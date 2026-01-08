@@ -24,6 +24,7 @@ import { CelebrationOverlay } from "./CelebrationOverlay";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { DASHBOARD_LIST } from "@/config/dashboards";
 
 interface TvBoardAccess {
   id: string;
@@ -36,6 +37,7 @@ interface TvBoardAccess {
   celebration_trigger_condition?: string | null;
   celebration_text?: string | null;
   celebration_metric?: string | null;
+  celebration_source_dashboard?: string | null;
 }
 
 interface TvLinkEditDialogProps {
@@ -87,13 +89,21 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
   const [celebrationMetric, setCelebrationMetric] = useState("sales_today");
+  const [celebrationSourceDashboard, setCelebrationSourceDashboard] = useState("");
   const [showTestCelebration, setShowTestCelebration] = useState(false);
+
+  const dashboardSlugs = tvLink?.dashboard_slugs || [];
+  const hasMultipleDashboards = dashboardSlugs.length > 1;
 
   // Get available metrics based on selected dashboards
   const availableMetrics = CELEBRATION_METRICS.filter(m => 
     m.dashboards.includes("all") || 
-    m.dashboards.some(d => tvLink?.dashboard_slugs?.includes(d))
+    m.dashboards.some(d => dashboardSlugs.includes(d))
   );
+
+  const getDashboardName = (slug: string) => {
+    return DASHBOARD_LIST.find((d) => d.slug === slug)?.name || slug;
+  };
 
   // Load values from tvLink when it changes
   useEffect(() => {
@@ -104,6 +114,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
       setCelebrationTriggerCondition(tvLink.celebration_trigger_condition ?? "any_update");
       setCelebrationText(tvLink.celebration_text ?? "");
       setCelebrationMetric(tvLink.celebration_metric ?? "sales_today");
+      setCelebrationSourceDashboard(tvLink.celebration_source_dashboard ?? "");
     }
   }, [tvLink]);
 
@@ -119,6 +130,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
           celebration_trigger_condition: celebrationTriggerCondition,
           celebration_text: celebrationText || null,
           celebration_metric: celebrationMetric,
+          celebration_source_dashboard: hasMultipleDashboards ? celebrationSourceDashboard || null : null,
         })
         .eq("id", tvLink.id);
       if (error) throw error;
@@ -233,6 +245,31 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
                       })}
                     </div>
                   </div>
+
+                  {/* Dashboard Source Selection (when multiple dashboards) */}
+                  {hasMultipleDashboards && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Hent data fra dette dashboard</Label>
+                      <Select
+                        value={celebrationSourceDashboard}
+                        onValueChange={setCelebrationSourceDashboard}
+                      >
+                        <SelectTrigger className="bg-background/80 backdrop-blur-sm">
+                          <SelectValue placeholder="Vælg dashboard" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dashboardSlugs.map((slug) => (
+                            <SelectItem key={slug} value={slug}>
+                              {getDashboardName(slug)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Vælg hvilket dashboard der udløser fejringen og leverer tal til teksten
+                      </p>
+                    </div>
+                  )}
 
                   {/* Metric Selection */}
                   <div className="space-y-2">
