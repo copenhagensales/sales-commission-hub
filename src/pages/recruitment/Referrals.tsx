@@ -49,7 +49,9 @@ import {
   Clock,
   XCircle,
   MessageSquare,
-  Plus
+  Plus,
+  UserPlus,
+  ExternalLink
 } from "lucide-react";
 import { CreateReferralDialog } from "@/components/recruitment/CreateReferralDialog";
 import { 
@@ -57,8 +59,10 @@ import {
   useUpdateReferralStatus, 
   useMarkBonusPaid,
   useDeleteReferral,
+  useConvertReferralToCandidate,
   type Referral 
 } from "@/hooks/useReferrals";
+import { useNavigate } from "react-router-dom";
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,10 +91,12 @@ export default function Referrals() {
   const [notes, setNotes] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
+  const navigate = useNavigate();
   const { data: referrals, isLoading } = useAllReferrals();
   const updateStatus = useUpdateReferralStatus();
   const markBonusPaid = useMarkBonusPaid();
   const deleteReferral = useDeleteReferral();
+  const convertToCandidate = useConvertReferralToCandidate();
 
   const filteredReferrals = referrals?.filter(r => {
     const matchesSearch = 
@@ -333,9 +339,17 @@ export default function Referrals() {
                       <TableRow key={referral.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">
-                              {referral.candidate_first_name} {referral.candidate_last_name}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">
+                                {referral.candidate_first_name} {referral.candidate_last_name}
+                              </p>
+                              {referral.converted_to_candidate_id && (
+                                <Badge variant="outline" className="text-xs gap-1 cursor-pointer hover:bg-muted" onClick={() => navigate(`/recruitment/candidate/${referral.converted_to_candidate_id}`)}>
+                                  <UserPlus className="h-3 w-3" />
+                                  Kandidat
+                                </Badge>
+                              )}
+                            </div>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground">
                               <a href={`mailto:${referral.candidate_email}`} className="flex items-center gap-1 hover:text-primary">
                                 <Mail className="h-3 w-3" />
@@ -397,6 +411,22 @@ export default function Referrals() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {referral.converted_to_candidate_id ? (
+                                <DropdownMenuItem 
+                                  onClick={() => navigate(`/recruitment/candidate/${referral.converted_to_candidate_id}`)}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Gå til kandidat
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem 
+                                  onClick={() => convertToCandidate.mutate(referral)}
+                                  disabled={convertToCandidate.isPending}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Opret som kandidat
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleOpenNotes(referral)}>
                                 <MessageSquare className="h-4 w-4 mr-2" />
                                 {referral.notes ? 'Rediger noter' : 'Tilføj noter'}

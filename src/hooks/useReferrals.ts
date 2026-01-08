@@ -20,6 +20,7 @@ export interface Referral {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  converted_to_candidate_id: string | null;
   referrer?: {
     first_name: string;
     last_name: string;
@@ -259,6 +260,62 @@ export function useMyReferralCode() {
         return dataByEmail;
       }
       return data;
+    },
+  });
+}
+
+// Hook to convert a referral to a candidate
+export function useConvertReferralToCandidate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (referral: Referral) => {
+      // Build notes from message and referrer info
+      const noteParts: string[] = [];
+      if (referral.message) {
+        noteParts.push(`Besked fra kandidat: ${referral.message}`);
+      }
+      noteParts.push(`Henvist af: ${referral.referrer_name_provided}`);
+      
+      const referrerName = referral.referrer 
+        ? `${referral.referrer.first_name} ${referral.referrer.last_name}` 
+        : referral.referrer_name_provided;
+
+      // Create candidate
+      const { data: candidate, error: candidateError } = await supabase
+        .from('candidates')
+        .insert({
+          first_name: referral.candidate_first_name,
+          last_name: referral.candidate_last_name,
+          email: referral.candidate_email,
+          phone: referral.candidate_phone,
+          source: `Henvisning fra ${referrerName}`,
+          notes: noteParts.join('\n'),
+          status: 'new',
+        })
+        .select()
+        .single();
+
+      if (candidateError) throw candidateError;
+
+      // Update referral with candidate link
+      const { error: updateError } = await supabase
+        .from('employee_referrals')
+        .update({ converted_to_candidate_id: candidate.id })
+        .eq('id', referral.id);
+
+      if (updateError) throw updateError;
+
+      return candidate;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-referrals'] });
+      queryClient.invalidateQueries({ queryKey: ['my-referrals'] });
+      toast.success('Henvisning konverteret til kandidat');
+    },
+    onError: (error) => {
+      console.error('Error converting referral:', error);
+      toast.error('Kunne ikke konvertere henvisning');
     },
   });
 }
