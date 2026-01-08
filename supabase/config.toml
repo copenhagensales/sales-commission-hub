@@ -200,3 +200,6 @@ verify_jwt = false
 
 [functions.reset-user-mfa]
 verify_jwt = false
+
+[functions.process-scheduled-emails]
+verify_jwt = false
