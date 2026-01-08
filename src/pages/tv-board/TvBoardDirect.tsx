@@ -6,6 +6,7 @@ import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { TvBoardProvider } from "@/contexts/TvBoardContext";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
+import { useCelebrationData, replaceCelebrationVariables } from "@/hooks/useCelebrationData";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -73,7 +74,15 @@ export default function TvBoardDirect() {
   // Celebration state
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  const prevDataRef = useRef<any>(null);
+  const prevMetricValueRef = useRef<number | null>(null);
+
+  // Celebration data - fetch from source dashboard
+  const celebrationSourceSlug = celebrationSettings?.sourceDashboard || dashboardSlugs[0] || null;
+  const { data: celebrationData, refetch: refetchCelebration } = useCelebrationData({
+    dashboardSlug: celebrationSourceSlug,
+    metric: celebrationSettings?.metric || "sales_today",
+    enabled: !!celebrationSettings?.enabled && dashboardSlugs.length > 0,
+  });
 
   useEffect(() => {
     const verifyCode = async () => {
@@ -186,25 +195,56 @@ export default function TvBoardDirect() {
     return () => clearTimeout(timer);
   }, [autoRotate, currentIndex, dashboardSlugs, rotateIntervals, defaultRotateInterval]);
 
-  // Auto-refresh queries every 30 seconds and check for celebration triggers
+  // Check for celebration triggers when data changes
+  useEffect(() => {
+    if (!celebrationSettings?.enabled || !celebrationData) return;
+
+    const currentValue = celebrationData.metricValue;
+    const prevValue = prevMetricValueRef.current;
+
+    // Determine if we should trigger celebration
+    let shouldCelebrate = false;
+
+    if (prevValue !== null) {
+      switch (celebrationSettings.triggerCondition) {
+        case "any_update":
+          // Trigger if value changed
+          shouldCelebrate = currentValue !== prevValue;
+          break;
+        case "increase":
+          // Trigger only if value increased
+          shouldCelebrate = currentValue > prevValue;
+          break;
+        case "reaches_goal":
+          // Trigger if we crossed 100% goal
+          if (celebrationSettings.metric === "goal_progress") {
+            shouldCelebrate = prevValue < 100 && currentValue >= 100;
+          } else {
+            // For other metrics, treat as increase
+            shouldCelebrate = currentValue > prevValue;
+          }
+          break;
+      }
+    }
+
+    prevMetricValueRef.current = currentValue;
+
+    if (shouldCelebrate) {
+      setShowCelebration(true);
+    }
+  }, [celebrationData, celebrationSettings]);
+
+  // Auto-refresh queries every 30 seconds
   useEffect(() => {
     if (dashboardSlugs.length === 0) return;
 
     const interval = setInterval(() => {
       queryClient.invalidateQueries();
-      
-      // Trigger celebration based on condition (simplified - can be enhanced)
-      if (celebrationSettings?.enabled && celebrationSettings.triggerCondition === 'any_update') {
-        // Random chance to show celebration on update (for demo purposes)
-        // In production, this should check actual data changes
-        if (Math.random() < 0.1) { // 10% chance on each refresh
-          setShowCelebration(true);
-        }
-      }
+      refetchCelebration();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [dashboardSlugs, queryClient, celebrationSettings]);
+  }, [dashboardSlugs, queryClient, refetchCelebration]);
 
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev - 1 + dashboardSlugs.length) % dashboardSlugs.length);
@@ -294,7 +334,7 @@ export default function TvBoardDirect() {
           onClose={() => setShowCelebration(false)}
           effect={celebrationSettings.effect}
           duration={celebrationSettings.duration}
-          text={celebrationSettings.text}
+          text={replaceCelebrationVariables(celebrationSettings.text, celebrationData)}
         />
       )}
       

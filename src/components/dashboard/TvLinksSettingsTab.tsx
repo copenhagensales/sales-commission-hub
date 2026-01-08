@@ -39,6 +39,24 @@ import {
 } from "@/components/ui/select";
 import { CelebrationOverlay } from "./CelebrationOverlay";
 import { TvLinkEditDialog } from "./TvLinkEditDialog";
+import { replaceCelebrationVariables, CelebrationTriggerData } from "@/hooks/useCelebrationData";
+
+// Demo data for test preview
+const DEMO_CELEBRATION_DATA: CelebrationTriggerData = {
+  employeeName: "Martin Jensen",
+  salesCount: 5,
+  commission: 2500,
+  metricValue: 5,
+  salesToday: 5,
+  salesMonth: 42,
+  salesWeek: 12,
+  totalSales: 42,
+  commissionToday: 2500,
+  commissionMonth: 21000,
+  goalProgress: 78,
+  goalTarget: 30000,
+  goalRemaining: 9000,
+};
 
 interface TvBoardAccess {
   id: string;
@@ -772,7 +790,7 @@ export function TvLinksSettingsTab() {
           onClose={() => setShowTestCelebration(false)}
           effect={celebrationEffect as "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles"}
           duration={celebrationDuration}
-          text={celebrationText || "🎉 Test fejring!"}
+          text={replaceCelebrationVariables(celebrationText || "🎉 Test fejring!", DEMO_CELEBRATION_DATA)}
         />
 
         {/* Existing codes */}
