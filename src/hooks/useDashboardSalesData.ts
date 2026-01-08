@@ -70,6 +70,9 @@ export function useDashboardSalesData({
           .select("id")
           .ilike("name", `%${clientName}%`)
           .limit(1);
+        if (clients && clients.length > 0) {
+          resolvedClientId = clients[0].id;
+        }
       }
 
       let employeeIds: string[] = [];
