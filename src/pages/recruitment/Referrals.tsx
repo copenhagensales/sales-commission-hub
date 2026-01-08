@@ -48,8 +48,10 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  MessageSquare
+  MessageSquare,
+  Plus
 } from "lucide-react";
+import { CreateReferralDialog } from "@/components/recruitment/CreateReferralDialog";
 import { 
   useAllReferrals, 
   useUpdateReferralStatus, 
@@ -83,6 +85,7 @@ export default function Referrals() {
   const [hiredDate, setHiredDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: referrals, isLoading } = useAllReferrals();
   const updateStatus = useUpdateReferralStatus();
@@ -206,6 +209,10 @@ export default function Referrals() {
               <p className="text-muted-foreground">Administrer medarbejderhenvisninger</p>
             </div>
           </div>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Opret henvisning
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -502,6 +509,11 @@ export default function Referrals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateReferralDialog 
+        open={createDialogOpen} 
+        onOpenChange={setCreateDialogOpen} 
+      />
     </MainLayout>
   );
 }
