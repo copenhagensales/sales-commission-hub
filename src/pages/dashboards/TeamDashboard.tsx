@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1084,7 +1084,9 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 };
 
 const TeamDashboard = () => {
-  const { teamSlug } = useParams<{ teamSlug: string }>();
+  const location = useLocation();
+  // Extract team slug from path: /dashboards/eesy-tm -> eesy-tm
+  const teamSlug = location.pathname.split('/').pop();
   
   const config = teamSlug ? TEAM_CONFIG[teamSlug] : null;
   
