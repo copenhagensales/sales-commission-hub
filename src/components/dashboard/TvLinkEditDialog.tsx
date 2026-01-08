@@ -114,9 +114,9 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
       setCelebrationTriggerCondition(tvLink.celebration_trigger_condition ?? "any_update");
       setCelebrationText(tvLink.celebration_text ?? "");
       setCelebrationMetric(tvLink.celebration_metric ?? "sales_today");
-      setCelebrationSourceDashboard(tvLink.celebration_source_dashboard ?? "");
+      setCelebrationSourceDashboard(tvLink.celebration_source_dashboard ?? (dashboardSlugs[0] || ""));
     }
-  }, [tvLink]);
+  }, [tvLink, dashboardSlugs]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {

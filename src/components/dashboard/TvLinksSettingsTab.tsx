@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,6 +136,13 @@ export function TvLinksSettingsTab() {
     m.dashboards.includes("all") || 
     m.dashboards.some(d => selectedDashboards.includes(d))
   );
+
+  // Set default source dashboard when dashboards change
+  useEffect(() => {
+    if (selectedDashboards.length > 0 && !selectedDashboards.includes(celebrationSourceDashboard)) {
+      setCelebrationSourceDashboard(selectedDashboards[0]);
+    }
+  }, [selectedDashboards, celebrationSourceDashboard]);
 
   const { data: accessCodes = [], isLoading } = useQuery({
     queryKey: ["tv-board-access-all"],
