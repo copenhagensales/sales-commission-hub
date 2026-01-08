@@ -7437,6 +7437,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           dashboard_slug: string
+          dashboard_slugs: string[] | null
           id: string
           is_active: boolean | null
           last_accessed_at: string | null
@@ -7448,6 +7449,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           dashboard_slug: string
+          dashboard_slugs?: string[] | null
           id?: string
           is_active?: boolean | null
           last_accessed_at?: string | null
@@ -7459,6 +7461,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           dashboard_slug?: string
+          dashboard_slugs?: string[] | null
           id?: string
           is_active?: boolean | null
           last_accessed_at?: string | null
