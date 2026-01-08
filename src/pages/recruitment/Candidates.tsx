@@ -305,6 +305,7 @@ export default function Candidates() {
                     <SelectItem value="rejected">Afvist</SelectItem>
                     <SelectItem value="ghostet">Ghostet</SelectItem>
                     <SelectItem value="takket_nej">Takket nej</SelectItem>
+                    <SelectItem value="ikke_kvalificeret">Ikke kvalificeret</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
