@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
+import { TvBoardProvider } from "@/contexts/TvBoardContext";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -165,7 +166,9 @@ export default function TvBoardDirect() {
         }
       `}</style>
       
-      <DashboardComponent />
+      <TvBoardProvider slug={currentSlug}>
+        <DashboardComponent />
+      </TvBoardProvider>
       
       {/* Navigation controls for multiple dashboards */}
       {dashboardSlugs.length > 1 && (

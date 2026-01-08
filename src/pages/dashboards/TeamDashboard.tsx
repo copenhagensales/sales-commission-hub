@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useTvBoardContext } from "@/contexts/TvBoardContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1085,8 +1086,10 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
 const TeamDashboard = () => {
   const location = useLocation();
-  // Extract team slug from path: /dashboards/eesy-tm -> eesy-tm
-  const teamSlug = location.pathname.split('/').pop();
+  const { overrideSlug } = useTvBoardContext();
+  
+  // Use override slug from TV board context, or extract from path
+  const teamSlug = overrideSlug || location.pathname.split('/').pop();
   
   const config = teamSlug ? TEAM_CONFIG[teamSlug] : null;
   
