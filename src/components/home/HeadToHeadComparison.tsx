@@ -1158,10 +1158,10 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
         )}
 
-        {/* Active Battles List - when multiple battles exist */}
-        {activeChallenges.length > 1 && (
+        {/* Active Battles List - show when any battles exist */}
+        {activeChallenges.length >= 1 && (
           <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-2">
-            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Dine aktive dueller</h4>
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Dine aktive dueller ({activeChallenges.length})</h4>
             <div className="flex flex-wrap gap-2">
               {activeChallenges.map((challenge: any) => {
                 const isChallenger = challenge.challenger_employee_id === currentEmployeeId;
@@ -1172,10 +1172,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   <button
                     key={challenge.id}
                     onClick={() => {
+                      const opponentId = isChallenger 
+                        ? challenge.opponent_employee_id 
+                        : challenge.challenger_employee_id;
                       setActiveChallengeId(challenge.id);
+                      setOpponentTeam([opponentId]);
                       setMatchStartTime(challenge.accepted_at);
                       setPeriod(challenge.period as PeriodType);
                       setBattleMode(challenge.battle_mode as BattleMode);
+                      setMatchComment(challenge.comment || "");
                       setMatchStarted(true);
                     }}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
