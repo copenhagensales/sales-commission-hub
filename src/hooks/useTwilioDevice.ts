@@ -407,7 +407,15 @@ export function useTwilioDevice() {
     }
     
     if (deviceRef.current) {
-      deviceRef.current.unregister();
+      // Only unregister if device is in a registered state
+      const state = deviceRef.current.state;
+      if (state === 'registered') {
+        try {
+          deviceRef.current.unregister();
+        } catch (err) {
+          console.warn('[useTwilioDevice] Error unregistering device:', err);
+        }
+      }
       deviceRef.current.destroy();
       deviceRef.current = null;
     }
