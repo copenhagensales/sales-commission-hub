@@ -506,12 +506,19 @@ export function useEmployeesForShifts(teamId?: string) {
     queryKey: ["employees-for-shifts", teamId, user?.id],
     queryFn: async () => {
       // First check if user is owner
-      const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: user?.id });
+      const { data: isOwner, error: ownerError } = await supabase.rpc("is_owner", { _user_id: user?.id });
       
       // Get current employee id
-      const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
+      const { data: currentEmployeeId, error: empError } = await supabase.rpc("get_current_employee_id");
       
-      console.log("[useEmployeesForShifts] isOwner:", isOwner, "currentEmployeeId:", currentEmployeeId, "teamId:", teamId);
+      console.log("[useEmployeesForShifts] DEBUG:", {
+        userId: user?.id,
+        isOwner,
+        ownerError,
+        currentEmployeeId,
+        empError,
+        teamId
+      });
       
       // Fetch all team memberships with team names for enriching employee data
       const { data: allTeamMemberships } = await supabase
