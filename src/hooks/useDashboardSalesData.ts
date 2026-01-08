@@ -23,6 +23,7 @@ export interface DashboardSalesData {
 
 interface UseDashboardSalesDataParams {
   clientId?: string;
+  clientName?: string; // Alternative to clientId - will look up client by name
   startDate: Date;
   endDate: Date;
   teamId?: string;
@@ -36,6 +37,7 @@ interface UseDashboardSalesDataParams {
  */
 export function useDashboardSalesData({
   clientId,
+  clientName,
   startDate,
   endDate,
   teamId,
@@ -45,6 +47,7 @@ export function useDashboardSalesData({
     queryKey: [
       "dashboard-sales-data",
       clientId,
+      clientName,
       format(startDate, "yyyy-MM-dd"),
       format(endDate, "yyyy-MM-dd"),
       teamId,
@@ -59,14 +62,24 @@ export function useDashboardSalesData({
       const authToken = session?.access_token || supabaseKey;
       const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
 
+      // Resolve clientId from clientName if provided
+      let resolvedClientId = clientId;
+      if (!resolvedClientId && clientName) {
+        const { data: clients } = await supabase
+          .from("clients")
+          .select("id")
+          .ilike("name", `%${clientName}%`)
+          .limit(1);
+      }
+
       let employeeIds: string[] = [];
       let filteredEmployees: any[] = [];
       let agentMappings: any[] = [];
 
       // Step 1: Find employees based on client or team filter
-      if (clientId) {
+      if (resolvedClientId) {
         // Find employees who have sales for this client via agent mapping
-        const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${clientId}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+        const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${resolvedClientId}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
         const salesRes = await fetch(salesUrl, { headers });
         const salesForClient = await salesRes.json();
 
@@ -198,7 +211,7 @@ export function useDashboardSalesData({
         const emailIdentifiers = uniqueAgentIdentifiers.filter((id) => id.includes("@")).map((e) => e.toLowerCase());
 
         if (emailIdentifiers.length > 0) {
-          const joinType = clientId ? "!inner" : "";
+          const joinType = resolvedClientId ? "!inner" : "";
           const selectParts = [
             "id",
             "agent_email",
@@ -214,8 +227,8 @@ export function useDashboardSalesData({
           salesUrl += `&or=(${emailOrFilter})`;
           salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
 
-          if (clientId) {
-            salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
+          if (resolvedClientId) {
+            salesUrl += `&client_campaigns.client_id=eq.${resolvedClientId}`;
           }
 
           const salesRes = await fetch(salesUrl, {
@@ -236,8 +249,8 @@ export function useDashboardSalesData({
         .gte("registered_at", `${startStr}T00:00:00`)
         .lte("registered_at", `${endStr}T23:59:59`);
 
-      if (clientId) {
-        fmQuery = fmQuery.eq("client_id", clientId);
+      if (resolvedClientId) {
+        fmQuery = fmQuery.eq("client_id", resolvedClientId);
       }
 
       const { data: fmSalesData } = await fmQuery;
