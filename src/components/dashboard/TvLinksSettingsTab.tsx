@@ -125,6 +125,7 @@ export function TvLinksSettingsTab() {
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
   const [celebrationMetric, setCelebrationMetric] = useState("sales_today");
+  const [celebrationSourceDashboard, setCelebrationSourceDashboard] = useState("");
   const [showTestCelebration, setShowTestCelebration] = useState(false);
   const [editingLink, setEditingLink] = useState<TvBoardAccess | null>(null);
   const queryClient = useQueryClient();
@@ -239,6 +240,7 @@ export function TvLinksSettingsTab() {
     setCelebrationTriggerCondition("any_update");
     setCelebrationText("");
     setCelebrationMetric("sales_today");
+    setCelebrationSourceDashboard("");
   };
 
   const updateRotateTime = (slug: string, field: 'minutes' | 'seconds', value: number) => {
@@ -572,6 +574,31 @@ export function TvLinksSettingsTab() {
                         })}
                       </div>
                     </div>
+
+                    {/* Dashboard Source Selection (when multiple dashboards) */}
+                    {selectedDashboards.length > 1 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Hent data fra dette dashboard</Label>
+                        <Select
+                          value={celebrationSourceDashboard}
+                          onValueChange={setCelebrationSourceDashboard}
+                        >
+                          <SelectTrigger className="bg-background/80 backdrop-blur-sm">
+                            <SelectValue placeholder="Vælg dashboard" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedDashboards.map((slug) => (
+                              <SelectItem key={slug} value={slug}>
+                                {getDashboardName(slug)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Vælg hvilket dashboard der udløser fejringen og leverer tal til teksten
+                        </p>
+                      </div>
+                    )}
 
                     {/* Metric Selection */}
                     <div className="space-y-2">
