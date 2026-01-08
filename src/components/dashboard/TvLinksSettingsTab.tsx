@@ -39,6 +39,8 @@ interface TvBoardAccess {
   is_active: boolean;
   created_at: string;
   expires_at: string | null;
+  auto_rotate: boolean | null;
+  rotate_interval_seconds: number | null;
 }
 
 function generateCode(): string {
@@ -56,6 +58,9 @@ export function TvLinksSettingsTab() {
   const [selectedDashboards, setSelectedDashboards] = useState<string[]>([]);
   const [hasExpiry, setHasExpiry] = useState(false);
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [rotateMinutes, setRotateMinutes] = useState(1);
+  const [rotateSeconds, setRotateSeconds] = useState(0);
   const queryClient = useQueryClient();
 
   const { data: accessCodes = [], isLoading } = useQuery({
@@ -76,11 +81,15 @@ export function TvLinksSettingsTab() {
     mutationFn: async ({ 
       name, 
       dashboardSlugs, 
-      expiresAt 
+      expiresAt,
+      autoRotate,
+      rotateIntervalSeconds,
     }: { 
       name: string; 
       dashboardSlugs: string[]; 
       expiresAt: string | null;
+      autoRotate: boolean;
+      rotateIntervalSeconds: number | null;
     }) => {
       const code = generateCode();
       const { error } = await supabase.from("tv_board_access").insert({
@@ -90,6 +99,8 @@ export function TvLinksSettingsTab() {
         name: name || null,
         is_active: true,
         expires_at: expiresAt,
+        auto_rotate: autoRotate,
+        rotate_interval_seconds: rotateIntervalSeconds,
       });
       if (error) throw error;
       return code;
@@ -127,6 +138,9 @@ export function TvLinksSettingsTab() {
     setSelectedDashboards([]);
     setHasExpiry(false);
     setExpiryDate(undefined);
+    setAutoRotate(false);
+    setRotateMinutes(1);
+    setRotateSeconds(0);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -155,11 +169,22 @@ export function TvLinksSettingsTab() {
       toast.error("Vælg mindst ét dashboard");
       return;
     }
+    const totalSeconds = autoRotate ? (rotateMinutes * 60 + rotateSeconds) : null;
     createMutation.mutate({ 
       name: newCodeName, 
       dashboardSlugs: selectedDashboards,
       expiresAt: hasExpiry && expiryDate ? expiryDate.toISOString() : null,
+      autoRotate: autoRotate && selectedDashboards.length > 1,
+      rotateIntervalSeconds: totalSeconds,
     });
+  };
+
+  const formatRotateInterval = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0 && secs > 0) return `${mins} min ${secs} sek`;
+    if (mins > 0) return `${mins} min`;
+    return `${secs} sek`;
   };
 
   const isExpired = (expiresAt: string | null) => {
@@ -234,6 +259,46 @@ export function TvLinksSettingsTab() {
                   </p>
                 )}
               </div>
+
+              {/* Auto rotate */}
+              {selectedDashboards.length > 1 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="auto-rotate">Automatisk skift mellem boards</Label>
+                    <Switch
+                      id="auto-rotate"
+                      checked={autoRotate}
+                      onCheckedChange={setAutoRotate}
+                    />
+                  </div>
+                  {autoRotate && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Label htmlFor="rotate-minutes" className="text-xs text-muted-foreground">Minutter</Label>
+                        <Input
+                          id="rotate-minutes"
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={rotateMinutes}
+                          onChange={(e) => setRotateMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label htmlFor="rotate-seconds" className="text-xs text-muted-foreground">Sekunder</Label>
+                        <Input
+                          id="rotate-seconds"
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={rotateSeconds}
+                          onChange={(e) => setRotateSeconds(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Expiry date */}
               <div className="space-y-3">
@@ -343,6 +408,11 @@ export function TvLinksSettingsTab() {
                             {getDashboardName(slug)}
                           </Badge>
                         ))}
+                        {code.auto_rotate && code.rotate_interval_seconds && (
+                          <Badge variant="outline" className="text-xs">
+                            Skifter hver {formatRotateInterval(code.rotate_interval_seconds)}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
