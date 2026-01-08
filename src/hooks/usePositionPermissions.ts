@@ -13,10 +13,14 @@ export interface PositionPermissions {
   [key: string]: boolean | { view: boolean; edit: boolean } | DataScope;
 }
 
+export type ManagerDataScope = 'all' | 'team' | 'self';
+
 interface JobPosition {
   id: string;
   name: string;
   permissions: PositionPermissions;
+  is_manager?: boolean;
+  manager_data_scope?: ManagerDataScope;
 }
 
 // Owner position always has full access
@@ -86,7 +90,13 @@ export function usePositionPermissions() {
         const allPermissions = generateAllPermissions();
         console.log("usePositionPermissions: Owner detected, returning full permissions", allPermissions);
         return {
-          position: { id: "owner", name: OWNER_POSITION_NAME, permissions: allPermissions },
+          position: { 
+            id: "owner", 
+            name: OWNER_POSITION_NAME, 
+            permissions: allPermissions,
+            is_manager: true,
+            manager_data_scope: 'all' as ManagerDataScope,
+          },
           permissions: allPermissions,
         };
       }
@@ -94,7 +104,7 @@ export function usePositionPermissions() {
       // Get position permissions from job_positions table
       const { data: position, error: posError } = await supabase
         .from("job_positions")
-        .select("id, name, permissions")
+        .select("id, name, permissions, is_manager, manager_data_scope")
         .ilike("name", employee.job_title)
         .maybeSingle();
 
@@ -110,7 +120,12 @@ export function usePositionPermissions() {
       const permissions = (position.permissions as PositionPermissions) || {};
 
       return {
-        position: { ...position, permissions },
+        position: { 
+          ...position, 
+          permissions,
+          is_manager: position.is_manager ?? false,
+          manager_data_scope: (position.manager_data_scope as ManagerDataScope) ?? 'self',
+        },
         permissions,
       };
     },
@@ -189,16 +204,31 @@ export function usePermissions() {
     return "egen"; // Default to own data only
   };
 
+  // Get manager scope from position (is_manager and manager_data_scope from job_positions table)
+  const positionData = isPreviewMode && previewRole 
+    ? { id: "preview", name: previewRole, permissions, is_manager: previewRole.toLowerCase() === 'ejer' || previewRole.toLowerCase() === 'teamleder', manager_data_scope: previewRole.toLowerCase() === 'ejer' ? 'all' : previewRole.toLowerCase() === 'teamleder' ? 'team' : 'self' } 
+    : data?.position;
+  
+  const isManager = positionData?.is_manager ?? false;
+  const managerDataScope: ManagerDataScope = (positionData?.manager_data_scope as ManagerDataScope) ?? 'self';
+  const canSeeAllData = managerDataScope === 'all';
+  const canSeeTeamData = managerDataScope === 'team' || managerDataScope === 'all';
+
   return {
     isLoading: actuallyLoading,
     isPreviewMode,
-    position: isPreviewMode && previewRole ? { id: "preview", name: previewRole, permissions } : data?.position,
+    position: positionData,
     permissions,
     hasPermission,
     canView,
     canEdit,
     getDataScope,
-    // Data scope helpers
+    // Manager data scope (from job_positions.is_manager and manager_data_scope)
+    isManager,
+    managerDataScope,
+    canSeeAllData,
+    canSeeTeamData,
+    // Data scope helpers (legacy - from JSONB permissions)
     scopeEmployees: getDataScope("scope_employees"),
     scopeShifts: getDataScope("scope_shifts"),
     scopeAbsence: getDataScope("scope_absence"),
