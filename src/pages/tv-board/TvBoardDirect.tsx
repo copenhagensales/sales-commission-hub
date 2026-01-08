@@ -5,13 +5,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 
-// Lazy load dashboard components
+// Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
+import FieldmarketingDashboardFull from "@/pages/dashboards/FieldmarketingDashboardFull";
+import TeamDashboard from "@/pages/dashboards/TeamDashboard";
+import TdcErhvervGoalsDashboard from "@/pages/dashboards/TdcErhvervGoalsDashboard";
+import FieldmarketingGoalsDashboard from "@/pages/dashboards/FieldmarketingGoalsDashboard";
 
-// Map dashboard slugs to components - add all dashboards here
+// Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
-  // Add more mappings as dashboards are created
+  "fieldmarketing": FieldmarketingDashboardFull,
+  "team": TeamDashboard,
+  "tdc-erhverv-goals": TdcErhvervGoalsDashboard,
+  "fieldmarketing-goals": FieldmarketingGoalsDashboard,
 };
 
 export default function TvBoardDirect() {
@@ -87,16 +94,7 @@ export default function TvBoardDirect() {
     return () => clearInterval(interval);
   }, [dashboardSlugs, queryClient]);
 
-  // Auto-rotate dashboards every 60 seconds if multiple
-  useEffect(() => {
-    if (dashboardSlugs.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % dashboardSlugs.length);
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [dashboardSlugs.length]);
+  // No auto-rotation - manual navigation only
 
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev - 1 + dashboardSlugs.length) % dashboardSlugs.length);
