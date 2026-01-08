@@ -53,13 +53,14 @@ const OWNER_POSITION_NAME = "Ejer";
 
 const isOwnerPosition = (name: string) => name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
 
-interface ManagerDataAccess {
-  sales: boolean;
-  employees: boolean;
-  calls: boolean;
-  contracts: boolean;
-  finance: boolean;
-}
+// Manager data scope options
+type ManagerDataScope = "all" | "team" | "self";
+
+const MANAGER_DATA_SCOPE_OPTIONS: { value: ManagerDataScope; label: string; description: string; icon: typeof Globe }[] = [
+  { value: "all", label: "Al data", description: "Adgang til data for alle medarbejdere", icon: Globe },
+  { value: "team", label: "Team data", description: "Kun data for medarbejdere i eget team", icon: Users },
+  { value: "self", label: "Kun egen data", description: "Kun adgang til egne data", icon: User },
+];
 
 interface JobPosition {
   id: string;
@@ -73,7 +74,7 @@ interface JobPosition {
   session_timeout_minutes: number;
   max_session_hours: number;
   is_manager: boolean;
-  manager_data_access: ManagerDataAccess | null;
+  manager_data_scope: ManagerDataScope | null;
 }
 
 interface TrustedIpRange {
@@ -91,24 +92,8 @@ interface FormData {
   max_session_hours: number;
   trusted_ip_ranges: TrustedIpRange[];
   is_manager: boolean;
-  manager_data_access: ManagerDataAccess;
+  manager_data_scope: ManagerDataScope;
 }
-
-const DEFAULT_MANAGER_DATA_ACCESS: ManagerDataAccess = {
-  sales: false,
-  employees: false,
-  calls: false,
-  contracts: false,
-  finance: false,
-};
-
-const MANAGER_DATA_OPTIONS = [
-  { key: "sales" as const, label: "Salg", description: "Se og administrer salgsdata" },
-  { key: "employees" as const, label: "Medarbejdere", description: "Se og administrer medarbejderdata" },
-  { key: "calls" as const, label: "Opkald", description: "Se opkaldshistorik og statistik" },
-  { key: "contracts" as const, label: "Kontrakter", description: "Se og administrer kontrakter" },
-  { key: "finance" as const, label: "Økonomi", description: "Se økonomiske data og transaktioner" },
-];
 
 interface Employee {
   id: string;
@@ -133,7 +118,7 @@ export function PositionsTab() {
     max_session_hours: 10,
     trusted_ip_ranges: [],
     is_manager: false,
-    manager_data_access: { ...DEFAULT_MANAGER_DATA_ACCESS },
+    manager_data_scope: "team",
   });
   const [newIpName, setNewIpName] = useState("");
   const [newIpAddress, setNewIpAddress] = useState("");
@@ -156,7 +141,7 @@ export function PositionsTab() {
       return data.map((p) => ({
         ...p,
         permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) || {},
-        manager_data_access: (p.manager_data_access as unknown as ManagerDataAccess) || DEFAULT_MANAGER_DATA_ACCESS,
+        manager_data_scope: (p.manager_data_scope as ManagerDataScope) || "team",
       })) as JobPosition[];
     },
   });
@@ -201,7 +186,7 @@ export function PositionsTab() {
         max_session_hours: data.max_session_hours,
         trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
         is_manager: data.is_manager,
-        manager_data_access: data.manager_data_access as unknown as Json,
+        manager_data_scope: data.manager_data_scope,
       });
       if (error) throw error;
     },
@@ -231,7 +216,7 @@ export function PositionsTab() {
           max_session_hours: data.max_session_hours,
           trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
           is_manager: data.is_manager,
-          manager_data_access: data.manager_data_access as unknown as Json,
+          manager_data_scope: data.manager_data_scope,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -276,7 +261,7 @@ export function PositionsTab() {
       max_session_hours: 10,
       trusted_ip_ranges: [],
       is_manager: false,
-      manager_data_access: { ...DEFAULT_MANAGER_DATA_ACCESS },
+      manager_data_scope: "team",
     });
     setNewIpName("");
     setNewIpAddress("");
@@ -299,9 +284,7 @@ export function PositionsTab() {
       max_session_hours: position.max_session_hours ?? 10,
       trusted_ip_ranges: existingRanges,
       is_manager: isOwner ? true : position.is_manager ?? false,
-      manager_data_access: isOwner 
-        ? { sales: true, employees: true, calls: true, contracts: true, finance: true }
-        : position.manager_data_access ?? { ...DEFAULT_MANAGER_DATA_ACCESS },
+      manager_data_scope: isOwner ? "all" : (position.manager_data_scope ?? "team"),
     });
     setNewIpName("");
     setNewIpAddress("");
@@ -323,7 +306,7 @@ export function PositionsTab() {
       max_session_hours: 10,
       trusted_ip_ranges: [],
       is_manager: false,
-      manager_data_access: { ...DEFAULT_MANAGER_DATA_ACCESS },
+      manager_data_scope: "team",
     });
     setNewIpName("");
     setNewIpAddress("");
@@ -669,49 +652,48 @@ export function PositionsTab() {
                     {formData.is_manager && (
                       <div className="pt-3 border-t space-y-3">
                         <div className="space-y-1">
-                          <Label className="text-sm font-medium">Dataadgang</Label>
+                          <Label className="text-sm font-medium">Datascope</Label>
                           <p className="text-xs text-muted-foreground">
-                            Vælg hvilke datatyper denne manager-stilling kan tilgå
+                            Vælg hvilket datascope denne manager-stilling har adgang til
                           </p>
                         </div>
-                        <div className="grid gap-2">
-                          {MANAGER_DATA_OPTIONS.map((option) => (
-                            <div
-                              key={option.key}
-                              className={cn(
-                                "flex items-center justify-between p-3 rounded-lg border transition-colors",
-                                formData.manager_data_access[option.key]
-                                  ? "border-primary/50 bg-primary/5"
-                                  : "border-border bg-muted/20"
-                              )}
-                            >
-                              <div className="space-y-0.5">
-                                <div className="text-sm font-medium">{option.label}</div>
-                                <div className="text-xs text-muted-foreground">{option.description}</div>
-                              </div>
-                              <Switch
-                                checked={formData.manager_data_access[option.key]}
-                                onCheckedChange={(checked) =>
-                                  setFormData({
-                                    ...formData,
-                                    manager_data_access: {
-                                      ...formData.manager_data_access,
-                                      [option.key]: checked,
-                                    },
-                                  })
-                                }
-                                disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        <RadioGroup
+                          value={formData.manager_data_scope}
+                          onValueChange={(value: ManagerDataScope) =>
+                            setFormData({ ...formData, manager_data_scope: value })
+                          }
+                          className="grid gap-2"
+                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                        >
+                          {MANAGER_DATA_SCOPE_OPTIONS.map((option) => {
+                            const Icon = option.icon;
+                            return (
+                              <label
+                                key={option.value}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                                  formData.manager_data_scope === option.value
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border bg-muted/20 hover:bg-muted/40"
+                                )}
+                              >
+                                <RadioGroupItem value={option.value} id={option.value} />
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                <div className="space-y-0.5">
+                                  <div className="text-sm font-medium">{option.label}</div>
+                                  <div className="text-xs text-muted-foreground">{option.description}</div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </RadioGroup>
                       </div>
                     )}
 
                     {editingPosition && isOwnerPosition(editingPosition.name) && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
                         <Info className="h-3.5 w-3.5" />
-                        Ejer-stillingen har altid fuld manager-adgang
+                        Ejer-stillingen har altid fuld adgang til al data
                       </div>
                     )}
                   </CardContent>
