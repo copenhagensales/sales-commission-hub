@@ -29,11 +29,13 @@ interface TvBoardAccess {
   id: string;
   name: string | null;
   access_code: string;
+  dashboard_slugs?: string[] | null;
   celebration_enabled?: boolean | null;
   celebration_effect?: string | null;
   celebration_duration?: number | null;
   celebration_trigger_condition?: string | null;
   celebration_text?: string | null;
+  celebration_metric?: string | null;
 }
 
 interface TvLinkEditDialogProps {
@@ -64,6 +66,15 @@ const DURATION_OPTIONS = [
   { value: 8, label: "8 sek" },
 ];
 
+// Available metrics based on dashboard type
+const CELEBRATION_METRICS = [
+  { value: "sales_today", label: "Salg i dag", dashboards: ["all"] },
+  { value: "sales_month", label: "Salg denne måned", dashboards: ["all"] },
+  { value: "sales_week", label: "Salg denne uge", dashboards: ["all"] },
+  { value: "total_sales", label: "Samlet antal salg", dashboards: ["all"] },
+  { value: "goal_progress", label: "Mål-fremskridt (%)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
+];
+
 export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialogProps) {
   const queryClient = useQueryClient();
   const [celebrationEnabled, setCelebrationEnabled] = useState(false);
@@ -71,7 +82,14 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   const [celebrationDuration, setCelebrationDuration] = useState(3);
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
+  const [celebrationMetric, setCelebrationMetric] = useState("sales_today");
   const [showTestCelebration, setShowTestCelebration] = useState(false);
+
+  // Get available metrics based on selected dashboards
+  const availableMetrics = CELEBRATION_METRICS.filter(m => 
+    m.dashboards.includes("all") || 
+    m.dashboards.some(d => tvLink?.dashboard_slugs?.includes(d))
+  );
 
   // Load values from tvLink when it changes
   useEffect(() => {
@@ -81,6 +99,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
       setCelebrationDuration(tvLink.celebration_duration ?? 3);
       setCelebrationTriggerCondition(tvLink.celebration_trigger_condition ?? "any_update");
       setCelebrationText(tvLink.celebration_text ?? "");
+      setCelebrationMetric(tvLink.celebration_metric ?? "sales_today");
     }
   }, [tvLink]);
 
@@ -95,6 +114,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
           celebration_duration: celebrationDuration,
           celebration_trigger_condition: celebrationTriggerCondition,
           celebration_text: celebrationText || null,
+          celebration_metric: celebrationMetric,
         })
         .eq("id", tvLink.id);
       if (error) throw error;
@@ -208,6 +228,26 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
                         );
                       })}
                     </div>
+                  </div>
+
+                  {/* Metric Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Reagér på dette tal</Label>
+                    <Select
+                      value={celebrationMetric}
+                      onValueChange={setCelebrationMetric}
+                    >
+                      <SelectTrigger className="bg-background/80 backdrop-blur-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMetrics.map((metric) => (
+                          <SelectItem key={metric.value} value={metric.value}>
+                            {metric.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Trigger Condition */}
