@@ -562,17 +562,17 @@ export function useEmployeesForShifts(teamId?: string) {
         return fetchEmployeesByIds(employeeIds);
       }
       
-      // For non-owners, get employees from teams they lead
+      // For non-owners, get employees from teams they lead (as leader or assistant)
       if (isOwner !== true && currentEmployeeId) {
-        // Get teams where current user is team_leader
+        // Get teams where current user is team_leader OR assistant_team_leader
         const { data: ledTeams, error: teamsError } = await supabase
           .from("teams")
           .select("id, name")
-          .eq("team_leader_id", currentEmployeeId);
+          .or(`team_leader_id.eq.${currentEmployeeId},assistant_team_leader_id.eq.${currentEmployeeId}`);
         
         if (teamsError) throw teamsError;
         
-        console.log("[useEmployeesForShifts] Led teams:", ledTeams);
+        console.log("[useEmployeesForShifts] Led teams (leader or assistant):", ledTeams);
         
         if (ledTeams && ledTeams.length > 0) {
           const teamIds = ledTeams.map(t => t.id);
