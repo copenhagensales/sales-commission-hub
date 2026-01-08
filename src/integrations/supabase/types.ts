@@ -7438,6 +7438,7 @@ export type Database = {
           celebration_duration: number | null
           celebration_effect: string | null
           celebration_enabled: boolean | null
+          celebration_metric: string | null
           celebration_text: string | null
           celebration_trigger_condition: string | null
           celebration_trigger_value: number | null
@@ -7460,6 +7461,7 @@ export type Database = {
           celebration_duration?: number | null
           celebration_effect?: string | null
           celebration_enabled?: boolean | null
+          celebration_metric?: string | null
           celebration_text?: string | null
           celebration_trigger_condition?: string | null
           celebration_trigger_value?: number | null
@@ -7482,6 +7484,7 @@ export type Database = {
           celebration_duration?: number | null
           celebration_effect?: string | null
           celebration_enabled?: boolean | null
+          celebration_metric?: string | null
           celebration_text?: string | null
           celebration_trigger_condition?: string | null
           celebration_trigger_value?: number | null

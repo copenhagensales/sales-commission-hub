@@ -58,6 +58,7 @@ interface TvBoardAccess {
   celebration_trigger_condition?: string | null;
   celebration_trigger_value?: number | null;
   celebration_text?: string | null;
+  celebration_metric?: string | null;
 }
 
 interface DashboardRotateTime {
@@ -87,6 +88,15 @@ const DURATION_OPTIONS = [
   { value: 8, label: "8 sek" },
 ];
 
+// Available metrics based on dashboard type
+const CELEBRATION_METRICS = [
+  { value: "sales_today", label: "Salg i dag", dashboards: ["all"] },
+  { value: "sales_month", label: "Salg denne måned", dashboards: ["all"] },
+  { value: "sales_week", label: "Salg denne uge", dashboards: ["all"] },
+  { value: "total_sales", label: "Samlet antal salg", dashboards: ["all"] },
+  { value: "goal_progress", label: "Mål-fremskridt (%)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
+];
+
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -110,6 +120,7 @@ export function TvLinksSettingsTab() {
   const [celebrationDuration, setCelebrationDuration] = useState(3);
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
+  const [celebrationMetric, setCelebrationMetric] = useState("sales_today");
   const [showTestCelebration, setShowTestCelebration] = useState(false);
   const [editingLink, setEditingLink] = useState<TvBoardAccess | null>(null);
   const queryClient = useQueryClient();
@@ -141,6 +152,7 @@ export function TvLinksSettingsTab() {
       celebrationDuration,
       celebrationTriggerCondition,
       celebrationText,
+      celebrationMetric,
     }: {
       name: string; 
       dashboardSlugs: string[]; 
@@ -153,6 +165,7 @@ export function TvLinksSettingsTab() {
       celebrationDuration: number;
       celebrationTriggerCondition: string;
       celebrationText: string;
+      celebrationMetric: string;
     }) => {
       const code = generateCode();
       const { error } = await supabase.from("tv_board_access").insert({
@@ -170,6 +183,7 @@ export function TvLinksSettingsTab() {
         celebration_duration: celebrationDuration,
         celebration_trigger_condition: celebrationTriggerCondition,
         celebration_text: celebrationText || null,
+        celebration_metric: celebrationMetric,
       });
       if (error) throw error;
       return code;
@@ -214,6 +228,7 @@ export function TvLinksSettingsTab() {
     setCelebrationDuration(3);
     setCelebrationTriggerCondition("any_update");
     setCelebrationText("");
+    setCelebrationMetric("sales_today");
   };
 
   const updateRotateTime = (slug: string, field: 'minutes' | 'seconds', value: number) => {
@@ -281,6 +296,7 @@ export function TvLinksSettingsTab() {
       celebrationDuration,
       celebrationTriggerCondition,
       celebrationText,
+      celebrationMetric,
     });
   };
 
@@ -545,6 +561,28 @@ export function TvLinksSettingsTab() {
                           );
                         })}
                       </div>
+                    </div>
+
+                    {/* Metric Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Reagér på dette tal</Label>
+                      <Select
+                        value={celebrationMetric}
+                        onValueChange={setCelebrationMetric}
+                      >
+                        <SelectTrigger className="bg-background/80 backdrop-blur-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CELEBRATION_METRICS
+                            .filter(m => m.dashboards.includes("all") || m.dashboards.some(d => selectedDashboards.includes(d)))
+                            .map((metric) => (
+                              <SelectItem key={metric.value} value={metric.value}>
+                                {metric.label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Trigger Condition */}
