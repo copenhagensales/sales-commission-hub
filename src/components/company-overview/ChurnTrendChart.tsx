@@ -25,10 +25,10 @@ export function ChurnTrendChart() {
         .select("id, team_name, tenure_days, end_date, start_date");
       if (histError) throw histError;
 
-      // Fetch current employees
+      // Fetch all employees (active and inactive) from employee_master_data
       const { data: currentEmployees, error: currError } = await supabase
         .from("employee_master_data")
-        .select("id, employment_start_date, is_active");
+        .select("id, employment_start_date, employment_end_date, is_active");
       if (currError) throw currError;
 
       // Fetch team memberships
@@ -77,21 +77,39 @@ export function ChurnTrendChart() {
           return startDate >= monthStart && startDate <= monthEnd;
         });
 
-        // Find current employees who STARTED in this specific month (still active)
-        const currentStartedInMonth = (currentEmployees || []).filter(emp => {
-          if (!emp.is_active) return false;
+        // Find employees from employee_master_data who STARTED in this specific month
+        const masterDataStartedInMonth = (currentEmployees || []).filter(emp => {
           const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
           if (EXCLUDED_TEAMS.includes(teamName)) return false;
           if (!emp.employment_start_date) return false;
           const startDate = parseISO(emp.employment_start_date);
+          
+          // Data quality validation
+          const now = new Date();
+          if (startDate > now) return false; // Exclude future start dates
+          
           return startDate >= monthStart && startDate <= monthEnd;
         });
 
         // Total employees who started in this month (cohort size)
-        const cohortSize = historicalStartedInMonth.length + currentStartedInMonth.length;
+        // Combine historical + master data, but avoid double-counting
+        const cohortSize = historicalStartedInMonth.length + masterDataStartedInMonth.length;
 
-        // Count those from historical who left within 60 days
-        const exits60Days = historicalStartedInMonth.filter(emp => emp.tenure_days <= 60).length;
+        // Count exits within 60 days
+        // From historical data
+        const historicalExits60 = historicalStartedInMonth.filter(emp => emp.tenure_days <= 60).length;
+        
+        // From master data (inactive employees who left within 60 days)
+        const masterDataExits60 = masterDataStartedInMonth.filter(emp => {
+          if (emp.is_active) return false; // Still active, hasn't left
+          if (!emp.employment_end_date) return false;
+          const startDate = parseISO(emp.employment_start_date);
+          const endDate = parseISO(emp.employment_end_date);
+          const tenureDays = differenceInDays(endDate, startDate);
+          return tenureDays >= 0 && tenureDays <= 60;
+        }).length;
+
+        const exits60Days = historicalExits60 + masterDataExits60;
 
         // Calculate churn rate for this cohort
         const churnRate = cohortSize > 0 ? (exits60Days / cohortSize) * 100 : 0;
