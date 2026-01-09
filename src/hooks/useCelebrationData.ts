@@ -41,8 +41,11 @@ export function useCelebrationData({
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["celebration-data", dashboardSlug, metric, todayStr],
     queryFn: async (): Promise<CelebrationTriggerData> => {
+      console.log("[CelebrationData] Fetching data for:", { dashboardSlug, metric, todayStr });
+      
       // Get team/client configuration based on dashboard slug
       const dashboardConfig = getDashboardConfig(dashboardSlug);
+      console.log("[CelebrationData] Dashboard config:", dashboardConfig);
       
       // Build query with client filter via campaign relation if needed
       // Note: The column is client_campaign_id (not campaign_id)
@@ -83,6 +86,13 @@ export function useCelebrationData({
         salesMonthQuery,
         salesWeekQuery,
       ]);
+
+      console.log("[CelebrationData] Query results:", {
+        todayCount: todayRes.data?.length ?? 0,
+        todayError: todayRes.error,
+        monthCount: monthRes.data?.length ?? 0,
+        weekCount: weekRes.data?.length ?? 0,
+      });
 
       // Calculate totals
       const calculateSalesAndCommission = (sales: any[]) => {
@@ -164,7 +174,7 @@ export function useCelebrationData({
         }
       };
 
-      return {
+      const result = {
         employeeName: topEmployeeName,
         salesCount: todayData.totalSales,
         commission: todayData.totalCommission,
@@ -179,6 +189,9 @@ export function useCelebrationData({
         goalTarget,
         goalRemaining,
       };
+      
+      console.log("[CelebrationData] Returning data:", result);
+      return result;
     },
     enabled: enabled && !!dashboardSlug,
     refetchInterval: 30000, // Refresh every 30 seconds
