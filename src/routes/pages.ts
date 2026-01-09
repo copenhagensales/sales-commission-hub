@@ -147,4 +147,5 @@ export const SalarySchemes = lazyPage(() => import("@/pages/SalarySchemes"));
 
 // Commission League
 export const CommissionLeague = lazyPage(() => import("@/pages/CommissionLeague"));
+export const CommissionLeagueTest = lazyPage(() => import("@/pages/CommissionLeagueTest"));
 
