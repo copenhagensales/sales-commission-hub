@@ -90,106 +90,144 @@ export default function TvBoardDirect() {
     enabled: !!celebrationSettings?.enabled && dashboardSlugs.length > 0,
   });
 
-  useEffect(() => {
-    const verifyCode = async () => {
-      if (!code) {
-        setError("Ingen adgangskode angivet");
-        setLoading(false);
-        return;
-      }
-
-      const { data, error: queryError } = await supabase
-        .from("tv_board_access")
-        .select(`
-          id, 
-          dashboard_slug, 
-          dashboard_slugs, 
-          is_active, 
-          access_count,
-          auto_rotate,
-          rotate_interval_seconds,
-          rotate_intervals_per_dashboard,
-          celebration_enabled,
-          celebration_effect,
-          celebration_duration,
-          celebration_trigger_condition,
-          celebration_text,
-          celebration_metric,
-          celebration_source_dashboard,
-          start_fullscreen
-        `)
-        .eq("access_code", code.toUpperCase())
-        .eq("is_active", true)
-        .single();
-
-      if (queryError || !data) {
-        setError("Ugyldig eller inaktiv adgangskode");
-        setLoading(false);
-        return;
-      }
-
-      const tvData = data as TvBoardData;
-
-      // Update access count and last accessed (fire-and-forget, don't block on RLS)
-      supabase
-        .from("tv_board_access")
-        .update({
-          last_accessed_at: new Date().toISOString(),
-          access_count: (tvData.access_count || 0) + 1,
-        })
-        .eq("id", tvData.id)
-        .then(() => {}); // Ignore errors - this is non-critical
-
-      // Use dashboard_slugs array if available, otherwise fall back to single slug
-      const slugs = tvData.dashboard_slugs && tvData.dashboard_slugs.length > 0
-        ? tvData.dashboard_slugs
-        : tvData.dashboard_slug
-          ? [tvData.dashboard_slug]
-          : [];
-
-      if (slugs.length === 0) {
-        setError("Ingen dashboards konfigureret for dette link");
-        setLoading(false);
-        return;
-      }
-
-      // Store in sessionStorage
-      sessionStorage.setItem("tv_board_code", code.toUpperCase());
-      sessionStorage.setItem("tv_board_slugs", JSON.stringify(slugs));
-
-      setDashboardSlugs(slugs);
-      
-      // Set auto-rotation settings
-      if (tvData.auto_rotate && slugs.length > 1) {
-        setAutoRotate(true);
-        if (tvData.rotate_intervals_per_dashboard) {
-          setRotateIntervals(tvData.rotate_intervals_per_dashboard);
-        }
-        if (tvData.rotate_interval_seconds) {
-          setDefaultRotateInterval(tvData.rotate_interval_seconds);
-        }
-      }
-      
-      // Set celebration settings
-      if (tvData.celebration_enabled) {
-        setCelebrationSettings({
-          enabled: true,
-          effect: (tvData.celebration_effect as CelebrationSettings['effect']) || 'confetti',
-          duration: tvData.celebration_duration || 3,
-          triggerCondition: tvData.celebration_trigger_condition || 'any_update',
-          text: tvData.celebration_text || '🎉 Tillykke!',
-          metric: tvData.celebration_metric || 'sales_today',
-          sourceDashboard: tvData.celebration_source_dashboard || null,
-        });
-      }
-      
+  // Function to fetch TV board configuration
+  const fetchTvBoardConfig = useCallback(async () => {
+    if (!code) {
+      setError("Ingen adgangskode angivet");
       setLoading(false);
-    };
+      return;
+    }
 
-    verifyCode();
+    const { data, error: queryError } = await supabase
+      .from("tv_board_access")
+      .select(`
+        id, 
+        dashboard_slug, 
+        dashboard_slugs, 
+        is_active, 
+        access_count,
+        auto_rotate,
+        rotate_interval_seconds,
+        rotate_intervals_per_dashboard,
+        celebration_enabled,
+        celebration_effect,
+        celebration_duration,
+        celebration_trigger_condition,
+        celebration_text,
+        celebration_metric,
+        celebration_source_dashboard,
+        start_fullscreen
+      `)
+      .eq("access_code", code.toUpperCase())
+      .eq("is_active", true)
+      .single();
+
+    if (queryError || !data) {
+      setError("Ugyldig eller inaktiv adgangskode");
+      setLoading(false);
+      return;
+    }
+
+    const tvData = data as TvBoardData;
+
+    // Use dashboard_slugs array if available, otherwise fall back to single slug
+    const slugs = tvData.dashboard_slugs && tvData.dashboard_slugs.length > 0
+      ? tvData.dashboard_slugs
+      : tvData.dashboard_slug
+        ? [tvData.dashboard_slug]
+        : [];
+
+    if (slugs.length === 0) {
+      setError("Ingen dashboards konfigureret for dette link");
+      setLoading(false);
+      return;
+    }
+
+    // Store in sessionStorage
+    sessionStorage.setItem("tv_board_code", code.toUpperCase());
+    sessionStorage.setItem("tv_board_slugs", JSON.stringify(slugs));
+
+    // Only update state if config actually changed
+    setDashboardSlugs(prevSlugs => {
+      const prevJson = JSON.stringify(prevSlugs);
+      const newJson = JSON.stringify(slugs);
+      if (prevJson !== newJson) {
+        // Reset to first dashboard if slugs changed
+        setCurrentIndex(0);
+        return slugs;
+      }
+      return prevSlugs;
+    });
+    
+    // Set auto-rotation settings
+    if (tvData.auto_rotate && slugs.length > 1) {
+      setAutoRotate(true);
+      if (tvData.rotate_intervals_per_dashboard) {
+        setRotateIntervals(tvData.rotate_intervals_per_dashboard);
+      }
+      if (tvData.rotate_interval_seconds) {
+        setDefaultRotateInterval(tvData.rotate_interval_seconds);
+      }
+    } else {
+      setAutoRotate(false);
+    }
+    
+    // Set celebration settings
+    if (tvData.celebration_enabled) {
+      setCelebrationSettings({
+        enabled: true,
+        effect: (tvData.celebration_effect as CelebrationSettings["effect"]) || "fireworks",
+        duration: tvData.celebration_duration || 5000,
+        triggerCondition: tvData.celebration_trigger_condition || "new_sale",
+        text: tvData.celebration_text || "🎉 Nyt salg!",
+        metric: tvData.celebration_metric || "sales_today",
+        sourceDashboard: tvData.celebration_source_dashboard || null,
+      });
+    } else {
+      setCelebrationSettings(null);
+    }
+    
+    // Auto-fullscreen on first load if setting is enabled
+    if (tvData.start_fullscreen && !hasAutoFullscreened.current && !document.fullscreenElement) {
+      hasAutoFullscreened.current = true;
+      setTimeout(() => {
+        document.documentElement.requestFullscreen?.().catch(() => {
+          // Ignore - user may need to interact first
+        });
+      }, 500);
+    }
+
+    setLoading(false);
+    
+    return tvData;
   }, [code]);
 
-  // Auto-rotation effect
+  // Initial load and periodic config refresh
+  useEffect(() => {
+    // Initial fetch
+    fetchTvBoardConfig().then((tvData) => {
+      if (tvData) {
+        // Update access count only on initial load (fire-and-forget, don't block on RLS)
+        supabase
+          .from("tv_board_access")
+          .update({
+            last_accessed_at: new Date().toISOString(),
+            access_count: (tvData.access_count || 0) + 1,
+          })
+          .eq("id", tvData.id)
+          .then(() => {}); // Ignore errors - this is non-critical
+      }
+    });
+
+    // Refresh config every 30 seconds to pick up admin changes
+    const configInterval = setInterval(() => {
+      fetchTvBoardConfig();
+    }, 30000);
+
+    return () => clearInterval(configInterval);
+  }, [fetchTvBoardConfig]);
+
+  // Handle auto-rotation
   useEffect(() => {
     if (!autoRotate || dashboardSlugs.length <= 1) return;
 
