@@ -254,6 +254,64 @@ Deno.serve(async (req) => {
   }
 });
 
+// Helper function to resolve agent email to display name
+async function resolveAgentNames(
+  supabase: any,
+  agentEmails: string[]
+): Promise<Map<string, string>> {
+  const nameMap = new Map<string, string>();
+  
+  if (agentEmails.length === 0) return nameMap;
+  
+  // Get agents by email (case-insensitive)
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, email")
+    .in("email", agentEmails);
+  
+  if (!agents || agents.length === 0) return nameMap;
+  
+  const agentIds = (agents as any[]).map((a) => a.id);
+  const emailToAgentId = new Map<string, string>((agents as any[]).map((a) => [a.email.toLowerCase(), a.id]));
+  
+  // Get employee mappings
+  const { data: mappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("agent_id, employee_id")
+    .in("agent_id", agentIds);
+  
+  if (!mappings || mappings.length === 0) return nameMap;
+  
+  const employeeIds = (mappings as any[]).map((m) => m.employee_id);
+  const agentIdToEmployeeId = new Map<string, string>((mappings as any[]).map((m) => [m.agent_id, m.employee_id]));
+  
+  // Get employee names from master data
+  const { data: employees } = await supabase
+    .from("employee_master_data")
+    .select("id, full_name")
+    .in("id", employeeIds);
+  
+  if (!employees) return nameMap;
+  
+  const employeeIdToName = new Map<string, string>((employees as any[]).map((e) => [e.id, e.full_name]));
+  
+  // Build the final email -> name map
+  for (const email of agentEmails) {
+    const agentId = emailToAgentId.get(email.toLowerCase());
+    if (agentId) {
+      const employeeId = agentIdToEmployeeId.get(agentId);
+      if (employeeId) {
+        const name = employeeIdToName.get(employeeId);
+        if (name) {
+          nameMap.set(email.toLowerCase(), name);
+        }
+      }
+    }
+  }
+  
+  return nameMap;
+}
+
 // Handle team-specific dashboards
 async function handleTeamDashboard(
   supabase: any, 
@@ -327,11 +385,18 @@ async function handleTeamDashboard(
     .gte("sale_datetime", monthStart)
     .order("sale_datetime", { ascending: false });
 
+  // Collect all unique agent emails to resolve names
+  const allEmails = (sales || []).map((s: any) => s.agent_name).filter((n: any): n is string => typeof n === 'string' && n.length > 0);
+  const uniqueEmails: string[] = Array.from(new Set(allEmails));
+  const agentNameMap = await resolveAgentNames(supabase, uniqueEmails);
+  
+  console.log(`Resolved ${agentNameMap.size} agent names from ${uniqueEmails.length} unique emails`);
+
   // Calculate stats by client
   const clientStatsMap: Record<string, { salesToday: number; salesThisMonth: number }> = {};
   clientIds.forEach(id => clientStatsMap[id] = { salesToday: 0, salesThisMonth: 0 });
 
-  // Calculate top sellers - separate for today and month
+  // Calculate top sellers - separate for today and month (keyed by resolved name)
   const todaySellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
   const monthSellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
 
@@ -356,31 +421,33 @@ async function handleTeamDashboard(
     if (validSales > 0 && clientStatsMap[saleClientId]) {
       clientStatsMap[saleClientId].salesThisMonth += validSales;
       
-      const agentName = sale.agent_name || "Ukendt";
+      // Resolve agent name from email
+      const agentEmail = sale.agent_name || "";
+      const resolvedName = agentNameMap.get(agentEmail.toLowerCase()) || agentEmail || "Ukendt";
       
       // Track month seller stats (all sales this month)
-      if (!monthSellerStats[agentName]) {
-        monthSellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
+      if (!monthSellerStats[resolvedName]) {
+        monthSellerStats[resolvedName] = { sales: 0, commission: 0, clientId: saleClientId };
       }
-      monthSellerStats[agentName].sales += validSales;
-      monthSellerStats[agentName].commission += commission;
+      monthSellerStats[resolvedName].sales += validSales;
+      monthSellerStats[resolvedName].commission += commission;
       
       if (sale.sale_datetime >= startOfDay) {
         clientStatsMap[saleClientId].salesToday += validSales;
         
         // Track today seller stats
-        if (!todaySellerStats[agentName]) {
-          todaySellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
+        if (!todaySellerStats[resolvedName]) {
+          todaySellerStats[resolvedName] = { sales: 0, commission: 0, clientId: saleClientId };
         }
-        todaySellerStats[agentName].sales += validSales;
-        todaySellerStats[agentName].commission += commission;
+        todaySellerStats[resolvedName].sales += validSales;
+        todaySellerStats[resolvedName].commission += commission;
       }
       
       // Add to recent sales (limit to 10 most recent)
       if (recentSalesList.length < 10) {
         recentSalesList.push({
           id: sale.id,
-          agentName: sale.agent_name,
+          agentName: resolvedName,
           saleDateTime: sale.sale_datetime,
           commission,
           sales: validSales,
