@@ -16,7 +16,7 @@ export function ZoneLegend({ className }: ZoneLegendProps) {
       </div>
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded bg-orange-500" />
-        <span>Duel zone</span>
+        <span>Playoff zone</span>
       </div>
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded bg-red-500" />
