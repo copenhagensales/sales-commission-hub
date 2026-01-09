@@ -22,7 +22,6 @@ export function PersonalBestBadge({ currentProvision, previousBest, className }:
               "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold",
               "bg-gradient-to-r from-emerald-400 to-teal-500 text-white",
               "shadow-lg shadow-emerald-500/30",
-              "animate-pulse",
               className
             )}
           >
