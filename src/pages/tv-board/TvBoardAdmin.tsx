@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getPublicUrl } from "@/lib/getPublicUrl";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,7 +106,7 @@ export default function TvBoardAdmin() {
   });
 
   const copyLink = (code: string, slug: string) => {
-    const url = `${window.location.origin}/tv/${slug}`;
+    const url = `${getPublicUrl()}/tv/${slug}`;
     navigator.clipboard.writeText(url);
     toast.success(`Link kopieret! Kode: ${code}`);
   };
@@ -306,7 +307,7 @@ export default function TvBoardAdmin() {
             </ol>
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm font-medium">TV Link format:</p>
-              <code className="text-primary">{window.location.origin}/tv/[dashboard-slug]</code>
+              <code className="text-primary">{getPublicUrl()}/tv/[dashboard-slug]</code>
             </div>
           </CardContent>
         </Card>

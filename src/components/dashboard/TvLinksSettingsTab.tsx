@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings } from "lucide-react";
+import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,7 +293,7 @@ export function TvLinksSettingsTab() {
     toast.success(`${label} kopieret`);
   };
 
-  const getTvUrl = (code: string) => `${window.location.origin}/t/${code}`;
+  const getTvUrl = (code: string) => getTvBoardUrl(code);
 
   const getDashboardName = (slug: string) => {
     return DASHBOARD_LIST.find((d) => d.slug === slug)?.name || slug;
