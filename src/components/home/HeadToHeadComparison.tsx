@@ -432,98 +432,175 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return getTeamNames(opponentTeam);
   }, [opponentTeam, employees, activeChallengeId, activeChallenges, currentEmployeeId]);
 
-  // Fetch stats for teams
+  // Get all employee IDs for both teams (to fetch agent mappings)
+  const allEmployeeIds = useMemo(() => {
+    const ids: string[] = [];
+    if (currentEmployeeId) ids.push(currentEmployeeId);
+    myTeam.forEach(id => { if (id) ids.push(id); });
+    opponentTeam.forEach(id => { if (id) ids.push(id); });
+    return [...new Set(ids)];
+  }, [currentEmployeeId, myTeam, opponentTeam]);
+
+  // Fetch stats for teams - using same logic as DailyReports for accuracy
   const { data: stats, dataUpdatedAt } = useQuery({
-    queryKey: ["h2h-stats", myTeamNames.join(","), opponentTeamNames.join(","), dateRange.start.toISOString(), dateRange.end.toISOString()],
+    queryKey: ["h2h-stats", allEmployeeIds.join(","), myTeamNames.join(","), opponentTeamNames.join(","), dateRange.start.toISOString(), dateRange.end.toISOString()],
     queryFn: async () => {
-      const monthStart = dateRange.start.toISOString();
-      const monthEnd = dateRange.end.toISOString();
+      const rangeStart = dateRange.start.toISOString();
+      const rangeEnd = dateRange.end.toISOString();
 
-      // Fetch sales stats
-      const { data: sales } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_name,
-          sale_datetime,
-          sale_items (
+      // 1. Fetch agent mappings for all employees (like DailyReports)
+      const { data: agentMappingsData } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id, agents(email, external_dialer_id)")
+        .in("employee_id", allEmployeeIds);
+
+      // Build map: employee_id -> { emails: string[], externalIds: string[] }
+      const employeeAgentMap = new Map<string, { emails: string[]; externalIds: string[] }>();
+      (agentMappingsData || []).forEach(m => {
+        const agent = m.agents as any;
+        const existing = employeeAgentMap.get(m.employee_id) || { emails: [], externalIds: [] };
+        if (agent?.email) existing.emails.push(agent.email.toLowerCase());
+        if (agent?.external_dialer_id) existing.externalIds.push(agent.external_dialer_id);
+        employeeAgentMap.set(m.employee_id, existing);
+      });
+
+      // Collect all emails for sales query
+      const allAgentEmails: string[] = [];
+      employeeAgentMap.forEach(v => allAgentEmails.push(...v.emails));
+      const uniqueEmails = [...new Set(allAgentEmails)];
+
+      // 2. Fetch sales with campaign info (like DailyReports)
+      let salesData: any[] = [];
+      if (uniqueEmails.length > 0) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select(`
             id,
-            mapped_commission,
-            quantity,
-            products:product_id (
-              revenue_dkk,
-              commission_dkk,
-              counts_as_sale
+            agent_email,
+            sale_datetime,
+            dialer_campaign_id,
+            sale_items (
+              id,
+              quantity,
+              mapped_commission,
+              mapped_revenue,
+              product_id,
+              products:product_id (
+                counts_as_sale
+              )
             )
-          )
-        `)
-        .gte("sale_datetime", monthStart)
-        .lte("sale_datetime", monthEnd);
+          `)
+          .gte("sale_datetime", rangeStart)
+          .lte("sale_datetime", rangeEnd);
+        
+        // Filter by agent emails (case-insensitive)
+        salesData = (sales || []).filter(s => 
+          uniqueEmails.includes((s.agent_email || "").toLowerCase())
+        );
+      }
 
-      // Fetch call stats
+      // 3. Fetch campaign mappings for campaign overrides
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      (campaignMappings || []).forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+
+      // 4. Fetch product campaign overrides
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+      
+      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+      (productCampaignOverrides || []).forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, {
+          commission: o.commission_dkk ?? 0,
+          revenue: o.revenue_dkk ?? 0
+        });
+      });
+
+      // 5. Fetch call stats
+      const allExternalIds: string[] = [];
+      employeeAgentMap.forEach(v => allExternalIds.push(...v.externalIds));
+      const uniqueExternalIds = [...new Set(allExternalIds)];
+
       const { data: calls } = await supabase
         .from("dialer_calls")
         .select("agent_external_id, duration_seconds, total_duration_seconds, start_time")
-        .gte("start_time", monthStart)
-        .lte("start_time", monthEnd);
+        .gte("start_time", rangeStart)
+        .lte("start_time", rangeEnd);
 
-      // Get agent external IDs for all team members
-      const allNames = [...myTeamNames, ...opponentTeamNames];
-      const { data: agentMappings } = await supabase
-        .from("agents")
-        .select("id, name, external_adversus_id")
-        .in("name", allNames.filter(Boolean));
+      // Helper to get team employee IDs from team names
+      const getTeamEmployeeIds = (teamNames: string[]): string[] => {
+        const ids: string[] = [];
+        teamNames.forEach(name => {
+          const emp = employees.find(e => e.name === name);
+          if (emp) ids.push(emp.id);
+        });
+        return ids;
+      };
 
-      // Calculate recent activity for momentum
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const recentSales = sales?.filter(s => s.sale_datetime && s.sale_datetime >= oneHourAgo) || [];
-      
-      let myRecentActivity = 0;
-      let opponentRecentActivity = 0;
-      recentSales.forEach(s => {
-        if (myTeamNames.includes(s.agent_name || "")) myRecentActivity++;
-        if (opponentTeamNames.includes(s.agent_name || "")) opponentRecentActivity++;
-      });
-
-      // Helper function to calculate team stats
+      // Helper function to calculate team stats (like DailyReports)
       const calculateTeamStats = (teamNames: string[]): TeamStats => {
-        const teamExternalIds = teamNames.map(name => 
-          agentMappings?.find(a => a.name === name)?.external_adversus_id
-        ).filter(Boolean);
-
-        const teamSales = sales?.filter(s => teamNames.includes(s.agent_name || "")) || [];
+        const teamEmployeeIds = getTeamEmployeeIds(teamNames);
         
-        const salesCount = teamSales.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => {
-            const product = item.products as any;
-            if (product?.counts_as_sale === false) return itemSum;
-            return itemSum + (item.quantity || 1);
-          }, 0) || 0);
-        }, 0);
+        // Collect all agent emails for this team
+        const teamAgentEmails: string[] = [];
+        const teamExternalIds: string[] = [];
+        teamEmployeeIds.forEach(empId => {
+          const agentInfo = employeeAgentMap.get(empId);
+          if (agentInfo) {
+            teamAgentEmails.push(...agentInfo.emails);
+            teamExternalIds.push(...agentInfo.externalIds);
+          }
+        });
 
-        const revenue = teamSales.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => {
-            const qty = item.quantity || 1;
-            // Use products.revenue_dkk (base) × qty, or mapped_revenue directly (already includes qty)
-            const rev = (item.products as any)?.revenue_dkk 
-              ? qty * Number((item.products as any).revenue_dkk)
-              : (Number((item as any).mapped_revenue) || 0);
-            return itemSum + rev;
-          }, 0) || 0);
-        }, 0);
+        // Filter sales by team agent emails
+        const teamSales = salesData.filter(s => 
+          teamAgentEmails.includes((s.agent_email || "").toLowerCase())
+        );
+        
+        // Calculate sales count, revenue, and commission with campaign overrides
+        let salesCount = 0;
+        let revenue = 0;
+        let commission = 0;
+        
+        teamSales.forEach(sale => {
+          const dialerCampaignId = sale.dialer_campaign_id;
+          const campaignMappingId = dialerCampaignId 
+            ? dialerCampaignToMappingId.get(dialerCampaignId) 
+            : null;
+          
+          (sale.sale_items || []).forEach((item: any) => {
+            const countsAsSale = item.products?.counts_as_sale !== false;
+            if (countsAsSale) {
+              salesCount += Number(item.quantity) || 1;
+            }
+            
+            // Check for campaign override - use it if exists, otherwise fallback to mapped values
+            const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+            const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+            
+            if (override) {
+              // Use campaign-specific commission/revenue (already includes quantity factor)
+              revenue += override.revenue;
+              commission += override.commission;
+            } else {
+              // Fallback to mapped values from sale_items (already includes quantity)
+              revenue += Number(item.mapped_revenue) || 0;
+              commission += Number(item.mapped_commission) || 0;
+            }
+          });
+        });
 
-        const commission = teamSales.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => {
-            const qty = item.quantity || 1;
-            // Use products.commission_dkk (base) × qty, or mapped_commission directly (already includes qty)
-            const comm = (item.products as any)?.commission_dkk 
-              ? qty * Number((item.products as any).commission_dkk)
-              : (Number(item.mapped_commission) || 0);
-            return itemSum + comm;
-          }, 0) || 0);
-        }, 0);
-
-        const teamCalls = calls?.filter(c => teamExternalIds.includes(c.agent_external_id)) || [];
+        // Calculate call stats
+        const teamCalls = (calls || []).filter(c => teamExternalIds.includes(c.agent_external_id));
         const callCount = teamCalls.length;
         const talkTimeSeconds = teamCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
 
@@ -538,13 +615,38 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         };
       };
 
+      // Calculate recent activity for momentum
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const myTeamEmployeeIds = getTeamEmployeeIds(myTeamNames);
+      const opponentTeamEmployeeIds = getTeamEmployeeIds(opponentTeamNames);
+      
+      const myTeamEmails: string[] = [];
+      const opponentTeamEmails: string[] = [];
+      myTeamEmployeeIds.forEach(empId => {
+        const info = employeeAgentMap.get(empId);
+        if (info) myTeamEmails.push(...info.emails);
+      });
+      opponentTeamEmployeeIds.forEach(empId => {
+        const info = employeeAgentMap.get(empId);
+        if (info) opponentTeamEmails.push(...info.emails);
+      });
+      
+      const recentSales = salesData.filter(s => s.sale_datetime && s.sale_datetime >= oneHourAgo);
+      let myRecentActivity = 0;
+      let opponentRecentActivity = 0;
+      recentSales.forEach(s => {
+        const email = (s.agent_email || "").toLowerCase();
+        if (myTeamEmails.includes(email)) myRecentActivity++;
+        if (opponentTeamEmails.includes(email)) opponentRecentActivity++;
+      });
+
       return {
         myTeam: calculateTeamStats(myTeamNames),
         opponentTeam: opponentTeamNames.length > 0 ? calculateTeamStats(opponentTeamNames) : null,
         recentActivity: { my: myRecentActivity, opponent: opponentRecentActivity },
       };
     },
-    enabled: myTeamNames.length > 0,
+    enabled: myTeamNames.length > 0 && allEmployeeIds.length > 0,
     refetchInterval: 30000, // Refresh every 30 seconds for live feel
   });
 
