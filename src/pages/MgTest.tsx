@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 import { ProductCampaignOverrides } from "@/components/mg-test/ProductCampaignOverrides";
+import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
 
 interface InspectorField {
   fieldId: string;
@@ -245,6 +246,14 @@ export default function MgTest() {
     clientId: "",
     externalId: "",
   });
+
+  // Product price edit dialog state
+  const [editingProduct, setEditingProduct] = useState<{
+    productId: string;
+    productName: string;
+    commission: number;
+    revenue: number;
+  } | null>(null);
 
   // Inspector mutation - fetch sample fields from Adversus
   const inspectCampaignMutation = useMutation({
@@ -2126,20 +2135,38 @@ export default function MgTest() {
                                         />
                                       </TableCell>
                                       <TableCell>
-                                        <Input
-                                          type="text"
-                                          inputMode="decimal"
-                                          className="h-9"
-                                          value={
-                                            current?.cpo ??
-                                            (row.product?.revenue_dkk !== null &&
-                                            row.product?.revenue_dkk !== undefined
-                                              ? String(row.product.revenue_dkk)
-                                              : "0")
-                                          }
-                                          onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
-                                          placeholder="0,00"
-                                        />
+                                        <div className="flex items-center gap-1">
+                                          <Input
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="h-9"
+                                            value={
+                                              current?.cpo ??
+                                              (row.product?.revenue_dkk !== null &&
+                                              row.product?.revenue_dkk !== undefined
+                                                ? String(row.product.revenue_dkk)
+                                                : "0")
+                                            }
+                                            onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
+                                            placeholder="0,00"
+                                          />
+                                          {row.product?.id && (
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
+                                              onClick={() => setEditingProduct({
+                                                productId: row.product!.id,
+                                                productName: row.product?.name || row.adversus_product_title || "Produkt",
+                                                commission: row.product?.commission_dkk ?? 0,
+                                                revenue: row.product?.revenue_dkk ?? 0,
+                                              })}
+                                              title="Rediger priser med gyldighedsdato"
+                                            >
+                                              <Pencil className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                        </div>
                                       </TableCell>
                                       <TableCell className="text-center">
                                         <Checkbox
@@ -3377,6 +3404,18 @@ export default function MgTest() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Product Price Edit Dialog */}
+      {editingProduct && (
+        <ProductPriceEditDialog
+          open={!!editingProduct}
+          onOpenChange={(open) => !open && setEditingProduct(null)}
+          productId={editingProduct.productId}
+          productName={editingProduct.productName}
+          currentCommission={editingProduct.commission}
+          currentRevenue={editingProduct.revenue}
+        />
+      )}
     </MainLayout>
   );
 }
