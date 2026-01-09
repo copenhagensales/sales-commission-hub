@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface ZoneLegendProps {
   className?: string;
@@ -8,39 +7,37 @@ interface ZoneLegendProps {
 
 export function ZoneLegend({ className }: ZoneLegendProps) {
   return (
-    <div className={cn("flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted-foreground", className)}>
-      {/* Zone forklaringer */}
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded bg-green-500" />
-        <span>Oprykningszone</span>
+    <div className={cn(
+      "flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground",
+      "p-2 rounded-lg bg-muted/30",
+      className
+    )}>
+      {/* Zone indicators */}
+      <div className="flex items-center gap-1.5">
+        <div className="w-2 h-2 rounded-sm bg-green-500" />
+        <span>Oprykker</span>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded bg-orange-500" />
-        <span>Playoff zone</span>
+      <div className="flex items-center gap-1.5">
+        <div className="w-2 h-2 rounded-sm bg-orange-500" />
+        <span>Playoff</span>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded bg-red-500" />
-        <span>Nedrykningszone</span>
+      <div className="flex items-center gap-1.5">
+        <div className="w-2 h-2 rounded-sm bg-red-500" />
+        <span>Nedrykker</span>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded bg-yellow-500" />
-        <span>Top 2 (Division 1)</span>
+      <div className="flex items-center gap-1.5">
+        <div className="w-2 h-2 rounded-sm bg-yellow-500" />
+        <span>Top 2</span>
       </div>
       
-      {/* Division-bevægelse forklaringer */}
-      <div className="flex items-center gap-2">
-        <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs px-1.5 py-0.5">
-          <ArrowUp className="h-3 w-3 mr-0.5" />
-          Div X
-        </Badge>
-        <span>Lige oprykket</span>
+      {/* Division movement - compact */}
+      <div className="flex items-center gap-1 text-green-600">
+        <ArrowUp className="h-3 w-3" />
+        <span>Oprykket</span>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs px-1.5 py-0.5">
-          <ArrowDown className="h-3 w-3 mr-0.5" />
-          Div X
-        </Badge>
-        <span>Lige nedrykket</span>
+      <div className="flex items-center gap-1 text-red-600">
+        <ArrowDown className="h-3 w-3" />
+        <span>Nedrykket</span>
       </div>
     </div>
   );

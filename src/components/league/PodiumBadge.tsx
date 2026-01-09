@@ -8,21 +8,18 @@ interface PodiumBadgeProps {
 const podiumConfig = {
   1: {
     emoji: "🥇",
-    gradient: "bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500",
-    shadow: "shadow-yellow-500/30",
-    ring: "ring-yellow-400/50",
+    gradient: "bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500",
+    shadow: "shadow-yellow-500/25",
   },
   2: {
     emoji: "🥈",
-    gradient: "bg-gradient-to-r from-slate-300 via-slate-400 to-slate-300",
-    shadow: "shadow-slate-400/30",
-    ring: "ring-slate-300/50",
+    gradient: "bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400",
+    shadow: "shadow-slate-400/25",
   },
   3: {
     emoji: "🥉",
-    gradient: "bg-gradient-to-r from-orange-400 via-amber-600 to-orange-500",
-    shadow: "shadow-orange-500/30",
-    ring: "ring-orange-400/50",
+    gradient: "bg-gradient-to-br from-orange-300 via-amber-500 to-orange-600",
+    shadow: "shadow-orange-500/25",
   },
 };
 
@@ -32,12 +29,10 @@ export function PodiumBadge({ rank, className }: PodiumBadgeProps) {
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center w-7 h-7 rounded-full text-base",
+        "inline-flex items-center justify-center w-6 h-6 rounded-full text-sm",
         config.gradient,
-        "shadow-lg",
+        "shadow-md",
         config.shadow,
-        "ring-2",
-        config.ring,
         className
       )}
     >
