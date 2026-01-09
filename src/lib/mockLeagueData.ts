@@ -11,6 +11,7 @@ export interface MockQualificationStanding {
   projected_rank: number;
   overall_rank: number;
   previous_overall_rank: number | null;
+  previous_division: number | null; // Division de kom fra (for at vise oprykket/nedrykket)
   last_calculated_at: string;
   employee?: {
     id: string;
@@ -34,7 +35,7 @@ const LAST_NAMES = [
   "Petersen", "Madsen", "Kristensen", "Olsen", "Thomsen", "Poulsen", "Johansen", "Knudsen", "Mortensen", "Møller"
 ];
 
-const TEAMS = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Fieldmarketing"];
+const TEAMS = ["TDC Erhverv", "Eesy TM", "Fieldmarketing", "Relatel", "United", "Tryg", "ASE"];
 
 function randomElement<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -99,6 +100,7 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
       projected_rank: 0, // Will be calculated
       overall_rank: 0, // Will be calculated
       previous_overall_rank: includeRankChanges ? randomInt(1, playerCount) : null,
+      previous_division: null, // Will be set after division calculation
       last_calculated_at: new Date().toISOString(),
       employee: {
         id: `emp-${i}`,
@@ -114,10 +116,25 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
   standings.sort((a, b) => b.current_provision - a.current_provision);
 
   // Calculate ranks and divisions
+  const maxDivision = Math.ceil(playerCount / playersPerDivision);
+  
   standings.forEach((standing, index) => {
     standing.overall_rank = index + 1;
     standing.projected_division = Math.floor(index / playersPerDivision) + 1;
     standing.projected_rank = (index % playersPerDivision) + 1;
+    
+    // Simuler division-bevægelse: ca. 20% af spillere har bevæget sig
+    const movementChance = Math.random();
+    if (movementChance < 0.1 && standing.projected_division > 1) {
+      // Lige rykket op (kom fra division under)
+      standing.previous_division = standing.projected_division + 1;
+    } else if (movementChance < 0.2 && standing.projected_division < maxDivision) {
+      // Lige rykket ned (kom fra division over)
+      standing.previous_division = standing.projected_division - 1;
+    } else {
+      // Ingen bevægelse
+      standing.previous_division = standing.projected_division;
+    }
   });
 
   return standings;
