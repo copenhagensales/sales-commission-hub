@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +50,11 @@ interface TvBoardAccess {
   id: string;
   name: string | null;
   access_code: string;
+  dashboard_slug: string;
   dashboard_slugs?: string[] | null;
+  auto_rotate?: boolean | null;
+  rotate_interval_seconds?: number | null;
+  rotate_intervals_per_dashboard?: Record<string, number> | null;
   celebration_enabled?: boolean | null;
   celebration_effect?: string | null;
   celebration_duration?: number | null;
@@ -56,6 +62,11 @@ interface TvBoardAccess {
   celebration_text?: string | null;
   celebration_metric?: string | null;
   celebration_source_dashboard?: string | null;
+}
+
+interface DashboardRotateTime {
+  minutes: number;
+  seconds: number;
 }
 
 interface TvLinkEditDialogProps {
@@ -101,6 +112,14 @@ const CELEBRATION_METRICS = [
 
 export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialogProps) {
   const queryClient = useQueryClient();
+  
+  // Dashboard selection state
+  const [linkName, setLinkName] = useState("");
+  const [selectedDashboards, setSelectedDashboards] = useState<string[]>([]);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [rotateTimes, setRotateTimes] = useState<Record<string, DashboardRotateTime>>({});
+  
+  // Celebration settings
   const [celebrationEnabled, setCelebrationEnabled] = useState(false);
   const [celebrationEffect, setCelebrationEffect] = useState("fireworks");
   const [celebrationDuration, setCelebrationDuration] = useState(3);
@@ -110,38 +129,108 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   const [celebrationSourceDashboard, setCelebrationSourceDashboard] = useState("");
   const [showTestCelebration, setShowTestCelebration] = useState(false);
 
-  const dashboardSlugs = tvLink?.dashboard_slugs || [];
-  const hasMultipleDashboards = dashboardSlugs.length > 1;
+  const hasMultipleDashboards = selectedDashboards.length > 1;
 
   // Get available metrics based on selected dashboards
   const availableMetrics = CELEBRATION_METRICS.filter(m => 
     m.dashboards.includes("all") || 
-    m.dashboards.some(d => dashboardSlugs.includes(d))
+    m.dashboards.some(d => selectedDashboards.includes(d))
   );
 
   const getDashboardName = (slug: string) => {
     return DASHBOARD_LIST.find((d) => d.slug === slug)?.name || slug;
   };
 
+  const toggleDashboard = (slug: string) => {
+    setSelectedDashboards((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  };
+
+  const updateRotateTime = (slug: string, field: 'minutes' | 'seconds', value: number) => {
+    setRotateTimes(prev => ({
+      ...prev,
+      [slug]: {
+        minutes: prev[slug]?.minutes ?? 1,
+        seconds: prev[slug]?.seconds ?? 0,
+        [field]: value
+      }
+    }));
+  };
+
+  const getRotateTime = (slug: string): DashboardRotateTime => {
+    return rotateTimes[slug] ?? { minutes: 1, seconds: 0 };
+  };
+
   // Load values from tvLink when it changes
   useEffect(() => {
     if (tvLink) {
+      setLinkName(tvLink.name || "");
+      const slugs = tvLink.dashboard_slugs?.length ? tvLink.dashboard_slugs : [tvLink.dashboard_slug];
+      setSelectedDashboards(slugs);
+      setAutoRotate(tvLink.auto_rotate ?? false);
+      
+      // Load rotate times per dashboard
+      if (tvLink.rotate_intervals_per_dashboard) {
+        const times: Record<string, DashboardRotateTime> = {};
+        Object.entries(tvLink.rotate_intervals_per_dashboard).forEach(([slug, seconds]) => {
+          const secs = typeof seconds === 'number' ? seconds : 60;
+          times[slug] = {
+            minutes: Math.floor(secs / 60),
+            seconds: secs % 60
+          };
+        });
+        setRotateTimes(times);
+      } else if (tvLink.rotate_interval_seconds) {
+        // Fallback to equal distribution
+        const perDashboard = tvLink.rotate_interval_seconds;
+        const times: Record<string, DashboardRotateTime> = {};
+        slugs.forEach(slug => {
+          times[slug] = {
+            minutes: Math.floor(perDashboard / 60),
+            seconds: perDashboard % 60
+          };
+        });
+        setRotateTimes(times);
+      }
+      
       setCelebrationEnabled(tvLink.celebration_enabled ?? false);
       setCelebrationEffect(tvLink.celebration_effect ?? "fireworks");
       setCelebrationDuration(tvLink.celebration_duration ?? 3);
       setCelebrationTriggerCondition(tvLink.celebration_trigger_condition ?? "any_update");
       setCelebrationText(tvLink.celebration_text ?? "");
       setCelebrationMetric(tvLink.celebration_metric ?? "sales_today");
-      setCelebrationSourceDashboard(tvLink.celebration_source_dashboard ?? (dashboardSlugs[0] || ""));
+      setCelebrationSourceDashboard(tvLink.celebration_source_dashboard ?? (slugs[0] || ""));
     }
-  }, [tvLink, dashboardSlugs]);
+  }, [tvLink]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!tvLink) return;
+      
+      // Build per-dashboard intervals
+      const rotateIntervalsPerDashboard: Record<string, number> = {};
+      if (autoRotate && selectedDashboards.length > 1) {
+        selectedDashboards.forEach(slug => {
+          const time = getRotateTime(slug);
+          rotateIntervalsPerDashboard[slug] = time.minutes * 60 + time.seconds;
+        });
+      }
+      
+      // Calculate total for backwards compatibility
+      const totalSeconds = autoRotate && selectedDashboards.length > 1
+        ? Object.values(rotateIntervalsPerDashboard).reduce((a, b) => a + b, 0) / selectedDashboards.length
+        : null;
+      
       const { error } = await supabase
         .from("tv_board_access")
         .update({
+          name: linkName || null,
+          dashboard_slug: selectedDashboards[0],
+          dashboard_slugs: selectedDashboards,
+          auto_rotate: autoRotate && selectedDashboards.length > 1,
+          rotate_interval_seconds: totalSeconds ? Math.round(totalSeconds) : null,
+          rotate_intervals_per_dashboard: autoRotate && selectedDashboards.length > 1 ? rotateIntervalsPerDashboard : null,
           celebration_enabled: celebrationEnabled,
           celebration_effect: celebrationEffect,
           celebration_duration: celebrationDuration,
@@ -155,7 +244,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tv-board-access-all"] });
-      toast.success("Fejringsindstillinger gemt");
+      toast.success("TV-link opdateret");
       onOpenChange(false);
     },
     onError: () => {
@@ -168,15 +257,103 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rediger fejringsindstillinger</DialogTitle>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Rediger TV-link</DialogTitle>
             <DialogDescription>
               {tvLink.name || tvLink.access_code}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
+            {/* Name input */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-link-name">Navn</Label>
+              <Input
+                id="edit-link-name"
+                placeholder="F.eks. Kontor TV"
+                value={linkName}
+                onChange={(e) => setLinkName(e.target.value)}
+              />
+            </div>
+
+            {/* Dashboard selection */}
+            <div className="space-y-2">
+              <Label>Dashboards</Label>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-3 border rounded-md bg-muted/30">
+                {DASHBOARD_LIST.map((dashboard) => (
+                  <div key={dashboard.slug} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-dashboard-${dashboard.slug}`}
+                      checked={selectedDashboards.includes(dashboard.slug)}
+                      onCheckedChange={() => toggleDashboard(dashboard.slug)}
+                    />
+                    <Label
+                      htmlFor={`edit-dashboard-${dashboard.slug}`}
+                      className="text-sm cursor-pointer truncate"
+                      title={dashboard.name}
+                    >
+                      {dashboard.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedDashboards.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedDashboards.length} dashboard{selectedDashboards.length !== 1 ? "s" : ""} valgt
+                </p>
+              )}
+            </div>
+
+            {/* Auto rotate */}
+            {selectedDashboards.length > 1 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="edit-auto-rotate">Automatisk skift mellem boards</Label>
+                  <Switch
+                    id="edit-auto-rotate"
+                    checked={autoRotate}
+                    onCheckedChange={setAutoRotate}
+                  />
+                </div>
+                {autoRotate && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Indstil tid for hvert board:</p>
+                    {selectedDashboards.map((slug) => {
+                      const time = getRotateTime(slug);
+                      return (
+                        <div key={slug} className="flex items-center gap-2 p-2 border rounded-md bg-muted/30">
+                          <span className="text-sm font-medium flex-1 truncate">{getDashboardName(slug)}</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={60}
+                              value={time.minutes}
+                              onChange={(e) => updateRotateTime(slug, 'minutes', Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-14 h-8 text-center"
+                            />
+                            <span className="text-xs text-muted-foreground">min</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={time.seconds}
+                              onChange={(e) => updateRotateTime(slug, 'seconds', Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                              className="w-14 h-8 text-center"
+                            />
+                            <span className="text-xs text-muted-foreground">sek</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Celebration Section */}
             <div className={cn(
               "relative overflow-hidden border rounded-xl p-4 space-y-4 transition-all duration-500",
@@ -276,7 +453,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
                           <SelectValue placeholder="Vælg dashboard" />
                         </SelectTrigger>
                         <SelectContent>
-                          {dashboardSlugs.map((slug) => (
+                          {selectedDashboards.map((slug) => (
                             <SelectItem key={slug} value={slug}>
                               {getDashboardName(slug)}
                             </SelectItem>
