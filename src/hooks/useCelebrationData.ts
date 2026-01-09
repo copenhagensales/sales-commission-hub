@@ -45,8 +45,9 @@ export function useCelebrationData({
       const dashboardConfig = getDashboardConfig(dashboardSlug);
       
       // Build query with client filter via campaign relation if needed
+      // Note: The column is client_campaign_id (not campaign_id)
       const selectFields = dashboardConfig.clientId
-        ? "id, agent_email, sale_datetime, campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
+        ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
         : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
       // Fetch sales data for today
