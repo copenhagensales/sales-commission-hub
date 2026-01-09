@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { QualificationBoard } from "@/components/league/QualificationBoard";
+import { PremierLeagueBoard } from "@/components/league/PremierLeagueBoard";
 import { generateMockStandings, getCurrentEmployeeId } from "@/lib/mockLeagueData";
 import { ArrowLeft, RefreshCw, Users, Layers, Eye, Shuffle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -56,7 +56,7 @@ const CommissionLeagueTest = () => {
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-foreground">QualificationBoard Test</h1>
+              <h1 className="text-xl font-bold text-foreground">Premier League Board Test</h1>
               <p className="text-sm text-muted-foreground">
                 Test visning med {playerCount} spillere i {divisionCount} divisioner
               </p>
@@ -214,11 +214,11 @@ const CommissionLeagueTest = () => {
 
           {/* Board Preview */}
           <div className="lg:col-span-3">
-            <QualificationBoard
+            <PremierLeagueBoard
               standings={standings}
               playersPerDivision={playersPerDivision}
               isLoading={isLoading}
-              currentEmployeeId={currentEmployeeId}
+              currentEmployeeId={currentEmployeeId ?? undefined}
             />
           </div>
         </div>
