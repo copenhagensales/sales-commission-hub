@@ -21,6 +21,9 @@ export interface MockQualificationStanding {
   };
   // Gamification fields
   recent_form: FormResult[];
+  personal_best_provision: number; // Previous best weekly provision
+  is_mvp_overall: boolean;
+  is_mvp_division: boolean;
 }
 
 const FIRST_NAMES = [
@@ -90,6 +93,9 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
     const provisionBase = maxProvision - (i / playerCount) * (maxProvision - minProvision);
     const provision = Math.round(provisionBase * (0.8 + Math.random() * 0.4));
     
+    // Personal best is usually slightly below current (chance of beating it)
+    const personalBest = Math.round(provision * (0.7 + Math.random() * 0.4));
+    
     standings.push({
       id: `mock-${i}`,
       season_id: "test-season-id",
@@ -108,7 +114,10 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
         last_name: lastName,
         team_name: randomElement(TEAMS)
       },
-      recent_form: generateRandomForm()
+      recent_form: generateRandomForm(),
+      personal_best_provision: personalBest,
+      is_mvp_overall: false,
+      is_mvp_division: false,
     });
   }
 
@@ -118,10 +127,24 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
   // Calculate ranks and divisions
   const maxDivision = Math.ceil(playerCount / playersPerDivision);
   
+  // Track division leaders for MVP
+  const divisionLeaders: Record<number, string> = {};
+  
   standings.forEach((standing, index) => {
     standing.overall_rank = index + 1;
     standing.projected_division = Math.floor(index / playersPerDivision) + 1;
     standing.projected_rank = (index % playersPerDivision) + 1;
+    
+    // First in each division is MVP of that division
+    if (standing.projected_rank === 1) {
+      divisionLeaders[standing.projected_division] = standing.id;
+      standing.is_mvp_division = true;
+    }
+    
+    // First overall is MVP overall
+    if (index === 0) {
+      standing.is_mvp_overall = true;
+    }
     
     // Simuler division-bevægelse: ca. 20% af spillere har bevæget sig
     const movementChance = Math.random();

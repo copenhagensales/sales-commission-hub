@@ -14,6 +14,12 @@ import { Trophy, Medal, ArrowUpRight, ArrowDownRight, ArrowUp, ArrowDown } from 
 import { MockQualificationStanding } from "@/lib/mockLeagueData";
 import { FormIndicator } from "./FormIndicator";
 import { ZoneLegend } from "./ZoneLegend";
+import { PodiumBadge } from "./PodiumBadge";
+import { MvpBadge } from "./MvpBadge";
+import { ProgressRing } from "./ProgressRing";
+import { PersonalBestBadge } from "./PersonalBestBadge";
+import { DistanceToZone } from "./DistanceToZone";
+import { RivalryIndicator } from "./RivalryIndicator";
 import { cn } from "@/lib/utils";
 
 interface PremierLeagueBoardProps {
@@ -50,6 +56,74 @@ export function PremierLeagueBoard({
   }, [standings]);
 
   const totalDivisions = divisionGroups.length;
+
+  // Helper to get rivalry data for current user
+  const getRivalryData = (players: MockQualificationStanding[], currentIndex: number) => {
+    if (currentIndex < 0) return { above: null, below: null };
+    
+    const current = players[currentIndex];
+    const above = currentIndex > 0 ? players[currentIndex - 1] : null;
+    const below = currentIndex < players.length - 1 ? players[currentIndex + 1] : null;
+
+    return {
+      above: above ? {
+        name: `${above.employee?.first_name} ${above.employee?.last_name}`,
+        provision: above.current_provision,
+        gap: above.current_provision - current.current_provision,
+      } : null,
+      below: below ? {
+        name: `${below.employee?.first_name} ${below.employee?.last_name}`,
+        provision: below.current_provision,
+        gap: current.current_provision - below.current_provision,
+      } : null,
+    };
+  };
+
+  // Helper to get zone provision thresholds
+  const getZoneThresholds = (
+    players: MockQualificationStanding[], 
+    currentIndex: number,
+    isTopDivision: boolean,
+    isBottomDivision: boolean
+  ) => {
+    if (currentIndex < 0) return { nextZone: null, prevZone: null, zoneType: "safe" as const };
+
+    const rank = players[currentIndex].projected_rank;
+    
+    // Determine current zone and targets
+    let zoneType: "promo" | "safe" | "playoff" | "relegation" | "top" = "safe";
+    let nextZoneProvision: number | null = null;
+    let prevZoneProvision: number | null = null;
+
+    if (isTopDivision && rank <= 2) {
+      zoneType = "top";
+    } else if (!isTopDivision && rank <= 2) {
+      zoneType = "promo";
+    } else if (!isTopDivision && rank === 3) {
+      // Playoff top - target is promo zone (rank 2)
+      zoneType = "playoff";
+      if (players[1]) nextZoneProvision = players[1].current_provision;
+    } else if (rank === playersPerDivision - 2) {
+      // Playoff bottom - target is safe zone
+      zoneType = "playoff";
+      if (players[playersPerDivision - 4]) nextZoneProvision = players[playersPerDivision - 4].current_provision;
+    } else if (!isBottomDivision && rank >= playersPerDivision - 1) {
+      // Relegation zone - target is playoff or safe zone
+      zoneType = "relegation";
+      if (players[playersPerDivision - 3]) nextZoneProvision = players[playersPerDivision - 3].current_provision;
+    } else {
+      // Safe zone - show distance to promo
+      if (!isTopDivision && players[2]) {
+        nextZoneProvision = players[2].current_provision;
+      }
+      // Buffer before falling into playoff/relegation
+      if (players[playersPerDivision - 3]) {
+        prevZoneProvision = players[playersPerDivision - 3].current_provision;
+      }
+    }
+
+    return { nextZone: nextZoneProvision, prevZone: prevZoneProvision, zoneType };
+  };
 
   if (isLoading) {
     return (
@@ -90,6 +164,7 @@ export function PremierLeagueBoard({
       {divisionGroups.map((group) => {
         const isTopDivision = group.division === 1;
         const isBottomDivision = group.division === totalDivisions;
+        const currentUserIndex = group.players.findIndex(p => p.employee_id === currentEmployeeId);
 
         return (
           <Card key={group.division} className="bg-card border-border overflow-hidden">
@@ -115,12 +190,12 @@ export function PremierLeagueBoard({
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b-2">
-                    <TableHead className="w-12 text-center">#</TableHead>
+                    <TableHead className="w-14 text-center">#</TableHead>
                     <TableHead>Spiller</TableHead>
                     <TableHead>Team</TableHead>
-                    <TableHead className="text-right w-28">Provision</TableHead>
-                    <TableHead className="text-center w-28">Form</TableHead>
-                    <TableHead className="text-center w-28">Status</TableHead>
+                    <TableHead className="text-right w-32">Provision</TableHead>
+                    <TableHead className="text-center w-24">Form</TableHead>
+                    <TableHead className="text-center w-24">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -145,11 +220,24 @@ export function PremierLeagueBoard({
                     const isPlayoffZone = isPlayoffZoneTop || isPlayoffZoneBottom;
                     const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 1;
 
+                    // Podium for top 3
+                    const isPodium = standing.projected_rank <= 3;
+                    const podiumRank = standing.projected_rank as 1 | 2 | 3;
+
+                    // Personal best check
+                    const isPersonalBest = standing.current_provision > standing.personal_best_provision;
+
                     // Show dashed separator before playoff zones and relegation zone
                     const showDashedBefore = 
                       (idx > 0 && standing.projected_rank === 3 && !isTopDivision) ||
                       (idx > 0 && standing.projected_rank === playersPerDivision - 2) ||
                       (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isPlayoffZoneBottom);
+
+                    // Get rivalry and zone data for current user
+                    const rivalry = isCurrentUser ? getRivalryData(group.players, idx) : null;
+                    const zoneData = isCurrentUser 
+                      ? getZoneThresholds(group.players, idx, isTopDivision, isBottomDivision) 
+                      : null;
 
                     return (
                       <>
@@ -169,12 +257,14 @@ export function PremierLeagueBoard({
                             isTopZone && !isCurrentUser && "bg-yellow-500/10 hover:bg-yellow-500/15",
                             isPlayoffZone && !isCurrentUser && "bg-orange-500/10 hover:bg-orange-500/15",
                             isRelegationZone && !isCurrentUser && "bg-red-500/10 hover:bg-red-500/15",
+                            // Danger zone pulse for relegation
+                            isRelegationZone && "animate-[pulse_3s_ease-in-out_infinite] ring-1 ring-red-500/30",
                             // Division movement highlight
                             justPromoted && "ring-2 ring-inset ring-green-500/40",
                             justRelegated && "ring-2 ring-inset ring-red-500/40"
                           )}
                         >
-                          {/* Rank with zone indicator */}
+                          {/* Rank with zone indicator and progress ring */}
                           <TableCell className="text-center font-bold">
                             <div className="flex items-center justify-center gap-1">
                               <div
@@ -187,7 +277,14 @@ export function PremierLeagueBoard({
                                   !isPromoZone && !isTopZone && !isPlayoffZone && !isRelegationZone && "bg-transparent"
                                 )}
                               />
-                              <span>{standing.projected_rank}</span>
+                              {isPodium ? (
+                                <PodiumBadge rank={podiumRank} />
+                              ) : (
+                                <ProgressRing 
+                                  rank={standing.projected_rank} 
+                                  total={playersPerDivision} 
+                                />
+                              )}
                             </div>
                           </TableCell>
 
@@ -203,6 +300,18 @@ export function PremierLeagueBoard({
                                   <span className="text-xs text-muted-foreground ml-1">(dig)</span>
                                 )}
                               </span>
+                              
+                              {/* MVP Badges */}
+                              {standing.is_mvp_overall && <MvpBadge type="overall" />}
+                              {standing.is_mvp_division && !standing.is_mvp_overall && <MvpBadge type="division" />}
+                              
+                              {/* Personal Best Badge */}
+                              {isPersonalBest && (
+                                <PersonalBestBadge 
+                                  currentProvision={standing.current_provision}
+                                  previousBest={standing.personal_best_provision}
+                                />
+                              )}
                               
                               {/* Division movement badge */}
                               {justPromoted && (
@@ -232,6 +341,11 @@ export function PremierLeagueBoard({
                                   {Math.abs(rankChange)}
                                 </span>
                               )}
+
+                              {/* Rivalry indicator for current user */}
+                              {isCurrentUser && rivalry && (
+                                <RivalryIndicator above={rivalry.above} below={rivalry.below} />
+                              )}
                             </div>
                           </TableCell>
 
@@ -242,9 +356,21 @@ export function PremierLeagueBoard({
                             </Badge>
                           </TableCell>
 
-                          {/* Provision */}
-                          <TableCell className="text-right font-mono font-medium">
-                            {standing.current_provision.toLocaleString("da-DK")} kr
+                          {/* Provision with distance to zone for current user */}
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-mono font-medium">
+                                {standing.current_provision.toLocaleString("da-DK")} kr
+                              </span>
+                              {isCurrentUser && zoneData && (
+                                <DistanceToZone
+                                  currentProvision={standing.current_provision}
+                                  nextZoneProvision={zoneData.nextZone}
+                                  prevZoneProvision={zoneData.prevZone}
+                                  zoneType={zoneData.zoneType}
+                                />
+                              )}
+                            </div>
                           </TableCell>
 
                           {/* Form indicator */}
