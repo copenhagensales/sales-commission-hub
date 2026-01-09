@@ -5856,6 +5856,47 @@ export type Database = {
           },
         ]
       }
+      product_price_history: {
+        Row: {
+          commission_dkk: number | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          is_retroactive: boolean
+          product_id: string
+          revenue_dkk: number | null
+        }
+        Insert: {
+          commission_dkk?: number | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          is_retroactive?: boolean
+          product_id: string
+          revenue_dkk?: number | null
+        }
+        Update: {
+          commission_dkk?: number | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          is_retroactive?: boolean
+          product_id?: string
+          revenue_dkk?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           client_campaign_id: string | null
