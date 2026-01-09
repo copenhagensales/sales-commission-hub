@@ -498,7 +498,7 @@ export default function ClosingShifts() {
                   Fredag: Oprydning før weekenden
                 </CardTitle>
                 <CardDescription>
-                  Sendes automatisk kl. 16:10 hver fredag til alle ledere og valgte modtagere
+                  Sendes automatisk kl. 15:10 hver fredag til alle ledere og valgte modtagere
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
