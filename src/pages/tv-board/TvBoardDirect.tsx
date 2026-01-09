@@ -333,8 +333,13 @@ export default function TvBoardDirect() {
   }
 
   return (
-    <div className="tv-board-wrapper min-h-screen relative">
+    <div className="tv-board-wrapper min-h-screen h-screen max-h-screen overflow-hidden relative">
       <style>{`
+        html, body {
+          overflow: hidden !important;
+          height: 100vh !important;
+          max-height: 100vh !important;
+        }
         .tv-board-wrapper {
           cursor: none;
         }
@@ -347,6 +352,11 @@ export default function TvBoardDirect() {
         }
         .tv-board-wrapper:hover .tv-nav-button {
           opacity: 1;
+        }
+        .tv-board-wrapper > div:first-of-type {
+          height: 100vh !important;
+          max-height: 100vh !important;
+          overflow: hidden !important;
         }
       `}</style>
       
