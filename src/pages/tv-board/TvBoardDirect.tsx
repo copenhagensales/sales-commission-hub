@@ -353,16 +353,18 @@ export default function TvBoardDirect() {
         .tv-board-wrapper:hover .tv-nav-button {
           opacity: 1;
         }
-        .tv-board-wrapper > div:first-of-type {
+        .tv-board-wrapper > [data-tv-dashboard] {
           height: 100vh !important;
           max-height: 100vh !important;
           overflow: hidden !important;
         }
       `}</style>
       
-      <TvBoardProvider slug={currentSlug}>
-        <DashboardComponent />
-      </TvBoardProvider>
+      <div data-tv-dashboard className="h-screen max-h-screen overflow-hidden">
+        <TvBoardProvider slug={currentSlug}>
+          <DashboardComponent />
+        </TvBoardProvider>
+      </div>
       
       {/* Celebration Overlay */}
       {celebrationSettings?.enabled && (
