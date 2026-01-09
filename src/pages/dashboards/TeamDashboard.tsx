@@ -72,7 +72,33 @@ interface TeamDashboardContentProps {
 const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboardContentProps) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
-  // Fetch team and its clients from team_clients table
+  // Check if we're in TV mode (accessed via TV board without auth)
+  const isTvMode = typeof window !== 'undefined' && sessionStorage.getItem('tv_board_code');
+  const tvAccessCode = typeof window !== 'undefined' ? sessionStorage.getItem('tv_board_code') : null;
+  
+  // Fetch data from edge function in TV mode (bypasses RLS)
+  const { data: tvData, isLoading: isLoadingTvData } = useQuery({
+    queryKey: ["tv-team-dashboard-data", teamSlug, tvAccessCode],
+    queryFn: async () => {
+      // Call edge function with query params
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tv-dashboard-data?dashboard=${teamSlug}&code=${tvAccessCode || ''}`;
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to fetch TV dashboard data');
+      }
+      
+      return res.json();
+    },
+    enabled: !!isTvMode,
+    refetchInterval: 30000, // Refresh every 30 seconds in TV mode
+  });
+  
+  // Fetch team and its clients from team_clients table (only when not in TV mode)
   const { data: teamData, isLoading: isLoadingTeam } = useQuery({
     queryKey: ["team-dashboard-team", teamName],
     queryFn: async () => {
@@ -104,12 +130,21 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
       return { team, clients };
     },
+    enabled: !isTvMode,
   });
 
-  const clients = teamData?.clients || [];
-  const clientIds = clients.map(c => c.id);
+  // Use TV data when in TV mode, otherwise use direct queries
+  const tvClients = tvData?.clients || [];
+  const tvTopSellers = tvData?.topSellers || [];
+  
+  const clients = isTvMode ? tvClients.map((c: any) => ({
+    id: c.clientId,
+    name: c.clientName,
+    logo_url: c.logoUrl,
+  })) : (teamData?.clients || []);
+  const clientIds = clients.map((c: any) => c.id);
 
-  // Fetch sales stats for ALL clients at once (for multi-client view)
+  // Fetch sales stats for ALL clients at once (for multi-client view) - disabled in TV mode
   const { data: allClientStats } = useQuery({
     queryKey: ["team-dashboard-all-client-stats", clientIds, selectedDate.toDateString()],
     queryFn: async () => {
@@ -168,7 +203,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
       // Convert to array, only include clients with sales
       const result: ClientSalesStats[] = clients
-        .map(client => ({
+        .map((client: any) => ({
           clientId: client.id,
           clientName: client.name,
           logoUrl: client.logo_url,
@@ -180,8 +215,11 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
       return result;
     },
-    enabled: clientIds.length > 0 && multiClient,
+    enabled: clientIds.length > 0 && multiClient && !isTvMode,
   });
+
+  // Use TV data for client stats in TV mode
+  const effectiveClientStats = isTvMode ? tvClients : (allClientStats || []);
 
   // Fetch top sellers this month across ALL clients (for multi-client view)
   const { data: allMonthSellers } = useQuery({
@@ -388,7 +426,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     enabled: clientIds.length > 0 && multiClient,
   });
 
-  if (isLoadingTeam) {
+  if (isTvMode ? isLoadingTvData : isLoadingTeam) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Indlæser...</p>
@@ -396,7 +434,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     );
   }
 
-  if (clients.length === 0) {
+  if (clients.length === 0 && !isTvMode) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
@@ -410,10 +448,10 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
   }
 
   // Multi-client view (United style)
-  if (multiClient) {
-    const clientsWithSales = allClientStats || [];
-    const monthSellers = allMonthSellers || [];
-    const todaySellers = allTodaySellers || [];
+  if (multiClient || isTvMode) {
+    const clientsWithSales = effectiveClientStats || [];
+    const monthSellers = isTvMode ? tvTopSellers : (allMonthSellers || []);
+    const todaySellers = isTvMode ? tvTopSellers : (allTodaySellers || []);
     const recentSales = allRecentSales || [];
 
     return (

@@ -55,8 +55,23 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching TV dashboard data for ${dashboard}, date: ${todayStr}`);
 
+    // Handle team-specific dashboards (tdc-erhverv, relatel, eesy-tm, etc.)
+    const TEAM_DASHBOARDS: Record<string, string> = {
+      "tdc-erhverv": "TDC Erhverv",
+      "relatel": "Relatel",
+      "eesy-tm": "Eesy TM",
+      "fieldmarketing": "Fieldmarketing",
+      "united": "United",
+      "tryg": "Tryg",
+      "ase": "ASE",
+    };
+
+    if (TEAM_DASHBOARDS[dashboard]) {
+      return await handleTeamDashboard(supabase, dashboard, TEAM_DASHBOARDS[dashboard], todayStr, startOfDay, endOfDay, corsHeaders);
+    }
+
+    // Default: CPH Sales dashboard logic
     // Fetch sales with sale_items to calculate correct counts using product mapping
-    // This matches the logic in MG Test / product mapping
     const { data: salesWithItems, error: salesError } = await supabase
       .from("sales")
       .select(`
@@ -238,3 +253,162 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Handle team-specific dashboards
+async function handleTeamDashboard(
+  supabase: any, 
+  teamSlug: string, 
+  teamName: string, 
+  todayStr: string, 
+  startOfDay: string, 
+  endOfDay: string,
+  corsHeaders: Record<string, string>
+) {
+  console.log(`Fetching team dashboard data for ${teamSlug} (${teamName})`);
+
+  // Find the team
+  const { data: team, error: teamError } = await supabase
+    .from("teams")
+    .select("id, name")
+    .ilike("name", `%${teamName}%`)
+    .maybeSingle();
+
+  if (teamError) {
+    console.error("Team error:", teamError);
+  }
+
+  // Get associated clients via team_clients
+  const clientIds: string[] = [];
+  const clients: any[] = [];
+
+  if (team) {
+    const { data: teamClients } = await supabase
+      .from("team_clients")
+      .select(`client_id, clients (id, name, logo_url)`)
+      .eq("team_id", team.id);
+
+    if (teamClients) {
+      for (const tc of teamClients) {
+        if (tc.clients) {
+          clients.push(tc.clients);
+          clientIds.push(tc.clients.id);
+        }
+      }
+    }
+  }
+
+  console.log(`Found ${clients.length} clients for team ${teamName}`);
+
+  // Get all campaigns for these clients
+  const { data: campaigns } = await supabase
+    .from("client_campaigns")
+    .select("id, client_id")
+    .in("client_id", clientIds.length > 0 ? clientIds : ['none']);
+
+  const campaignIds = (campaigns || []).map((c: any) => c.id);
+  const campaignToClient = new Map((campaigns || []).map((c: any) => [c.id, c.client_id]));
+
+  // Get month start
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Fetch sales for these campaigns
+  const { data: sales } = await supabase
+    .from("sales")
+    .select(`
+      id, agent_name, sale_datetime, client_campaign_id,
+      sale_items (
+        quantity,
+        product_id,
+        products (counts_as_sale, commission_dkk)
+      )
+    `)
+    .in("client_campaign_id", campaignIds.length > 0 ? campaignIds : ['none'])
+    .gte("sale_datetime", monthStart)
+    .order("sale_datetime", { ascending: false });
+
+  // Calculate stats by client
+  const clientStatsMap: Record<string, { salesToday: number; salesThisMonth: number }> = {};
+  clientIds.forEach(id => clientStatsMap[id] = { salesToday: 0, salesThisMonth: 0 });
+
+  // Calculate top sellers
+  const sellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
+
+  for (const sale of sales || []) {
+    const saleClientId = campaignToClient.get(sale.client_campaign_id) as string | undefined;
+    if (!saleClientId) continue;
+
+    // Count only items where counts_as_sale !== false
+    let validSales = 0;
+    let commission = 0;
+    for (const item of (sale as any).sale_items || []) {
+      if (item.products?.counts_as_sale !== false) {
+        const qty = Number(item.quantity) || 1;
+        validSales += qty;
+        commission += (item.products?.commission_dkk || 0) * qty;
+      }
+    }
+
+    if (validSales > 0 && clientStatsMap[saleClientId]) {
+      clientStatsMap[saleClientId].salesThisMonth += validSales;
+      
+      if (sale.sale_datetime >= startOfDay) {
+        clientStatsMap[saleClientId].salesToday += validSales;
+        
+        // Track seller stats for today only
+        const agentName = sale.agent_name || "Ukendt";
+        if (!sellerStats[agentName]) {
+          sellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
+        }
+        sellerStats[agentName].sales += validSales;
+        sellerStats[agentName].commission += commission;
+      }
+    }
+  }
+
+  // Build client stats array
+  const clientStatsArray = clients
+    .map((client: any) => ({
+      clientId: client.id,
+      clientName: client.name,
+      logoUrl: client.logo_url,
+      salesToday: clientStatsMap[client.id]?.salesToday || 0,
+      salesThisMonth: clientStatsMap[client.id]?.salesThisMonth || 0,
+    }))
+    .sort((a: any, b: any) => b.salesThisMonth - a.salesThisMonth);
+
+  // Build top sellers array
+  const topSellers = Object.entries(sellerStats)
+    .map(([name, stats]) => ({
+      name,
+      sales: stats.sales,
+      commission: stats.commission,
+      clientId: stats.clientId,
+    }))
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 10);
+
+  // Calculate totals
+  const totalSalesToday = Object.values(clientStatsMap).reduce((sum, s) => sum + s.salesToday, 0);
+  const totalSalesThisMonth = Object.values(clientStatsMap).reduce((sum, s) => sum + s.salesThisMonth, 0);
+
+  const response = {
+    date: todayStr,
+    timestamp: new Date().toISOString(),
+    dashboardType: "team",
+    teamSlug,
+    teamName: team?.name || teamName,
+    clients: clientStatsArray,
+    topSellers,
+    totals: {
+      salesToday: totalSalesToday,
+      salesThisMonth: totalSalesThisMonth,
+    },
+  };
+
+  console.log(`Team dashboard response: ${totalSalesToday} sales today, ${totalSalesThisMonth} this month, ${topSellers.length} top sellers`);
+
+  return new Response(JSON.stringify(response), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
