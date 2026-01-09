@@ -422,6 +422,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 Cph Sales Ligaen
               </NavLink>
               
+              {/* Liga Test Board - kun for ejere */}
+              {p.position?.name?.toLowerCase() === "ejer" && (
+                <NavLink
+                  to="/commission-league/test"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                    location.pathname === "/commission-league/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <FlaskConical className="h-4 w-4" />
+                  Liga Test Board
+                </NavLink>
+              )}
+              
               {/* Beskeder */}
               <NavLink
                 to="/messages"
