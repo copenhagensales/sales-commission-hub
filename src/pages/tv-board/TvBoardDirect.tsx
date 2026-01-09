@@ -243,10 +243,26 @@ export default function TvBoardDirect() {
 
   // Check for celebration triggers when data changes
   useEffect(() => {
-    if (!celebrationSettings?.enabled || !celebrationData) return;
+    console.log("[Celebration] Effect triggered:", {
+      enabled: celebrationSettings?.enabled,
+      hasData: !!celebrationData,
+      metric: celebrationSettings?.metric,
+      sourceDashboard: celebrationSettings?.sourceDashboard,
+    });
+
+    if (!celebrationSettings?.enabled || !celebrationData) {
+      console.log("[Celebration] Early exit - settings or data missing");
+      return;
+    }
 
     const currentValue = celebrationData.metricValue;
     const prevValue = prevMetricValueRef.current;
+
+    console.log("[Celebration] Value comparison:", {
+      currentValue,
+      prevValue,
+      triggerCondition: celebrationSettings.triggerCondition,
+    });
 
     // Determine if we should trigger celebration
     let shouldCelebrate = false;
@@ -273,9 +289,16 @@ export default function TvBoardDirect() {
       }
     }
 
+    console.log("[Celebration] Should celebrate:", shouldCelebrate);
+    
     prevMetricValueRef.current = currentValue;
 
     if (shouldCelebrate) {
+      console.log("[Celebration] 🎉 TRIGGERING CELEBRATION!", {
+        effect: celebrationSettings.effect,
+        text: celebrationSettings.text,
+        duration: celebrationSettings.duration,
+      });
       setShowCelebration(true);
     }
   }, [celebrationData, celebrationSettings]);
