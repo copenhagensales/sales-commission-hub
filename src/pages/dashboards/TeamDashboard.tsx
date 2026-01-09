@@ -857,29 +857,24 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       
       if (error) throw error;
       
-      // Build agent email to employee name map
-      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
-      
-      const { data: agents } = await supabase
+      // Build agent email to employee name map - fetch all agents and mappings for this lookup
+      const { data: allAgents } = await supabase
         .from("agents")
-        .select("id, email")
-        .in("email", agentEmails);
+        .select("id, email");
       
-      const agentIds = agents?.map(a => a.id) || [];
       const emailToAgentId = new Map<string, string>();
-      agents?.forEach(a => {
+      allAgents?.forEach(a => {
         if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
       });
       
-      const { data: mappings } = await supabase
+      const { data: allMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agent_id")
-        .in("agent_id", agentIds);
+        .select("employee_id, agent_id");
       
       const agentIdToEmployeeId = new Map<string, string>();
-      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      allMappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
       
-      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const employeeIds = [...new Set(allMappings?.map(m => m.employee_id) || [])];
       const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
@@ -991,29 +986,24 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       
       if (error) throw error;
       
-      // Build agent email to employee name map
-      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
-      
-      const { data: agents } = await supabase
+      // Build agent email to employee name map - fetch all agents and mappings for this lookup
+      const { data: allAgents } = await supabase
         .from("agents")
-        .select("id, email")
-        .in("email", agentEmails);
+        .select("id, email");
       
-      const agentIds = agents?.map(a => a.id) || [];
       const emailToAgentId = new Map<string, string>();
-      agents?.forEach(a => {
+      allAgents?.forEach(a => {
         if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
       });
       
-      const { data: mappings } = await supabase
+      const { data: allMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agent_id")
-        .in("agent_id", agentIds);
+        .select("employee_id, agent_id");
       
       const agentIdToEmployeeId = new Map<string, string>();
-      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      allMappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
       
-      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const employeeIds = [...new Set(allMappings?.map(m => m.employee_id) || [])];
       const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
@@ -1121,29 +1111,24 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       
       if (error) throw error;
       
-      // Build agent email to employee name map
-      const agentEmails = [...new Set((data || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
-      
-      const { data: agents } = await supabase
+      // Build agent email to employee name map - fetch all agents and mappings for this lookup
+      const { data: allAgents } = await supabase
         .from("agents")
-        .select("id, email")
-        .in("email", agentEmails);
+        .select("id, email");
       
-      const agentIds = agents?.map(a => a.id) || [];
       const emailToAgentId = new Map<string, string>();
-      agents?.forEach(a => {
+      allAgents?.forEach(a => {
         if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
       });
       
-      const { data: mappings } = await supabase
+      const { data: allMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agent_id")
-        .in("agent_id", agentIds);
+        .select("employee_id, agent_id");
       
       const agentIdToEmployeeId = new Map<string, string>();
-      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      allMappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
       
-      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const employeeIds = [...new Set(allMappings?.map(m => m.employee_id) || [])];
       const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
