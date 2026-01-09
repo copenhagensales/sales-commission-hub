@@ -108,6 +108,7 @@ import {
   SecurityDashboard,
   UpcomingStarts,
   SalarySchemes,
+  CommissionLeague,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -133,6 +134,7 @@ export const routes: RouteConfig[] = [
   { path: "/some", component: Some, access: "protected" },
   { path: "/messages", component: Messages, access: "protected" },
   { path: "/refer-a-friend", component: ReferAFriend, access: "protected" },
+  { path: "/commission-league", component: CommissionLeague, access: "protected" },
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/contract/:id", component: ContractSign, access: "public" },

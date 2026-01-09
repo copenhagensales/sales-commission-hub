@@ -4948,6 +4948,175 @@ export type Database = {
           },
         ]
       }
+      league_enrollments: {
+        Row: {
+          employee_id: string
+          enrolled_at: string | null
+          id: string
+          is_active: boolean | null
+          season_id: string
+        }
+        Insert: {
+          employee_id: string
+          enrolled_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          season_id: string
+        }
+        Update: {
+          employee_id?: string
+          enrolled_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_enrollments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_enrollments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_enrollments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_enrollments_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "league_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_qualification_standings: {
+        Row: {
+          current_provision: number | null
+          deals_count: number | null
+          employee_id: string
+          id: string
+          last_calculated_at: string | null
+          overall_rank: number
+          previous_overall_rank: number | null
+          projected_division: number
+          projected_rank: number
+          season_id: string
+        }
+        Insert: {
+          current_provision?: number | null
+          deals_count?: number | null
+          employee_id: string
+          id?: string
+          last_calculated_at?: string | null
+          overall_rank?: number
+          previous_overall_rank?: number | null
+          projected_division?: number
+          projected_rank?: number
+          season_id: string
+        }
+        Update: {
+          current_provision?: number | null
+          deals_count?: number | null
+          employee_id?: string
+          id?: string
+          last_calculated_at?: string | null
+          overall_rank?: number
+          previous_overall_rank?: number | null
+          projected_division?: number
+          projected_rank?: number
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_qualification_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_qualification_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_qualification_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_qualification_standings_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "league_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_seasons: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          qualification_end_at: string
+          qualification_source_end: string
+          qualification_source_start: string
+          qualification_start_at: string
+          season_number: number
+          start_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          qualification_end_at: string
+          qualification_source_end: string
+          qualification_source_start: string
+          qualification_start_at: string
+          season_number: number
+          start_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          qualification_end_at?: string
+          qualification_source_end?: string
+          qualification_source_start?: string
+          qualification_start_at?: string
+          season_number?: number
+          start_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       location: {
         Row: {
           address_city: string | null

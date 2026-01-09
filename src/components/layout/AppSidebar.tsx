@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -358,7 +358,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head", "/refer-a-friend", "/commission-league"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -407,6 +407,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
                   </Badge>
                 )}
+              </NavLink>
+
+              {/* Provisionsliga */}
+              <NavLink
+                to="/commission-league"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Trophy className="h-4 w-4" />
+                Provisionsliga
               </NavLink>
               
               {/* Beskeder */}

@@ -145,3 +145,6 @@ export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"
 // Salary Schemes
 export const SalarySchemes = lazyPage(() => import("@/pages/SalarySchemes"));
 
+// Commission League
+export const CommissionLeague = lazyPage(() => import("@/pages/CommissionLeague"));
+
