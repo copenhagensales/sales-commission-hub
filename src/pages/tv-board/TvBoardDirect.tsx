@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { TvBoardProvider } from "@/contexts/TvBoardContext";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { useCelebrationData, replaceCelebrationVariables } from "@/hooks/useCelebrationData";
+import { Button } from "@/components/ui/button";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -56,6 +57,7 @@ interface TvBoardData {
   celebration_text: string | null;
   celebration_metric: string | null;
   celebration_source_dashboard: string | null;
+  start_fullscreen: boolean | null;
 }
 
 export default function TvBoardDirect() {
@@ -75,6 +77,10 @@ export default function TvBoardDirect() {
   const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const prevMetricValueRef = useRef<number | null>(null);
+  
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const hasAutoFullscreened = useRef(false);
 
   // Celebration data - fetch from source dashboard
   const celebrationSourceSlug = celebrationSettings?.sourceDashboard || dashboardSlugs[0] || null;
@@ -109,7 +115,8 @@ export default function TvBoardDirect() {
           celebration_trigger_condition,
           celebration_text,
           celebration_metric,
-          celebration_source_dashboard
+          celebration_source_dashboard,
+          start_fullscreen
         `)
         .eq("access_code", code.toUpperCase())
         .eq("is_active", true)
@@ -254,6 +261,23 @@ export default function TvBoardDirect() {
     setCurrentIndex((prev) => (prev + 1) % dashboardSlugs.length);
   }, [dashboardSlugs.length]);
 
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -262,11 +286,14 @@ export default function TvBoardDirect() {
       if (e.key === 'c' && celebrationSettings?.enabled) {
         setShowCelebration(true); // Manual trigger with 'c' key
       }
+      if (e.key === 'f') {
+        toggleFullscreen();
+      }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToPrevious, goToNext, celebrationSettings]);
+  }, [goToPrevious, goToNext, celebrationSettings, toggleFullscreen]);
 
   if (loading) {
     return (
@@ -337,6 +364,16 @@ export default function TvBoardDirect() {
           text={replaceCelebrationVariables(celebrationSettings.text, celebrationData)}
         />
       )}
+      
+      {/* Fullscreen button - always visible on hover */}
+      <Button
+        onClick={toggleFullscreen}
+        className="tv-nav-button fixed top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
+        size="icon"
+        variant="ghost"
+      >
+        {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+      </Button>
       
       {/* Navigation controls for multiple dashboards */}
       {dashboardSlugs.length > 1 && (

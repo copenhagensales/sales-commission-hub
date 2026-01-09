@@ -7495,6 +7495,7 @@ export type Database = {
           name: string | null
           rotate_interval_seconds: number | null
           rotate_intervals_per_dashboard: Json | null
+          start_fullscreen: boolean
         }
         Insert: {
           access_code: string
@@ -7519,6 +7520,7 @@ export type Database = {
           name?: string | null
           rotate_interval_seconds?: number | null
           rotate_intervals_per_dashboard?: Json | null
+          start_fullscreen?: boolean
         }
         Update: {
           access_code?: string
@@ -7543,6 +7545,7 @@ export type Database = {
           name?: string | null
           rotate_interval_seconds?: number | null
           rotate_intervals_per_dashboard?: Json | null
+          start_fullscreen?: boolean
         }
         Relationships: []
       }
