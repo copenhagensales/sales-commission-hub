@@ -140,13 +140,16 @@ export function PremierLeagueBoard({
                     // Zone determination
                     const isPromoZone = !isTopDivision && standing.projected_rank <= 2;
                     const isTopZone = isTopDivision && standing.projected_rank <= 2;
-                    const isDuelZone = standing.projected_rank === playersPerDivision - 2;
+                    const isPlayoffZoneTop = !isTopDivision && standing.projected_rank === 3; // Top playoff
+                    const isPlayoffZoneBottom = standing.projected_rank === playersPerDivision - 2; // Bottom playoff
+                    const isPlayoffZone = isPlayoffZoneTop || isPlayoffZoneBottom;
                     const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 1;
 
-                    // Show dashed separator before duel zone and relegation zone
+                    // Show dashed separator before playoff zones and relegation zone
                     const showDashedBefore = 
+                      (idx > 0 && standing.projected_rank === 3 && !isTopDivision) ||
                       (idx > 0 && standing.projected_rank === playersPerDivision - 2) ||
-                      (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isDuelZone);
+                      (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isPlayoffZoneBottom);
 
                     return (
                       <>
@@ -164,7 +167,7 @@ export function PremierLeagueBoard({
                             isCurrentUser && "bg-primary/10 hover:bg-primary/15",
                             isPromoZone && !isCurrentUser && "bg-green-500/10 hover:bg-green-500/15",
                             isTopZone && !isCurrentUser && "bg-yellow-500/10 hover:bg-yellow-500/15",
-                            isDuelZone && !isCurrentUser && "bg-orange-500/10 hover:bg-orange-500/15",
+                            isPlayoffZone && !isCurrentUser && "bg-orange-500/10 hover:bg-orange-500/15",
                             isRelegationZone && !isCurrentUser && "bg-red-500/10 hover:bg-red-500/15",
                             // Division movement highlight
                             justPromoted && "ring-2 ring-inset ring-green-500/40",
@@ -179,9 +182,9 @@ export function PremierLeagueBoard({
                                   "w-1 h-6 rounded-full",
                                   isPromoZone && "bg-green-500",
                                   isTopZone && "bg-yellow-500",
-                                  isDuelZone && "bg-orange-500",
+                                  isPlayoffZone && "bg-orange-500",
                                   isRelegationZone && "bg-red-500",
-                                  !isPromoZone && !isTopZone && !isDuelZone && !isRelegationZone && "bg-transparent"
+                                  !isPromoZone && !isTopZone && !isPlayoffZone && !isRelegationZone && "bg-transparent"
                                 )}
                               />
                               <span>{standing.projected_rank}</span>
@@ -203,13 +206,13 @@ export function PremierLeagueBoard({
                               
                               {/* Division movement badge */}
                               {justPromoted && (
-                                <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs px-1.5 py-0.5 animate-pulse">
+                                <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs px-1.5 py-0.5">
                                   <ArrowUp className="h-3 w-3 mr-0.5" />
                                   Div {standing.previous_division}
                                 </Badge>
                               )}
                               {justRelegated && (
-                                <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs px-1.5 py-0.5 animate-pulse">
+                                <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs px-1.5 py-0.5">
                                   <ArrowDown className="h-3 w-3 mr-0.5" />
                                   Div {standing.previous_division}
                                 </Badge>
@@ -263,9 +266,9 @@ export function PremierLeagueBoard({
                                 Top 2
                               </Badge>
                             )}
-                            {isDuelZone && (
+                            {isPlayoffZone && (
                               <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 hover:bg-orange-500/30">
-                                Duel
+                                Playoff
                               </Badge>
                             )}
                             {isRelegationZone && (
