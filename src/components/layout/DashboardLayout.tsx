@@ -19,6 +19,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Detect TV mode - skip all auth-dependent components
+  const isTvMode = typeof window !== 'undefined' && 
+    (window.location.pathname.startsWith('/t/') || 
+     window.location.pathname.startsWith('/tv/') ||
+     sessionStorage.getItem('tv_board_code') !== null);
+
+  // In TV mode, render only children without auth wrappers
+  if (isTvMode) {
+    return (
+      <div className="min-h-screen bg-background">
+        {children}
+      </div>
+    );
+  }
+
   return (
     <LockOverlays>
       <div className="min-h-screen bg-background">

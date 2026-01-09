@@ -39,7 +39,9 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   // TV board routes are exempt from timeout
-  const isTvBoardRoute = location.pathname.startsWith("/tv-board");
+  const isTvBoardRoute = location.pathname.startsWith("/tv-board") ||
+                         location.pathname.startsWith("/t/") ||
+                         location.pathname.startsWith("/tv/");
 
   // Fetch timeout settings based on user's position
   useEffect(() => {
