@@ -299,16 +299,16 @@ async function resolveAgentNames(
     (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
   );
   
-  // Get employee names from master data
+  // Get employee names from master data (first_name + last_name, no full_name column)
   const { data: employees } = await supabase
     .from("employee_master_data")
-    .select("id, full_name")
+    .select("id, first_name, last_name")
     .in("id", employeeIds);
   
   if (!employees) return nameMap;
   
   const employeeIdToName = new Map<string, string>(
-    (employees as any[]).map((e) => [e.id, e.full_name])
+    (employees as any[]).map((e) => [e.id, `${e.first_name || ''} ${e.last_name || ''}`.trim()])
   );
   
   // Build the final email -> name map
