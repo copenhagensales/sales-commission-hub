@@ -263,16 +263,28 @@ async function resolveAgentNames(
   
   if (agentEmails.length === 0) return nameMap;
   
-  // Get agents by email (case-insensitive)
-  const { data: agents } = await supabase
+  // Normalize emails to lowercase for consistent matching
+  const lowerEmails = agentEmails.map(e => e.toLowerCase());
+  const uniqueLowerEmails = [...new Set(lowerEmails)];
+  
+  // Get all agents and filter case-insensitively (agents table might have different casing)
+  const { data: allAgents } = await supabase
     .from("agents")
-    .select("id, email")
-    .in("email", agentEmails);
+    .select("id, email");
   
-  if (!agents || agents.length === 0) return nameMap;
+  if (!allAgents || allAgents.length === 0) return nameMap;
   
-  const agentIds = (agents as any[]).map((a) => a.id);
-  const emailToAgentId = new Map<string, string>((agents as any[]).map((a) => [a.email.toLowerCase(), a.id]));
+  // Filter agents that match our emails (case-insensitive)
+  const matchingAgents = (allAgents as any[]).filter(
+    (a) => a.email && uniqueLowerEmails.includes(a.email.toLowerCase())
+  );
+  
+  if (matchingAgents.length === 0) return nameMap;
+  
+  const agentIds = matchingAgents.map((a) => a.id);
+  const emailToAgentId = new Map<string, string>(
+    matchingAgents.map((a) => [a.email.toLowerCase(), a.id])
+  );
   
   // Get employee mappings
   const { data: mappings } = await supabase
@@ -283,7 +295,9 @@ async function resolveAgentNames(
   if (!mappings || mappings.length === 0) return nameMap;
   
   const employeeIds = (mappings as any[]).map((m) => m.employee_id);
-  const agentIdToEmployeeId = new Map<string, string>((mappings as any[]).map((m) => [m.agent_id, m.employee_id]));
+  const agentIdToEmployeeId = new Map<string, string>(
+    (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
+  );
   
   // Get employee names from master data
   const { data: employees } = await supabase
@@ -293,7 +307,9 @@ async function resolveAgentNames(
   
   if (!employees) return nameMap;
   
-  const employeeIdToName = new Map<string, string>((employees as any[]).map((e) => [e.id, e.full_name]));
+  const employeeIdToName = new Map<string, string>(
+    (employees as any[]).map((e) => [e.id, e.full_name])
+  );
   
   // Build the final email -> name map
   for (const email of agentEmails) {
