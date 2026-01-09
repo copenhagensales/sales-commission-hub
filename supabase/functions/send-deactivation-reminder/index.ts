@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +16,78 @@ interface DeactivationReminderRequest {
   is_followup?: boolean;
 }
 
+// Get M365 access token
+async function getM365AccessToken(): Promise<string> {
+  const tenantId = Deno.env.get("M365_TENANT_ID");
+  const clientId = Deno.env.get("M365_CLIENT_ID");
+  const clientSecret = Deno.env.get("M365_CLIENT_SECRET");
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("M365 credentials not configured");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: "https://graph.microsoft.com/.default",
+      grant_type: "client_credentials",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("M365 token error:", error);
+    throw new Error("Failed to get M365 access token");
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
+// Send email via M365
+async function sendEmail(
+  accessToken: string,
+  recipients: string[],
+  subject: string,
+  htmlBody: string
+): Promise<void> {
+  const senderEmail = Deno.env.get("M365_SENDER_EMAIL");
+  
+  if (!senderEmail) {
+    throw new Error("M365_SENDER_EMAIL not configured");
+  }
+
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: { contentType: "HTML", content: htmlBody },
+          toRecipients: recipients.map(email => ({ emailAddress: { address: email } })),
+        },
+        saveToSentItems: true,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("M365 send email error:", error);
+    throw new Error("Failed to send email via M365");
+  }
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -24,7 +95,6 @@ serve(async (req: Request) => {
   }
 
   try {
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -129,18 +199,10 @@ CPH Sales System`,
       </html>
     `;
 
-    // Send email to all recipients
-    const { error: emailError } = await resend.emails.send({
-      from: "CPH Sales <noreply@cph.sales>",
-      to: recipients,
-      subject: emailSubject,
-      html: htmlBody,
-    });
-
-    if (emailError) {
-      console.error("Resend error:", emailError);
-      throw new Error(`Failed to send email: ${emailError.message}`);
-    }
+    // Send email via M365
+    console.log(`Sending deactivation reminder to ${recipients.length} recipients via M365`);
+    const accessToken = await getM365AccessToken();
+    await sendEmail(accessToken, recipients, emailSubject, htmlBody);
 
     console.log(`Deactivation reminder sent successfully to ${recipients.length} recipients`);
 
