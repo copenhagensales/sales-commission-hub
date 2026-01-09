@@ -5,12 +5,25 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
+import FieldmarketingDashboardFull from "@/pages/dashboards/FieldmarketingDashboardFull";
+import TeamDashboard from "@/pages/dashboards/TeamDashboard";
+import TdcErhvervGoalsDashboard from "@/pages/dashboards/TdcErhvervGoalsDashboard";
+import FieldmarketingGoalsDashboard from "@/pages/dashboards/FieldmarketingGoalsDashboard";
 import { Loader2 } from "lucide-react";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
-  // Add more dashboard mappings here as needed
+  "fieldmarketing": FieldmarketingDashboardFull,
+  "team": TeamDashboard,
+  "eesy-tm": TeamDashboard,
+  "tdc-erhverv": TeamDashboard,
+  "relatel": TeamDashboard,
+  "tryg": TeamDashboard,
+  "ase": TeamDashboard,
+  "united": TeamDashboard,
+  "tdc-erhverv-goals": TdcErhvervGoalsDashboard,
+  "fieldmarketing-goals": FieldmarketingGoalsDashboard,
 };
 
 export default function TvBoardView() {
