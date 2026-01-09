@@ -816,33 +816,111 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
 
+      // Fetch campaign mappings for overrides
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+      
+      // Fetch product campaign overrides
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk");
+      
+      const campaignOverrideMap = new Map<string, number>();
+      productCampaignOverrides?.forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
+      });
+
       const { data: sales, error } = await supabase
         .from("sales")
         .select(`
-          agent_name, 
+          agent_name,
+          agent_email,
+          dialer_campaign_id,
           sale_items (
             quantity,
             mapped_commission,
             product_id,
-            products (commission_dkk, counts_as_sale)
+            products (counts_as_sale)
           )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart);
       
       if (error) throw error;
+      
+      // Build agent email to employee name map
+      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+      
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, email")
+        .in("email", agentEmails);
+      
+      const agentIds = agents?.map(a => a.id) || [];
+      const emailToAgentId = new Map<string, string>();
+      agents?.forEach(a => {
+        if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
+      });
+      
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id")
+        .in("agent_id", agentIds);
+      
+      const agentIdToEmployeeId = new Map<string, string>();
+      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      
+      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", employeeIds);
+      
+      const employeeIdToName = new Map<string, string>();
+      employees?.forEach(e => employeeIdToName.set(e.id, `${e.first_name} ${e.last_name}`.trim()));
+      
+      // Function to get employee name from agent email
+      const getEmployeeName = (agentEmail: string | null, agentName: string): string => {
+        if (!agentEmail) return agentName;
+        const agentId = emailToAgentId.get(agentEmail.toLowerCase());
+        if (!agentId) return agentName;
+        const employeeId = agentIdToEmployeeId.get(agentId);
+        if (!employeeId) return agentName;
+        return employeeIdToName.get(employeeId) || agentName;
+      };
 
       const agentStats: Record<string, { sales: number; commission: number }> = {};
       (sales || []).forEach((sale: any) => {
-        if (!agentStats[sale.agent_name]) {
-          agentStats[sale.agent_name] = { sales: 0, commission: 0 };
+        const displayName = getEmployeeName(sale.agent_email, sale.agent_name);
+        const campaignMappingId = sale.dialer_campaign_id ? dialerCampaignToMappingId.get(sale.dialer_campaign_id) : null;
+        
+        if (!agentStats[displayName]) {
+          agentStats[displayName] = { sales: 0, commission: 0 };
         }
         // Only count items where counts_as_sale !== false
         (sale.sale_items || []).forEach((item: any) => {
           if (item.products?.counts_as_sale === false) return;
           const qty = Number(item.quantity) || 1;
-          agentStats[sale.agent_name].sales += qty;
-          agentStats[sale.agent_name].commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+          agentStats[displayName].sales += qty;
+          
+          // Check for campaign override
+          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          
+          if (overrideCommission !== null && overrideCommission !== undefined) {
+            agentStats[displayName].commission += overrideCommission;
+          } else {
+            agentStats[displayName].commission += Number(item.mapped_commission) || 0;
+          }
         });
       });
 
@@ -872,33 +950,111 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
 
+      // Fetch campaign mappings for overrides
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+      
+      // Fetch product campaign overrides
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk");
+      
+      const campaignOverrideMap = new Map<string, number>();
+      productCampaignOverrides?.forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
+      });
+
       const { data: sales, error } = await supabase
         .from("sales")
         .select(`
-          agent_name, 
+          agent_name,
+          agent_email,
+          dialer_campaign_id,
           sale_items (
             quantity,
             mapped_commission,
             product_id,
-            products (commission_dkk, counts_as_sale)
+            products (counts_as_sale)
           )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", todayStart);
       
       if (error) throw error;
+      
+      // Build agent email to employee name map
+      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+      
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, email")
+        .in("email", agentEmails);
+      
+      const agentIds = agents?.map(a => a.id) || [];
+      const emailToAgentId = new Map<string, string>();
+      agents?.forEach(a => {
+        if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
+      });
+      
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id")
+        .in("agent_id", agentIds);
+      
+      const agentIdToEmployeeId = new Map<string, string>();
+      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      
+      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", employeeIds);
+      
+      const employeeIdToName = new Map<string, string>();
+      employees?.forEach(e => employeeIdToName.set(e.id, `${e.first_name} ${e.last_name}`.trim()));
+      
+      // Function to get employee name from agent email
+      const getEmployeeName = (agentEmail: string | null, agentName: string): string => {
+        if (!agentEmail) return agentName;
+        const agentId = emailToAgentId.get(agentEmail.toLowerCase());
+        if (!agentId) return agentName;
+        const employeeId = agentIdToEmployeeId.get(agentId);
+        if (!employeeId) return agentName;
+        return employeeIdToName.get(employeeId) || agentName;
+      };
 
       const agentStats: Record<string, { sales: number; commission: number }> = {};
       (sales || []).forEach((sale: any) => {
-        if (!agentStats[sale.agent_name]) {
-          agentStats[sale.agent_name] = { sales: 0, commission: 0 };
+        const displayName = getEmployeeName(sale.agent_email, sale.agent_name);
+        const campaignMappingId = sale.dialer_campaign_id ? dialerCampaignToMappingId.get(sale.dialer_campaign_id) : null;
+        
+        if (!agentStats[displayName]) {
+          agentStats[displayName] = { sales: 0, commission: 0 };
         }
         // Only count items where counts_as_sale !== false
         (sale.sale_items || []).forEach((item: any) => {
           if (item.products?.counts_as_sale === false) return;
           const qty = Number(item.quantity) || 1;
-          agentStats[sale.agent_name].sales += qty;
-          agentStats[sale.agent_name].commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+          agentStats[displayName].sales += qty;
+          
+          // Check for campaign override
+          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          
+          if (overrideCommission !== null && overrideCommission !== undefined) {
+            agentStats[displayName].commission += overrideCommission;
+          } else {
+            agentStats[displayName].commission += Number(item.mapped_commission) || 0;
+          }
         });
       });
 
@@ -925,15 +1081,38 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
 
+      // Fetch campaign mappings for overrides
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+      
+      // Fetch product campaign overrides
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk");
+      
+      const campaignOverrideMap = new Map<string, number>();
+      productCampaignOverrides?.forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
+      });
+
       const { data, error } = await supabase
         .from("sales")
         .select(`
-          id, sale_datetime, agent_name, customer_phone, created_at, 
+          id, sale_datetime, agent_name, agent_email, customer_phone, created_at, dialer_campaign_id,
           sale_items (
             quantity,
             mapped_commission,
             product_id,
-            products (commission_dkk, counts_as_sale)
+            products (counts_as_sale)
           )
         `)
         .in("client_campaign_id", campaignIds)
@@ -942,15 +1121,64 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
       
       if (error) throw error;
       
+      // Build agent email to employee name map
+      const agentEmails = [...new Set((data || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+      
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, email")
+        .in("email", agentEmails);
+      
+      const agentIds = agents?.map(a => a.id) || [];
+      const emailToAgentId = new Map<string, string>();
+      agents?.forEach(a => {
+        if (a.email) emailToAgentId.set(a.email.toLowerCase(), a.id);
+      });
+      
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id")
+        .in("agent_id", agentIds);
+      
+      const agentIdToEmployeeId = new Map<string, string>();
+      mappings?.forEach(m => agentIdToEmployeeId.set(m.agent_id, m.employee_id));
+      
+      const employeeIds = [...new Set(mappings?.map(m => m.employee_id) || [])];
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", employeeIds);
+      
+      const employeeIdToName = new Map<string, string>();
+      employees?.forEach(e => employeeIdToName.set(e.id, `${e.first_name} ${e.last_name}`.trim()));
+      
+      // Function to get employee name from agent email
+      const getEmployeeName = (agentEmail: string | null, agentName: string): string => {
+        if (!agentEmail) return agentName;
+        const agentId = emailToAgentId.get(agentEmail.toLowerCase());
+        if (!agentId) return agentName;
+        const employeeId = agentIdToEmployeeId.get(agentId);
+        if (!employeeId) return agentName;
+        return employeeIdToName.get(employeeId) || agentName;
+      };
+      
       return (data || []).map((sale: any) => {
+        const campaignMappingId = sale.dialer_campaign_id ? dialerCampaignToMappingId.get(sale.dialer_campaign_id) : null;
+        
         // Only count items where counts_as_sale !== false
         const validItems = (sale.sale_items || []).filter((item: any) => item.products?.counts_as_sale !== false);
         const total_commission = validItems.reduce((sum: number, item: any) => {
-          const qty = Number(item.quantity) || 1;
-          return sum + qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          
+          if (overrideCommission !== null && overrideCommission !== undefined) {
+            return sum + overrideCommission;
+          }
+          return sum + (Number(item.mapped_commission) || 0);
         }, 0);
         return {
           ...sale,
+          agent_name: getEmployeeName(sale.agent_email, sale.agent_name),
           total_commission,
         };
       });
