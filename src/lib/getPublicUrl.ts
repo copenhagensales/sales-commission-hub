@@ -1,19 +1,19 @@
+// Custom domain for the app
+const CUSTOM_DOMAIN = 'https://provision.copenhagensales.dk';
+
 /**
  * Get the public URL for the app.
- * In production, this returns the current origin.
- * In Lovable preview (lovableproject.com), this returns the published .lovable.app URL.
+ * Returns the custom domain when on preview, otherwise current origin.
  */
 export function getPublicUrl(): string {
   const origin = window.location.origin;
   
-  // If we're on the Lovable preview domain, convert to published URL
-  // Preview: https://[project-id].lovableproject.com
-  // Published: https://[project-id].lovable.app
-  if (origin.includes('.lovableproject.com')) {
-    return origin.replace('.lovableproject.com', '.lovable.app');
+  // If we're on the Lovable preview domain, use the custom domain
+  if (origin.includes('.lovableproject.com') || origin.includes('.lovable.app')) {
+    return CUSTOM_DOMAIN;
   }
   
-  // Otherwise return current origin (custom domain or published URL)
+  // Otherwise return current origin (custom domain)
   return origin;
 }
 
