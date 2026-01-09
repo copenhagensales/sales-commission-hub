@@ -1,4 +1,27 @@
-import { QualificationStanding } from "@/hooks/useLeagueData";
+import { FormResult } from "@/components/league/FormIndicator";
+
+// Extended interface for mock data with gamification fields
+export interface MockQualificationStanding {
+  id: string;
+  season_id: string;
+  employee_id: string;
+  current_provision: number;
+  deals_count: number;
+  projected_division: number;
+  projected_rank: number;
+  overall_rank: number;
+  previous_overall_rank: number | null;
+  last_calculated_at: string;
+  employee?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
+  // Gamification fields
+  weekly_change: number;
+  avg_per_deal: number;
+  recent_form: FormResult[];
+}
 
 const FIRST_NAMES = [
   "Anders", "Kasper", "Mikkel", "Frederik", "Christian", "Thomas", "Martin", "Jonas", "Mads", "Nicolai",
@@ -20,6 +43,21 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function generateRandomForm(): FormResult[] {
+  const results: FormResult[] = [];
+  for (let i = 0; i < 5; i++) {
+    const rand = Math.random();
+    if (rand < 0.45) {
+      results.push("win");
+    } else if (rand < 0.75) {
+      results.push("loss");
+    } else {
+      results.push("draw");
+    }
+  }
+  return results;
+}
+
 export interface MockStandingsOptions {
   playerCount: number;
   playersPerDivision: number;
@@ -29,7 +67,7 @@ export interface MockStandingsOptions {
   maxProvision?: number;
 }
 
-export function generateMockStandings(options: MockStandingsOptions): QualificationStanding[] {
+export function generateMockStandings(options: MockStandingsOptions): MockQualificationStanding[] {
   const {
     playerCount,
     playersPerDivision,
@@ -39,7 +77,7 @@ export function generateMockStandings(options: MockStandingsOptions): Qualificat
     maxProvision = 120000
   } = options;
 
-  const standings: QualificationStanding[] = [];
+  const standings: MockQualificationStanding[] = [];
 
   // Generate players with random provision
   for (let i = 0; i < playerCount; i++) {
@@ -49,13 +87,19 @@ export function generateMockStandings(options: MockStandingsOptions): Qualificat
     // Higher provision for lower indexes (to create realistic distribution)
     const provisionBase = maxProvision - (i / playerCount) * (maxProvision - minProvision);
     const provision = Math.round(provisionBase * (0.8 + Math.random() * 0.4));
+    const deals = randomInt(5, 50);
+    const avgPerDeal = deals > 0 ? Math.round(provision / deals) : 0;
+    
+    // Weekly change - higher ranked players tend to have positive change
+    const changeBase = (playerCount - i) / playerCount;
+    const weeklyChange = Math.round((changeBase - 0.5) * 20000 * (0.5 + Math.random()));
     
     standings.push({
       id: `mock-${i}`,
       season_id: "test-season-id",
       employee_id: `emp-${i}`,
       current_provision: provision,
-      deals_count: randomInt(5, 50),
+      deals_count: deals,
       projected_division: 0, // Will be calculated
       projected_rank: 0, // Will be calculated
       overall_rank: 0, // Will be calculated
@@ -65,7 +109,10 @@ export function generateMockStandings(options: MockStandingsOptions): Qualificat
         id: `emp-${i}`,
         first_name: firstName,
         last_name: lastName
-      }
+      },
+      weekly_change: weeklyChange,
+      avg_per_deal: avgPerDeal,
+      recent_form: generateRandomForm()
     });
   }
 
@@ -82,7 +129,7 @@ export function generateMockStandings(options: MockStandingsOptions): Qualificat
   return standings;
 }
 
-export function getCurrentEmployeeId(standings: QualificationStanding[], index: number): string | null {
+export function getCurrentEmployeeId(standings: MockQualificationStanding[], index: number): string | null {
   if (index >= 0 && index < standings.length) {
     return standings[index].employee_id;
   }
