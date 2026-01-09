@@ -16,7 +16,6 @@ import { FormIndicator } from "./FormIndicator";
 import { ZoneLegend } from "./ZoneLegend";
 import { PodiumBadge } from "./PodiumBadge";
 import { MvpBadge } from "./MvpBadge";
-import { ProgressRing } from "./ProgressRing";
 import { PersonalBestBadge } from "./PersonalBestBadge";
 import { DistanceToZone } from "./DistanceToZone";
 import { RivalryIndicator } from "./RivalryIndicator";
@@ -257,8 +256,6 @@ export function PremierLeagueBoard({
                             isTopZone && !isCurrentUser && "bg-yellow-500/10 hover:bg-yellow-500/15",
                             isPlayoffZone && !isCurrentUser && "bg-orange-500/10 hover:bg-orange-500/15",
                             isRelegationZone && !isCurrentUser && "bg-red-500/10 hover:bg-red-500/15",
-                            // Danger zone pulse for relegation
-                            isRelegationZone && "animate-[pulse_3s_ease-in-out_infinite] ring-1 ring-red-500/30",
                             // Division movement highlight
                             justPromoted && "ring-2 ring-inset ring-green-500/40",
                             justRelegated && "ring-2 ring-inset ring-red-500/40"
@@ -280,10 +277,7 @@ export function PremierLeagueBoard({
                               {isPodium ? (
                                 <PodiumBadge rank={podiumRank} />
                               ) : (
-                                <ProgressRing 
-                                  rank={standing.projected_rank} 
-                                  total={playersPerDivision} 
-                                />
+                                <span>{standing.projected_rank}</span>
                               )}
                             </div>
                           </TableCell>
