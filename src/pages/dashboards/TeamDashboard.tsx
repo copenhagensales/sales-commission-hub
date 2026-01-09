@@ -447,9 +447,9 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     );
   }
 
-  // Multi-client view (United style)
-  if (multiClient || isTvMode) {
-    const clientsWithSales = effectiveClientStats || [];
+  // Multi-client view (United style) - only for multiClient dashboards, NOT forced by TV mode
+  if (multiClient) {
+    const clientsWithSales = isTvMode ? effectiveClientStats : (allClientStats || []);
     const monthSellers = isTvMode ? tvTopSellers : (allMonthSellers || []);
     const todaySellers = isTvMode ? tvTopSellers : (allTodaySellers || []);
     const recentSales = allRecentSales || [];
@@ -710,16 +710,38 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
   }
 
   // Single client view (original behavior for other teams)
-  return <SingleClientDashboard clients={clients} teamName={teamName} />;
+  return <SingleClientDashboard 
+    clients={clients} 
+    teamName={teamName} 
+    tvData={isTvMode ? tvData : null}
+    isTvMode={!!isTvMode}
+  />;
 };
 
 // Single client dashboard component (extracted for clarity)
-const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; teamName: string }) => {
+interface SingleClientDashboardProps {
+  clients: TeamClient[];
+  teamName: string;
+  tvData?: any;
+  isTvMode?: boolean;
+}
+
+const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleClientDashboardProps) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const activeClient = clients[0];
   const activeClientId = activeClient?.id;
 
-  // Fetch sales stats for selected client
+  // Use TV data if available, otherwise fetch from Supabase
+  const tvSalesStats = tvData ? {
+    salesToday: tvData.totals?.salesToday || 0,
+    salesThisWeek: tvData.totals?.salesToday || 0, // TV data doesn't have week, use today
+    salesThisMonth: tvData.totals?.salesThisMonth || 0,
+    totalSales: tvData.totals?.salesThisMonth || 0,
+  } : null;
+
+  const tvTopSellersData = tvData?.topSellers || [];
+
+  // Fetch sales stats for selected client - disabled in TV mode
   const { data: salesStats } = useQuery({
     queryKey: ["team-dashboard-sales-stats", activeClientId, selectedDate.toDateString()],
     queryFn: async () => {
@@ -770,8 +792,11 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         totalSales: allSales.reduce((sum, s) => sum + countValidSales(s), 0),
       };
     },
-    enabled: !!activeClientId,
+    enabled: !!activeClientId && !isTvMode,
   });
+
+  // Use TV data or fetched data
+  const effectiveSalesStats = isTvMode ? tvSalesStats : salesStats;
 
   const { data: topSellers } = useQuery({
     queryKey: ["team-dashboard-top-sellers", activeClientId],
@@ -823,8 +848,11 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         .map(([name, stats]) => ({ name, ...stats }))
         .sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!activeClientId,
+    enabled: !!activeClientId && !isTvMode,
   });
+
+  // Use TV data or fetched data for top sellers
+  const effectiveTopSellers = isTvMode ? tvTopSellersData : (topSellers || []);
 
   const { data: todaySellers } = useQuery({
     queryKey: ["team-dashboard-today-sellers", activeClientId, selectedDate.toDateString()],
@@ -876,8 +904,11 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         .map(([name, stats]) => ({ name, ...stats }))
         .sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!activeClientId,
+    enabled: !!activeClientId && !isTvMode,
   });
+
+  // Use TV data or fetched data for today sellers
+  const effectiveTodaySellers = isTvMode ? tvTopSellersData : (todaySellers || []);
 
   const { data: recentSales } = useQuery({
     queryKey: ["team-dashboard-recent-sales", activeClientId],
@@ -922,8 +953,11 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         };
       });
     },
-    enabled: !!activeClientId,
+    enabled: !!activeClientId && !isTvMode,
   });
+
+  // Recent sales is not available in TV mode (edge function doesn't return it for single-client)
+  const effectiveRecentSales = recentSales || [];
 
   const datePickerContent = (
     <div className="flex items-center gap-4">
@@ -975,7 +1009,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             <CardTitle className="text-sm font-medium">{format(selectedDate, "d. MMM", { locale: da })}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesStats?.salesToday || 0}</div>
+            <div className="text-2xl font-bold">{effectiveSalesStats?.salesToday || 0}</div>
             <p className="text-xs text-muted-foreground">salg</p>
           </CardContent>
         </Card>
@@ -984,7 +1018,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             <CardTitle className="text-sm font-medium">Denne uge</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesStats?.salesThisWeek || 0}</div>
+            <div className="text-2xl font-bold">{effectiveSalesStats?.salesThisWeek || 0}</div>
             <p className="text-xs text-muted-foreground">salg</p>
           </CardContent>
         </Card>
@@ -993,7 +1027,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             <CardTitle className="text-sm font-medium">Denne måned</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesStats?.salesThisMonth || 0}</div>
+            <div className="text-2xl font-bold">{effectiveSalesStats?.salesThisMonth || 0}</div>
             <p className="text-xs text-muted-foreground">salg</p>
           </CardContent>
         </Card>
@@ -1002,7 +1036,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             <CardTitle className="text-sm font-medium">Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesStats?.totalSales || 0}</div>
+            <div className="text-2xl font-bold">{effectiveSalesStats?.totalSales || 0}</div>
             <p className="text-xs text-muted-foreground">salg</p>
           </CardContent>
         </Card>
@@ -1015,7 +1049,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             <CardTitle className="text-lg">Månedens sælgere</CardTitle>
           </CardHeader>
           <CardContent>
-            {topSellers && topSellers.length > 0 ? (
+            {effectiveTopSellers && effectiveTopSellers.length > 0 ? (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -1027,14 +1061,14 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {topSellers.map((seller, index) => (
+                    {effectiveTopSellers.map((seller: any, index: number) => (
                       <TableRow key={seller.name}>
                         <TableCell>
                           <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>{index + 1}</Badge>
                         </TableCell>
                         <TableCell className="font-medium">{seller.name}</TableCell>
                         <TableCell className="text-right">{seller.sales}</TableCell>
-                        <TableCell className="text-right font-mono font-medium">{seller.commission.toLocaleString("da-DK")} kr</TableCell>
+                        <TableCell className="text-right font-mono font-medium">{(seller.commission || 0).toLocaleString("da-DK")} kr</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1052,7 +1086,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
           <CardTitle className="text-lg">Sælgere {format(selectedDate, "d. MMMM", { locale: da })}</CardTitle>
         </CardHeader>
         <CardContent>
-          {todaySellers && todaySellers.length > 0 ? (
+          {effectiveTodaySellers && effectiveTodaySellers.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -1064,14 +1098,14 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {todaySellers.map((seller, index) => (
+                  {effectiveTodaySellers.map((seller: any, index: number) => (
                     <TableRow key={seller.name}>
                       <TableCell>
                         <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>{index + 1}</Badge>
                       </TableCell>
                       <TableCell className="font-medium">{seller.name}</TableCell>
                       <TableCell className="text-right">{seller.sales}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">{seller.commission.toLocaleString("da-DK")} kr</TableCell>
+                      <TableCell className="text-right font-mono font-medium">{(seller.commission || 0).toLocaleString("da-DK")} kr</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1089,7 +1123,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
           <CardTitle className="text-lg">Seneste salg</CardTitle>
         </CardHeader>
         <CardContent>
-          {recentSales && recentSales.length > 0 ? (
+          {effectiveRecentSales && effectiveRecentSales.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -1101,7 +1135,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentSales.map((sale: any) => (
+                  {effectiveRecentSales.map((sale: any) => (
                     <TableRow key={sale.id}>
                       <TableCell>{format(new Date(sale.created_at), "dd/MM/yyyy HH:mm", { locale: da })}</TableCell>
                       <TableCell>{sale.agent_name}</TableCell>
@@ -1113,7 +1147,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
               </Table>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm text-center py-8">Ingen salg endnu</p>
+            <p className="text-muted-foreground text-sm text-center py-8">{isTvMode ? "Seneste salg ikke tilgængeligt i TV-tilstand" : "Ingen salg endnu"}</p>
           )}
         </CardContent>
       </Card>
