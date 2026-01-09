@@ -16,10 +16,9 @@ export interface MockQualificationStanding {
     id: string;
     first_name: string;
     last_name: string;
+    team_name?: string;
   };
   // Gamification fields
-  weekly_change: number;
-  avg_per_deal: number;
   recent_form: FormResult[];
 }
 
@@ -34,6 +33,8 @@ const LAST_NAMES = [
   "Jensen", "Nielsen", "Hansen", "Pedersen", "Andersen", "Christensen", "Larsen", "Sørensen", "Rasmussen", "Jørgensen",
   "Petersen", "Madsen", "Kristensen", "Olsen", "Thomsen", "Poulsen", "Johansen", "Knudsen", "Mortensen", "Møller"
 ];
+
+const TEAMS = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Fieldmarketing"];
 
 function randomElement<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -87,19 +88,13 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
     // Higher provision for lower indexes (to create realistic distribution)
     const provisionBase = maxProvision - (i / playerCount) * (maxProvision - minProvision);
     const provision = Math.round(provisionBase * (0.8 + Math.random() * 0.4));
-    const deals = randomInt(5, 50);
-    const avgPerDeal = deals > 0 ? Math.round(provision / deals) : 0;
-    
-    // Weekly change - higher ranked players tend to have positive change
-    const changeBase = (playerCount - i) / playerCount;
-    const weeklyChange = Math.round((changeBase - 0.5) * 20000 * (0.5 + Math.random()));
     
     standings.push({
       id: `mock-${i}`,
       season_id: "test-season-id",
       employee_id: `emp-${i}`,
       current_provision: provision,
-      deals_count: deals,
+      deals_count: 0,
       projected_division: 0, // Will be calculated
       projected_rank: 0, // Will be calculated
       overall_rank: 0, // Will be calculated
@@ -108,10 +103,9 @@ export function generateMockStandings(options: MockStandingsOptions): MockQualif
       employee: {
         id: `emp-${i}`,
         first_name: firstName,
-        last_name: lastName
+        last_name: lastName,
+        team_name: randomElement(TEAMS)
       },
-      weekly_change: weeklyChange,
-      avg_per_deal: avgPerDeal,
       recent_form: generateRandomForm()
     });
   }

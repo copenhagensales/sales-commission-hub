@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trophy, Medal, TrendingUp, TrendingDown } from "lucide-react";
+import { Trophy, Medal, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { MockQualificationStanding } from "@/lib/mockLeagueData";
 import { FormIndicator } from "./FormIndicator";
 import { ZoneLegend } from "./ZoneLegend";
@@ -117,11 +117,10 @@ export function PremierLeagueBoard({
                   <TableRow className="hover:bg-transparent border-b-2">
                     <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Spiller</TableHead>
-                    <TableHead className="text-center w-16">Salg</TableHead>
+                    <TableHead>Team</TableHead>
                     <TableHead className="text-right w-28">Provision</TableHead>
-                    <TableHead className="text-right w-24">Gns/salg</TableHead>
-                    <TableHead className="text-right w-24">Uge +/-</TableHead>
-                    <TableHead className="text-center w-32">Seneste 5</TableHead>
+                    <TableHead className="text-center w-28">Form</TableHead>
+                    <TableHead className="text-center w-28">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -146,7 +145,7 @@ export function PremierLeagueBoard({
                       <>
                         {showDashedBefore && (
                           <TableRow key={`sep-${standing.id}`} className="hover:bg-transparent h-0">
-                            <TableCell colSpan={7} className="p-0">
+                            <TableCell colSpan={6} className="p-0">
                               <div className="border-t-2 border-dashed border-muted-foreground/30" />
                             </TableCell>
                           </TableRow>
@@ -193,13 +192,13 @@ export function PremierLeagueBoard({
                               </span>
                               {rankChange !== 0 && (
                                 <span className={cn(
-                                  "text-xs font-medium flex items-center gap-0.5",
+                                  "text-sm font-medium flex items-center gap-0.5",
                                   rankChange > 0 ? "text-green-500" : "text-red-500"
                                 )}>
                                   {rankChange > 0 ? (
-                                    <TrendingUp className="h-3 w-3" />
+                                    <ArrowUpRight className="h-4 w-4" />
                                   ) : (
-                                    <TrendingDown className="h-3 w-3" />
+                                    <ArrowDownRight className="h-4 w-4" />
                                   )}
                                   {Math.abs(rankChange)}
                                 </span>
@@ -207,32 +206,16 @@ export function PremierLeagueBoard({
                             </div>
                           </TableCell>
 
-                          {/* Sales count */}
-                          <TableCell className="text-center font-mono">
-                            {standing.deals_count}
+                          {/* Team badge */}
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {standing.employee?.team_name || "Ingen team"}
+                            </Badge>
                           </TableCell>
 
                           {/* Provision */}
                           <TableCell className="text-right font-mono font-medium">
-                            {standing.current_provision.toLocaleString("da-DK")}
-                          </TableCell>
-
-                          {/* Avg per deal */}
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {standing.avg_per_deal.toLocaleString("da-DK")}
-                          </TableCell>
-
-                          {/* Weekly change */}
-                          <TableCell className="text-right">
-                            <span className={cn(
-                              "font-mono text-sm",
-                              standing.weekly_change > 0 && "text-green-500",
-                              standing.weekly_change < 0 && "text-red-500",
-                              standing.weekly_change === 0 && "text-muted-foreground"
-                            )}>
-                              {standing.weekly_change > 0 && "+"}
-                              {(standing.weekly_change / 1000).toFixed(1)}k
-                            </span>
+                            {standing.current_provision.toLocaleString("da-DK")} kr
                           </TableCell>
 
                           {/* Form indicator */}
@@ -240,6 +223,30 @@ export function PremierLeagueBoard({
                             <div className="flex justify-center">
                               <FormIndicator form={standing.recent_form} />
                             </div>
+                          </TableCell>
+
+                          {/* Status badge */}
+                          <TableCell className="text-center">
+                            {isPromoZone && (
+                              <Badge className="bg-green-500/20 text-green-600 border-green-500/30 hover:bg-green-500/30">
+                                Oprykker
+                              </Badge>
+                            )}
+                            {isTopZone && (
+                              <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 hover:bg-yellow-500/30">
+                                Top 2
+                              </Badge>
+                            )}
+                            {isDuelZone && (
+                              <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 hover:bg-orange-500/30">
+                                Duel
+                              </Badge>
+                            )}
+                            {isRelegationZone && (
+                              <Badge className="bg-red-500/20 text-red-600 border-red-500/30 hover:bg-red-500/30">
+                                Nedrykker
+                              </Badge>
+                            )}
                           </TableCell>
                         </TableRow>
                       </>
