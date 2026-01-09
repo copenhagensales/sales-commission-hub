@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trophy, Medal, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Trophy, Medal, ArrowUpRight, ArrowDownRight, ArrowUp, ArrowDown } from "lucide-react";
 import { MockQualificationStanding } from "@/lib/mockLeagueData";
 import { FormIndicator } from "./FormIndicator";
 import { ZoneLegend } from "./ZoneLegend";
@@ -130,6 +130,13 @@ export function PremierLeagueBoard({
                       ? standing.previous_overall_rank - standing.overall_rank
                       : 0;
 
+                    // Division movement detection
+                    const divisionChange = standing.previous_division !== null
+                      ? standing.previous_division - standing.projected_division
+                      : 0;
+                    const justPromoted = divisionChange > 0;  // Kom fra lavere division (højere nummer)
+                    const justRelegated = divisionChange < 0; // Kom fra højere division (lavere nummer)
+
                     // Zone determination
                     const isPromoZone = !isTopDivision && standing.projected_rank <= 2;
                     const isTopZone = isTopDivision && standing.projected_rank <= 2;
@@ -158,7 +165,10 @@ export function PremierLeagueBoard({
                             isPromoZone && !isCurrentUser && "bg-green-500/10 hover:bg-green-500/15",
                             isTopZone && !isCurrentUser && "bg-yellow-500/10 hover:bg-yellow-500/15",
                             isDuelZone && !isCurrentUser && "bg-orange-500/10 hover:bg-orange-500/15",
-                            isRelegationZone && !isCurrentUser && "bg-red-500/10 hover:bg-red-500/15"
+                            isRelegationZone && !isCurrentUser && "bg-red-500/10 hover:bg-red-500/15",
+                            // Division movement highlight
+                            justPromoted && "ring-2 ring-inset ring-green-500/40",
+                            justRelegated && "ring-2 ring-inset ring-red-500/40"
                           )}
                         >
                           {/* Rank with zone indicator */}
@@ -178,9 +188,9 @@ export function PremierLeagueBoard({
                             </div>
                           </TableCell>
 
-                          {/* Player name with rank change */}
+                          {/* Player name with division movement and rank change */}
                           <TableCell>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className={cn(
                                 "font-medium",
                                 isCurrentUser && "text-primary"
@@ -190,6 +200,22 @@ export function PremierLeagueBoard({
                                   <span className="text-xs text-muted-foreground ml-1">(dig)</span>
                                 )}
                               </span>
+                              
+                              {/* Division movement badge */}
+                              {justPromoted && (
+                                <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs px-1.5 py-0.5 animate-pulse">
+                                  <ArrowUp className="h-3 w-3 mr-0.5" />
+                                  Div {standing.previous_division}
+                                </Badge>
+                              )}
+                              {justRelegated && (
+                                <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs px-1.5 py-0.5 animate-pulse">
+                                  <ArrowDown className="h-3 w-3 mr-0.5" />
+                                  Div {standing.previous_division}
+                                </Badge>
+                              )}
+                              
+                              {/* Rank change indicator */}
                               {rankChange !== 0 && (
                                 <span className={cn(
                                   "text-sm font-medium flex items-center gap-0.5",
