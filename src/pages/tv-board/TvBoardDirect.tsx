@@ -130,14 +130,15 @@ export default function TvBoardDirect() {
 
       const tvData = data as TvBoardData;
 
-      // Update access count and last accessed
-      await supabase
+      // Update access count and last accessed (fire-and-forget, don't block on RLS)
+      supabase
         .from("tv_board_access")
         .update({
           last_accessed_at: new Date().toISOString(),
           access_count: (tvData.access_count || 0) + 1,
         })
-        .eq("id", tvData.id);
+        .eq("id", tvData.id)
+        .then(() => {}); // Ignore errors - this is non-critical
 
       // Use dashboard_slugs array if available, otherwise fall back to single slug
       const slugs = tvData.dashboard_slugs && tvData.dashboard_slugs.length > 0
