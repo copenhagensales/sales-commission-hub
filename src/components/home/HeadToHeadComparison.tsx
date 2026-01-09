@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { da } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { LiveScoreboard } from "@/components/h2h/LiveScoreboard";
@@ -101,7 +102,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const [setupPeriod, setSetupPeriod] = useState<PeriodType>("custom");
   const [setupComment, setSetupComment] = useState("");
   const [setupTargetCommission, setSetupTargetCommission] = useState<number>(1000);
-  const [setupCustomEndDate, setSetupCustomEndDate] = useState<Date | undefined>(undefined);
+  const [setupCustomDateRange, setSetupCustomDateRange] = useState<DateRange | undefined>(undefined);
   const [setupCustomEndTime, setSetupCustomEndTime] = useState<string>("17:00");
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(initialState?.activeChallengeId ?? null);
   const [matchStartTime, setMatchStartTime] = useState<string | null>(initialState?.matchStartTime ?? null);
@@ -163,12 +164,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
 
   // Create challenge mutation
   const createChallengeMutation = useMutation({
-    mutationFn: async ({ opponentId, battleMode, period, comment, targetCommission, customEndAt }: { 
+    mutationFn: async ({ opponentId, battleMode, period, comment, targetCommission, customStartAt, customEndAt }: { 
       opponentId: string; 
       battleMode: string; 
       period: string; 
       comment: string; 
       targetCommission?: number;
+      customStartAt?: string;
       customEndAt?: string;
     }) => {
       const { error } = await supabase.from("h2h_challenges").insert({
@@ -178,6 +180,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         period: period,
         comment: comment || null,
         target_commission: period === "target" ? targetCommission : null,
+        custom_start_at: period === "custom" ? customStartAt : null,
         custom_end_at: period === "custom" ? customEndAt : null,
       });
       if (error) throw error;
@@ -1557,33 +1560,44 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               </Select>
             </div>
 
-            {/* Period Selection - Calendar-based */}
+            {/* Period Selection - Calendar-based with range support */}
             <div className="space-y-3">
-              <label className="text-sm font-medium text-slate-300">Duellen afsluttes</label>
+              <label className="text-sm font-medium text-slate-300">Duellens periode</label>
               
               <div className="grid grid-cols-2 gap-3">
-                {/* Date picker */}
-                <div className="space-y-1.5">
-                  <span className="text-xs text-slate-400">Dato</span>
+                {/* Date range picker */}
+                <div className="space-y-1.5 col-span-2">
+                  <span className="text-xs text-slate-400">Vælg periode (klik to datoer)</span>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal bg-slate-800 border-slate-600 hover:bg-slate-700",
-                          !setupCustomEndDate && "text-slate-500"
+                          !setupCustomDateRange?.from && "text-slate-500"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {setupCustomEndDate ? format(setupCustomEndDate, "d. MMM yyyy", { locale: da }) : <span>Vælg dato</span>}
+                        {setupCustomDateRange?.from ? (
+                          setupCustomDateRange.to ? (
+                            <>
+                              {format(setupCustomDateRange.from, "d. MMM", { locale: da })} - {format(setupCustomDateRange.to, "d. MMM yyyy", { locale: da })}
+                            </>
+                          ) : (
+                            format(setupCustomDateRange.from, "d. MMM yyyy", { locale: da })
+                          )
+                        ) : (
+                          <span>Vælg start- og slutdato</span>
+                        )}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" align="start">
                       <Calendar
-                        mode="single"
-                        selected={setupCustomEndDate}
-                        onSelect={setSetupCustomEndDate}
+                        mode="range"
+                        selected={setupCustomDateRange}
+                        onSelect={setSetupCustomDateRange}
                         disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                        numberOfMonths={1}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
@@ -1591,30 +1605,37 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   </Popover>
                 </div>
                 
-                {/* Time picker */}
-                <div className="space-y-1.5">
-                  <span className="text-xs text-slate-400">Tidspunkt</span>
-                  <Select value={setupCustomEndTime} onValueChange={setSetupCustomEndTime}>
-                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                      <Clock className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Vælg tid" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-                      {Array.from({ length: 24 }, (_, h) => (
-                        [`${h.toString().padStart(2, '0')}:00`, `${h.toString().padStart(2, '0')}:30`]
-                      )).flat().map((time) => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Time picker - only show when end date is selected */}
+                {setupCustomDateRange?.to && (
+                  <div className="space-y-1.5 col-span-2">
+                    <span className="text-xs text-slate-400">Sluttidspunkt</span>
+                    <Select value={setupCustomEndTime} onValueChange={setSetupCustomEndTime}>
+                      <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                        <Clock className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Vælg tid" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                        {Array.from({ length: 24 }, (_, h) => (
+                          [`${h.toString().padStart(2, '0')}:00`, `${h.toString().padStart(2, '0')}:30`]
+                        )).flat().map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               
-              {setupCustomEndDate && (
+              {setupCustomDateRange?.from && setupCustomDateRange?.to && (
                 <p className="text-xs text-emerald-400/80 text-center">
-                  Duellen slutter {format(setupCustomEndDate, "EEEE d. MMMM", { locale: da })} kl. {setupCustomEndTime}
+                  Duellen løber fra {format(setupCustomDateRange.from, "EEEE d. MMM", { locale: da })} til {format(setupCustomDateRange.to, "EEEE d. MMM", { locale: da })} kl. {setupCustomEndTime}
+                </p>
+              )}
+              {setupCustomDateRange?.from && !setupCustomDateRange?.to && (
+                <p className="text-xs text-amber-400/80 text-center">
+                  Vælg en slutdato ved at klikke på en anden dag
                 </p>
               )}
               
@@ -1676,19 +1697,23 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   return;
                 }
                 
-                // Validate custom period has date selected
-                if (setupPeriod === "custom" && !setupCustomEndDate) {
-                  toast.error("Vælg en slutdato for duellen");
+                // Validate custom period has date range selected
+                if (setupPeriod === "custom" && (!setupCustomDateRange?.from || !setupCustomDateRange?.to)) {
+                  toast.error("Vælg en start- og slutdato for duellen");
                   return;
                 }
                 
                 const opponent = employees.find(e => e.id === setupOpponent);
                 
-                // Build custom end datetime
+                // Build custom start and end datetime
+                let customStartAt: string | undefined;
                 let customEndAt: string | undefined;
-                if (setupPeriod === "custom" && setupCustomEndDate) {
+                if (setupPeriod === "custom" && setupCustomDateRange?.from && setupCustomDateRange?.to) {
+                  // Start at beginning of start day
+                  customStartAt = startOfDay(setupCustomDateRange.from).toISOString();
+                  // End at specified time on end day
                   const [hours, minutes] = setupCustomEndTime.split(':').map(Number);
-                  const endDateTime = setMinutes(setHours(setupCustomEndDate, hours), minutes);
+                  const endDateTime = setMinutes(setHours(setupCustomDateRange.to, hours), minutes);
                   customEndAt = endDateTime.toISOString();
                 }
                 
@@ -1700,14 +1725,18 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       period: setupPeriod,
                       comment: setupComment,
                       targetCommission: setupPeriod === "target" ? setupTargetCommission : undefined,
+                      customStartAt,
                       customEndAt
                     });
                     
                     let periodText: string;
                     if (setupPeriod === "target") {
                       periodText = `Først til ${setupTargetCommission.toLocaleString()} kr!`;
-                    } else if (setupPeriod === "custom" && setupCustomEndDate) {
-                      periodText = `til ${format(setupCustomEndDate, "d. MMM", { locale: da })} kl. ${setupCustomEndTime}`;
+                    } else if (setupPeriod === "custom" && setupCustomDateRange?.from && setupCustomDateRange?.to) {
+                      const sameDay = format(setupCustomDateRange.from, "yyyy-MM-dd") === format(setupCustomDateRange.to, "yyyy-MM-dd");
+                      periodText = sameDay 
+                        ? `${format(setupCustomDateRange.from, "d. MMM", { locale: da })} kl. ${setupCustomEndTime}`
+                        : `${format(setupCustomDateRange.from, "d. MMM", { locale: da })} - ${format(setupCustomDateRange.to, "d. MMM", { locale: da })} kl. ${setupCustomEndTime}`;
                     } else {
                       periodText = setupPeriod === "today" ? "i dag" : "denne uge";
                     }
@@ -1730,7 +1759,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                     // Reset setup state
                     setSetupOpponent("");
                     setSetupComment("");
-                    setSetupCustomEndDate(undefined);
+                    setSetupCustomDateRange(undefined);
                     setSetupCustomEndTime("17:00");
                   } catch (error) {
                     console.error("Failed to send challenge:", error);
@@ -1738,7 +1767,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   }
                 }
               }}
-              disabled={!setupOpponent || createChallengeMutation.isPending || (setupPeriod === "custom" && !setupCustomEndDate)}
+              disabled={!setupOpponent || createChallengeMutation.isPending || (setupPeriod === "custom" && (!setupCustomDateRange?.from || !setupCustomDateRange?.to))}
               className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold"
             >
               <Send className="w-4 h-4 mr-2" />
