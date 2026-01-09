@@ -419,7 +419,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}
               >
                 <Trophy className="h-4 w-4" />
-                Provisionsliga
+                Premier League
               </NavLink>
               
               {/* Beskeder */}
