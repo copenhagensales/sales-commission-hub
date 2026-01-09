@@ -20,6 +20,13 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const accessCode = url.searchParams.get("code");
     const dashboard = url.searchParams.get("dashboard") || "cph-sales";
+    const action = url.searchParams.get("action");
+    const metric = url.searchParams.get("metric") || "sales_today";
+
+    // Handle celebration data request (bypasses RLS for TV boards)
+    if (action === "celebration-data") {
+      return await handleCelebrationData(supabase, dashboard, metric, corsHeaders);
+    }
 
     // Verify access code if provided
     if (accessCode) {
@@ -530,4 +537,195 @@ async function handleTeamDashboard(
   return new Response(JSON.stringify(response), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Handle celebration data requests (used by TV boards that need to bypass RLS)
+async function handleCelebrationData(
+  supabase: any,
+  dashboardSlug: string,
+  metric: string,
+  corsHeaders: Record<string, string>
+) {
+  console.log(`[CelebrationData] Fetching for dashboard: ${dashboardSlug}, metric: ${metric}`);
+  
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+  const weekStart = getWeekStart(today);
+
+  // Map dashboard slugs to client IDs
+  const clientIdMap: Record<string, string> = {
+    "tdc-erhverv": "20744525-7466-4b2c-afa7-6ee09a9112b0",
+    "tdc-erhverv-goals": "20744525-7466-4b2c-afa7-6ee09a9112b0",
+    "tryg": "516a3f67-ea6d-4ef0-929d-e3224cc16e22",
+    "relatel": "0ff8476d-16d8-4150-aee9-48ac90ec962d",
+    "ase": "53eb9c4a-91b0-44a9-9ee7-a87d87cc3e0f",
+    "codan": "789f7e51-d3c8-42c6-b461-b45ea20d1e1f",
+    "fieldmarketing": "9a92ea4c-6404-4b58-be08-065e7552d552",
+    "fieldmarketing-goals": "9a92ea4c-6404-4b58-be08-065e7552d552",
+    "eesy-tm": "81993a7b-ff24-46b8-8ffb-37a83138ddba",
+  };
+
+  const clientId = clientIdMap[dashboardSlug] || null;
+  console.log(`[CelebrationData] Client ID for ${dashboardSlug}: ${clientId}`);
+
+  // Build queries
+  const selectFields = clientId
+    ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
+    : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
+
+  // Fetch today's sales
+  let salesTodayQuery = supabase
+    .from("sales")
+    .select(selectFields)
+    .gte("sale_datetime", `${todayStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch month's sales
+  let salesMonthQuery = supabase
+    .from("sales")
+    .select(selectFields)
+    .gte("sale_datetime", `${monthStart}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch week's sales
+  let salesWeekQuery = supabase
+    .from("sales")
+    .select(selectFields)
+    .gte("sale_datetime", `${weekStart}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Apply client filter if needed
+  if (clientId) {
+    salesTodayQuery = salesTodayQuery.eq("client_campaigns.client_id", clientId);
+    salesMonthQuery = salesMonthQuery.eq("client_campaigns.client_id", clientId);
+    salesWeekQuery = salesWeekQuery.eq("client_campaigns.client_id", clientId);
+  }
+
+  const [todayRes, monthRes, weekRes] = await Promise.all([
+    salesTodayQuery,
+    salesMonthQuery,
+    salesWeekQuery,
+  ]);
+
+  console.log(`[CelebrationData] Query results: today=${todayRes.data?.length || 0}, month=${monthRes.data?.length || 0}, week=${weekRes.data?.length || 0}`);
+
+  // Calculate totals
+  const calculateSalesAndCommission = (sales: any[]) => {
+    let totalSales = 0;
+    let totalCommission = 0;
+    const employeeSales: Record<string, { name: string; sales: number; commission: number }> = {};
+
+    sales?.forEach((sale) => {
+      const agentEmail = sale.agent_email || "Unknown";
+      if (!employeeSales[agentEmail]) {
+        employeeSales[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
+      }
+      
+      sale.sale_items?.forEach((item: any) => {
+        const countsAsSale = item.products?.counts_as_sale !== false;
+        if (countsAsSale) {
+          totalSales += Number(item.quantity) || 1;
+          employeeSales[agentEmail].sales += Number(item.quantity) || 1;
+        }
+        totalCommission += Number(item.mapped_commission) || 0;
+        employeeSales[agentEmail].commission += Number(item.mapped_commission) || 0;
+      });
+    });
+
+    return { totalSales, totalCommission, employeeSales };
+  };
+
+  const todayData = calculateSalesAndCommission(todayRes.data || []);
+  const monthData = calculateSalesAndCommission(monthRes.data || []);
+  const weekData = calculateSalesAndCommission(weekRes.data || []);
+
+  // Find top performer today
+  let topEmployeeName: string | null = null;
+  let topSales = 0;
+  
+  // Resolve agent names to employee names
+  const agentEmails = Object.keys(todayData.employeeSales);
+  if (agentEmails.length > 0) {
+    const nameMap = await resolveAgentNames(supabase, agentEmails);
+    
+    Object.entries(todayData.employeeSales).forEach(([email, empData]) => {
+      const resolvedName = nameMap.get(email.toLowerCase()) || empData.name;
+      if (empData.sales > topSales) {
+        topSales = empData.sales;
+        topEmployeeName = resolvedName;
+      }
+    });
+  }
+
+  // Fetch goal data if relevant
+  let goalProgress = 0;
+  let goalTarget = 0;
+  let goalRemaining = 0;
+
+  if (clientId && (metric.includes("goal") || dashboardSlug?.includes("goals"))) {
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+    
+    const { data: goalData } = await supabase
+      .from("client_monthly_goals")
+      .select("sales_target")
+      .eq("client_id", clientId)
+      .eq("month", currentMonth)
+      .eq("year", currentYear)
+      .single();
+
+    if (goalData) {
+      goalTarget = goalData.sales_target || 0;
+      goalRemaining = Math.max(0, goalTarget - monthData.totalCommission);
+      goalProgress = goalTarget > 0 ? Math.round((monthData.totalCommission / goalTarget) * 100) : 0;
+    }
+  }
+
+  // Get the specific metric value
+  const getMetricValue = (metricKey: string): number => {
+    switch (metricKey) {
+      case "sales_today": return todayData.totalSales;
+      case "sales_month": return monthData.totalSales;
+      case "sales_week": return weekData.totalSales;
+      case "total_sales": return monthData.totalSales;
+      case "commission_today": return todayData.totalCommission;
+      case "commission_month": return monthData.totalCommission;
+      case "goal_progress": return goalProgress;
+      case "goal_target": return goalTarget;
+      case "goal_remaining": return goalRemaining;
+      default: return todayData.totalSales;
+    }
+  };
+
+  const result = {
+    employeeName: topEmployeeName,
+    salesCount: todayData.totalSales,
+    commission: todayData.totalCommission,
+    metricValue: getMetricValue(metric),
+    salesToday: todayData.totalSales,
+    salesMonth: monthData.totalSales,
+    salesWeek: weekData.totalSales,
+    totalSales: monthData.totalSales,
+    commissionToday: todayData.totalCommission,
+    commissionMonth: monthData.totalCommission,
+    goalProgress,
+    goalTarget,
+    goalRemaining,
+  };
+
+  console.log(`[CelebrationData] Returning:`, result);
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Helper to get week start (Monday)
+function getWeekStart(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split("T")[0];
 }
