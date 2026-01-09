@@ -331,8 +331,12 @@ async function handleTeamDashboard(
   const clientStatsMap: Record<string, { salesToday: number; salesThisMonth: number }> = {};
   clientIds.forEach(id => clientStatsMap[id] = { salesToday: 0, salesThisMonth: 0 });
 
-  // Calculate top sellers
-  const sellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
+  // Calculate top sellers - separate for today and month
+  const todaySellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
+  const monthSellerStats: Record<string, { sales: number; commission: number; clientId: string }> = {};
+
+  // Track recent sales
+  const recentSalesList: any[] = [];
 
   for (const sale of sales || []) {
     const saleClientId = campaignToClient.get(sale.client_campaign_id) as string | undefined;
@@ -352,16 +356,35 @@ async function handleTeamDashboard(
     if (validSales > 0 && clientStatsMap[saleClientId]) {
       clientStatsMap[saleClientId].salesThisMonth += validSales;
       
+      const agentName = sale.agent_name || "Ukendt";
+      
+      // Track month seller stats (all sales this month)
+      if (!monthSellerStats[agentName]) {
+        monthSellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
+      }
+      monthSellerStats[agentName].sales += validSales;
+      monthSellerStats[agentName].commission += commission;
+      
       if (sale.sale_datetime >= startOfDay) {
         clientStatsMap[saleClientId].salesToday += validSales;
         
-        // Track seller stats for today only
-        const agentName = sale.agent_name || "Ukendt";
-        if (!sellerStats[agentName]) {
-          sellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
+        // Track today seller stats
+        if (!todaySellerStats[agentName]) {
+          todaySellerStats[agentName] = { sales: 0, commission: 0, clientId: saleClientId };
         }
-        sellerStats[agentName].sales += validSales;
-        sellerStats[agentName].commission += commission;
+        todaySellerStats[agentName].sales += validSales;
+        todaySellerStats[agentName].commission += commission;
+      }
+      
+      // Add to recent sales (limit to 10 most recent)
+      if (recentSalesList.length < 10) {
+        recentSalesList.push({
+          id: sale.id,
+          agentName: sale.agent_name,
+          saleDateTime: sale.sale_datetime,
+          commission,
+          sales: validSales,
+        });
       }
     }
   }
@@ -377,16 +400,26 @@ async function handleTeamDashboard(
     }))
     .sort((a: any, b: any) => b.salesThisMonth - a.salesThisMonth);
 
-  // Build top sellers array
-  const topSellers = Object.entries(sellerStats)
+  // Build top sellers arrays (today and month separately)
+  const topSellersToday = Object.entries(todaySellerStats)
     .map(([name, stats]) => ({
       name,
       sales: stats.sales,
       commission: stats.commission,
       clientId: stats.clientId,
     }))
-    .sort((a, b) => b.sales - a.sales)
+    .sort((a, b) => b.commission - a.commission)
     .slice(0, 10);
+
+  const topSellersMonth = Object.entries(monthSellerStats)
+    .map(([name, stats]) => ({
+      name,
+      sales: stats.sales,
+      commission: stats.commission,
+      clientId: stats.clientId,
+    }))
+    .sort((a, b) => b.commission - a.commission)
+    .slice(0, 15);
 
   // Calculate totals
   const totalSalesToday = Object.values(clientStatsMap).reduce((sum, s) => sum + s.salesToday, 0);
@@ -399,14 +432,17 @@ async function handleTeamDashboard(
     teamSlug,
     teamName: team?.name || teamName,
     clients: clientStatsArray,
-    topSellers,
+    topSellers: topSellersToday, // Keep for backward compatibility
+    topSellersToday,
+    topSellersMonth,
+    recentSales: recentSalesList,
     totals: {
       salesToday: totalSalesToday,
       salesThisMonth: totalSalesThisMonth,
     },
   };
 
-  console.log(`Team dashboard response: ${totalSalesToday} sales today, ${totalSalesThisMonth} this month, ${topSellers.length} top sellers`);
+  console.log(`Team dashboard response: ${totalSalesToday} sales today, ${totalSalesThisMonth} this month, ${topSellersToday.length} today sellers, ${topSellersMonth.length} month sellers`);
 
   return new Response(JSON.stringify(response), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
