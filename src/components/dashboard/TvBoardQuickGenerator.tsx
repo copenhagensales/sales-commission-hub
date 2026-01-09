@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Monitor, Copy, Trash2, Plus, Loader2 } from "lucide-react";
+import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -94,7 +95,7 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     toast.success(`${label} kopieret`);
   };
 
-  const getTvUrl = (code: string) => `${window.location.origin}/t/${code}`;
+  const getTvUrl = (code: string) => getTvBoardUrl(code);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
