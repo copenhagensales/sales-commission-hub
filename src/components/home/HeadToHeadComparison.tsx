@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle, EyeOff } from "lucide-react";
-import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differenceInDays, addDays } from "date-fns";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle, EyeOff, CalendarIcon } from "lucide-react";
+import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differenceInDays, addDays, format, setHours, setMinutes, isBefore, addHours } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +44,7 @@ interface HeadToHeadComparisonProps {
   onHide?: () => void;
 }
 
-type PeriodType = "today" | "week" | "target";
+type PeriodType = "today" | "week" | "target" | "custom";
 type BattleMode = "1v1" | "team";
 
 // Player role types based on performance
@@ -95,11 +98,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const [showPendingChallenges, setShowPendingChallenges] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [setupOpponent, setSetupOpponent] = useState<string>("");
-  const [setupPeriod, setSetupPeriod] = useState<PeriodType>("today");
+  const [setupPeriod, setSetupPeriod] = useState<PeriodType>("custom");
   const [setupComment, setSetupComment] = useState("");
   const [setupTargetCommission, setSetupTargetCommission] = useState<number>(1000);
+  const [setupCustomEndDate, setSetupCustomEndDate] = useState<Date | undefined>(undefined);
+  const [setupCustomEndTime, setSetupCustomEndTime] = useState<string>("17:00");
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(initialState?.activeChallengeId ?? null);
   const [matchStartTime, setMatchStartTime] = useState<string | null>(initialState?.matchStartTime ?? null);
+  const [matchEndTime, setMatchEndTime] = useState<string | null>(null); // Custom end time for active challenge
   
   // Gamification state
   const [showConfetti, setShowConfetti] = useState(false);
@@ -140,6 +146,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         .select(`
           id, battle_mode, period, comment, accepted_at, status,
           challenger_employee_id, opponent_employee_id,
+          custom_start_at, custom_end_at,
           challenger:challenger_employee_id(id, first_name, last_name),
           opponent:opponent_employee_id(id, first_name, last_name)
         `)
@@ -156,7 +163,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
 
   // Create challenge mutation
   const createChallengeMutation = useMutation({
-    mutationFn: async ({ opponentId, battleMode, period, comment, targetCommission }: { opponentId: string; battleMode: string; period: string; comment: string; targetCommission?: number }) => {
+    mutationFn: async ({ opponentId, battleMode, period, comment, targetCommission, customEndAt }: { 
+      opponentId: string; 
+      battleMode: string; 
+      period: string; 
+      comment: string; 
+      targetCommission?: number;
+      customEndAt?: string;
+    }) => {
       const { error } = await supabase.from("h2h_challenges").insert({
         challenger_employee_id: currentEmployeeId,
         opponent_employee_id: opponentId,
@@ -164,6 +178,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         period: period,
         comment: comment || null,
         target_commission: period === "target" ? targetCommission : null,
+        custom_end_at: period === "custom" ? customEndAt : null,
       });
       if (error) throw error;
     },
@@ -226,6 +241,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         setMatchStarted(false);
         setActiveChallengeId(null);
         setMatchStartTime(null);
+        setMatchEndTime(null);
         setOpponentTeam([]);
       }
     },
@@ -246,6 +262,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       setActiveChallengeId(activeChallenge.id);
       setOpponentTeam([opponentId]);
       setMatchStartTime(activeChallenge.accepted_at);
+      setMatchEndTime(activeChallenge.custom_end_at || null);
       setPeriod(activeChallenge.period as PeriodType);
       setBattleMode(activeChallenge.battle_mode as BattleMode);
       setMatchComment(activeChallenge.comment || "");
@@ -257,6 +274,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       setMatchStarted(false);
       setActiveChallengeId(null);
       setMatchStartTime(null);
+      setMatchEndTime(null);
       setOpponentTeam([]);
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -288,6 +306,17 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     // If match is active and we have a start time, use that as the start
     if (matchStarted && matchStartTime) {
       const startTime = new Date(matchStartTime);
+      
+      // For custom period, use the stored end time
+      if (period === "custom" && matchEndTime) {
+        const customEnd = new Date(matchEndTime);
+        return {
+          start: startTime,
+          end: customEnd,
+          label: format(customEnd, "d. MMM 'kl.' HH:mm", { locale: da })
+        };
+      }
+      
       const endTime = period === "today" 
         ? endOfDay(startTime) 
         : endOfWeek(startTime, { weekStartsOn: 1 });
@@ -304,10 +333,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         return { start: startOfDay(now), end: endOfDay(now), label: "I dag" };
       case "week":
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
+      case "custom":
+        // For custom without active match, just show current time range
+        return { start: now, end: addHours(now, 24), label: "Brugerdefineret" };
       default:
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
     }
-  }, [period, matchStarted, matchStartTime]);
+  }, [period, matchStarted, matchStartTime, matchEndTime]);
 
   // Calculate time remaining
   const timeInfo = useMemo(() => {
@@ -1525,51 +1557,86 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               </Select>
             </div>
 
-            {/* Period Selection */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Kampperiode</label>
-              <div className="grid grid-cols-3 gap-2">
+            {/* Period Selection - Calendar-based */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-slate-300">Duellen afsluttes</label>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* Date picker */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-slate-400">Dato</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-slate-800 border-slate-600 hover:bg-slate-700",
+                          !setupCustomEndDate && "text-slate-500"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {setupCustomEndDate ? format(setupCustomEndDate, "d. MMM yyyy", { locale: da }) : <span>Vælg dato</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={setupCustomEndDate}
+                        onSelect={setSetupCustomEndDate}
+                        disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {/* Time picker */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-slate-400">Tidspunkt</span>
+                  <Select value={setupCustomEndTime} onValueChange={setSetupCustomEndTime}>
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <Clock className="mr-2 h-4 w-4" />
+                      <SelectValue placeholder="Vælg tid" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                      {Array.from({ length: 24 }, (_, h) => (
+                        [`${h.toString().padStart(2, '0')}:00`, `${h.toString().padStart(2, '0')}:30`]
+                      )).flat().map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {setupCustomEndDate && (
+                <p className="text-xs text-emerald-400/80 text-center">
+                  Duellen slutter {format(setupCustomEndDate, "EEEE d. MMMM", { locale: da })} kl. {setupCustomEndTime}
+                </p>
+              )}
+              
+              {/* Alternative: First to target */}
+              <div className="pt-2 border-t border-slate-700/50">
                 <button
-                  onClick={() => setSetupPeriod("today")}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
-                    setupPeriod === "today" 
-                      ? "bg-blue-500/20 border-blue-400/50 text-blue-400" 
+                  onClick={() => setSetupPeriod(setupPeriod === "target" ? "custom" : "target")}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all",
+                    setupPeriod === "target"
+                      ? "bg-amber-500/20 border-amber-400/50 text-amber-400"
                       : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
-                  }`}
+                  )}
                 >
-                  <CalendarDays className="w-5 h-5" />
-                  <span className="text-xs font-medium">I dag</span>
-                  <span className="text-[9px] text-slate-500">Til midnat</span>
-                </button>
-                <button
-                  onClick={() => setSetupPeriod("week")}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
-                    setupPeriod === "week" 
-                      ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-400" 
-                      : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
-                  }`}
-                >
-                  <CalendarRange className="w-5 h-5" />
-                  <span className="text-xs font-medium">Denne uge</span>
-                  <span className="text-[9px] text-slate-500">Til søndag</span>
-                </button>
-                <button
-                  onClick={() => setSetupPeriod("target")}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
-                    setupPeriod === "target" 
-                      ? "bg-amber-500/20 border-amber-400/50 text-amber-400" 
-                      : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
-                  }`}
-                >
-                  <Target className="w-5 h-5" />
-                  <span className="text-xs font-medium">Først til mål</span>
-                  <span className="text-[9px] text-slate-500">Provision</span>
+                  <Target className="w-4 h-4" />
+                  <span className="text-xs font-medium">Eller: Først til mål</span>
                 </button>
               </div>
               
               {/* Target commission input */}
               {setupPeriod === "target" && (
-                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg">
+                <div className="p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg">
                   <label className="text-xs font-medium text-amber-300 block mb-2">
                     Provisionsmål (DKK)
                   </label>
@@ -1609,7 +1676,21 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   return;
                 }
                 
+                // Validate custom period has date selected
+                if (setupPeriod === "custom" && !setupCustomEndDate) {
+                  toast.error("Vælg en slutdato for duellen");
+                  return;
+                }
+                
                 const opponent = employees.find(e => e.id === setupOpponent);
+                
+                // Build custom end datetime
+                let customEndAt: string | undefined;
+                if (setupPeriod === "custom" && setupCustomEndDate) {
+                  const [hours, minutes] = setupCustomEndTime.split(':').map(Number);
+                  const endDateTime = setMinutes(setHours(setupCustomEndDate, hours), minutes);
+                  customEndAt = endDateTime.toISOString();
+                }
                 
                 if (setupOpponent && currentEmployeeId) {
                   try {
@@ -1618,11 +1699,19 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       battleMode: battleMode,
                       period: setupPeriod,
                       comment: setupComment,
-                      targetCommission: setupPeriod === "target" ? setupTargetCommission : undefined
+                      targetCommission: setupPeriod === "target" ? setupTargetCommission : undefined,
+                      customEndAt
                     });
-                    const periodText = setupPeriod === "target" 
-                      ? `Først til ${setupTargetCommission.toLocaleString()} kr!` 
-                      : setupPeriod === "today" ? "i dag" : "denne uge";
+                    
+                    let periodText: string;
+                    if (setupPeriod === "target") {
+                      periodText = `Først til ${setupTargetCommission.toLocaleString()} kr!`;
+                    } else if (setupPeriod === "custom" && setupCustomEndDate) {
+                      periodText = `til ${format(setupCustomEndDate, "d. MMM", { locale: da })} kl. ${setupCustomEndTime}`;
+                    } else {
+                      periodText = setupPeriod === "today" ? "i dag" : "denne uge";
+                    }
+                    
                     toast.success(`⚔️ Invitation sendt!`, {
                       description: `${opponent?.name} vil modtage din udfordring (${periodText}). Duellen starter når de accepterer.`
                     });
@@ -1641,13 +1730,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                     // Reset setup state
                     setSetupOpponent("");
                     setSetupComment("");
+                    setSetupCustomEndDate(undefined);
+                    setSetupCustomEndTime("17:00");
                   } catch (error) {
                     console.error("Failed to send challenge:", error);
                     toast.error("Kunne ikke sende invitation");
                   }
                 }
               }}
-              disabled={!setupOpponent || createChallengeMutation.isPending}
+              disabled={!setupOpponent || createChallengeMutation.isPending || (setupPeriod === "custom" && !setupCustomEndDate)}
               className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold"
             >
               <Send className="w-4 h-4 mr-2" />

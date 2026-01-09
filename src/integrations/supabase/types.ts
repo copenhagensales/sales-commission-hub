@@ -4388,6 +4388,8 @@ export type Database = {
           comment: string | null
           completed_at: string | null
           created_at: string
+          custom_end_at: string | null
+          custom_start_at: string | null
           forfeited_at: string | null
           forfeited_by: string | null
           id: string
@@ -4410,6 +4412,8 @@ export type Database = {
           comment?: string | null
           completed_at?: string | null
           created_at?: string
+          custom_end_at?: string | null
+          custom_start_at?: string | null
           forfeited_at?: string | null
           forfeited_by?: string | null
           id?: string
@@ -4432,6 +4436,8 @@ export type Database = {
           comment?: string | null
           completed_at?: string | null
           created_at?: string
+          custom_end_at?: string | null
+          custom_start_at?: string | null
           forfeited_at?: string | null
           forfeited_by?: string | null
           id?: string
