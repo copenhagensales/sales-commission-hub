@@ -9,6 +9,7 @@ import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw } from "lucid
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePositionPermissions } from "@/hooks/usePositionPermissions";
 import {
   useActiveSeason,
   useMyEnrollment,
@@ -20,12 +21,15 @@ import {
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
+import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const positionQuery = usePositionPermissions();
+  const isOwner = positionQuery.data?.position?.name?.toLowerCase() === "ejer";
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -160,6 +164,9 @@ export default function CommissionLeague() {
             </div>
 
             <div className="flex items-center gap-3">
+              {isOwner && season && (
+                <SeasonSettingsDialog season={season} />
+              )}
               <Button
                 variant="outline"
                 size="sm"

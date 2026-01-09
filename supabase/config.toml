@@ -203,3 +203,6 @@ verify_jwt = false
 
 [functions.process-scheduled-emails]
 verify_jwt = false
+
+[functions.league-calculate-standings]
+verify_jwt = false
