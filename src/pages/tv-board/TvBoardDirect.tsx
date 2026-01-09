@@ -6,7 +6,8 @@ import { Loader2, ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-r
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { TvBoardProvider } from "@/contexts/TvBoardContext";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
-import { useCelebrationData, replaceCelebrationVariables } from "@/hooks/useCelebrationData";
+import { replaceCelebrationVariables } from "@/hooks/useCelebrationData";
+import { useTvCelebrationData } from "@/hooks/useTvCelebrationData";
 import { Button } from "@/components/ui/button";
 
 // Import dashboard components
@@ -82,9 +83,9 @@ export default function TvBoardDirect() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasAutoFullscreened = useRef(false);
 
-  // Celebration data - fetch from source dashboard
+  // Celebration data - fetch from source dashboard via edge function (bypasses RLS)
   const celebrationSourceSlug = celebrationSettings?.sourceDashboard || dashboardSlugs[0] || null;
-  const { data: celebrationData, refetch: refetchCelebration } = useCelebrationData({
+  const { data: celebrationData, refetch: refetchCelebration } = useTvCelebrationData({
     dashboardSlug: celebrationSourceSlug,
     metric: celebrationSettings?.metric || "sales_today",
     enabled: !!celebrationSettings?.enabled && dashboardSlugs.length > 0,
