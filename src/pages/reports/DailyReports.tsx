@@ -428,6 +428,7 @@ export default function DailyReports() {
       // Fetch sales with sale_items - same logic as KPI sales-count
       // Sales are linked to clients via client_campaign_id -> client_campaigns.client_id
       // Match on agent_email (contains email) rather than agent_name (contains full name)
+      // Also fetch dialer_campaign_id for campaign override lookup
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
         // Get emails only from unique identifiers (filter out numeric external IDs)
@@ -440,11 +441,11 @@ export default function DailyReports() {
           // Use REST API directly to support dynamic !inner join for client filtering
           const joinType = selectedClient !== "all" ? "!inner" : "";
           
-          // Build query - don't encode !inner as it needs to be literal for PostgREST
+          // Build query - include dialer_campaign_id and product_id for campaign override lookup
           const selectParts = [
-            "id", "agent_name", "agent_email", "sale_datetime", "client_campaign_id",
+            "id", "agent_name", "agent_email", "sale_datetime", "client_campaign_id", "dialer_campaign_id",
             `client_campaigns${joinType}(client_id)`,
-            "sale_items(quantity,mapped_commission,mapped_revenue,products(counts_as_sale))"
+            "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))"
           ];
           const selectClause = selectParts.join(",");
           // Use eq for exact match (case-insensitive handled by lowercasing both sides)
@@ -479,6 +480,33 @@ export default function DailyReports() {
           console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_email, items: s.sale_items?.length })));
         }
       }
+      
+      // Fetch campaign mappings to resolve dialer_campaign_id -> campaign_mapping_id
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+      
+      // Fetch product campaign overrides
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+      
+      // Build a map: product_id + campaign_mapping_id -> { commission, revenue }
+      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+      productCampaignOverrides?.forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, {
+          commission: o.commission_dkk ?? 0,
+          revenue: o.revenue_dkk ?? 0
+        });
+      });
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
       let fmSalesQuery = supabase
@@ -652,13 +680,29 @@ export default function DailyReports() {
               dayClientIds.add(clientId);
             }
             
+            // Get campaign mapping id for this sale's dialer campaign
+            const dialerCampaignId = sale.dialer_campaign_id;
+            const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
+            
             (sale.sale_items || []).forEach((item: any) => {
               const countsAsSale = item.products?.counts_as_sale !== false;
               if (countsAsSale) {
                 salesCount += Number(item.quantity) || 1;
               }
-              revenue += Number(item.mapped_revenue) || 0;
-              commission += Number(item.mapped_commission) || 0;
+              
+              // Check for campaign override - use it if exists, otherwise fallback to mapped values
+              const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+              const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+              
+              if (override) {
+                // Use campaign-specific commission/revenue
+                revenue += override.revenue;
+                commission += override.commission;
+              } else {
+                // Fallback to mapped values from sale_items
+                revenue += Number(item.mapped_revenue) || 0;
+                commission += Number(item.mapped_commission) || 0;
+              }
             });
           });
 
