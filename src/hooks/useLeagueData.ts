@@ -256,3 +256,33 @@ export function useQualificationStandingsRealtime(
     enabled: !!seasonId,
   });
 }
+
+// Update season dates (admin)
+export function useUpdateSeasonDates() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      seasonId,
+      dates,
+    }: {
+      seasonId: string;
+      dates: {
+        qualification_source_start?: string;
+        qualification_source_end?: string;
+        qualification_start_at?: string;
+        qualification_end_at?: string;
+      };
+    }) => {
+      const { error } = await supabase
+        .from("league_seasons")
+        .update(dates)
+        .eq("id", seasonId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["league-active-season"] });
+    },
+  });
+}
