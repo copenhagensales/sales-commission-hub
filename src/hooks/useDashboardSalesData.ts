@@ -208,7 +208,34 @@ export function useDashboardSalesData({
       });
       const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
 
-      // Step 4: Fetch sales matched by agent_email
+      // Fetch campaign mappings to resolve dialer_campaign_id -> campaign_mapping_id (for campaign overrides)
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+      
+      // Fetch product campaign overrides for commission/revenue
+      const { data: productCampaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+      
+      // Build a map: product_id + campaign_mapping_id -> { commission, revenue }
+      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+      productCampaignOverrides?.forEach(o => {
+        const key = `${o.product_id}_${o.campaign_mapping_id}`;
+        campaignOverrideMap.set(key, {
+          commission: o.commission_dkk ?? 0,
+          revenue: o.revenue_dkk ?? 0
+        });
+      });
+
+      // Step 4: Fetch sales matched by agent_email - include dialer_campaign_id and product_id for override lookup
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
         const emailIdentifiers = uniqueAgentIdentifiers.filter((id) => id.includes("@")).map((e) => e.toLowerCase());
@@ -220,8 +247,9 @@ export function useDashboardSalesData({
             "agent_email",
             "sale_datetime",
             "client_campaign_id",
+            "dialer_campaign_id",
             `client_campaigns${joinType}(client_id)`,
-            "sale_items(quantity,mapped_commission,mapped_revenue,products(counts_as_sale))",
+            "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))",
           ];
           const selectClause = selectParts.join(",");
           const emailOrFilter = emailIdentifiers.map((e) => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
@@ -366,13 +394,29 @@ export function useDashboardSalesData({
           });
 
           empSales.forEach((sale: any) => {
+            // Get campaign mapping id for this sale's dialer campaign
+            const dialerCampaignId = sale.dialer_campaign_id;
+            const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
+            
             (sale.sale_items || []).forEach((item: any) => {
               const countsAsSale = item.products?.counts_as_sale !== false;
               if (countsAsSale) {
                 totalSales += Number(item.quantity) || 1;
               }
-              totalRevenue += Number(item.mapped_revenue) || 0;
-              totalCommission += Number(item.mapped_commission) || 0;
+              
+              // Check for campaign override - use it if exists, otherwise fallback to mapped values
+              const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+              const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+              
+              if (override) {
+                // Use campaign-specific commission/revenue
+                totalRevenue += override.revenue;
+                totalCommission += override.commission;
+              } else {
+                // Fallback to mapped values from sale_items
+                totalRevenue += Number(item.mapped_revenue) || 0;
+                totalCommission += Number(item.mapped_commission) || 0;
+              }
             });
           });
 
