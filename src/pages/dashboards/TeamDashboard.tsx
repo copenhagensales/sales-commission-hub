@@ -739,7 +739,9 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
     totalSales: tvData.totals?.salesThisMonth || 0,
   } : null;
 
-  const tvTopSellersData = tvData?.topSellers || [];
+  const tvTopSellersMonthData = tvData?.topSellersMonth || [];
+  const tvTopSellersTodayData = tvData?.topSellersToday || tvData?.topSellers || [];
+  const tvRecentSalesData = tvData?.recentSales || [];
 
   // Fetch sales stats for selected client - disabled in TV mode
   const { data: salesStats } = useQuery({
@@ -851,8 +853,8 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
     enabled: !!activeClientId && !isTvMode,
   });
 
-  // Use TV data or fetched data for top sellers
-  const effectiveTopSellers = isTvMode ? tvTopSellersData : (topSellers || []);
+  // Use TV data or fetched data for top sellers (month)
+  const effectiveTopSellers = isTvMode ? tvTopSellersMonthData : (topSellers || []);
 
   const { data: todaySellers } = useQuery({
     queryKey: ["team-dashboard-today-sellers", activeClientId, selectedDate.toDateString()],
@@ -908,7 +910,7 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
   });
 
   // Use TV data or fetched data for today sellers
-  const effectiveTodaySellers = isTvMode ? tvTopSellersData : (todaySellers || []);
+  const effectiveTodaySellers = isTvMode ? tvTopSellersTodayData : (todaySellers || []);
 
   const { data: recentSales } = useQuery({
     queryKey: ["team-dashboard-recent-sales", activeClientId],
@@ -956,8 +958,8 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
     enabled: !!activeClientId && !isTvMode,
   });
 
-  // Recent sales is not available in TV mode (edge function doesn't return it for single-client)
-  const effectiveRecentSales = recentSales || [];
+  // Use TV data for recent sales in TV mode
+  const effectiveRecentSales = isTvMode ? tvRecentSalesData : (recentSales || []);
 
   const datePickerContent = (
     <div className="flex items-center gap-4">
@@ -1135,19 +1137,25 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {effectiveRecentSales.map((sale: any) => (
-                    <TableRow key={sale.id}>
-                      <TableCell>{format(new Date(sale.created_at), "dd/MM/yyyy HH:mm", { locale: da })}</TableCell>
-                      <TableCell>{sale.agent_name}</TableCell>
-                      <TableCell className="font-mono">{sale.customer_phone || "-"}</TableCell>
-                      <TableCell className="text-right font-mono">{(sale.total_commission || 0).toLocaleString("da-DK")} kr</TableCell>
-                    </TableRow>
-                  ))}
+                  {effectiveRecentSales.map((sale: any) => {
+                    // Handle both direct Supabase format and edge function format
+                    const dateStr = sale.created_at || sale.saleDateTime;
+                    const agentName = sale.agent_name || sale.agentName;
+                    const commission = sale.total_commission ?? sale.commission ?? 0;
+                    return (
+                      <TableRow key={sale.id}>
+                        <TableCell>{format(new Date(dateStr), "dd/MM/yyyy HH:mm", { locale: da })}</TableCell>
+                        <TableCell>{agentName}</TableCell>
+                        <TableCell className="font-mono">{sale.customer_phone || "-"}</TableCell>
+                        <TableCell className="text-right font-mono">{commission.toLocaleString("da-DK")} kr</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm text-center py-8">{isTvMode ? "Seneste salg ikke tilgængeligt i TV-tilstand" : "Ingen salg endnu"}</p>
+            <p className="text-muted-foreground text-sm text-center py-8">Ingen salg endnu</p>
           )}
         </CardContent>
       </Card>
