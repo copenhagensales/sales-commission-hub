@@ -1,14 +1,21 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay } from "date-fns";
+import { format, startOfDay, addDays, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, Trophy, Clock, TrendingUp, Target } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { DateRange } from "react-day-picker";
+import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+
+const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
 
 interface ProductStat {
   name: string;
@@ -17,33 +24,103 @@ interface ProductStat {
   commission: number;
 }
 
-interface AgentStat {
-  name: string;
-  salesCount: number;
-  revenue: number;
-  commission: number;
+// Calculate payroll period (15th to 14th)
+function calculatePayrollPeriod(): { start: Date; end: Date } {
+  const today = new Date();
+  const currentDay = today.getDate();
+  
+  if (currentDay >= 15) {
+    const start = new Date(today.getFullYear(), today.getMonth(), 15);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
+    return { start, end };
+  } else {
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
+    const end = new Date(today.getFullYear(), today.getMonth(), 14);
+    return { start, end };
+  }
+}
+
+// Calculate working days in range (excludes weekends)
+function getWorkingDaysInRange(start: Date, end: Date): number {
+  let count = 0;
+  let current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+  const endDate = new Date(end);
+  endDate.setHours(23, 59, 59, 999);
+  
+  while (current <= endDate) {
+    if (!isWeekend(current)) {
+      count++;
+    }
+    current = addDays(current, 1);
+  }
+  return count;
 }
 
 const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
+  new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' kr';
+
+const getInitials = (name: string) => {
+  const parts = name.split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
+const getMedal = (rank: number) => {
+  switch (rank) {
+    case 1: return "🥇";
+    case 2: return "🥈";
+    case 3: return "🥉";
+    default: return null;
+  }
+};
 
 export default function TdcErhvervDashboard() {
+  const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
+  
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfDay(new Date()),
+    from: payrollPeriod.start,
     to: new Date()
   });
 
-  // Fetch TDC Erhverv sales for selected date range with product mapping
-  const { data, isLoading } = useQuery({
-    queryKey: ["tdc-erhverv-dashboard", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+  // Use the unified dashboard sales data hook
+  const dashboardData = useDashboardSalesData({
+    clientName: "TDC Erhverv",
+    startDate: dateRange?.from || payrollPeriod.start,
+    endDate: dateRange?.to || new Date(),
+    enabled: !!dateRange?.from
+  });
+
+  // Fetch team goal for payroll period
+  const periodStartStr = format(payrollPeriod.start, "yyyy-MM-dd");
+  const periodEndStr = format(payrollPeriod.end, "yyyy-MM-dd");
+
+  const { data: teamGoal } = useQuery({
+    queryKey: ["team-sales-goal-tdc", TDC_ERHVERV_TEAM_ID, periodStartStr, periodEndStr],
     queryFn: async () => {
-      if (!dateRange?.from) return { sales: [], campaignIds: [] };
+      const { data } = await supabase
+        .from("team_sales_goals")
+        .select("id, target_amount")
+        .eq("team_id", TDC_ERHVERV_TEAM_ID)
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  // Fetch product stats for the selected date range
+  const { data: productData, isLoading: productsLoading } = useQuery({
+    queryKey: ["tdc-erhverv-products", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryFn: async () => {
+      if (!dateRange?.from) return [];
       
       const rangeStart = startOfDay(dateRange.from);
       const rangeEnd = dateRange.to ? new Date(startOfDay(dateRange.to)) : new Date(rangeStart);
       rangeEnd.setDate(rangeEnd.getDate() + 1);
 
-      // Find TDC Erhverv client
       const { data: clients } = await supabase
         .from("clients")
         .select("id")
@@ -51,106 +128,90 @@ export default function TdcErhvervDashboard() {
         .limit(1);
 
       const tdcClientId = clients?.[0]?.id;
-      if (!tdcClientId) return { sales: [], campaignIds: [] };
+      if (!tdcClientId) return [];
 
-      // Get campaigns
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
         .eq("client_id", tdcClientId);
 
       const campaignIds = (campaigns || []).map(c => c.id);
-      if (campaignIds.length === 0) return { sales: [], campaignIds: [] };
+      if (campaignIds.length === 0) return [];
 
-      // Fetch sales for selected date range with product mappings
       const { data: sales } = await supabase
         .from("sales")
         .select(`
-          id, 
-          sale_datetime, 
-          agent_name,
           sale_items (
-            id,
             quantity,
             mapped_commission,
-            mapped_revenue,
-            product_id,
-            products (
-              id,
-              name,
-              commission_dkk,
-              revenue_dkk,
-              counts_as_sale
-            )
+            products (name, counts_as_sale)
           )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", rangeStart.toISOString())
-        .lt("sale_datetime", rangeEnd.toISOString())
-        .order("sale_datetime", { ascending: false });
+        .lt("sale_datetime", rangeEnd.toISOString());
 
-      return { sales: sales || [], campaignIds };
+      const productMap = new Map<string, ProductStat>();
+      
+      (sales || []).forEach((sale: any) => {
+        (sale.sale_items || []).forEach((item: any) => {
+          const product = item.products;
+          if (product?.counts_as_sale === false) return;
+          
+          const qty = Number(item.quantity) || 1;
+          const commission = Number(item.mapped_commission) || 0;
+          const productName = product?.name || "Ukendt produkt";
+          
+          const existing = productMap.get(productName) || { name: productName, quantity: 0, revenue: 0, commission: 0 };
+          existing.quantity += qty;
+          existing.commission += commission;
+          productMap.set(productName, existing);
+        });
+      });
+
+      return Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity);
     },
     enabled: !!dateRange?.from
   });
 
-  // Process stats
-  const { agentStats, productStats, totalSales, totalRevenue, totalCommission } = useMemo(() => {
-    const agentMap = new Map<string, AgentStat>();
-    const productMap = new Map<string, ProductStat>();
-    let totalSales = 0;
-    let totalRevenue = 0;
-    let totalCommission = 0;
+  // Calculate team progress metrics
+  const teamProgress = useMemo(() => {
+    const targetAmount = teamGoal?.target_amount || 0;
+    const achieved = dashboardData.totalCommission;
+    const progressPercent = targetAmount > 0 ? (achieved / targetAmount) * 100 : 0;
 
-    (data?.sales || []).forEach((sale: any) => {
-      const agentName = sale.agent_name?.trim() || "Ukendt";
-
-      (sale.sale_items || []).forEach((item: any) => {
-        const product = item.products;
-        
-        // Only count if counts_as_sale is true (or null/undefined, default to true)
-        const countsAsSale = product?.counts_as_sale !== false;
-        if (!countsAsSale) return;
-
-        const qty = Number(item.quantity) || 1;
-        // Use products table values (base) × qty, or mapped values directly (already includes qty)
-        const itemCommission = product?.commission_dkk 
-          ? qty * Number(product.commission_dkk) 
-          : (Number(item.mapped_commission) || 0);
-        const itemRevenue = product?.revenue_dkk 
-          ? qty * Number(product.revenue_dkk) 
-          : (Number(item.mapped_revenue) || 0);
-        const productName = product?.name || "Ukendt produkt";
-
-        // Update totals
-        totalSales += qty;
-        totalCommission += itemCommission;
-        totalRevenue += itemRevenue;
-
-        // Update agent stats
-        const existing = agentMap.get(agentName) || { name: agentName, salesCount: 0, revenue: 0, commission: 0 };
-        existing.salesCount += qty;
-        existing.revenue += itemRevenue;
-        existing.commission += itemCommission;
-        agentMap.set(agentName, existing);
-
-        // Update product stats
-        const productStat = productMap.get(productName) || { name: productName, quantity: 0, revenue: 0, commission: 0 };
-        productStat.quantity += qty;
-        productStat.revenue += itemRevenue;
-        productStat.commission += itemCommission;
-        productMap.set(productName, productStat);
-      });
-    });
+    const today = new Date();
+    const totalWorkingDays = getWorkingDaysInRange(payrollPeriod.start, payrollPeriod.end);
+    const elapsedWorkingDays = getWorkingDaysInRange(payrollPeriod.start, today > payrollPeriod.end ? payrollPeriod.end : today);
+    
+    const expectedProgress = totalWorkingDays > 0 ? (elapsedWorkingDays / totalWorkingDays) * 100 : 0;
+    const expectedAmount = targetAmount * (expectedProgress / 100);
+    const vsExpected = expectedAmount > 0 ? ((achieved - expectedAmount) / expectedAmount) * 100 : 0;
 
     return {
-      agentStats: Array.from(agentMap.values()).sort((a, b) => b.commission - a.commission),
-      productStats: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity),
-      totalSales,
-      totalRevenue,
-      totalCommission
+      targetAmount,
+      achieved,
+      progressPercent: Math.min(progressPercent, 100),
+      expectedProgress,
+      expectedAmount,
+      vsExpected,
+      isAhead: achieved >= expectedAmount,
+      elapsedWorkingDays,
+      totalWorkingDays
     };
-  }, [data?.sales]);
+  }, [teamGoal, dashboardData.totalCommission, payrollPeriod]);
+
+  // Sort employees by commission for leaderboard
+  const sortedEmployees = useMemo(() => {
+    return [...dashboardData.employeeStats].sort((a, b) => b.totalCommission - a.totalCommission);
+  }, [dashboardData.employeeStats]);
+
+  const topSellers = sortedEmployees.slice(0, 5);
+
+  // Calculate averages
+  const avgSalesPerHour = dashboardData.totalHours > 0 
+    ? (dashboardData.totalSales / dashboardData.totalHours).toFixed(2) 
+    : "0";
 
   const getSubtitle = () => {
     if (!dateRange?.from) return "Baseret på produkt-mapping fra MG Test";
@@ -161,6 +222,8 @@ export default function TdcErhvervDashboard() {
     }
     return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test`;
   };
+
+  const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM yyyy", { locale: da })}`;
 
   const datePickerContent = (
     <DashboardDateRangePicker 
@@ -178,16 +241,64 @@ export default function TdcErhvervDashboard() {
       />
       <div className="space-y-6">
 
+        {/* Team Progress Hero */}
+        {teamProgress.targetAmount > 0 && (
+          <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium text-muted-foreground">Team Fremskridt</span>
+                    <Badge variant="outline" className="text-xs">{periodLabel}</Badge>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-3 mb-4">
+                    <span className="text-4xl font-bold text-primary">
+                      {teamProgress.progressPercent.toFixed(0)}%
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(teamProgress.achieved)} af {formatCurrency(teamProgress.targetAmount)}
+                    </span>
+                  </div>
+                  
+                  <Progress value={teamProgress.progressPercent} className="h-3 mb-4" />
+                  
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className={`flex items-center gap-1 ${teamProgress.isAhead ? 'text-green-600' : 'text-red-500'}`}>
+                      <TrendingUp className={`h-4 w-4 ${!teamProgress.isAhead && 'rotate-180'}`} />
+                      <span className="font-medium">
+                        {teamProgress.isAhead ? '+' : ''}{teamProgress.vsExpected.toFixed(0)}% vs. forventet
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground">
+                      Dag {teamProgress.elapsedWorkingDays} af {teamProgress.totalWorkingDays}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="lg:text-right">
+                  <div className="text-sm text-muted-foreground mb-1">Forventet nu</div>
+                  <div className="text-xl font-semibold">{formatCurrency(teamProgress.expectedAmount)}</div>
+                  <div className={`text-sm ${teamProgress.isAhead ? 'text-green-600' : 'text-red-500'}`}>
+                    {teamProgress.isAhead ? '↑ Foran' : '↓ Bagud'} med {formatCurrency(Math.abs(teamProgress.achieved - teamProgress.expectedAmount))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Antal salg</CardTitle>
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{totalSales}</div>
-              <p className="text-xs text-muted-foreground mt-1">Kun produkter markeret som salg</p>
+              <div className="text-3xl font-bold text-primary">{dashboardData.totalSales}</div>
+              <p className="text-xs text-muted-foreground mt-1">I valgt periode</p>
             </CardContent>
           </Card>
 
@@ -197,47 +308,168 @@ export default function TdcErhvervDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{formatCurrency(totalCommission)}</div>
+              <div className="text-3xl font-bold">{formatCurrency(dashboardData.totalCommission)}</div>
               <p className="text-xs text-muted-foreground mt-1">Fra mappede produkter</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Timer</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{dashboardData.totalHours.toFixed(1)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Totale arbejdstimer</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg/time</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{avgSalesPerHour}</div>
+              <p className="text-xs text-muted-foreground mt-1">Effektivitet</p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Top Sellers Leaderboard */}
+        {topSellers.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                Top Sælgere
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3">
+                {topSellers.map((seller, index) => {
+                  const rank = index + 1;
+                  const medal = getMedal(rank);
+                  const salesPerHour = seller.totalHours > 0 
+                    ? (seller.totalSales / seller.totalHours).toFixed(2) 
+                    : "0";
+                  
+                  return (
+                    <div 
+                      key={seller.employeeId} 
+                      className={`flex items-center gap-4 p-3 rounded-lg ${
+                        rank <= 3 ? 'bg-gradient-to-r from-primary/10 to-transparent' : 'bg-muted/50'
+                      }`}
+                    >
+                      <div className="w-8 text-center">
+                        {medal || <span className="text-muted-foreground font-medium">{rank}</span>}
+                      </div>
+                      
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback className={rank <= 3 ? 'bg-primary/20 text-primary font-semibold' : ''}>
+                          {getInitials(seller.employeeName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1 min-w-0">
+                        <Link 
+                          to={`/my-goals/${seller.employeeId}`}
+                          className="font-medium hover:text-primary transition-colors truncate block"
+                        >
+                          {seller.employeeName}
+                        </Link>
+                      </div>
+                      
+                      <div className="hidden sm:flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <div className="font-semibold">{seller.totalSales}</div>
+                          <div className="text-muted-foreground text-xs">salg</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold">{seller.totalHours.toFixed(1)}t</div>
+                          <div className="text-muted-foreground text-xs">timer</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold">{salesPerHour}</div>
+                          <div className="text-muted-foreground text-xs">salg/t</div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <div className="font-bold text-primary">{formatCurrency(seller.totalCommission)}</div>
+                        <div className="text-xs text-muted-foreground sm:hidden">{seller.totalSales} salg</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Sales by Agent */}
+          {/* Full Sales Table */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                Salg pr. sælger
+                Alle sælgere
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {dashboardData.isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : agentStats.length === 0 ? (
+              ) : sortedEmployees.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">Ingen salg registreret i perioden</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-8">#</TableHead>
                       <TableHead>Sælger</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right hidden sm:table-cell">Timer</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">Salg/t</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {agentStats.map(agent => (
-                      <TableRow key={agent.name}>
-                        <TableCell className="font-medium">{agent.name}</TableCell>
-                        <TableCell className="text-right">{agent.salesCount}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(agent.commission)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {sortedEmployees.map((emp, index) => {
+                      const rank = index + 1;
+                      const salesPerHour = emp.totalHours > 0 
+                        ? (emp.totalSales / emp.totalHours).toFixed(2) 
+                        : "-";
+                      
+                      return (
+                        <TableRow 
+                          key={emp.employeeId}
+                          className={rank <= 3 ? 'bg-primary/5' : ''}
+                        >
+                          <TableCell className="font-medium">
+                            {getMedal(rank) || rank}
+                          </TableCell>
+                          <TableCell>
+                            <Link 
+                              to={`/my-goals/${emp.employeeId}`}
+                              className="font-medium hover:text-primary transition-colors"
+                            >
+                              {emp.employeeName}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-right">{emp.totalSales}</TableCell>
+                          <TableCell className="text-right hidden sm:table-cell">{emp.totalHours.toFixed(1)}</TableCell>
+                          <TableCell className="text-right hidden md:table-cell">{salesPerHour}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(emp.totalCommission)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell></TableCell>
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{totalSales}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
+                      <TableCell className="text-right">{dashboardData.totalSales}</TableCell>
+                      <TableCell className="text-right hidden sm:table-cell">{dashboardData.totalHours.toFixed(1)}</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{avgSalesPerHour}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(dashboardData.totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -254,9 +486,9 @@ export default function TdcErhvervDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {productsLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : productStats.length === 0 ? (
+              ) : (productData || []).length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">Ingen produkter solgt i perioden</p>
               ) : (
                 <Table>
@@ -268,7 +500,7 @@ export default function TdcErhvervDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {productStats.map(product => (
+                    {(productData || []).map(product => (
                       <TableRow key={product.name}>
                         <TableCell className="font-medium max-w-[200px] truncate">{product.name}</TableCell>
                         <TableCell className="text-right">{product.quantity}</TableCell>
@@ -277,8 +509,8 @@ export default function TdcErhvervDashboard() {
                     ))}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{totalSales}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
+                      <TableCell className="text-right">{dashboardData.totalSales}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(dashboardData.totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
