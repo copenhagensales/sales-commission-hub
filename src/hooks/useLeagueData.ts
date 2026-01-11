@@ -199,6 +199,50 @@ export function useEnrollInSeason() {
     onSuccess: (_, seasonId) => {
       queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
       queryClient.invalidateQueries({ queryKey: ["league-qualification-standings", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-enrollment-count", seasonId] });
+    },
+  });
+}
+
+// Unenroll from a season (soft delete - sets is_active to false)
+export function useUnenrollFromSeason() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (seasonId: string) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      
+      // Get employee_id
+      const { data: employee, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single();
+      
+      if (empError) throw empError;
+      
+      // Soft delete by setting is_active to false
+      const { error } = await supabase
+        .from("league_enrollments")
+        .update({ is_active: false })
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id);
+
+      if (error) throw error;
+      
+      // Also remove from standings
+      await supabase
+        .from("league_qualification_standings")
+        .delete()
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id);
+    },
+    onSuccess: (_, seasonId) => {
+      queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-qualification-standings", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-enrollment-count", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-my-qualification-standing", seasonId] });
     },
   });
 }
