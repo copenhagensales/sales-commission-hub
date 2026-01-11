@@ -16,6 +16,7 @@ import {
   useQualificationStandings,
   useMyQualificationStanding,
   useEnrollInSeason,
+  useUnenrollFromSeason,
   useEnrollmentCount,
 } from "@/hooks/useLeagueData";
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
@@ -50,6 +51,7 @@ export default function CommissionLeague() {
   const { data: myStanding } = useMyQualificationStanding(season?.id);
   const { data: enrollmentCount } = useEnrollmentCount(season?.id);
   const enrollMutation = useEnrollInSeason();
+  const unenrollMutation = useUnenrollFromSeason();
 
   // Real-time subscription
   useEffect(() => {
@@ -86,6 +88,16 @@ export default function CommissionLeague() {
       handleCalculateStandings();
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke tilmelde");
+    }
+  };
+
+  const handleUnenroll = async () => {
+    if (!season?.id) return;
+    try {
+      await unenrollMutation.mutateAsync(season.id);
+      toast.success("Du er nu afmeldt ligaen");
+    } catch (error: any) {
+      toast.error(error.message || "Kunne ikke afmelde");
     }
   };
 
@@ -264,6 +276,22 @@ export default function CommissionLeague() {
                 totalPlayers={standings?.length || 0}
                 playersPerDivision={playersPerDivision}
               />
+
+              {/* Unenroll button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleUnenroll}
+                  disabled={unenrollMutation.isPending}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  {unenrollMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Afmeld liga
+                </Button>
+              </div>
 
               {/* Leaderboard */}
               <Card className="bg-slate-800/30 border-slate-700">
