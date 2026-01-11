@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
+import { formatPlayerName } from "@/lib/formatPlayerName";
 
 export function LeaguePromoCard() {
   const { user } = useAuth();
@@ -87,15 +88,6 @@ export function LeaguePromoCard() {
     }).format(amount) + " kr";
   };
 
-  const formatShortName = (employee: { first_name?: string | null; last_name?: string | null } | null | undefined) => {
-    if (!employee) return "Ukendt";
-    const firstName = employee.first_name || "";
-    const lastName = employee.last_name || "";
-    if (!firstName && !lastName) return "Ukendt";
-    if (!lastName) return firstName;
-    const lastInitial = lastName.charAt(0).toUpperCase();
-    return `${firstName} ${lastInitial}`;
-  };
 
   const getMedalEmoji = (rank: number) => {
     switch (rank) {
@@ -149,7 +141,7 @@ export function LeaguePromoCard() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{getMedalEmoji(index + 1)}</span>
                     <span className="font-medium text-sm">
-                      {formatShortName(standing.employee)}
+                      {formatPlayerName(standing.employee)}
                       {standing.employee_id === currentEmployeeId && (
                         <span className="text-primary ml-1">(dig)</span>
                       )}
@@ -171,7 +163,7 @@ export function LeaguePromoCard() {
             <div className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-primary">#{myStanding.projected_rank}</span>
-                <span className="font-medium text-sm">{formatShortName(myStanding.employee)}</span>
+                <span className="font-medium text-sm">{formatPlayerName(myStanding.employee)}</span>
               </div>
               <span className="text-sm font-semibold">{formatProvision(myStanding.current_provision || 0)}</span>
             </div>
