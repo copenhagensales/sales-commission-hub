@@ -215,8 +215,12 @@ Deno.serve(async (req) => {
       if (agentEmail && saleItemsMap[agentEmail]) {
         currentProvision = saleItemsMap[agentEmail].total_commission;
         dealsCount = saleItemsMap[agentEmail].deals_count;
+        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmail}): ${currentProvision} kr, ${dealsCount} deals`);
+      } else {
+        console.log(`[league-calculate-standings] Employee ${employeeId}: No agent email or no sales found (email: ${agentEmail || 'none'})`);
       }
 
+      // ALWAYS add standing for enrolled players, even with 0 provision
       standingsData.push({
         employee_id: employeeId,
         current_provision: currentProvision,
@@ -226,6 +230,8 @@ Deno.serve(async (req) => {
         projected_rank: 1,
       });
     }
+
+    console.log(`[league-calculate-standings] Total standings to save: ${standingsData.length}`);
 
     // 7. Sort by provision (highest first) and calculate ranks
     standingsData.sort((a, b) => b.current_provision - a.current_provision);

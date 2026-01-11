@@ -33,19 +33,16 @@ export default function CommissionLeague() {
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
 
-  // Fetch current employee ID
+  // Fetch current employee ID using robust RPC with email fallback
   useEffect(() => {
     const fetchEmployeeId = async () => {
-      if (!user?.id) return;
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
-      if (data) setCurrentEmployeeId(data.id);
+      const { data, error } = await supabase.rpc("get_current_employee_id");
+      if (!error && data) {
+        setCurrentEmployeeId(data);
+      }
     };
     fetchEmployeeId();
-  }, [user?.id]);
+  }, []);
 
   const { data: season, isLoading: seasonLoading } = useActiveSeason();
   const { data: enrollment, isLoading: enrollmentLoading } = useMyEnrollment(season?.id);
