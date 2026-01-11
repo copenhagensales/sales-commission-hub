@@ -12,6 +12,7 @@ import { PersonalBestBadge } from "./PersonalBestBadge";
 import { DistanceToZone } from "./DistanceToZone";
 import { RivalryIndicator } from "./RivalryIndicator";
 import { cn } from "@/lib/utils";
+import { formatPlayerName } from "@/lib/formatPlayerName";
 
 interface PremierLeagueBoardProps {
   standings: MockQualificationStanding[];
@@ -58,12 +59,12 @@ export function PremierLeagueBoard({
 
     return {
       above: above ? {
-        name: `${above.employee?.first_name} ${above.employee?.last_name}`,
+        name: formatPlayerName(above.employee),
         provision: above.current_provision,
         gap: above.current_provision - current.current_provision,
       } : null,
       below: below ? {
-        name: `${below.employee?.first_name} ${below.employee?.last_name}`,
+        name: formatPlayerName(below.employee),
         provision: below.current_provision,
         gap: current.current_provision - below.current_provision,
       } : null,
@@ -262,7 +263,7 @@ export function PremierLeagueBoard({
                               "font-medium text-sm sm:text-[15px] truncate max-w-[140px] sm:max-w-none",
                               isCurrentUser && "text-primary font-semibold"
                             )}>
-                              {standing.employee?.first_name} {standing.employee?.last_name}
+                              {formatPlayerName(standing.employee)}
                             </span>
                             
                             {isCurrentUser && (

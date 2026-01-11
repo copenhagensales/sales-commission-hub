@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUp, ArrowDown, Minus, Trophy, Medal, Award } from "lucide-react";
 import { QualificationStanding } from "@/hooks/useLeagueData";
 import { cn } from "@/lib/utils";
+import { formatPlayerName } from "@/lib/formatPlayerName";
 
 interface QualificationBoardProps {
   standings: QualificationStanding[];
@@ -188,7 +189,7 @@ function PlayerRow({
           "font-medium truncate block",
           isCurrentUser && "text-primary"
         )}>
-          {standing.employee?.first_name} {standing.employee?.last_name}
+          {formatPlayerName(standing.employee)}
           {isCurrentUser && <span className="text-xs ml-2">(dig)</span>}
         </span>
       </div>
