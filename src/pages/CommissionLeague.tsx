@@ -190,7 +190,7 @@ export default function CommissionLeague() {
                     </h2>
                     <p className="text-muted-foreground mb-6">
                       Kæmp mod dine kolleger i et spændende liga-system baseret på din provision.
-                      Op- og nedrykning hver uge!
+                      Op- og nedrykning hver uge – og der kan vindes fede præmier!
                     </p>
 
                     <div className="space-y-3 mb-6">
@@ -205,6 +205,10 @@ export default function CommissionLeague() {
                       <div className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4 text-primary" />
                         <span>#8 spiller duel mod #3 i divisionen under</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className="h-4 w-4 text-primary" />
+                        <span>🎁 Præmier til topplaceringer</span>
                       </div>
                     </div>
 
