@@ -91,6 +91,7 @@ export function useMyEnrollment(seasonId: string | undefined) {
         .select("*")
         .eq("season_id", seasonId)
         .eq("employee_id", employee.id)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
