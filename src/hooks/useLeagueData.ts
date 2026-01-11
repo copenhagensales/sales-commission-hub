@@ -184,17 +184,37 @@ export function useEnrollInSeason() {
       
       if (empError) throw empError;
       
-      const { data, error } = await supabase
+      // Check if there's an existing inactive enrollment
+      const { data: existing } = await supabase
         .from("league_enrollments")
-        .insert({
-          season_id: seasonId,
-          employee_id: employee.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+        .select("id, is_active")
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id)
+        .maybeSingle();
+      
+      if (existing) {
+        // Re-activate existing enrollment
+        const { data, error } = await supabase
+          .from("league_enrollments")
+          .update({ is_active: true })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        // Create new enrollment
+        const { data, error } = await supabase
+          .from("league_enrollments")
+          .insert({
+            season_id: seasonId,
+            employee_id: employee.id,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: (_, seasonId) => {
       queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
