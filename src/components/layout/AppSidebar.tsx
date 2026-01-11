@@ -412,14 +412,25 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               {/* Provisionsliga */}
               <NavLink
                 to="/commission-league"
-                onClick={handleNavClick}
+                onClick={(e) => {
+                  handleNavClick(e);
+                  // Mark as seen to hide "NY" badge
+                  localStorage.setItem("league-sidebar-seen", "true");
+                }}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
-                <Trophy className="h-4 w-4" />
-                Cph Sales Ligaen
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-4 w-4" />
+                  Cph Sales Ligaen
+                </div>
+                {!localStorage.getItem("league-sidebar-seen") && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
+                    NY
+                  </span>
+                )}
               </NavLink>
               
               {/* Liga Test Board - kun for ejere */}

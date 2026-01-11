@@ -30,6 +30,7 @@ import {
   Flame,
   ArrowUpRight
 } from "lucide-react";
+import { LeaguePromoCard } from "@/components/league/LeaguePromoCard";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -999,7 +1000,8 @@ const Home = () => {
           </div>
         </section>
 
-        
+        {/* League Promo Card */}
+        <LeaguePromoCard />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Team Performance */}

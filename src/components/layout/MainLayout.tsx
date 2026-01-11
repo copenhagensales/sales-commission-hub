@@ -8,6 +8,7 @@ import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
+import { LeagueAnnouncementPopup } from "@/components/league/LeagueAnnouncementPopup";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -69,6 +70,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         
         {/* Popup for pending absence requests - shown to team leaders (skip in preview mode) */}
         {!isPreviewMode && <PendingAbsencePopup />}
+        
+        {/* League announcement popup - shown once to non-enrolled users */}
+        {!isPreviewMode && <LeagueAnnouncementPopup />}
         
         {/* Softphone Widget */}
         <SoftphoneWidget />
