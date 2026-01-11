@@ -81,7 +81,7 @@ export default function TdcErhvervDashboard() {
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: payrollPeriod.start,
+    from: startOfDay(new Date()),
     to: new Date()
   });
 
