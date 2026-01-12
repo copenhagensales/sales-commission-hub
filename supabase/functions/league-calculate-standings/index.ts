@@ -232,6 +232,7 @@ Deno.serve(async (req) => {
         }
 
         // Check for campaign override - use it if exists, otherwise fallback to mapped_commission
+        // IMPORTANT: Match DailyReports logic exactly - override is NOT multiplied by quantity
         const campaignMappingId = saleToCampaignMappingId[item.sale_id];
         const overrideKey = campaignMappingId && item.product_id 
           ? `${item.product_id}_${campaignMappingId}` 
@@ -239,11 +240,11 @@ Deno.serve(async (req) => {
         const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
 
         if (override) {
-          // Use campaign-specific commission (override already per-unit, multiply by quantity)
-          saleToCommission[item.sale_id] += override.commission * (item.quantity || 1);
+          // Use campaign-specific commission (per-item, NOT multiplied by quantity - same as DailyReports)
+          saleToCommission[item.sale_id] += override.commission;
         } else {
-          // Fallback to mapped_commission (already includes quantity multiplier)
-          saleToCommission[item.sale_id] += item.mapped_commission || 0;
+          // Fallback to mapped values from sale_items (same as DailyReports)
+          saleToCommission[item.sale_id] += Number(item.mapped_commission) || 0;
         }
       }
 
