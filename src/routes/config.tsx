@@ -108,6 +108,7 @@ import {
   SecurityDashboard,
   UpcomingStarts,
   SalarySchemes,
+  MgTestPage,
   CommissionLeague,
   CommissionLeagueTest,
   LeagueAdminDashboard,
@@ -406,8 +407,8 @@ export const routes: RouteConfig[] = [
   // League Admin
   { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
 
-  // Salary Schemes
-  { path: "/1234", component: SalarySchemes, access: "role", positionPermission: "menu_mg_test" },
+  // MG Test (Salary Schemes + Relatel Data)
+  { path: "/1234", component: MgTestPage, access: "role", positionPermission: "menu_mg_test" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
