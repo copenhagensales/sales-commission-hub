@@ -200,15 +200,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Add to recent sales
-      if (recentSales.length < 15) {
+      // Add to recent sales with commission
+      if (recentSales.length < 30) {
         recentSales.push({
           id: sale.id,
           agent_name: sale.agent_name,
           sale_datetime: sale.sale_datetime,
           status: sale.status,
           client_name: clientName,
-          items_count: saleItemCount
+          items_count: saleItemCount,
+          commission: saleCommission
         });
       }
     }
