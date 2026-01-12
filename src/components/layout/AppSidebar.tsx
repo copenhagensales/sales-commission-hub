@@ -244,6 +244,40 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
 
+  // Fetch unread recruitment messages and missed calls count
+  const { data: recruitmentNotificationsCount = 0 } = useQuery({
+    queryKey: ["recruitment-notifications-count"],
+    queryFn: async () => {
+      if (!p.canViewMessages) return 0;
+
+      // Count unread inbound SMS in recruitment context
+      const { count: unreadSmsCount } = await supabase
+        .from("communication_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("read", false)
+        .eq("direction", "inbound")
+        .eq("type", "sms")
+        .eq("context_type", "recruitment");
+
+      // Count missed calls to candidates (from the last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const { count: missedCallsCount } = await supabase
+        .from("call_records")
+        .select("*", { count: "exact", head: true })
+        .not("candidate_id", "is", null)
+        .in("status", ["missed", "no-answer", "busy"])
+        .gte("started_at", sevenDaysAgo.toISOString());
+
+      return (unreadSmsCount || 0) + (missedCallsCount || 0);
+    },
+    enabled: p.canViewMessages,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -1478,9 +1512,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.recruitment")}
                   </div>
                   <div className="flex items-center gap-1">
-                    {pendingReferralsCount > 0 && (
+                    {(pendingReferralsCount > 0 || recruitmentNotificationsCount > 0) && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {pendingReferralsCount > 99 ? "99+" : pendingReferralsCount}
+                        {(pendingReferralsCount + recruitmentNotificationsCount) > 99 ? "99+" : (pendingReferralsCount + recruitmentNotificationsCount)}
                       </Badge>
                     )}
                     {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -1535,11 +1569,18 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}
                 {p.canViewMessages && (
                   <NavLink to="/recruitment/messages" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/recruitment/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
-                    <FileText className="h-4 w-4" />
-                    {t("sidebar.messages")}
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className="h-4 w-4" />
+                      {t("sidebar.messages")}
+                    </div>
+                    {recruitmentNotificationsCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                        {recruitmentNotificationsCount > 99 ? "99+" : recruitmentNotificationsCount}
+                      </Badge>
+                    )}
                   </NavLink>
                 )}
                 {p.canViewSmsTemplates && (
