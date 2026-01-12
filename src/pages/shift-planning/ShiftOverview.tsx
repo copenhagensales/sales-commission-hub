@@ -200,12 +200,14 @@ export default function ShiftOverview() {
   const { data: weeklySales } = useQuery({
     queryKey: ["weekly-sales-for-shift-cells", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
     queryFn: async () => {
+      // Fetch sales that are pending, approved, or have no status (null)
+      // Using 'or' filter to include null status values
       const { data, error } = await supabase
         .from("sales")
         .select("id, agent_name, sale_datetime, status")
         .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
         .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
-        .in("status", ["pending", "approved"]);
+        .or("status.in.(pending,approved),status.is.null");
       if (error) throw error;
       return data;
     },
