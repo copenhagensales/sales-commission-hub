@@ -153,3 +153,6 @@ export const CommissionLeagueTest = lazyPage(() => import("@/pages/CommissionLea
 // League Admin
 export const LeagueAdminDashboard = lazyPage(() => import("@/pages/admin/LeagueAdminDashboard"));
 
+// KPI Definitions (Owner only)
+export const KpiDefinitions = lazyPage(() => import("@/pages/admin/KpiDefinitions"));
+
