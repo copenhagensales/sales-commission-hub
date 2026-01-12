@@ -225,7 +225,13 @@ export default function ShiftOverview() {
       return `${start}-${end}`;
     }
 
-    // Fallback to main shift times
+    // For weekend days: only show time if there's explicit configuration
+    const isWeekend = dbDayOfWeek === 6 || dbDayOfWeek === 7;
+    if (isWeekend) {
+      return null; // No fallback for weekends
+    }
+
+    // Fallback to main shift times only for weekdays
     const start = primaryShift.start_time.slice(0, 5);
     const end = primaryShift.end_time.slice(0, 5);
     return `${start}-${end}`;
