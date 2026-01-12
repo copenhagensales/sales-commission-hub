@@ -1274,9 +1274,10 @@ export default function ShiftOverview() {
                               {/* Status Tags */}
                               {!hasShift && isLate && (
                                 <div className="flex flex-col items-center gap-1">
-                                  {workTimes && (
+                                  {timeStamp && (
                                     <span className="text-[10px] font-medium text-muted-foreground">
-                                      {workTimes}
+                                      {format(new Date(timeStamp.clock_in), "HH:mm")}
+                                      {timeStamp.clock_out ? `-${format(new Date(timeStamp.clock_out), "HH:mm")}` : workTimes ? `-${workTimes.split('-')[1]}` : ''}
                                     </span>
                                   )}
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
