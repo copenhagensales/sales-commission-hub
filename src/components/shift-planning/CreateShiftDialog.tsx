@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { format, getDay } from "date-fns";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { format, getDay, parseISO, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,25 @@ function usePrimaryStandardShift(teamId: string | null | undefined) {
   });
 }
 
+// Hook to fetch existing shifts for an employee
+function useEmployeeExistingShifts(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-existing-shifts", employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      
+      const { data, error } = await supabase
+        .from("shift")
+        .select("date")
+        .eq("employee_id", employeeId);
+      
+      if (error) throw error;
+      return data?.map(s => s.date) || [];
+    },
+    enabled: !!employeeId,
+  });
+}
+
 export function CreateShiftDialog({
   open,
   onOpenChange,
@@ -128,7 +147,18 @@ export function CreateShiftDialog({
   // Get the selected employee's team via team_members table
   const { data: employeeTeamId } = useEmployeeTeamId(employeeId || undefined);
   
+  // Get existing shifts for the selected employee
+  const { data: existingShiftDates } = useEmployeeExistingShifts(employeeId || undefined);
+  
   const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId);
+
+  // Function to check if a date is disabled (already has a shift)
+  const isDateDisabled = useCallback((checkDate: Date) => {
+    if (!existingShiftDates || existingShiftDates.length === 0) return false;
+    return existingShiftDates.some(shiftDate => 
+      isSameDay(parseISO(shiftDate), checkDate)
+    );
+  }, [existingShiftDates]);
 
   useEffect(() => {
     if (selectedDate) {
@@ -287,6 +317,8 @@ export function CreateShiftDialog({
                   selected={date}
                   onSelect={setDate}
                   locale={da}
+                  disabled={isDateDisabled}
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
