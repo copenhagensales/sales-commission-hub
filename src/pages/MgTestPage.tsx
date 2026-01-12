@@ -255,7 +255,7 @@ function RelatelDataTab() {
     mutationFn: async () => {
       const response = await supabase.functions.invoke("integration-engine", {
         body: {
-          source: "Relatel_CPHSALES",
+          integration_id: RELATEL_INTEGRATION_ID,
           action: "sync",
           days: 7,
         },
