@@ -17,7 +17,8 @@ import {
   Clock,
   ArrowLeft,
   Send,
-  ChevronRight
+  ChevronRight,
+  Filter
 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -63,6 +64,7 @@ export default function Messages() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -159,16 +161,19 @@ export default function Messages() {
     );
   })();
 
-  const filteredConversations = smsConversations.filter(conv =>
-    conv.candidate_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.phone_number.includes(searchQuery) ||
-    conv.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = smsConversations
+    .filter(conv => showUnreadOnly ? conv.unread_count > 0 : true)
+    .filter(conv =>
+      conv.candidate_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.phone_number.includes(searchQuery) ||
+      conv.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const filteredMessages = messages.filter((message) => {
     const matchesSearch = message.content?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === "all" || message.type === activeTab;
-    return matchesSearch && matchesTab;
+    const matchesUnread = showUnreadOnly ? (!message.read && message.direction === 'inbound') : true;
+    return matchesSearch && matchesTab && matchesUnread;
   });
 
   const getTypeIcon = (type: string) => {
@@ -259,16 +264,43 @@ export default function Messages() {
             "w-full md:w-80 lg:w-96 flex flex-col shrink-0",
             isMobileConversationView && "hidden md:flex"
           )}>
-            {/* Search */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Søg i beskeder..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-background border-border"
-              />
+            {/* Search and Filter */}
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Søg i beskeder..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-background border-border"
+                />
+              </div>
+              <Button
+                variant={showUnreadOnly ? "default" : "outline"}
+                size="icon"
+                onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                title={showUnreadOnly ? "Vis alle" : "Vis kun ulæste"}
+                className="shrink-0"
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
             </div>
+            
+            {showUnreadOnly && (
+              <div className="mb-3 flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  Viser kun ulæste
+                </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs"
+                  onClick={() => setShowUnreadOnly(false)}
+                >
+                  Nulstil
+                </Button>
+              </div>
+            )}
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MessageType | "all")} className="flex flex-col flex-1 min-h-0">
