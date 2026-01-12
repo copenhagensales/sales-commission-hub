@@ -781,6 +781,79 @@ export default function CphSalesDashboard() {
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
+      {/* Sales by Client - Cards with colors - MOVED TO TOP */}
+      <div>
+        <div className={`flex items-center gap-2 mb-3 ${tvMode ? 'mb-2' : ''}`}>
+          <Target className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
+          <h3 className={`font-semibold ${tvMode ? 'text-sm' : 'text-base'}`}>Salg per opgave</h3>
+        </div>
+        {Object.keys(displaySalesByClient).length === 0 ? (
+          <p className="text-muted-foreground text-center py-4">Ingen salg registreret i dag</p>
+        ) : (
+          <div className={`grid ${tvMode ? 'grid-cols-4 gap-2' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3'}`}>
+            {Object.entries(displaySalesByClient)
+              .sort(([, a], [, b]) => b.count - a.count)
+              .map(([client, data], index) => (
+                <Card 
+                  key={client} 
+                  className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
+                >
+                  <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
+                    {/* Client logo */}
+                    {data.logoUrl && (
+                      <div className={`flex items-center justify-center bg-white/90 rounded-lg ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
+                        <img 
+                          src={data.logoUrl} 
+                          alt={client} 
+                          className="object-contain max-h-full max-w-full"
+                        />
+                      </div>
+                    )}
+                    <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{data.count}</span>
+                    <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
+                      {client}
+                    </span>
+                    {/* Absence info per client - only show in non-TV mode */}
+                    {!tvMode && absenceData && (
+                      (() => {
+                        const sickCount = absenceData.sickByClient?.[client] || 0;
+                        const vacationCount = absenceData.vacationByClient?.[client] || 0;
+                        const noShowCount = absenceData.noShowByClient?.[client] || 0;
+                        const employeeCount = absenceData.employeeCountByClient?.[client] || 0;
+                        
+                        if (employeeCount === 0) return null;
+                        
+                        const totalAbsent = sickCount + vacationCount + noShowCount;
+                        if (totalAbsent === 0) return null;
+                        
+                        return (
+                          <div className="flex flex-wrap gap-1 justify-center mt-1">
+                            {sickCount > 0 && (
+                              <span className="text-[10px] text-rose-400">
+                                🤒 {Math.round((sickCount / employeeCount) * 100)}% ({sickCount})
+                              </span>
+                            )}
+                            {vacationCount > 0 && (
+                              <span className="text-[10px] text-blue-400">
+                                🌴 {Math.round((vacationCount / employeeCount) * 100)}% ({vacationCount})
+                              </span>
+                            )}
+                            {noShowCount > 0 && (
+                              <span className="text-[10px] text-gray-400">
+                                ⚠️ {noShowCount}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        )}
+      </div>
+
       {/* Recruitment KPIs - Only show in non-TV mode */}
       {!tvMode && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1053,80 +1126,6 @@ export default function CphSalesDashboard() {
         </Card>
       </div>
 
-      {/* Sales by Client - Cards with colors */}
-      <div>
-        <div className={`flex items-center gap-2 mb-3 ${tvMode ? 'mb-2' : ''}`}>
-          <Target className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
-          <h3 className={`font-semibold ${tvMode ? 'text-sm' : 'text-base'}`}>Salg per opgave</h3>
-        </div>
-        {Object.keys(displaySalesByClient).length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">Ingen salg registreret i dag</p>
-        ) : (
-          <div className={`grid ${tvMode ? 'grid-cols-4 gap-2' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3'}`}>
-            {Object.entries(displaySalesByClient)
-              .sort(([, a], [, b]) => b.count - a.count)
-              .map(([client, data], index) => (
-                <Card 
-                  key={client} 
-                  className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
-                >
-                  <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
-                    {/* Client logo */}
-                    {data.logoUrl && (
-                      <div className={`flex items-center justify-center bg-white/90 rounded-lg ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
-                        <img 
-                          src={data.logoUrl} 
-                          alt={client} 
-                          className="object-contain max-h-full max-w-full"
-                        />
-                      </div>
-                    )}
-                    <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{data.count}</span>
-                    <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
-                      {client}
-                    </span>
-                    {/* Absence info per client - only show in non-TV mode */}
-                    {!tvMode && absenceData && (
-                      (() => {
-                        const sickCount = absenceData.sickByClient?.[client] || 0;
-                        const vacationCount = absenceData.vacationByClient?.[client] || 0;
-                        const noShowCount = absenceData.noShowByClient?.[client] || 0;
-                        const employeeCount = absenceData.employeeCountByClient?.[client] || 0;
-                        
-                        if (employeeCount === 0) return null;
-                        
-                        const totalAbsent = sickCount + vacationCount + noShowCount;
-                        if (totalAbsent === 0) return null;
-                        
-                        const absencePercent = Math.round((totalAbsent / employeeCount) * 100);
-                        
-                        return (
-                          <div className="flex flex-wrap gap-1 justify-center mt-1">
-                            {sickCount > 0 && (
-                              <span className="text-[10px] text-rose-400">
-                                🤒 {Math.round((sickCount / employeeCount) * 100)}% ({sickCount})
-                              </span>
-                            )}
-                            {vacationCount > 0 && (
-                              <span className="text-[10px] text-blue-400">
-                                🌴 {Math.round((vacationCount / employeeCount) * 100)}% ({vacationCount})
-                              </span>
-                            )}
-                            {noShowCount > 0 && (
-                              <span className="text-[10px] text-gray-400">
-                                ⚠️ {noShowCount}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        )}
-      </div>
 
       {/* Main content: Top 20 Sellers + Recent Sales - Equal size */}
       <div className={`grid ${tvMode ? 'grid-cols-2 gap-3' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
