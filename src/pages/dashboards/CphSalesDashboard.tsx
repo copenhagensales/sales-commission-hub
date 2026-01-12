@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, subDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus, CalendarDays } from "lucide-react";
+import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus, CalendarDays, HeartPulse } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useMemo } from "react";
@@ -234,6 +234,98 @@ export default function CphSalesDashboard() {
         .eq("is_staff_employee", false);
       if (error) throw error;
       return count || 0;
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+  });
+
+  // Fetch absence data for today (sick & vacation) with team info
+  const { data: absenceData } = useQuery({
+    queryKey: ["cph-dashboard-absences", todayStr],
+    queryFn: async () => {
+      // Get today's absences
+      const { data: absences, error: absError } = await supabase
+        .from("absence_request_v2")
+        .select("employee_id, type, start_date, end_date")
+        .eq("status", "approved")
+        .lte("start_date", todayStr)
+        .gte("end_date", todayStr);
+      
+      if (absError) throw absError;
+
+      // Get team_clients mapping
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("team_id, client_id, clients(name)");
+
+      // Get team_members for employee-team mapping
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id");
+
+      // Get active employee count per team
+      const { data: activeByTeam } = await supabase
+        .from("team_members")
+        .select("team_id, employee:employee_master_data!inner(id, is_active, is_staff_employee)")
+        .eq("employee.is_active", true)
+        .eq("employee.is_staff_employee", false);
+
+      // Build team -> client name map
+      const teamToClient: Record<string, string> = {};
+      (teamClients || []).forEach((tc: any) => {
+        if (tc.clients?.name) {
+          teamToClient[tc.team_id] = tc.clients.name;
+        }
+      });
+
+      // Build employee -> team map
+      const employeeToTeam: Record<string, string> = {};
+      (teamMembers || []).forEach((tm: any) => {
+        employeeToTeam[tm.employee_id] = tm.team_id;
+      });
+
+      // Count employees per team
+      const employeesPerTeam: Record<string, number> = {};
+      (activeByTeam || []).forEach((tm: any) => {
+        employeesPerTeam[tm.team_id] = (employeesPerTeam[tm.team_id] || 0) + 1;
+      });
+
+      // Calculate absence counts by type
+      const sickToday = (absences || []).filter(a => a.type === "sick");
+      const vacationToday = (absences || []).filter(a => a.type === "vacation");
+      const noShowToday = (absences || []).filter(a => a.type === "no_show");
+
+      // Calculate sick count per client
+      const sickByClient: Record<string, number> = {};
+      const employeeCountByClient: Record<string, number> = {};
+
+      // Map teams to clients for employee counts
+      (teamClients || []).forEach((tc: any) => {
+        const clientName = tc.clients?.name;
+        if (clientName && employeesPerTeam[tc.team_id]) {
+          employeeCountByClient[clientName] = (employeeCountByClient[clientName] || 0) + employeesPerTeam[tc.team_id];
+        }
+      });
+
+      // Map sick employees to clients
+      sickToday.forEach(absence => {
+        const teamId = employeeToTeam[absence.employee_id];
+        if (teamId) {
+          const clientName = teamToClient[teamId];
+          if (clientName) {
+            sickByClient[clientName] = (sickByClient[clientName] || 0) + 1;
+          }
+        }
+      });
+
+      return {
+        sickCount: sickToday.length,
+        vacationCount: vacationToday.length,
+        noShowCount: noShowToday.length,
+        totalAbsent: (absences || []).length,
+        sickByClient,
+        employeeCountByClient,
+      };
     },
     enabled: !tvMode,
     refetchInterval: 60000,
@@ -523,6 +615,51 @@ export default function CphSalesDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Absence KPI */}
+          <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Fravær i dag</CardTitle>
+              <HeartPulse className="h-5 w-5 text-rose-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                {/* Sick */}
+                <div>
+                  <div className="text-3xl font-bold text-rose-500">{absenceData?.sickCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">syge</div>
+                </div>
+                
+                <div className="h-10 w-px bg-border" />
+                
+                {/* Vacation */}
+                <div>
+                  <div className="text-3xl font-bold text-blue-500">{absenceData?.vacationCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">ferie</div>
+                </div>
+
+                {(absenceData?.noShowCount || 0) > 0 && (
+                  <>
+                    <div className="h-10 w-px bg-border" />
+                    <div>
+                      <div className="text-3xl font-bold text-gray-500">{absenceData?.noShowCount}</div>
+                      <div className="text-xs text-muted-foreground">udeblivelse</div>
+                    </div>
+                  </>
+                )}
+
+                <div className="h-10 w-px bg-border" />
+
+                {/* Total percent */}
+                <div>
+                  <div className="text-2xl font-bold text-muted-foreground">
+                    {activeEmployees > 0 ? Math.round(((absenceData?.totalAbsent || 0) / activeEmployees) * 100) : 0}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">af {activeEmployees}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -599,6 +736,21 @@ export default function CphSalesDashboard() {
                     <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
                       {client}
                     </span>
+                    {/* Sickness percentage per client - only show in non-TV mode */}
+                    {!tvMode && absenceData?.sickByClient && (
+                      (() => {
+                        const sickCount = absenceData.sickByClient[client] || 0;
+                        const employeeCount = absenceData.employeeCountByClient[client] || 0;
+                        if (employeeCount === 0) return null;
+                        const sickPercent = Math.round((sickCount / employeeCount) * 100);
+                        if (sickCount === 0) return null;
+                        return (
+                          <span className="text-[10px] text-rose-400 mt-1">
+                            🤒 {sickPercent}% ({sickCount})
+                          </span>
+                        );
+                      })()
+                    )}
                   </CardContent>
                 </Card>
               ))}
