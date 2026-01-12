@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { MissingShiftsAlert } from "@/components/shift-planning/MissingShiftsAlert";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -171,6 +171,47 @@ export default function ShiftOverview() {
     },
   });
 
+  // Fetch agent mappings for missing shift detection
+  const { data: agentMappings } = useQuery({
+    queryKey: ["employee-agent-mappings-shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
+      if (error) throw error;
+      if (data.length === 0) return [];
+
+      const agentIds = data.map((m) => m.agent_id);
+      const { data: agents, error: agentsError } = await supabase
+        .from("agents")
+        .select("id, name")
+        .in("id", agentIds);
+      if (agentsError) throw agentsError;
+
+      return data.map((mapping) => ({
+        employee_id: mapping.employee_id,
+        agent_name: agents?.find((a) => a.id === mapping.agent_id)?.name || null,
+      }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch sales for the week for missing shift detection
+  const { data: weeklySales } = useQuery({
+    queryKey: ["weekly-sales-for-shift-cells", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("id, agent_name, sale_datetime, status")
+        .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
+        .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
+        .in("status", ["pending", "approved"]);
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
   // Fetch primary shifts with their day configurations
   const { data: primaryShiftsData } = useQuery({
     queryKey: ["primary-shifts-all-teams"],
@@ -245,6 +286,38 @@ export default function ShiftOverview() {
       return ts.employee_id === employeeId && tsDate === dateStr;
     }) || null;
   };
+
+  // Check if employee has missing shift (sales but no shift/timestamp)
+  const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
+    if (!weeklySales || !agentMappings) return false;
+    
+    const dateStr = format(date, "yyyy-MM-dd");
+    
+    // Find agent name for this employee
+    const mapping = agentMappings.find(m => m.employee_id === employeeId);
+    if (!mapping || !mapping.agent_name) return false;
+    
+    // Check if there are sales for this employee on this date
+    const hasSales = weeklySales.some(sale => {
+      if (!sale.agent_name || !sale.sale_datetime) return false;
+      const saleDate = sale.sale_datetime.split("T")[0];
+      return sale.agent_name.toLowerCase() === mapping.agent_name?.toLowerCase() && saleDate === dateStr;
+    });
+    
+    if (!hasSales) return false;
+    
+    // Check if has shift
+    const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
+    if (hasShift) return false;
+    
+    // Check if has timestamp
+    const hasTimestamp = timeStamps?.some(ts => {
+      const tsDate = ts.clock_in.split("T")[0];
+      return ts.employee_id === employeeId && tsDate === dateStr;
+    });
+    
+    return !hasTimestamp;
+  }, [weeklySales, agentMappings, shifts, timeStamps]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
@@ -1090,6 +1163,9 @@ export default function ShiftOverview() {
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
+                    // Missing shift detection (has sales but no shift/timestamp)
+                    const isMissingShift = !hasShift && !timeStamp && hasMissingShiftForDate(employee.id, day);
+                    
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);
                     const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp) : null;
@@ -1112,6 +1188,15 @@ export default function ShiftOverview() {
                               !holiday && "hover:bg-muted/30"
                             )}
                           >
+                            {/* Missing shift indicator */}
+                            {isMissingShift && (
+                              <div className="absolute top-1 left-1">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/40" title="Vagt mangler - der er salg men ingen vagt">
+                                  <AlertTriangle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                </span>
+                              </div>
+                            )}
+                            
                             {/* Daily bonus indicator */}
                             {bonusPaid && (
                               <div className="absolute top-1 right-1">
