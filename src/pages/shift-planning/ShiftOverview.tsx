@@ -303,7 +303,16 @@ export default function ShiftOverview() {
     const hasSales = weeklySales.some(sale => {
       if (!sale.agent_name || !sale.sale_datetime) return false;
       const saleDate = sale.sale_datetime.split("T")[0];
-      return sale.agent_name.toLowerCase() === mapping.agent_name?.toLowerCase() && saleDate === dateStr;
+      if (saleDate !== dateStr) return false;
+      
+      const saleAgent = sale.agent_name.toLowerCase();
+      const mappedAgent = mapping.agent_name?.toLowerCase();
+      if (!mappedAgent) return false;
+      
+      // Match exact, or if sale agent is email format matching the mapped agent
+      return saleAgent === mappedAgent || 
+             saleAgent.startsWith(mappedAgent + '@') ||
+             saleAgent.split('@')[0] === mappedAgent;
     });
     
     if (!hasSales) return false;
