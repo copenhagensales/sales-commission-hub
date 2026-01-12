@@ -362,6 +362,7 @@ export default function CphSalesDashboard() {
     queryFn: async (): Promise<Array<{
       id: string;
       name: string;
+      employeeCount: number;
       sales: { day: number; week: number; month: number };
       sick: { day: number; week: number; month: number };
       vacation: { day: number; week: number; month: number };
@@ -423,10 +424,15 @@ export default function CphSalesDashboard() {
       const absencesResult = await absencesQuery;
       const absences = (absencesResult.data as any[]) || [];
 
-      // Build employee -> team map
+      // Build employee -> team map and count employees per team
       const employeeToTeam: Record<string, string> = {};
+      const employeeCountByTeam: Record<string, number> = {};
+      teams.forEach(t => { employeeCountByTeam[t.id] = 0; });
       (teamMembers || []).forEach((tm: any) => {
         employeeToTeam[tm.employee_id] = tm.team_id;
+        if (employeeCountByTeam[tm.team_id] !== undefined) {
+          employeeCountByTeam[tm.team_id]++;
+        }
       });
 
       // Build agent_email/name -> employee_id map
@@ -557,6 +563,7 @@ export default function CphSalesDashboard() {
       return teams.map(t => ({
         id: t.id,
         name: t.name,
+        employeeCount: employeeCountByTeam[t.id] || 0,
         sales: teamSales[t.id] || { day: 0, week: 0, month: 0 },
         sick: {
           day: teamAbsences[t.id]?.sickDay || 0,
@@ -854,6 +861,132 @@ export default function CphSalesDashboard() {
         )}
       </div>
 
+      {/* Team Performance Overview - Only show in non-TV mode */}
+      {!tvMode && teamPerformanceData && teamPerformanceData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-5 w-5 text-primary" />
+              Team Performance Oversigt
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead rowSpan={2} className="align-bottom font-semibold">Team</TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-emerald-500/5 font-semibold">
+                      📈 Salg
+                    </TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-rose-500/5 font-semibold">
+                      🤒 Sygdom
+                    </TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-blue-500/5 font-semibold">
+                      🌴 Ferie
+                    </TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="text-center border-l bg-emerald-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Mdr</TableHead>
+                    <TableHead className="text-center border-l bg-rose-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Mdr</TableHead>
+                    <TableHead className="text-center border-l bg-blue-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Mdr</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamPerformanceData.map((team) => {
+                    const empCount = team.employeeCount || 1;
+                    const formatAbsence = (count: number) => {
+                      if (count === 0) return '-';
+                      const pct = Math.round((count / empCount) * 100);
+                      return `${pct}% (${count})`;
+                    };
+                    return (
+                      <TableRow key={team.id}>
+                        <TableCell className="font-medium">{team.name}</TableCell>
+                        <TableCell className={`text-center border-l ${team.sales.day > 0 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>
+                          {team.sales.day}
+                        </TableCell>
+                        <TableCell className={`text-center ${team.sales.week > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {team.sales.week}
+                        </TableCell>
+                        <TableCell className={`text-center ${team.sales.month > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {team.sales.month}
+                        </TableCell>
+                        <TableCell className={`text-center border-l text-xs ${team.sick.day > 0 ? 'text-rose-500 font-semibold' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.sick.day)}
+                        </TableCell>
+                        <TableCell className={`text-center text-xs ${team.sick.week > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.sick.week)}
+                        </TableCell>
+                        <TableCell className={`text-center text-xs ${team.sick.month > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.sick.month)}
+                        </TableCell>
+                        <TableCell className={`text-center border-l text-xs ${team.vacation.day > 0 ? 'text-blue-500 font-semibold' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.vacation.day)}
+                        </TableCell>
+                        <TableCell className={`text-center text-xs ${team.vacation.week > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.vacation.week)}
+                        </TableCell>
+                        <TableCell className={`text-center text-xs ${team.vacation.month > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                          {formatAbsence(team.vacation.month)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {/* Total row */}
+                  {(() => {
+                    const totalEmp = teamPerformanceData.reduce((sum, t) => sum + (t.employeeCount || 0), 0) || 1;
+                    const formatTotal = (count: number) => {
+                      if (count === 0) return '-';
+                      const pct = Math.round((count / totalEmp) * 100);
+                      return `${pct}% (${count})`;
+                    };
+                    return (
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-center border-l text-emerald-600">
+                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.day, 0)}
+                        </TableCell>
+                        <TableCell className="text-center text-emerald-600">
+                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.week, 0)}
+                        </TableCell>
+                        <TableCell className="text-center text-emerald-600">
+                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.month, 0)}
+                        </TableCell>
+                        <TableCell className="text-center border-l text-rose-500 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.day, 0))}
+                        </TableCell>
+                        <TableCell className="text-center text-rose-400 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.week, 0))}
+                        </TableCell>
+                        <TableCell className="text-center text-rose-400 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.month, 0))}
+                        </TableCell>
+                        <TableCell className="text-center border-l text-blue-500 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.day, 0))}
+                        </TableCell>
+                        <TableCell className="text-center text-blue-400 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.week, 0))}
+                        </TableCell>
+                        <TableCell className="text-center text-blue-400 text-xs">
+                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.month, 0))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recruitment KPIs - Only show in non-TV mode */}
       {!tvMode && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -975,114 +1108,6 @@ export default function CphSalesDashboard() {
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {/* Team Performance Overview - Only show in non-TV mode */}
-      {!tvMode && teamPerformanceData && teamPerformanceData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-5 w-5 text-primary" />
-              Team Performance Oversigt
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead rowSpan={2} className="align-bottom font-semibold">Team</TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-emerald-500/5 font-semibold">
-                      📈 Salg
-                    </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-rose-500/5 font-semibold">
-                      🤒 Sygdom
-                    </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-blue-500/5 font-semibold">
-                      🌴 Ferie
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="text-center border-l bg-emerald-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Mdr</TableHead>
-                    <TableHead className="text-center border-l bg-rose-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Mdr</TableHead>
-                    <TableHead className="text-center border-l bg-blue-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Mdr</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {teamPerformanceData.map((team) => (
-                    <TableRow key={team.id}>
-                      <TableCell className="font-medium">{team.name}</TableCell>
-                      <TableCell className={`text-center border-l ${team.sales.day > 0 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>
-                        {team.sales.day}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.sales.week > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                        {team.sales.week}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.sales.month > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                        {team.sales.month}
-                      </TableCell>
-                      <TableCell className={`text-center border-l ${team.sick.day > 0 ? 'text-rose-500 font-semibold' : 'text-muted-foreground'}`}>
-                        {team.sick.day || '-'}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.sick.week > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                        {team.sick.week || '-'}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.sick.month > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                        {team.sick.month || '-'}
-                      </TableCell>
-                      <TableCell className={`text-center border-l ${team.vacation.day > 0 ? 'text-blue-500 font-semibold' : 'text-muted-foreground'}`}>
-                        {team.vacation.day || '-'}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.vacation.week > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                        {team.vacation.week || '-'}
-                      </TableCell>
-                      <TableCell className={`text-center ${team.vacation.month > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                        {team.vacation.month || '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {/* Total row */}
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-center border-l text-emerald-600">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.day, 0)}
-                    </TableCell>
-                    <TableCell className="text-center text-emerald-600">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.week, 0)}
-                    </TableCell>
-                    <TableCell className="text-center text-emerald-600">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.month, 0)}
-                    </TableCell>
-                    <TableCell className="text-center border-l text-rose-500">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.day, 0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-center text-rose-400">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.week, 0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-center text-rose-400">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.month, 0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-center border-l text-blue-500">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.day, 0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-center text-blue-400">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.week, 0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-center text-blue-400">
-                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.month, 0) || '-'}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {/* Top KPI Row - Compact */}
