@@ -2,11 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target, Activity, Trophy, Medal } from "lucide-react";
+import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useMemo } from "react";
 
 interface TopSeller {
   name: string;
@@ -71,6 +72,45 @@ export default function CphSalesDashboard() {
     enabled: tvMode,
     refetchInterval: 30000,
   });
+
+  // Fetch candidates for recruitment KPI (only in non-TV mode)
+  const { data: candidates = [] } = useQuery({
+    queryKey: ["cph-dashboard-candidates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("candidates")
+        .select("id, created_at")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+  });
+
+  // Calculate recruitment KPIs
+  const recruitmentKpis = useMemo(() => {
+    const now = new Date();
+    
+    // Last 24 hours
+    const last24h = candidates.filter(c => new Date(c.created_at) >= subDays(now, 1)).length;
+    const prev24h = candidates.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= subDays(now, 2) && created < subDays(now, 1);
+    }).length;
+    const trend24h = prev24h > 0 ? Math.round(((last24h - prev24h) / prev24h) * 100) : last24h > 0 ? 100 : 0;
+
+    // Last 7 days
+    const last7d = candidates.filter(c => new Date(c.created_at) >= subDays(now, 7)).length;
+    const prev7d = candidates.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= subDays(now, 14) && created < subDays(now, 7);
+    }).length;
+    const trend7d = prev7d > 0 ? Math.round(((last7d - prev7d) / prev7d) * 100) : last7d > 0 ? 100 : 0;
+
+    return { last24h, trend24h, last7d, trend7d };
+  }, [candidates]);
 
   // Regular authenticated queries for non-TV mode
   const { data: todaySalesData } = useQuery({
@@ -361,6 +401,47 @@ export default function CphSalesDashboard() {
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
+
+      {/* Recruitment KPI - Only show in non-TV mode */}
+      {!tvMode && (
+        <Card className="bg-gradient-to-br from-sky-500/10 to-sky-500/5 border-sky-500/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgere</CardTitle>
+            <UserPlus className="h-5 w-5 text-sky-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {/* Last 24 hours */}
+              <div>
+                <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last24h}</div>
+                <div className="flex items-center gap-1 text-xs">
+                  {recruitmentKpis.trend24h !== 0 && (
+                    <span className={recruitmentKpis.trend24h > 0 ? "text-green-500" : "text-red-500"}>
+                      {recruitmentKpis.trend24h > 0 ? "+" : ""}{recruitmentKpis.trend24h}%
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">sidste 24t</span>
+                </div>
+              </div>
+              
+              <div className="h-10 w-px bg-border" />
+              
+              {/* Last 7 days */}
+              <div>
+                <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last7d}</div>
+                <div className="flex items-center gap-1 text-xs">
+                  {recruitmentKpis.trend7d !== 0 && (
+                    <span className={recruitmentKpis.trend7d > 0 ? "text-green-500" : "text-red-500"}>
+                      {recruitmentKpis.trend7d > 0 ? "+" : ""}{recruitmentKpis.trend7d}%
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">sidste 7 dage</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top KPI Row - Compact */}
       <div className={`grid grid-cols-2 ${tvMode ? 'gap-3' : 'gap-4'}`}>
