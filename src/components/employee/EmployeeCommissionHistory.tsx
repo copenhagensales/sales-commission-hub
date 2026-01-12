@@ -6,9 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp, Clock, ShoppingCart, Coins, AlertTriangle, Umbrella, HeartPulse } from "lucide-react";
-import { format, eachDayOfInterval, isSameDay } from "date-fns";
+import { format, eachDayOfInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-
 interface EmployeeCommissionHistoryProps {
   employeeId: string;
   periodStart: Date;
@@ -42,6 +41,43 @@ export function EmployeeCommissionHistory({
       return data;
     },
     enabled: !!employeeId,
+  });
+
+  // Fetch employee's team membership
+  const { data: teamMembership } = useQuery({
+    queryKey: ["employee-team-membership", employeeId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("employee_id", employeeId)
+        .single();
+      return data;
+    },
+    enabled: !!employeeId,
+  });
+
+  // Fetch team's primary shift with day configurations (vagtplan leder sandhed)
+  const { data: primaryShiftData } = useQuery({
+    queryKey: ["primary-shift-with-days", teamMembership?.team_id],
+    queryFn: async () => {
+      const { data: shift } = await supabase
+        .from("team_standard_shifts")
+        .select("id, start_time, end_time, hours_source")
+        .eq("team_id", teamMembership!.team_id)
+        .eq("is_primary", true)
+        .single();
+      
+      if (!shift) return null;
+      
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("day_of_week, start_time, end_time")
+        .eq("shift_id", shift.id);
+      
+      return { shift, days: days || [] };
+    },
+    enabled: !!teamMembership?.team_id,
   });
 
   // Fetch time stamps for period
@@ -152,9 +188,10 @@ export function EmployeeCommissionHistory({
     return map;
   }, [products]);
 
-  // Process daily data
+  // Process daily data - using vagtplan leder as source of truth
   const dailyData = useMemo(() => {
     const daysInPeriod = eachDayOfInterval({ start: periodStart, end: new Date(Math.min(periodEnd.getTime(), Date.now())) });
+    const hoursSource = primaryShiftData?.shift?.hours_source || 'shift';
     
     const result: DailyData[] = daysInPeriod.map(date => {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -178,11 +215,35 @@ export function EmployeeCommissionHistory({
         };
       }
       
-      // Calculate hours from timestamps
-      const dayStamps = timeStamps.filter(s => 
-        format(new Date(s.clock_in), "yyyy-MM-dd") === dateStr
-      );
-      const hours = dayStamps.reduce((sum, s) => sum + (s.effective_hours ?? 0), 0);
+      // Calculate hours based on hours_source (vagtplan leder logic)
+      const dayOfWeek = getDay(date);
+      const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert Sunday (0) to 7
+      
+      let hours = 0;
+      let hasPlannedShift = false;
+
+      if (hoursSource === 'timestamp') {
+        // Use actual clock-in/out from time_stamps
+        const dayStamps = timeStamps.filter(s => 
+          format(new Date(s.clock_in), "yyyy-MM-dd") === dateStr
+        );
+        hours = dayStamps.reduce((sum, s) => sum + (s.effective_hours ?? 0), 0);
+        hasPlannedShift = hours > 0;
+      } else {
+        // Use planned hours from team_standard_shift_days (vagtplan sandhed)
+        const shiftForDay = primaryShiftData?.days?.find(
+          sd => sd.day_of_week === adjustedDayOfWeek
+        );
+        if (shiftForDay?.start_time && shiftForDay?.end_time) {
+          const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
+          const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
+          const rawHours = (endH + endM / 60) - (startH + startM / 60);
+          // Standard 30 min break for shifts over 6 hours
+          const breakMinutes = rawHours > 6 ? 30 : 0;
+          hours = rawHours - (breakMinutes / 60);
+          hasPlannedShift = true;
+        }
+      }
       
       // Calculate sales and commission from telesales
       const daySales = sales.filter(s => {
@@ -218,9 +279,9 @@ export function EmployeeCommissionHistory({
         commission += productCommissionMap.get(productName) ?? 0;
       });
       
-      // Determine status
+      // Determine status - only show "Vagt mangler" if NO planned shift exists
       let status: DailyData["status"] = "ok";
-      if (hours === 0 && (salesCount > 0 || commission > 0)) {
+      if (!hasPlannedShift && (salesCount > 0 || commission > 0)) {
         status = "missing_shift";
       }
       
@@ -236,7 +297,7 @@ export function EmployeeCommissionHistory({
     });
     
     return result;
-  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, productCommissionMap]);
+  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, productCommissionMap, primaryShiftData]);
 
   // Calculate chart data with cumulative commission
   const chartData = useMemo(() => {
