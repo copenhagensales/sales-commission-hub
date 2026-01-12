@@ -185,8 +185,7 @@ export default function LeagueAdminDashboard() {
     return participants.filter((p) => {
       const matchesSearch = 
         `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.work_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.private_email?.toLowerCase().includes(searchTerm.toLowerCase());
+        p.team_name?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesDivision = 
         divisionFilter === "all" || 
@@ -372,7 +371,7 @@ export default function LeagueAdminDashboard() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Søg efter navn eller email..."
+                  placeholder="Søg efter navn eller team..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -400,9 +399,8 @@ export default function LeagueAdminDashboard() {
                   <TableRow>
                     <TableHead className="w-[60px]">#</TableHead>
                     <TableHead>Spiller</TableHead>
-                    <TableHead className="hidden md:table-cell">Email</TableHead>
+                    <TableHead className="hidden md:table-cell">Team</TableHead>
                     <TableHead className="hidden lg:table-cell">Job titel</TableHead>
-                    <TableHead className="hidden lg:table-cell">Team</TableHead>
                     <TableHead className="text-center">Div</TableHead>
                     <TableHead className="text-right">Provision</TableHead>
                     <TableHead className="text-center hidden sm:table-cell">Salg</TableHead>
@@ -442,13 +440,10 @@ export default function LeagueAdminDashboard() {
                           {formatPlayerName(participant.first_name, participant.last_name)}
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground">
-                          {participant.work_email || participant.private_email || "-"}
+                          {participant.team_name || "-"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
                           {participant.job_title || "-"}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {participant.team_name || "-"}
                         </TableCell>
                         <TableCell className="text-center">
                           {participant.projected_division ? (
