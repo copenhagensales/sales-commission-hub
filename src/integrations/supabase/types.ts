@@ -4899,6 +4899,51 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_definitions: {
+        Row: {
+          calculation_formula: string | null
+          category: string
+          created_at: string | null
+          data_sources: string[] | null
+          description: string | null
+          example_value: string | null
+          id: string
+          important_notes: string[] | null
+          name: string
+          slug: string
+          sql_query: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          calculation_formula?: string | null
+          category: string
+          created_at?: string | null
+          data_sources?: string[] | null
+          description?: string | null
+          example_value?: string | null
+          id?: string
+          important_notes?: string[] | null
+          name: string
+          slug: string
+          sql_query?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          calculation_formula?: string | null
+          category?: string
+          created_at?: string | null
+          data_sources?: string[] | null
+          description?: string | null
+          example_value?: string | null
+          id?: string
+          important_notes?: string[] | null
+          name?: string
+          slug?: string
+          sql_query?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lateness_record: {
         Row: {
           created_at: string

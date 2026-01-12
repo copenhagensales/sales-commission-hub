@@ -112,6 +112,7 @@ import {
   CommissionLeague,
   CommissionLeagueTest,
   LeagueAdminDashboard,
+  KpiDefinitions,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -406,6 +407,9 @@ export const routes: RouteConfig[] = [
 
   // League Admin
   { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
+
+  // KPI Definitions (Owner only)
+  { path: "/admin/kpi-definitions", component: KpiDefinitions, access: "role", positionPermission: "menu_kpi_definitions" },
 
   // MG Test (Salary Schemes + Relatel Data)
   { path: "/1234", component: MgTestPage, access: "role", positionPermission: "menu_mg_test" },
