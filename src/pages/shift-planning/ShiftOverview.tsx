@@ -302,7 +302,8 @@ export default function ShiftOverview() {
     // Check if there are sales for this employee on this date
     const hasSales = weeklySales.some(sale => {
       if (!sale.agent_name || !sale.sale_datetime) return false;
-      const saleDate = sale.sale_datetime.split("T")[0];
+      // Handle both ISO format (with T) and database format (with space)
+      const saleDate = sale.sale_datetime.split(/[T ]/)[0];
       if (saleDate !== dateStr) return false;
       
       const saleAgent = sale.agent_name.toLowerCase();
