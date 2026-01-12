@@ -62,14 +62,18 @@ export function MissingShiftsAlert({
       const agentIds = data.map((m) => m.agent_id);
       const { data: agents, error: agentsError } = await supabase
         .from("agents")
-        .select("id, name")
+        .select("id, name, email")
         .in("id", agentIds);
       if (agentsError) throw agentsError;
 
-      return data.map((mapping) => ({
-        employee_id: mapping.employee_id,
-        agent_name: agents?.find((a) => a.id === mapping.agent_id)?.name || null,
-      }));
+      return data.map((mapping) => {
+        const agent = agents?.find((a) => a.id === mapping.agent_id);
+        return {
+          employee_id: mapping.employee_id,
+          agent_name: agent?.name || null,
+          agent_email: agent?.email || null,
+        };
+      });
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -84,10 +88,10 @@ export function MissingShiftsAlert({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("id, agent_name, sale_datetime, status")
+        .select("id, agent_name, agent_email, sale_datetime, status")
         .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
         .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
-        .in("status", ["pending", "approved"]);
+        .or("status.in.(pending,approved),status.is.null");
       if (error) throw error;
       return data;
     },
@@ -98,24 +102,50 @@ export function MissingShiftsAlert({
   const missingSales = useMemo<MissingSale[]>(() => {
     if (!weeklySales || !employees || !agentMappings) return [];
 
-    // Group sales by agent_name and date
-    const salesByAgentDate = new Map<string, number>();
+    // Group sales by agent identifier (prefer email) and date
+    const salesByAgentDate = new Map<string, { count: number; agentEmail: string | null; agentName: string | null }>();
     weeklySales.forEach((sale) => {
-      if (!sale.agent_name || !sale.sale_datetime) return;
-      const saleDate = sale.sale_datetime.split("T")[0];
-      const key = `${sale.agent_name}|${saleDate}`;
-      salesByAgentDate.set(key, (salesByAgentDate.get(key) || 0) + 1);
+      if (!sale.sale_datetime) return;
+      const saleDate = sale.sale_datetime.split(/[T ]/)[0];
+      // Use email as primary key if available, otherwise name
+      const agentKey = sale.agent_email || sale.agent_name || "";
+      if (!agentKey) return;
+      const key = `${agentKey.toLowerCase()}|${saleDate}`;
+      const existing = salesByAgentDate.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        salesByAgentDate.set(key, { 
+          count: 1, 
+          agentEmail: sale.agent_email || null, 
+          agentName: sale.agent_name || null 
+        });
+      }
     });
 
     const missing: MissingSale[] = [];
 
-    salesByAgentDate.forEach((count, key) => {
-      const [agentName, dateStr] = key.split("|");
+    salesByAgentDate.forEach((saleInfo, key) => {
+      const [agentKey, dateStr] = key.split("|");
 
-      // Find employee from agent mapping
-      const mapping = agentMappings.find(
-        (m) => m.agent_name?.toLowerCase() === agentName.toLowerCase()
-      );
+      // Find employee from agent mapping - prioritize email matching
+      const mapping = agentMappings.find((m) => {
+        const mappedEmail = m.agent_email?.toLowerCase();
+        const mappedName = m.agent_name?.toLowerCase();
+        
+        // Primary: Match by email
+        if (mappedEmail && agentKey === mappedEmail) return true;
+        if (mappedEmail && saleInfo.agentName?.toLowerCase() === mappedEmail) return true;
+        
+        // Secondary: Match by name
+        if (mappedName && agentKey === mappedName) return true;
+        if (mappedName && saleInfo.agentName?.toLowerCase() === mappedName) return true;
+        
+        // Also check if agent_name is an email that matches
+        if (mappedEmail && saleInfo.agentName?.toLowerCase()?.split('@')[0] === mappedEmail.split('@')[0]) return true;
+        
+        return false;
+      });
       if (!mapping) return;
 
       const employee = employees.find((e) => e.id === mapping.employee_id);
@@ -138,7 +168,7 @@ export function MissingShiftsAlert({
           employeeId: employee.id,
           employeeName: `${employee.first_name} ${employee.last_name}`,
           date: dateStr,
-          salesCount: count,
+          salesCount: saleInfo.count,
         });
       }
     });
