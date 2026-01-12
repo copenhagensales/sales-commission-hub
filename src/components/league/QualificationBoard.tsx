@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -141,7 +141,7 @@ interface PlayerRowProps {
   idx: number;
 }
 
-function PlayerRow({
+const PlayerRow = memo(function PlayerRow({
   standing,
   isCurrentUser,
   playersPerDivision,
@@ -298,4 +298,19 @@ function PlayerRow({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if relevant data changes
+  return (
+    prevProps.standing.id === nextProps.standing.id &&
+    prevProps.standing.projected_rank === nextProps.standing.projected_rank &&
+    prevProps.standing.overall_rank === nextProps.standing.overall_rank &&
+    prevProps.standing.previous_overall_rank === nextProps.standing.previous_overall_rank &&
+    prevProps.standing.current_provision === nextProps.standing.current_provision &&
+    prevProps.standing.deals_count === nextProps.standing.deals_count &&
+    prevProps.isCurrentUser === nextProps.isCurrentUser &&
+    prevProps.playersPerDivision === nextProps.playersPerDivision &&
+    prevProps.isTopDivision === nextProps.isTopDivision &&
+    prevProps.isBottomDivision === nextProps.isBottomDivision &&
+    prevProps.idx === nextProps.idx
+  );
+});

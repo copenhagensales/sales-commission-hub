@@ -135,10 +135,10 @@ export function usePositionPermissions() {
       };
     },
     enabled: !!user && !authLoading,
-    staleTime: 0, // Data is immediately stale
-    gcTime: 0, // Don't cache - always fetch fresh
+    staleTime: 5 * 60 * 1000, // 5 minutes - reduce unnecessary refetches
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
     refetchOnWindowFocus: true, // Refetch when user returns to tab
-    refetchOnMount: "always", // Always refetch when component mounts
+    refetchOnMount: true, // Refetch only if stale
     refetchOnReconnect: true, // Refetch when network reconnects
     retry: 2,
   });

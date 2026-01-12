@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEmployeesForChat } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
@@ -33,9 +33,13 @@ export function MentionInput({
   
   const { data: employees = [] } = useEmployeesForChat();
 
-  const filteredEmployees = employees.filter((emp: Employee) =>
-    emp.full_name.toLowerCase().includes(mentionSearch.toLowerCase())
-  ).slice(0, 5);
+  // Memoize filtered employees to avoid recalculation on every render
+  const filteredEmployees = useMemo(() => 
+    employees.filter((emp: Employee) =>
+      emp.full_name.toLowerCase().includes(mentionSearch.toLowerCase())
+    ).slice(0, 5),
+    [employees, mentionSearch]
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
