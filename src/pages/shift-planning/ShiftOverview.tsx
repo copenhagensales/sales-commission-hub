@@ -414,8 +414,8 @@ export default function ShiftOverview() {
   // Mutation to create or update lateness record
   const createLateness = useMutation({
     mutationFn: async ({ employeeId, date, minutes, newStartTime }: { employeeId: string; date: string; minutes: number; newStartTime: string }) => {
-      const { error } = await supabase
-        .from("lateness_record")
+      const { error } = await (supabase
+        .from("lateness_record") as any)
         .upsert({
           employee_id: employeeId,
           date,
