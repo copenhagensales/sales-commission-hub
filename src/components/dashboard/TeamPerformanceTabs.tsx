@@ -36,9 +36,9 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const getVacationValue = (team: TeamData) => team.vacation[period];
 
   const formatAbsence = (count: number, empCount: number) => {
-    if (count === 0) return { display: "-", percentage: 0 };
+    if (count === 0) return { display: "-", percentage: 0, count: 0 };
     const percentage = empCount > 0 ? Math.round((count / empCount) * 100) : 0;
-    return { display: `${percentage}%`, percentage };
+    return { display: `${percentage}% (${count})`, percentage, count };
   };
 
   // Calculate totals
@@ -170,7 +170,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className={`text-sm ${totalSick > 0 ? 'text-rose-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalEmp > 0 ? `${Math.round((totalSick / totalEmp) * 100)}%` : '-'}
+                        {totalEmp > 0 ? `${Math.round((totalSick / totalEmp) * 100)}% (${totalSick})` : '-'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -182,7 +182,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className={`text-sm ${totalVacation > 0 ? 'text-blue-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalEmp > 0 ? `${Math.round((totalVacation / totalEmp) * 100)}%` : '-'}
+                        {totalEmp > 0 ? `${Math.round((totalVacation / totalEmp) * 100)}% (${totalVacation})` : '-'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
