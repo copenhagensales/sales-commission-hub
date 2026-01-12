@@ -117,7 +117,7 @@ export function useQualificationStandings(seasonId: string | undefined) {
             id,
             first_name,
             last_name,
-            team:teams(name)
+            team_id
           )
         `)
         .eq("season_id", seasonId)
@@ -125,12 +125,36 @@ export function useQualificationStandings(seasonId: string | undefined) {
 
       if (error) throw error;
       
-      // Transform team data to team_name for easier access
+      // Fetch team names for all employees via team_members junction
+      const employeeIds = (data || [])
+        .map(s => s.employee?.id)
+        .filter(Boolean) as string[];
+      
+      let teamMap: Record<string, string> = {};
+      if (employeeIds.length > 0) {
+        const { data: teamData } = await supabase
+          .from("team_members")
+          .select(`
+            employee_id,
+            team:teams(name)
+          `)
+          .in("employee_id", employeeIds);
+        
+        if (teamData) {
+          teamData.forEach((tm: any) => {
+            if (tm.team?.name) {
+              teamMap[tm.employee_id] = tm.team.name;
+            }
+          });
+        }
+      }
+      
+      // Transform data with team_name
       const transformedData = (data || []).map(standing => ({
         ...standing,
         employee: standing.employee ? {
           ...standing.employee,
-          team_name: (standing.employee as any).team?.name || null,
+          team_name: teamMap[standing.employee.id] || null,
         } : undefined,
       }));
       
@@ -165,8 +189,7 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
           employee:employee_master_data!league_qualification_standings_employee_id_fkey(
             id,
             first_name,
-            last_name,
-            team:teams(name)
+            last_name
           )
         `)
         .eq("season_id", seasonId)
@@ -175,13 +198,25 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
 
       if (error && error.code !== "PGRST116") throw error;
       
-      // Transform team data to team_name
+      // Fetch team name via team_members junction
+      let teamName: string | null = null;
+      if (data?.employee?.id) {
+        const { data: teamData } = await supabase
+          .from("team_members")
+          .select(`team:teams(name)`)
+          .eq("employee_id", data.employee.id)
+          .maybeSingle();
+        
+        teamName = (teamData as any)?.team?.name || null;
+      }
+      
+      // Transform data with team_name
       if (data && data.employee) {
         return {
           ...data,
           employee: {
             ...data.employee,
-            team_name: (data.employee as any).team?.name || null,
+            team_name: teamName,
           },
         } as QualificationStanding;
       }
