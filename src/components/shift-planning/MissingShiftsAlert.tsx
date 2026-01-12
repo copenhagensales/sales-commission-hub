@@ -74,6 +74,74 @@ export function MissingShiftsAlert({
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch team memberships for employees
+  const { data: teamMemberships } = useQuery({
+    queryKey: ["team-memberships-for-missing-shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_memberships" as any)
+        .select("employee_id, team_id");
+      if (error) throw error;
+      return data as unknown as { employee_id: string; team_id: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch primary shifts with their day configurations
+  const { data: primaryShiftsData } = useQuery({
+    queryKey: ["primary-shifts-for-missing-shifts"],
+    queryFn: async () => {
+      const { data: shiftsData, error } = await supabase
+        .from("team_standard_shifts" as any)
+        .select("id, team_id, start_time, end_time")
+        .eq("is_primary", true);
+      if (error) throw error;
+      if (!shiftsData || shiftsData.length === 0) return { shifts: [] as { id: string; team_id: string; start_time: string; end_time: string }[], days: [] as { shift_id: string; day_of_week: number; start_time: string; end_time: string }[] };
+
+      const shifts = shiftsData as unknown as { id: string; team_id: string; start_time: string; end_time: string }[];
+      const shiftIds = shifts.map((s) => s.id);
+      const { data: days, error: daysError } = await supabase
+        .from("team_standard_shift_days" as any)
+        .select("shift_id, day_of_week, start_time, end_time")
+        .in("shift_id", shiftIds);
+      if (daysError) throw daysError;
+
+      return { 
+        shifts, 
+        days: (days || []) as unknown as { shift_id: string; day_of_week: number; start_time: string; end_time: string }[]
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper to check if employee has standard work times for a specific date
+  const hasStandardWorkTimes = (employeeId: string, dateStr: string): boolean => {
+    if (!teamMemberships || !primaryShiftsData) return false;
+
+    const membership = teamMemberships.find((m) => m.employee_id === employeeId);
+    if (!membership) return false;
+
+    const primaryShift = primaryShiftsData.shifts.find(
+      (s) => s.team_id === membership.team_id
+    );
+    if (!primaryShift) return false;
+
+    const date = parseISO(dateStr);
+    const dayOfWeek = date.getDay();
+
+    // Check day-specific config first
+    const dayConfig = primaryShiftsData.days.find(
+      (d) => d.shift_id === primaryShift.id && d.day_of_week === dayOfWeek
+    );
+
+    if (dayConfig) {
+      return !!(dayConfig.start_time && dayConfig.end_time);
+    }
+
+    // Fall back to general shift times
+    return !!(primaryShift.start_time && primaryShift.end_time);
+  };
+
   // Fetch sales for the week
   const { data: weeklySales } = useQuery({
     queryKey: [
@@ -94,7 +162,7 @@ export function MissingShiftsAlert({
     staleTime: 2 * 60 * 1000,
   });
 
-  // Calculate missing shifts (sales without corresponding shift or timestamp)
+  // Calculate missing shifts (sales without corresponding shift, standard shift, or timestamp)
   const missingSales = useMemo<MissingSale[]>(() => {
     if (!weeklySales || !employees || !agentMappings) return [];
 
@@ -121,10 +189,14 @@ export function MissingShiftsAlert({
       const employee = employees.find((e) => e.id === mapping.employee_id);
       if (!employee) return;
 
-      // Check if employee has shift on this date
+      // Check if employee has individual shift on this date
       const hasShift = shifts?.some(
         (s) => s.employee_id === employee.id && s.date === dateStr
       );
+      if (hasShift) return;
+
+      // Check if employee has standard work times for this date
+      if (hasStandardWorkTimes(employee.id, dateStr)) return;
 
       // Check if employee has timestamp on this date
       const hasTimestamp = timeStamps?.some((ts) => {
@@ -132,8 +204,8 @@ export function MissingShiftsAlert({
         return ts.employee_id === employee.id && tsDate === dateStr;
       });
 
-      // If no shift and no timestamp, this is a missing shift
-      if (!hasShift && !hasTimestamp) {
+      // If no shift, no standard work times, and no timestamp, this is a missing shift
+      if (!hasTimestamp) {
         missing.push({
           employeeId: employee.id,
           employeeName: `${employee.first_name} ${employee.last_name}`,
@@ -145,7 +217,7 @@ export function MissingShiftsAlert({
 
     // Sort by date
     return missing.sort((a, b) => a.date.localeCompare(b.date));
-  }, [weeklySales, employees, agentMappings, shifts, timeStamps]);
+  }, [weeklySales, employees, agentMappings, shifts, timeStamps, teamMemberships, primaryShiftsData]);
 
   if (missingSales.length === 0) return null;
 

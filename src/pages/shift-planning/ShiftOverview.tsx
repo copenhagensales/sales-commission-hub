@@ -307,7 +307,7 @@ export default function ShiftOverview() {
     }) || null;
   };
 
-  // Check if employee has missing shift (sales but no shift/timestamp)
+  // Check if employee has missing shift (sales but no shift/timestamp/standard shift)
   const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
     if (!weeklySales || !agentMappings) return false;
     
@@ -335,9 +335,13 @@ export default function ShiftOverview() {
     
     if (!hasSales) return false;
     
-    // Check if has shift
+    // Check if has individual shift
     const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
     if (hasShift) return false;
+    
+    // Check if has standard work times (team standard shift)
+    const hasStandardWorkTimes = !!getWorkTimesForEmployeeAndDay(employeeId, date);
+    if (hasStandardWorkTimes) return false;
     
     // Check if has timestamp
     const hasTimestamp = timeStamps?.some(ts => {
@@ -346,7 +350,7 @@ export default function ShiftOverview() {
     });
     
     return !hasTimestamp;
-  }, [weeklySales, agentMappings, shifts, timeStamps]);
+  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
