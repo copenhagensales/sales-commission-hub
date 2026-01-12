@@ -5001,6 +5001,7 @@ export type Database = {
           employee_id: string
           id: string
           minutes: number
+          new_start_time: string | null
           note: string | null
         }
         Insert: {
@@ -5009,6 +5010,7 @@ export type Database = {
           employee_id: string
           id?: string
           minutes?: number
+          new_start_time?: string | null
           note?: string | null
         }
         Update: {
@@ -5017,6 +5019,7 @@ export type Database = {
           employee_id?: string
           id?: string
           minutes?: number
+          new_start_time?: string | null
           note?: string | null
         }
         Relationships: [
