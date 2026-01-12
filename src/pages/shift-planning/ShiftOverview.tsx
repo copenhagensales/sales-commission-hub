@@ -1274,6 +1274,11 @@ export default function ShiftOverview() {
                               {/* Status Tags */}
                               {!hasShift && isLate && (
                                 <div className="flex flex-col items-center gap-1">
+                                  {workTimes && (
+                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                      {workTimes}
+                                    </span>
+                                  )}
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
                                     <AlarmClock className="h-3 w-3" />
                                     Forsinket
