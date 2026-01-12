@@ -82,12 +82,12 @@ export function KpiLiveTest({ slug, name }: KpiLiveTestProps) {
 
           <div className="space-y-2">
             <Label>Klient (valgfri)</Label>
-            <Select value={clientId} onValueChange={setClientId}>
+            <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Alle klienter" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Alle klienter</SelectItem>
+                <SelectItem value="all">Alle klienter</SelectItem>
                 {clients?.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
