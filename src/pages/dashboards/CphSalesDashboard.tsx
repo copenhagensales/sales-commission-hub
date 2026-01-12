@@ -421,20 +421,16 @@ export default function CphSalesDashboard() {
                   className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
                 >
                   <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
-                    {/* Client logo - consistent container */}
-                    <div className={`flex items-center justify-center bg-white/80 rounded-md ${tvMode ? 'h-8 w-16 mb-1 p-1' : 'h-10 w-20 mb-2 p-1.5'}`}>
-                      {data.logoUrl ? (
+                    {/* Client logo */}
+                    {data.logoUrl && (
+                      <div className={`flex items-center justify-center bg-white rounded-lg shadow-sm ${tvMode ? 'h-10 w-20 mb-2 p-1.5' : 'h-12 w-24 mb-3 p-2'}`}>
                         <img 
                           src={data.logoUrl} 
                           alt={client} 
-                          className={`object-contain max-h-full max-w-full`}
+                          className="object-contain max-h-full max-w-full"
                         />
-                      ) : (
-                        <span className={`font-semibold text-muted-foreground/50 ${tvMode ? 'text-[8px]' : 'text-[10px]'}`}>
-                          {client.slice(0, 3).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{data.count}</span>
                     <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
                       {client}
