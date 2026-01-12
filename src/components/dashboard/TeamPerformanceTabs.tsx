@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Activity } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClientSalesData {
@@ -67,7 +67,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const formatAbsence = (count: number, possibleDays: number) => {
     if (count === 0) return { display: "-", percentage: 0, count: 0 };
     const percentage = possibleDays > 0 ? Math.round((count / possibleDays) * 100) : 0;
-    return { display: `${percentage}% (${count})`, percentage, count };
+    return { display: `${percentage}%`, fullDisplay: `${percentage}% (${count})`, percentage, count };
   };
 
   // Get work days from first team (same for all)
@@ -84,216 +84,207 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const sortedData = [...data].sort((a, b) => getSalesValue(b) - getSalesValue(a));
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-5 w-5 text-primary" />
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2 bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <TrendingUp className="h-5 w-5 text-primary" />
             Team Performance
           </CardTitle>
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="day" className="text-xs px-3 h-7">
+            <TabsList className="h-8 bg-background/80">
+              <TabsTrigger value="day" className="text-xs px-3 h-7 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Dag
               </TabsTrigger>
-              <TabsTrigger value="week" className="text-xs px-3 h-7">
+              <TabsTrigger value="week" className="text-xs px-3 h-7 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Uge
               </TabsTrigger>
-              <TabsTrigger value="month" className="text-xs px-3 h-7">
-                Måned
+              <TabsTrigger value="month" className="text-xs px-3 h-7 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Mdr
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="p-0">
         <TooltipProvider>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">Team</TableHead>
-                <TableHead className="text-center font-semibold w-24">
-                  <span className="flex items-center justify-center gap-1">
-                    📈 Salg
-                  </span>
-                </TableHead>
-                {period === "month" && (
-                  <TableHead className="text-center font-semibold w-28">
-                    <span className="flex items-center justify-center gap-1">
-                      📊 Forecast
-                    </span>
-                  </TableHead>
-                )}
-                <TableHead className="text-center font-semibold w-28">
-                  <span className="flex items-center justify-center gap-1">
-                    🤒 Sygdom
-                  </span>
-                </TableHead>
-                <TableHead className="text-center font-semibold w-28">
-                  <span className="flex items-center justify-center gap-1">
-                    🌴 Ferie
-                  </span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedData.map((team) => {
-                const possibleDays = getPossibleWorkDays(team);
-                const sick = formatAbsence(getSickValue(team), possibleDays);
-                const vacation = formatAbsence(getVacationValue(team), possibleDays);
-                const clientSales = getClientSales(team);
-                const teamForecast = getForecast(getSalesValue(team), getWorkDays(team));
-                
-                return (
-                  <TableRow key={team.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <span>{team.name}</span>
-                        <span className="text-xs text-muted-foreground">({team.employeeCount})</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`text-lg font-bold ${getSalesValue(team) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                          {getSalesValue(team)}
-                        </span>
-                        {/* Show client breakdown for teams with multiple clients */}
-                        {clientSales && clientSales.length > 0 && (
-                          <div className="flex flex-wrap gap-1 justify-center">
-                            {clientSales.map((client) => (
-                              <Tooltip key={client.clientName}>
-                                <TooltipTrigger asChild>
-                                  <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                                    {client.clientName.slice(0, 8)}: {client.sales[period]}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{client.clientName}: {client.sales[period]} salg</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    {period === "month" && teamForecast !== null && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="font-semibold text-foreground pl-4">Team</TableHead>
+                  <TableHead className="text-center font-semibold text-foreground w-20">Salg</TableHead>
+                  {period === "month" && (
+                    <TableHead className="text-center font-semibold text-foreground w-24">
+                      <Tooltip>
+                        <TooltipTrigger className="cursor-help">Forecast</TooltipTrigger>
+                        <TooltipContent>Fremskrivning baseret på salg/arbejdsdag</TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  <TableHead className="text-center font-semibold text-foreground w-20">Syg</TableHead>
+                  <TableHead className="text-center font-semibold text-foreground w-20 pr-4">Ferie</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedData.map((team, index) => {
+                  const possibleDays = getPossibleWorkDays(team);
+                  const sick = formatAbsence(getSickValue(team), possibleDays);
+                  const vacation = formatAbsence(getVacationValue(team), possibleDays);
+                  const clientSales = getClientSales(team);
+                  const teamForecast = getForecast(getSalesValue(team), getWorkDays(team));
+                  const isTopTeam = index === 0 && getSalesValue(team) > 0;
+                  
+                  return (
+                    <TableRow key={team.id} className={isTopTeam ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}>
+                      <TableCell className="pl-4">
+                        <div className="flex items-center gap-2">
+                          {isTopTeam && <span className="text-sm">🏆</span>}
+                          <span className="font-medium">{team.name}</span>
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {team.employeeCount}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="text-lg font-semibold text-primary">
-                              → {teamForecast}
+                            <div className="flex flex-col items-center">
+                              <span className={`text-lg font-bold tabular-nums ${getSalesValue(team) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                                {getSalesValue(team)}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          {clientSales && clientSales.length > 0 && (
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                {clientSales.map((client) => (
+                                  <p key={client.clientName} className="text-xs">
+                                    {client.clientName}: <span className="font-semibold">{client.sales[period]}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TableCell>
+                      {period === "month" && teamForecast !== null && (
+                        <TableCell className="text-center">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-base font-semibold text-primary tabular-nums">
+                                {teamForecast}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-medium">{getSalesValue(team)} salg / {getWorkDays(team)} dage</p>
+                              <p className="text-xs text-muted-foreground">
+                                = {(getSalesValue(team) / (getWorkDays(team) || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`text-sm tabular-nums ${
+                              sick.percentage > 20 
+                                ? 'text-rose-600 dark:text-rose-400 font-semibold' 
+                                : sick.percentage > 0 
+                                  ? 'text-rose-500/80' 
+                                  : 'text-muted-foreground'
+                            }`}>
+                              {sick.display}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Forecast baseret på {getSalesValue(team)} salg over {getWorkDays(team)} arbejdsdage</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              = {(getSalesValue(team) / (getWorkDays(team) || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
-                            </p>
+                            <p>{getSickValue(team)} sygedage af {possibleDays} mulige</p>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
-                    )}
+                      <TableCell className="text-center pr-4">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`text-sm tabular-nums ${vacation.percentage > 0 ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                              {vacation.display}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{getVacationValue(team)} feriedage af {possibleDays} mulige</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {/* Total row */}
+                <TableRow className="bg-muted/60 font-semibold border-t-2 border-border">
+                  <TableCell className="pl-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold">Total</span>
+                      <span className="text-xs text-muted-foreground bg-background px-1.5 py-0.5 rounded font-normal">
+                        {totalEmp}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      {totalSales}
+                    </span>
+                  </TableCell>
+                  {period === "month" && (
                     <TableCell className="text-center">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="inline-flex items-center gap-1.5">
-                            {sick.percentage > 20 ? (
-                              <span className="inline-flex items-center gap-1 bg-rose-500/15 text-rose-600 px-2 py-0.5 rounded-full text-sm font-medium">
-                                {sick.display}
-                              </span>
-                            ) : sick.percentage > 0 ? (
-                              <span className="text-sm text-rose-500">{sick.display}</span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </div>
+                          <span className="text-base font-bold text-primary tabular-nums">
+                            {getForecast(totalSales, workDaysInPeriod)}
+                          </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{getSickValue(team)} sygedage ud af {possibleDays} mulige arbejdsdage</p>
+                          <p className="font-medium">{totalSales} salg / {workDaysInPeriod} dage</p>
+                          <p className="text-xs text-muted-foreground">
+                            = {(totalSales / (workDaysInPeriod || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
-                    <TableCell className="text-center">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="inline-flex items-center gap-1.5">
-                            {vacation.percentage > 0 ? (
-                              <span className="text-sm text-blue-500">{vacation.display}</span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{getVacationValue(team)} feriedage ud af {possibleDays} mulige arbejdsdage</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {/* Total row */}
-              <TableRow className="bg-muted/50 font-semibold border-t-2">
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span>Total</span>
-                    <span className="text-xs text-muted-foreground font-normal">({totalEmp})</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-center">
-                  <span className="text-lg font-bold text-emerald-600">
-                    {totalSales}
-                  </span>
-                </TableCell>
-                {period === "month" && (
+                  )}
                   <TableCell className="text-center">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-lg font-bold text-primary">
-                          → {getForecast(totalSales, workDaysInPeriod)}
+                        <span className={`text-sm tabular-nums ${totalSick > 0 ? 'text-rose-500 font-medium' : 'text-muted-foreground'}`}>
+                          {totalPossibleDays > 0 ? `${Math.round((totalSick / totalPossibleDays) * 100)}%` : '-'}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Total forecast baseret på {totalSales} salg over {workDaysInPeriod} arbejdsdage</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          = {(totalSales / (workDaysInPeriod || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
-                        </p>
+                        <p>{totalSick} sygedage af {totalPossibleDays} mulige</p>
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                )}
-                <TableCell className="text-center">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className={`text-sm ${totalSick > 0 ? 'text-rose-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalPossibleDays > 0 ? `${Math.round((totalSick / totalPossibleDays) * 100)}% (${totalSick})` : '-'}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{totalSick} sygedage ud af {totalPossibleDays} mulige arbejdsdage</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className={`text-sm ${totalVacation > 0 ? 'text-blue-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalPossibleDays > 0 ? `${Math.round((totalVacation / totalPossibleDays) * 100)}% (${totalVacation})` : '-'}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{totalVacation} feriedage ud af {totalPossibleDays} mulige arbejdsdage</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                  <TableCell className="text-center pr-4">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={`text-sm tabular-nums ${totalVacation > 0 ? 'text-blue-500 font-medium' : 'text-muted-foreground'}`}>
+                          {totalPossibleDays > 0 ? `${Math.round((totalVacation / totalPossibleDays) * 100)}%` : '-'}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{totalVacation} feriedage af {totalPossibleDays} mulige</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
         </TooltipProvider>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          {periodLabels[period]} • {workDaysInPeriod} arbejdsdag{workDaysInPeriod !== 1 ? 'e' : ''} i perioden
-          {period === "month" && ` af ${getTotalMonthWorkDays()} i måneden`} • Sorteret efter salg
-        </p>
+        <div className="px-4 py-2 text-xs text-muted-foreground border-t bg-muted/20 flex items-center justify-between">
+          <span>{periodLabels[period]}</span>
+          <span>
+            {workDaysInPeriod}{period === "month" ? `/${getTotalMonthWorkDays()}` : ""} arbejdsdage
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
