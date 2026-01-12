@@ -827,6 +827,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til systemindstillinger",
         hasEditOption: true,
       },
+      {
+        key: "menu_league_admin",
+        label: "Liga Administration",
+        description: "Adgang til at administrere Cph Sales Ligaen",
+        hasEditOption: false,
+      },
     ],
   },
   {

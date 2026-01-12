@@ -447,6 +447,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   Liga Test Board
                 </NavLink>
               )}
+
+              {/* Liga Admin - for ejere og teamledere */}
+              {p.canViewLeagueAdmin && (
+                <NavLink
+                  to="/admin/league"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                    location.pathname === "/admin/league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Shield className="h-4 w-4" />
+                  Liga Admin
+                </NavLink>
+              )}
               
               {/* Beskeder */}
               <NavLink

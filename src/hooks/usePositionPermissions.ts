@@ -361,5 +361,7 @@ export function usePermissions() {
     canViewReportsEmployee: canView("menu_reports_employee"),
     // Employee SMS permission
     canSendEmployeeSms: canView("employee_sms"),
+    // League admin
+    canViewLeagueAdmin: canView("menu_league_admin"),
   };
 }

@@ -110,6 +110,7 @@ import {
   SalarySchemes,
   CommissionLeague,
   CommissionLeagueTest,
+  LeagueAdminDashboard,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -401,6 +402,9 @@ export const routes: RouteConfig[] = [
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },
+
+  // League Admin
+  { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
 
   // Salary Schemes
   { path: "/1234", component: SalarySchemes, access: "role", positionPermission: "menu_mg_test" },
