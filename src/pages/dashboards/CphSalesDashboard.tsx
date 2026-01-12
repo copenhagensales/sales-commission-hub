@@ -2,12 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus, CalendarDays, HeartPulse } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useMemo } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface TopSeller {
   name: string;
@@ -355,7 +356,223 @@ export default function CphSalesDashboard() {
     refetchInterval: 60000,
   });
 
-  // Filter out sales with unknown clients
+  // Team Performance Overview - data for day, week, month
+  const { data: teamPerformanceData } = useQuery({
+    queryKey: ["cph-dashboard-team-performance", todayStr],
+    queryFn: async (): Promise<Array<{
+      id: string;
+      name: string;
+      sales: { day: number; week: number; month: number };
+      sick: { day: number; week: number; month: number };
+      vacation: { day: number; week: number; month: number };
+    }>> => {
+      const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
+
+      // Get teams (exclude Stab) - use any to avoid deep type issues
+      const teamsQuery = supabase.from("teams").select("id, name, is_active");
+      const teamsResult = await (teamsQuery as any);
+      const teams = ((teamsResult.data as any[]) || []).filter((t: any) => t.name !== "Stab" && t.is_active === true);
+
+      if (teams.length === 0) return [];
+
+      // Get team_members for employee-team mapping
+      const teamMembersQuery = supabase.from("team_members").select("employee_id, team_id");
+      const teamMembersResult = await teamMembersQuery;
+      const teamMembers = (teamMembersResult.data as any[]) || [];
+
+      // Get employee_agent_mapping for sales matching
+      const agentMappingsQuery = supabase.from("employee_agent_mapping").select("employee_id, agent_email, agent_name");
+      const agentMappingsResult = await agentMappingsQuery;
+      const agentMappings = (agentMappingsResult.data as any[]) || [];
+
+      // Get sales for the month (to filter day/week/month)
+      const salesQuery = supabase
+        .from("sales")
+        .select("id, agent_name, agent_email, sale_datetime")
+        .gte("sale_datetime", `${monthStart}T00:00:00`)
+        .lte("sale_datetime", `${todayStr}T23:59:59`);
+      const salesResult = await salesQuery;
+      const salesData = (salesResult.data as any[]) || [];
+
+      // Get sale_items with products for those sales
+      const saleIds = salesData.map((s) => s.id);
+      let saleItems: any[] = [];
+      if (saleIds.length > 0) {
+        const saleItemsQuery = supabase
+          .from("sale_items")
+          .select("sale_id, quantity, product_id, products(counts_as_sale)")
+          .in("sale_id", saleIds);
+        const saleItemsResult = await saleItemsQuery;
+        saleItems = (saleItemsResult.data as any[]) || [];
+      }
+
+      // Map sale_items to sales
+      const saleItemsBySaleId: Record<string, any[]> = {};
+      saleItems.forEach((si) => {
+        if (!saleItemsBySaleId[si.sale_id]) saleItemsBySaleId[si.sale_id] = [];
+        saleItemsBySaleId[si.sale_id].push(si);
+      });
+
+      // Get absences for the month
+      const absencesQuery = supabase
+        .from("absence_request_v2")
+        .select("employee_id, type, start_date, end_date")
+        .eq("status", "approved")
+        .or(`start_date.lte.${todayStr},end_date.gte.${monthStart}`);
+      const absencesResult = await absencesQuery;
+      const absences = (absencesResult.data as any[]) || [];
+
+      // Build employee -> team map
+      const employeeToTeam: Record<string, string> = {};
+      (teamMembers || []).forEach((tm: any) => {
+        employeeToTeam[tm.employee_id] = tm.team_id;
+      });
+
+      // Build agent_email/name -> employee_id map
+      const agentToEmployee: Record<string, string> = {};
+      (agentMappings || []).forEach((am: any) => {
+        if (am.agent_email) {
+          agentToEmployee[am.agent_email.toLowerCase()] = am.employee_id;
+        }
+        if (am.agent_name) {
+          agentToEmployee[am.agent_name.toLowerCase()] = am.employee_id;
+        }
+      });
+
+      // Calculate sales per team for day, week, month
+      const teamSales: Record<string, { day: number; week: number; month: number }> = {};
+      teams.forEach(t => {
+        teamSales[t.id] = { day: 0, week: 0, month: 0 };
+      });
+
+      (salesData || []).forEach((sale: any) => {
+        // Match sale to employee via agent_email or agent_name
+        const employeeId = 
+          (sale.agent_email && agentToEmployee[sale.agent_email.toLowerCase()]) ||
+          (sale.agent_name && agentToEmployee[sale.agent_name.toLowerCase()]);
+        
+        if (!employeeId) return;
+        
+        const teamId = employeeToTeam[employeeId];
+        if (!teamId || !teamSales[teamId]) return;
+
+        // Count sales (only products with counts_as_sale = true) - use saleItemsBySaleId
+        const items = saleItemsBySaleId[sale.id] || [];
+        let saleCount = 0;
+        for (const item of items) {
+          if (item.products?.counts_as_sale === true) {
+            saleCount += item.quantity || 1;
+          }
+        }
+
+        if (saleCount === 0) return;
+
+        const saleDate = sale.sale_datetime.split("T")[0];
+        
+        // Month (always add)
+        teamSales[teamId].month += saleCount;
+        
+        // Week (if >= weekStart)
+        if (saleDate >= weekStart) {
+          teamSales[teamId].week += saleCount;
+        }
+        
+        // Day (if == today)
+        if (saleDate === todayStr) {
+          teamSales[teamId].day += saleCount;
+        }
+      });
+
+      // Calculate absences per team for day, week, month
+      const teamAbsences: Record<string, { 
+        sickDay: number; sickWeek: number; sickMonth: number;
+        vacationDay: number; vacationWeek: number; vacationMonth: number;
+      }> = {};
+      teams.forEach(t => {
+        teamAbsences[t.id] = { 
+          sickDay: 0, sickWeek: 0, sickMonth: 0,
+          vacationDay: 0, vacationWeek: 0, vacationMonth: 0
+        };
+      });
+
+      // Track unique employees per period per team
+      const sickByTeamDay: Record<string, Set<string>> = {};
+      const sickByTeamWeek: Record<string, Set<string>> = {};
+      const sickByTeamMonth: Record<string, Set<string>> = {};
+      const vacationByTeamDay: Record<string, Set<string>> = {};
+      const vacationByTeamWeek: Record<string, Set<string>> = {};
+      const vacationByTeamMonth: Record<string, Set<string>> = {};
+
+      teams.forEach(t => {
+        sickByTeamDay[t.id] = new Set();
+        sickByTeamWeek[t.id] = new Set();
+        sickByTeamMonth[t.id] = new Set();
+        vacationByTeamDay[t.id] = new Set();
+        vacationByTeamWeek[t.id] = new Set();
+        vacationByTeamMonth[t.id] = new Set();
+      });
+
+      (absences || []).forEach((absence: any) => {
+        const teamId = employeeToTeam[absence.employee_id];
+        if (!teamId || !teamAbsences[teamId]) return;
+
+        const isSick = absence.type === "sick";
+        const isVacation = absence.type === "vacation";
+        if (!isSick && !isVacation) return;
+
+        const startDate = absence.start_date;
+        const endDate = absence.end_date;
+
+        // Check if absence overlaps with today
+        if (startDate <= todayStr && endDate >= todayStr) {
+          if (isSick) sickByTeamDay[teamId].add(absence.employee_id);
+          if (isVacation) vacationByTeamDay[teamId].add(absence.employee_id);
+        }
+
+        // Check if absence overlaps with this week
+        if (startDate <= todayStr && endDate >= weekStart) {
+          if (isSick) sickByTeamWeek[teamId].add(absence.employee_id);
+          if (isVacation) vacationByTeamWeek[teamId].add(absence.employee_id);
+        }
+
+        // Check if absence overlaps with this month
+        if (startDate <= todayStr && endDate >= monthStart) {
+          if (isSick) sickByTeamMonth[teamId].add(absence.employee_id);
+          if (isVacation) vacationByTeamMonth[teamId].add(absence.employee_id);
+        }
+      });
+
+      // Convert sets to counts
+      teams.forEach(t => {
+        teamAbsences[t.id].sickDay = sickByTeamDay[t.id].size;
+        teamAbsences[t.id].sickWeek = sickByTeamWeek[t.id].size;
+        teamAbsences[t.id].sickMonth = sickByTeamMonth[t.id].size;
+        teamAbsences[t.id].vacationDay = vacationByTeamDay[t.id].size;
+        teamAbsences[t.id].vacationWeek = vacationByTeamWeek[t.id].size;
+        teamAbsences[t.id].vacationMonth = vacationByTeamMonth[t.id].size;
+      });
+
+      // Return combined data
+      return teams.map(t => ({
+        id: t.id,
+        name: t.name,
+        sales: teamSales[t.id] || { day: 0, week: 0, month: 0 },
+        sick: {
+          day: teamAbsences[t.id]?.sickDay || 0,
+          week: teamAbsences[t.id]?.sickWeek || 0,
+          month: teamAbsences[t.id]?.sickMonth || 0,
+        },
+        vacation: {
+          day: teamAbsences[t.id]?.vacationDay || 0,
+          week: teamAbsences[t.id]?.vacationWeek || 0,
+          month: teamAbsences[t.id]?.vacationMonth || 0,
+        },
+      }));
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+  });
   const knownClientSales = todaySales.filter(sale => 
     sale.client_name && sale.client_name !== "Ukendt"
   );
@@ -685,6 +902,114 @@ export default function CphSalesDashboard() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Team Performance Overview - Only show in non-TV mode */}
+      {!tvMode && teamPerformanceData && teamPerformanceData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-5 w-5 text-primary" />
+              Team Performance Oversigt
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead rowSpan={2} className="align-bottom font-semibold">Team</TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-emerald-500/5 font-semibold">
+                      📈 Salg
+                    </TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-rose-500/5 font-semibold">
+                      🤒 Sygdom
+                    </TableHead>
+                    <TableHead colSpan={3} className="text-center border-l bg-blue-500/5 font-semibold">
+                      🌴 Ferie
+                    </TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="text-center border-l bg-emerald-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Mdr</TableHead>
+                    <TableHead className="text-center border-l bg-rose-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Mdr</TableHead>
+                    <TableHead className="text-center border-l bg-blue-500/5 text-xs font-medium">Dag</TableHead>
+                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Uge</TableHead>
+                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Mdr</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamPerformanceData.map((team) => (
+                    <TableRow key={team.id}>
+                      <TableCell className="font-medium">{team.name}</TableCell>
+                      <TableCell className={`text-center border-l ${team.sales.day > 0 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>
+                        {team.sales.day}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.sales.week > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                        {team.sales.week}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.sales.month > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                        {team.sales.month}
+                      </TableCell>
+                      <TableCell className={`text-center border-l ${team.sick.day > 0 ? 'text-rose-500 font-semibold' : 'text-muted-foreground'}`}>
+                        {team.sick.day || '-'}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.sick.week > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                        {team.sick.week || '-'}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.sick.month > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                        {team.sick.month || '-'}
+                      </TableCell>
+                      <TableCell className={`text-center border-l ${team.vacation.day > 0 ? 'text-blue-500 font-semibold' : 'text-muted-foreground'}`}>
+                        {team.vacation.day || '-'}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.vacation.week > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                        {team.vacation.week || '-'}
+                      </TableCell>
+                      <TableCell className={`text-center ${team.vacation.month > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                        {team.vacation.month || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Total row */}
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-center border-l text-emerald-600">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.day, 0)}
+                    </TableCell>
+                    <TableCell className="text-center text-emerald-600">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.week, 0)}
+                    </TableCell>
+                    <TableCell className="text-center text-emerald-600">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sales.month, 0)}
+                    </TableCell>
+                    <TableCell className="text-center border-l text-rose-500">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.day, 0) || '-'}
+                    </TableCell>
+                    <TableCell className="text-center text-rose-400">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.week, 0) || '-'}
+                    </TableCell>
+                    <TableCell className="text-center text-rose-400">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.sick.month, 0) || '-'}
+                    </TableCell>
+                    <TableCell className="text-center border-l text-blue-500">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.day, 0) || '-'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.week, 0) || '-'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400">
+                      {teamPerformanceData.reduce((sum, t) => sum + t.vacation.month, 0) || '-'}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Top KPI Row - Compact */}
