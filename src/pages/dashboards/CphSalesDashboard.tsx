@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, subDays, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus, CalendarDays, HeartPulse } from "lucide-react";
+import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useMemo } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
+import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
 
 interface TopSeller {
   name: string;
@@ -861,253 +862,20 @@ export default function CphSalesDashboard() {
         )}
       </div>
 
-      {/* Team Performance Overview - Only show in non-TV mode */}
+      {/* Team Performance - Tab-based component - Only in non-TV mode */}
       {!tvMode && teamPerformanceData && teamPerformanceData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-5 w-5 text-primary" />
-              Team Performance Oversigt
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead rowSpan={2} className="align-bottom font-semibold">Team</TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-emerald-500/5 font-semibold">
-                      📈 Salg
-                    </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-rose-500/5 font-semibold">
-                      🤒 Sygdom
-                    </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l bg-blue-500/5 font-semibold">
-                      🌴 Ferie
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="text-center border-l bg-emerald-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-emerald-500/5 text-xs font-medium">Mdr</TableHead>
-                    <TableHead className="text-center border-l bg-rose-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-rose-500/5 text-xs font-medium">Mdr</TableHead>
-                    <TableHead className="text-center border-l bg-blue-500/5 text-xs font-medium">Dag</TableHead>
-                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Uge</TableHead>
-                    <TableHead className="text-center bg-blue-500/5 text-xs font-medium">Mdr</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {teamPerformanceData.map((team) => {
-                    const empCount = team.employeeCount || 1;
-                    const formatAbsence = (count: number) => {
-                      if (count === 0) return '-';
-                      const pct = Math.round((count / empCount) * 100);
-                      return `${pct}% (${count})`;
-                    };
-                    return (
-                      <TableRow key={team.id}>
-                        <TableCell className="font-medium">{team.name}</TableCell>
-                        <TableCell className={`text-center border-l ${team.sales.day > 0 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>
-                          {team.sales.day}
-                        </TableCell>
-                        <TableCell className={`text-center ${team.sales.week > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                          {team.sales.week}
-                        </TableCell>
-                        <TableCell className={`text-center ${team.sales.month > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                          {team.sales.month}
-                        </TableCell>
-                        <TableCell className={`text-center border-l text-xs ${team.sick.day > 0 ? 'text-rose-500 font-semibold' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.sick.day)}
-                        </TableCell>
-                        <TableCell className={`text-center text-xs ${team.sick.week > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.sick.week)}
-                        </TableCell>
-                        <TableCell className={`text-center text-xs ${team.sick.month > 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.sick.month)}
-                        </TableCell>
-                        <TableCell className={`text-center border-l text-xs ${team.vacation.day > 0 ? 'text-blue-500 font-semibold' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.vacation.day)}
-                        </TableCell>
-                        <TableCell className={`text-center text-xs ${team.vacation.week > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.vacation.week)}
-                        </TableCell>
-                        <TableCell className={`text-center text-xs ${team.vacation.month > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                          {formatAbsence(team.vacation.month)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {/* Total row */}
-                  {(() => {
-                    const totalEmp = teamPerformanceData.reduce((sum, t) => sum + (t.employeeCount || 0), 0) || 1;
-                    const formatTotal = (count: number) => {
-                      if (count === 0) return '-';
-                      const pct = Math.round((count / totalEmp) * 100);
-                      return `${pct}% (${count})`;
-                    };
-                    return (
-                      <TableRow className="bg-muted/50 font-semibold">
-                        <TableCell>Total</TableCell>
-                        <TableCell className="text-center border-l text-emerald-600">
-                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.day, 0)}
-                        </TableCell>
-                        <TableCell className="text-center text-emerald-600">
-                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.week, 0)}
-                        </TableCell>
-                        <TableCell className="text-center text-emerald-600">
-                          {teamPerformanceData.reduce((sum, t) => sum + t.sales.month, 0)}
-                        </TableCell>
-                        <TableCell className="text-center border-l text-rose-500 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.day, 0))}
-                        </TableCell>
-                        <TableCell className="text-center text-rose-400 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.week, 0))}
-                        </TableCell>
-                        <TableCell className="text-center text-rose-400 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.sick.month, 0))}
-                        </TableCell>
-                        <TableCell className="text-center border-l text-blue-500 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.day, 0))}
-                        </TableCell>
-                        <TableCell className="text-center text-blue-400 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.week, 0))}
-                        </TableCell>
-                        <TableCell className="text-center text-blue-400 text-xs">
-                          {formatTotal(teamPerformanceData.reduce((sum, t) => sum + t.vacation.month, 0))}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })()}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <TeamPerformanceTabs data={teamPerformanceData} />
       )}
 
-      {/* Recruitment KPIs - Only show in non-TV mode */}
+      {/* Quick Stats Bar - Compact KPIs - Only in non-TV mode */}
       {!tvMode && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="bg-gradient-to-br from-sky-500/10 to-sky-500/5 border-sky-500/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgere</CardTitle>
-              <UserPlus className="h-5 w-5 text-sky-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                {/* Last 24 hours */}
-                <div>
-                  <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last24h}</div>
-                  <div className="flex items-center gap-1 text-xs">
-                    {recruitmentKpis.trend24h !== 0 && (
-                      <span className={recruitmentKpis.trend24h > 0 ? "text-green-500" : "text-red-500"}>
-                        {recruitmentKpis.trend24h > 0 ? "+" : ""}{recruitmentKpis.trend24h}%
-                      </span>
-                    )}
-                    <span className="text-muted-foreground">sidste 24t</span>
-                  </div>
-                </div>
-                
-                <div className="h-10 w-px bg-border" />
-                
-                {/* Last 7 days */}
-                <div>
-                  <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last7d}</div>
-                  <div className="flex items-center gap-1 text-xs">
-                    {recruitmentKpis.trend7d !== 0 && (
-                      <span className={recruitmentKpis.trend7d > 0 ? "text-green-500" : "text-red-500"}>
-                        {recruitmentKpis.trend7d > 0 ? "+" : ""}{recruitmentKpis.trend7d}%
-                      </span>
-                    )}
-                    <span className="text-muted-foreground">sidste 7 dage</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Upcoming Cohorts KPI */}
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kommende opstarter</CardTitle>
-              <CalendarDays className="h-5 w-5 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                {/* Members in cohorts */}
-                <div>
-                  <div className="text-3xl font-bold text-amber-500">{upcomingCohortsData?.memberCount || 0}</div>
-                  <div className="text-xs text-muted-foreground">personer i hold</div>
-                </div>
-                
-                <div className="h-10 w-px bg-border" />
-                
-                {/* Number of cohorts */}
-                <div>
-                  <div className="text-3xl font-bold text-amber-500">{upcomingCohortsData?.cohortCount || 0}</div>
-                  <div className="text-xs text-muted-foreground">hold planlagt</div>
-                </div>
-
-                {(upcomingCohortsData?.unassignedCount || 0) > 0 && (
-                  <>
-                    <div className="h-10 w-px bg-border" />
-                    <div>
-                      <div className="text-3xl font-bold text-orange-500">{upcomingCohortsData?.unassignedCount}</div>
-                      <div className="text-xs text-muted-foreground">uplacerede</div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Absence KPI */}
-          <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Fravær i dag</CardTitle>
-              <HeartPulse className="h-5 w-5 text-rose-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                {/* Sick */}
-                <div>
-                  <div className="text-3xl font-bold text-rose-500">{absenceData?.sickCount || 0}</div>
-                  <div className="text-xs text-muted-foreground">syge</div>
-                </div>
-                
-                <div className="h-10 w-px bg-border" />
-                
-                {/* Vacation */}
-                <div>
-                  <div className="text-3xl font-bold text-blue-500">{absenceData?.vacationCount || 0}</div>
-                  <div className="text-xs text-muted-foreground">ferie</div>
-                </div>
-
-                {(absenceData?.noShowCount || 0) > 0 && (
-                  <>
-                    <div className="h-10 w-px bg-border" />
-                    <div>
-                      <div className="text-3xl font-bold text-gray-500">{absenceData?.noShowCount}</div>
-                      <div className="text-xs text-muted-foreground">udeblivelse</div>
-                    </div>
-                  </>
-                )}
-
-                <div className="h-10 w-px bg-border" />
-
-                {/* Total percent */}
-                <div>
-                  <div className="text-2xl font-bold text-muted-foreground">
-                    {activeEmployees > 0 ? Math.round(((absenceData?.totalAbsent || 0) / activeEmployees) * 100) : 0}%
-                  </div>
-                  <div className="text-xs text-muted-foreground">af {activeEmployees}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <QuickStatsBar
+          applicants24h={recruitmentKpis.last24h}
+          upcomingStarters={upcomingCohortsData?.memberCount || 0}
+          sickToday={absenceData?.sickCount || 0}
+          vacationToday={absenceData?.vacationCount || 0}
+          totalEmployees={activeEmployees}
+        />
       )}
 
       {/* Top KPI Row - Compact */}
