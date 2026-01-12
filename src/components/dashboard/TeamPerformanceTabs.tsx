@@ -18,7 +18,7 @@ interface TeamData {
   clients?: ClientSalesData[];
   sick: { day: number; week: number; month: number };
   vacation: { day: number; week: number; month: number };
-  workDays?: { day: number; week: number; month: number; totalMonth?: number };
+  workDays?: { day: number; week: number; month: number; totalWeek?: number; totalMonth?: number };
 }
 
 interface TeamPerformanceTabsProps {
@@ -42,15 +42,19 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const getSickValue = (team: TeamData) => team.sick[period];
   const getVacationValue = (team: TeamData) => team.vacation[period];
   const getWorkDays = (team: TeamData) => team.workDays?.[period] || 1;
+  const getTotalWeekWorkDays = () => data[0]?.workDays?.totalWeek || 5;
   const getTotalMonthWorkDays = () => data[0]?.workDays?.totalMonth || 1;
+  const getTotalPeriodWorkDays = () => period === "month" ? getTotalMonthWorkDays() : getTotalWeekWorkDays();
 
-  // Calculate forecast (only for month view)
+  // Calculate forecast (for week and month view)
   const getForecast = (salesSoFar: number, workDaysSoFar: number): number | null => {
-    if (period !== "month") return null;
+    if (period === "day") return null;
     if (workDaysSoFar === 0) return 0;
-    const totalWorkDays = getTotalMonthWorkDays();
+    const totalWorkDays = getTotalPeriodWorkDays();
     return Math.round((salesSoFar / workDaysSoFar) * totalWorkDays);
   };
+
+  const showForecast = period !== "day";
 
   // Get client sales for a team
   const getClientSales = (team: TeamData) => {
@@ -114,7 +118,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead className="font-semibold text-foreground pl-4">Team</TableHead>
                   <TableHead className="text-center font-semibold text-foreground w-20">Salg</TableHead>
-                  {period === "month" && (
+                  {showForecast && (
                     <TableHead className="text-center font-semibold text-foreground w-24">
                       <Tooltip>
                         <TooltipTrigger className="cursor-help">Forecast</TooltipTrigger>
@@ -168,7 +172,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                           )}
                         </Tooltip>
                       </TableCell>
-                      {period === "month" && teamForecast !== null && (
+                      {showForecast && teamForecast !== null && (
                         <TableCell className="text-center">
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -179,7 +183,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                             <TooltipContent>
                               <p className="font-medium">{getSalesValue(team)} salg / {getWorkDays(team)} dage</p>
                               <p className="text-xs text-muted-foreground">
-                                = {(getSalesValue(team) / (getWorkDays(team) || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                                = {(getSalesValue(team) / (getWorkDays(team) || 1)).toFixed(1)} salg/dag × {getTotalPeriodWorkDays()} dage
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -233,7 +237,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                       {totalSales}
                     </span>
                   </TableCell>
-                  {period === "month" && (
+                  {showForecast && (
                     <TableCell className="text-center">
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -244,7 +248,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                         <TooltipContent>
                           <p className="font-medium">{totalSales} salg / {workDaysInPeriod} dage</p>
                           <p className="text-xs text-muted-foreground">
-                            = {(totalSales / (workDaysInPeriod || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                            = {(totalSales / (workDaysInPeriod || 1)).toFixed(1)} salg/dag × {getTotalPeriodWorkDays()} dage
                           </p>
                         </TooltipContent>
                       </Tooltip>
@@ -282,7 +286,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
         <div className="px-4 py-2 text-xs text-muted-foreground border-t bg-muted/20 flex items-center justify-between">
           <span>{periodLabels[period]}</span>
           <span>
-            {workDaysInPeriod}{period === "month" ? `/${getTotalMonthWorkDays()}` : ""} arbejdsdage
+            {workDaysInPeriod}{showForecast ? `/${getTotalPeriodWorkDays()}` : ""} arbejdsdage
           </span>
         </div>
       </CardContent>
