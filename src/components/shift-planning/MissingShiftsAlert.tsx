@@ -35,6 +35,7 @@ interface MissingShiftsAlertProps {
 interface MissingSale {
   employeeId: string;
   employeeName: string;
+  teamName: string | null;
   date: string;
   salesCount: number;
 }
@@ -74,6 +75,19 @@ export function MissingShiftsAlert({
           agent_email: agent?.email || null,
         };
       });
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch team memberships for employees
+  const { data: teamMemberships } = useQuery({
+    queryKey: ["team-memberships-for-missing-shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      if (error) throw error;
+      return data;
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -164,9 +178,17 @@ export function MissingShiftsAlert({
 
       // If no shift and no timestamp, this is a missing shift
       if (!hasShift && !hasTimestamp) {
+        // Get team name for this employee
+        const employeeTeams = teamMemberships
+          ?.filter((tm) => tm.employee_id === employee.id)
+          .map((tm) => (tm.team as { name: string } | null)?.name)
+          .filter(Boolean);
+        const teamName = employeeTeams?.length ? employeeTeams.join(", ") : null;
+
         missing.push({
           employeeId: employee.id,
           employeeName: `${employee.first_name} ${employee.last_name}`,
+          teamName,
           date: dateStr,
           salesCount: saleInfo.count,
         });
@@ -175,7 +197,7 @@ export function MissingShiftsAlert({
 
     // Sort by date
     return missing.sort((a, b) => a.date.localeCompare(b.date));
-  }, [weeklySales, employees, agentMappings, shifts, timeStamps]);
+  }, [weeklySales, employees, agentMappings, shifts, timeStamps, teamMemberships]);
 
   if (missingSales.length === 0) return null;
 
@@ -221,6 +243,11 @@ export function MissingShiftsAlert({
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         {sale.employeeName}
+                        {sale.teamName && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            ({sale.teamName})
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {format(date, "EEEE d. MMM", { locale: da })} •{" "}
