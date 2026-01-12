@@ -29,9 +29,10 @@ interface ShiftCardProps {
   compact?: boolean;
   showEmployee?: boolean;
   standardTimes?: { start: string; end: string } | null;
+  displayAsStandard?: boolean;
 }
 
-export function ShiftCard({ shift, compact = false, showEmployee = false, standardTimes }: ShiftCardProps) {
+export function ShiftCard({ shift, compact = false, showEmployee = false, standardTimes, displayAsStandard = false }: ShiftCardProps) {
   // Check if shift times differ from standard times
   const isModified = standardTimes && (
     shift.start_time.slice(0, 5) !== standardTimes.start.slice(0, 5) ||
@@ -82,6 +83,136 @@ export function ShiftCard({ shift, compact = false, showEmployee = false, standa
   };
 
   if (compact) {
+    // Display as plain text (like standard shifts) when displayAsStandard is true
+    if (displayAsStandard) {
+      return (
+        <>
+          <div
+            className="text-center cursor-pointer hover:opacity-80"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditDialogOpen(true);
+            }}
+          >
+            <div className="flex items-center justify-center gap-1 text-xs">
+              {isModified && (
+                <span title="Tilpasset vagt">
+                  <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                </span>
+              )}
+              <span>{shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}</span>
+            </div>
+          </div>
+
+          {/* Edit Dialog */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent onClick={(e) => e.stopPropagation()}>
+              <DialogHeader>
+                <DialogTitle>Rediger vagt</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                {showEmployee && shift.employee && (
+                  <div>
+                    <p className="text-sm font-medium">{shift.employee.first_name} {shift.employee.last_name}</p>
+                    <p className="text-xs text-muted-foreground">{shift.employee.department}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Starttid</Label>
+                    <Input
+                      type="time"
+                      value={editForm.start_time}
+                      onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sluttid</Label>
+                    <Input
+                      type="time"
+                      value={editForm.end_time}
+                      onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Pause (minutter)</Label>
+                  <Input
+                    type="number"
+                    value={editForm.break_minutes}
+                    onChange={(e) => setEditForm({ ...editForm, break_minutes: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(v) => setEditForm({ ...editForm, status: v as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planned">Planlagt</SelectItem>
+                      <SelectItem value="completed">Afsluttet</SelectItem>
+                      <SelectItem value="cancelled">Aflyst</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Note</Label>
+                  <Textarea
+                    value={editForm.note}
+                    onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex justify-between">
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setEditDialogOpen(false);
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Slet
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                    Annuller
+                  </Button>
+                  <Button onClick={handleUpdate} disabled={updateShift.isPending}>
+                    {updateShift.isPending ? "Gemmer..." : "Gem"}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation */}
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent onClick={(e) => e.stopPropagation()}>
+              <DialogHeader>
+                <DialogTitle>Slet vagt</DialogTitle>
+                <DialogDescription>
+                  Er du sikker på, at du vil slette denne vagt? Denne handling kan ikke fortrydes.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                  Annuller
+                </Button>
+                <Button variant="destructive" onClick={handleDelete} disabled={deleteShift.isPending}>
+                  {deleteShift.isPending ? "Sletter..." : "Slet"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+
     return (
       <>
         <div
