@@ -359,7 +359,7 @@ export default function CphSalesDashboard() {
 
   // Team Performance Overview - data for day, week, month
   const { data: teamPerformanceData } = useQuery({
-    queryKey: ["cph-dashboard-team-performance", todayStr],
+    queryKey: ["cph-dashboard-team-performance-v2", todayStr],
     queryFn: async (): Promise<Array<{
       id: string;
       name: string;
