@@ -1260,9 +1260,16 @@ export default function ShiftOverview() {
                             
                             <div className="flex flex-col items-center justify-center h-full gap-1.5">
                               {/* Shift cards */}
-                              {hasShift && dayShifts.map(shift => (
-                                <ShiftCard key={shift.id} shift={shift} compact />
-                              ))}
+                              {hasShift && dayShifts.map(shift => {
+                                const standardWorkTimes = getWorkTimesForEmployeeAndDay(employee.id, day);
+                                const standardTimes = standardWorkTimes ? {
+                                  start: standardWorkTimes.split('-')[0],
+                                  end: standardWorkTimes.split('-')[1]
+                                } : null;
+                                return (
+                                  <ShiftCard key={shift.id} shift={shift} compact standardTimes={standardTimes} />
+                                );
+                              })}
 
                               {/* Status Tags */}
                               {!hasShift && isLate && (

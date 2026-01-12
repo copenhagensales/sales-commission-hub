@@ -28,9 +28,15 @@ interface ShiftCardProps {
   shift: Shift;
   compact?: boolean;
   showEmployee?: boolean;
+  standardTimes?: { start: string; end: string } | null;
 }
 
-export function ShiftCard({ shift, compact = false, showEmployee = false }: ShiftCardProps) {
+export function ShiftCard({ shift, compact = false, showEmployee = false, standardTimes }: ShiftCardProps) {
+  // Check if shift times differ from standard times
+  const isModified = standardTimes && (
+    shift.start_time.slice(0, 5) !== standardTimes.start.slice(0, 5) ||
+    shift.end_time.slice(0, 5) !== standardTimes.end.slice(0, 5)
+  );
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -88,7 +94,12 @@ export function ShiftCard({ shift, compact = false, showEmployee = false }: Shif
             setEditDialogOpen(true);
           }}
         >
-          <p className="font-medium">
+          <p className="font-medium flex items-center gap-1">
+            {isModified && (
+              <span title="Tilpasset vagt">
+                <Pencil className="h-2.5 w-2.5 opacity-70" />
+              </span>
+            )}
             {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
           </p>
           {shift.planned_hours && (
