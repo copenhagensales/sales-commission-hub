@@ -1083,7 +1083,10 @@ export default function ShiftOverview() {
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const isActive = isEmployeeActiveOnDate(employee.id, day);
-                    const workTimes = isActive ? (getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time) : null;
+                    const isDayWeekend = day.getDay() === 0 || day.getDay() === 6;
+                    const workTimes = isActive 
+                      ? (getWorkTimesForEmployeeAndDay(employee.id, day) || (isDayWeekend ? null : employee.standard_start_time)) 
+                      : null;
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
