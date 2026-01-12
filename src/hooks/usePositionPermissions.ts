@@ -363,5 +363,8 @@ export function usePermissions() {
     canSendEmployeeSms: canView("employee_sms"),
     // League admin
     canViewLeagueAdmin: canView("menu_league_admin"),
+    // Admin menu
+    canViewKpiDefinitions: canView("menu_kpi_definitions"),
+    canEditKpiDefinitions: canEdit("menu_kpi_definitions"),
   };
 }
