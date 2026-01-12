@@ -29,6 +29,7 @@ interface LatenessRecord {
   date: string;
   minutes: number;
   note: string | null;
+  new_start_time: string | null;
 }
 
 type TimeStampData = {
@@ -50,7 +51,8 @@ export default function ShiftOverview() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [delayDialogOpen, setDelayDialogOpen] = useState(false);
-  const [delayMinutes, setDelayMinutes] = useState("");
+  const [originalStartTime, setOriginalStartTime] = useState<string>("");
+  const [newStartTime, setNewStartTime] = useState<string>("");
   const [pendingDelayCell, setPendingDelayCell] = useState<{ employeeId: string; date: string } | null>(null);
   const [editTimeStampDialogOpen, setEditTimeStampDialogOpen] = useState(false);
   const [selectedTimeStamp, setSelectedTimeStamp] = useState<{ id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null } | null>(null);
@@ -411,22 +413,23 @@ export default function ShiftOverview() {
 
   // Mutation to create lateness record
   const createLateness = useMutation({
-    mutationFn: async ({ employeeId, date, minutes }: { employeeId: string; date: string; minutes: number }) => {
+    mutationFn: async ({ employeeId, date, minutes, newStartTime }: { employeeId: string; date: string; minutes: number; newStartTime: string }) => {
       const { error } = await supabase
         .from("lateness_record")
         .insert({
           employee_id: employeeId,
           date,
           minutes,
+          new_start_time: newStartTime,
         });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lateness-records"] });
-      toast.success("Forsinkelse registreret");
+      toast.success("Ny mødetid registreret");
     },
     onError: (error: any) => {
-      toast.error("Kunne ikke registrere forsinkelse: " + error.message);
+      toast.error("Kunne ikke registrere ny mødetid: " + error.message);
     },
   });
 
@@ -822,8 +825,14 @@ export default function ShiftOverview() {
     if (currentAbsence) {
       deleteAbsence.mutate(currentAbsence.id);
     }
+    
+    // Get employee's planned start time
+    const workTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
+    const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
+    
+    setOriginalStartTime(startTime);
+    setNewStartTime(startTime);
     setPendingDelayCell({ employeeId, date: dateStr });
-    setDelayMinutes("");
     setDelayDialogOpen(true);
     setOpenPopoverKey(null);
   };
@@ -881,16 +890,25 @@ export default function ShiftOverview() {
 
   // Handle delay dialog submit
   const handleDelaySubmit = () => {
-    if (!pendingDelayCell || !delayMinutes) return;
-    const minutes = parseInt(delayMinutes, 10);
-    if (isNaN(minutes) || minutes <= 0) {
-      toast.error("Indtast et gyldigt antal minutter");
+    if (!pendingDelayCell || !newStartTime || !originalStartTime) return;
+    
+    // Calculate minutes from time difference
+    const [origH, origM] = originalStartTime.split(':').map(Number);
+    const [newH, newM] = newStartTime.split(':').map(Number);
+    const origMinutes = origH * 60 + origM;
+    const newMinutes = newH * 60 + newM;
+    const delayMinutes = newMinutes - origMinutes;
+    
+    if (delayMinutes <= 0) {
+      toast.error("Ny mødetid skal være efter den planlagte tid");
       return;
     }
+    
     createLateness.mutate({
       employeeId: pendingDelayCell.employeeId,
       date: pendingDelayCell.date,
-      minutes,
+      minutes: delayMinutes,
+      newStartTime: newStartTime,
     });
     setDelayDialogOpen(false);
     setPendingDelayCell(null);
@@ -1274,9 +1292,13 @@ export default function ShiftOverview() {
                               {/* Status Tags */}
                               {!hasShift && isLate && (
                                 <div className="flex flex-col items-center gap-1">
-                                  {workTimes && (
+                                  {/* Show the NEW meeting time instead of planned time */}
+                                  {(lateness.new_start_time || workTimes) && (
                                     <span className="text-[10px] font-medium text-muted-foreground">
-                                      {workTimes}
+                                      {lateness.new_start_time 
+                                        ? `${lateness.new_start_time.slice(0, 5)}-${workTimes?.split('-')[1] || ''}`
+                                        : workTimes
+                                      }
                                     </span>
                                   )}
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
@@ -1590,35 +1612,43 @@ export default function ShiftOverview() {
           teamId={selectedDepartment}
         />
 
-        {/* Delay Input Dialog */}
+        {/* New Meeting Time Dialog */}
         <Dialog open={delayDialogOpen} onOpenChange={setDelayDialogOpen}>
           <DialogContent className="sm:max-w-[320px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <AlarmClock className="h-5 w-5 text-orange-500" />
-                Registrer forsinkelse
+                Registrer ny mødetid
               </DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-              <label className="text-sm text-muted-foreground mb-2 block">
-                Antal minutter forsinket
-              </label>
-              <Input
-                type="number"
-                min="1"
-                max="480"
-                placeholder="f.eks. 15"
-                value={delayMinutes}
-                onChange={(e) => setDelayMinutes(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleDelaySubmit();
-                }}
-                autoFocus
-              />
+            <div className="py-4 space-y-4">
+              {/* Show original planned time */}
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  Planlagt mødetid
+                </label>
+                <div className="text-lg font-medium">{originalStartTime}</div>
+              </div>
+              
+              {/* Input for new meeting time */}
+              <div>
+                <label className="text-sm text-muted-foreground mb-2 block">
+                  Ny mødetid
+                </label>
+                <Input
+                  type="time"
+                  value={newStartTime}
+                  onChange={(e) => setNewStartTime(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleDelaySubmit();
+                  }}
+                  autoFocus
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDelayDialogOpen(false)}>
-                Spring over
+                Annuller
               </Button>
               <Button onClick={handleDelaySubmit} className="bg-orange-500 hover:bg-orange-600">
                 Gem
