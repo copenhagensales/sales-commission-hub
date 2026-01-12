@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -81,6 +81,7 @@ interface DailyEntry {
   revenue: number;
   commission: number;
   clients: string[];
+  missing_shift: boolean;
 }
 
 interface EmployeeReportData {
@@ -95,6 +96,7 @@ interface EmployeeReportData {
   total_commission: number;
   clients: string[];
   daily_entries: DailyEntry[];
+  has_missing_shifts: boolean;
 }
 
 export default function DailyReports() {
@@ -611,6 +613,7 @@ export default function DailyReports() {
           
           // Calculate hours based on hours_source setting
           let hours = 0;
+          let missingShift = false;
           
           if (hoursSource === 'timestamp') {
             // Use actual timestamp data
@@ -621,23 +624,24 @@ export default function DailyReports() {
               const rawHours = (outH + outM / 60) - (inH + inM / 60);
               const breakMins = empTimestamp.break_minutes || 0;
               hours = Math.max(0, rawHours - (breakMins / 60));
+            } else {
+              // No timestamp - mark as missing shift
+              missingShift = true;
             }
           } else {
             // Use planned shift times (original logic)
             if (!shiftForDay || !shiftForDay.start_time || !shiftForDay.end_time) {
-              continue;
+              // No shift for this day - mark as missing but don't skip yet
+              missingShift = true;
+              hours = 0;
+            } else {
+              const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
+              const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
+              const rawHours = (endH + endM / 60) - (startH + startM / 60);
+              // Standard 30 min break for shifts over 6 hours
+              const breakMinutes = rawHours > 6 ? 30 : 0;
+              hours = rawHours - (breakMinutes / 60);
             }
-            const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
-            const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
-            const rawHours = (endH + endM / 60) - (startH + startM / 60);
-            // Standard 30 min break for shifts over 6 hours
-            const breakMinutes = rawHours > 6 ? 30 : 0;
-            hours = rawHours - (breakMinutes / 60);
-          }
-          
-          // Skip days with no hours (for shift-based) or continue for timestamp-based
-          if (hoursSource === 'shift' && hours === 0) {
-            continue;
           }
 
           const empAbsences = absences?.filter(a => 
@@ -723,6 +727,11 @@ export default function DailyReports() {
             .map(cid => clients.find((c: any) => c.id === cid)?.name)
             .filter(Boolean) as string[];
 
+          // Skip days with no activity at all (no hours, no sales, not sick, not vacation)
+          if (hours === 0 && salesCount === 0 && !isSick && !isVacation) {
+            continue;
+          }
+
           dailyEntries.push({
             date: dayStr,
             hours: Math.round(hours * 100) / 100,
@@ -732,6 +741,7 @@ export default function DailyReports() {
             revenue: Math.round(revenue),
             commission: Math.round(commission),
             clients: dayClientNames,
+            missing_shift: missingShift && salesCount > 0,  // Only flag if there are sales but no shift
           });
 
           totalHours += hours;
@@ -747,6 +757,9 @@ export default function DailyReports() {
           const allClientNames = new Set<string>();
           dailyEntries.forEach(entry => entry.clients.forEach(c => allClientNames.add(c)));
           
+          // Check if any day has missing shift with sales
+          const hasMissingShifts = dailyEntries.some(entry => entry.missing_shift);
+          
           report.push({
             employee_id: empId,
             employee_name: `${emp.first_name} ${emp.last_name}`,
@@ -759,6 +772,7 @@ export default function DailyReports() {
             total_commission: Math.round(totalCommission),
             clients: Array.from(allClientNames),
             daily_entries: dailyEntries.sort((a, b) => b.date.localeCompare(a.date)),
+            has_missing_shifts: hasMissingShifts,
           });
         }
       }
@@ -1190,7 +1204,17 @@ export default function DailyReports() {
                               {format(parseISO(row.daily_entries[0]?.date || format(dateRange.start, "yyyy-MM-dd")), "d. MMM", { locale: da })}
                             </TableCell>
                           )}
-                          <TableCell className="font-medium">{row.employee_name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {row.employee_name}
+                              {row.has_missing_shifts && (
+                                <Badge variant="outline" className="gap-1 border-orange-500 text-orange-500 text-xs">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Vagt mangler
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{row.team_name || "-"}</TableCell>
                           {selectedColumns.includes("hours") && (
                             <TableCell className="text-right font-medium">
@@ -1250,7 +1274,15 @@ export default function DailyReports() {
                           <TableRow key={`${row.employee_id}-${entry.date}`} className="bg-muted/30">
                             <TableCell></TableCell>
                             <TableCell className="text-muted-foreground pl-6">
-                              {format(parseISO(entry.date), "EEEE d. MMM", { locale: da })}
+                              <div className="flex items-center gap-2">
+                                {format(parseISO(entry.date), "EEEE d. MMM", { locale: da })}
+                                {entry.missing_shift && (
+                                  <Badge variant="destructive" className="gap-1 text-xs">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Vagt mangler
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell></TableCell>
                             {selectedColumns.includes("hours") && (
