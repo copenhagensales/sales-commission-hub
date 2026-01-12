@@ -69,7 +69,14 @@ export default function CphSalesDashboard() {
       
       const { data, error } = await supabase
         .from("sales")
-        .select("id, agent_name, sale_datetime, status, client_campaign_id")
+        .select(`
+          id, agent_name, sale_datetime, status, client_campaign_id,
+          sale_items (
+            quantity,
+            product_id,
+            products (counts_as_sale)
+          )
+        `)
         .gte("sale_datetime", startOfDay)
         .lte("sale_datetime", endOfDay)
         .order("created_at", { ascending: false });
@@ -157,16 +164,67 @@ export default function CphSalesDashboard() {
     refetchInterval: 30000,
   });
 
+  // Calculate counted sales (only products with counts_as_sale = true)
+  const calculateCountedSales = (sales: typeof todaySales) => {
+    return sales.reduce((total, sale) => {
+      const saleItems = (sale as any).sale_items || [];
+      for (const item of saleItems) {
+        if (item.products?.counts_as_sale === true) {
+          total += item.quantity || 1;
+        }
+      }
+      return total;
+    }, 0);
+  };
+
+  const calculateSalesByClient = (sales: typeof todaySales) => {
+    const result: Record<string, number> = {};
+    for (const sale of sales) {
+      const saleItems = (sale as any).sale_items || [];
+      let saleCount = 0;
+      for (const item of saleItems) {
+        if (item.products?.counts_as_sale === true) {
+          saleCount += item.quantity || 1;
+        }
+      }
+      if (saleCount > 0) {
+        const clientName = sale.client_name || "Ukendt";
+        result[clientName] = (result[clientName] || 0) + saleCount;
+      }
+    }
+    return result;
+  };
+
+  const calculateConfirmedSales = (sales: typeof todaySales) => {
+    return sales.filter((s: any) => s.status === "confirmed").reduce((total, sale) => {
+      const saleItems = (sale as any).sale_items || [];
+      for (const item of saleItems) {
+        if (item.products?.counts_as_sale === true) {
+          total += item.quantity || 1;
+        }
+      }
+      return total;
+    }, 0);
+  };
+
+  const calculatePendingSales = (sales: typeof todaySales) => {
+    return sales.filter((s: any) => s.status === "pending").reduce((total, sale) => {
+      const saleItems = (sale as any).sale_items || [];
+      for (const item of saleItems) {
+        if (item.products?.counts_as_sale === true) {
+          total += item.quantity || 1;
+        }
+      }
+      return total;
+    }, 0);
+  };
+
   // Use TV data if in TV mode, otherwise use regular queries
   const displaySales = tvMode && tvData ? tvData.sales.recent : todaySales;
-  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : todaySales.length;
-  const displaySalesByClient = tvMode && tvData ? tvData.sales.byClient : todaySales.reduce((acc: Record<string, number>, sale: any) => {
-    const clientName = sale.client_name || "Ukendt";
-    acc[clientName] = (acc[clientName] || 0) + 1;
-    return acc;
-  }, {});
-  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : todaySales.filter((s: any) => s.status === "confirmed").length;
-  const displayPending = tvMode && tvData ? tvData.sales.pending : todaySales.filter((s: any) => s.status === "pending").length;
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(todaySales);
+  const displaySalesByClient = tvMode && tvData ? tvData.sales.byClient : calculateSalesByClient(todaySales);
+  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(todaySales);
+  const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(todaySales);
   const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
   const displayStaffEmployees = tvMode && tvData ? tvData.employees.staff : staffEmployees;
   const displayCalls = tvMode && tvData ? tvData.calls.today : todayCalls;
