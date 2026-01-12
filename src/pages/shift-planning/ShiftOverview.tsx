@@ -241,6 +241,24 @@ export default function ShiftOverview() {
     },
   });
 
+  // Fetch employee-specific special shift assignments
+  const { data: employeeSpecialShifts } = useQuery({
+    queryKey: ["employee-special-shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select(`
+          employee_id,
+          shift_id,
+          team_standard_shifts (
+            id, hours_source
+          )
+        `);
+      if (error) throw error;
+      return data as { employee_id: string; shift_id: string; team_standard_shifts: { id: string; hours_source: 'timestamp' | 'shift' } | null }[];
+    },
+  });
+
   // Helper to get work times from primary shift
   const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
     if (!teamMemberships || !primaryShiftsData) return null;
@@ -556,14 +574,30 @@ export default function ShiftOverview() {
     return (endMinutes - startMinutes) / 60;
   }, []);
 
-  // Get hours source for employee's team
+  // Get hours source for employee - check special shift first, then team primary shift
   const getHoursSourceForEmployee = useCallback((employeeId: string): 'timestamp' | 'shift' => {
+    // 1. FIRST: Check if employee has a special shift assigned
+    const specialShift = employeeSpecialShifts?.find(s => s.employee_id === employeeId);
+    if (specialShift?.team_standard_shifts?.hours_source) {
+      return specialShift.team_standard_shifts.hours_source;
+    }
+    
+    // 2. FALLBACK: Use team's primary shift (excluding special shifts)
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return 'shift';
     
-    const primaryShift = primaryShiftsData?.shifts.find(s => s.team_id === membership.team_id);
-    return primaryShift?.hours_source || 'shift';
-  }, [teamMemberships, primaryShiftsData]);
+    // Get shift IDs that are used as special shifts
+    const specialShiftIds = new Set(
+      employeeSpecialShifts?.map(s => s.shift_id) || []
+    );
+    
+    // Find team primary shift that is NOT a special shift
+    const teamPrimaryShift = primaryShiftsData?.shifts.find(
+      s => s.team_id === membership.team_id && !specialShiftIds.has(s.id)
+    );
+    
+    return teamPrimaryShift?.hours_source || 'shift';
+  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts]);
 
   const getDailyBonusEligibility = useCallback((
     employeeId: string, 
