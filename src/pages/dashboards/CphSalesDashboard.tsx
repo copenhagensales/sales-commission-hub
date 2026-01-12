@@ -295,8 +295,10 @@ export default function CphSalesDashboard() {
       const vacationToday = (absences || []).filter(a => a.type === "vacation");
       const noShowToday = (absences || []).filter(a => a.type === "no_show");
 
-      // Calculate sick count per client
+      // Calculate absence counts per client
       const sickByClient: Record<string, number> = {};
+      const vacationByClient: Record<string, number> = {};
+      const noShowByClient: Record<string, number> = {};
       const employeeCountByClient: Record<string, number> = {};
 
       // Map teams to clients for employee counts
@@ -307,7 +309,7 @@ export default function CphSalesDashboard() {
         }
       });
 
-      // Map sick employees to clients
+      // Map absences to clients by type
       sickToday.forEach(absence => {
         const teamId = employeeToTeam[absence.employee_id];
         if (teamId) {
@@ -318,12 +320,34 @@ export default function CphSalesDashboard() {
         }
       });
 
+      vacationToday.forEach(absence => {
+        const teamId = employeeToTeam[absence.employee_id];
+        if (teamId) {
+          const clientName = teamToClient[teamId];
+          if (clientName) {
+            vacationByClient[clientName] = (vacationByClient[clientName] || 0) + 1;
+          }
+        }
+      });
+
+      noShowToday.forEach(absence => {
+        const teamId = employeeToTeam[absence.employee_id];
+        if (teamId) {
+          const clientName = teamToClient[teamId];
+          if (clientName) {
+            noShowByClient[clientName] = (noShowByClient[clientName] || 0) + 1;
+          }
+        }
+      });
+
       return {
         sickCount: sickToday.length,
         vacationCount: vacationToday.length,
         noShowCount: noShowToday.length,
         totalAbsent: (absences || []).length,
         sickByClient,
+        vacationByClient,
+        noShowByClient,
         employeeCountByClient,
       };
     },
@@ -736,18 +760,39 @@ export default function CphSalesDashboard() {
                     <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
                       {client}
                     </span>
-                    {/* Sickness percentage per client - only show in non-TV mode */}
-                    {!tvMode && absenceData?.sickByClient && (
+                    {/* Absence info per client - only show in non-TV mode */}
+                    {!tvMode && absenceData && (
                       (() => {
-                        const sickCount = absenceData.sickByClient[client] || 0;
-                        const employeeCount = absenceData.employeeCountByClient[client] || 0;
+                        const sickCount = absenceData.sickByClient?.[client] || 0;
+                        const vacationCount = absenceData.vacationByClient?.[client] || 0;
+                        const noShowCount = absenceData.noShowByClient?.[client] || 0;
+                        const employeeCount = absenceData.employeeCountByClient?.[client] || 0;
+                        
                         if (employeeCount === 0) return null;
-                        const sickPercent = Math.round((sickCount / employeeCount) * 100);
-                        if (sickCount === 0) return null;
+                        
+                        const totalAbsent = sickCount + vacationCount + noShowCount;
+                        if (totalAbsent === 0) return null;
+                        
+                        const absencePercent = Math.round((totalAbsent / employeeCount) * 100);
+                        
                         return (
-                          <span className="text-[10px] text-rose-400 mt-1">
-                            🤒 {sickPercent}% ({sickCount})
-                          </span>
+                          <div className="flex flex-wrap gap-1 justify-center mt-1">
+                            {sickCount > 0 && (
+                              <span className="text-[10px] text-rose-400">
+                                🤒 {Math.round((sickCount / employeeCount) * 100)}% ({sickCount})
+                              </span>
+                            )}
+                            {vacationCount > 0 && (
+                              <span className="text-[10px] text-blue-400">
+                                🌴 {Math.round((vacationCount / employeeCount) * 100)}% ({vacationCount})
+                              </span>
+                            )}
+                            {noShowCount > 0 && (
+                              <span className="text-[10px] text-gray-400">
+                                ⚠️ {noShowCount}
+                              </span>
+                            )}
+                          </div>
                         );
                       })()
                     )}
