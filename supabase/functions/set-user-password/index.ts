@@ -39,18 +39,34 @@ serve(async (req) => {
       );
     }
 
-    // Find user by email
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    // Find user by email - paginate through all users to find the one we need
+    let user = null;
+    let page = 1;
+    const perPage = 1000;
     
-    if (listError) {
-      console.error("Error listing users:", listError);
-      return new Response(
-        JSON.stringify({ error: "Kunne ikke finde brugere" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    while (!user) {
+      const { data: usersPage, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page: page,
+        perPage: perPage,
+      });
+      
+      if (listError) {
+        console.error("Error listing users:", listError);
+        return new Response(
+          JSON.stringify({ error: "Kunne ikke finde brugere" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      user = usersPage.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      
+      // If we found the user or there are no more pages, break
+      if (user || usersPage.users.length < perPage) {
+        break;
+      }
+      
+      page++;
     }
-
-    let user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
     
     // If user doesn't exist, create them
     if (!user) {
