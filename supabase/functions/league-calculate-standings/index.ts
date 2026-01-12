@@ -210,19 +210,30 @@ Deno.serve(async (req) => {
     }
 
     // 7. Get sale_items with mapped_commission and product_id for all sales
+    // Batch in chunks of 100 to avoid URL length limits
     const allSaleIds = (sales || []).map((s) => s.id);
     let saleItemsMap: Record<string, { total_commission: number; deals_count: number }> = {};
 
     if (allSaleIds.length > 0) {
-      // Batch fetch sale_items with product_id for override lookup
-      const { data: saleItems, error: itemsError } = await supabase
-        .from("sale_items")
-        .select("sale_id, mapped_commission, product_id, quantity")
-        .in("sale_id", allSaleIds);
-
-      if (itemsError) {
-        console.error("[league-calculate-standings] Failed to fetch sale_items:", itemsError);
+      // Batch fetch sale_items in chunks to avoid URL length limits
+      const BATCH_SIZE = 100;
+      const saleItems: any[] = [];
+      
+      for (let i = 0; i < allSaleIds.length; i += BATCH_SIZE) {
+        const batchIds = allSaleIds.slice(i, i + BATCH_SIZE);
+        const { data: batchItems, error: batchError } = await supabase
+          .from("sale_items")
+          .select("sale_id, mapped_commission, product_id, quantity")
+          .in("sale_id", batchIds);
+        
+        if (batchError) {
+          console.error(`[league-calculate-standings] Failed to fetch sale_items batch ${i}-${i + BATCH_SIZE}:`, batchError);
+        } else if (batchItems) {
+          saleItems.push(...batchItems);
+        }
       }
+      
+      console.log(`[league-calculate-standings] Fetched ${saleItems.length} sale_items for ${allSaleIds.length} sales`);
 
       // Calculate commission per sale using campaign overrides (same as DailyReports)
       const saleToCommission: Record<string, number> = {};
