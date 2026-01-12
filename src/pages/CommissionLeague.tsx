@@ -298,7 +298,7 @@ export default function CommissionLeague() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Kvalifikations-stillingen</CardTitle>
+                      <CardTitle>Kvalifikationsrunde</CardTitle>
                       <CardDescription>
                         Live opdatering • {standings?.length || 0} tilmeldte
                       </CardDescription>
