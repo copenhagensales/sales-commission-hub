@@ -5,11 +5,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Activity } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+interface ClientSalesData {
+  clientName: string;
+  sales: { day: number; week: number; month: number };
+}
+
 interface TeamData {
   id: string;
   name: string;
   employeeCount: number;
   sales: { day: number; week: number; month: number };
+  clients?: ClientSalesData[];
   sick: { day: number; week: number; month: number };
   vacation: { day: number; week: number; month: number };
   workDays?: { day: number; week: number; month: number };
@@ -36,6 +42,12 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const getSickValue = (team: TeamData) => team.sick[period];
   const getVacationValue = (team: TeamData) => team.vacation[period];
   const getWorkDays = (team: TeamData) => team.workDays?.[period] || 1;
+
+  // Get client sales for a team
+  const getClientSales = (team: TeamData) => {
+    if (!team.clients || team.clients.length <= 1) return null;
+    return team.clients.filter(c => c.sales[period] > 0);
+  };
 
   // Calculate possible work days for a team in this period
   const getPossibleWorkDays = (team: TeamData) => {
@@ -113,6 +125,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                 const possibleDays = getPossibleWorkDays(team);
                 const sick = formatAbsence(getSickValue(team), possibleDays);
                 const vacation = formatAbsence(getVacationValue(team), possibleDays);
+                const clientSales = getClientSales(team);
                 
                 return (
                   <TableRow key={team.id}>
@@ -123,9 +136,28 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className={`text-lg font-bold ${getSalesValue(team) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                        {getSalesValue(team)}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`text-lg font-bold ${getSalesValue(team) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {getSalesValue(team)}
+                        </span>
+                        {/* Show client breakdown for teams with multiple clients */}
+                        {clientSales && clientSales.length > 0 && (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {clientSales.map((client) => (
+                              <Tooltip key={client.clientName}>
+                                <TooltipTrigger asChild>
+                                  <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                    {client.clientName.slice(0, 8)}: {client.sales[period]}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{client.clientName}: {client.sales[period]} salg</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Tooltip>
