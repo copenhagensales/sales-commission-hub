@@ -390,10 +390,17 @@ export default function CphSalesDashboard() {
       const agentMappingsResult = await agentMappingsQuery;
       const agentMappings = (agentMappingsResult.data as any[]) || [];
 
-      // Get sales for the month (to filter day/week/month)
+      // Get team_clients for client grouping
+      const teamClientsQuery = supabase
+        .from("team_clients")
+        .select("team_id, client_id, clients(name)");
+      const teamClientsResult = await teamClientsQuery;
+      const teamClients = (teamClientsResult.data as any[]) || [];
+
+      // Get sales for the month with client info
       const salesQuery = supabase
         .from("sales")
-        .select("id, agent_name, agent_email, sale_datetime")
+        .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
         .gte("sale_datetime", `${monthStart}T00:00:00`)
         .lte("sale_datetime", `${todayStr}T23:59:59`);
       const salesResult = await salesQuery;
@@ -438,33 +445,78 @@ export default function CphSalesDashboard() {
         }
       });
 
+      // Build team -> clients map
+      const teamToClients: Record<string, Array<{ clientId: string; clientName: string }>> = {};
+      (teamClients || []).forEach((tc: any) => {
+        if (!teamToClients[tc.team_id]) teamToClients[tc.team_id] = [];
+        if (tc.clients?.name) {
+          teamToClients[tc.team_id].push({
+            clientId: tc.client_id,
+            clientName: tc.clients.name
+          });
+        }
+      });
+
       // Build agent_email/name -> employee_id map (using joined agents data)
+      // Include both full email and email prefix for flexible matching
       const agentToEmployee: Record<string, string> = {};
       (agentMappings || []).forEach((am: any) => {
         if (am.agents?.email) {
-          agentToEmployee[am.agents.email.toLowerCase()] = am.employee_id;
+          const email = am.agents.email.toLowerCase();
+          agentToEmployee[email] = am.employee_id;
+          // Also add email prefix (before @) for matching agent_name like "bena" 
+          const prefix = email.split('@')[0];
+          if (prefix && !agentToEmployee[prefix]) {
+            agentToEmployee[prefix] = am.employee_id;
+          }
         }
         if (am.agents?.name) {
           agentToEmployee[am.agents.name.toLowerCase()] = am.employee_id;
         }
       });
 
-      // Calculate sales per team for day, week, month
+      // Helper to find employee from sale
+      const findEmployeeFromSale = (sale: any): string | null => {
+        // Try exact email match first
+        if (sale.agent_email) {
+          const email = sale.agent_email.toLowerCase();
+          if (agentToEmployee[email]) return agentToEmployee[email];
+          // Try email prefix
+          const prefix = email.split('@')[0];
+          if (prefix && agentToEmployee[prefix]) return agentToEmployee[prefix];
+        }
+        // Try agent_name
+        if (sale.agent_name) {
+          const name = sale.agent_name.toLowerCase();
+          if (agentToEmployee[name]) return agentToEmployee[name];
+          // Try name as email prefix
+          const prefix = name.split('@')[0];
+          if (prefix && agentToEmployee[prefix]) return agentToEmployee[prefix];
+        }
+        return null;
+      };
+
+      // Calculate sales per team AND per client within team for day, week, month
       const teamSales: Record<string, { day: number; week: number; month: number }> = {};
+      const teamClientSales: Record<string, Record<string, { day: number; week: number; month: number }>> = {};
       teams.forEach(t => {
         teamSales[t.id] = { day: 0, week: 0, month: 0 };
+        teamClientSales[t.id] = {};
+        // Initialize client sales for this team
+        (teamToClients[t.id] || []).forEach(c => {
+          teamClientSales[t.id][c.clientName] = { day: 0, week: 0, month: 0 };
+        });
       });
 
       (salesData || []).forEach((sale: any) => {
-        // Match sale to employee via agent_email or agent_name
-        const employeeId = 
-          (sale.agent_email && agentToEmployee[sale.agent_email.toLowerCase()]) ||
-          (sale.agent_name && agentToEmployee[sale.agent_name.toLowerCase()]);
-        
+        const employeeId = findEmployeeFromSale(sale);
         if (!employeeId) return;
         
         const teamId = employeeToTeam[employeeId];
         if (!teamId || !teamSales[teamId]) return;
+
+        // Get client name from sale
+        const saleClientName = sale.client_campaigns?.clients?.name;
 
         // Count sales (only products with counts_as_sale = true) - use saleItemsBySaleId
         const items = saleItemsBySaleId[sale.id] || [];
@@ -481,15 +533,24 @@ export default function CphSalesDashboard() {
         
         // Month (always add)
         teamSales[teamId].month += saleCount;
+        if (saleClientName && teamClientSales[teamId][saleClientName]) {
+          teamClientSales[teamId][saleClientName].month += saleCount;
+        }
         
         // Week (if >= weekStart)
         if (saleDate >= weekStart) {
           teamSales[teamId].week += saleCount;
+          if (saleClientName && teamClientSales[teamId][saleClientName]) {
+            teamClientSales[teamId][saleClientName].week += saleCount;
+          }
         }
         
         // Day (if == today)
         if (saleDate === todayStr) {
           teamSales[teamId].day += saleCount;
+          if (saleClientName && teamClientSales[teamId][saleClientName]) {
+            teamClientSales[teamId][saleClientName].day += saleCount;
+          }
         }
       });
 
@@ -583,6 +644,10 @@ export default function CphSalesDashboard() {
         name: t.name,
         employeeCount: employeeCountByTeam[t.id] || 0,
         sales: teamSales[t.id] || { day: 0, week: 0, month: 0 },
+        clients: (teamToClients[t.id] || []).map(c => ({
+          clientName: c.clientName,
+          sales: teamClientSales[t.id]?.[c.clientName] || { day: 0, week: 0, month: 0 }
+        })),
         sick: {
           day: teamAbsences[t.id]?.sickDay || 0,
           week: teamAbsences[t.id]?.sickWeek || 0,
