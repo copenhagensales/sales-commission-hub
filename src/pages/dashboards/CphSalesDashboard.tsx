@@ -410,21 +410,21 @@ export default function CphSalesDashboard() {
         )}
       </div>
 
-      {/* Main content: Top 20 Sellers + Recent Sales */}
-      <div className={`grid ${tvMode ? 'grid-cols-3 gap-3' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
-        {/* Top 20 Sellers - Takes more space */}
-        <Card className={tvMode ? 'col-span-2' : ''}>
+      {/* Main content: Top 20 Sellers + Recent Sales - Equal size */}
+      <div className={`grid ${tvMode ? 'grid-cols-2 gap-3' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
+        {/* Top 20 Sellers */}
+        <Card className="flex flex-col">
           <CardHeader className={tvMode ? 'pb-2 pt-3 px-4' : ''}>
             <CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-sm' : ''}`}>
               <Trophy className={`text-yellow-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Top 20 Sælgere i dag
             </CardTitle>
           </CardHeader>
-          <CardContent className={tvMode ? 'px-4 pb-3 pt-0' : ''}>
+          <CardContent className={`flex-1 ${tvMode ? 'px-4 pb-3 pt-0' : ''}`}>
             {displayTopSellers.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
-              <div className={`${tvMode ? 'grid grid-cols-2 gap-x-4 gap-y-1' : 'space-y-2'}`}>
+              <div className={`space-y-1.5 overflow-y-auto ${tvMode ? 'max-h-[500px]' : 'max-h-[400px]'}`}>
                 {displayTopSellers.map((seller) => (
                   <div 
                     key={seller.name} 
@@ -438,7 +438,7 @@ export default function CphSalesDashboard() {
                       <div className={`flex items-center justify-center ${tvMode ? 'w-5' : 'w-8'}`}>
                         {getRankDisplay(seller.rank)}
                       </div>
-                      <span className={`font-medium truncate ${tvMode ? 'text-xs max-w-[100px]' : 'text-sm'}`}>
+                      <span className={`font-medium truncate ${tvMode ? 'text-xs max-w-[120px]' : 'text-sm'}`}>
                         {seller.name}
                       </span>
                     </div>
@@ -455,7 +455,7 @@ export default function CphSalesDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Sales - Expanded with commission */}
+        {/* Recent Sales - Same size as Top Sellers */}
         <Card className="flex flex-col">
           <CardHeader className={tvMode ? 'pb-2 pt-3 px-4' : ''}>
             <CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-sm' : ''}`}>
