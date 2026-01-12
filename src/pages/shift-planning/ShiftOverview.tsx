@@ -208,7 +208,7 @@ export default function ShiftOverview() {
       // Using 'or' filter to include null status values
       const { data, error } = await supabase
         .from("sales")
-        .select("id, agent_name, sale_datetime, status")
+        .select("id, agent_name, agent_email, sale_datetime, status")
         .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
         .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
         .or("status.in.(pending,approved),status.is.null");
@@ -543,24 +543,26 @@ export default function ShiftOverview() {
     
     // Check if there are sales for this employee on this date
     const hasSales = weeklySales.some(sale => {
-      if (!sale.agent_name || !sale.sale_datetime) return false;
+      if (!sale.sale_datetime) return false;
       // Handle both ISO format (with T) and database format (with space)
       const saleDate = sale.sale_datetime.split(/[T ]/)[0];
       if (saleDate !== dateStr) return false;
       
-      const saleAgent = sale.agent_name.toLowerCase();
-      const mappedName = mapping.agent_name?.toLowerCase();
+      // PRIMARY: Match by agent_email (most reliable - same as DailyReports)
+      const saleEmail = (sale.agent_email || "").toLowerCase();
       const mappedEmail = mapping.agent_email?.toLowerCase();
       
-      // Match by email (most reliable)
-      if (mappedEmail && saleAgent === mappedEmail) return true;
-      
-      // Match by name
-      if (mappedName) {
-        if (saleAgent === mappedName) return true;
-        if (saleAgent.startsWith(mappedName + '@')) return true;
-        if (saleAgent.split('@')[0] === mappedName) return true;
+      if (mappedEmail && saleEmail && saleEmail === mappedEmail) {
+        return true;
       }
+      
+      // FALLBACK: Match by agent_name if email doesn't match
+      const saleAgent = (sale.agent_name || "").toLowerCase();
+      const mappedName = mapping.agent_name?.toLowerCase();
+      
+      if (mappedEmail && saleAgent === mappedEmail) return true;
+      if (mappedName && saleAgent === mappedName) return true;
+      if (mappedName && saleAgent.split('@')[0] === mappedName) return true;
       
       return false;
     });
