@@ -17,11 +17,13 @@ import {
   Users,
   ShoppingCart,
   Megaphone,
-  Activity
+  Activity,
+  Table as TableIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import SalarySchemes from "./SalarySchemes";
+import RelatelEventsTable from "@/components/relatel/RelatelEventsTable";
 
 const RELATEL_INTEGRATION_ID = "657c2050-1faa-4233-a964-900fb9e7b8c6";
 
@@ -66,14 +68,18 @@ export default function MgTestPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
             <TabsTrigger value="salary-schemes" className="flex items-center gap-2">
               <Percent className="h-4 w-4" />
               Lønordninger
             </TabsTrigger>
             <TabsTrigger value="relatel-data" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
-              Relatel Data
+              Relatel Status
+            </TabsTrigger>
+            <TabsTrigger value="relatel-events" className="flex items-center gap-2">
+              <TableIcon className="h-4 w-4" />
+              Relatel Events
             </TabsTrigger>
           </TabsList>
 
@@ -83,6 +89,10 @@ export default function MgTestPage() {
 
           <TabsContent value="relatel-data" className="mt-6">
             <RelatelDataTab />
+          </TabsContent>
+
+          <TabsContent value="relatel-events" className="mt-6">
+            <RelatelEventsTable />
           </TabsContent>
         </Tabs>
       </div>
