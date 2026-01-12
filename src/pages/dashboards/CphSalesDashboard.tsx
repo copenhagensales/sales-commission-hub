@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, subDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus } from "lucide-react";
+import { Users, TrendingUp, Target, Activity, Trophy, Medal, UserPlus, CalendarDays } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useMemo } from "react";
@@ -84,6 +84,52 @@ export default function CphSalesDashboard() {
       
       if (error) throw error;
       return data;
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+  });
+
+  // Fetch upcoming cohorts and starters (only in non-TV mode)
+  const { data: upcomingCohortsData } = useQuery({
+    queryKey: ["cph-dashboard-upcoming-cohorts"],
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      
+      // Get upcoming/active cohorts
+      const { data: cohorts, error: cohortsError } = await supabase
+        .from("onboarding_cohorts")
+        .select("id, name, start_date, status")
+        .in("status", ["planned", "in_progress"])
+        .gte("start_date", today)
+        .order("start_date", { ascending: true });
+      
+      if (cohortsError) throw cohortsError;
+
+      // Get total members in upcoming cohorts
+      let totalMembers = 0;
+      if (cohorts && cohorts.length > 0) {
+        const cohortIds = cohorts.map(c => c.id);
+        const { count } = await supabase
+          .from("cohort_members")
+          .select("id", { count: "exact", head: true })
+          .in("cohort_id", cohortIds)
+          .in("status", ["assigned", "confirmed"]);
+        
+        totalMembers = count || 0;
+      }
+
+      // Get unassigned hired candidates
+      const { count: unassignedCount } = await supabase
+        .from("candidates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "hired")
+        .not("cohort_assignment_status", "eq", "assigned");
+
+      return {
+        cohortCount: cohorts?.length || 0,
+        memberCount: totalMembers,
+        unassignedCount: unassignedCount || 0,
+      };
     },
     enabled: !tvMode,
     refetchInterval: 60000,
@@ -402,45 +448,82 @@ export default function CphSalesDashboard() {
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
-      {/* Recruitment KPI - Only show in non-TV mode */}
+      {/* Recruitment KPIs - Only show in non-TV mode */}
       {!tvMode && (
-        <Card className="bg-gradient-to-br from-sky-500/10 to-sky-500/5 border-sky-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgere</CardTitle>
-            <UserPlus className="h-5 w-5 text-sky-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-6">
-              {/* Last 24 hours */}
-              <div>
-                <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last24h}</div>
-                <div className="flex items-center gap-1 text-xs">
-                  {recruitmentKpis.trend24h !== 0 && (
-                    <span className={recruitmentKpis.trend24h > 0 ? "text-green-500" : "text-red-500"}>
-                      {recruitmentKpis.trend24h > 0 ? "+" : ""}{recruitmentKpis.trend24h}%
-                    </span>
-                  )}
-                  <span className="text-muted-foreground">sidste 24t</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-gradient-to-br from-sky-500/10 to-sky-500/5 border-sky-500/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgere</CardTitle>
+              <UserPlus className="h-5 w-5 text-sky-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                {/* Last 24 hours */}
+                <div>
+                  <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last24h}</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {recruitmentKpis.trend24h !== 0 && (
+                      <span className={recruitmentKpis.trend24h > 0 ? "text-green-500" : "text-red-500"}>
+                        {recruitmentKpis.trend24h > 0 ? "+" : ""}{recruitmentKpis.trend24h}%
+                      </span>
+                    )}
+                    <span className="text-muted-foreground">sidste 24t</span>
+                  </div>
+                </div>
+                
+                <div className="h-10 w-px bg-border" />
+                
+                {/* Last 7 days */}
+                <div>
+                  <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last7d}</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {recruitmentKpis.trend7d !== 0 && (
+                      <span className={recruitmentKpis.trend7d > 0 ? "text-green-500" : "text-red-500"}>
+                        {recruitmentKpis.trend7d > 0 ? "+" : ""}{recruitmentKpis.trend7d}%
+                      </span>
+                    )}
+                    <span className="text-muted-foreground">sidste 7 dage</span>
+                  </div>
                 </div>
               </div>
-              
-              <div className="h-10 w-px bg-border" />
-              
-              {/* Last 7 days */}
-              <div>
-                <div className="text-3xl font-bold text-sky-500">{recruitmentKpis.last7d}</div>
-                <div className="flex items-center gap-1 text-xs">
-                  {recruitmentKpis.trend7d !== 0 && (
-                    <span className={recruitmentKpis.trend7d > 0 ? "text-green-500" : "text-red-500"}>
-                      {recruitmentKpis.trend7d > 0 ? "+" : ""}{recruitmentKpis.trend7d}%
-                    </span>
-                  )}
-                  <span className="text-muted-foreground">sidste 7 dage</span>
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Cohorts KPI */}
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Kommende opstarter</CardTitle>
+              <CalendarDays className="h-5 w-5 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                {/* Members in cohorts */}
+                <div>
+                  <div className="text-3xl font-bold text-amber-500">{upcomingCohortsData?.memberCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">personer i hold</div>
                 </div>
+                
+                <div className="h-10 w-px bg-border" />
+                
+                {/* Number of cohorts */}
+                <div>
+                  <div className="text-3xl font-bold text-amber-500">{upcomingCohortsData?.cohortCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">hold planlagt</div>
+                </div>
+
+                {(upcomingCohortsData?.unassignedCount || 0) > 0 && (
+                  <>
+                    <div className="h-10 w-px bg-border" />
+                    <div>
+                      <div className="text-3xl font-bold text-orange-500">{upcomingCohortsData?.unassignedCount}</div>
+                      <div className="text-xs text-muted-foreground">uplacerede</div>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Top KPI Row - Compact */}
