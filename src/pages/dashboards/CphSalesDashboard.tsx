@@ -4,9 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Phone, Target, Award, Activity } from "lucide-react";
+import { Users, TrendingUp, Target, Activity, Trophy, Medal } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+
+interface TopSeller {
+  name: string;
+  commission: number;
+  rank: number;
+}
+
 interface TvDashboardData {
   date: string;
   timestamp: string;
@@ -30,6 +37,8 @@ interface TvDashboardData {
   calls: {
     today: number;
   };
+  sellersOnBoard: number;
+  topSellers: TopSeller[];
 }
 
 // Check if we're in TV mode (accessed via /tv route with sessionStorage code)
@@ -74,6 +83,7 @@ export default function CphSalesDashboard() {
           sale_items (
             quantity,
             product_id,
+            mapped_commission,
             products (counts_as_sale)
           )
         `)
@@ -111,54 +121,6 @@ export default function CphSalesDashboard() {
         ...s,
         client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
       }));
-    },
-    enabled: !tvMode,
-    refetchInterval: 30000,
-  });
-
-  const { data: activeEmployees = 0 } = useQuery({
-    queryKey: ["cph-dashboard-active-employees"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("employee_master_data")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("is_staff_employee", false);
-      if (error) throw error;
-      return count || 0;
-    },
-    enabled: !tvMode,
-    refetchInterval: 60000,
-  });
-
-  const { data: staffEmployees = 0 } = useQuery({
-    queryKey: ["cph-dashboard-staff-employees"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("employee_master_data")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("is_staff_employee", true);
-      if (error) throw error;
-      return count || 0;
-    },
-    enabled: !tvMode,
-    refetchInterval: 60000,
-  });
-
-  const { data: todayCalls = 0 } = useQuery({
-    queryKey: ["cph-dashboard-today-calls", todayStr],
-    queryFn: async () => {
-      const startOfDay = `${todayStr}T00:00:00`;
-      const endOfDay = `${todayStr}T23:59:59`;
-      
-      const { count, error } = await supabase
-        .from("dialer_calls")
-        .select("*", { count: "exact", head: true })
-        .gte("start_time", startOfDay)
-        .lte("start_time", endOfDay);
-      if (error) throw error;
-      return count || 0;
     },
     enabled: !tvMode,
     refetchInterval: 30000,
@@ -226,6 +188,60 @@ export default function CphSalesDashboard() {
     }, 0);
   };
 
+  // Calculate sellers on board (unique sellers with at least 1 sale)
+  const calculateSellersOnBoard = (sales: typeof todaySales) => {
+    const sellersWithSales = new Set<string>();
+    for (const sale of sales) {
+      const saleItems = (sale as any).sale_items || [];
+      const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
+      if (hasCountedSale && sale.agent_name) {
+        sellersWithSales.add(sale.agent_name.toLowerCase());
+      }
+    }
+    return sellersWithSales.size;
+  };
+
+  // Calculate top 20 sellers by commission
+  const calculateTopSellers = (sales: typeof todaySales): TopSeller[] => {
+    const sellerCommission = new Map<string, number>();
+    
+    for (const sale of sales) {
+      const agentName = sale.agent_name || "Ukendt";
+      const saleItems = (sale as any).sale_items || [];
+      
+      // Only count sales with valid counted items
+      const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
+      if (!hasCountedSale) continue;
+      
+      const commission = saleItems.reduce(
+        (sum: number, item: any) => sum + (item.mapped_commission || 0), 0
+      );
+      
+      sellerCommission.set(
+        agentName.toLowerCase(), 
+        (sellerCommission.get(agentName.toLowerCase()) || 0) + commission
+      );
+    }
+    
+    // Get original names with proper casing
+    const nameMap = new Map<string, string>();
+    for (const sale of sales) {
+      if (sale.agent_name) {
+        nameMap.set(sale.agent_name.toLowerCase(), sale.agent_name);
+      }
+    }
+    
+    return Array.from(sellerCommission.entries())
+      .map(([lowerName, commission], index) => ({ 
+        name: nameMap.get(lowerName) || lowerName, 
+        commission,
+        rank: 0
+      }))
+      .sort((a, b) => b.commission - a.commission)
+      .slice(0, 20)
+      .map((seller, index) => ({ ...seller, rank: index + 1 }));
+  };
+
   // Filter TV data to exclude unknown clients
   const filterTvSales = (sales: typeof tvData.sales.recent) => 
     sales.filter(s => s.client_name && s.client_name !== "Ukendt");
@@ -246,27 +262,43 @@ export default function CphSalesDashboard() {
   const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : calculateSalesByClient(knownClientSales);
   const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
   const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
-  const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
-  const displayStaffEmployees = tvMode && tvData ? tvData.employees.staff : staffEmployees;
-  const displayCalls = tvMode && tvData ? tvData.calls.today : todayCalls;
+  const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : calculateSellersOnBoard(knownClientSales);
+  const displayTopSellers = tvMode && tvData ? tvData.topSellers : calculateTopSellers(knownClientSales);
+
+  // Format commission as DKK
+  const formatCommission = (amount: number) => {
+    return new Intl.NumberFormat('da-DK', {
+      style: 'decimal',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount) + ' kr';
+  };
+
+  // Get rank medal/icon
+  const getRankDisplay = (rank: number) => {
+    if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-500" />;
+    if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
+    if (rank === 3) return <Medal className="h-5 w-5 text-amber-600" />;
+    return <span className={`font-bold ${tvMode ? 'text-sm' : 'text-base'}`}>{rank}</span>;
+  };
 
   // Skip layout wrapper in TV mode to avoid lock checks
   const content = (
-    <div className="space-y-6">
+    <div className={`space-y-4 ${tvMode ? 'space-y-3' : 'space-y-6'}`}>
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
-      {/* KPI Cards - Compact for TV */}
-      <div className={`grid grid-cols-4 ${tvMode ? 'gap-3' : 'gap-6'}`}>
+      {/* Top KPI Row - Compact */}
+      <div className={`grid grid-cols-2 ${tvMode ? 'gap-3' : 'gap-4'}`}>
         <Card className={`bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 ${tvMode ? 'py-2' : ''}`}>
           <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
             <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Salg i dag</CardTitle>
             <TrendingUp className={`text-emerald-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
           <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
-            <div className={`font-bold text-emerald-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displaySalesTotal}</div>
+            <div className={`font-bold text-emerald-500 ${tvMode ? 'text-3xl' : 'text-4xl'}`}>{displaySalesTotal}</div>
             <div className={`flex gap-1 ${tvMode ? 'mt-1' : 'mt-2'}`}>
               <Badge variant="secondary" className={`bg-emerald-500/20 text-emerald-600 ${tvMode ? 'text-[10px] px-1.5 py-0' : ''}`}>
                 {displayConfirmed} bekræftet
@@ -280,100 +312,119 @@ export default function CphSalesDashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 ${tvMode ? 'py-2' : ''}`}>
-          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
-            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Opkald i dag</CardTitle>
-            <Phone className={`text-blue-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
-          </CardHeader>
-          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
-            <div className={`font-bold text-blue-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayCalls}</div>
-            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Registrerede opkald</p>}
-          </CardContent>
-        </Card>
-
         <Card className={`bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 ${tvMode ? 'py-2' : ''}`}>
           <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
-            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Aktive sælgere</CardTitle>
+            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Sælgere på tavlen</CardTitle>
             <Users className={`text-purple-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
           <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
-            <div className={`font-bold text-purple-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayActiveEmployees}</div>
-            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Sælgere</p>}
-          </CardContent>
-        </Card>
-
-        <Card className={`bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 ${tvMode ? 'py-2' : ''}`}>
-          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
-            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Backoffice</CardTitle>
-            <Award className={`text-orange-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
-          </CardHeader>
-          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
-            <div className={`font-bold text-orange-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayStaffEmployees}</div>
-            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Aktive backoffice</p>}
+            <div className={`font-bold text-purple-500 ${tvMode ? 'text-3xl' : 'text-4xl'}`}>{displaySellersOnBoard}</div>
+            <p className={`text-muted-foreground ${tvMode ? 'text-[10px] mt-1' : 'text-xs mt-2'}`}>
+              Med mindst 1 salg
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Sales by Client */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Salg per kunde i dag
+      {/* Sales by Client - Horizontal chips */}
+      <Card className={tvMode ? 'py-2' : ''}>
+        <CardHeader className={tvMode ? 'pb-2 pt-3 px-4' : 'pb-3'}>
+          <CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-sm' : ''}`}>
+            <Target className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
+            Salg per opgave
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={tvMode ? 'px-4 pb-3 pt-0' : ''}>
+          {Object.keys(displaySalesByClient).length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">Ingen salg registreret i dag</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(displaySalesByClient)
+                .sort(([, a], [, b]) => (b as number) - (a as number))
+                .map(([client, count]) => (
+                  <Badge 
+                    key={client} 
+                    variant="secondary" 
+                    className={`bg-primary/10 text-primary border-primary/20 ${tvMode ? 'text-sm px-3 py-1.5' : 'text-base px-4 py-2'}`}
+                  >
+                    <span className="font-medium">{client}:</span>
+                    <span className="ml-1.5 font-bold">{count as number}</span>
+                  </Badge>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Main content: Top 20 Sellers + Recent Sales */}
+      <div className={`grid ${tvMode ? 'grid-cols-3 gap-3' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
+        {/* Top 20 Sellers - Takes more space */}
+        <Card className={tvMode ? 'col-span-2' : ''}>
+          <CardHeader className={tvMode ? 'pb-2 pt-3 px-4' : ''}>
+            <CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-sm' : ''}`}>
+              <Trophy className={`text-yellow-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
+              Top 20 Sælgere i dag
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {Object.keys(displaySalesByClient).length === 0 ? (
+          <CardContent className={tvMode ? 'px-4 pb-3 pt-0' : ''}>
+            {displayTopSellers.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
-              <div className="space-y-4">
-                {Object.entries(displaySalesByClient)
-                  .sort(([, a], [, b]) => (b as number) - (a as number))
-                  .map(([client, count]) => (
-                    <div key={client} className="flex items-center justify-between">
-                      <span className="font-medium">{client}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(((count as number) / displaySalesTotal) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <Badge variant="secondary" className="min-w-[40px] justify-center">
-                          {count as number}
-                        </Badge>
+              <div className={`${tvMode ? 'grid grid-cols-2 gap-x-4 gap-y-1' : 'space-y-2'}`}>
+                {displayTopSellers.map((seller) => (
+                  <div 
+                    key={seller.name} 
+                    className={`flex items-center justify-between rounded-lg ${
+                      seller.rank <= 3 
+                        ? 'bg-gradient-to-r from-yellow-500/10 to-transparent' 
+                        : 'bg-muted/30'
+                    } ${tvMode ? 'p-1.5 px-2' : 'p-3'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`flex items-center justify-center ${tvMode ? 'w-5' : 'w-8'}`}>
+                        {getRankDisplay(seller.rank)}
                       </div>
+                      <span className={`font-medium truncate ${tvMode ? 'text-xs max-w-[100px]' : 'text-sm'}`}>
+                        {seller.name}
+                      </span>
                     </div>
-                  ))}
+                    <Badge 
+                      variant="secondary" 
+                      className={`bg-emerald-500/20 text-emerald-600 font-mono ${tvMode ? 'text-[10px] px-1.5' : ''}`}
+                    >
+                      {formatCommission(seller.commission)}
+                    </Badge>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Recent Sales */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
+          <CardHeader className={tvMode ? 'pb-2 pt-3 px-4' : ''}>
+            <CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-sm' : ''}`}>
+              <Activity className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Seneste salg
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={tvMode ? 'px-4 pb-3 pt-0' : ''}>
             {displaySales.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
-              <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {displaySales.slice(0, 10).map((sale: any) => (
-                  <div key={sale.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="font-medium">{sale.agent_name}</p>
-                      <p className="text-sm text-muted-foreground">{sale.client_name || "Ukendt kunde"}</p>
+              <div className={`space-y-2 ${tvMode ? 'max-h-[400px]' : 'max-h-[300px]'} overflow-y-auto`}>
+                {displaySales.slice(0, tvMode ? 15 : 10).map((sale: any) => (
+                  <div key={sale.id} className={`flex items-center justify-between rounded-lg bg-muted/50 ${tvMode ? 'p-2' : 'p-3'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`font-medium truncate ${tvMode ? 'text-xs' : 'text-sm'}`}>{sale.agent_name}</p>
+                      <p className={`text-muted-foreground truncate ${tvMode ? 'text-[10px]' : 'text-xs'}`}>{sale.client_name || "Ukendt kunde"}</p>
                     </div>
                     <Badge 
                       variant={sale.status === "confirmed" ? "default" : "secondary"}
-                      className={sale.status === "confirmed" ? "bg-emerald-500" : ""}
+                      className={`ml-2 shrink-0 ${sale.status === "confirmed" ? "bg-emerald-500" : ""} ${tvMode ? 'text-[10px] px-1.5' : ''}`}
                     >
-                      {sale.status === "confirmed" ? "Bekræftet" : sale.status === "pending" ? "Afventer" : sale.status || "-"}
+                      {sale.status === "confirmed" ? "✓" : sale.status === "pending" ? "⏳" : "-"}
                     </Badge>
                   </div>
                 ))}
@@ -384,7 +435,7 @@ export default function CphSalesDashboard() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-sm text-muted-foreground">
+      <div className={`text-center text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>
         <p>CPH Sales Dashboard • {format(today, "HH:mm", { locale: da })}</p>
       </div>
     </div>
@@ -393,7 +444,7 @@ export default function CphSalesDashboard() {
   // In TV mode, render without layout to skip lock checks
   if (tvMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4">
         {content}
       </div>
     );

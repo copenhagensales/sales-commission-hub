@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
           id,
           quantity,
           product_id,
+          mapped_commission,
           products (
             id,
             name,
@@ -138,8 +139,10 @@ Deno.serve(async (req) => {
       (clientCampaigns || []).map(c => [c.id, c.client_id])
     );
 
-    // Calculate sales by client using product mapping and counts_as_sale flag
+    // Calculate sales by client and track seller commission
     const salesByClient: Record<string, number> = {};
+    const sellerCommission: Record<string, { commission: number; name: string }> = {};
+    const sellersWithSales = new Set<string>();
     let totalCountedSales = 0;
     const recentSales: any[] = [];
 
@@ -165,8 +168,9 @@ Deno.serve(async (req) => {
         clientName = clientMap[clientId] || "Ukendt";
       }
 
-      // Count sale items where product is mapped AND counts_as_sale = true
+      // Count sale items and track commission
       let saleItemCount = 0;
+      let saleCommission = 0;
       const saleItems = (sale as any).sale_items || [];
       
       for (const item of saleItems) {
@@ -176,15 +180,28 @@ Deno.serve(async (req) => {
           const qty = item.quantity || 1;
           saleItemCount += qty;
         }
+        // Sum commission (mapped_commission already includes quantity)
+        saleCommission += item.mapped_commission || 0;
       }
 
       if (saleItemCount > 0) {
         salesByClient[clientName] = (salesByClient[clientName] || 0) + saleItemCount;
         totalCountedSales += saleItemCount;
+        
+        // Track seller
+        if (sale.agent_name) {
+          const lowerName = sale.agent_name.toLowerCase();
+          sellersWithSales.add(lowerName);
+          
+          if (!sellerCommission[lowerName]) {
+            sellerCommission[lowerName] = { commission: 0, name: sale.agent_name };
+          }
+          sellerCommission[lowerName].commission += saleCommission;
+        }
       }
 
       // Add to recent sales
-      if (recentSales.length < 10) {
+      if (recentSales.length < 15) {
         recentSales.push({
           id: sale.id,
           agent_name: sale.agent_name,
@@ -198,6 +215,27 @@ Deno.serve(async (req) => {
 
     console.log(`Sales by client:`, salesByClient);
     console.log(`Total counted sales: ${totalCountedSales}`);
+    console.log(`Sellers on board: ${sellersWithSales.size}`);
+
+    // Resolve agent names to employee names for top sellers
+    const agentEmails = Object.keys(sellerCommission);
+    let nameMap = new Map<string, string>();
+    
+    if (agentEmails.length > 0) {
+      nameMap = await resolveAgentNames(supabase, agentEmails);
+    }
+
+    // Build top 20 sellers list with resolved names
+    const topSellers = Object.entries(sellerCommission)
+      .map(([email, data]) => ({
+        name: nameMap.get(email) || data.name,
+        commission: data.commission,
+      }))
+      .sort((a, b) => b.commission - a.commission)
+      .slice(0, 20)
+      .map((seller, index) => ({ ...seller, rank: index + 1 }));
+
+    console.log(`Top sellers:`, topSellers.slice(0, 5));
 
     // Fetch employee counts
     const { count: activeEmployees } = await supabase
@@ -239,13 +277,15 @@ Deno.serve(async (req) => {
       calls: {
         today: todayCalls || 0,
       },
+      sellersOnBoard: sellersWithSales.size,
+      topSellers,
     };
 
     console.log("Response prepared:", JSON.stringify({
       salesTotal: response.sales.total,
       salesByClient: response.sales.byClient,
-      employeesActive: response.employees.active,
-      calls: response.calls.today
+      sellersOnBoard: response.sellersOnBoard,
+      topSellersCount: response.topSellers.length
     }));
 
     return new Response(JSON.stringify(response), {
