@@ -298,6 +298,7 @@ export default function ShiftOverview() {
     if (!weeklySales || !agentMappings) return false;
     
     const dateStr = format(date, "yyyy-MM-dd");
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     
     // Find agent mapping for this employee
     const mapping = agentMappings.find(m => m.employee_id === employeeId);
@@ -340,13 +341,20 @@ export default function ShiftOverview() {
     });
     if (hasTimestamp) return false;
     
-    // Check if employee has a standard shift for this day of week
-    // If they have a standard shift, they don't need an explicit shift
-    const hasStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date) !== null;
-    if (hasStandardShift) return false;
+    // Check if employee has a standard shift (from team or employee record)
+    // For weekdays: check both team standard shifts and employee's standard_start_time
+    // For weekends: only explicit team weekend config counts
+    const teamStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date);
+    if (teamStandardShift) return false;
+    
+    // For weekdays, also check employee's own standard_start_time field
+    if (!isWeekend) {
+      const employee = employees?.find(e => e.id === employeeId);
+      if (employee?.standard_start_time) return false;
+    }
     
     return true;
-  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay]);
+  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay, employees]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
