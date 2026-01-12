@@ -163,30 +163,49 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     enabled: !!teamId,
   });
 
+  // Get shift IDs for dependent queries
+  const shiftIds = shifts.map((s) => s.id);
+
   // Fetch employee standard shifts assignments
   const { data: employeeShiftAssignments = [] } = useQuery({
-    queryKey: ["employee-standard-shifts", teamId],
+    queryKey: ["employee-standard-shifts", teamId, shiftIds],
     queryFn: async () => {
-      if (!teamId) return [];
-      const shiftIds = shifts.map((s) => s.id);
-      if (shiftIds.length === 0) return [];
+      if (!teamId || shiftIds.length === 0) return [];
       const { data, error } = await supabase
         .from("employee_standard_shifts")
-        .select("*, employee_master_data(id, first_name, last_name)")
+        .select(`
+          id,
+          employee_id,
+          shift_id
+        `)
         .in("shift_id", shiftIds);
       if (error) throw error;
-      return data as (EmployeeStandardShift & { employee_master_data: TeamMember })[];
+      
+      // Fetch employee data separately to avoid relation issues
+      if (!data || data.length === 0) return [];
+      
+      const employeeIds = [...new Set(data.map(d => d.employee_id))];
+      const { data: employees, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", employeeIds);
+      if (empError) throw empError;
+      
+      const employeeMap = new Map((employees || []).map(e => [e.id, e]));
+      
+      return data.map(assignment => ({
+        ...assignment,
+        employee_master_data: employeeMap.get(assignment.employee_id) || null,
+      })) as (EmployeeStandardShift & { employee_master_data: TeamMember | null })[];
     },
-    enabled: !!teamId && shifts.length > 0,
+    enabled: !!teamId && shiftIds.length > 0,
   });
 
   // Fetch all breaks for all shifts
   const { data: allBreaks = [] } = useQuery({
-    queryKey: ["team-shift-breaks", teamId],
+    queryKey: ["team-shift-breaks", teamId, shiftIds],
     queryFn: async () => {
-      if (!teamId) return [];
-      const shiftIds = shifts.map((s) => s.id);
-      if (shiftIds.length === 0) return [];
+      if (!teamId || shiftIds.length === 0) return [];
       const { data, error } = await supabase
         .from("team_shift_breaks")
         .select("*")
@@ -195,16 +214,14 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       if (error) throw error;
       return data as ShiftBreak[];
     },
-    enabled: !!teamId && shifts.length > 0,
+    enabled: !!teamId && shiftIds.length > 0,
   });
 
   // Fetch all shift days for all shifts
   const { data: allShiftDays = [] } = useQuery({
-    queryKey: ["team-shift-days", teamId],
+    queryKey: ["team-shift-days", teamId, shiftIds],
     queryFn: async () => {
-      if (!teamId) return [];
-      const shiftIds = shifts.map((s) => s.id);
-      if (shiftIds.length === 0) return [];
+      if (!teamId || shiftIds.length === 0) return [];
       const { data, error } = await supabase
         .from("team_standard_shift_days")
         .select("*")
@@ -213,7 +230,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       if (error) throw error;
       return data as ShiftDay[];
     },
-    enabled: !!teamId && shifts.length > 0,
+    enabled: !!teamId && shiftIds.length > 0,
   });
 
   // Get breaks for a specific shift
@@ -227,10 +244,10 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   };
 
   // Get assigned employees for a specific shift
-  const getShiftEmployees = (shiftId: string) => {
+  const getShiftEmployees = (shiftId: string): TeamMember[] => {
     return employeeShiftAssignments
-      .filter((a) => a.shift_id === shiftId)
-      .map((a) => a.employee_master_data);
+      .filter((a) => a.shift_id === shiftId && a.employee_master_data)
+      .map((a) => a.employee_master_data as TeamMember);
   };
 
   // Create shift mutation
