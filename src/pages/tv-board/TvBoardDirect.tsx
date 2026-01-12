@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Maximize, Minimize, Monitor } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { TvBoardProvider } from "@/contexts/TvBoardContext";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { replaceCelebrationVariables } from "@/hooks/useCelebrationData";
 import { useTvCelebrationData } from "@/hooks/useTvCelebrationData";
 import { Button } from "@/components/ui/button";
+import { useTvScreenAdapter, getTvScaleStyles, getTvCenteringStyles } from "@/hooks/useTvScreenAdapter";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -82,6 +83,12 @@ export default function TvBoardDirect() {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasAutoFullscreened = useRef(false);
+  
+  // Debug overlay state
+  const [showDebug, setShowDebug] = useState(false);
+  
+  // Screen adapter for automatic scaling
+  const screenInfo = useTvScreenAdapter();
 
   // Celebration data - fetch from source dashboard via edge function (bypasses RLS)
   const celebrationSourceSlug = celebrationSettings?.sourceDashboard || dashboardSlugs[0] || null;
@@ -352,6 +359,9 @@ export default function TvBoardDirect() {
       if (e.key === 'f') {
         toggleFullscreen();
       }
+      if (e.key === 'd') {
+        setShowDebug(prev => !prev); // Toggle debug overlay with 'd' key
+      }
     };
     
     window.addEventListener('keydown', handleKeyDown);
@@ -395,8 +405,11 @@ export default function TvBoardDirect() {
     );
   }
 
+  const scaleStyles = getTvScaleStyles(screenInfo);
+  const centeringStyles = getTvCenteringStyles(screenInfo);
+
   return (
-    <div className="tv-board-wrapper min-h-screen h-screen max-h-screen overflow-hidden relative">
+    <div className="tv-board-wrapper min-h-screen h-screen max-h-screen overflow-hidden relative bg-slate-900">
       <style>{`
         html, body {
           overflow: hidden !important;
@@ -416,18 +429,36 @@ export default function TvBoardDirect() {
         .tv-board-wrapper:hover .tv-nav-button {
           opacity: 1;
         }
-        .tv-board-wrapper > [data-tv-dashboard] {
-          height: 100vh !important;
-          max-height: 100vh !important;
-          overflow: hidden !important;
-        }
       `}</style>
       
-      <div data-tv-dashboard className="h-screen max-h-screen overflow-hidden">
-        <TvBoardProvider slug={currentSlug}>
-          <DashboardComponent />
-        </TvBoardProvider>
+      {/* Scaled dashboard container */}
+      <div style={centeringStyles}>
+        <div data-tv-dashboard style={scaleStyles}>
+          <TvBoardProvider slug={currentSlug}>
+            <DashboardComponent />
+          </TvBoardProvider>
+        </div>
       </div>
+      
+      {/* Debug overlay - toggle with 'd' key */}
+      {showDebug && (
+        <div className="fixed bottom-20 right-4 z-[100] bg-black/80 text-white text-xs font-mono p-3 rounded-lg shadow-lg">
+          <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-2">
+            <Monitor className="h-4 w-4" />
+            <span className="font-bold">Screen Info</span>
+          </div>
+          <div className="space-y-1">
+            <div>Viewport: {screenInfo.width} × {screenInfo.height}</div>
+            <div>Aspect Ratio: {screenInfo.aspectRatio.toFixed(2)}</div>
+            <div>Scale Factor: {screenInfo.scaleFactor.toFixed(3)}</div>
+            <div>Screen Class: {screenInfo.screenClass}</div>
+            <div>Reference: {screenInfo.referenceWidth} × {screenInfo.referenceHeight}</div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-white/20 text-[10px] text-white/60">
+            Press 'd' to hide
+          </div>
+        </div>
+      )}
       
       {/* Celebration Overlay */}
       {celebrationSettings?.enabled && (
