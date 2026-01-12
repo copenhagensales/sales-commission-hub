@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { TimeSelect } from "@/components/ui/time-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Clock, X, Star, Calendar } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, X, Star, Calendar, Users } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StandardShift {
   id: string;
@@ -49,6 +50,18 @@ interface DayConfig {
   start_time: string;
   end_time: string;
   breaks: BreakInput[];
+}
+
+interface EmployeeStandardShift {
+  id: string;
+  employee_id: string;
+  shift_id: string;
+}
+
+interface TeamMember {
+  id: string;
+  first_name: string;
+  last_name: string;
 }
 
 interface TeamStandardShiftsProps {
@@ -94,7 +107,9 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSpecialShift, setIsSpecialShift] = useState(false);
   const [editingShift, setEditingShift] = useState<StandardShift | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     start_time: "08:00",
@@ -127,6 +142,42 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       return data as StandardShift[];
     },
     enabled: !!teamId,
+  });
+
+  // Fetch team members for employee picker
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["team-members-for-shifts", teamId],
+    queryFn: async () => {
+      if (!teamId) return [];
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id, employee_master_data!inner(id, first_name, last_name)")
+        .eq("team_id", teamId);
+      if (error) throw error;
+      return (data || []).map(tm => ({
+        id: (tm.employee_master_data as any).id,
+        first_name: (tm.employee_master_data as any).first_name,
+        last_name: (tm.employee_master_data as any).last_name,
+      })) as TeamMember[];
+    },
+    enabled: !!teamId,
+  });
+
+  // Fetch employee standard shifts assignments
+  const { data: employeeShiftAssignments = [] } = useQuery({
+    queryKey: ["employee-standard-shifts", teamId],
+    queryFn: async () => {
+      if (!teamId) return [];
+      const shiftIds = shifts.map((s) => s.id);
+      if (shiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select("*, employee_master_data(id, first_name, last_name)")
+        .in("shift_id", shiftIds);
+      if (error) throw error;
+      return data as (EmployeeStandardShift & { employee_master_data: TeamMember })[];
+    },
+    enabled: !!teamId && shifts.length > 0,
   });
 
   // Fetch all breaks for all shifts
@@ -175,6 +226,13 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     return allShiftDays.filter((d) => d.shift_id === shiftId);
   };
 
+  // Get assigned employees for a specific shift
+  const getShiftEmployees = (shiftId: string) => {
+    return employeeShiftAssignments
+      .filter((a) => a.shift_id === shiftId)
+      .map((a) => a.employee_master_data);
+  };
+
   // Create shift mutation
   const createMutation = useMutation({
     mutationFn: async (data: { 
@@ -184,6 +242,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       hours_source: 'timestamp' | 'shift';
       breaks: BreakInput[];
       dayConfigs: Record<number, DayConfig>;
+      employeeIds?: string[];
     }) => {
       // Create shift
       const { data: newShift, error: shiftError } = await supabase
@@ -250,14 +309,26 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           .insert(enabledDays);
         if (daysError) throw daysError;
       }
+
+      // Create employee assignments for special shifts
+      if (data.employeeIds && data.employeeIds.length > 0) {
+        const { error: assignError } = await supabase
+          .from("employee_standard_shifts")
+          .insert(data.employeeIds.map(empId => ({
+            shift_id: newShift.id,
+            employee_id: empId,
+          })));
+        if (assignError) throw assignError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-days", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["employee-standard-shifts", teamId] });
       setDialogOpen(false);
       resetForm();
-      toast({ title: "Standard vagt oprettet" });
+      toast({ title: isSpecialShift ? "Speciel vagt oprettet" : "Standard vagt oprettet" });
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -274,6 +345,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       hours_source: 'timestamp' | 'shift';
       breaks: BreakInput[];
       dayConfigs: Record<number, DayConfig>;
+      employeeIds?: string[];
     }) => {
       // Update shift
       const { error: shiftError } = await supabase
@@ -350,11 +422,29 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           .insert(enabledDays);
         if (daysError) throw daysError;
       }
+
+      // Update employee assignments if provided
+      if (data.employeeIds !== undefined) {
+        // Delete existing assignments
+        await supabase.from("employee_standard_shifts").delete().eq("shift_id", data.id);
+        
+        // Add new assignments
+        if (data.employeeIds.length > 0) {
+          const { error: assignError } = await supabase
+            .from("employee_standard_shifts")
+            .insert(data.employeeIds.map(empId => ({
+              shift_id: data.id,
+              employee_id: empId,
+            })));
+          if (assignError) throw assignError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-days", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["employee-standard-shifts", teamId] });
       setDialogOpen(false);
       setEditingShift(null);
       resetForm();
@@ -416,6 +506,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     });
     setBreaks([]);
     setUseDifferentTimes(false);
+    setSelectedEmployees([]);
+    setIsSpecialShift(false);
     // Reset day configs
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
@@ -426,7 +518,16 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   const openCreate = () => {
     setEditingShift(null);
+    setIsSpecialShift(false);
     resetForm();
+    setDialogOpen(true);
+  };
+
+  const openCreateSpecial = () => {
+    setEditingShift(null);
+    setIsSpecialShift(true);
+    resetForm();
+    setIsSpecialShift(true); // Re-set after reset clears it
     setDialogOpen(true);
   };
 
@@ -434,6 +535,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     setEditingShift(shift);
     const shiftBreaks = getShiftBreaks(shift.id);
     const shiftDays = getShiftDays(shift.id);
+    const shiftEmployees = getShiftEmployees(shift.id);
+    
+    // Determine if this is a special shift (has employee assignments)
+    const hasEmployees = shiftEmployees.length > 0;
+    setIsSpecialShift(hasEmployees);
+    setSelectedEmployees(shiftEmployees.map(e => e.id));
     
     setFormData({
       name: shift.name,
@@ -495,6 +602,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       toast({ title: "Udfyld navn og tidspunkter", variant: "destructive" });
       return;
     }
+
+    // For special shifts, require at least one employee
+    if (isSpecialShift && selectedEmployees.length === 0) {
+      toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
+      return;
+    }
     
     // If using "Samme tider" mode, update all enabled dayConfigs to use the general times
     let finalDayConfigs = dayConfigs;
@@ -512,12 +625,22 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         }
       });
     }
+
+    const employeeIds = isSpecialShift ? selectedEmployees : undefined;
     
     if (editingShift) {
-      updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs: finalDayConfigs });
+      updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs: finalDayConfigs, employeeIds });
     } else {
-      createMutation.mutate({ ...formData, breaks, dayConfigs: finalDayConfigs });
+      createMutation.mutate({ ...formData, breaks, dayConfigs: finalDayConfigs, employeeIds });
     }
+  };
+
+  const toggleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployees(prev => 
+      prev.includes(employeeId)
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
   };
 
   const addBreak = () => {
@@ -622,10 +745,16 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           <Clock className="h-4 w-4 text-muted-foreground" />
           <Label className="text-base font-medium">Standard vagter</Label>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1" />
-          Tilføj vagt
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openCreateSpecial}>
+            <Users className="h-4 w-4 mr-1" />
+            Tilføj speciel vagt
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-1" />
+            Tilføj vagt
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -641,6 +770,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               <TableRow>
                 <TableHead className="text-xs w-16">Primær</TableHead>
                 <TableHead className="text-xs">Navn</TableHead>
+                <TableHead className="text-xs">Tilknyttede</TableHead>
                 <TableHead className="text-xs">Dage</TableHead>
                 <TableHead className="text-xs">Pauser</TableHead>
                 <TableHead className="text-xs">Arbejdstid</TableHead>
@@ -651,6 +781,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               {shifts.map((shift) => {
                 const shiftBreaks = getShiftBreaks(shift.id);
                 const shiftDays = getShiftDays(shift.id);
+                const shiftEmployees = getShiftEmployees(shift.id);
                 
                 // Calculate work time: sum of all days with their respective breaks
                 let workTime = 0;
@@ -688,8 +819,34 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-1.5">
                         {shift.is_primary && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
+                        {shiftEmployees.length > 0 && <Users className="h-3.5 w-3.5 text-blue-500" />}
                         {shift.name}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {shiftEmployees.length > 0 ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="secondary" className="text-xs cursor-help">
+                                <Users className="h-3 w-3 mr-1" />
+                                {shiftEmployees.length} medarbejder{shiftEmployees.length > 1 ? 'e' : ''}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs">
+                                {shiftEmployees.map(e => (
+                                  <div key={e.id}>{e.first_name} {e.last_name}</div>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : shift.is_primary ? (
+                        <span className="text-muted-foreground text-xs">Alle (primær)</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {shiftDays.length > 0 ? (
@@ -792,6 +949,43 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 placeholder="F.eks. Dagvagt, Aftenvagt..."
               />
             </div>
+
+            {/* Employee picker - only for special shifts */}
+            {isSpecialShift && (
+              <div className="space-y-3 p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm font-medium">Vælg medarbejdere *</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Denne vagt vil overskrive standard-vagten for de valgte medarbejdere.
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {teamMembers.map(member => (
+                    <label
+                      key={member.id}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                        selectedEmployees.includes(member.id)
+                          ? "bg-blue-100 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300"
+                          : "bg-background hover:bg-muted border-border"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={selectedEmployees.includes(member.id)}
+                        onCheckedChange={() => toggleEmployeeSelection(member.id)}
+                        className="sr-only"
+                      />
+                      <span className="text-sm">{member.first_name} {member.last_name}</span>
+                    </label>
+                  ))}
+                </div>
+                {selectedEmployees.length > 0 && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {selectedEmployees.length} medarbejder{selectedEmployees.length > 1 ? 'e' : ''} valgt
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Toggle for same/different times - at the top */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
