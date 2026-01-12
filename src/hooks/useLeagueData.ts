@@ -46,6 +46,7 @@ export interface QualificationStanding {
     id: string;
     first_name: string;
     last_name: string;
+    team_name?: string;
   };
 }
 
@@ -115,14 +116,25 @@ export function useQualificationStandings(seasonId: string | undefined) {
           employee:employee_master_data!league_qualification_standings_employee_id_fkey(
             id,
             first_name,
-            last_name
+            last_name,
+            team:teams(name)
           )
         `)
         .eq("season_id", seasonId)
         .order("overall_rank", { ascending: true });
 
       if (error) throw error;
-      return data as QualificationStanding[];
+      
+      // Transform team data to team_name for easier access
+      const transformedData = (data || []).map(standing => ({
+        ...standing,
+        employee: standing.employee ? {
+          ...standing.employee,
+          team_name: (standing.employee as any).team?.name || null,
+        } : undefined,
+      }));
+      
+      return transformedData as QualificationStanding[];
     },
     enabled: !!seasonId,
     refetchInterval: 60000, // Refetch every minute
@@ -153,7 +165,8 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
           employee:employee_master_data!league_qualification_standings_employee_id_fkey(
             id,
             first_name,
-            last_name
+            last_name,
+            team:teams(name)
           )
         `)
         .eq("season_id", seasonId)
@@ -161,6 +174,18 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
+      
+      // Transform team data to team_name
+      if (data && data.employee) {
+        return {
+          ...data,
+          employee: {
+            ...data.employee,
+            team_name: (data.employee as any).team?.name || null,
+          },
+        } as QualificationStanding;
+      }
+      
       return data as QualificationStanding | null;
     },
     enabled: !!seasonId && !!user?.id,
