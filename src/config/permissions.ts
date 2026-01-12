@@ -815,6 +815,21 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
+  // ==================== ADMIN MENU ====================
+  {
+    key: "menu_admin",
+    label: "Admin menu",
+    icon: "🔧",
+    permissions: [
+      {
+        key: "menu_kpi_definitions",
+        label: "KPI Definitioner",
+        description: "Adgang til central KPI dokumentation og test",
+        hasEditOption: true,
+      },
+    ],
+  },
+
   // ==================== SYSTEM MENU ====================
   {
     key: "menu_system",
