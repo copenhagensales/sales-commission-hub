@@ -164,6 +164,11 @@ export default function CphSalesDashboard() {
     refetchInterval: 30000,
   });
 
+  // Filter out sales with unknown clients
+  const knownClientSales = todaySales.filter(sale => 
+    sale.client_name && sale.client_name !== "Ukendt"
+  );
+
   // Calculate counted sales (only products with counts_as_sale = true)
   const calculateCountedSales = (sales: typeof todaySales) => {
     return sales.reduce((total, sale) => {
@@ -188,8 +193,10 @@ export default function CphSalesDashboard() {
         }
       }
       if (saleCount > 0) {
-        const clientName = sale.client_name || "Ukendt";
-        result[clientName] = (result[clientName] || 0) + saleCount;
+        const clientName = sale.client_name;
+        if (clientName && clientName !== "Ukendt") {
+          result[clientName] = (result[clientName] || 0) + saleCount;
+        }
       }
     }
     return result;
@@ -219,12 +226,26 @@ export default function CphSalesDashboard() {
     }, 0);
   };
 
+  // Filter TV data to exclude unknown clients
+  const filterTvSales = (sales: typeof tvData.sales.recent) => 
+    sales.filter(s => s.client_name && s.client_name !== "Ukendt");
+  
+  const filterTvSalesByClient = (byClient: Record<string, number>) => {
+    const result: Record<string, number> = {};
+    for (const [client, count] of Object.entries(byClient)) {
+      if (client !== "Ukendt") {
+        result[client] = count;
+      }
+    }
+    return result;
+  };
+
   // Use TV data if in TV mode, otherwise use regular queries
-  const displaySales = tvMode && tvData ? tvData.sales.recent : todaySales;
-  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(todaySales);
-  const displaySalesByClient = tvMode && tvData ? tvData.sales.byClient : calculateSalesByClient(todaySales);
-  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(todaySales);
-  const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(todaySales);
+  const displaySales = tvMode && tvData ? filterTvSales(tvData.sales.recent) : knownClientSales;
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales);
+  const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : calculateSalesByClient(knownClientSales);
+  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
+  const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
   const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
   const displayStaffEmployees = tvMode && tvData ? tvData.employees.staff : staffEmployees;
   const displayCalls = tvMode && tvData ? tvData.calls.today : todayCalls;
