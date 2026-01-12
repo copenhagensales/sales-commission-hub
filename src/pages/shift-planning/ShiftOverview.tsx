@@ -329,7 +329,7 @@ export default function ShiftOverview() {
     
     if (!hasSales) return false;
     
-    // Check if has shift
+    // Check if has explicit shift for this date
     const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
     if (hasShift) return false;
     
@@ -338,9 +338,15 @@ export default function ShiftOverview() {
       const tsDate = ts.clock_in.split("T")[0];
       return ts.employee_id === employeeId && tsDate === dateStr;
     });
+    if (hasTimestamp) return false;
     
-    return !hasTimestamp;
-  }, [weeklySales, agentMappings, shifts, timeStamps]);
+    // Check if employee has a standard shift for this day of week
+    // If they have a standard shift, they don't need an explicit shift
+    const hasStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date) !== null;
+    if (hasStandardShift) return false;
+    
+    return true;
+  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
