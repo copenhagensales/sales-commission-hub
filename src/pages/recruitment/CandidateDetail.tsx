@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall, Trash2, Check, UserX } from "lucide-react";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall, Trash2, Check, UserX, Link2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -326,6 +326,69 @@ export default function CandidateDetail() {
       toast.error(error.message || "Kunne ikke tilføje til Winback");
     }
   });
+
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+
+  const sendSelfRegistrationMutation = useMutation({
+    mutationFn: async () => {
+      if (!candidate?.email) {
+        throw new Error("Kandidaten har ingen email");
+      }
+
+      // Check if employee record already exists for this candidate
+      // @ts-ignore - Supabase type chain too deep
+      const { data: existingEmployee } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("email", candidate.email.toLowerCase())
+        .maybeSingle();
+
+      let employeeId = existingEmployee?.id;
+
+      // If no employee record exists, create one
+      if (!employeeId) {
+        // @ts-ignore - Supabase type chain too deep
+        const { data: newEmployee, error: createError } = await supabase
+          .from("employee_master_data")
+          .insert({
+            first_name: candidate.first_name,
+            last_name: candidate.last_name,
+            email: candidate.email.toLowerCase(),
+            phone: candidate.phone || null,
+            is_active: false, // Will be activated after onboarding
+            applied_position: candidate.applied_position,
+            team_id: candidate.team_id,
+          })
+          .select("id")
+          .single();
+
+        if (createError) throw createError;
+        employeeId = newEmployee.id;
+      }
+
+      // Send the invitation email
+      const { error: inviteError } = await supabase.functions.invoke(
+        "send-employee-invitation",
+        {
+          body: {
+            employeeId,
+            email: candidate.email.toLowerCase(),
+            firstName: candidate.first_name,
+            lastName: candidate.last_name,
+          },
+        }
+      );
+
+      if (inviteError) throw inviteError;
+    },
+    onSuccess: () => {
+      toast.success("Selvregistreringslink sendt til kandidaten");
+    },
+    onError: (error: any) => {
+      console.error("Failed to send invitation:", error);
+      toast.error(error.message || "Kunne ikke sende invitation");
+    },
+  });
   if (isLoading) {
     return <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -430,6 +493,22 @@ export default function CandidateDetail() {
                   <UserX className="h-4 w-4 mr-1.5" />
                   Winback
                 </Button>
+                {candidate.status === "hired" && (
+                  <Button 
+                    size="sm" 
+                    variant="default" 
+                    onClick={() => sendSelfRegistrationMutation.mutate()} 
+                    disabled={!candidate.email || sendSelfRegistrationMutation.isPending}
+                    className="col-span-2 sm:col-span-1"
+                  >
+                    {sendSelfRegistrationMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    ) : (
+                      <Link2 className="h-4 w-4 mr-1.5" />
+                    )}
+                    Send registreringslink
+                  </Button>
+                )}
               </div>
             </div>
           </div>
