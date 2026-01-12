@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useMemo } from "react";
 
 type DataScope = "egen" | "team" | "alt";
 
@@ -29,29 +29,31 @@ export function RolePreviewProvider({ children }: { children: ReactNode }) {
   const [previewPermissions, setPreviewPermissions] = useState<RolePreviewPermissions | null>(null);
   const [previewEmployee, setPreviewEmployee] = useState<PreviewEmployee | null>(null);
 
-  const enterPreviewMode = (roleName: string, permissions: RolePreviewPermissions, employee?: PreviewEmployee) => {
+  const enterPreviewMode = useCallback((roleName: string, permissions: RolePreviewPermissions, employee?: PreviewEmployee) => {
     setPreviewRole(roleName);
     setPreviewPermissions(permissions);
     setPreviewEmployee(employee || null);
     setIsPreviewMode(true);
-  };
+  }, []);
 
-  const exitPreviewMode = () => {
+  const exitPreviewMode = useCallback(() => {
     setPreviewRole(null);
     setPreviewPermissions(null);
     setPreviewEmployee(null);
     setIsPreviewMode(false);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    isPreviewMode,
+    previewRole,
+    previewPermissions,
+    previewEmployee,
+    enterPreviewMode,
+    exitPreviewMode,
+  }), [isPreviewMode, previewRole, previewPermissions, previewEmployee, enterPreviewMode, exitPreviewMode]);
 
   return (
-    <RolePreviewContext.Provider value={{
-      isPreviewMode,
-      previewRole,
-      previewPermissions,
-      previewEmployee,
-      enterPreviewMode,
-      exitPreviewMode,
-    }}>
+    <RolePreviewContext.Provider value={value}>
       {children}
     </RolePreviewContext.Provider>
   );

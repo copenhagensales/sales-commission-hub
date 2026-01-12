@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useMemo } from "react";
 
 interface TvBoardContextValue {
   overrideSlug: string | null;
@@ -14,8 +14,10 @@ interface TvBoardProviderProps {
 }
 
 export const TvBoardProvider = ({ slug, children }: TvBoardProviderProps) => {
+  const value = useMemo(() => ({ overrideSlug: slug }), [slug]);
+  
   return (
-    <TvBoardContext.Provider value={{ overrideSlug: slug }}>
+    <TvBoardContext.Provider value={value}>
       {children}
     </TvBoardContext.Provider>
   );

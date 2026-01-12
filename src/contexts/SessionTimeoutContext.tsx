@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { SessionTimeoutModal } from "@/components/session/SessionTimeoutModal";
@@ -184,12 +184,18 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleContinueSession = () => {
+  const handleContinueSession = useCallback(() => {
     resetActivity();
-  };
+  }, [resetActivity]);
+
+  const value = useMemo(() => ({
+    isActive,
+    remainingTime,
+    resetActivity,
+  }), [isActive, remainingTime, resetActivity]);
 
   return (
-    <SessionTimeoutContext.Provider value={{ isActive, remainingTime, resetActivity }}>
+    <SessionTimeoutContext.Provider value={value}>
       {children}
       <SessionTimeoutModal
         isOpen={showWarning}

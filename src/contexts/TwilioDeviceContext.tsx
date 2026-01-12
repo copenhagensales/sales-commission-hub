@@ -66,14 +66,59 @@ export function TwilioDeviceProvider({ children }: { children: ReactNode }) {
     return twilioDevice.makeCall(toNumber, hasInboundAccess);
   }, [hasOutboundAccess, hasInboundAccess, twilioDevice]);
 
+  // Destructure to use primitive values in dependency array for better memoization
+  const { 
+    deviceState, 
+    callState, 
+    currentCall, 
+    isMuted, 
+    callDuration, 
+    error, 
+    answerCall, 
+    rejectCall, 
+    hangUp, 
+    toggleMute, 
+    disconnectDevice,
+    isDeviceReady 
+  } = twilioDevice;
+
   const value = useMemo(() => ({
-    ...twilioDevice,
+    deviceState,
+    callState,
+    currentCall,
+    isMuted,
+    callDuration,
+    error,
+    answerCall,
+    rejectCall,
+    hangUp,
+    toggleMute,
+    disconnectDevice,
+    isDeviceReady,
     initializeDevice,
     makeCall,
     hasOutboundAccess,
     hasInboundAccess,
     hasAnyAccess,
-  }), [twilioDevice, initializeDevice, makeCall, hasOutboundAccess, hasInboundAccess, hasAnyAccess]);
+  }), [
+    deviceState, 
+    callState, 
+    currentCall, 
+    isMuted, 
+    callDuration, 
+    error, 
+    answerCall, 
+    rejectCall, 
+    hangUp, 
+    toggleMute, 
+    disconnectDevice,
+    isDeviceReady,
+    initializeDevice, 
+    makeCall, 
+    hasOutboundAccess, 
+    hasInboundAccess, 
+    hasAnyAccess
+  ]);
 
   return (
     <TwilioDeviceContext.Provider value={value}>
