@@ -30,7 +30,7 @@ interface TvDashboardData {
     total: number;
     confirmed: number;
     pending: number;
-    byClient: Record<string, number>;
+    byClient: Record<string, { count: number; logoUrl: string | null }>;
     recent: RecentSale[];
   };
   employees: {
@@ -42,6 +42,7 @@ interface TvDashboardData {
   };
   sellersOnBoard: number;
   topSellers: TopSeller[];
+  clientLogos?: Record<string, string | null>;
 }
 
 // Check if we're in TV mode (accessed via /tv route with sessionStorage code)
@@ -72,7 +73,7 @@ export default function CphSalesDashboard() {
   });
 
   // Regular authenticated queries for non-TV mode
-  const { data: todaySales = [] } = useQuery({
+  const { data: todaySalesData } = useQuery({
     queryKey: ["cph-dashboard-today-sales", todayStr],
     queryFn: async () => {
       const startOfDay = `${todayStr}T00:00:00`;
@@ -96,6 +97,7 @@ export default function CphSalesDashboard() {
       
       const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))] as string[];
       let campaignClientMap: Record<string, string> = {};
+      let clientLogoMap: Record<string, string | null> = {};
       
       if (campaignIds.length > 0) {
         const { data: campaigns } = await supabase
@@ -109,9 +111,10 @@ export default function CphSalesDashboard() {
         if (clientIds.length > 0) {
           const { data: clients } = await supabase
             .from("clients")
-            .select("id, name")
+            .select("id, name, logo_url")
             .in("id", clientIds);
           clientMap = Object.fromEntries((clients || []).map(c => [c.id, c.name]));
+          clientLogoMap = Object.fromEntries((clients || []).map(c => [c.name, c.logo_url]));
         }
         
         campaignClientMap = Object.fromEntries(
@@ -119,14 +122,20 @@ export default function CphSalesDashboard() {
         );
       }
       
-      return (data || []).map(s => ({
-        ...s,
-        client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
-      }));
+      return {
+        sales: (data || []).map(s => ({
+          ...s,
+          client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
+        })),
+        clientLogos: clientLogoMap
+      };
     },
     enabled: !tvMode,
     refetchInterval: 30000,
   });
+
+  const todaySales = todaySalesData?.sales || [];
+  const clientLogos = todaySalesData?.clientLogos || {};
 
   // Fetch active employees count for display
   const { data: activeEmployees = 0 } = useQuery({
@@ -283,12 +292,25 @@ export default function CphSalesDashboard() {
   const filterTvSales = (sales: RecentSale[]) => 
     sales.filter(s => s.client_name && s.client_name !== "Ukendt");
   
-  const filterTvSalesByClient = (byClient: Record<string, number>) => {
-    const result: Record<string, number> = {};
-    for (const [client, count] of Object.entries(byClient)) {
+  const filterTvSalesByClient = (byClient: Record<string, { count: number; logoUrl: string | null }>) => {
+    const result: Record<string, { count: number; logoUrl: string | null }> = {};
+    for (const [client, data] of Object.entries(byClient)) {
       if (client !== "Ukendt") {
-        result[client] = count;
+        result[client] = data;
       }
+    }
+    return result;
+  };
+
+  // Convert regular sales by client to include logo
+  const getSalesByClientWithLogos = (): Record<string, { count: number; logoUrl: string | null }> => {
+    const byClient = calculateSalesByClient(knownClientSales);
+    const result: Record<string, { count: number; logoUrl: string | null }> = {};
+    for (const [client, count] of Object.entries(byClient)) {
+      result[client] = { 
+        count, 
+        logoUrl: clientLogos[client] || null 
+      };
     }
     return result;
   };
@@ -296,7 +318,7 @@ export default function CphSalesDashboard() {
   // Use TV data if in TV mode, otherwise use regular queries
   const displaySales = tvMode && tvData ? filterTvSales(tvData.sales.recent) : calculateRecentSalesWithCommission(knownClientSales);
   const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales);
-  const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : calculateSalesByClient(knownClientSales);
+  const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
   const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
   const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
   const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : calculateSellersOnBoard(knownClientSales);
@@ -392,14 +414,24 @@ export default function CphSalesDashboard() {
         ) : (
           <div className={`grid ${tvMode ? 'grid-cols-4 gap-2' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3'}`}>
             {Object.entries(displaySalesByClient)
-              .sort(([, a], [, b]) => (b as number) - (a as number))
-              .map(([client, count], index) => (
+              .sort(([, a], [, b]) => b.count - a.count)
+              .map(([client, data], index) => (
                 <Card 
                   key={client} 
                   className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
                 >
                   <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
-                    <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{count as number}</span>
+                    {/* Client logo */}
+                    {data.logoUrl && (
+                      <div className={`flex items-center justify-center ${tvMode ? 'h-6 mb-1' : 'h-8 mb-2'}`}>
+                        <img 
+                          src={data.logoUrl} 
+                          alt={client} 
+                          className={`object-contain ${tvMode ? 'max-h-6' : 'max-h-8'} max-w-full`}
+                        />
+                      </div>
+                    )}
+                    <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{data.count}</span>
                     <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
                       {client}
                     </span>

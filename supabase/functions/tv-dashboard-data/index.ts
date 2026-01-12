@@ -112,13 +112,16 @@ Deno.serve(async (req) => {
     const sales = salesWithItems || [];
     console.log(`Found ${sales.length} sales with items`);
 
-    // Fetch all clients
+    // Fetch all clients with logo_url
     const { data: allClients } = await supabase
       .from("clients")
-      .select("id, name");
+      .select("id, name, logo_url");
     
     const clientMap: Record<string, string> = Object.fromEntries(
       (allClients || []).map(c => [c.id, c.name])
+    );
+    const clientLogoMap: Record<string, string | null> = Object.fromEntries(
+      (allClients || []).map(c => [c.name, c.logo_url])
     );
 
     // Fetch campaign mappings (adversus -> client_campaign)
@@ -140,7 +143,7 @@ Deno.serve(async (req) => {
     );
 
     // Calculate sales by client and track seller commission
-    const salesByClient: Record<string, number> = {};
+    const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
     const sellerCommission: Record<string, { commission: number; name: string }> = {};
     const sellersWithSales = new Set<string>();
     let totalCountedSales = 0;
@@ -185,7 +188,10 @@ Deno.serve(async (req) => {
       }
 
       if (saleItemCount > 0) {
-        salesByClient[clientName] = (salesByClient[clientName] || 0) + saleItemCount;
+        if (!salesByClient[clientName]) {
+          salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
+        }
+        salesByClient[clientName].count += saleItemCount;
         totalCountedSales += saleItemCount;
         
         // Track seller
