@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff } from "lucide-react";
+import { MissingShiftsAlert } from "@/components/shift-planning/MissingShiftsAlert";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -62,19 +63,24 @@ export default function ShiftOverview() {
   const [selectedDetailTimeStamp, setSelectedDetailTimeStamp] = useState<TimeStampData | null>(null);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [showWeekend, setShowWeekend] = useState(false);
 
   const queryClient = useQueryClient();
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-  // Only show weekdays (Monday-Friday), exclude weekend
+  // Only show weekdays (Monday-Friday), exclude weekend by default
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
     day => day.getDay() !== 0 && day.getDay() !== 6
   );
-  // Weekend days for fold-out
+  // Weekend days
   const weekendDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
     day => day.getDay() === 0 || day.getDay() === 6
   );
+  // Display days based on showWeekend toggle
+  const displayDays = showWeekend 
+    ? eachDayOfInterval({ start: weekStart, end: weekEnd })
+    : weekDays;
 
   const { data: shifts } = useShifts(
     format(weekStart, "yyyy-MM-dd"),
@@ -870,6 +876,24 @@ export default function ShiftOverview() {
             
             {/* Actions */}
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 gap-2"
+                onClick={() => setShowWeekend(!showWeekend)}
+              >
+                {showWeekend ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Skjul weekend
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Se weekend
+                  </>
+                )}
+              </Button>
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                 <SelectTrigger className="w-[180px] h-10 rounded-lg border-border/60 bg-background/50 backdrop-blur-sm">
                   <SelectValue placeholder="Alle afdelinger" />
@@ -949,39 +973,65 @@ export default function ShiftOverview() {
           </div>
         </div>
 
+        {/* Missing Shifts Alert */}
+        <MissingShiftsAlert
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          employees={employees}
+          shifts={shifts}
+          timeStamps={timeStamps}
+          onCreateShift={(employeeId, date) => {
+            setSelectedDate(date);
+            setSelectedEmployeeId(employeeId);
+            setCreateDialogOpen(true);
+          }}
+        />
+
         {/* Calendar Grid */}
         <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
               {/* Day Headers */}
-              <div className="grid grid-cols-6 border-b border-border/60 bg-muted/30">
+              <div 
+                className={cn(
+                  "grid border-b border-border/60 bg-muted/30",
+                  showWeekend ? "grid-cols-8" : "grid-cols-6"
+                )}
+              >
                 <div className="p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Medarbejder
                 </div>
-                {weekDays.map((day, dayIdx) => (
-                  <div
-                    key={day.toISOString()}
-                    className={cn(
-                      "text-center py-3 px-2 border-l border-border/40",
-                      isToday(day) && "bg-primary/10"
-                    )}
-                  >
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                      {format(day, "EEE", { locale: da })}
-                    </p>
-                    <p className={cn(
-                      "text-lg font-semibold mt-0.5",
-                      isToday(day) ? "text-primary" : "text-foreground"
-                    )}>
-                      {format(day, "d")}
-                    </p>
-                    {isHoliday(day) && (
-                      <span className="inline-block text-[9px] px-1.5 py-0.5 mt-1 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-medium">
-                        {getHolidayName(day)}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {displayDays.map((day) => {
+                  const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={cn(
+                        "text-center py-3 px-2 border-l border-border/40",
+                        isToday(day) && "bg-primary/10",
+                        isWeekendDay && "bg-orange-50/50 dark:bg-orange-950/20"
+                      )}
+                    >
+                      <p className={cn(
+                        "text-[10px] font-medium uppercase tracking-wide",
+                        isWeekendDay ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"
+                      )}>
+                        {format(day, "EEE", { locale: da })}
+                      </p>
+                      <p className={cn(
+                        "text-lg font-semibold mt-0.5",
+                        isToday(day) ? "text-primary" : isWeekendDay ? "text-orange-700 dark:text-orange-300" : "text-foreground"
+                      )}>
+                        {format(day, "d")}
+                      </p>
+                      {isHoliday(day) && (
+                        <span className="inline-block text-[9px] px-1.5 py-0.5 mt-1 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-medium">
+                          {getHolidayName(day)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Employee Rows */}
@@ -989,7 +1039,8 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-6",
+                    "grid",
+                    showWeekend ? "grid-cols-8" : "grid-cols-6",
                     idx < (employees?.length || 0) - 1 && "border-b border-border/30"
                   )}
                 >
@@ -1009,7 +1060,8 @@ export default function ShiftOverview() {
                   </div>
 
                   {/* Day cells */}
-                  {weekDays.map((day, dayIdx) => {
+                  {displayDays.map((day) => {
+                    const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
                     const dateKey = format(day, "yyyy-MM-dd");
                     const popoverKey = `${employee.id}-${dateKey}`;
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
@@ -1047,6 +1099,7 @@ export default function ShiftOverview() {
                               "min-h-[60px] p-2 border-l border-border/40 cursor-pointer transition-colors relative",
                               isToday(day) && "bg-primary/5",
                               holiday && "bg-muted/40 cursor-not-allowed",
+                              isWeekendDay && "bg-orange-50/30 dark:bg-orange-950/10",
                               !holiday && "hover:bg-muted/30"
                             )}
                           >
