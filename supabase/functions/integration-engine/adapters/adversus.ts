@@ -100,11 +100,11 @@ export class AdversusAdapter implements DialerAdapter {
     const rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales`);
 
-    console.log(`[Adversus] Fetched ${rawSales.length} sales, now building OPP map from leads...`);
+    console.log(`[Adversus] Fetched ${rawSales.length} sales, now building lead data map from leads...`);
 
-    // NUEVA ESTRATEGIA: Obtener OPPs desde /leads con filtros por campaña
-    const leadIdToOpp = await this.buildLeadOppMap(rawSales, campaignConfigMap);
-    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries`);
+    // NUEVA ESTRATEGIA: Obtener todos los resultFields desde /leads con filtros por campaña
+    const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
+    console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
 
     // Mapeo a StandardSale usando el mapa de OPPs y el mapa de usuarios
     return rawSales.map((s: any) => {
@@ -161,8 +161,9 @@ export class AdversusAdapter implements DialerAdapter {
       }
 
       // Buscar OPP en el mapa por leadId
-      if (leadId && leadIdToOpp.has(leadId)) {
-        externalReference = leadIdToOpp.get(leadId)!;
+      const leadData = leadId ? leadIdToData.get(leadId) : undefined;
+      if (leadData?.opp) {
+        externalReference = leadData.opp;
       }
 
       // Use sale ID (s.id) as the primary externalId - this is unique per sale in Adversus
@@ -197,8 +198,12 @@ export class AdversusAdapter implements DialerAdapter {
           metadata: { rawLineId: l.id },
         })),
 
-        // Store complete raw JSON from dialer
-        rawPayload: s,
+        // Store complete raw JSON from dialer with lead result fields
+        rawPayload: {
+          ...s,
+          leadResultData: leadData?.resultData || [],
+          leadResultFields: leadData?.resultFields || {},
+        },
 
         metadata: {
           campaignId: s.campaignId,
@@ -226,8 +231,8 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
     const rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales (range)`);
-    const leadIdToOpp = await this.buildLeadOppMap(rawSales, campaignConfigMap);
-    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries`);
+    const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
+    console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
     return rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
@@ -273,8 +278,9 @@ export class AdversusAdapter implements DialerAdapter {
       if (campaignId && campaignConfigMap.has(campaignId)) {
         clientCampaignId = campaignConfigMap.get(campaignId)!.clientCampaignId;
       }
-      if (leadId && leadIdToOpp.has(leadId)) {
-        externalReference = leadIdToOpp.get(leadId)!;
+      const leadData = leadId ? leadIdToData.get(leadId) : undefined;
+      if (leadData?.opp) {
+        externalReference = leadData.opp;
       }
       const saleId = String(s.id);
       const leadIdValue = s.leadId ? String(s.leadId) : null;
@@ -300,7 +306,11 @@ export class AdversusAdapter implements DialerAdapter {
           unitPrice: l.unitPrice || 0,
           metadata: { rawLineId: l.id },
         })),
-        rawPayload: s,
+        rawPayload: {
+          ...s,
+          leadResultData: leadData?.resultData || [],
+          leadResultFields: leadData?.resultFields || {},
+        },
         metadata: {
           campaignId: s.campaignId,
           leadId: s.leadId,
@@ -310,12 +320,19 @@ export class AdversusAdapter implements DialerAdapter {
     });
   }
 
-  // Construir mapa leadId -> OPP desde /leads con filtros por campaña (SECUENCIAL para evitar rate limit)
-  private async buildLeadOppMap(
+  // Interface for lead data with all result fields
+  private LeadData = class {
+    opp: string | null = null;
+    resultData: Array<{ id: number; name: string; type: string; value: any }> = [];
+    resultFields: Record<string, any> = {};
+  };
+
+  // Construir mapa leadId -> LeadData con TODOS los resultatfelter (SECUENCIAL para evitar rate limit)
+  private async buildLeadDataMap(
     sales: any[],
     campaignConfigMap: Map<string, CampaignMappingConfig>
-  ): Promise<Map<string, string>> {
-    const leadIdToOpp = new Map<string, string>();
+  ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name: string; type: string; value: any }>; resultFields: Record<string, any> }>> {
+    const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name: string; type: string; value: any }>; resultFields: Record<string, any> }>();
 
     // 1. Obtener campaignIds únicos de las ventas
     const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
@@ -365,21 +382,37 @@ export class AdversusAdapter implements DialerAdapter {
 
         for (const lead of leads) {
           const leadId = String(lead.id);
-          const resultData = lead.resultData || [];
+          const resultData: Array<{ id: number; name: string; type: string; value: any }> = lead.resultData || [];
+
+          // Build resultFields object (name -> value)
+          const resultFields: Record<string, any> = {};
+          let opp: string | null = null;
 
           if (Array.isArray(resultData)) {
             for (const field of resultData) {
-              if (field && field.value) {
-                const value = String(field.value);
-                const match = value.match(oppPattern);
-                if (match) {
-                  leadIdToOpp.set(leadId, match[0]);
-                  oppsFound++;
-                  break; // Solo el primer OPP encontrado
+              if (field && field.name !== undefined) {
+                // Store field by name
+                resultFields[field.name] = field.value;
+                
+                // Check for OPP pattern
+                if (field.value) {
+                  const value = String(field.value);
+                  const match = value.match(oppPattern);
+                  if (match && !opp) {
+                    opp = match[0];
+                    oppsFound++;
+                  }
                 }
               }
             }
           }
+
+          // Store lead data with all result fields
+          leadIdToData.set(leadId, {
+            opp,
+            resultData,
+            resultFields,
+          });
         }
 
         totalLeads += leads.length;
@@ -393,8 +426,8 @@ export class AdversusAdapter implements DialerAdapter {
       }
     }
 
-    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
-    return leadIdToOpp;
+    console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
+    return leadIdToData;
   }
 
   // Validar que el OPP tenga formato correcto
