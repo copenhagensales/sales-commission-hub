@@ -1025,6 +1025,18 @@ export default function ShiftOverview() {
             {/* Actions */}
             <div className="flex items-center gap-3">
               <Button
+                size="sm"
+                className="h-10 gap-2"
+                onClick={() => {
+                  setSelectedDate(null);
+                  setSelectedEmployeeId(null);
+                  setCreateDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Opret vagt
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 className="h-10 gap-2"
