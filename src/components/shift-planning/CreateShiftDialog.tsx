@@ -78,14 +78,17 @@ function usePrimaryStandardShift(teamId: string | null | undefined) {
     queryFn: async () => {
       if (!teamId) return null;
       
-      const { data: shift, error } = await supabase
+      // Use limit(1) to handle case where multiple primary shifts exist
+      const { data: shifts, error } = await supabase
         .from("team_standard_shifts")
         .select("*")
         .eq("team_id", teamId)
         .eq("is_primary", true)
-        .maybeSingle();
+        .order("created_at", { ascending: true })
+        .limit(1);
       
       if (error) throw error;
+      const shift = shifts?.[0];
       if (!shift) return null;
       
       // Also fetch shift days for day-specific times
