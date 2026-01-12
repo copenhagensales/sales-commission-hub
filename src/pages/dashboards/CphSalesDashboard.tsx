@@ -370,9 +370,9 @@ export default function CphSalesDashboard() {
       const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
 
       // Get teams (exclude Stab) - use any to avoid deep type issues
-      const teamsQuery = supabase.from("teams").select("id, name, is_active");
+      const teamsQuery = supabase.from("teams").select("id, name");
       const teamsResult = await (teamsQuery as any);
-      const teams = ((teamsResult.data as any[]) || []).filter((t: any) => t.name !== "Stab" && t.is_active === true);
+      const teams = ((teamsResult.data as any[]) || []).filter((t: any) => t.name !== "Stab");
 
       if (teams.length === 0) return [];
 
