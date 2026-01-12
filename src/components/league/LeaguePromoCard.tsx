@@ -73,7 +73,7 @@ export function LeaguePromoCard() {
         .from("league_enrollments")
         .select("id", { count: "exact", head: true }) as any)
         .eq("season_id", season.id)
-        .eq("status", "active");
+        .eq("is_active", true);
 
       return count || 0;
     },
