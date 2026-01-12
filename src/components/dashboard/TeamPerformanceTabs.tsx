@@ -12,6 +12,7 @@ interface TeamData {
   sales: { day: number; week: number; month: number };
   sick: { day: number; week: number; month: number };
   vacation: { day: number; week: number; month: number };
+  workDays?: { day: number; week: number; month: number };
 }
 
 interface TeamPerformanceTabsProps {
@@ -34,18 +35,29 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const getSalesValue = (team: TeamData) => team.sales[period];
   const getSickValue = (team: TeamData) => team.sick[period];
   const getVacationValue = (team: TeamData) => team.vacation[period];
+  const getWorkDays = (team: TeamData) => team.workDays?.[period] || 1;
 
-  const formatAbsence = (count: number, empCount: number) => {
+  // Calculate possible work days for a team in this period
+  const getPossibleWorkDays = (team: TeamData) => {
+    const workDays = getWorkDays(team);
+    return team.employeeCount * workDays;
+  };
+
+  const formatAbsence = (count: number, possibleDays: number) => {
     if (count === 0) return { display: "-", percentage: 0, count: 0 };
-    const percentage = empCount > 0 ? Math.round((count / empCount) * 100) : 0;
+    const percentage = possibleDays > 0 ? Math.round((count / possibleDays) * 100) : 0;
     return { display: `${percentage}% (${count})`, percentage, count };
   };
+
+  // Get work days from first team (same for all)
+  const workDaysInPeriod = data[0]?.workDays?.[period] || 1;
 
   // Calculate totals
   const totalEmp = data.reduce((sum, t) => sum + t.employeeCount, 0);
   const totalSales = data.reduce((sum, t) => sum + getSalesValue(t), 0);
   const totalSick = data.reduce((sum, t) => sum + getSickValue(t), 0);
   const totalVacation = data.reduce((sum, t) => sum + getVacationValue(t), 0);
+  const totalPossibleDays = totalEmp * workDaysInPeriod;
 
   // Sort by sales descending
   const sortedData = [...data].sort((a, b) => getSalesValue(b) - getSalesValue(a));
@@ -98,8 +110,9 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
             </TableHeader>
             <TableBody>
               {sortedData.map((team) => {
-                const sick = formatAbsence(getSickValue(team), team.employeeCount);
-                const vacation = formatAbsence(getVacationValue(team), team.employeeCount);
+                const possibleDays = getPossibleWorkDays(team);
+                const sick = formatAbsence(getSickValue(team), possibleDays);
+                const vacation = formatAbsence(getVacationValue(team), possibleDays);
                 
                 return (
                   <TableRow key={team.id}>
@@ -130,7 +143,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{getSickValue(team)} af {team.employeeCount} medarbejdere</p>
+                          <p>{getSickValue(team)} sygedage ud af {possibleDays} mulige arbejdsdage</p>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
@@ -146,7 +159,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{getVacationValue(team)} af {team.employeeCount} medarbejdere</p>
+                          <p>{getVacationValue(team)} feriedage ud af {possibleDays} mulige arbejdsdage</p>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
@@ -170,11 +183,11 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className={`text-sm ${totalSick > 0 ? 'text-rose-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalEmp > 0 ? `${Math.round((totalSick / totalEmp) * 100)}% (${totalSick})` : '-'}
+                        {totalPossibleDays > 0 ? `${Math.round((totalSick / totalPossibleDays) * 100)}% (${totalSick})` : '-'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{totalSick} af {totalEmp} medarbejdere</p>
+                      <p>{totalSick} sygedage ud af {totalPossibleDays} mulige arbejdsdage</p>
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
@@ -182,11 +195,11 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className={`text-sm ${totalVacation > 0 ? 'text-blue-500 font-medium' : 'text-muted-foreground'}`}>
-                        {totalEmp > 0 ? `${Math.round((totalVacation / totalEmp) * 100)}% (${totalVacation})` : '-'}
+                        {totalPossibleDays > 0 ? `${Math.round((totalVacation / totalPossibleDays) * 100)}% (${totalVacation})` : '-'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{totalVacation} af {totalEmp} medarbejdere</p>
+                      <p>{totalVacation} feriedage ud af {totalPossibleDays} mulige arbejdsdage</p>
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
@@ -195,7 +208,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
           </Table>
         </TooltipProvider>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          {periodLabels[period]} • Sorteret efter salg
+          {periodLabels[period]} • {workDaysInPeriod} arbejdsdag{workDaysInPeriod !== 1 ? 'e' : ''} i perioden • Sorteret efter salg
         </p>
       </CardContent>
     </Card>
