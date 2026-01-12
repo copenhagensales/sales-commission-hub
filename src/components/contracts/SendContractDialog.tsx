@@ -81,9 +81,18 @@ const getRequiredFieldsForType = (contractType: ContractType | null): RequiredFi
   }
 };
 
-const getMissingFields = (employee: EmployeeData, contractType: ContractType | null): string[] => {
+// Fields to skip validation for freelancers
+const freelanceExemptFields: (keyof EmployeeData)[] = ["work_location", "weekly_hours", "standard_start_time"];
+
+const getMissingFields = (employee: EmployeeData & { is_freelance_consultant?: boolean | null }, contractType: ContractType | null): string[] => {
   const requiredFields = getRequiredFieldsForType(contractType);
-  return requiredFields
+  
+  // If employee is freelance consultant, skip work location, weekly hours, and work schedule
+  const fieldsToCheck = employee.is_freelance_consultant 
+    ? requiredFields.filter((field) => !freelanceExemptFields.includes(field.key))
+    : requiredFields;
+    
+  return fieldsToCheck
     .filter((field) => !field.check(employee))
     .map((field) => field.label);
 };
