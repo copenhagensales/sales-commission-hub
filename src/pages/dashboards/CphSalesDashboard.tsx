@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -667,6 +667,10 @@ export default function CphSalesDashboard() {
       const workDaysWeek = countWorkDaysInPeriod(weekStart, todayStr);
       const workDaysMonth = countWorkDaysInPeriod(monthStart, todayStr);
       
+      // Calculate total work days in the entire week (for forecast)
+      const weekEndStr = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const totalWorkDaysInWeek = countWorkDaysInPeriod(weekStart, weekEndStr);
+      
       // Calculate total work days in the entire month (for forecast)
       const monthEndStr = format(endOfMonth(today), "yyyy-MM-dd");
       const totalWorkDaysInMonth = countWorkDaysInPeriod(monthStart, monthEndStr);
@@ -695,6 +699,7 @@ export default function CphSalesDashboard() {
           day: workDaysDay,
           week: workDaysWeek,
           month: workDaysMonth,
+          totalWeek: totalWorkDaysInWeek,
           totalMonth: totalWorkDaysInMonth,
         },
       }));
