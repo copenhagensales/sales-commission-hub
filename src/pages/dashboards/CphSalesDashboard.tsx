@@ -237,21 +237,21 @@ export default function CphSalesDashboard() {
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Salg i dag</CardTitle>
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
+      {/* KPI Cards - Compact for TV */}
+      <div className={`grid grid-cols-4 ${tvMode ? 'gap-3' : 'gap-6'}`}>
+        <Card className={`bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 ${tvMode ? 'py-2' : ''}`}>
+          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
+            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Salg i dag</CardTitle>
+            <TrendingUp className={`text-emerald-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-emerald-500">{displaySalesTotal}</div>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-600">
+          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
+            <div className={`font-bold text-emerald-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displaySalesTotal}</div>
+            <div className={`flex gap-1 ${tvMode ? 'mt-1' : 'mt-2'}`}>
+              <Badge variant="secondary" className={`bg-emerald-500/20 text-emerald-600 ${tvMode ? 'text-[10px] px-1.5 py-0' : ''}`}>
                 {displayConfirmed} bekræftet
               </Badge>
               {displayPending > 0 && (
-                <Badge variant="secondary" className="bg-amber-500/20 text-amber-600">
+                <Badge variant="secondary" className={`bg-amber-500/20 text-amber-600 ${tvMode ? 'text-[10px] px-1.5 py-0' : ''}`}>
                   {displayPending} afventer
                 </Badge>
               )}
@@ -259,42 +259,36 @@ export default function CphSalesDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Opkald i dag</CardTitle>
-            <Phone className="h-5 w-5 text-blue-500" />
+        <Card className={`bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 ${tvMode ? 'py-2' : ''}`}>
+          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
+            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Opkald i dag</CardTitle>
+            <Phone className={`text-blue-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-blue-500">{displayCalls}</div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Registrerede opkald
-            </p>
+          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
+            <div className={`font-bold text-blue-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayCalls}</div>
+            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Registrerede opkald</p>}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Aktive medarbejdere</CardTitle>
-            <Users className="h-5 w-5 text-purple-500" />
+        <Card className={`bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 ${tvMode ? 'py-2' : ''}`}>
+          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
+            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Aktive sælgere</CardTitle>
+            <Users className={`text-purple-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-purple-500">{displayActiveEmployees}</div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Sælgere
-            </p>
+          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
+            <div className={`font-bold text-purple-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayActiveEmployees}</div>
+            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Sælgere</p>}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Backoffice</CardTitle>
-            <Award className="h-5 w-5 text-orange-500" />
+        <Card className={`bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 ${tvMode ? 'py-2' : ''}`}>
+          <CardHeader className={`flex flex-row items-center justify-between ${tvMode ? 'pb-1 pt-2 px-4' : 'pb-2'}`}>
+            <CardTitle className={`font-medium text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>Backoffice</CardTitle>
+            <Award className={`text-orange-500 ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-orange-500">{displayStaffEmployees}</div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Aktive backoffice
-            </p>
+          <CardContent className={tvMode ? 'px-4 pb-2 pt-0' : ''}>
+            <div className={`font-bold text-orange-500 ${tvMode ? 'text-2xl' : 'text-4xl'}`}>{displayStaffEmployees}</div>
+            {!tvMode && <p className="text-xs text-muted-foreground mt-2">Aktive backoffice</p>}
           </CardContent>
         </Card>
       </div>
