@@ -410,25 +410,38 @@ export default function CphSalesDashboard() {
       const teamClientsResult = await teamClientsQuery;
       const teamClients = (teamClientsResult.data as any[]) || [];
 
-      // Get sales for the month with client info
-      const salesQuery = supabase
-        .from("sales")
-        .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
-        .gte("sale_datetime", `${monthStart}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
-      const salesResult = await salesQuery;
-      const salesData = (salesResult.data as any[]) || [];
+      // Get sales for the month with client info - use pagination to get all results
+      // Supabase has a default limit of 1000 rows, so we need to paginate
+      let salesData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: salesPage } = await supabase
+          .from("sales")
+          .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
+          .gte("sale_datetime", `${monthStart}T00:00:00`)
+          .lte("sale_datetime", `${todayStr}T23:59:59`)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (!salesPage || salesPage.length === 0) break;
+        salesData = [...salesData, ...salesPage];
+        if (salesPage.length < pageSize) break;
+        page++;
+      }
 
-      // Get sale_items with products for those sales
+      // Get sale_items with products for those sales - batch in chunks to avoid query size limits
       const saleIds = salesData.map((s) => s.id);
       let saleItems: any[] = [];
-      if (saleIds.length > 0) {
-        const saleItemsQuery = supabase
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < saleIds.length; i += BATCH_SIZE) {
+        const batchIds = saleIds.slice(i, i + BATCH_SIZE);
+        const { data: batchItems } = await supabase
           .from("sale_items")
           .select("sale_id, quantity, product_id, products(counts_as_sale)")
-          .in("sale_id", saleIds);
-        const saleItemsResult = await saleItemsQuery;
-        saleItems = (saleItemsResult.data as any[]) || [];
+          .in("sale_id", batchIds);
+        if (batchItems) {
+          saleItems = [...saleItems, ...batchItems];
+        }
       }
 
       // Map sale_items to sales
