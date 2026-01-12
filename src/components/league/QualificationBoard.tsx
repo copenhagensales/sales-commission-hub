@@ -92,12 +92,12 @@ export function QualificationBoard({
                 {isTopDivision ? (
                   <>
                     <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
-                    <span className="truncate">Division 1 - Topliga</span>
+                    <span className="truncate">Superligaen</span>
                   </>
                 ) : (
                   <>
                     <Medal className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span>Division {group.division}</span>
+                    <span>{group.division - 1}. Division</span>
                   </>
                 )}
                 <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
