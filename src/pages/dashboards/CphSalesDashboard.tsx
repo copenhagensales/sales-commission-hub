@@ -423,7 +423,7 @@ export default function CphSalesDashboard() {
                   <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
                     {/* Client logo */}
                     {data.logoUrl && (
-                      <div className={`flex items-center justify-center bg-white rounded-lg shadow-sm ${tvMode ? 'h-10 w-20 mb-2 p-1.5' : 'h-12 w-24 mb-3 p-2'}`}>
+                      <div className={`flex items-center justify-center bg-muted/40 backdrop-blur-sm rounded-lg ${tvMode ? 'h-12 w-24 mb-2 p-2' : 'h-14 w-28 mb-3 p-2.5'}`}>
                         <img 
                           src={data.logoUrl} 
                           alt={client} 
