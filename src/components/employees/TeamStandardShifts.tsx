@@ -489,17 +489,9 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     },
   });
 
-  // Toggle primary mutation
+  // Toggle primary mutation - allows multiple primaries, special shifts override for assigned employees
   const togglePrimaryMutation = useMutation({
     mutationFn: async ({ shiftId, isPrimary }: { shiftId: string; isPrimary: boolean }) => {
-      // If setting as primary, first unset all others for this team
-      if (isPrimary) {
-        await supabase
-          .from("team_standard_shifts")
-          .update({ is_primary: false })
-          .eq("team_id", teamId);
-      }
-      // Then set/unset this one
       const { error } = await supabase
         .from("team_standard_shifts")
         .update({ is_primary: isPrimary })
