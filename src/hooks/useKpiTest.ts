@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
 
 export type TestPeriod = "today" | "yesterday" | "this_week" | "this_month" | "last_30_days" | "custom";
 
@@ -103,103 +103,371 @@ export function useKpiTest() {
   return { runTest, isLoading, result, clearResult: () => setResult(null) };
 }
 
-// Test functions for each KPI
+// ============================================================================
+// SALES COUNT - Matches DailyReports logic exactly
+// ============================================================================
+// Sources: sale_items (via sales) + fieldmarketing_sales
+// - sale_items.quantity WHERE products.counts_as_sale != false
+// - fieldmarketing_sales: 1 per row
+// - No validation_status filter
+// ============================================================================
 async function testSalesCount(start: Date, end: Date, clientId?: string): Promise<TestResult> {
-  // Get sales with sale_items that have products with counts_as_sale = true
-  let query = supabase
-    .from("sale_items")
-    .select(`
-      quantity,
-      product:products!sale_items_product_id_fkey (
-        counts_as_sale
-      ),
-      sale:sales!inner (
-        sale_datetime,
-        client_campaign_id
-      )
-    `)
-    .gte("sale.sale_datetime", start.toISOString())
-    .lte("sale.sale_datetime", end.toISOString());
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  const authToken = session?.access_token || supabaseKey;
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Accept: "application/json" };
 
-  const { data, error } = await query;
-  if (error) throw error;
-
-  // Filter and sum
-  const filteredItems = (data || []).filter((item: any) => {
-    const countsAsSale = item.product?.counts_as_sale ?? true;
-    return countsAsSale;
+  // === TELESALES ===
+  // Build query with optional client filter via client_campaigns
+  const joinType = clientId ? "!inner" : "";
+  const selectClause = `id,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,product_id,products(counts_as_sale))`;
+  
+  let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
+  salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+  
+  if (clientId) {
+    salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
+  }
+  
+  const salesRes = await fetch(salesUrl, { headers });
+  const salesData = salesRes.ok ? await salesRes.json() : [];
+  
+  // Count telesales: sum of quantities where counts_as_sale != false
+  let telesalesCount = 0;
+  let withProductMapping = 0;
+  let withoutProductMapping = 0;
+  
+  salesData.forEach((sale: any) => {
+    (sale.sale_items || []).forEach((item: any) => {
+      const countsAsSale = item.products?.counts_as_sale !== false;
+      if (countsAsSale) {
+        telesalesCount += Number(item.quantity) || 1;
+      }
+      if (item.products) {
+        withProductMapping++;
+      } else {
+        withoutProductMapping++;
+      }
+    });
   });
 
-  const total = filteredItems.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-  const withProduct = filteredItems.filter((i: any) => i.product).length;
-  const withoutProduct = filteredItems.length - withProduct;
+  // === FIELDMARKETING ===
+  let fmQuery = supabase
+    .from("fieldmarketing_sales")
+    .select("id", { count: "exact" })
+    .gte("registered_at", `${startStr}T00:00:00`)
+    .lte("registered_at", `${endStr}T23:59:59`);
+  
+  if (clientId) {
+    fmQuery = fmQuery.eq("client_id", clientId);
+  }
+  
+  const { count: fmCount } = await fmQuery;
+  const fieldmarketingCount = fmCount || 0;
+  
+  const totalSales = telesalesCount + fieldmarketingCount;
 
   return {
-    value: total,
+    value: totalSales,
     queryTimeMs: 0,
     breakdown: {
-      "Med produkt-mapping": withProduct,
-      "Uden produkt-mapping": withoutProduct,
-      "Rækker behandlet": data?.length || 0,
+      "Telesales": telesalesCount,
+      "Fieldmarketing": fieldmarketingCount,
+      "Med produkt-mapping": withProductMapping,
+      "Uden produkt-mapping": withoutProductMapping,
+      "Antal salg (sales tabel)": salesData.length,
     },
-    rowCount: data?.length || 0,
+    rowCount: salesData.length + fieldmarketingCount,
   };
 }
 
+// ============================================================================
+// TOTAL COMMISSION - Matches DailyReports logic exactly
+// ============================================================================
+// Sources: sale_items + product_campaign_overrides + fieldmarketing_sales
+// Priority:
+//   1. product_campaign_overrides.commission_dkk (if dialer_campaign matches)
+//   2. sale_items.mapped_commission (already includes quantity - DO NOT multiply)
+//   3. For FM: products.commission_dkk (matched by product_name)
+// ============================================================================
 async function testTotalCommission(start: Date, end: Date, clientId?: string): Promise<TestResult> {
-  const { data, error } = await supabase
-    .from("sale_items")
-    .select(`
-      mapped_commission,
-      sale:sales!inner (
-        sale_datetime
-      )
-    `)
-    .gte("sale.sale_datetime", start.toISOString())
-    .lte("sale.sale_datetime", end.toISOString());
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  const authToken = session?.access_token || supabaseKey;
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Accept: "application/json" };
 
-  if (error) throw error;
+  // === Fetch campaign mappings for override lookup ===
+  const { data: campaignMappings } = await supabase
+    .from("adversus_campaign_mappings")
+    .select("id, adversus_campaign_id");
+  
+  const dialerCampaignToMappingId = new Map<string, string>();
+  campaignMappings?.forEach(m => {
+    if (m.adversus_campaign_id) {
+      dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+    }
+  });
 
-  const total = (data || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0);
-  const withCommission = (data || []).filter((i: any) => i.mapped_commission && i.mapped_commission > 0).length;
+  // === Fetch product campaign overrides ===
+  const { data: productCampaignOverrides } = await supabase
+    .from("product_campaign_overrides")
+    .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+  
+  const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+  productCampaignOverrides?.forEach(o => {
+    const key = `${o.product_id}_${o.campaign_mapping_id}`;
+    campaignOverrideMap.set(key, {
+      commission: o.commission_dkk ?? 0,
+      revenue: o.revenue_dkk ?? 0
+    });
+  });
+
+  // === TELESALES ===
+  const joinType = clientId ? "!inner" : "";
+  const selectClause = `id,sale_datetime,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(mapped_commission,product_id)`;
+  
+  let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
+  salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+  
+  if (clientId) {
+    salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
+  }
+  
+  const salesRes = await fetch(salesUrl, { headers });
+  const salesData = salesRes.ok ? await salesRes.json() : [];
+  
+  let telesalesCommission = 0;
+  let withOverride = 0;
+  let withMapped = 0;
+  
+  salesData.forEach((sale: any) => {
+    const dialerCampaignId = sale.dialer_campaign_id;
+    const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
+    
+    (sale.sale_items || []).forEach((item: any) => {
+      const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+      const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+      
+      if (override) {
+        telesalesCommission += override.commission;
+        withOverride++;
+      } else {
+        telesalesCommission += Number(item.mapped_commission) || 0;
+        if (item.mapped_commission) withMapped++;
+      }
+    });
+  });
+
+  // === FIELDMARKETING ===
+  // Fetch products for FM commission lookup by product_name
+  const { data: allProducts } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk");
+  
+  // Get campaign overrides - prefer highest commission
+  const { data: campaignOverrides } = await supabase
+    .from("product_campaign_overrides")
+    .select("product_id, commission_dkk");
+  
+  const overrideByProductId = new Map<string, number>();
+  campaignOverrides?.forEach(o => {
+    const existing = overrideByProductId.get(o.product_id);
+    if (!existing || (o.commission_dkk ?? 0) > existing) {
+      overrideByProductId.set(o.product_id, o.commission_dkk ?? 0);
+    }
+  });
+  
+  const productCommissionMap = new Map<string, number>();
+  allProducts?.forEach(p => {
+    if (p.name) {
+      const override = overrideByProductId.get(p.id);
+      const commission = override ?? p.commission_dkk ?? 0;
+      productCommissionMap.set(p.name.toLowerCase(), commission);
+    }
+  });
+
+  let fmQuery = supabase
+    .from("fieldmarketing_sales")
+    .select("id, product_name")
+    .gte("registered_at", `${startStr}T00:00:00`)
+    .lte("registered_at", `${endStr}T23:59:59`);
+  
+  if (clientId) {
+    fmQuery = fmQuery.eq("client_id", clientId);
+  }
+  
+  const { data: fmSales } = await fmQuery;
+  
+  let fmCommission = 0;
+  (fmSales || []).forEach((sale: any) => {
+    const productName = (sale.product_name || "").toLowerCase();
+    fmCommission += productCommissionMap.get(productName) || 0;
+  });
+
+  const totalCommission = telesalesCommission + fmCommission;
 
   return {
-    value: `${total.toLocaleString("da-DK")} DKK`,
+    value: `${Math.round(totalCommission).toLocaleString("da-DK")} DKK`,
     queryTimeMs: 0,
     breakdown: {
-      "Med provision": withCommission,
-      "Uden provision": (data?.length || 0) - withCommission,
+      "Telesales provision": `${Math.round(telesalesCommission).toLocaleString("da-DK")} DKK`,
+      "Fieldmarketing provision": `${Math.round(fmCommission).toLocaleString("da-DK")} DKK`,
+      "Med campaign override": withOverride,
+      "Med mapped_commission": withMapped,
+      "FM salg": fmSales?.length || 0,
     },
-    rowCount: data?.length || 0,
+    rowCount: salesData.length + (fmSales?.length || 0),
   };
 }
 
+// ============================================================================
+// TOTAL REVENUE - Matches DailyReports logic exactly
+// ============================================================================
+// Same structure as commission, but uses revenue_dkk/mapped_revenue
+// ============================================================================
 async function testTotalRevenue(start: Date, end: Date, clientId?: string): Promise<TestResult> {
-  const { data, error } = await supabase
-    .from("sale_items")
-    .select(`
-      mapped_revenue,
-      sale:sales!inner (
-        sale_datetime
-      )
-    `)
-    .gte("sale.sale_datetime", start.toISOString())
-    .lte("sale.sale_datetime", end.toISOString());
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  const authToken = session?.access_token || supabaseKey;
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Accept: "application/json" };
 
-  if (error) throw error;
+  // === Fetch campaign mappings for override lookup ===
+  const { data: campaignMappings } = await supabase
+    .from("adversus_campaign_mappings")
+    .select("id, adversus_campaign_id");
+  
+  const dialerCampaignToMappingId = new Map<string, string>();
+  campaignMappings?.forEach(m => {
+    if (m.adversus_campaign_id) {
+      dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+    }
+  });
 
-  const total = (data || []).reduce((sum: number, item: any) => sum + (item.mapped_revenue || 0), 0);
+  // === Fetch product campaign overrides ===
+  const { data: productCampaignOverrides } = await supabase
+    .from("product_campaign_overrides")
+    .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+  
+  const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+  productCampaignOverrides?.forEach(o => {
+    const key = `${o.product_id}_${o.campaign_mapping_id}`;
+    campaignOverrideMap.set(key, {
+      commission: o.commission_dkk ?? 0,
+      revenue: o.revenue_dkk ?? 0
+    });
+  });
+
+  // === TELESALES ===
+  const joinType = clientId ? "!inner" : "";
+  const selectClause = `id,sale_datetime,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(mapped_revenue,product_id)`;
+  
+  let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
+  salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+  
+  if (clientId) {
+    salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
+  }
+  
+  const salesRes = await fetch(salesUrl, { headers });
+  const salesData = salesRes.ok ? await salesRes.json() : [];
+  
+  let telesalesRevenue = 0;
+  let withOverride = 0;
+  let withMapped = 0;
+  
+  salesData.forEach((sale: any) => {
+    const dialerCampaignId = sale.dialer_campaign_id;
+    const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
+    
+    (sale.sale_items || []).forEach((item: any) => {
+      const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
+      const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+      
+      if (override) {
+        telesalesRevenue += override.revenue;
+        withOverride++;
+      } else {
+        telesalesRevenue += Number(item.mapped_revenue) || 0;
+        if (item.mapped_revenue) withMapped++;
+      }
+    });
+  });
+
+  // === FIELDMARKETING ===
+  const { data: allProducts } = await supabase
+    .from("products")
+    .select("id, name, revenue_dkk");
+  
+  const { data: campaignOverrides } = await supabase
+    .from("product_campaign_overrides")
+    .select("product_id, revenue_dkk");
+  
+  const overrideByProductId = new Map<string, number>();
+  campaignOverrides?.forEach(o => {
+    const existing = overrideByProductId.get(o.product_id);
+    if (!existing || (o.revenue_dkk ?? 0) > existing) {
+      overrideByProductId.set(o.product_id, o.revenue_dkk ?? 0);
+    }
+  });
+  
+  const productRevenueMap = new Map<string, number>();
+  allProducts?.forEach(p => {
+    if (p.name) {
+      const override = overrideByProductId.get(p.id);
+      const revenue = override ?? p.revenue_dkk ?? 0;
+      productRevenueMap.set(p.name.toLowerCase(), revenue);
+    }
+  });
+
+  let fmQuery = supabase
+    .from("fieldmarketing_sales")
+    .select("id, product_name")
+    .gte("registered_at", `${startStr}T00:00:00`)
+    .lte("registered_at", `${endStr}T23:59:59`);
+  
+  if (clientId) {
+    fmQuery = fmQuery.eq("client_id", clientId);
+  }
+  
+  const { data: fmSales } = await fmQuery;
+  
+  let fmRevenue = 0;
+  (fmSales || []).forEach((sale: any) => {
+    const productName = (sale.product_name || "").toLowerCase();
+    fmRevenue += productRevenueMap.get(productName) || 0;
+  });
+
+  const totalRevenue = telesalesRevenue + fmRevenue;
 
   return {
-    value: `${total.toLocaleString("da-DK")} DKK`,
+    value: `${Math.round(totalRevenue).toLocaleString("da-DK")} DKK`,
     queryTimeMs: 0,
     breakdown: {
-      "Med omsætning": (data || []).filter((i: any) => i.mapped_revenue && i.mapped_revenue > 0).length,
+      "Telesales omsætning": `${Math.round(telesalesRevenue).toLocaleString("da-DK")} DKK`,
+      "Fieldmarketing omsætning": `${Math.round(fmRevenue).toLocaleString("da-DK")} DKK`,
+      "Med campaign override": withOverride,
+      "Med mapped_revenue": withMapped,
+      "FM salg": fmSales?.length || 0,
     },
-    rowCount: data?.length || 0,
+    rowCount: salesData.length + (fmSales?.length || 0),
   };
 }
 
+// ============================================================================
+// ACTIVE EMPLOYEES
+// ============================================================================
 async function testActiveEmployees(): Promise<TestResult> {
   const { data, error, count } = await supabase
     .from("employee_master_data")
@@ -223,6 +491,9 @@ async function testActiveEmployees(): Promise<TestResult> {
   };
 }
 
+// ============================================================================
+// CALLS TOTAL
+// ============================================================================
 async function testCallsTotal(start: Date, end: Date): Promise<TestResult> {
   const { count, error } = await supabase
     .from("dialer_calls")
@@ -239,6 +510,9 @@ async function testCallsTotal(start: Date, end: Date): Promise<TestResult> {
   };
 }
 
+// ============================================================================
+// CALLS ANSWERED
+// ============================================================================
 async function testCallsAnswered(start: Date, end: Date): Promise<TestResult> {
   const { count, error } = await supabase
     .from("dialer_calls")
