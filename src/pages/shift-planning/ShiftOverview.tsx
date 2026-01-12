@@ -184,18 +184,14 @@ export default function ShiftOverview() {
       const agentIds = data.map((m) => m.agent_id);
       const { data: agents, error: agentsError } = await supabase
         .from("agents")
-        .select("id, name, email")
+        .select("id, name")
         .in("id", agentIds);
       if (agentsError) throw agentsError;
 
-      return data.map((mapping) => {
-        const agent = agents?.find((a) => a.id === mapping.agent_id);
-        return {
-          employee_id: mapping.employee_id,
-          agent_name: agent?.name || null,
-          agent_email: agent?.email || null,
-        };
-      });
+      return data.map((mapping) => ({
+        employee_id: mapping.employee_id,
+        agent_name: agents?.find((a) => a.id === mapping.agent_id)?.name || null,
+      }));
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -208,7 +204,7 @@ export default function ShiftOverview() {
       // Using 'or' filter to include null status values
       const { data, error } = await supabase
         .from("sales")
-        .select("id, agent_name, agent_email, sale_datetime, status")
+        .select("id, agent_name, sale_datetime, status")
         .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
         .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
         .or("status.in.(pending,approved),status.is.null");
@@ -293,6 +289,37 @@ export default function ShiftOverview() {
     }) || null;
   };
 
+  // Check if employee has missing shift (sales but no shift/timestamp)
+  const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
+    if (!weeklySales || !agentMappings) return false;
+    
+    const dateStr = format(date, "yyyy-MM-dd");
+    
+    // Find agent name for this employee
+    const mapping = agentMappings.find(m => m.employee_id === employeeId);
+    if (!mapping || !mapping.agent_name) return false;
+    
+    // Check if there are sales for this employee on this date
+    const hasSales = weeklySales.some(sale => {
+      if (!sale.agent_name || !sale.sale_datetime) return false;
+      const saleDate = sale.sale_datetime.split("T")[0];
+      return sale.agent_name.toLowerCase() === mapping.agent_name?.toLowerCase() && saleDate === dateStr;
+    });
+    
+    if (!hasSales) return false;
+    
+    // Check if has shift
+    const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
+    if (hasShift) return false;
+    
+    // Check if has timestamp
+    const hasTimestamp = timeStamps?.some(ts => {
+      const tsDate = ts.clock_in.split("T")[0];
+      return ts.employee_id === employeeId && tsDate === dateStr;
+    });
+    
+    return !hasTimestamp;
+  }, [weeklySales, agentMappings, shifts, timeStamps]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
@@ -528,76 +555,6 @@ export default function ShiftOverview() {
     const primaryShift = primaryShiftsData?.shifts.find(s => s.team_id === membership.team_id);
     return primaryShift?.hours_source || 'shift';
   }, [teamMemberships, primaryShiftsData]);
-
-  // Check if employee has missing shift (sales but no shift/timestamp)
-  // Respects hours_source setting: 'timestamp' = check clock-in/out, 'shift' = check planned shifts
-  const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
-    if (!weeklySales || !agentMappings) return false;
-    
-    const dateStr = format(date, "yyyy-MM-dd");
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    
-    // Find agent mapping for this employee
-    const mapping = agentMappings.find(m => m.employee_id === employeeId);
-    if (!mapping || (!mapping.agent_name && !mapping.agent_email)) return false;
-    
-    // Check if there are sales for this employee on this date
-    const hasSales = weeklySales.some(sale => {
-      if (!sale.sale_datetime) return false;
-      // Handle both ISO format (with T) and database format (with space)
-      const saleDate = sale.sale_datetime.split(/[T ]/)[0];
-      if (saleDate !== dateStr) return false;
-      
-      // PRIMARY: Match by agent_email (most reliable - same as DailyReports)
-      const saleEmail = (sale.agent_email || "").toLowerCase();
-      const mappedEmail = mapping.agent_email?.toLowerCase();
-      
-      if (mappedEmail && saleEmail && saleEmail === mappedEmail) {
-        return true;
-      }
-      
-      // FALLBACK: Match by agent_name if email doesn't match
-      const saleAgent = (sale.agent_name || "").toLowerCase();
-      const mappedName = mapping.agent_name?.toLowerCase();
-      
-      if (mappedEmail && saleAgent === mappedEmail) return true;
-      if (mappedName && saleAgent === mappedName) return true;
-      if (mappedName && saleAgent.split('@')[0] === mappedName) return true;
-      
-      return false;
-    });
-    
-    if (!hasSales) return false;
-    
-    // Get hours_source for this employee's team (same logic as DailyReports)
-    const hoursSource = getHoursSourceForEmployee(employeeId);
-    
-    if (hoursSource === 'timestamp') {
-      // For timestamp-based teams: ONLY check if there's a clock-in/out
-      const hasTimestamp = timeStamps?.some(ts => {
-        const tsDate = ts.clock_in.split("T")[0];
-        return ts.employee_id === employeeId && tsDate === dateStr;
-      });
-      return !hasTimestamp; // Missing if no timestamp
-    } else {
-      // For shift-based teams: check explicit shift OR standard shift
-      // Check if has explicit shift for this date
-      const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
-      if (hasShift) return false;
-      
-      // Check if employee has a standard shift (from team or employee record)
-      const teamStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date);
-      if (teamStandardShift) return false;
-      
-      // For weekdays, also check employee's own standard_start_time field
-      if (!isWeekend) {
-        const employee = employees?.find(e => e.id === employeeId);
-        if (employee?.standard_start_time) return false;
-      }
-      
-      return true; // Missing if no shift found
-    }
-  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay, employees, getHoursSourceForEmployee]);
 
   const getDailyBonusEligibility = useCallback((
     employeeId: string, 
@@ -1209,8 +1166,7 @@ export default function ShiftOverview() {
                     const hasStatus = isVacation || isSick || isLate;
                     
                     // Missing shift detection (has sales but no shift/timestamp)
-                    // hasMissingShiftForDate handles all logic including hours_source setting
-                    const isMissingShift = hasMissingShiftForDate(employee.id, day);
+                    const isMissingShift = !hasShift && !timeStamp && hasMissingShiftForDate(employee.id, day);
                     
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);

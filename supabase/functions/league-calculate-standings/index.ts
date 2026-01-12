@@ -186,49 +186,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[league-calculate-standings] Found ${sales?.length || 0} telesales in period`);
-
-    // 6b. Get all products with commission for Fieldmarketing lookup
-    const { data: products, error: productsError } = await supabase
-      .from("products")
-      .select("name, commission_dkk");
-
-    if (productsError) {
-      console.error("[league-calculate-standings] Failed to fetch products:", productsError);
-    }
-
-    const productCommissionMap = new Map<string, number>(
-      (products || []).map((p: { name: string; commission_dkk: number | null }) => [p.name, p.commission_dkk || 0])
-    );
-    console.log(`[league-calculate-standings] Loaded ${productCommissionMap.size} products for FM commission lookup`);
-
-    // 6c. Get Fieldmarketing sales in the qualification period
-    const { data: fmSales, error: fmError } = await supabase
-      .from("fieldmarketing_sales")
-      .select("id, seller_id, product_name, registered_at")
-      .gte("registered_at", sourceStart)
-      .lte("registered_at", sourceEnd);
-
-    if (fmError) {
-      console.error("[league-calculate-standings] Failed to fetch fieldmarketing sales:", fmError);
-    }
-
-    console.log(`[league-calculate-standings] Found ${fmSales?.length || 0} fieldmarketing sales in period`);
-
-    // Calculate FM provision per employee
-    const employeeFmProvision: Record<string, { commission: number; deals: number }> = {};
-    for (const sale of fmSales || []) {
-      if (employeeIds.includes(sale.seller_id)) {
-        if (!employeeFmProvision[sale.seller_id]) {
-          employeeFmProvision[sale.seller_id] = { commission: 0, deals: 0 };
-        }
-        const productCommission = productCommissionMap.get(sale.product_name) || 0;
-        employeeFmProvision[sale.seller_id].commission += productCommission;
-        employeeFmProvision[sale.seller_id].deals += 1;
-      }
-    }
-
-    console.log(`[league-calculate-standings] FM provision for ${Object.keys(employeeFmProvision).length} employees`);
+    console.log(`[league-calculate-standings] Found ${sales?.length || 0} sales in period`);
 
     // Build sale_id -> campaign_mapping_id map for override lookup
     const saleToCampaignMappingId: Record<string, string | null> = {};
@@ -321,25 +279,12 @@ Deno.serve(async (req) => {
       let currentProvision = 0;
       let dealsCount = 0;
 
-      // Telesales provision
       if (agentEmail && saleItemsMap[agentEmail]) {
         currentProvision = saleItemsMap[agentEmail].total_commission;
         dealsCount = saleItemsMap[agentEmail].deals_count;
-        console.log(`[league-calculate-standings] Employee ${employeeId} telesales: ${currentProvision} kr, ${dealsCount} deals`);
-      }
-
-      // Add Fieldmarketing provision
-      const fmData = employeeFmProvision[employeeId];
-      if (fmData) {
-        console.log(`[league-calculate-standings] Employee ${employeeId} FM: ${fmData.commission} kr, ${fmData.deals} deals`);
-        currentProvision += fmData.commission;
-        dealsCount += fmData.deals;
-      }
-
-      if (currentProvision === 0 && dealsCount === 0) {
-        console.log(`[league-calculate-standings] Employee ${employeeId}: No sales found (email: ${agentEmail || 'none'})`);
+        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmail}): ${currentProvision} kr, ${dealsCount} deals`);
       } else {
-        console.log(`[league-calculate-standings] Employee ${employeeId} TOTAL: ${currentProvision} kr, ${dealsCount} deals`);
+        console.log(`[league-calculate-standings] Employee ${employeeId}: No agent email or no sales found (email: ${agentEmail || 'none'})`);
       }
 
       // ALWAYS add standing for enrolled players, even with 0 provision
