@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, Cale
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
-import { EmployeeCommissionHistory } from "@/components/employee/EmployeeCommissionHistory";
+import { HistorikTabContent } from "@/components/employee/HistorikTabContent";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
 import { EditableRow, ContactRow, SelectRow, TableSection, DateRow } from "@/components/employee/EmployeeDetailFields";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
@@ -1092,39 +1092,7 @@ export default function EmployeeDetail() {
 
           <TabsContent value="historik" className="mt-6">
             {/* Commission History with Sales Development Chart */}
-            {(() => {
-              // Calculate payroll periods (15th to 14th)
-              const now = new Date();
-              const currentDay = now.getDate();
-              let currentPeriodStart: Date;
-              let currentPeriodEnd: Date;
-              
-              if (currentDay >= 15) {
-                // Current period: 15th of this month to 14th of next month
-                currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 15);
-                currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14, 23, 59, 59);
-              } else {
-                // Current period: 15th of last month to 14th of this month
-                currentPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
-                currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
-              }
-
-              return (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">
-                      Lønperiode: {format(currentPeriodStart, "d. MMM", { locale: da })} - {format(currentPeriodEnd, "d. MMM", { locale: da })}
-                    </h3>
-                  </div>
-                  
-                  <EmployeeCommissionHistory
-                    employeeId={id!}
-                    periodStart={currentPeriodStart}
-                    periodEnd={currentPeriodEnd}
-                  />
-                </div>
-              );
-            })()}
+            <HistorikTabContent employeeId={id!} />
 
             {/* Time stamps section - collapsible */}
             <details className="mt-6">
