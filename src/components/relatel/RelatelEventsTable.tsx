@@ -26,7 +26,8 @@ import {
   Mail,
   Building2,
   Hash,
-  FileJson
+  FileJson,
+  ClipboardList
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -136,6 +137,9 @@ export default function RelatelEventsTable() {
       lastModifiedBy: payload.lastModifiedBy,
       lastModifiedTime: payload.lastModifiedTime,
       lines: payload.lines || [],
+      // New: Lead result fields from Adversus
+      leadResultFields: payload.leadResultFields || {},
+      leadResultData: payload.leadResultData || [],
     };
   };
 
@@ -383,6 +387,30 @@ export default function RelatelEventsTable() {
                                             ))}
                                           </TableBody>
                                         </Table>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Lead Result Fields */}
+                                  {payloadInfo?.leadResultFields && Object.keys(payloadInfo.leadResultFields).length > 0 && (
+                                    <div className="space-y-2">
+                                      <h4 className="text-sm font-medium flex items-center gap-1">
+                                        <ClipboardList className="h-4 w-4" /> Resultatfelter ({Object.keys(payloadInfo.leadResultFields).length})
+                                      </h4>
+                                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 bg-background border rounded-md">
+                                        {Object.entries(payloadInfo.leadResultFields).map(([fieldName, fieldValue]) => (
+                                          <div key={fieldName} className="space-y-0.5">
+                                            <p className="text-xs text-muted-foreground truncate" title={fieldName}>
+                                              {fieldName}
+                                            </p>
+                                            <p className="text-sm font-medium truncate" title={String(fieldValue ?? "-")}>
+                                              {fieldValue !== null && fieldValue !== undefined && fieldValue !== "" 
+                                                ? String(fieldValue) 
+                                                : "-"
+                                              }
+                                            </p>
+                                          </div>
+                                        ))}
                                       </div>
                                     </div>
                                   )}
