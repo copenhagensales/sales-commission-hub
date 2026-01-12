@@ -293,68 +293,6 @@ export default function ShiftOverview() {
     }) || null;
   };
 
-  // Check if employee has missing shift (sales but no shift/timestamp)
-  const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
-    if (!weeklySales || !agentMappings) return false;
-    
-    const dateStr = format(date, "yyyy-MM-dd");
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    
-    // Find agent mapping for this employee
-    const mapping = agentMappings.find(m => m.employee_id === employeeId);
-    if (!mapping || (!mapping.agent_name && !mapping.agent_email)) return false;
-    
-    // Check if there are sales for this employee on this date
-    const hasSales = weeklySales.some(sale => {
-      if (!sale.agent_name || !sale.sale_datetime) return false;
-      // Handle both ISO format (with T) and database format (with space)
-      const saleDate = sale.sale_datetime.split(/[T ]/)[0];
-      if (saleDate !== dateStr) return false;
-      
-      const saleAgent = sale.agent_name.toLowerCase();
-      const mappedName = mapping.agent_name?.toLowerCase();
-      const mappedEmail = mapping.agent_email?.toLowerCase();
-      
-      // Match by email (most reliable)
-      if (mappedEmail && saleAgent === mappedEmail) return true;
-      
-      // Match by name
-      if (mappedName) {
-        if (saleAgent === mappedName) return true;
-        if (saleAgent.startsWith(mappedName + '@')) return true;
-        if (saleAgent.split('@')[0] === mappedName) return true;
-      }
-      
-      return false;
-    });
-    
-    if (!hasSales) return false;
-    
-    // Check if has explicit shift for this date
-    const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
-    if (hasShift) return false;
-    
-    // Check if has timestamp
-    const hasTimestamp = timeStamps?.some(ts => {
-      const tsDate = ts.clock_in.split("T")[0];
-      return ts.employee_id === employeeId && tsDate === dateStr;
-    });
-    if (hasTimestamp) return false;
-    
-    // Check if employee has a standard shift (from team or employee record)
-    // For weekdays: check both team standard shifts and employee's standard_start_time
-    // For weekends: only explicit team weekend config counts
-    const teamStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date);
-    if (teamStandardShift) return false;
-    
-    // For weekdays, also check employee's own standard_start_time field
-    if (!isWeekend) {
-      const employee = employees?.find(e => e.id === employeeId);
-      if (employee?.standard_start_time) return false;
-    }
-    
-    return true;
-  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay, employees]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
@@ -590,6 +528,74 @@ export default function ShiftOverview() {
     const primaryShift = primaryShiftsData?.shifts.find(s => s.team_id === membership.team_id);
     return primaryShift?.hours_source || 'shift';
   }, [teamMemberships, primaryShiftsData]);
+
+  // Check if employee has missing shift (sales but no shift/timestamp)
+  // Respects hours_source setting: 'timestamp' = check clock-in/out, 'shift' = check planned shifts
+  const hasMissingShiftForDate = useCallback((employeeId: string, date: Date): boolean => {
+    if (!weeklySales || !agentMappings) return false;
+    
+    const dateStr = format(date, "yyyy-MM-dd");
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    
+    // Find agent mapping for this employee
+    const mapping = agentMappings.find(m => m.employee_id === employeeId);
+    if (!mapping || (!mapping.agent_name && !mapping.agent_email)) return false;
+    
+    // Check if there are sales for this employee on this date
+    const hasSales = weeklySales.some(sale => {
+      if (!sale.agent_name || !sale.sale_datetime) return false;
+      // Handle both ISO format (with T) and database format (with space)
+      const saleDate = sale.sale_datetime.split(/[T ]/)[0];
+      if (saleDate !== dateStr) return false;
+      
+      const saleAgent = sale.agent_name.toLowerCase();
+      const mappedName = mapping.agent_name?.toLowerCase();
+      const mappedEmail = mapping.agent_email?.toLowerCase();
+      
+      // Match by email (most reliable)
+      if (mappedEmail && saleAgent === mappedEmail) return true;
+      
+      // Match by name
+      if (mappedName) {
+        if (saleAgent === mappedName) return true;
+        if (saleAgent.startsWith(mappedName + '@')) return true;
+        if (saleAgent.split('@')[0] === mappedName) return true;
+      }
+      
+      return false;
+    });
+    
+    if (!hasSales) return false;
+    
+    // Get hours_source for this employee's team (same logic as DailyReports)
+    const hoursSource = getHoursSourceForEmployee(employeeId);
+    
+    if (hoursSource === 'timestamp') {
+      // For timestamp-based teams: ONLY check if there's a clock-in/out
+      const hasTimestamp = timeStamps?.some(ts => {
+        const tsDate = ts.clock_in.split("T")[0];
+        return ts.employee_id === employeeId && tsDate === dateStr;
+      });
+      return !hasTimestamp; // Missing if no timestamp
+    } else {
+      // For shift-based teams: check explicit shift OR standard shift
+      // Check if has explicit shift for this date
+      const hasShift = shifts?.some(s => s.employee_id === employeeId && s.date === dateStr);
+      if (hasShift) return false;
+      
+      // Check if employee has a standard shift (from team or employee record)
+      const teamStandardShift = getWorkTimesForEmployeeAndDay(employeeId, date);
+      if (teamStandardShift) return false;
+      
+      // For weekdays, also check employee's own standard_start_time field
+      if (!isWeekend) {
+        const employee = employees?.find(e => e.id === employeeId);
+        if (employee?.standard_start_time) return false;
+      }
+      
+      return true; // Missing if no shift found
+    }
+  }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay, employees, getHoursSourceForEmployee]);
 
   const getDailyBonusEligibility = useCallback((
     employeeId: string, 
