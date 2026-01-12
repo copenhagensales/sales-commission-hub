@@ -24,7 +24,7 @@ import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 
-type MessageType = "sms" | "email" | "call";
+type MessageType = "sms" | "email" | "call" | "sent";
 
 interface Message {
   id: string;
@@ -272,7 +272,7 @@ export default function Messages() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MessageType | "all")} className="flex flex-col flex-1 min-h-0">
-              <TabsList className="bg-muted/50 border border-border shrink-0 w-full grid grid-cols-4">
+              <TabsList className="bg-muted/50 border border-border shrink-0 w-full grid grid-cols-5">
                 <TabsTrigger value="all" className="text-xs data-[state=active]:bg-background">
                   Alle
                 </TabsTrigger>
@@ -284,6 +284,9 @@ export default function Messages() {
                 </TabsTrigger>
                 <TabsTrigger value="call" className="text-xs data-[state=active]:bg-background">
                   Opkald
+                </TabsTrigger>
+                <TabsTrigger value="sent" className="text-xs data-[state=active]:bg-background">
+                  Sendt
                 </TabsTrigger>
               </TabsList>
 
@@ -386,6 +389,71 @@ export default function Messages() {
                   </ScrollArea>
                 </TabsContent>
               ))}
+
+              {/* Sent messages tab - outbound SMS and Email */}
+              <TabsContent value="sent" className="flex-1 min-h-0 mt-3">
+                <ScrollArea className="h-full">
+                  <div className="space-y-2 pr-2">
+                    {messages
+                      .filter(m => m.direction === 'outbound' && (m.type === 'sms' || m.type === 'email'))
+                      .filter(m => 
+                        searchQuery === '' || 
+                        m.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        m.phone_number?.includes(searchQuery)
+                      )
+                      .map((message) => {
+                        // Find candidate for this message
+                        const normalizedPhone = message.phone_number?.replace(/\D/g, '').slice(-8);
+                        const matchedCandidate = candidates.find(c => 
+                          c.phone?.replace(/\D/g, '').slice(-8) === normalizedPhone ||
+                          c.email?.toLowerCase() === message.phone_number?.toLowerCase()
+                        );
+                        
+                        return (
+                          <Card 
+                            key={message.id} 
+                            className="bg-card border-border"
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex items-start gap-3">
+                                <div className={cn("p-2 rounded-lg shrink-0", getTypeColor(message.type))}>
+                                  {getTypeIcon(message.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className={cn("text-xs", getTypeColor(message.type))}>
+                                        ↑ {message.type.toUpperCase()}
+                                      </Badge>
+                                      <span className="text-xs font-medium text-muted-foreground">
+                                        til {matchedCandidate 
+                                          ? `${matchedCandidate.first_name} ${matchedCandidate.last_name}` 
+                                          : message.phone_number || 'Ukendt'
+                                        }
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <p className="text-sm text-foreground line-clamp-2">
+                                    {message.content || "Ingen indhold"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {format(new Date(message.created_at), "d. MMM HH:mm", { locale: da })}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    {messages.filter(m => m.direction === 'outbound' && (m.type === 'sms' || m.type === 'email')).length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Send className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                        <p>Ingen sendte beskeder endnu</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
             </Tabs>
           </div>
 
