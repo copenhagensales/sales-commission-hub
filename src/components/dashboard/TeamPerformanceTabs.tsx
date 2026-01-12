@@ -18,7 +18,7 @@ interface TeamData {
   clients?: ClientSalesData[];
   sick: { day: number; week: number; month: number };
   vacation: { day: number; week: number; month: number };
-  workDays?: { day: number; week: number; month: number };
+  workDays?: { day: number; week: number; month: number; totalMonth?: number };
 }
 
 interface TeamPerformanceTabsProps {
@@ -42,6 +42,15 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
   const getSickValue = (team: TeamData) => team.sick[period];
   const getVacationValue = (team: TeamData) => team.vacation[period];
   const getWorkDays = (team: TeamData) => team.workDays?.[period] || 1;
+  const getTotalMonthWorkDays = () => data[0]?.workDays?.totalMonth || 1;
+
+  // Calculate forecast (only for month view)
+  const getForecast = (salesSoFar: number, workDaysSoFar: number): number | null => {
+    if (period !== "month") return null;
+    if (workDaysSoFar === 0) return 0;
+    const totalWorkDays = getTotalMonthWorkDays();
+    return Math.round((salesSoFar / workDaysSoFar) * totalWorkDays);
+  };
 
   // Get client sales for a team
   const getClientSales = (team: TeamData) => {
@@ -108,6 +117,13 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                     📈 Salg
                   </span>
                 </TableHead>
+                {period === "month" && (
+                  <TableHead className="text-center font-semibold w-28">
+                    <span className="flex items-center justify-center gap-1">
+                      📊 Forecast
+                    </span>
+                  </TableHead>
+                )}
                 <TableHead className="text-center font-semibold w-28">
                   <span className="flex items-center justify-center gap-1">
                     🤒 Sygdom
@@ -126,6 +142,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                 const sick = formatAbsence(getSickValue(team), possibleDays);
                 const vacation = formatAbsence(getVacationValue(team), possibleDays);
                 const clientSales = getClientSales(team);
+                const teamForecast = getForecast(getSalesValue(team), getWorkDays(team));
                 
                 return (
                   <TableRow key={team.id}>
@@ -159,6 +176,23 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                         )}
                       </div>
                     </TableCell>
+                    {period === "month" && teamForecast !== null && (
+                      <TableCell className="text-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-lg font-semibold text-primary">
+                              → {teamForecast}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Forecast baseret på {getSalesValue(team)} salg over {getWorkDays(team)} arbejdsdage</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              = {(getSalesValue(team) / (getWorkDays(team) || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    )}
                     <TableCell className="text-center">
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -211,6 +245,23 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                     {totalSales}
                   </span>
                 </TableCell>
+                {period === "month" && (
+                  <TableCell className="text-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-lg font-bold text-primary">
+                          → {getForecast(totalSales, workDaysInPeriod)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Total forecast baseret på {totalSales} salg over {workDaysInPeriod} arbejdsdage</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          = {(totalSales / (workDaysInPeriod || 1)).toFixed(1)} salg/dag × {getTotalMonthWorkDays()} dage
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                )}
                 <TableCell className="text-center">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -240,7 +291,8 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
           </Table>
         </TooltipProvider>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          {periodLabels[period]} • {workDaysInPeriod} arbejdsdag{workDaysInPeriod !== 1 ? 'e' : ''} i perioden • Sorteret efter salg
+          {periodLabels[period]} • {workDaysInPeriod} arbejdsdag{workDaysInPeriod !== 1 ? 'e' : ''} i perioden
+          {period === "month" && ` af ${getTotalMonthWorkDays()} i måneden`} • Sorteret efter salg
         </p>
       </CardContent>
     </Card>
