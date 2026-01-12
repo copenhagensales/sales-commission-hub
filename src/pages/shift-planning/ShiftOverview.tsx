@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle, Timer } from "lucide-react";
 import { MissingShiftsAlert } from "@/components/shift-planning/MissingShiftsAlert";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -1174,6 +1174,9 @@ export default function ShiftOverview() {
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
+                    // Check if employee uses timestamp-based hours
+                    const usesTimestamp = getHoursSourceForEmployee(employee.id) === 'timestamp';
+                    
                     // Missing shift detection (has sales but no shift/timestamp)
                     const isMissingShift = !hasShift && !timeStamp && hasMissingShiftForDate(employee.id, day);
                     
@@ -1261,9 +1264,16 @@ export default function ShiftOverview() {
                               {!hasShift && !isLate && isWorking && !holiday && (
                                 <div className="flex flex-col items-center gap-1">
                                   {workTimes && (
-                                    <span className="text-[10px] font-medium text-muted-foreground">
-                                      {workTimes}
-                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      {usesTimestamp && (
+                                        <span title="Stempelur">
+                                          <Timer className="h-3 w-3 text-blue-500" />
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] font-medium text-muted-foreground">
+                                        {workTimes}
+                                      </span>
+                                    </div>
                                   )}
                                   {timeStamp && (
                                     <span className="text-[9px] text-muted-foreground/80">
