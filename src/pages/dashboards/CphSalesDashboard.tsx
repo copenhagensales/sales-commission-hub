@@ -357,34 +357,26 @@ export default function CphSalesDashboard() {
     refetchInterval: 60000,
   });
 
-  // Client Performance Overview - data for day, week, month (aggregated by client)
+  // Team Performance Overview - data for day, week, month
   const { data: teamPerformanceData } = useQuery({
-    queryKey: ["cph-dashboard-client-performance", todayStr],
+    queryKey: ["cph-dashboard-team-performance", todayStr],
     queryFn: async (): Promise<Array<{
-      clientId: string;
-      clientName: string;
+      id: string;
+      name: string;
       employeeCount: number;
       sales: { day: number; week: number; month: number };
       sick: { day: number; week: number; month: number };
       vacation: { day: number; week: number; month: number };
-      workDays?: { day: number; week: number; month: number };
     }>> => {
       const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
       const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
 
-      // Get all clients
-      const clientsQuery = supabase.from("clients").select("id, name");
-      const clientsResult = await clientsQuery;
-      const allClients = (clientsResult.data as any[]) || [];
+      // Get teams (exclude Stab) - use any to avoid deep type issues
+      const teamsQuery = supabase.from("teams").select("id, name");
+      const teamsResult = await (teamsQuery as any);
+      const teams = ((teamsResult.data as any[]) || []).filter((t: any) => t.name !== "Stab");
 
-      if (allClients.length === 0) return [];
-
-      // Get team_clients for client-team-employee mapping
-      const teamClientsQuery = supabase
-        .from("team_clients")
-        .select("team_id, client_id");
-      const teamClientsResult = await teamClientsQuery;
-      const teamClients = (teamClientsResult.data as any[]) || [];
+      if (teams.length === 0) return [];
 
       // Get team_members for employee-team mapping
       const teamMembersQuery = supabase.from("team_members").select("employee_id, team_id");
@@ -392,12 +384,16 @@ export default function CphSalesDashboard() {
       const teamMembers = (teamMembersResult.data as any[]) || [];
 
       // Get all agents for mapping
-      const agentsQuery = supabase.from("agents").select("id, email, name");
+      const agentsQuery = supabase
+        .from("agents")
+        .select("id, email, name");
       const agentsResult = await agentsQuery;
       const agents = (agentsResult.data as any[]) || [];
 
       // Get employee_agent_mapping
-      const agentMappingsQuery = supabase.from("employee_agent_mapping").select("employee_id, agent_id");
+      const agentMappingsQuery = supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
       const agentMappingsResult = await agentMappingsQuery;
       const agentMappings = (agentMappingsResult.data as any[]) || [];
 
@@ -406,6 +402,13 @@ export default function CphSalesDashboard() {
       (agents || []).forEach((a: any) => {
         agentById[a.id] = { email: a.email, name: a.name };
       });
+
+      // Get team_clients for client grouping
+      const teamClientsQuery = supabase
+        .from("team_clients")
+        .select("team_id, client_id, clients(name)");
+      const teamClientsResult = await teamClientsQuery;
+      const teamClients = (teamClientsResult.data as any[]) || [];
 
       // Get sales for the month with client info
       const salesQuery = supabase
@@ -444,37 +447,31 @@ export default function CphSalesDashboard() {
       const absencesResult = await absencesQuery;
       const absences = (absencesResult.data as any[]) || [];
 
-      // Build employee -> team map
+      // Build employee -> team map and count employees per team
       const employeeToTeam: Record<string, string> = {};
+      const employeeCountByTeam: Record<string, number> = {};
+      teams.forEach(t => { employeeCountByTeam[t.id] = 0; });
       (teamMembers || []).forEach((tm: any) => {
         employeeToTeam[tm.employee_id] = tm.team_id;
+        if (employeeCountByTeam[tm.team_id] !== undefined) {
+          employeeCountByTeam[tm.team_id]++;
+        }
       });
 
-      // Build team -> clients map and client -> employees map
-      const teamToClients: Record<string, string[]> = {};
-      const clientToTeams: Record<string, string[]> = {};
+      // Build team -> clients map
+      const teamToClients: Record<string, Array<{ clientId: string; clientName: string }>> = {};
       (teamClients || []).forEach((tc: any) => {
         if (!teamToClients[tc.team_id]) teamToClients[tc.team_id] = [];
-        teamToClients[tc.team_id].push(tc.client_id);
-        if (!clientToTeams[tc.client_id]) clientToTeams[tc.client_id] = [];
-        clientToTeams[tc.client_id].push(tc.team_id);
+        if (tc.clients?.name) {
+          teamToClients[tc.team_id].push({
+            clientId: tc.client_id,
+            clientName: tc.clients.name
+          });
+        }
       });
 
-      // Build client -> employees map (employees whose teams work on this client)
-      const clientToEmployees: Record<string, Set<string>> = {};
-      allClients.forEach((c) => {
-        clientToEmployees[c.id] = new Set();
-      });
-      (teamMembers || []).forEach((tm: any) => {
-        const clientIds = teamToClients[tm.team_id] || [];
-        clientIds.forEach((clientId) => {
-          if (clientToEmployees[clientId]) {
-            clientToEmployees[clientId].add(tm.employee_id);
-          }
-        });
-      });
-
-      // Build agent_email/name -> employee_id map
+      // Build agent_email/name -> employee_id map (using agent lookup)
+      // Include both full email and email prefix for flexible matching
       const agentToEmployee: Record<string, string> = {};
       (agentMappings || []).forEach((am: any) => {
         const agentData = agentById[am.agent_id];
@@ -483,6 +480,7 @@ export default function CphSalesDashboard() {
         if (agentData.email) {
           const email = agentData.email.toLowerCase();
           agentToEmployee[email] = am.employee_id;
+          // Also add email prefix (before @) for matching agent_name like "bena" 
           const prefix = email.split('@')[0];
           if (prefix && !agentToEmployee[prefix]) {
             agentToEmployee[prefix] = am.employee_id;
@@ -495,33 +493,48 @@ export default function CphSalesDashboard() {
 
       // Helper to find employee from sale
       const findEmployeeFromSale = (sale: any): string | null => {
+        // Try exact email match first
         if (sale.agent_email) {
           const email = sale.agent_email.toLowerCase();
           if (agentToEmployee[email]) return agentToEmployee[email];
+          // Try email prefix
           const prefix = email.split('@')[0];
           if (prefix && agentToEmployee[prefix]) return agentToEmployee[prefix];
         }
+        // Try agent_name
         if (sale.agent_name) {
           const name = sale.agent_name.toLowerCase();
           if (agentToEmployee[name]) return agentToEmployee[name];
+          // Try name as email prefix
           const prefix = name.split('@')[0];
           if (prefix && agentToEmployee[prefix]) return agentToEmployee[prefix];
         }
         return null;
       };
 
-      // Calculate sales per client for day, week, month
-      const clientSales: Record<string, { day: number; week: number; month: number }> = {};
-      allClients.forEach(c => {
-        clientSales[c.id] = { day: 0, week: 0, month: 0 };
+      // Calculate sales per team AND per client within team for day, week, month
+      const teamSales: Record<string, { day: number; week: number; month: number }> = {};
+      const teamClientSales: Record<string, Record<string, { day: number; week: number; month: number }>> = {};
+      teams.forEach(t => {
+        teamSales[t.id] = { day: 0, week: 0, month: 0 };
+        teamClientSales[t.id] = {};
+        // Initialize client sales for this team
+        (teamToClients[t.id] || []).forEach(c => {
+          teamClientSales[t.id][c.clientName] = { day: 0, week: 0, month: 0 };
+        });
       });
 
       (salesData || []).forEach((sale: any) => {
-        // Get client from sale
-        const saleClientId = sale.client_campaigns?.client_id;
-        if (!saleClientId || !clientSales[saleClientId]) return;
+        const employeeId = findEmployeeFromSale(sale);
+        if (!employeeId) return;
+        
+        const teamId = employeeToTeam[employeeId];
+        if (!teamId || !teamSales[teamId]) return;
 
-        // Count sales (only products with counts_as_sale = true)
+        // Get client name from sale
+        const saleClientName = sale.client_campaigns?.clients?.name;
+
+        // Count sales (only products with counts_as_sale = true) - use saleItemsBySaleId
         const items = saleItemsBySaleId[sale.id] || [];
         let saleCount = 0;
         for (const item of items) {
@@ -535,16 +548,25 @@ export default function CphSalesDashboard() {
         const saleDate = sale.sale_datetime.split("T")[0];
         
         // Month (always add)
-        clientSales[saleClientId].month += saleCount;
+        teamSales[teamId].month += saleCount;
+        if (saleClientName && teamClientSales[teamId][saleClientName]) {
+          teamClientSales[teamId][saleClientName].month += saleCount;
+        }
         
         // Week (if >= weekStart)
         if (saleDate >= weekStart) {
-          clientSales[saleClientId].week += saleCount;
+          teamSales[teamId].week += saleCount;
+          if (saleClientName && teamClientSales[teamId][saleClientName]) {
+            teamClientSales[teamId][saleClientName].week += saleCount;
+          }
         }
         
         // Day (if == today)
         if (saleDate === todayStr) {
-          clientSales[saleClientId].day += saleCount;
+          teamSales[teamId].day += saleCount;
+          if (saleClientName && teamClientSales[teamId][saleClientName]) {
+            teamClientSales[teamId][saleClientName].day += saleCount;
+          }
         }
       });
 
@@ -555,6 +577,7 @@ export default function CphSalesDashboard() {
         periodStart: string, 
         periodEnd: string
       ): number => {
+        // Calculate overlap
         const overlapStart = absenceStart > periodStart ? absenceStart : periodStart;
         const overlapEnd = absenceEnd < periodEnd ? absenceEnd : periodEnd;
         
@@ -566,7 +589,7 @@ export default function CphSalesDashboard() {
         
         while (current <= end) {
           const dayOfWeek = current.getDay();
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not weekend
             count++;
           }
           current.setDate(current.getDate() + 1);
@@ -574,19 +597,22 @@ export default function CphSalesDashboard() {
         return count;
       };
 
-      // Calculate absences per client for day, week, month
-      const clientAbsences: Record<string, { 
+      // Calculate absences per team for day, week, month (actual days, not unique employees)
+      const teamAbsences: Record<string, { 
         sickDay: number; sickWeek: number; sickMonth: number;
         vacationDay: number; vacationWeek: number; vacationMonth: number;
       }> = {};
-      allClients.forEach(c => {
-        clientAbsences[c.id] = { 
+      teams.forEach(t => {
+        teamAbsences[t.id] = { 
           sickDay: 0, sickWeek: 0, sickMonth: 0,
           vacationDay: 0, vacationWeek: 0, vacationMonth: 0
         };
       });
 
       (absences || []).forEach((absence: any) => {
+        const teamId = employeeToTeam[absence.employee_id];
+        if (!teamId || !teamAbsences[teamId]) return;
+
         const isSick = absence.type === "sick";
         const isVacation = absence.type === "vacation";
         if (!isSick && !isVacation) return;
@@ -594,31 +620,24 @@ export default function CphSalesDashboard() {
         const startDate = absence.start_date;
         const endDate = absence.end_date;
 
-        // Find which clients this employee works on
-        const teamId = employeeToTeam[absence.employee_id];
-        if (!teamId) return;
-        
-        const clientIds = teamToClients[teamId] || [];
-        
-        clientIds.forEach((clientId) => {
-          if (!clientAbsences[clientId]) return;
+        // Count actual work days for each period
+        // Day: just today
+        const dayDays = countWorkDaysInOverlap(startDate, endDate, todayStr, todayStr);
+        if (isSick) teamAbsences[teamId].sickDay += dayDays;
+        if (isVacation) teamAbsences[teamId].vacationDay += dayDays;
 
-          // Count actual work days for each period
-          const dayDays = countWorkDaysInOverlap(startDate, endDate, todayStr, todayStr);
-          if (isSick) clientAbsences[clientId].sickDay += dayDays;
-          if (isVacation) clientAbsences[clientId].vacationDay += dayDays;
+        // Week: weekStart to today
+        const weekDays = countWorkDaysInOverlap(startDate, endDate, weekStart, todayStr);
+        if (isSick) teamAbsences[teamId].sickWeek += weekDays;
+        if (isVacation) teamAbsences[teamId].vacationWeek += weekDays;
 
-          const weekDays = countWorkDaysInOverlap(startDate, endDate, weekStart, todayStr);
-          if (isSick) clientAbsences[clientId].sickWeek += weekDays;
-          if (isVacation) clientAbsences[clientId].vacationWeek += weekDays;
-
-          const monthDays = countWorkDaysInOverlap(startDate, endDate, monthStart, todayStr);
-          if (isSick) clientAbsences[clientId].sickMonth += monthDays;
-          if (isVacation) clientAbsences[clientId].vacationMonth += monthDays;
-        });
+        // Month: monthStart to today
+        const monthDays = countWorkDaysInOverlap(startDate, endDate, monthStart, todayStr);
+        if (isSick) teamAbsences[teamId].sickMonth += monthDays;
+        if (isVacation) teamAbsences[teamId].vacationMonth += monthDays;
       });
 
-      // Calculate work days in each period
+      // Calculate work days in each period (for percentage calculation)
       const countWorkDaysInPeriod = (start: string, end: string): number => {
         let count = 0;
         const current = new Date(start);
@@ -631,34 +650,36 @@ export default function CphSalesDashboard() {
         return count;
       };
 
-      const workDaysDay = countWorkDaysInPeriod(todayStr, todayStr);
+      const workDaysDay = countWorkDaysInPeriod(todayStr, todayStr); // 1 if weekday, 0 if weekend
       const workDaysWeek = countWorkDaysInPeriod(weekStart, todayStr);
       const workDaysMonth = countWorkDaysInPeriod(monthStart, todayStr);
 
-      // Return client-based data (filter out clients with no employees)
-      return allClients
-        .filter(c => clientToEmployees[c.id]?.size > 0)
-        .map(c => ({
-          clientId: c.id,
-          clientName: c.name,
-          employeeCount: clientToEmployees[c.id]?.size || 0,
-          sales: clientSales[c.id] || { day: 0, week: 0, month: 0 },
-          sick: {
-            day: clientAbsences[c.id]?.sickDay || 0,
-            week: clientAbsences[c.id]?.sickWeek || 0,
-            month: clientAbsences[c.id]?.sickMonth || 0,
-          },
-          vacation: {
-            day: clientAbsences[c.id]?.vacationDay || 0,
-            week: clientAbsences[c.id]?.vacationWeek || 0,
-            month: clientAbsences[c.id]?.vacationMonth || 0,
-          },
-          workDays: {
-            day: workDaysDay,
-            week: workDaysWeek,
-            month: workDaysMonth,
-          },
-        }));
+      // Return combined data with work days for percentage calculation
+      return teams.map(t => ({
+        id: t.id,
+        name: t.name,
+        employeeCount: employeeCountByTeam[t.id] || 0,
+        sales: teamSales[t.id] || { day: 0, week: 0, month: 0 },
+        clients: (teamToClients[t.id] || []).map(c => ({
+          clientName: c.clientName,
+          sales: teamClientSales[t.id]?.[c.clientName] || { day: 0, week: 0, month: 0 }
+        })),
+        sick: {
+          day: teamAbsences[t.id]?.sickDay || 0,
+          week: teamAbsences[t.id]?.sickWeek || 0,
+          month: teamAbsences[t.id]?.sickMonth || 0,
+        },
+        vacation: {
+          day: teamAbsences[t.id]?.vacationDay || 0,
+          week: teamAbsences[t.id]?.vacationWeek || 0,
+          month: teamAbsences[t.id]?.vacationMonth || 0,
+        },
+        workDays: {
+          day: workDaysDay,
+          week: workDaysWeek,
+          month: workDaysMonth,
+        },
+      }));
     },
     enabled: !tvMode,
     refetchInterval: 60000,

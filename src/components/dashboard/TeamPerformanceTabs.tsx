@@ -5,18 +5,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Activity } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface ClientData {
-  clientId: string;
+interface ClientSalesData {
   clientName: string;
+  sales: { day: number; week: number; month: number };
+}
+
+interface TeamData {
+  id: string;
+  name: string;
   employeeCount: number;
   sales: { day: number; week: number; month: number };
+  clients?: ClientSalesData[];
   sick: { day: number; week: number; month: number };
   vacation: { day: number; week: number; month: number };
   workDays?: { day: number; week: number; month: number };
 }
 
 interface TeamPerformanceTabsProps {
-  data: ClientData[];
+  data: TeamData[];
 }
 
 type Period = "day" | "week" | "month";
@@ -32,15 +38,21 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
     month: "Denne måned",
   };
 
-  const getSalesValue = (client: ClientData) => client.sales[period];
-  const getSickValue = (client: ClientData) => client.sick[period];
-  const getVacationValue = (client: ClientData) => client.vacation[period];
-  const getWorkDays = (client: ClientData) => client.workDays?.[period] || 1;
+  const getSalesValue = (team: TeamData) => team.sales[period];
+  const getSickValue = (team: TeamData) => team.sick[period];
+  const getVacationValue = (team: TeamData) => team.vacation[period];
+  const getWorkDays = (team: TeamData) => team.workDays?.[period] || 1;
 
-  // Calculate possible work days for a client in this period
-  const getPossibleWorkDays = (client: ClientData) => {
-    const workDays = getWorkDays(client);
-    return client.employeeCount * workDays;
+  // Get client sales for a team
+  const getClientSales = (team: TeamData) => {
+    if (!team.clients || team.clients.length <= 1) return null;
+    return team.clients.filter(c => c.sales[period] > 0);
+  };
+
+  // Calculate possible work days for a team in this period
+  const getPossibleWorkDays = (team: TeamData) => {
+    const workDays = getWorkDays(team);
+    return team.employeeCount * workDays;
   };
 
   const formatAbsence = (count: number, possibleDays: number) => {
@@ -49,14 +61,14 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
     return { display: `${percentage}% (${count})`, percentage, count };
   };
 
-  // Get work days from first client (same for all)
+  // Get work days from first team (same for all)
   const workDaysInPeriod = data[0]?.workDays?.[period] || 1;
 
   // Calculate totals
-  const totalEmp = data.reduce((sum, c) => sum + c.employeeCount, 0);
-  const totalSales = data.reduce((sum, c) => sum + getSalesValue(c), 0);
-  const totalSick = data.reduce((sum, c) => sum + getSickValue(c), 0);
-  const totalVacation = data.reduce((sum, c) => sum + getVacationValue(c), 0);
+  const totalEmp = data.reduce((sum, t) => sum + t.employeeCount, 0);
+  const totalSales = data.reduce((sum, t) => sum + getSalesValue(t), 0);
+  const totalSick = data.reduce((sum, t) => sum + getSickValue(t), 0);
+  const totalVacation = data.reduce((sum, t) => sum + getVacationValue(t), 0);
   const totalPossibleDays = totalEmp * workDaysInPeriod;
 
   // Sort by sales descending
@@ -68,7 +80,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
             <Activity className="h-5 w-5 text-primary" />
-            Salg per kunde
+            Team Performance
           </CardTitle>
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
             <TabsList className="h-8">
@@ -90,7 +102,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="font-semibold">Kunde</TableHead>
+                <TableHead className="font-semibold">Team</TableHead>
                 <TableHead className="text-center font-semibold w-24">
                   <span className="flex items-center justify-center gap-1">
                     📈 Salg
@@ -109,23 +121,43 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedData.map((client) => {
-                const possibleDays = getPossibleWorkDays(client);
-                const sick = formatAbsence(getSickValue(client), possibleDays);
-                const vacation = formatAbsence(getVacationValue(client), possibleDays);
+              {sortedData.map((team) => {
+                const possibleDays = getPossibleWorkDays(team);
+                const sick = formatAbsence(getSickValue(team), possibleDays);
+                const vacation = formatAbsence(getVacationValue(team), possibleDays);
+                const clientSales = getClientSales(team);
                 
                 return (
-                  <TableRow key={client.clientId}>
+                  <TableRow key={team.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <span>{client.clientName}</span>
-                        <span className="text-xs text-muted-foreground">({client.employeeCount})</span>
+                        <span>{team.name}</span>
+                        <span className="text-xs text-muted-foreground">({team.employeeCount})</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className={`text-lg font-bold ${getSalesValue(client) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                        {getSalesValue(client)}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`text-lg font-bold ${getSalesValue(team) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {getSalesValue(team)}
+                        </span>
+                        {/* Show client breakdown for teams with multiple clients */}
+                        {clientSales && clientSales.length > 0 && (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {clientSales.map((client) => (
+                              <Tooltip key={client.clientName}>
+                                <TooltipTrigger asChild>
+                                  <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                    {client.clientName.slice(0, 8)}: {client.sales[period]}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{client.clientName}: {client.sales[period]} salg</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Tooltip>
@@ -143,7 +175,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{getSickValue(client)} sygedage ud af {possibleDays} mulige arbejdsdage</p>
+                          <p>{getSickValue(team)} sygedage ud af {possibleDays} mulige arbejdsdage</p>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
@@ -159,7 +191,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{getVacationValue(client)} feriedage ud af {possibleDays} mulige arbejdsdage</p>
+                          <p>{getVacationValue(team)} feriedage ud af {possibleDays} mulige arbejdsdage</p>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
