@@ -184,14 +184,18 @@ export default function ShiftOverview() {
       const agentIds = data.map((m) => m.agent_id);
       const { data: agents, error: agentsError } = await supabase
         .from("agents")
-        .select("id, name")
+        .select("id, name, email")
         .in("id", agentIds);
       if (agentsError) throw agentsError;
 
-      return data.map((mapping) => ({
-        employee_id: mapping.employee_id,
-        agent_name: agents?.find((a) => a.id === mapping.agent_id)?.name || null,
-      }));
+      return data.map((mapping) => {
+        const agent = agents?.find((a) => a.id === mapping.agent_id);
+        return {
+          employee_id: mapping.employee_id,
+          agent_name: agent?.name || null,
+          agent_email: agent?.email || null,
+        };
+      });
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -295,9 +299,9 @@ export default function ShiftOverview() {
     
     const dateStr = format(date, "yyyy-MM-dd");
     
-    // Find agent name for this employee
+    // Find agent mapping for this employee
     const mapping = agentMappings.find(m => m.employee_id === employeeId);
-    if (!mapping || !mapping.agent_name) return false;
+    if (!mapping || (!mapping.agent_name && !mapping.agent_email)) return false;
     
     // Check if there are sales for this employee on this date
     const hasSales = weeklySales.some(sale => {
@@ -307,13 +311,20 @@ export default function ShiftOverview() {
       if (saleDate !== dateStr) return false;
       
       const saleAgent = sale.agent_name.toLowerCase();
-      const mappedAgent = mapping.agent_name?.toLowerCase();
-      if (!mappedAgent) return false;
+      const mappedName = mapping.agent_name?.toLowerCase();
+      const mappedEmail = mapping.agent_email?.toLowerCase();
       
-      // Match exact, or if sale agent is email format matching the mapped agent
-      return saleAgent === mappedAgent || 
-             saleAgent.startsWith(mappedAgent + '@') ||
-             saleAgent.split('@')[0] === mappedAgent;
+      // Match by email (most reliable)
+      if (mappedEmail && saleAgent === mappedEmail) return true;
+      
+      // Match by name
+      if (mappedName) {
+        if (saleAgent === mappedName) return true;
+        if (saleAgent.startsWith(mappedName + '@')) return true;
+        if (saleAgent.split('@')[0] === mappedName) return true;
+      }
+      
+      return false;
     });
     
     if (!hasSales) return false;
