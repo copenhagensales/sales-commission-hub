@@ -1207,7 +1207,8 @@ export default function ShiftOverview() {
                     const hasStatus = isVacation || isSick || isLate;
                     
                     // Missing shift detection (has sales but no shift/timestamp)
-                    const isMissingShift = !hasShift && !timeStamp && hasMissingShiftForDate(employee.id, day);
+                    // hasMissingShiftForDate handles all logic including hours_source setting
+                    const isMissingShift = hasMissingShiftForDate(employee.id, day);
                     
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);
