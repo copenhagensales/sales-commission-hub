@@ -383,12 +383,25 @@ export default function CphSalesDashboard() {
       const teamMembersResult = await teamMembersQuery;
       const teamMembers = (teamMembersResult.data as any[]) || [];
 
-      // Get employee_agent_mapping for sales matching (join with agents table)
+      // Get all agents for mapping
+      const agentsQuery = supabase
+        .from("agents")
+        .select("id, email, name");
+      const agentsResult = await agentsQuery;
+      const agents = (agentsResult.data as any[]) || [];
+
+      // Get employee_agent_mapping
       const agentMappingsQuery = supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agents(email, name)");
+        .select("employee_id, agent_id");
       const agentMappingsResult = await agentMappingsQuery;
       const agentMappings = (agentMappingsResult.data as any[]) || [];
+
+      // Build agent_id -> agent data map
+      const agentById: Record<string, { email: string; name: string }> = {};
+      (agents || []).forEach((a: any) => {
+        agentById[a.id] = { email: a.email, name: a.name };
+      });
 
       // Get team_clients for client grouping
       const teamClientsQuery = supabase
@@ -457,12 +470,15 @@ export default function CphSalesDashboard() {
         }
       });
 
-      // Build agent_email/name -> employee_id map (using joined agents data)
+      // Build agent_email/name -> employee_id map (using agent lookup)
       // Include both full email and email prefix for flexible matching
       const agentToEmployee: Record<string, string> = {};
       (agentMappings || []).forEach((am: any) => {
-        if (am.agents?.email) {
-          const email = am.agents.email.toLowerCase();
+        const agentData = agentById[am.agent_id];
+        if (!agentData) return;
+        
+        if (agentData.email) {
+          const email = agentData.email.toLowerCase();
           agentToEmployee[email] = am.employee_id;
           // Also add email prefix (before @) for matching agent_name like "bena" 
           const prefix = email.split('@')[0];
@@ -470,8 +486,8 @@ export default function CphSalesDashboard() {
             agentToEmployee[prefix] = am.employee_id;
           }
         }
-        if (am.agents?.name) {
-          agentToEmployee[am.agents.name.toLowerCase()] = am.employee_id;
+        if (agentData.name) {
+          agentToEmployee[agentData.name.toLowerCase()] = am.employee_id;
         }
       });
 
