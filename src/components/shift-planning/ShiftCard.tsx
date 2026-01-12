@@ -94,13 +94,13 @@ export function ShiftCard({ shift, compact = false, showEmployee = false, standa
               setEditDialogOpen(true);
             }}
           >
-            <div className="flex items-center justify-center gap-1 text-xs">
+            <div className="flex items-center justify-center gap-1">
               {isModified && (
                 <span title="Tilpasset vagt">
                   <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
                 </span>
               )}
-              <span>{shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}</span>
+              <span className="text-[10px] font-medium text-muted-foreground">{shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}</span>
             </div>
           </div>
 
