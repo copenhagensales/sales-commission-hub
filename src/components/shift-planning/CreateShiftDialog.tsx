@@ -166,24 +166,29 @@ export function CreateShiftDialog({
     };
   };
 
-  // Apply times when date changes (only if using primary shift)
+  // Apply times when employee or date changes
+  // Priority: Primary shift > Employee standard time > defaults
   useEffect(() => {
-    if (date && primaryShiftData) {
+    // If we have a primary shift from the employee's team
+    if (primaryShiftData && date) {
       const times = getShiftTimesForDay(date);
       if (times) {
         setStartTime(times.startTime);
         setEndTime(times.endTime);
+        return;
       }
     }
-  }, [date, primaryShiftData]);
-
-  // Priority: Primary shift > Employee standard time > defaults
-  useEffect(() => {
-    // If we have a primary shift, use it (handled above)
-    if (primaryShiftData) return;
+    
+    // Also apply primary shift times when employee is selected (even without date selected yet)
+    if (primaryShiftData && !date) {
+      // Use main shift times as default
+      setStartTime(primaryShiftData.shift.start_time.slice(0, 5));
+      setEndTime(primaryShiftData.shift.end_time.slice(0, 5));
+      return;
+    }
     
     // Fallback to employee standard time
-    if (employeeId) {
+    if (employeeId && !primaryShiftData) {
       const employee = employees.find(e => e.id === employeeId);
       if (employee?.standard_start_time) {
         // Parse "8.00-16.30" format
@@ -194,7 +199,7 @@ export function CreateShiftDialog({
         }
       }
     }
-  }, [employeeId, employees, primaryShiftData]);
+  }, [employeeId, employees, primaryShiftData, date]);
 
   const handleSubmit = () => {
     if (!employeeId || !date) return;
