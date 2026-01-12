@@ -108,20 +108,75 @@ function usePrimaryStandardShift(teamId: string | null | undefined) {
   });
 }
 
-// Hook to fetch existing shifts for an employee
-function useEmployeeExistingShifts(employeeId: string | undefined) {
+// Hook to fetch employee work days (individual shifts + standard shift days)
+function useEmployeeWorkDays(employeeId: string | undefined) {
   return useQuery({
-    queryKey: ["employee-existing-shifts", employeeId],
+    queryKey: ["employee-work-days", employeeId],
     queryFn: async () => {
-      if (!employeeId) return [];
+      if (!employeeId) return { workDays: [], individualShiftDates: [] };
       
-      const { data, error } = await supabase
+      // 1. Get individual shifts from shift table
+      const { data: shifts } = await supabase
         .from("shift")
         .select("date")
         .eq("employee_id", employeeId);
       
-      if (error) throw error;
-      return data?.map(s => s.date) || [];
+      // 2. Find employee's team
+      const { data: teamMember } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("employee_id", employeeId)
+        .limit(1);
+      
+      const teamId = teamMember?.[0]?.team_id;
+      if (!teamId) {
+        return { 
+          workDays: [], 
+          individualShiftDates: shifts?.map(s => s.date) || [] 
+        };
+      }
+      
+      // 3. Check for employee_standard_shifts (special shift override)
+      const { data: specialShift } = await supabase
+        .from("employee_standard_shifts")
+        .select("shift_id")
+        .eq("employee_id", employeeId)
+        .limit(1);
+      
+      const shiftIdToCheck = specialShift?.[0]?.shift_id;
+      
+      // 4. Get work days from team_standard_shift_days
+      let workDays: number[] = [];
+      
+      if (shiftIdToCheck) {
+        // Use special shift
+        const { data: days } = await supabase
+          .from("team_standard_shift_days")
+          .select("day_of_week")
+          .eq("shift_id", shiftIdToCheck);
+        workDays = days?.map(d => d.day_of_week) || [];
+      } else {
+        // Use primary team shift
+        const { data: primaryShift } = await supabase
+          .from("team_standard_shifts")
+          .select("id")
+          .eq("team_id", teamId)
+          .eq("is_primary", true)
+          .limit(1);
+        
+        if (primaryShift?.[0]?.id) {
+          const { data: days } = await supabase
+            .from("team_standard_shift_days")
+            .select("day_of_week")
+            .eq("shift_id", primaryShift[0].id);
+          workDays = days?.map(d => d.day_of_week) || [];
+        }
+      }
+      
+      return {
+        workDays,
+        individualShiftDates: shifts?.map(s => s.date) || []
+      };
     },
     enabled: !!employeeId,
   });
@@ -147,18 +202,31 @@ export function CreateShiftDialog({
   // Get the selected employee's team via team_members table
   const { data: employeeTeamId } = useEmployeeTeamId(employeeId || undefined);
   
-  // Get existing shifts for the selected employee
-  const { data: existingShiftDates } = useEmployeeExistingShifts(employeeId || undefined);
+  // Get work days and existing shifts for the selected employee
+  const { data: workDaysData } = useEmployeeWorkDays(employeeId || undefined);
   
   const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId);
 
-  // Function to check if a date is disabled (already has a shift)
+  // Function to check if a date is disabled (already has a shift or is a standard work day)
   const isDateDisabled = useCallback((checkDate: Date) => {
-    if (!existingShiftDates || existingShiftDates.length === 0) return false;
-    return existingShiftDates.some(shiftDate => 
-      isSameDay(parseISO(shiftDate), checkDate)
-    );
-  }, [existingShiftDates]);
+    if (!workDaysData) return false;
+    
+    // Check individual shifts from shift table
+    if (workDaysData.individualShiftDates?.length > 0) {
+      const hasIndividualShift = workDaysData.individualShiftDates.some(
+        shiftDate => isSameDay(parseISO(shiftDate), checkDate)
+      );
+      if (hasIndividualShift) return true;
+    }
+    
+    // Check standard work days (0 = Sunday, 1 = Monday, etc.)
+    if (workDaysData.workDays?.length > 0) {
+      const dayOfWeek = getDay(checkDate);
+      if (workDaysData.workDays.includes(dayOfWeek)) return true;
+    }
+    
+    return false;
+  }, [workDaysData]);
 
   useEffect(() => {
     if (selectedDate) {
