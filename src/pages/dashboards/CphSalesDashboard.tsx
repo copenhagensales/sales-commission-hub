@@ -383,8 +383,10 @@ export default function CphSalesDashboard() {
       const teamMembersResult = await teamMembersQuery;
       const teamMembers = (teamMembersResult.data as any[]) || [];
 
-      // Get employee_agent_mapping for sales matching
-      const agentMappingsQuery = supabase.from("employee_agent_mapping").select("employee_id, agent_email, agent_name");
+      // Get employee_agent_mapping for sales matching (join with agents table)
+      const agentMappingsQuery = supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agents(email, name)");
       const agentMappingsResult = await agentMappingsQuery;
       const agentMappings = (agentMappingsResult.data as any[]) || [];
 
@@ -436,14 +438,14 @@ export default function CphSalesDashboard() {
         }
       });
 
-      // Build agent_email/name -> employee_id map
+      // Build agent_email/name -> employee_id map (using joined agents data)
       const agentToEmployee: Record<string, string> = {};
       (agentMappings || []).forEach((am: any) => {
-        if (am.agent_email) {
-          agentToEmployee[am.agent_email.toLowerCase()] = am.employee_id;
+        if (am.agents?.email) {
+          agentToEmployee[am.agents.email.toLowerCase()] = am.employee_id;
         }
-        if (am.agent_name) {
-          agentToEmployee[am.agent_name.toLowerCase()] = am.employee_id;
+        if (am.agents?.name) {
+          agentToEmployee[am.agents.name.toLowerCase()] = am.employee_id;
         }
       });
 
