@@ -491,7 +491,34 @@ export default function CphSalesDashboard() {
         }
       });
 
-      // Calculate absences per team for day, week, month
+      // Helper function to count work days (excluding weekends) within a period overlap
+      const countWorkDaysInOverlap = (
+        absenceStart: string, 
+        absenceEnd: string, 
+        periodStart: string, 
+        periodEnd: string
+      ): number => {
+        // Calculate overlap
+        const overlapStart = absenceStart > periodStart ? absenceStart : periodStart;
+        const overlapEnd = absenceEnd < periodEnd ? absenceEnd : periodEnd;
+        
+        if (overlapStart > overlapEnd) return 0;
+        
+        let count = 0;
+        const current = new Date(overlapStart);
+        const end = new Date(overlapEnd);
+        
+        while (current <= end) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not weekend
+            count++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+        return count;
+      };
+
+      // Calculate absences per team for day, week, month (actual days, not unique employees)
       const teamAbsences: Record<string, { 
         sickDay: number; sickWeek: number; sickMonth: number;
         vacationDay: number; vacationWeek: number; vacationMonth: number;
@@ -501,23 +528,6 @@ export default function CphSalesDashboard() {
           sickDay: 0, sickWeek: 0, sickMonth: 0,
           vacationDay: 0, vacationWeek: 0, vacationMonth: 0
         };
-      });
-
-      // Track unique employees per period per team
-      const sickByTeamDay: Record<string, Set<string>> = {};
-      const sickByTeamWeek: Record<string, Set<string>> = {};
-      const sickByTeamMonth: Record<string, Set<string>> = {};
-      const vacationByTeamDay: Record<string, Set<string>> = {};
-      const vacationByTeamWeek: Record<string, Set<string>> = {};
-      const vacationByTeamMonth: Record<string, Set<string>> = {};
-
-      teams.forEach(t => {
-        sickByTeamDay[t.id] = new Set();
-        sickByTeamWeek[t.id] = new Set();
-        sickByTeamMonth[t.id] = new Set();
-        vacationByTeamDay[t.id] = new Set();
-        vacationByTeamWeek[t.id] = new Set();
-        vacationByTeamMonth[t.id] = new Set();
       });
 
       (absences || []).forEach((absence: any) => {
@@ -531,36 +541,41 @@ export default function CphSalesDashboard() {
         const startDate = absence.start_date;
         const endDate = absence.end_date;
 
-        // Check if absence overlaps with today
-        if (startDate <= todayStr && endDate >= todayStr) {
-          if (isSick) sickByTeamDay[teamId].add(absence.employee_id);
-          if (isVacation) vacationByTeamDay[teamId].add(absence.employee_id);
-        }
+        // Count actual work days for each period
+        // Day: just today
+        const dayDays = countWorkDaysInOverlap(startDate, endDate, todayStr, todayStr);
+        if (isSick) teamAbsences[teamId].sickDay += dayDays;
+        if (isVacation) teamAbsences[teamId].vacationDay += dayDays;
 
-        // Check if absence overlaps with this week
-        if (startDate <= todayStr && endDate >= weekStart) {
-          if (isSick) sickByTeamWeek[teamId].add(absence.employee_id);
-          if (isVacation) vacationByTeamWeek[teamId].add(absence.employee_id);
-        }
+        // Week: weekStart to today
+        const weekDays = countWorkDaysInOverlap(startDate, endDate, weekStart, todayStr);
+        if (isSick) teamAbsences[teamId].sickWeek += weekDays;
+        if (isVacation) teamAbsences[teamId].vacationWeek += weekDays;
 
-        // Check if absence overlaps with this month
-        if (startDate <= todayStr && endDate >= monthStart) {
-          if (isSick) sickByTeamMonth[teamId].add(absence.employee_id);
-          if (isVacation) vacationByTeamMonth[teamId].add(absence.employee_id);
-        }
+        // Month: monthStart to today
+        const monthDays = countWorkDaysInOverlap(startDate, endDate, monthStart, todayStr);
+        if (isSick) teamAbsences[teamId].sickMonth += monthDays;
+        if (isVacation) teamAbsences[teamId].vacationMonth += monthDays;
       });
 
-      // Convert sets to counts
-      teams.forEach(t => {
-        teamAbsences[t.id].sickDay = sickByTeamDay[t.id].size;
-        teamAbsences[t.id].sickWeek = sickByTeamWeek[t.id].size;
-        teamAbsences[t.id].sickMonth = sickByTeamMonth[t.id].size;
-        teamAbsences[t.id].vacationDay = vacationByTeamDay[t.id].size;
-        teamAbsences[t.id].vacationWeek = vacationByTeamWeek[t.id].size;
-        teamAbsences[t.id].vacationMonth = vacationByTeamMonth[t.id].size;
-      });
+      // Calculate work days in each period (for percentage calculation)
+      const countWorkDaysInPeriod = (start: string, end: string): number => {
+        let count = 0;
+        const current = new Date(start);
+        const endDate = new Date(end);
+        while (current <= endDate) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+          current.setDate(current.getDate() + 1);
+        }
+        return count;
+      };
 
-      // Return combined data
+      const workDaysDay = countWorkDaysInPeriod(todayStr, todayStr); // 1 if weekday, 0 if weekend
+      const workDaysWeek = countWorkDaysInPeriod(weekStart, todayStr);
+      const workDaysMonth = countWorkDaysInPeriod(monthStart, todayStr);
+
+      // Return combined data with work days for percentage calculation
       return teams.map(t => ({
         id: t.id,
         name: t.name,
@@ -575,6 +590,11 @@ export default function CphSalesDashboard() {
           day: teamAbsences[t.id]?.vacationDay || 0,
           week: teamAbsences[t.id]?.vacationWeek || 0,
           month: teamAbsences[t.id]?.vacationMonth || 0,
+        },
+        workDays: {
+          day: workDaysDay,
+          week: workDaysWeek,
+          month: workDaysMonth,
         },
       }));
     },
