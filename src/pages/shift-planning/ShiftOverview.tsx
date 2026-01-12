@@ -1267,7 +1267,7 @@ export default function ShiftOverview() {
                                   end: standardWorkTimes.split('-')[1]
                                 } : null;
                                 return (
-                                  <ShiftCard key={shift.id} shift={shift} compact standardTimes={standardTimes} />
+                                  <ShiftCard key={shift.id} shift={shift} compact standardTimes={standardTimes} displayAsStandard />
                                 );
                               })}
 
