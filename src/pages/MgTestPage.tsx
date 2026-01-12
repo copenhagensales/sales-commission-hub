@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,12 +18,14 @@ import {
   ShoppingCart,
   Megaphone,
   Activity,
-  Table as TableIcon
+  Table as TableIcon,
+  Play
 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import SalarySchemes from "./SalarySchemes";
 import RelatelEventsTable from "@/components/relatel/RelatelEventsTable";
+import { toast } from "sonner";
 
 const RELATEL_INTEGRATION_ID = "657c2050-1faa-4233-a964-900fb9e7b8c6";
 
@@ -217,6 +219,8 @@ function SalarySchemesTab() {
 }
 
 function RelatelDataTab() {
+  const queryClient = useQueryClient();
+  
   // Fetch integration details
   const { data: integration, isLoading: loadingIntegration } = useQuery({
     queryKey: ["relatel-integration"],
@@ -243,6 +247,30 @@ function RelatelDataTab() {
         .limit(50);
       if (error) throw error;
       return data as IntegrationLog[];
+    },
+  });
+
+  // Manual sync mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await supabase.functions.invoke("integration-engine", {
+        body: {
+          source: "Relatel_CPHSALES",
+          action: "sync",
+          days: 7,
+        },
+      });
+      if (response.error) throw new Error(response.error.message);
+      if (!response.data?.success) throw new Error(response.data?.error || "Synkronisering fejlede");
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Synkronisering gennemført: ${data.results?.sales?.processed || 0} salg hentet`);
+      queryClient.invalidateQueries({ queryKey: ["relatel-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["relatel-events"] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Synkronisering fejlede: ${error.message}`);
     },
   });
 
@@ -303,6 +331,18 @@ function RelatelDataTab() {
               <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Opdater
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+              >
+                {syncMutation.isPending ? (
+                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-1" />
+                )}
+                Synk nu
               </Button>
             </div>
           </div>
