@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useKpiDefinitions, useKpiDefinition, KpiCategory } from "@/hooks/useKpiDefinitions";
 import { KpiDefinitionList } from "@/components/kpi/KpiDefinitionList";
 import { KpiDefinitionDetail } from "@/components/kpi/KpiDefinitionDetail";
@@ -33,8 +34,8 @@ export default function KpiDefinitions() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-6 px-4 max-w-7xl">
+    <MainLayout>
+      <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -190,6 +191,6 @@ export default function KpiDefinitions() {
           onOpenChange={setShowCreateForm}
         />
       </div>
-    </div>
+    </MainLayout>
   );
 }
