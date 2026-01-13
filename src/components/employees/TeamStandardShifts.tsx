@@ -1152,7 +1152,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
               <p className="text-xs text-muted-foreground">
                 {enabledDaysCount === 0 
-                  ? "Ingen dage valgt = gælder alle dage med standard tidspunkter" 
+                  ? "Ingen dage valgt = medarbejderen får 0 vagter" 
                   : `${enabledDaysCount} dag(e) valgt`}
               </p>
             </div>

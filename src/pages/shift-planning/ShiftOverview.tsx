@@ -243,9 +243,9 @@ export default function ShiftOverview() {
     },
   });
 
-  // Fetch employee-specific special shift assignments
+  // Fetch employee-specific special shift assignments with shift details
   const { data: employeeSpecialShifts } = useQuery({
-    queryKey: ["employee-special-shifts"],
+    queryKey: ["employee-special-shifts-with-details"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_standard_shifts")
@@ -253,19 +253,73 @@ export default function ShiftOverview() {
           employee_id,
           shift_id,
           team_standard_shifts (
-            id, hours_source
+            id, hours_source, start_time, end_time
           )
         `);
       if (error) throw error;
-      return data as { employee_id: string; shift_id: string; team_standard_shifts: { id: string; hours_source: 'timestamp' | 'shift' } | null }[];
+      
+      // Get all unique shift IDs
+      const shiftIds = [...new Set(data?.map(d => d.shift_id) || [])];
+      
+      // Fetch day configurations for these shifts
+      let shiftDaysMap: Record<string, { day_of_week: number; start_time: string; end_time: string }[]> = {};
+      if (shiftIds.length > 0) {
+        const { data: days } = await supabase
+          .from("team_standard_shift_days")
+          .select("shift_id, day_of_week, start_time, end_time")
+          .in("shift_id", shiftIds);
+        
+        // Group by shift_id
+        (days || []).forEach((d: any) => {
+          if (!shiftDaysMap[d.shift_id]) {
+            shiftDaysMap[d.shift_id] = [];
+          }
+          shiftDaysMap[d.shift_id].push({
+            day_of_week: d.day_of_week,
+            start_time: d.start_time,
+            end_time: d.end_time,
+          });
+        });
+      }
+      
+      return {
+        assignments: data as { employee_id: string; shift_id: string; team_standard_shifts: { id: string; hours_source: 'timestamp' | 'shift'; start_time: string; end_time: string } | null }[],
+        shiftDays: shiftDaysMap,
+      };
     },
   });
 
-  // Helper to get work times from primary shift
+  // Helper to get work times from primary shift or special shift
   const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
     if (!teamMemberships || !primaryShiftsData) return null;
 
-    // Find employee's team
+    // Convert JS day to database format (1=Monday, 7=Sunday)
+    const jsDay = getDay(date);
+    const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+    // 1. FIRST: Check if employee has a special shift assigned
+    const specialShiftAssignment = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
+    if (specialShiftAssignment) {
+      const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
+      
+      // If special shift has NO days configured, employee gets 0 shifts
+      if (specialShiftDays.length === 0) {
+        return null;
+      }
+      
+      // Check if this day is configured for the special shift
+      const dayConfig = specialShiftDays.find(d => d.day_of_week === dbDayOfWeek);
+      if (dayConfig) {
+        const start = dayConfig.start_time.slice(0, 5);
+        const end = dayConfig.end_time.slice(0, 5);
+        return `${start}-${end}`;
+      }
+      
+      // Day not configured in special shift = no shift for this day
+      return null;
+    }
+
+    // 2. FALLBACK: Use team's primary shift
     const membership = teamMemberships.find(m => m.employee_id === employeeId);
     if (!membership) return null;
 
@@ -273,11 +327,7 @@ export default function ShiftOverview() {
     const primaryShift = primaryShiftsData.shifts.find(s => s.team_id === membership.team_id);
     if (!primaryShift) return null;
 
-    // Convert JS day to database format (1=Monday, 7=Sunday)
-    const jsDay = getDay(date);
-    const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
-
-    // Check for day-specific times
+    // Check for day-specific times in primary shift
     const dayConfig = primaryShiftsData.days.find(
       d => d.shift_id === primaryShift.id && d.day_of_week === dbDayOfWeek
     );
@@ -298,7 +348,7 @@ export default function ShiftOverview() {
     const start = primaryShift.start_time.slice(0, 5);
     const end = primaryShift.end_time.slice(0, 5);
     return `${start}-${end}`;
-  }, [teamMemberships, primaryShiftsData]);
+  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts]);
 
   // Get time stamp for specific employee and date
   const getTimeStampForDate = (employeeId: string, date: Date) => {
@@ -586,7 +636,7 @@ export default function ShiftOverview() {
   // Get hours source for employee - check special shift first, then team primary shift
   const getHoursSourceForEmployee = useCallback((employeeId: string): 'timestamp' | 'shift' => {
     // 1. FIRST: Check if employee has a special shift assigned
-    const specialShift = employeeSpecialShifts?.find(s => s.employee_id === employeeId);
+    const specialShift = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
     if (specialShift?.team_standard_shifts?.hours_source) {
       return specialShift.team_standard_shifts.hours_source;
     }
@@ -597,7 +647,7 @@ export default function ShiftOverview() {
     
     // Get shift IDs that are used as special shifts
     const specialShiftIds = new Set(
-      employeeSpecialShifts?.map(s => s.shift_id) || []
+      employeeSpecialShifts?.assignments?.map(s => s.shift_id) || []
     );
     
     // Find team primary shift that is NOT a special shift
