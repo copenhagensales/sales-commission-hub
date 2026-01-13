@@ -182,9 +182,10 @@ export default function Logikker() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <ul className="list-disc space-y-1 pl-5">
-                <li>Ferie skal søges med <strong>minimum 14 dages varsel</strong>.</li>
+                <li>Ferie skal søges med <strong>minimum 5 ugers varsel (35 dage)</strong>.</li>
                 <li>Ved kortere varsel kan systemet <strong>ikke godkende ferien</strong>.</li>
                 <li>Medarbejderen skal i stedet <strong>kontakte sin teamleder</strong>, som kan godkende ferien manuelt.</li>
+                <li>Alle ferieanmodninger kræver <strong>godkendelse af teamleder</strong>.</li>
                 <li>Helligdage kræver særskilt <strong>7 dages varsel</strong> for at holde fri.</li>
               </ul>
             </CardContent>
