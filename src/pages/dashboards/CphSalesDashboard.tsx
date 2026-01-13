@@ -705,7 +705,6 @@ export default function CphSalesDashboard() {
         },
       }));
     },
-    enabled: !tvMode,
     refetchInterval: 60000,
   });
   const knownClientSales = todaySales.filter(sale => 
