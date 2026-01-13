@@ -84,6 +84,9 @@ export function useKpiTest() {
         case "shifts":
           testResult = await testNormalShifts(start, end, params.employeeId);
           break;
+        case "sick_days":
+          testResult = await testSickDays(start, end, params.employeeId);
+          break;
         default:
           testResult = {
             value: "Test ikke tilgængelig for denne KPI",
@@ -747,5 +750,214 @@ async function testNormalShifts(start: Date, end: Date, employeeId?: string): Pr
       "Antal dage i periode": dates.length,
     },
     rowCount: totalShifts,
+  };
+}
+
+// ============================================================================
+// SICK DAYS - Sygedage
+// ============================================================================
+// En sygedag KRÆVER at der er en planlagt vagt på datoen
+// Kun godkendte fraværsanmodninger (status = 'approved') tælles
+// Alle sygedage tælles som hele dage (ingen halve sygedage)
+// ============================================================================
+async function testSickDays(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+
+  // Generate all dates in period
+  const dates: string[] = [];
+  const current = new Date(start);
+  while (current <= end) {
+    dates.push(format(current, "yyyy-MM-dd"));
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Get employees to check
+  let employeesToCheck: { id: string; team_id: string | null }[] = [];
+  
+  if (employeeId) {
+    const { data: emp } = await supabase
+      .from("employee_master_data")
+      .select("id, team_id")
+      .eq("id", employeeId)
+      .single();
+    if (emp) employeesToCheck = [emp];
+  } else {
+    const { data: emps } = await supabase
+      .from("employee_master_data")
+      .select("id, team_id")
+      .eq("is_active", true);
+    employeesToCheck = emps || [];
+  }
+
+  if (employeesToCheck.length === 0) {
+    return { value: 0, queryTimeMs: 0, breakdown: { "Ingen medarbejdere fundet": 0 } };
+  }
+
+  const employeeIds = employeesToCheck.map(e => e.id);
+
+  // Fetch all shift sources and sick absences in parallel
+  const [
+    individualShiftsRes,
+    employeeStandardShiftsRes,
+    teamMembersRes,
+    teamStandardShiftsRes,
+    shiftDaysRes,
+    sickAbsencesRes
+  ] = await Promise.all([
+    // 1. Individual shifts (shift table)
+    supabase
+      .from("shift")
+      .select("employee_id, date")
+      .in("employee_id", employeeIds)
+      .gte("date", startStr)
+      .lte("date", endStr),
+    
+    // 2. Employee standard shifts
+    supabase
+      .from("employee_standard_shifts")
+      .select("employee_id, shift_id")
+      .in("employee_id", employeeIds),
+    
+    // 3. Team members
+    supabase
+      .from("team_members")
+      .select("employee_id, team_id")
+      .in("employee_id", employeeIds),
+    
+    // 4. Team standard shifts (primary shifts)
+    supabase
+      .from("team_standard_shifts")
+      .select("id, team_id, is_primary"),
+    
+    // 5. Team standard shift days
+    supabase
+      .from("team_standard_shift_days")
+      .select("shift_id, day_of_week"),
+    
+    // 6. Approved SICK absences only
+    supabase
+      .from("absence_request_v2")
+      .select("employee_id, start_date, end_date")
+      .in("employee_id", employeeIds)
+      .eq("status", "approved")
+      .eq("type", "sick")
+      .lte("start_date", endStr)
+      .gte("end_date", startStr)
+  ]);
+
+  const individualShifts = individualShiftsRes.data || [];
+  const employeeStandardShifts = employeeStandardShiftsRes.data || [];
+  const teamMembers = teamMembersRes.data || [];
+  const teamStandardShifts = teamStandardShiftsRes.data || [];
+  const shiftDays = shiftDaysRes.data || [];
+  const sickAbsences = sickAbsencesRes.data || [];
+
+  // Build shift_id -> days map
+  const shiftDaysMap = new Map<string, number[]>();
+  shiftDays.forEach(sd => {
+    if (!shiftDaysMap.has(sd.shift_id)) {
+      shiftDaysMap.set(sd.shift_id, []);
+    }
+    shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
+  });
+
+  // Build team -> primary shift_id map
+  const teamPrimaryShiftMap = new Map<string, string>();
+  teamStandardShifts.forEach(s => {
+    if (s.is_primary) {
+      teamPrimaryShiftMap.set(s.team_id, s.id);
+    }
+  });
+
+  // Build lookup maps
+  const individualShiftMap = new Map<string, Set<string>>();
+  individualShifts.forEach(s => {
+    if (!individualShiftMap.has(s.employee_id)) {
+      individualShiftMap.set(s.employee_id, new Set());
+    }
+    individualShiftMap.get(s.employee_id)!.add(s.date);
+  });
+
+  const employeeShiftIdMap = new Map<string, string>();
+  employeeStandardShifts.forEach(s => {
+    employeeShiftIdMap.set(s.employee_id, s.shift_id);
+  });
+
+  const employeeTeamMap = new Map<string, string>();
+  teamMembers.forEach(m => {
+    if (m.team_id) employeeTeamMap.set(m.employee_id, m.team_id);
+  });
+
+  // Build sick date sets per employee
+  const sickDateMap = new Map<string, Set<string>>();
+  sickAbsences.forEach(a => {
+    if (!sickDateMap.has(a.employee_id)) {
+      sickDateMap.set(a.employee_id, new Set());
+    }
+    const absStart = new Date(a.start_date);
+    const absEnd = new Date(a.end_date);
+    const current = new Date(absStart);
+    while (current <= absEnd) {
+      sickDateMap.get(a.employee_id)!.add(format(current, "yyyy-MM-dd"));
+      current.setDate(current.getDate() + 1);
+    }
+  });
+
+  // Count sick days where there was a planned shift
+  let totalSickDays = 0;
+  let withIndividualShift = 0;
+  let withStandardShift = 0;
+  let withTeamShift = 0;
+  let sickWithoutShift = 0;
+
+  for (const employee of employeesToCheck) {
+    const empId = employee.id;
+    const teamId = employeeTeamMap.get(empId) || employee.team_id;
+    const sickDates = sickDateMap.get(empId) || new Set();
+    const individualDates = individualShiftMap.get(empId) || new Set();
+    
+    const empShiftId = employeeShiftIdMap.get(empId);
+    const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+    
+    const teamPrimaryShiftId = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
+    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+
+    for (const dateStr of dates) {
+      // Only count if employee was sick on this date
+      if (!sickDates.has(dateStr)) continue;
+
+      const dayOfWeek = new Date(dateStr).getDay();
+      const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+      // Check if there was a planned shift (from hierarchy)
+      if (individualDates.has(dateStr)) {
+        totalSickDays++;
+        withIndividualShift++;
+      } else if (empStandardDays !== undefined && empStandardDays.includes(dayNumber)) {
+        totalSickDays++;
+        withStandardShift++;
+      } else if (teamDays && teamDays.includes(dayNumber)) {
+        totalSickDays++;
+        withTeamShift++;
+      } else {
+        // Sick but no planned shift - doesn't count
+        sickWithoutShift++;
+      }
+    }
+  }
+
+  return {
+    value: totalSickDays,
+    queryTimeMs: 0,
+    breakdown: {
+      "Med individuel vagt": withIndividualShift,
+      "Med medarbejder-standardvagt": withStandardShift,
+      "Med team-vagt": withTeamShift,
+      "Syg uden vagt (tæller ikke)": sickWithoutShift,
+      "Antal medarbejdere": employeesToCheck.length,
+      "Antal godkendte sygemeldinger": sickAbsences.length,
+    },
+    rowCount: totalSickDays,
   };
 }
