@@ -80,6 +80,34 @@ export function EmployeeCommissionHistory({
     enabled: !!teamMembership?.team_id,
   });
 
+  // Fetch employee's special shift assignment (overrides team primary)
+  const { data: specialShiftData } = useQuery({
+    queryKey: ["employee-special-shift-with-days", employeeId],
+    queryFn: async () => {
+      const { data: assignment } = await supabase
+        .from("employee_standard_shifts")
+        .select(`
+          shift_id,
+          team_standard_shifts(id, start_time, end_time, hours_source)
+        `)
+        .eq("employee_id", employeeId)
+        .single();
+      
+      if (!assignment?.shift_id) return null;
+      
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("day_of_week, start_time, end_time")
+        .eq("shift_id", assignment.shift_id);
+      
+      return { 
+        shift: assignment.team_standard_shifts as { id: string; start_time: string; end_time: string; hours_source: 'timestamp' | 'shift' } | null,
+        days: days || [],
+      };
+    },
+    enabled: !!employeeId,
+  });
+
   // Fetch time stamps for period
   const { data: timeStamps = [] } = useQuery({
     queryKey: ["employee-timestamps-period", employeeId, periodStart.toISOString(), periodEnd.toISOString()],
@@ -191,7 +219,10 @@ export function EmployeeCommissionHistory({
   // Process daily data - using vagtplan leder as source of truth
   const dailyData = useMemo(() => {
     const daysInPeriod = eachDayOfInterval({ start: periodStart, end: new Date(Math.min(periodEnd.getTime(), Date.now())) });
-    const hoursSource = primaryShiftData?.shift?.hours_source || 'shift';
+    
+    // Determine which shift data to use: special shift first, then primary shift
+    const activeShiftData = specialShiftData?.shift ? specialShiftData : primaryShiftData;
+    const hoursSource = activeShiftData?.shift?.hours_source || 'shift';
     
     const result: DailyData[] = daysInPeriod.map(date => {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -222,7 +253,12 @@ export function EmployeeCommissionHistory({
       let hours = 0;
       let hasPlannedShift = false;
 
-      if (hoursSource === 'timestamp') {
+      // For special shifts with NO days configured, employee gets 0 hours
+      if (specialShiftData?.shift && specialShiftData.days.length === 0) {
+        // Employee has special shift with no days = no shifts at all
+        hasPlannedShift = false;
+        hours = 0;
+      } else if (hoursSource === 'timestamp') {
         // Use actual clock-in/out from time_stamps
         const dayStamps = timeStamps.filter(s => 
           format(new Date(s.clock_in), "yyyy-MM-dd") === dateStr
@@ -230,8 +266,8 @@ export function EmployeeCommissionHistory({
         hours = dayStamps.reduce((sum, s) => sum + (s.effective_hours ?? 0), 0);
         hasPlannedShift = hours > 0;
       } else {
-        // Use planned hours from team_standard_shift_days (vagtplan sandhed)
-        const shiftForDay = primaryShiftData?.days?.find(
+        // Use planned hours from shift days (special or primary)
+        const shiftForDay = activeShiftData?.days?.find(
           sd => sd.day_of_week === adjustedDayOfWeek
         );
         if (shiftForDay?.start_time && shiftForDay?.end_time) {
@@ -297,7 +333,7 @@ export function EmployeeCommissionHistory({
     });
     
     return result;
-  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, productCommissionMap, primaryShiftData]);
+  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, productCommissionMap, primaryShiftData, specialShiftData]);
 
   // Calculate chart data with cumulative commission
   const chartData = useMemo(() => {
