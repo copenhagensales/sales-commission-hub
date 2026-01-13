@@ -1192,6 +1192,7 @@ async function testVacationDays(start: Date, end: Date, employeeId?: string): Pr
 // - Alm. vagt: Planlagt vagt uden fravær
 // - Sygevagt: Planlagt vagt med godkendt sygefravær
 // - Ferievagt: Planlagt vagt med godkendt ferie
+// - Fridagsvagt: Planlagt vagt med godkendt fridag (day_off)
 // - Udeblivelsesvagt: Planlagt vagt med godkendt udeblivelse (no_show)
 // ============================================================================
 async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
@@ -1269,13 +1270,13 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
       .from("team_standard_shift_days")
       .select("shift_id, day_of_week"),
     
-    // 6. ALL approved absences (sick, vacation, no_show)
+    // 6. ALL approved absences (sick, vacation, day_off, no_show)
     supabase
       .from("absence_request_v2")
       .select("employee_id, start_date, end_date, type")
       .in("employee_id", employeeIds)
       .eq("status", "approved")
-      .in("type", ["sick", "vacation", "no_show"])
+      .in("type", ["sick", "vacation", "day_off", "no_show"])
       .lte("start_date", endStr)
       .gte("end_date", startStr)
   ]);
@@ -1349,6 +1350,7 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
   let normalCount = 0;
   let sickCount = 0;
   let vacationCount = 0;
+  let dayOffCount = 0;
   let noShowCount = 0;
 
   for (const employee of employeesToCheck) {
@@ -1391,6 +1393,9 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
           case "vacation":
             vacationCount++;
             break;
+          case "day_off":
+            dayOffCount++;
+            break;
           case "no_show":
             noShowCount++;
             break;
@@ -1402,7 +1407,7 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
     }
   }
 
-  const totalShifts = normalCount + sickCount + vacationCount + noShowCount;
+  const totalShifts = normalCount + sickCount + vacationCount + dayOffCount + noShowCount;
 
   return {
     value: totalShifts,
@@ -1411,6 +1416,7 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
       "Alm. vagt": normalCount,
       "Sygevagt": sickCount,
       "Ferievagt": vacationCount,
+      "Fridagsvagt": dayOffCount,
       "Udeblivelsesvagt": noShowCount,
       "Antal medarbejdere": employeesToCheck.length,
       "Antal dage i periode": dates.length,
