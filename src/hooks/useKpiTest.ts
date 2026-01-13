@@ -1465,19 +1465,17 @@ async function testLatenessDays(start: Date, end: Date, employeeId?: string): Pr
 // ============================================================================
 // DAY OFF DAYS - Fridage
 // ============================================================================
-// Tæller antal godkendte fridage
-// Følger samme logik som syge- og feriedage
+// Tæller antal dage registreret med fridag (alle registreringer, uanset status)
 // ============================================================================
 async function testDayOffDays(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
   const startStr = format(start, "yyyy-MM-dd");
   const endStr = format(end, "yyyy-MM-dd");
 
-  // Hent godkendte fridage
+  // Hent alle fridag-registreringer (uanset status)
   let absenceQuery = supabase
     .from("absence_request_v2")
     .select("*")
     .eq("type", "day_off")
-    .eq("status", "approved")
     .lte("start_date", endStr)
     .gte("end_date", startStr);
 
@@ -1492,7 +1490,7 @@ async function testDayOffDays(start: Date, end: Date, employeeId?: string): Prom
     return {
       value: 0,
       queryTimeMs: 0,
-      breakdown: { "Godkendte fridage": 0 },
+      breakdown: { "Fridag-registreringer": 0 },
       rowCount: 0,
     };
   }
@@ -1500,6 +1498,12 @@ async function testDayOffDays(start: Date, end: Date, employeeId?: string): Prom
   // Tæl alle dage i fridag-perioden der overlapper med dato-intervallet
   let totalDayOffDays = 0;
   const dayOffDetails: Record<string, number> = {};
+
+  // Tæl status-fordeling
+  const statusCounts = absences.reduce((acc, a) => {
+    acc[a.status || 'unknown'] = (acc[a.status || 'unknown'] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   absences.forEach(absence => {
     const absStart = new Date(Math.max(new Date(absence.start_date).getTime(), start.getTime()));
@@ -1522,8 +1526,11 @@ async function testDayOffDays(start: Date, end: Date, employeeId?: string): Prom
     value: totalDayOffDays,
     queryTimeMs: 0,
     breakdown: {
-      "Godkendte fridagsanmodninger": absences.length,
+      "Fridag-registreringer": absences.length,
       "Total fridage": totalDayOffDays,
+      "Godkendte": statusCounts.approved || 0,
+      "Afventende": statusCounts.pending || 0,
+      "Afvist": statusCounts.rejected || 0,
       ...dayOffDetails,
     },
     rowCount: absences.length,
