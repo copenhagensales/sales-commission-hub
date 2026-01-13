@@ -421,6 +421,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 12. Delete standings for unenrolled players (is_active = false)
+    const { data: inactiveEnrollments } = await supabase
+      .from("league_enrollments")
+      .select("employee_id")
+      .eq("season_id", seasonId)
+      .eq("is_active", false);
+
+    if (inactiveEnrollments && inactiveEnrollments.length > 0) {
+      const inactiveIds = inactiveEnrollments.map((e) => e.employee_id);
+      const { error: deleteError } = await supabase
+        .from("league_qualification_standings")
+        .delete()
+        .eq("season_id", seasonId)
+        .in("employee_id", inactiveIds);
+
+      if (deleteError) {
+        console.error("[league-calculate-standings] Failed to delete inactive standings:", deleteError);
+      } else {
+        console.log(`[league-calculate-standings] Deleted standings for ${inactiveIds.length} unenrolled players`);
+      }
+    }
+
     console.log(`[league-calculate-standings] Successfully updated ${upsertData.length} standings`);
 
     return new Response(
