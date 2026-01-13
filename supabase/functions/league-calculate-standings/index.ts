@@ -207,11 +207,12 @@ Deno.serve(async (req) => {
     console.log(`[league-calculate-standings] Found ${sales.length} telesales in period (paginated)`);
 
     // 6b. Get fieldmarketing sales in the qualification period
+    // Use correct column names: seller_id, product_name, registered_at (not seller_email, product_id, sale_date)
     const { data: fmSales, error: fmSalesError } = await supabase
       .from("fieldmarketing_sales")
-      .select("id, seller_email, product_id")
-      .gte("sale_date", sourceStart.split('T')[0])
-      .lte("sale_date", sourceEnd.split('T')[0]);
+      .select("id, seller_id, product_name, registered_at")
+      .gte("registered_at", `${sourceStart.split('T')[0]}T00:00:00`)
+      .lte("registered_at", `${sourceEnd.split('T')[0]}T23:59:59`);
 
     if (fmSalesError) {
       console.error("[league-calculate-standings] Failed to fetch fieldmarketing sales:", fmSalesError);
@@ -219,30 +220,67 @@ Deno.serve(async (req) => {
 
     console.log(`[league-calculate-standings] Found ${fmSales?.length || 0} fieldmarketing sales in period`);
 
-    // Get product info for FM sales commission calculation
-    const fmProductIds = [...new Set((fmSales || []).map(s => s.product_id).filter(Boolean))];
-    let fmProductCommissions: Record<string, number> = {};
+    // Build product commission map by name (same logic as DailyReports)
+    // Get all products and campaign overrides
+    const { data: allProducts } = await supabase
+      .from("products")
+      .select("id, name, commission_dkk");
+
+    const { data: allCampaignOverrides } = await supabase
+      .from("product_campaign_overrides")
+      .select("product_id, commission_dkk");
+
+    // Build override map: prefer highest override commission per product
+    const overrideByProductId = new Map<string, number>();
+    (allCampaignOverrides || []).forEach((o: any) => {
+      const existing = overrideByProductId.get(o.product_id);
+      if (!existing || (o.commission_dkk ?? 0) > existing) {
+        overrideByProductId.set(o.product_id, o.commission_dkk ?? 0);
+      }
+    });
+
+    // Build product name -> commission map (prefer override, fallback to base)
+    const productCommissionByName = new Map<string, number>();
+    (allProducts || []).forEach((p: any) => {
+      if (p.name) {
+        const override = overrideByProductId.get(p.id);
+        const commission = override ?? p.commission_dkk ?? 0;
+        productCommissionByName.set(p.name.toLowerCase(), commission);
+      }
+    });
+
+    console.log(`[league-calculate-standings] Built commission map for ${productCommissionByName.size} products`);
+
+    // Build seller_id -> email map for FM sales attribution
+    const fmSellerIds = [...new Set((fmSales || []).map((s: any) => s.seller_id).filter(Boolean))];
+    const sellerIdToEmail: Record<string, string> = {};
     
-    if (fmProductIds.length > 0) {
-      const { data: fmProducts } = await supabase
-        .from("products")
-        .select("id, commission_dkk")
-        .in("id", fmProductIds);
+    if (fmSellerIds.length > 0) {
+      const { data: fmEmployees } = await supabase
+        .from("employee_master_data")
+        .select("id, work_email, private_email")
+        .in("id", fmSellerIds);
       
-      for (const p of fmProducts || []) {
-        fmProductCommissions[p.id] = Number(p.commission_dkk) || 0;
+      for (const emp of fmEmployees || []) {
+        // Prefer work_email, fallback to private_email
+        const email = emp.work_email || emp.private_email;
+        if (email) {
+          sellerIdToEmail[emp.id] = email.toLowerCase();
+        }
       }
     }
 
     // Build email -> FM commission/deals map
     const fmEmailStats: Record<string, { commission: number; deals: number }> = {};
     for (const fmSale of fmSales || []) {
-      const email = fmSale.seller_email?.toLowerCase();
+      const email = sellerIdToEmail[fmSale.seller_id];
       if (email) {
         if (!fmEmailStats[email]) {
           fmEmailStats[email] = { commission: 0, deals: 0 };
         }
-        fmEmailStats[email].commission += fmProductCommissions[fmSale.product_id] || 0;
+        // Match product_name to get commission (same as DailyReports)
+        const productName = (fmSale.product_name || "").toLowerCase();
+        fmEmailStats[email].commission += productCommissionByName.get(productName) || 0;
         fmEmailStats[email].deals += 1;
       }
     }
