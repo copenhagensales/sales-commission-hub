@@ -453,17 +453,45 @@ export function TeamsTab() {
   });
 
   // Add employee to team mutation (for drag and drop)
+  // Database trigger automatically removes non-staff employees from other teams
   const addEmployeeToTeamMutation = useMutation({
     mutationFn: async ({ employeeId, teamId }: { employeeId: string; teamId: string }) => {
+      // Check if employee is staff
+      const isStaffEmployee = teamLeaders.some(tl => tl.id === employeeId);
+      
+      // Get existing team memberships for this employee
+      const existingTeams = teamMembers.filter(tm => tm.employee_id === employeeId);
+      const previousTeamIds = existingTeams.map(tm => tm.team_id);
+      
+      // Insert into new team - database trigger handles cleanup for non-staff
       const { error } = await supabase
         .from("team_members")
         .insert({ employee_id: employeeId, team_id: teamId });
       if (error) throw error;
+      
+      // Return context for toast message
+      return { isStaffEmployee, previousTeamIds, newTeamId: teamId };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["team-members-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-for-teams"] });
-      toast({ title: "Medarbejder tilføjet til team" });
+      
+      const newTeam = teams.find(t => t.id === result.newTeamId);
+      const previousTeams = result.previousTeamIds
+        .filter(id => id !== result.newTeamId)
+        .map(id => teams.find(t => t.id === id)?.name)
+        .filter(Boolean);
+      
+      if (result.isStaffEmployee) {
+        toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
+      } else if (previousTeams.length > 0) {
+        toast({ 
+          title: `Medarbejder flyttet til ${newTeam?.name || 'team'}`,
+          description: `Fjernet fra: ${previousTeams.join(', ')}`
+        });
+      } else {
+        toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
+      }
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
