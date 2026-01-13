@@ -130,43 +130,6 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
     category: "Produktivitet",
     isSuggested: true,
   },
-
-  // Vagter
-  {
-    id: "regular-shift",
-    name: "Alm. vagt",
-    description: "Antal almindelige vagter",
-    category: "Vagter",
-    isSuggested: true,
-  },
-  {
-    id: "sick-shift",
-    name: "Sygevagt",
-    description: "Antal sygevagter",
-    category: "Vagter",
-    isSuggested: true,
-  },
-  {
-    id: "vacation-shift",
-    name: "Ferievagt",
-    description: "Antal ferievagter",
-    category: "Vagter",
-    isSuggested: true,
-  },
-  {
-    id: "lateness",
-    name: "Forsinkelse",
-    description: "Antal forsinkelser",
-    category: "Vagter",
-    isSuggested: true,
-  },
-  {
-    id: "no-show-shift",
-    name: "Udeblivelsesvagt",
-    description: "Antal udeblivelser fra vagt",
-    category: "Vagter",
-    isSuggested: true,
-  },
 ];
 
 const DEFAULT_KPI_TYPES: KpiTypeConfig[] = SUGGESTED_KPIS.map((kpi) => ({
