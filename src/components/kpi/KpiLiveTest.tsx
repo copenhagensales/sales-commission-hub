@@ -26,6 +26,7 @@ const periodLabels: Record<TestPeriod, string> = {
 export function KpiLiveTest({ slug, name }: KpiLiveTestProps) {
   const [period, setPeriod] = useState<TestPeriod>("this_month");
   const [clientId, setClientId] = useState<string>("");
+  const [employeeId, setEmployeeId] = useState<string>("");
   const { runTest, isLoading, result, clearResult } = useKpiTest();
 
   // Fetch clients for filtering
@@ -41,10 +42,25 @@ export function KpiLiveTest({ slug, name }: KpiLiveTestProps) {
     },
   });
 
+  // Fetch employees for filtering
+  const { data: employees } = useQuery({
+    queryKey: ["employees-for-kpi-test"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleRunTest = () => {
     runTest(slug, {
       period,
       clientId: clientId || undefined,
+      employeeId: employeeId || undefined,
     });
   };
 
@@ -80,89 +96,106 @@ export function KpiLiveTest({ slug, name }: KpiLiveTestProps) {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Klient (valgfri)</Label>
-            <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? "" : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle klienter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle klienter</SelectItem>
-                {clients?.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <Label>Klient (valgfri)</Label>
+          <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? "" : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Alle klienter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle klienter</SelectItem>
+              {clients?.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Run button */}
-        <Button onClick={handleRunTest} disabled={isLoading} className="w-full">
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Kører test...
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4 mr-2" />
-              Kør test
-            </>
-          )}
-        </Button>
+        <div className="space-y-2">
+          <Label>Medarbejder (valgfri)</Label>
+          <Select value={employeeId || "all"} onValueChange={(v) => setEmployeeId(v === "all" ? "" : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Alle medarbejdere" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle medarbejdere</SelectItem>
+              {employees?.map((emp) => (
+                <SelectItem key={emp.id} value={emp.id}>
+                  {emp.first_name} {emp.last_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        {/* Results */}
-        {result && (
-          <div className="space-y-3 pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Resultat</span>
-              <span className="text-2xl font-bold text-primary">
-                {typeof result.value === "number"
-                  ? result.value.toLocaleString("da-DK")
-                  : result.value}
-              </span>
+      {/* Run button */}
+      <Button onClick={handleRunTest} disabled={isLoading} className="w-full">
+        {isLoading ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Kører test...
+          </>
+        ) : (
+          <>
+            <Play className="h-4 w-4 mr-2" />
+            Kør test
+          </>
+        )}
+      </Button>
+
+      {/* Results */}
+      {result && (
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Resultat</span>
+            <span className="text-2xl font-bold text-primary">
+              {typeof result.value === "number"
+                ? result.value.toLocaleString("da-DK")
+                : result.value}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span>{result.queryTimeMs}ms</span>
             </div>
-
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {result.rowCount !== undefined && (
               <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>{result.queryTimeMs}ms</span>
-              </div>
-              {result.rowCount !== undefined && (
-                <div className="flex items-center gap-1">
-                  <Database className="h-3 w-3" />
-                  <span>{result.rowCount} rækker</span>
-                </div>
-              )}
-            </div>
-
-            {result.breakdown && Object.keys(result.breakdown).length > 0 && (
-              <div className="space-y-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Breakdown
-                </span>
-                <div className="grid gap-1">
-                  {Object.entries(result.breakdown).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between text-sm bg-muted/50 px-3 py-1.5 rounded"
-                    >
-                      <span>{key}</span>
-                      <Badge variant="secondary">
-                        {typeof value === "number"
-                          ? value.toLocaleString("da-DK")
-                          : value}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                <Database className="h-3 w-3" />
+                <span>{result.rowCount} rækker</span>
               </div>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {result.breakdown && Object.keys(result.breakdown).length > 0 && (
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Breakdown
+              </span>
+              <div className="grid gap-1">
+                {Object.entries(result.breakdown).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between text-sm bg-muted/50 px-3 py-1.5 rounded"
+                  >
+                    <span>{key}</span>
+                    <Badge variant="secondary">
+                      {typeof value === "number"
+                        ? value.toLocaleString("da-DK")
+                        : value}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </CardContent>
+  </Card>
   );
 }
