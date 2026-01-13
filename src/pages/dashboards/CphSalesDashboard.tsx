@@ -7,6 +7,7 @@ import { da } from "date-fns/locale";
 import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
 import { useMemo } from "react";
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
@@ -1138,6 +1139,11 @@ export default function CphSalesDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Daily Revenue Chart */}
+      {!tvMode && (
+        <DailyRevenueChart daysBack={30} />
+      )}
 
       {/* Footer */}
       <div className={`text-center text-muted-foreground ${tvMode ? 'text-xs' : 'text-sm'}`}>
