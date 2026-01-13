@@ -330,12 +330,25 @@ export function useUpdateAbsenceRequest() {
   
   return useMutation({
     mutationFn: async ({ id, status, rejection_reason }: { id: string; status: "approved" | "rejected"; rejection_reason?: string }) => {
+      // Get the current user's employee ID for reviewed_by
+      let reviewerId: string | null = null;
+      if (user?.email) {
+        const lowerEmail = user.email.toLowerCase();
+        const { data: reviewer } = await supabase
+          .from("employee_master_data")
+          .select("id")
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+          .maybeSingle();
+        
+        reviewerId = reviewer?.id || null;
+      }
+
       const { data, error } = await supabase
         .from("absence_request_v2")
         .update({
           status,
           rejection_reason,
-          reviewed_by: user?.id,
+          reviewed_by: reviewerId,
           reviewed_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -347,6 +360,7 @@ export function useUpdateAbsenceRequest() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["absence-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-absence-count"] });
       toast.success(variables.status === "approved" ? "Anmodning godkendt" : "Anmodning afvist");
     },
     onError: (error: any) => {

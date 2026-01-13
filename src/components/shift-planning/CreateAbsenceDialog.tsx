@@ -53,16 +53,16 @@ export function CreateAbsenceDialog({
     setType(defaultType);
   }, [defaultType]);
 
-  // Check for short notice (less than 14 days)
+  // Check for short notice (less than 5 weeks / 35 days)
   useEffect(() => {
     if (type === "vacation" && startDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const daysUntilStart = differenceInDays(startDate, today);
       
-      if (daysUntilStart < 14) {
+      if (daysUntilStart < 35) {
         setShortNoticeWarning(
-          `Ferie skal søges med minimum 14 dages varsel. Du kan ikke søge ferie med så kort varsel. Kontakt din teamleder, som kan godkende ferien manuelt.`
+          `Ferie skal søges med minimum 5 ugers varsel (35 dage). Du kan ikke søge ferie med så kort varsel. Kontakt din teamleder, som kan godkende ferien manuelt.`
         );
       } else {
         setShortNoticeWarning(null);

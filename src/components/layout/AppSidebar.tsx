@@ -127,21 +127,30 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
         return count || 0;
       }
 
-      // For team scope, get team members' requests
-      const { data: teamMembers } = await supabase
-        .from("employee_master_data")
+      // For team scope, get teams where current user is team_leader or assistant
+      const { data: ledTeams } = await supabase
+        .from("teams")
         .select("id")
-        .eq("manager_id", currentEmployee.id);
+        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
 
-      const teamIds = teamMembers?.map(m => m.id) || [];
-      if (teamIds.length === 0) return 0;
+      const ledTeamIds = ledTeams?.map(t => t.id) || [];
+      if (ledTeamIds.length === 0) return 0;
+
+      // Get all employees from those teams
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .in("team_id", ledTeamIds);
+
+      const teamMemberIds = teamMembers?.map(tm => tm.employee_id) || [];
+      if (teamMemberIds.length === 0) return 0;
 
       const { count } = await supabase
         .from("absence_request_v2")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending")
         .or(`postponed_until.is.null,postponed_until.lt.${now}`)
-        .in("employee_id", teamIds);
+        .in("employee_id", teamMemberIds);
 
       return count || 0;
     },
