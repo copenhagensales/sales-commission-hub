@@ -1,13 +1,15 @@
-import { useState } from "react";
-import { format, startOfMonth, endOfMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks } from "date-fns";
+import { useState, useCallback } from "react";
+import { format, startOfMonth, endOfMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Clock, AlarmClock, UserX, CalendarX2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-import { useCurrentEmployee, useMyShifts, useDanishHolidays, useAbsenceRequests } from "@/hooks/useShiftPlanning";
+import { useCurrentEmployee, useMyShifts, useDanishHolidays, useAbsenceRequests, useAbsencesForDateRange } from "@/hooks/useShiftPlanning";
 import { useTimeStampsForRange } from "@/hooks/useTimeStamps";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
 import { cn } from "@/lib/utils";
@@ -26,23 +28,20 @@ export default function MySchedule() {
   const monthEnd = endOfMonth(currentDate);
   
   // Generate weeks for the month (Mon-Fri only)
-  // Each week always has 5 elements (Mon-Fri), with null for days outside current month
   const generateWeeks = () => {
     const weeks: (Date | null)[][] = [];
     let weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     
     while (weekStart <= monthEnd) {
       const weekDays: (Date | null)[] = [];
-      for (let d = 0; d < 5; d++) { // Only Mon-Fri
+      for (let d = 0; d < 5; d++) {
         const day = addDays(weekStart, d);
-        // Include day if it's in current month, otherwise null
         if (day.getMonth() === currentDate.getMonth()) {
           weekDays.push(day);
         } else {
           weekDays.push(null);
         }
       }
-      // Only add week if it has at least one day from current month
       if (weekDays.some(d => d !== null)) {
         weeks.push(weekDays);
       }
@@ -53,15 +52,6 @@ export default function MySchedule() {
   
   const calendarWeeks = generateWeeks();
 
-  // Parse working hours from standard_start_time
-  const parseWorkingHours = (timeString: string | null) => {
-    if (!timeString) return { start: "09:00", end: "17:00" };
-    const [start, end] = timeString.split("-").map(t => t.trim().replace(".", ":"));
-    return { start, end };
-  };
-  
-  const workingHours = employee ? parseWorkingHours(employee.standard_start_time) : { start: "09:00", end: "17:00" };
-
   const { data: shifts } = useMyShifts(
     employee?.id,
     format(monthStart, "yyyy-MM-dd"),
@@ -70,12 +60,143 @@ export default function MySchedule() {
   const { data: holidays } = useDanishHolidays(currentDate.getFullYear());
   const { data: myAbsences } = useAbsenceRequests(undefined, employee?.id);
   
+  // Fetch APPROVED absences only (same as ShiftOverview)
+  const { data: approvedAbsences } = useAbsencesForDateRange(
+    format(monthStart, "yyyy-MM-dd"),
+    format(monthEnd, "yyyy-MM-dd")
+  );
+  
   // Get time stamps for the month
   const { data: timeStamps } = useTimeStampsForRange(
     employee?.id,
     format(monthStart, "yyyy-MM-dd"),
     format(monthEnd, "yyyy-MM-dd")
   );
+
+  // Fetch team membership for this employee
+  const { data: myTeamMembership } = useQuery({
+    queryKey: ["my-team-membership", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("employee_id", employee.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Fetch primary shift for my team with day configurations
+  const { data: primaryShiftData } = useQuery({
+    queryKey: ["my-primary-shift", myTeamMembership?.team_id],
+    queryFn: async () => {
+      if (!myTeamMembership?.team_id) return null;
+      
+      const { data: shift, error } = await supabase
+        .from("team_standard_shifts")
+        .select("id, team_id, name, start_time, end_time, hours_source")
+        .eq("team_id", myTeamMembership.team_id)
+        .eq("is_primary", true)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (!shift) return null;
+
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("day_of_week, start_time, end_time")
+        .eq("shift_id", shift.id);
+
+      return { shift, days: days || [] };
+    },
+    enabled: !!myTeamMembership?.team_id,
+  });
+
+  // Fetch employee special shift assignment (overrides team primary)
+  const { data: employeeSpecialShift } = useQuery({
+    queryKey: ["my-special-shift", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select(`
+          employee_id,
+          shift_id,
+          team_standard_shifts (id, hours_source, start_time, end_time)
+        `)
+        .eq("employee_id", employee.id)
+        .maybeSingle();
+      
+      if (error && error.code !== "PGRST116") throw error;
+      if (!data) return null;
+      
+      // Fetch day configs for special shift
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("day_of_week, start_time, end_time")
+        .eq("shift_id", data.shift_id);
+        
+      return { ...data, shiftDays: days || [] };
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Fetch lateness records
+  const { data: latenessRecords } = useQuery({
+    queryKey: ["my-lateness", employee?.id, format(monthStart, "yyyy-MM-dd"), format(monthEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      if (!employee?.id) return [];
+      const { data, error } = await supabase
+        .from("lateness_record")
+        .select("*")
+        .eq("employee_id", employee.id)
+        .gte("date", format(monthStart, "yyyy-MM-dd"))
+        .lte("date", format(monthEnd, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Get work times for a specific day using the same hierarchy as ShiftOverview
+  const getWorkTimesForDay = useCallback((date: Date): string | null => {
+    if (!employee?.id) return null;
+
+    const jsDay = getDay(date);
+    const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+    // 1. Check special shift first (employee-specific override)
+    if (employeeSpecialShift) {
+      const specialDays = employeeSpecialShift.shiftDays || [];
+      if (specialDays.length === 0) return null;
+      
+      const dayConfig = specialDays.find((d: { day_of_week: number }) => d.day_of_week === dbDayOfWeek);
+      if (dayConfig) {
+        return `${dayConfig.start_time.slice(0,5)}-${dayConfig.end_time.slice(0,5)}`;
+      }
+      return null;
+    }
+
+    // 2. Fallback to team primary shift
+    if (!primaryShiftData?.shift) return null;
+
+    const dayConfig = primaryShiftData.days.find(
+      (d: { day_of_week: number }) => d.day_of_week === dbDayOfWeek
+    );
+
+    if (dayConfig) {
+      return `${dayConfig.start_time.slice(0,5)}-${dayConfig.end_time.slice(0,5)}`;
+    }
+
+    // No weekend fallback
+    if (dbDayOfWeek === 6 || dbDayOfWeek === 7) return null;
+
+    // Weekday fallback to main shift times
+    return `${primaryShiftData.shift.start_time.slice(0,5)}-${primaryShiftData.shift.end_time.slice(0,5)}`;
+  }, [employee?.id, primaryShiftData, employeeSpecialShift]);
 
   const isHoliday = (date: Date) => {
     return holidays?.some(h => isSameDay(new Date(h.date), date));
@@ -90,15 +211,19 @@ export default function MySchedule() {
     return shifts?.find(s => isSameDay(new Date(s.date), date));
   };
 
-  const getAbsenceForDay = (date: Date) => {
-    return myAbsences?.find(a => {
+  const getApprovedAbsenceForDay = (date: Date) => {
+    return approvedAbsences?.filter(a => a.employee_id === employee?.id).find(a => {
       const start = new Date(a.start_date);
       const end = new Date(a.end_date);
       return date >= start && date <= end;
-    });
+    }) || null;
+  };
+
+  const getLatenessForDay = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return latenessRecords?.find(r => r.date === dateStr) || null;
   };
   
-  // Get time stamp for a specific day
   const getTimeStampForDay = (date: Date) => {
     return timeStamps?.find(ts => {
       const stampDate = new Date(ts.clock_in);
@@ -142,6 +267,9 @@ export default function MySchedule() {
       </MainLayout>
     );
   }
+
+  // Pending absences for "Mine anmodninger" section
+  const pendingAbsences = myAbsences?.filter(a => a.status === "pending") || [];
 
   return (
     <MainLayout>
@@ -193,6 +321,10 @@ export default function MySchedule() {
                 <span className="text-muted-foreground">Syg</span>
               </div>
               <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500/30" />
+                <span className="text-muted-foreground">Forsinket</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <Clock className="w-3 h-3 text-blue-600" />
                 <span className="text-muted-foreground">Stemplet</span>
               </div>
@@ -213,7 +345,6 @@ export default function MySchedule() {
 
                 {/* Calendar weeks */}
                 {calendarWeeks.map((week, weekIndex) => {
-                  // Find first non-null day for week number
                   const firstDay = week.find(d => d !== null);
                   const weekNumber = firstDay ? format(firstDay, "w") : "";
                   const isCurrentWeek = week.some(day => day && isToday(day));
@@ -231,9 +362,8 @@ export default function MySchedule() {
                         {weekNumber}
                       </div>
 
-                      {/* Days - always 5 cells (Mon-Fri) */}
+                      {/* Days */}
                       {week.map((day, dayIndex) => {
-                        // Empty cell for days not in this month
                         if (!day) {
                           return (
                             <div 
@@ -246,44 +376,70 @@ export default function MySchedule() {
                         const shift = getShiftForDay(day);
                         const holiday = isHoliday(day);
                         const holidayName = getHolidayName(day);
-                        const absence = getAbsenceForDay(day);
+                        const approvedAbsence = getApprovedAbsenceForDay(day);
+                        const lateness = getLatenessForDay(day);
                         const timeStamp = getTimeStampForDay(day);
+                        const workTimes = getWorkTimesForDay(day);
                         const isPast = day < new Date() && !isToday(day);
 
-                        // Determine cell style based on status
-                        let bgColor = "bg-green-500/15"; // Default: working day
-                        let icon = <Briefcase className="h-3 w-3 text-green-600" />;
-                        let statusText = workingHours.start.replace(":", ".") + "-" + workingHours.end.replace(":", ".");
+                        // Determine cell style using same hierarchy as ShiftOverview
+                        let bgColor = "";
+                        let icon = null;
+                        let statusText = "";
                         let timeStampInfo: React.ReactNode = null;
 
                         if (holiday) {
                           bgColor = "bg-destructive/10";
                           icon = <CalendarPlus className="h-3 w-3 text-destructive" />;
                           statusText = holidayName || "Helligdag";
-                        } else if (absence) {
-                          if (absence.type === "vacation") {
+                        } else if (approvedAbsence) {
+                          if (approvedAbsence.type === "vacation") {
                             bgColor = "bg-amber-500/20";
                             icon = <Palmtree className="h-3 w-3 text-amber-600" />;
-                            statusText = absence.status === "pending" ? "Ferie (afventer)" : "Ferie";
-                          } else {
+                            statusText = "Ferie";
+                          } else if (approvedAbsence.type === "sick") {
                             bgColor = "bg-red-500/20";
                             icon = <Thermometer className="h-3 w-3 text-red-500" />;
-                            statusText = absence.status === "pending" ? "Syg (afventer)" : "Syg";
+                            statusText = "Syg";
+                          } else if (approvedAbsence.type === "day_off") {
+                            bgColor = "bg-blue-500/20";
+                            icon = <CalendarX2 className="h-3 w-3 text-blue-600" />;
+                            statusText = "Fridag";
+                          } else if (approvedAbsence.type === "no_show") {
+                            bgColor = "bg-gray-500/20";
+                            icon = <UserX className="h-3 w-3 text-gray-600" />;
+                            statusText = "Udeblivelse";
                           }
+                        } else if (lateness) {
+                          bgColor = "bg-orange-500/15";
+                          icon = <AlarmClock className="h-3 w-3 text-orange-600" />;
+                          const newTime = lateness.new_start_time?.slice(0,5) || "";
+                          const endTime = workTimes?.split('-')[1] || "";
+                          statusText = newTime && endTime ? `${newTime}-${endTime}` : `+${lateness.minutes} min`;
                         } else if (shift) {
-                          statusText = `${shift.start_time.slice(0, 5).replace(":", ".")}-${shift.end_time.slice(0, 5).replace(":", ".")}`;
+                          // Individual shift exception
+                          bgColor = "bg-green-500/15";
+                          icon = <Briefcase className="h-3 w-3 text-green-600" />;
+                          statusText = `${shift.start_time.slice(0, 5)}-${shift.end_time.slice(0, 5)}`;
+                        } else if (workTimes) {
+                          // Standard shift from hierarchy
+                          bgColor = "bg-green-500/15";
+                          icon = <Briefcase className="h-3 w-3 text-green-600" />;
+                          statusText = workTimes;
+                        } else {
+                          // No shift configured for this day
+                          bgColor = "bg-muted/30";
+                          statusText = "";
                         }
                         
                         // Show time stamp info if available
-                        if (timeStamp && !holiday && !absence) {
+                        if (timeStamp && !holiday && !approvedAbsence) {
                           const clockIn = format(new Date(timeStamp.clock_in), "HH:mm");
                           const clockOut = timeStamp.clock_out 
                             ? format(new Date(timeStamp.clock_out), "HH:mm") 
                             : "...";
                           const effectiveHours = timeStamp.effective_hours ?? null;
                           
-                          // Calculate daily pay if we have effective hours and salary amount
-                          // Only show for hourly employees, not fixed salary
                           const isFixedSalary = employee?.salary_type === 'fixed';
                           const hourlyRate = employee?.salary_amount || 0;
                           const dailyPay = !isFixedSalary && effectiveHours != null && hourlyRate > 0 
@@ -318,7 +474,7 @@ export default function MySchedule() {
                               bgColor,
                               isPast && "opacity-60"
                             )}
-                            onClick={() => !holiday && !absence && handleDayClick(day)}
+                            onClick={() => !holiday && !approvedAbsence && handleDayClick(day)}
                           >
                             <div className="flex flex-col h-full">
                               {/* Date */}
@@ -331,12 +487,14 @@ export default function MySchedule() {
                               </div>
 
                               {/* Status */}
-                              <div className="flex items-center gap-1">
-                                {icon}
-                                <span className="text-[10px] text-muted-foreground truncate">
-                                  {statusText}
-                                </span>
-                              </div>
+                              {(icon || statusText) && (
+                                <div className="flex items-center gap-1">
+                                  {icon}
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    {statusText}
+                                  </span>
+                                </div>
+                              )}
                               
                               {/* Time stamp info */}
                               {timeStampInfo}
@@ -349,42 +507,30 @@ export default function MySchedule() {
                 })}
               </CardContent>
             </Card>
-            
-            {/* Working hours info */}
-            {employee?.standard_start_time && (
-              <p className="text-xs text-muted-foreground">
-                Din standardmødetid er <span className="font-medium">{employee.standard_start_time}</span> (mandag-fredag)
-              </p>
-            )}
 
-            {/* Recent Absence Requests */}
-            {myAbsences && myAbsences.length > 0 && (
+            {/* Pending Absence Requests */}
+            {pendingAbsences.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Mine anmodninger</CardTitle>
+                  <CardTitle className="text-sm">Afventende anmodninger</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {myAbsences.slice(0, 3).map(absence => (
+                    {pendingAbsences.slice(0, 3).map(absence => (
                       <div key={absence.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
                         <div>
                           <p className="font-medium">
-                            {absence.type === "vacation" ? "Ferie" : "Sygdom"}
+                            {absence.type === "vacation" ? "Ferie" : 
+                             absence.type === "sick" ? "Sygdom" :
+                             absence.type === "day_off" ? "Fridag" : "Udeblivelse"}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {format(new Date(absence.start_date), "d. MMM", { locale: da })}
                             {absence.start_date !== absence.end_date && ` - ${format(new Date(absence.end_date), "d. MMM", { locale: da })}`}
                           </p>
                         </div>
-                        <Badge
-                          variant={
-                            absence.status === "approved" ? "default" :
-                            absence.status === "pending" ? "secondary" : "destructive"
-                          }
-                          className="text-xs"
-                        >
-                          {absence.status === "approved" ? "Godkendt" :
-                           absence.status === "pending" ? "Afventer" : "Afvist"}
+                        <Badge variant="secondary" className="text-xs">
+                          Afventer
                         </Badge>
                       </div>
                     ))}
