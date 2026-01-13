@@ -172,21 +172,39 @@ Deno.serve(async (req) => {
     });
 
     // 6. Get all sales in the qualification period with campaign info
-    const { data: sales, error: salesError } = await supabase
-      .from("sales")
-      .select("id, agent_email, dialer_campaign_id, client_campaign_id")
-      .gte("sale_datetime", sourceStart)
-      .lte("sale_datetime", sourceEnd);
+    // Paginate to avoid the 1000 row limit
+    let allSales: any[] = [];
+    const SALES_PAGE_SIZE = 1000;
+    let salesOffset = 0;
+    let hasMoreSales = true;
 
-    if (salesError) {
-      console.error("[league-calculate-standings] Failed to fetch sales:", salesError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch sales", details: salesError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    while (hasMoreSales) {
+      const { data: salesBatch, error: salesError } = await supabase
+        .from("sales")
+        .select("id, agent_email, dialer_campaign_id, client_campaign_id")
+        .gte("sale_datetime", sourceStart)
+        .lte("sale_datetime", sourceEnd)
+        .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
+
+      if (salesError) {
+        console.error("[league-calculate-standings] Failed to fetch sales:", salesError);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch sales", details: salesError }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (salesBatch && salesBatch.length > 0) {
+        allSales = [...allSales, ...salesBatch];
+        salesOffset += salesBatch.length;
+        hasMoreSales = salesBatch.length === SALES_PAGE_SIZE;
+      } else {
+        hasMoreSales = false;
+      }
     }
 
-    console.log(`[league-calculate-standings] Found ${sales?.length || 0} telesales in period`);
+    const sales = allSales;
+    console.log(`[league-calculate-standings] Found ${sales.length} telesales in period (paginated)`);
 
     // 6b. Get fieldmarketing sales in the qualification period
     const { data: fmSales, error: fmSalesError } = await supabase
