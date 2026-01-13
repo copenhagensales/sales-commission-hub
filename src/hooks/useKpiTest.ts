@@ -99,6 +99,24 @@ export function useKpiTest() {
         case "day_off_days":
           testResult = await testDayOffDays(start, end, params.employeeId);
           break;
+        case "all_hours":
+          testResult = await testAllHours(start, end, params.employeeId);
+          break;
+        case "sales_hours":
+          testResult = await testSalesHours(start, end, params.employeeId);
+          break;
+        case "vacation_hours":
+          testResult = await testVacationHours(start, end, params.employeeId);
+          break;
+        case "sick_hours":
+          testResult = await testSickHours(start, end, params.employeeId);
+          break;
+        case "day_off_hours":
+          testResult = await testDayOffHours(start, end, params.employeeId);
+          break;
+        case "lateness_hours":
+          testResult = await testLatenessHours(start, end, params.employeeId);
+          break;
         default:
           testResult = {
             value: "Test ikke tilgængelig for denne KPI",
@@ -1540,5 +1558,497 @@ async function testDayOffDays(start: Date, end: Date, employeeId?: string): Prom
       ...dayOffDetails,
     },
     rowCount: absences.length,
+  };
+}
+
+// ============================================================================
+// HELPER: Beregn timer fra start_time og end_time
+// Følger Vagtplan leder logik med fleksibel pause
+// ============================================================================
+function calculateHoursFromTimes(
+  startTime: string,
+  endTime: string,
+  breakMinutes?: number | null
+): number {
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  
+  let rawHours = (endH + endM / 60) - (startH + startM / 60);
+  // Handle overnight shifts
+  if (rawHours < 0) rawHours += 24;
+  
+  // Brug eksplicit break_minutes hvis tilgængelig, ellers 30 min fallback for >6t
+  const breakMins = breakMinutes ?? (rawHours > 6 ? 30 : 0);
+  
+  return Math.max(0, rawHours - breakMins / 60);
+}
+
+// ============================================================================
+// HELPER: Core timer-beregning baseret på Vagtplan leder logik
+// Returnerer timer fordelt på type (normal, sick, vacation, day_off, no_show)
+// ============================================================================
+interface HoursResult {
+  normalHours: number;
+  sickHours: number;
+  vacationHours: number;
+  dayOffHours: number;
+  noShowHours: number;
+  totalHours: number;
+  employeeCount: number;
+  dayCount: number;
+}
+
+async function calculateHoursByType(start: Date, end: Date, employeeId?: string): Promise<HoursResult> {
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+
+  // Generate all dates in period
+  const dates: string[] = [];
+  const current = new Date(start);
+  while (current <= end) {
+    dates.push(format(current, "yyyy-MM-dd"));
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Get employees to check
+  let employeesToCheck: { id: string; team_id: string | null }[] = [];
+  
+  if (employeeId) {
+    const { data: emp } = await supabase
+      .from("employee_master_data")
+      .select("id, team_id")
+      .eq("id", employeeId)
+      .single();
+    if (emp) employeesToCheck = [emp];
+  } else {
+    const { data: emps } = await supabase
+      .from("employee_master_data")
+      .select("id, team_id")
+      .eq("is_active", true);
+    employeesToCheck = emps || [];
+  }
+
+  if (employeesToCheck.length === 0) {
+    return { normalHours: 0, sickHours: 0, vacationHours: 0, dayOffHours: 0, noShowHours: 0, totalHours: 0, employeeCount: 0, dayCount: dates.length };
+  }
+
+  const employeeIds = employeesToCheck.map(e => e.id);
+
+  // Fetch all data sources in parallel
+  const [
+    individualShiftsRes,
+    employeeStandardShiftsRes,
+    teamMembersRes,
+    teamStandardShiftsRes,
+    shiftDaysRes,
+    absencesRes,
+    timeStampsRes
+  ] = await Promise.all([
+    // 1. Individual shifts with times and break_minutes
+    supabase
+      .from("shift")
+      .select("employee_id, date, start_time, end_time, break_minutes")
+      .in("employee_id", employeeIds)
+      .gte("date", startStr)
+      .lte("date", endStr),
+    
+    // 2. Employee standard shifts with shift_id
+    supabase
+      .from("employee_standard_shifts")
+      .select("employee_id, shift_id")
+      .in("employee_id", employeeIds),
+    
+    // 3. Team members
+    supabase
+      .from("team_members")
+      .select("employee_id, team_id")
+      .in("employee_id", employeeIds),
+    
+    // 4. Team standard shifts with hours_source and times
+    supabase
+      .from("team_standard_shifts")
+      .select("id, team_id, is_primary, hours_source, start_time, end_time, created_at"),
+    
+    // 5. Team standard shift days with times
+    supabase
+      .from("team_standard_shift_days")
+      .select("shift_id, day_of_week, start_time, end_time"),
+    
+    // 6. ALL approved absences
+    supabase
+      .from("absence_request_v2")
+      .select("employee_id, start_date, end_date, type")
+      .in("employee_id", employeeIds)
+      .eq("status", "approved")
+      .in("type", ["sick", "vacation", "day_off", "no_show"])
+      .lte("start_date", endStr)
+      .gte("end_date", startStr),
+    
+    // 7. Time stamps for timestamp-based hours (use clock_in for date filtering)
+    supabase
+      .from("time_stamps")
+      .select("employee_id, clock_in, clock_out, break_minutes, effective_hours")
+      .in("employee_id", employeeIds)
+      .gte("clock_in", `${startStr}T00:00:00`)
+      .lte("clock_in", `${endStr}T23:59:59`)
+  ]);
+
+  const individualShifts = individualShiftsRes.data || [];
+  const employeeStandardShifts = employeeStandardShiftsRes.data || [];
+  const teamMembers = teamMembersRes.data || [];
+  const teamStandardShifts = teamStandardShiftsRes.data || [];
+  const shiftDays = shiftDaysRes.data || [];
+  const absences = absencesRes.data || [];
+  const timeStamps = timeStampsRes.data || [];
+
+  // Build shift_id -> days map (with times)
+  const shiftDaysMap = new Map<string, { day_of_week: number; start_time: string | null; end_time: string | null }[]>();
+  shiftDays.forEach(sd => {
+    if (!shiftDaysMap.has(sd.shift_id)) {
+      shiftDaysMap.set(sd.shift_id, []);
+    }
+    shiftDaysMap.get(sd.shift_id)!.push({
+      day_of_week: sd.day_of_week,
+      start_time: sd.start_time,
+      end_time: sd.end_time
+    });
+  });
+
+  // Build team -> primary shift map (use oldest primary shift per team)
+  const sortedTeamStandardShifts = [...teamStandardShifts].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const teamPrimaryShiftMap = new Map<string, typeof teamStandardShifts[0]>();
+  sortedTeamStandardShifts.forEach(s => {
+    if (s.is_primary && !teamPrimaryShiftMap.has(s.team_id)) {
+      teamPrimaryShiftMap.set(s.team_id, s);
+    }
+  });
+
+  // Build shift_id -> shift details map
+  const shiftDetailsMap = new Map<string, typeof teamStandardShifts[0]>();
+  teamStandardShifts.forEach(s => {
+    shiftDetailsMap.set(s.id, s);
+  });
+
+  // Build individual shift map: employee_id_date -> shift details
+  const individualShiftMap = new Map<string, typeof individualShifts[0]>();
+  individualShifts.forEach(s => {
+    individualShiftMap.set(`${s.employee_id}_${s.date}`, s);
+  });
+
+  // Build employee -> special shift_id map
+  const employeeShiftIdMap = new Map<string, string>();
+  employeeStandardShifts.forEach(s => {
+    employeeShiftIdMap.set(s.employee_id, s.shift_id);
+  });
+
+  // Build employee -> team map
+  const employeeTeamMap = new Map<string, string>();
+  teamMembers.forEach(m => {
+    if (m.team_id) employeeTeamMap.set(m.employee_id, m.team_id);
+  });
+
+  // Build timestamp map: employee_id_date -> timestamp (extract date from clock_in)
+  const timeStampMap = new Map<string, { clock_in: string; clock_out: string | null; break_minutes: number | null; effective_hours: number | null }>();
+  timeStamps.forEach(ts => {
+    const dateStr = format(new Date(ts.clock_in), "yyyy-MM-dd");
+    timeStampMap.set(`${ts.employee_id}_${dateStr}`, ts);
+  });
+
+  // Build absence type date sets per employee
+  const absenceTypeMap = new Map<string, Map<string, string>>();
+  absences.forEach(a => {
+    if (!absenceTypeMap.has(a.employee_id)) {
+      absenceTypeMap.set(a.employee_id, new Map());
+    }
+    const absStart = new Date(a.start_date);
+    const absEnd = new Date(a.end_date);
+    const cur = new Date(absStart);
+    while (cur <= absEnd) {
+      const dateStr = format(cur, "yyyy-MM-dd");
+      if (!absenceTypeMap.get(a.employee_id)!.has(dateStr)) {
+        absenceTypeMap.get(a.employee_id)!.set(dateStr, a.type);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+
+  // Calculate hours by type
+  let normalHours = 0;
+  let sickHours = 0;
+  let vacationHours = 0;
+  let dayOffHours = 0;
+  let noShowHours = 0;
+
+  for (const employee of employeesToCheck) {
+    const empId = employee.id;
+    const teamId = employeeTeamMap.get(empId) || employee.team_id;
+    const absenceDatesForEmp = absenceTypeMap.get(empId) || new Map();
+    
+    const empShiftId = employeeShiftIdMap.get(empId);
+    const empStandardShift = empShiftId ? shiftDetailsMap.get(empShiftId) : undefined;
+    const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+    
+    const teamPrimaryShift = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
+    const teamPrimaryShiftId = teamPrimaryShift?.id;
+    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+
+    // Determine hours_source: employee special shift → team primary shift → default 'shift'
+    const hoursSource = empStandardShift?.hours_source || teamPrimaryShift?.hours_source || 'shift';
+
+    for (const dateStr of dates) {
+      const dayOfWeek = new Date(dateStr).getDay();
+      const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+      const key = `${empId}_${dateStr}`;
+
+      // Check if there's a planned shift and get times
+      let hasShift = false;
+      let shiftHours = 0;
+      
+      const individualShift = individualShiftMap.get(key);
+      
+      if (individualShift) {
+        hasShift = true;
+        if (hoursSource === 'timestamp') {
+          // Use actual timestamp
+          const ts = timeStampMap.get(key);
+          if (ts?.effective_hours) {
+            shiftHours = ts.effective_hours;
+          } else if (ts?.clock_in && ts?.clock_out) {
+            shiftHours = calculateHoursFromTimes(ts.clock_in, ts.clock_out, ts.break_minutes);
+          }
+        } else {
+          // Use planned shift times
+          if (individualShift.start_time && individualShift.end_time) {
+            shiftHours = calculateHoursFromTimes(individualShift.start_time, individualShift.end_time, individualShift.break_minutes);
+          }
+        }
+      } else if (empStandardDays !== undefined) {
+        // Check employee special shift
+        const dayConfig = empStandardDays.find(d => d.day_of_week === dayNumber);
+        if (dayConfig) {
+          hasShift = true;
+          if (hoursSource === 'timestamp') {
+            const ts = timeStampMap.get(key);
+            if (ts?.effective_hours) {
+              shiftHours = ts.effective_hours;
+            } else if (ts?.clock_in && ts?.clock_out) {
+              shiftHours = calculateHoursFromTimes(ts.clock_in, ts.clock_out, ts.break_minutes);
+            }
+          } else {
+            // Use day-specific times or fallback to shift default times
+            const startTime = dayConfig.start_time || empStandardShift?.start_time;
+            const endTime = dayConfig.end_time || empStandardShift?.end_time;
+            if (startTime && endTime) {
+              shiftHours = calculateHoursFromTimes(startTime, endTime, null);
+            }
+          }
+        }
+      } else if (teamDays) {
+        // Check team primary shift
+        const dayConfig = teamDays.find(d => d.day_of_week === dayNumber);
+        if (dayConfig) {
+          hasShift = true;
+          if (hoursSource === 'timestamp') {
+            const ts = timeStampMap.get(key);
+            if (ts?.effective_hours) {
+              shiftHours = ts.effective_hours;
+            } else if (ts?.clock_in && ts?.clock_out) {
+              shiftHours = calculateHoursFromTimes(ts.clock_in, ts.clock_out, ts.break_minutes);
+            }
+          } else {
+            // Use day-specific times or fallback to team shift default times
+            const startTime = dayConfig.start_time || teamPrimaryShift?.start_time;
+            const endTime = dayConfig.end_time || teamPrimaryShift?.end_time;
+            if (startTime && endTime) {
+              shiftHours = calculateHoursFromTimes(startTime, endTime, null);
+            }
+          }
+        }
+      }
+
+      // Only count if there's a planned shift
+      if (hasShift) {
+        const absenceType = absenceDatesForEmp.get(dateStr);
+        
+        switch (absenceType) {
+          case "sick":
+            sickHours += shiftHours;
+            break;
+          case "vacation":
+            vacationHours += shiftHours;
+            break;
+          case "day_off":
+            dayOffHours += shiftHours;
+            break;
+          case "no_show":
+            noShowHours += shiftHours;
+            break;
+          default:
+            normalHours += shiftHours;
+            break;
+        }
+      }
+    }
+  }
+
+  const totalHours = normalHours + sickHours + vacationHours + dayOffHours + noShowHours;
+
+  return {
+    normalHours: Math.round(normalHours * 100) / 100,
+    sickHours: Math.round(sickHours * 100) / 100,
+    vacationHours: Math.round(vacationHours * 100) / 100,
+    dayOffHours: Math.round(dayOffHours * 100) / 100,
+    noShowHours: Math.round(noShowHours * 100) / 100,
+    totalHours: Math.round(totalHours * 100) / 100,
+    employeeCount: employeesToCheck.length,
+    dayCount: dates.length
+  };
+}
+
+// ============================================================================
+// ALL HOURS - Alle timer fordelt på type
+// ============================================================================
+// Beregner timer fra alle vagttyper baseret på Vagtplan leder logik
+// hours_source: 'timestamp' → faktiske stempletider, 'shift' → planlagte tider
+// ============================================================================
+async function testAllHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const result = await calculateHoursByType(start, end, employeeId);
+
+  return {
+    value: result.totalHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Salgstimer (alm. vagt)": result.normalHours.toFixed(2),
+      "Sygetimer": result.sickHours.toFixed(2),
+      "Ferietimer": result.vacationHours.toFixed(2),
+      "Fridagstimer": result.dayOffHours.toFixed(2),
+      "Udeblivelsestimer": result.noShowHours.toFixed(2),
+      "Total timer": result.totalHours.toFixed(2),
+      "Antal medarbejdere": result.employeeCount,
+      "Antal dage i periode": result.dayCount,
+    },
+    rowCount: result.employeeCount,
+  };
+}
+
+// ============================================================================
+// SALES HOURS - Salgstimer (alm. vagt timer)
+// ============================================================================
+// Timer fra almindelige vagter uden fravær
+// ============================================================================
+async function testSalesHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const result = await calculateHoursByType(start, end, employeeId);
+
+  return {
+    value: result.normalHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Salgstimer (alm. vagt)": result.normalHours.toFixed(2),
+      "Antal medarbejdere": result.employeeCount,
+      "Antal dage i periode": result.dayCount,
+    },
+    rowCount: result.employeeCount,
+  };
+}
+
+// ============================================================================
+// VACATION HOURS - Ferietimer
+// ============================================================================
+// Timer fra vagter med godkendt ferie
+// ============================================================================
+async function testVacationHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const result = await calculateHoursByType(start, end, employeeId);
+
+  return {
+    value: result.vacationHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Ferietimer": result.vacationHours.toFixed(2),
+      "Antal medarbejdere": result.employeeCount,
+      "Antal dage i periode": result.dayCount,
+    },
+    rowCount: result.employeeCount,
+  };
+}
+
+// ============================================================================
+// SICK HOURS - Sygetimer
+// ============================================================================
+// Timer fra vagter med godkendt sygefravær
+// ============================================================================
+async function testSickHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const result = await calculateHoursByType(start, end, employeeId);
+
+  return {
+    value: result.sickHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Sygetimer": result.sickHours.toFixed(2),
+      "Antal medarbejdere": result.employeeCount,
+      "Antal dage i periode": result.dayCount,
+    },
+    rowCount: result.employeeCount,
+  };
+}
+
+// ============================================================================
+// DAY OFF HOURS - Fridagstimer
+// ============================================================================
+// Timer fra vagter med godkendt fridag
+// ============================================================================
+async function testDayOffHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const result = await calculateHoursByType(start, end, employeeId);
+
+  return {
+    value: result.dayOffHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Fridagstimer": result.dayOffHours.toFixed(2),
+      "Antal medarbejdere": result.employeeCount,
+      "Antal dage i periode": result.dayCount,
+    },
+    rowCount: result.employeeCount,
+  };
+}
+
+// ============================================================================
+// LATENESS HOURS - Forsinket timer
+// ============================================================================
+// Total tid forsinket (minutter konverteret til timer)
+// Bruger lateness_record.minutes
+// ============================================================================
+async function testLatenessHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+
+  let query = supabase
+    .from("lateness_record")
+    .select("id, employee_id, date, minutes")
+    .gte("date", startStr)
+    .lte("date", endStr);
+
+  if (employeeId) {
+    query = query.eq("employee_id", employeeId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const totalMinutes = data?.reduce((sum, r) => sum + (r.minutes || 0), 0) || 0;
+  const totalHours = totalMinutes / 60;
+  const avgMinutes = data?.length ? Math.round(totalMinutes / data.length) : 0;
+
+  return {
+    value: totalHours.toFixed(2),
+    queryTimeMs: 0,
+    breakdown: {
+      "Antal forsinkelser": data?.length || 0,
+      "Total minutter": totalMinutes,
+      "Total timer": totalHours.toFixed(2),
+      "Gennemsnitlig forsinkelse": `${avgMinutes} min`,
+    },
+    rowCount: data?.length || 0,
   };
 }
