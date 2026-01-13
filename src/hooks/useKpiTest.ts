@@ -93,6 +93,12 @@ export function useKpiTest() {
         case "all_shift_types":
           testResult = await testAllShiftTypes(start, end, params.employeeId);
           break;
+        case "lateness_days":
+          testResult = await testLatenessDays(start, end, params.employeeId);
+          break;
+        case "day_off_days":
+          testResult = await testDayOffDays(start, end, params.employeeId);
+          break;
         default:
           testResult = {
             value: "Test ikke tilgængelig for denne KPI",
@@ -1410,5 +1416,116 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
       "Antal dage i periode": dates.length,
     },
     rowCount: totalShifts,
+  };
+}
+
+// ============================================================================
+// LATENESS DAYS - Forsinkede dage
+// ============================================================================
+// Tæller antal unikke dage med forsinkelsesregistrering
+// Kræver IKKE planlagt vagt - tæller blot registreringer i lateness_record
+// ============================================================================
+async function testLatenessDays(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+
+  let query = supabase
+    .from("lateness_record")
+    .select("id, employee_id, date, minutes", { count: "exact" })
+    .gte("date", startStr)
+    .lte("date", endStr);
+
+  if (employeeId) {
+    query = query.eq("employee_id", employeeId);
+  }
+
+  const { data, count, error } = await query;
+  if (error) throw error;
+
+  // Tæl unikke dage (en medarbejder kan kun have én forsinkelse per dag)
+  const uniqueDays = new Set(data?.map(r => `${r.employee_id}_${r.date}`) || []);
+  
+  // Beregn gennemsnitlig forsinkelse
+  const totalMinutes = data?.reduce((sum, r) => sum + (r.minutes || 0), 0) || 0;
+  const avgMinutes = data?.length ? Math.round(totalMinutes / data.length) : 0;
+
+  return {
+    value: uniqueDays.size,
+    queryTimeMs: 0,
+    breakdown: {
+      "Antal forsinkelser": count || 0,
+      "Unikke dage": uniqueDays.size,
+      "Total minutter": totalMinutes,
+      "Gennemsnitlig forsinkelse": `${avgMinutes} min`,
+    },
+    rowCount: count || 0,
+  };
+}
+
+// ============================================================================
+// DAY OFF DAYS - Fridage
+// ============================================================================
+// Tæller antal godkendte fridage
+// Følger samme logik som syge- og feriedage
+// ============================================================================
+async function testDayOffDays(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const startStr = format(start, "yyyy-MM-dd");
+  const endStr = format(end, "yyyy-MM-dd");
+
+  // Hent godkendte fridage
+  let absenceQuery = supabase
+    .from("absence_request_v2")
+    .select("*")
+    .eq("type", "day_off")
+    .eq("status", "approved")
+    .lte("start_date", endStr)
+    .gte("end_date", startStr);
+
+  if (employeeId) {
+    absenceQuery = absenceQuery.eq("employee_id", employeeId);
+  }
+
+  const { data: absences, error } = await absenceQuery;
+  if (error) throw error;
+
+  if (!absences?.length) {
+    return {
+      value: 0,
+      queryTimeMs: 0,
+      breakdown: { "Godkendte fridage": 0 },
+      rowCount: 0,
+    };
+  }
+
+  // Tæl alle dage i fridag-perioden der overlapper med dato-intervallet
+  let totalDayOffDays = 0;
+  const dayOffDetails: Record<string, number> = {};
+
+  absences.forEach(absence => {
+    const absStart = new Date(Math.max(new Date(absence.start_date).getTime(), start.getTime()));
+    const absEnd = new Date(Math.min(new Date(absence.end_date).getTime(), end.getTime()));
+    
+    const current = new Date(absStart);
+    let daysForThisAbsence = 0;
+    
+    while (current <= absEnd) {
+      daysForThisAbsence++;
+      current.setDate(current.getDate() + 1);
+    }
+    
+    totalDayOffDays += daysForThisAbsence;
+    const empId = absence.employee_id.substring(0, 8);
+    dayOffDetails[`Medarbejder ${empId}...`] = (dayOffDetails[`Medarbejder ${empId}...`] || 0) + daysForThisAbsence;
+  });
+
+  return {
+    value: totalDayOffDays,
+    queryTimeMs: 0,
+    breakdown: {
+      "Godkendte fridagsanmodninger": absences.length,
+      "Total fridage": totalDayOffDays,
+      ...dayOffDetails,
+    },
+    rowCount: absences.length,
   };
 }
