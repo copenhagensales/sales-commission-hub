@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle, Timer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle, Timer, CalendarX2 } from "lucide-react";
 import { MissingShiftsAlert } from "@/components/shift-planning/MissingShiftsAlert";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -406,7 +406,7 @@ export default function ShiftOverview() {
 
   // Mutation to create absence
   const createAbsence = useMutation({
-    mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" | "no_show" }) => {
+    mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" | "no_show" | "day_off" }) => {
       const { error } = await supabase
         .from("absence_request_v2")
         .insert({
@@ -429,7 +429,7 @@ export default function ShiftOverview() {
 
   // Mutation to update absence type
   const updateAbsence = useMutation({
-    mutationFn: async ({ id, type }: { id: string; type: "vacation" | "sick" | "no_show" }) => {
+    mutationFn: async ({ id, type }: { id: string; type: "vacation" | "sick" | "no_show" | "day_off" }) => {
       const { error } = await supabase
         .from("absence_request_v2")
         .update({ type })
@@ -901,6 +901,18 @@ export default function ShiftOverview() {
     setOpenPopoverKey(null);
   };
 
+  const handleSetDayOff = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    if (currentAbsence) {
+      if (currentAbsence.type !== "day_off") {
+        updateAbsence.mutate({ id: currentAbsence.id, type: "day_off" });
+      }
+    } else {
+      createAbsence.mutate({ employeeId, date: dateStr, type: "day_off" });
+    }
+    setOpenPopoverKey(null);
+  };
+
   const handleEditTimeStamp = (employee: { id: string; first_name: string; last_name: string }, date: Date, timeStamp: TimeStampData | null) => {
     setSelectedTimeStamp(timeStamp);
     setSelectedTimeStampEmployee({
@@ -1179,6 +1191,12 @@ export default function ShiftOverview() {
             <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium">
               <AlarmClock className="h-3 w-3" /> Forsinket
             </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-800/60 dark:text-gray-300 font-medium">
+              <UserX className="h-3 w-3" /> Udeblivelse
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+              <CalendarX2 className="h-3 w-3" /> Fridag
+            </span>
             <span className="text-muted-foreground/70 ml-auto">Klik på celle for handlinger</span>
           </div>
         </div>
@@ -1284,6 +1302,7 @@ export default function ShiftOverview() {
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
                     const isNoShow = absenceDisplay?.type === "no_show";
+                    const isDayOff = absenceDisplay?.type === "day_off";
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const isActive = isEmployeeActiveOnDate(employee.id, day);
@@ -1396,6 +1415,13 @@ export default function ShiftOverview() {
                                 </span>
                               )}
 
+                              {!hasShift && !isLate && isDayOff && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                  <CalendarX2 className="h-3 w-3" />
+                                  Fridag
+                                </span>
+                              )}
+
                               {/* Working state */}
                               {!hasShift && !isLate && isWorking && !holiday && (
                                 <div className="flex flex-col items-center gap-1">
@@ -1475,6 +1501,18 @@ export default function ShiftOverview() {
                               >
                                 <UserX className="h-4 w-4" />
                                 Udeblivelse
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "justify-start gap-2 h-8",
+                                  isDayOff && "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                                )}
+                                onClick={() => handleSetDayOff(employee.id, day, absence)}
+                              >
+                                <CalendarX2 className="h-4 w-4" />
+                                Fridag
                               </Button>
                               {hasWorkTimes && (
                                 <Button

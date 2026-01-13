@@ -27,7 +27,7 @@ export interface Shift {
 export interface AbsenceRequest {
   id: string;
   employee_id: string;
-  type: "vacation" | "sick" | "no_show";
+  type: "vacation" | "sick" | "no_show" | "day_off";
   start_date: string;
   end_date: string;
   start_time: string | null;
