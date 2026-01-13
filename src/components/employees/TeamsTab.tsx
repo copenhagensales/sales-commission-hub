@@ -41,6 +41,7 @@ interface Employee {
   last_name: string;
   job_title: string | null;
   team_id: string | null;
+  is_staff_employee: boolean;
 }
 
 interface Client {
@@ -241,7 +242,7 @@ export function TeamsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, team_id")
+        .select("id, first_name, last_name, job_title, team_id, is_staff_employee")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
@@ -548,9 +549,36 @@ export function TeamsTab() {
     client.name.toLowerCase().includes(clientSearch.toLowerCase())
   );
 
-  const filteredEmployees = employees.filter((emp) =>
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(employeeSearch.toLowerCase())
-  );
+  const filteredEmployees = employees.filter((emp) => {
+    // Check if name matches search
+    const matchesSearch = `${emp.first_name} ${emp.last_name}`
+      .toLowerCase()
+      .includes(employeeSearch.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    // Already selected for this team - always show
+    if (formData.employee_ids.includes(emp.id)) return true;
+    
+    // Staff employee - always show (can be in multiple teams)
+    if (emp.is_staff_employee) return true;
+    
+    // Find if employee is on any team
+    const employeeTeamMemberships = teamMembers.filter(
+      tm => tm.employee_id === emp.id
+    );
+    
+    // If no team memberships - show (available to add)
+    if (employeeTeamMemberships.length === 0) return true;
+    
+    // If only on this team being edited - show
+    if (editingTeam && employeeTeamMemberships.every(
+      tm => tm.team_id === editingTeam.id
+    )) return true;
+    
+    // Otherwise hide (is on another team and not staff)
+    return false;
+  });
 
   const openCreate = () => {
     setEditingTeam(null);
@@ -1174,8 +1202,13 @@ export function TeamsTab() {
                               {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium block truncate">
+                              <span className="text-sm font-medium block truncate flex items-center gap-1.5">
                                 {emp.first_name} {emp.last_name}
+                                {emp.is_staff_employee && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
+                                    Stab
+                                  </Badge>
+                                )}
                               </span>
                               {emp.job_title && (
                                 <span className="text-xs text-muted-foreground truncate block">
