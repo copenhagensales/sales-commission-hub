@@ -124,15 +124,12 @@ export default function AbsenceManagement() {
     
     // Apply scope-based filtering using team relationships:
     // Team leaders: only see employees from teams they lead
-    // Admins (scopeAbsence === "alt"): only see employees NOT in any team with a leader
+    // Owners (scopeAbsence === "alt"): see ALL requests
     if (scopeAbsence !== "alt") {
       // Team leader: only see requests from employees in teams I lead
       filtered = filtered.filter(r => ledTeamMemberIds?.includes(r.employee_id) ?? false);
-    } else {
-      // Admin/Owner: only see requests from employees NOT in any team with a leader
-      // This ensures team leaders handle their own team's requests first
-      filtered = filtered.filter(r => !(employeesWithTeamLeaders?.includes(r.employee_id) ?? false));
     }
+    // If scopeAbsence === "alt" (Owner), don't filter - show ALL requests
     
     // Additional department filter if selected
     if (selectedDepartment !== "all" && teamMemberIds) {
