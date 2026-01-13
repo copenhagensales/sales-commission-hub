@@ -186,7 +186,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[league-calculate-standings] Found ${sales?.length || 0} sales in period`);
+    console.log(`[league-calculate-standings] Found ${sales?.length || 0} telesales in period`);
+
+    // 6b. Get fieldmarketing sales in the qualification period
+    const { data: fmSales, error: fmSalesError } = await supabase
+      .from("fieldmarketing_sales")
+      .select("id, seller_email, product_id")
+      .gte("sale_date", sourceStart.split('T')[0])
+      .lte("sale_date", sourceEnd.split('T')[0]);
+
+    if (fmSalesError) {
+      console.error("[league-calculate-standings] Failed to fetch fieldmarketing sales:", fmSalesError);
+    }
+
+    console.log(`[league-calculate-standings] Found ${fmSales?.length || 0} fieldmarketing sales in period`);
+
+    // Get product info for FM sales commission calculation
+    const fmProductIds = [...new Set((fmSales || []).map(s => s.product_id).filter(Boolean))];
+    let fmProductCommissions: Record<string, number> = {};
+    
+    if (fmProductIds.length > 0) {
+      const { data: fmProducts } = await supabase
+        .from("products")
+        .select("id, commission_dkk")
+        .in("id", fmProductIds);
+      
+      for (const p of fmProducts || []) {
+        fmProductCommissions[p.id] = Number(p.commission_dkk) || 0;
+      }
+    }
+
+    // Build email -> FM commission/deals map
+    const fmEmailStats: Record<string, { commission: number; deals: number }> = {};
+    for (const fmSale of fmSales || []) {
+      const email = fmSale.seller_email?.toLowerCase();
+      if (email) {
+        if (!fmEmailStats[email]) {
+          fmEmailStats[email] = { commission: 0, deals: 0 };
+        }
+        fmEmailStats[email].commission += fmProductCommissions[fmSale.product_id] || 0;
+        fmEmailStats[email].deals += 1;
+      }
+    }
+
+    console.log(`[league-calculate-standings] FM stats for ${Object.keys(fmEmailStats).length} unique sellers`);
 
     // Build sale_id -> campaign_mapping_id map for override lookup
     const saleToCampaignMappingId: Record<string, string | null> = {};
@@ -259,7 +302,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Map email -> commission/deals
+      // Map email -> commission/deals (telesales only first)
       for (const [email, saleIds] of Object.entries(emailToSaleIds)) {
         let totalCommission = 0;
         let dealsCount = 0;
@@ -270,6 +313,18 @@ Deno.serve(async (req) => {
         saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
       }
     }
+
+    // 7b. Merge fieldmarketing stats into saleItemsMap
+    for (const [email, stats] of Object.entries(fmEmailStats)) {
+      if (saleItemsMap[email]) {
+        saleItemsMap[email].total_commission += stats.commission;
+        saleItemsMap[email].deals_count += stats.deals;
+      } else {
+        saleItemsMap[email] = { total_commission: stats.commission, deals_count: stats.deals };
+      }
+    }
+
+    console.log(`[league-calculate-standings] Combined stats for ${Object.keys(saleItemsMap).length} unique sellers (telesales + FM)`);
 
     // 8. Calculate standings for each employee
     const standingsData: StandingResult[] = [];
