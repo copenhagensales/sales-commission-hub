@@ -6746,6 +6746,78 @@ export type Database = {
           },
         ]
       }
+      scheduled_team_changes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          effective_date: string
+          employee_id: string
+          executed_at: string | null
+          from_team_id: string | null
+          id: string
+          status: string | null
+          to_team_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_date: string
+          employee_id: string
+          executed_at?: string | null
+          from_team_id?: string | null
+          id?: string
+          status?: string | null
+          to_team_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_date?: string
+          employee_id?: string
+          executed_at?: string | null
+          from_team_id?: string | null
+          id?: string
+          status?: string | null
+          to_team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_team_changes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_team_changes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_team_changes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_team_changes_from_team_id_fkey"
+            columns: ["from_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_team_changes_to_team_id_fkey"
+            columns: ["to_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift: {
         Row: {
           break_minutes: number | null

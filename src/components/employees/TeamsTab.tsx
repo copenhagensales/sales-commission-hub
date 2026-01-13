@@ -11,11 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, X, Coins, ArrowRightLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, X, Coins, ArrowRightLeft, CalendarIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
-
+import { format, isToday, startOfDay } from "date-fns";
+import { da } from "date-fns/locale";
 interface Team {
   id: string;
   name: string;
@@ -53,6 +56,7 @@ export function TeamsTab() {
   const [employeeToMove, setEmployeeToMove] = useState<Employee | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [moveEmployeeSearch, setMoveEmployeeSearch] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(undefined);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -295,7 +299,7 @@ export function TeamsTab() {
   // Move employee to team mutation
   // Database trigger automatically removes non-staff employees from other teams
   const moveEmployeeToTeamMutation = useMutation({
-    mutationFn: async ({ employeeId, teamId }: { employeeId: string; teamId: string }) => {
+    mutationFn: async ({ employeeId, teamId, effectiveDate }: { employeeId: string; teamId: string; effectiveDate: Date }) => {
       // Check if employee is staff
       const employee = employees.find(e => e.id === employeeId);
       const isStaffEmployee = employee?.is_staff_employee ?? false;
@@ -309,34 +313,60 @@ export function TeamsTab() {
         throw new Error("Medarbejderen er allerede på dette team");
       }
       
-      // Insert into new team - database trigger handles cleanup for non-staff
-      const { error } = await supabase
-        .from("team_members")
-        .insert({ employee_id: employeeId, team_id: teamId });
-      if (error) throw error;
+      const isTodayMove = isToday(effectiveDate);
       
-      // Return context for toast message
-      return { isStaffEmployee, previousTeamIds, newTeamId: teamId };
+      if (isTodayMove) {
+        // Insert into new team immediately - database trigger handles cleanup for non-staff
+        const { error } = await supabase
+          .from("team_members")
+          .insert({ employee_id: employeeId, team_id: teamId });
+        if (error) throw error;
+        
+        return { isStaffEmployee, previousTeamIds, newTeamId: teamId, scheduled: false };
+      } else {
+        // Schedule the change for later
+        const fromTeamId = previousTeamIds.length > 0 ? previousTeamIds[0] : null;
+        const { error } = await supabase
+          .from("scheduled_team_changes")
+          .insert({
+            employee_id: employeeId,
+            from_team_id: fromTeamId,
+            to_team_id: teamId,
+            effective_date: format(effectiveDate, 'yyyy-MM-dd'),
+            status: 'pending'
+          });
+        if (error) throw error;
+        
+        return { isStaffEmployee, previousTeamIds, newTeamId: teamId, scheduled: true, effectiveDate };
+      }
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["team-members-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-for-teams"] });
       
       const newTeam = teams.find(t => t.id === result.newTeamId);
-      const previousTeams = result.previousTeamIds
-        .filter(id => id !== result.newTeamId)
-        .map(id => teams.find(t => t.id === id)?.name)
-        .filter(Boolean);
       
-      if (result.isStaffEmployee) {
-        toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
-      } else if (previousTeams.length > 0) {
+      if (result.scheduled) {
         toast({ 
-          title: `Medarbejder flyttet til ${newTeam?.name || 'team'}`,
-          description: `Fjernet fra: ${previousTeams.join(', ')}`
+          title: "Flytning planlagt",
+          description: `Medarbejderen flyttes til ${newTeam?.name || 'team'} d. ${format(result.effectiveDate!, "d. MMMM yyyy", { locale: da })}`
         });
       } else {
-        toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
+        const previousTeams = result.previousTeamIds
+          .filter(id => id !== result.newTeamId)
+          .map(id => teams.find(t => t.id === id)?.name)
+          .filter(Boolean);
+        
+        if (result.isStaffEmployee) {
+          toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
+        } else if (previousTeams.length > 0) {
+          toast({ 
+            title: `Medarbejder flyttet til ${newTeam?.name || 'team'}`,
+            description: `Fjernet fra: ${previousTeams.join(', ')}`
+          });
+        } else {
+          toast({ title: `Medarbejder tilføjet til ${newTeam?.name || 'team'}` });
+        }
       }
       
       // Close dialog and reset
@@ -344,6 +374,7 @@ export function TeamsTab() {
       setEmployeeToMove(null);
       setSelectedTeamId("");
       setMoveEmployeeSearch("");
+      setEffectiveDate(undefined);
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -436,15 +467,17 @@ export function TeamsTab() {
     setEmployeeToMove(emp || null);
     setSelectedTeamId("");
     setMoveEmployeeSearch("");
+    setEffectiveDate(new Date()); // Default to today
     setMoveDialogOpen(true);
   };
 
   // Handle move employee
   const handleMoveEmployee = () => {
-    if (employeeToMove && selectedTeamId) {
+    if (employeeToMove && selectedTeamId && effectiveDate) {
       moveEmployeeToTeamMutation.mutate({ 
         employeeId: employeeToMove.id, 
-        teamId: selectedTeamId 
+        teamId: selectedTeamId,
+        effectiveDate: effectiveDate
       });
     }
   };
@@ -947,6 +980,42 @@ export function TeamsTab() {
                 </Select>
               </div>
             )}
+
+            {/* Date selection */}
+            {employeeToMove && selectedTeamId && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Dato for flytning</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start h-11">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {effectiveDate ? format(effectiveDate, "d. MMMM yyyy", { locale: da }) : "Vælg dato..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={effectiveDate}
+                      onSelect={setEffectiveDate}
+                      disabled={(date) => date < startOfDay(new Date())}
+                      locale={da}
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                {effectiveDate && isToday(effectiveDate) && (
+                  <p className="text-xs text-muted-foreground p-2 rounded bg-muted/50">
+                    Medarbejderen flyttes øjeblikkeligt
+                  </p>
+                )}
+                
+                {effectiveDate && !isToday(effectiveDate) && (
+                  <p className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/30 p-2 rounded">
+                    ℹ️ Medarbejderen forbliver på nuværende team indtil {format(effectiveDate, "d. MMMM yyyy", { locale: da })}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -955,7 +1024,7 @@ export function TeamsTab() {
             </Button>
             <Button
               onClick={handleMoveEmployee}
-              disabled={!employeeToMove || !selectedTeamId || moveEmployeeToTeamMutation.isPending}
+              disabled={!employeeToMove || !selectedTeamId || !effectiveDate || moveEmployeeToTeamMutation.isPending}
             >
               {moveEmployeeToTeamMutation.isPending ? "Flytter..." : (
                 employeeToMove?.is_staff_employee ? "Tilføj til team" : "Flyt til team"
