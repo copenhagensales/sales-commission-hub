@@ -24,6 +24,7 @@ import { useState } from "react";
 import { CreateCohortDialog } from "@/components/personnel/CreateCohortDialog";
 import { AddMemberDialog } from "@/components/personnel/AddMemberDialog";
 import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientDialog";
+import { EditCohortDialog } from "@/components/personnel/EditCohortDialog";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -99,6 +100,14 @@ export default function UpcomingStarts() {
     name: string;
     teamId: string | null;
     clientId: string | null;
+  } | null>(null);
+  const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
+  const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
+    id: string;
+    name: string;
+    start_date: string;
+    start_time: string | null;
+    max_capacity: number | null;
   } | null>(null);
   const p = usePermissions();
   const { toast } = useToast();
@@ -418,9 +427,30 @@ export default function UpcomingStarts() {
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Badge className={statusColors[cohort.status]}>
-                {statusLabels[cohort.status]}
-              </Badge>
+              <div className="flex items-center gap-1">
+                {canEdit && cohort.status === "planned" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      setSelectedCohortForEdit({
+                        id: cohort.id,
+                        name: cohort.name,
+                        start_date: cohort.start_date,
+                        start_time: cohort.start_time,
+                        max_capacity: cohort.max_capacity,
+                      });
+                      setEditCohortDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                <Badge className={statusColors[cohort.status]}>
+                  {statusLabels[cohort.status]}
+                </Badge>
+              </div>
               <Badge variant="secondary" className={isAtCapacity ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" : ""}>
                 <Users className="h-3 w-3 mr-1" />
                 {capacityText}
@@ -757,6 +787,12 @@ export default function UpcomingStarts() {
           currentClientId={selectedMemberForEdit.clientId}
         />
       )}
+
+      <EditCohortDialog
+        open={editCohortDialogOpen}
+        onOpenChange={setEditCohortDialogOpen}
+        cohort={selectedCohortForEdit}
+      />
     </MainLayout>
   );
 }
