@@ -1042,7 +1042,7 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
     // 4. Team standard shifts (primary shifts)
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary"),
+      .select("id, team_id, is_primary, created_at"),
     
     // 5. Team standard shift days
     supabase
@@ -1076,10 +1076,13 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
     shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
   });
 
-  // Build team -> primary shift_id map
+  // Build team -> primary shift_id map (use oldest primary shift per team)
+  const sortedTeamStandardShifts = [...teamStandardShifts].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
   const teamPrimaryShiftMap = new Map<string, string>();
-  teamStandardShifts.forEach(s => {
-    if (s.is_primary) {
+  sortedTeamStandardShifts.forEach(s => {
+    if (s.is_primary && !teamPrimaryShiftMap.has(s.team_id)) {
       teamPrimaryShiftMap.set(s.team_id, s.id);
     }
   });
