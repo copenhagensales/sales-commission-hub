@@ -112,6 +112,7 @@ import {
   CommissionLeague,
   CommissionLeagueTest,
   LeagueAdminDashboard,
+  H2HAdminBoard,
   KpiDefinitions,
 } from "./pages";
 import { SmartRedirect } from "./guards";
@@ -407,6 +408,9 @@ export const routes: RouteConfig[] = [
 
   // League Admin
   { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
+
+  // H2H Admin
+  { path: "/admin/h2h", component: H2HAdminBoard, access: "role", positionPermission: "menu_league_admin" },
 
   // KPI Definitions (Owner only)
   { path: "/admin/kpi-definitions", component: KpiDefinitions, access: "role", positionPermission: "menu_kpi_definitions" },
