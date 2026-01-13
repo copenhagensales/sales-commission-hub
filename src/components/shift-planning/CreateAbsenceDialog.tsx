@@ -170,7 +170,18 @@ export function CreateAbsenceDialog({
                         setEndDate(date);
                       }
                     }}
+                    disabled={(date) => {
+                      // For vacation, disable dates less than 35 days from today
+                      if (type === "vacation") {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const minDate = addDays(today, 35);
+                        return date < minDate;
+                      }
+                      return false;
+                    }}
                     locale={da}
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -195,8 +206,20 @@ export function CreateAbsenceDialog({
                     mode="single"
                     selected={endDate}
                     onSelect={setEndDate}
-                    disabled={(date) => startDate ? date < startDate : false}
+                    disabled={(date) => {
+                      // Must be >= startDate
+                      if (startDate && date < startDate) return true;
+                      // For vacation, disable dates less than 35 days from today
+                      if (type === "vacation") {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const minDate = addDays(today, 35);
+                        return date < minDate;
+                      }
+                      return false;
+                    }}
                     locale={da}
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
