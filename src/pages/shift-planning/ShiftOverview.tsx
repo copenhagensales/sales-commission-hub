@@ -849,6 +849,18 @@ export default function ShiftOverview() {
   // Handle popover actions
   const handleSetVacation = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
     const dateStr = format(date, "yyyy-MM-dd");
+    
+    // Check 5-week notice requirement for vacation (35 days)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysUntilDate = Math.floor((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilDate < 35) {
+      toast.error("Ferie kan kun registreres med minimum 5 ugers varsel (35 dage)");
+      setOpenPopoverKey(null);
+      return;
+    }
+    
     if (currentAbsence) {
       if (currentAbsence.type !== "vacation") {
         updateAbsence.mutate({ id: currentAbsence.id, type: "vacation" });
