@@ -9,6 +9,7 @@ export interface TestParams {
   period: TestPeriod;
   clientId?: string;
   teamId?: string;
+  employeeId?: string;
   customStartDate?: Date;
   customEndDate?: Date;
 }
