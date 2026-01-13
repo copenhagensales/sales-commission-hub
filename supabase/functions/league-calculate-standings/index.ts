@@ -65,12 +65,13 @@ Deno.serve(async (req) => {
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
     console.log(`[league-calculate-standings] Players per division: ${playersPerDivision}`);
 
-    // 2. Get all active enrollments
+    // 2. Get all active enrollments (exclude spectators - they can see but not appear in standings)
     const { data: enrollments, error: enrollError } = await supabase
       .from("league_enrollments")
       .select("employee_id")
       .eq("season_id", seasonId)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("is_spectator", false);
 
     if (enrollError) {
       console.error("[league-calculate-standings] Failed to fetch enrollments:", enrollError);

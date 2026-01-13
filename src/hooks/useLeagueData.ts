@@ -245,6 +245,16 @@ export function useEnrollInSeason() {
       
       if (empError) throw empError;
       
+      // Check if employee is in "Stab" team - they become spectators
+      const { data: stabMembership } = await supabase
+        .from("team_members")
+        .select("team_id, teams!inner(name)")
+        .eq("employee_id", employee.id)
+        .eq("teams.name", "Stab")
+        .maybeSingle();
+      
+      const isSpectator = !!stabMembership;
+      
       // Check if there's an existing inactive enrollment
       const { data: existing } = await supabase
         .from("league_enrollments")
@@ -254,10 +264,10 @@ export function useEnrollInSeason() {
         .maybeSingle();
       
       if (existing) {
-        // Re-activate existing enrollment
+        // Re-activate existing enrollment (update spectator status too)
         const { data, error } = await supabase
           .from("league_enrollments")
-          .update({ is_active: true })
+          .update({ is_active: true, is_spectator: isSpectator })
           .eq("id", existing.id)
           .select()
           .single();
@@ -270,6 +280,7 @@ export function useEnrollInSeason() {
           .insert({
             season_id: seasonId,
             employee_id: employee.id,
+            is_spectator: isSpectator,
           })
           .select()
           .single();

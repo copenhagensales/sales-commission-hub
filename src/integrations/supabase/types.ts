@@ -5052,6 +5052,7 @@ export type Database = {
           enrolled_at: string | null
           id: string
           is_active: boolean | null
+          is_spectator: boolean
           season_id: string
         }
         Insert: {
@@ -5059,6 +5060,7 @@ export type Database = {
           enrolled_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_spectator?: boolean
           season_id: string
         }
         Update: {
@@ -5066,6 +5068,7 @@ export type Database = {
           enrolled_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_spectator?: boolean
           season_id?: string
         }
         Relationships: [
