@@ -361,6 +361,7 @@ export function useUpdateAbsenceRequest() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["absence-requests"] });
       queryClient.invalidateQueries({ queryKey: ["pending-absence-count"] });
+      queryClient.invalidateQueries({ queryKey: ["absences-date-range"] });
       toast.success(variables.status === "approved" ? "Anmodning godkendt" : "Anmodning afvist");
     },
     onError: (error: any) => {
