@@ -989,8 +989,8 @@ export default function CphSalesDashboard() {
         )}
       </div>
 
-      {/* Team Performance - Tab-based component - Only in non-TV mode */}
-      {!tvMode && teamPerformanceData && teamPerformanceData.length > 0 && (
+      {/* Team Performance - Tab-based component */}
+      {teamPerformanceData && teamPerformanceData.length > 0 && (
         <TeamPerformanceTabs data={teamPerformanceData} />
       )}
 
