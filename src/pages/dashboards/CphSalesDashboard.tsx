@@ -47,6 +47,15 @@ interface TvDashboardData {
   sellersOnBoard: number;
   topSellers: TopSeller[];
   clientLogos?: Record<string, string | null>;
+  teamPerformance?: Array<{
+    id: string;
+    name: string;
+    employeeCount: number;
+    sales: { day: number; week: number; month: number };
+    sick: { day: number; week: number; month: number };
+    vacation: { day: number; week: number; month: number };
+    workDays?: { day: number; week: number; month: number };
+  }>;
 }
 
 // Check if we're in TV mode (accessed via /tv route with sessionStorage code)
@@ -989,9 +998,12 @@ export default function CphSalesDashboard() {
       </div>
 
       {/* Team Performance - Tab-based component */}
-      {teamPerformanceData && teamPerformanceData.length > 0 && (
-        <TeamPerformanceTabs data={teamPerformanceData} />
-      )}
+      {(() => {
+        const perfData = tvMode ? tvData?.teamPerformance : teamPerformanceData;
+        return perfData && perfData.length > 0 ? (
+          <TeamPerformanceTabs data={perfData} />
+        ) : null;
+      })()}
 
       {/* Quick Stats Bar - Compact KPIs - Only in non-TV mode */}
       {!tvMode && (
