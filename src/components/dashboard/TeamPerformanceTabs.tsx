@@ -199,7 +199,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                                   ? 'text-rose-500/80' 
                                   : 'text-muted-foreground'
                             }`}>
-                              {sick.display}
+                              {sick.fullDisplay || sick.display}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -211,7 +211,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className={`text-sm tabular-nums ${vacation.percentage > 0 ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                              {vacation.display}
+                              {vacation.fullDisplay || vacation.display}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -258,7 +258,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className={`text-sm tabular-nums ${totalSick > 0 ? 'text-rose-500 font-medium' : 'text-muted-foreground'}`}>
-                          {totalPossibleDays > 0 ? `${Math.round((totalSick / totalPossibleDays) * 100)}%` : '-'}
+                          {totalPossibleDays > 0 ? `${Math.round((totalSick / totalPossibleDays) * 100)}% (${totalSick})` : '-'}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -270,7 +270,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className={`text-sm tabular-nums ${totalVacation > 0 ? 'text-blue-500 font-medium' : 'text-muted-foreground'}`}>
-                          {totalPossibleDays > 0 ? `${Math.round((totalVacation / totalPossibleDays) * 100)}%` : '-'}
+                          {totalPossibleDays > 0 ? `${Math.round((totalVacation / totalPossibleDays) * 100)}% (${totalVacation})` : '-'}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
