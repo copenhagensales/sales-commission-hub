@@ -267,6 +267,9 @@ Deno.serve(async (req) => {
     const confirmedSales = sales.filter((s: any) => s.status === "confirmed").length;
     const pendingSales = sales.filter((s: any) => s.status === "pending").length;
 
+    // Fetch team performance data for TV mode
+    const teamPerformance = await fetchTeamPerformanceData(supabase, todayStr);
+
     const response = {
       date: todayStr,
       timestamp: new Date().toISOString(),
@@ -286,13 +289,15 @@ Deno.serve(async (req) => {
       },
       sellersOnBoard: sellersWithSales.size,
       topSellers,
+      teamPerformance,
     };
 
     console.log("Response prepared:", JSON.stringify({
       salesTotal: response.sales.total,
       salesByClient: response.sales.byClient,
       sellersOnBoard: response.sellersOnBoard,
-      topSellersCount: response.topSellers.length
+      topSellersCount: response.topSellers.length,
+      teamPerformanceCount: response.teamPerformance?.length || 0
     }));
 
     return new Response(JSON.stringify(response), {
@@ -380,6 +385,292 @@ async function resolveAgentNames(
   }
   
   return nameMap;
+}
+
+// Fetch team performance data for TV mode
+async function fetchTeamPerformanceData(supabase: any, todayStr: string) {
+  const today = new Date(todayStr);
+  
+  // Calculate period starts
+  const weekStart = getWeekStart(today);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  
+  console.log(`Fetching team performance: today=${todayStr}, weekStart=${weekStart}, monthStart=${monthStart}`);
+
+  // Get teams (exclude Stab)
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("id, name");
+  
+  const filteredTeams = ((teams as any[]) || []).filter((t: any) => t.name !== "Stab");
+  if (filteredTeams.length === 0) return [];
+
+  // Get team_members for employee-team mapping
+  const { data: teamMembers } = await supabase
+    .from("team_members")
+    .select("employee_id, team_id");
+
+  // Get all agents
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, email, name");
+
+  // Get employee_agent_mapping
+  const { data: agentMappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("employee_id, agent_id");
+
+  // Build agent_id -> agent data map
+  const agentById: Record<string, { email: string; name: string }> = {};
+  (agents || []).forEach((a: any) => {
+    agentById[a.id] = { email: a.email, name: a.name };
+  });
+
+  // Get team_clients for client grouping
+  const { data: teamClients } = await supabase
+    .from("team_clients")
+    .select("team_id, client_id, clients(name)");
+
+  // Get sales for the month with pagination
+  let salesData: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: salesPage } = await supabase
+      .from("sales")
+      .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
+      .gte("sale_datetime", `${monthStart}T00:00:00`)
+      .lte("sale_datetime", `${todayStr}T23:59:59`)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (!salesPage || salesPage.length === 0) break;
+    salesData = [...salesData, ...salesPage];
+    if (salesPage.length < pageSize) break;
+    page++;
+  }
+
+  // Get sale_items with products - batch in chunks
+  const saleIds = salesData.map((s) => s.id);
+  let saleItems: any[] = [];
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < saleIds.length; i += BATCH_SIZE) {
+    const batchIds = saleIds.slice(i, i + BATCH_SIZE);
+    const { data: batchItems } = await supabase
+      .from("sale_items")
+      .select("sale_id, quantity, product_id, products(counts_as_sale)")
+      .in("sale_id", batchIds);
+    if (batchItems) {
+      saleItems = [...saleItems, ...batchItems];
+    }
+  }
+
+  // Map sale_items to sales
+  const saleItemsBySaleId: Record<string, any[]> = {};
+  saleItems.forEach((si) => {
+    if (!saleItemsBySaleId[si.sale_id]) saleItemsBySaleId[si.sale_id] = [];
+    saleItemsBySaleId[si.sale_id].push(si);
+  });
+
+  // Get absences for the month
+  const { data: absences } = await supabase
+    .from("absence_request_v2")
+    .select("employee_id, type, start_date, end_date")
+    .eq("status", "approved")
+    .or(`start_date.lte.${todayStr},end_date.gte.${monthStart}`);
+
+  // Build employee -> team map and count employees per team
+  const employeeToTeam: Record<string, string> = {};
+  const employeeCountByTeam: Record<string, number> = {};
+  filteredTeams.forEach(t => { employeeCountByTeam[t.id] = 0; });
+  (teamMembers || []).forEach((tm: any) => {
+    employeeToTeam[tm.employee_id] = tm.team_id;
+    if (employeeCountByTeam[tm.team_id] !== undefined) {
+      employeeCountByTeam[tm.team_id]++;
+    }
+  });
+
+  // Build team -> clients map
+  const teamToClients: Record<string, Array<{ clientId: string; clientName: string }>> = {};
+  (teamClients || []).forEach((tc: any) => {
+    if (!teamToClients[tc.team_id]) teamToClients[tc.team_id] = [];
+    if (tc.clients?.name) {
+      teamToClients[tc.team_id].push({
+        clientId: tc.client_id,
+        clientName: tc.clients.name
+      });
+    }
+  });
+
+  // Build employee -> agent mapping (by email)
+  const employeeToEmails = new Map<string, string[]>();
+  (agentMappings || []).forEach((m: any) => {
+    const agent = agentById[m.agent_id];
+    if (agent?.email) {
+      const emails = employeeToEmails.get(m.employee_id) || [];
+      emails.push(agent.email.toLowerCase());
+      employeeToEmails.set(m.employee_id, emails);
+    }
+  });
+
+  // Reverse map: email -> employee_id
+  const emailToEmployee = new Map<string, string>();
+  employeeToEmails.forEach((emails, empId) => {
+    emails.forEach(email => emailToEmployee.set(email, empId));
+  });
+
+  // Calculate sales per team for day, week, month
+  const teamSales: Record<string, { day: number; week: number; month: number }> = {};
+  filteredTeams.forEach(t => {
+    teamSales[t.id] = { day: 0, week: 0, month: 0 };
+  });
+
+  // Process each sale - attribute to team based on CLIENT, not seller
+  for (const sale of salesData) {
+    // Get client from sale
+    const saleClientName = (sale.client_campaigns?.clients?.name || "").toLowerCase();
+    
+    // Find team by client
+    let teamId: string | null = null;
+    for (const [tid, clients] of Object.entries(teamToClients)) {
+      if (clients.some(c => c.clientName.toLowerCase() === saleClientName)) {
+        teamId = tid;
+        break;
+      }
+    }
+
+    if (!teamId || !teamSales[teamId]) continue;
+
+    // Count sales items
+    const items = saleItemsBySaleId[sale.id] || [];
+    let salesCount = 0;
+    for (const item of items) {
+      if (item.products?.counts_as_sale === true) {
+        salesCount += item.quantity || 1;
+      }
+    }
+
+    if (salesCount === 0) continue;
+
+    // Determine period
+    const saleDate = sale.sale_datetime.split('T')[0];
+    
+    teamSales[teamId].month += salesCount;
+    if (saleDate >= weekStart) {
+      teamSales[teamId].week += salesCount;
+    }
+    if (saleDate === todayStr) {
+      teamSales[teamId].day += salesCount;
+    }
+  }
+
+  // Calculate work days helper
+  const countWorkDaysInOverlap = (absStart: string, absEnd: string, periodStart: string, periodEnd: string): number => {
+    const overlapStart = absStart > periodStart ? absStart : periodStart;
+    const overlapEnd = absEnd < periodEnd ? absEnd : periodEnd;
+    if (overlapStart > overlapEnd) return 0;
+    
+    let count = 0;
+    const current = new Date(overlapStart);
+    const end = new Date(overlapEnd);
+    
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+      current.setDate(current.getDate() + 1);
+    }
+    return count;
+  };
+
+  // Calculate absences per team
+  const teamAbsences: Record<string, { 
+    sickDay: number; sickWeek: number; sickMonth: number;
+    vacationDay: number; vacationWeek: number; vacationMonth: number;
+  }> = {};
+  filteredTeams.forEach(t => {
+    teamAbsences[t.id] = { 
+      sickDay: 0, sickWeek: 0, sickMonth: 0,
+      vacationDay: 0, vacationWeek: 0, vacationMonth: 0
+    };
+  });
+
+  (absences || []).forEach((absence: any) => {
+    const teamId = employeeToTeam[absence.employee_id];
+    if (!teamId || !teamAbsences[teamId]) return;
+
+    const isSick = absence.type === "sick";
+    const isVacation = absence.type === "vacation";
+    if (!isSick && !isVacation) return;
+
+    const startDate = absence.start_date;
+    const endDate = absence.end_date;
+
+    // Day
+    const dayDays = countWorkDaysInOverlap(startDate, endDate, todayStr, todayStr);
+    if (isSick) teamAbsences[teamId].sickDay += dayDays;
+    if (isVacation) teamAbsences[teamId].vacationDay += dayDays;
+
+    // Week
+    const weekDays = countWorkDaysInOverlap(startDate, endDate, weekStart, todayStr);
+    if (isSick) teamAbsences[teamId].sickWeek += weekDays;
+    if (isVacation) teamAbsences[teamId].vacationWeek += weekDays;
+
+    // Month
+    const monthDays = countWorkDaysInOverlap(startDate, endDate, monthStart, todayStr);
+    if (isSick) teamAbsences[teamId].sickMonth += monthDays;
+    if (isVacation) teamAbsences[teamId].vacationMonth += monthDays;
+  });
+
+  // Calculate work days in periods
+  const workDaysDay = (new Date(todayStr).getDay() !== 0 && new Date(todayStr).getDay() !== 6) ? 1 : 0;
+  
+  let workDaysWeek = 0;
+  let current = new Date(weekStart);
+  const endDate = new Date(todayStr);
+  while (current <= endDate) {
+    const dow = current.getDay();
+    if (dow !== 0 && dow !== 6) workDaysWeek++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  let workDaysMonth = 0;
+  current = new Date(monthStart);
+  while (current <= endDate) {
+    const dow = current.getDay();
+    if (dow !== 0 && dow !== 6) workDaysMonth++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Build response
+  return filteredTeams.map(t => ({
+    id: t.id,
+    name: t.name,
+    employeeCount: employeeCountByTeam[t.id] || 0,
+    sales: teamSales[t.id] || { day: 0, week: 0, month: 0 },
+    sick: {
+      day: teamAbsences[t.id]?.sickDay || 0,
+      week: teamAbsences[t.id]?.sickWeek || 0,
+      month: teamAbsences[t.id]?.sickMonth || 0,
+    },
+    vacation: {
+      day: teamAbsences[t.id]?.vacationDay || 0,
+      week: teamAbsences[t.id]?.vacationWeek || 0,
+      month: teamAbsences[t.id]?.vacationMonth || 0,
+    },
+    workDays: {
+      day: workDaysDay,
+      week: workDaysWeek,
+      month: workDaysMonth,
+    },
+  }));
+}
+
+// Helper to get week start (Monday)
+function getWeekStart(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split('T')[0];
 }
 
 // Handle team-specific dashboards
@@ -766,13 +1057,4 @@ async function handleCelebrationData(
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-// Helper to get week start (Monday)
-function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d.toISOString().split("T")[0];
 }
