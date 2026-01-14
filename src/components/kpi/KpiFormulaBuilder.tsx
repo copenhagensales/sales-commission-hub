@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Calculator, Pencil, Trash2, Loader2, X, Parentheses, BookOpen } from "lucide-react";
+import { FormulaLiveTest } from "./FormulaLiveTest";
 import {
   useKpiFormulas,
   useCreateKpiFormula,
@@ -684,6 +685,12 @@ export function KpiFormulaBuilder() {
                     </div>
                   )}
                 </div>
+
+                {/* Live Test */}
+                <FormulaLiveTest 
+                  tokens={formData.tokens} 
+                  formulaName={formData.name || undefined} 
+                />
               </div>
             </div>
           </div>
