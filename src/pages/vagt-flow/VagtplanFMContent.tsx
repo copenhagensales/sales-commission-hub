@@ -155,7 +155,7 @@ export default function VagtplanFMContent() {
         .from("team_standard_shifts")
         .select("id, team_id, name, start_time, end_time, hours_source")
         .eq("team_id", fieldmarketingTeamId)
-        .eq("is_primary", true);
+        .eq("is_active", true);
       if (error) throw error;
       if (!shiftData || shiftData.length === 0) return { shifts: [], days: [] };
 

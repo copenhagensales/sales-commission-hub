@@ -99,7 +99,7 @@ export default function MySchedule() {
         .from("team_standard_shifts")
         .select("id, team_id, name, start_time, end_time, hours_source")
         .eq("team_id", myTeamMembership.team_id)
-        .eq("is_primary", true)
+        .eq("is_active", true)
         .maybeSingle();
       
       if (error) throw error;

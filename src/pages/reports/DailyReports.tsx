@@ -389,7 +389,7 @@ export default function DailyReports() {
         .from("team_standard_shifts")
         .select("id, team_id, start_time, end_time, hours_source")
         .in("team_id", teamIds)
-        .eq("is_primary", true);
+        .eq("is_active", true);
 
       const { data: shiftDays } = await supabase
         .from("team_standard_shift_days")

@@ -224,11 +224,11 @@ export default function ShiftOverview() {
   const { data: primaryShiftsData } = useQuery({
     queryKey: ["primary-shifts-all-teams"],
     queryFn: async () => {
-      // Get all primary shifts
+      // Get all active shifts
       const { data: shifts, error } = await supabase
         .from("team_standard_shifts")
         .select("id, team_id, name, start_time, end_time, hours_source")
-        .eq("is_primary", true);
+        .eq("is_active", true);
       if (error) throw error;
       if (!shifts || shifts.length === 0) return { shifts: [], days: [] };
 
