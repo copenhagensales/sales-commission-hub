@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 
@@ -20,7 +23,9 @@ interface ProductPricingRulesDialogProps {
   productName: string;
   baseCommission: number;
   baseRevenue: number;
+  countsAsSale: boolean;
   clientId?: string;
+  onBaseValuesChange?: () => void;
 }
 
 interface PricingRule {
@@ -47,11 +52,25 @@ export function ProductPricingRulesDialog({
   productName,
   baseCommission,
   baseRevenue,
+  countsAsSale,
   clientId,
+  onBaseValuesChange,
 }: ProductPricingRulesDialogProps) {
   const queryClient = useQueryClient();
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Local state for editable base values
+  const [localCommission, setLocalCommission] = useState(String(baseCommission));
+  const [localRevenue, setLocalRevenue] = useState(String(baseRevenue));
+  const [localCountsAsSale, setLocalCountsAsSale] = useState(countsAsSale);
+
+  // Update local state when props change
+  useEffect(() => {
+    setLocalCommission(String(baseCommission));
+    setLocalRevenue(String(baseRevenue));
+    setLocalCountsAsSale(countsAsSale);
+  }, [baseCommission, baseRevenue, countsAsSale]);
 
   // Fetch existing rules for this product
   const { data: rules, isLoading: rulesLoading } = useQuery({
@@ -82,6 +101,50 @@ export function ProductPricingRulesDialog({
       return data as CampaignMapping[];
     },
     enabled: open,
+  });
+
+  // Mutation to update base values (commission + revenue)
+  const updateBaseValues = useMutation({
+    mutationFn: async ({ commission, revenue }: { commission: number; revenue: number }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ commission_dkk: commission, revenue_dkk: revenue })
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Basis-priser opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      onBaseValuesChange?.();
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere priser: " + error.message);
+    },
+  });
+
+  // Mutation to update counts_as_sale
+  const updateCountsAsSale = useMutation({
+    mutationFn: async (countsAsSale: boolean) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ counts_as_sale: countsAsSale })
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tæl som salg opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      onBaseValuesChange?.();
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere: " + error.message);
+    },
   });
 
   // Delete mutation
@@ -115,6 +178,17 @@ export function ProductPricingRulesDialog({
     queryClient.invalidateQueries({ queryKey: ["product-pricing-rules", productId] });
   };
 
+  const handleSaveBaseValues = () => {
+    const commission = parseFloat(localCommission.replace(",", ".")) || 0;
+    const revenue = parseFloat(localRevenue.replace(",", ".")) || 0;
+    updateBaseValues.mutate({ commission, revenue });
+  };
+
+  const handleCountsAsSaleChange = (checked: boolean) => {
+    setLocalCountsAsSale(checked);
+    updateCountsAsSale.mutate(checked);
+  };
+
   const formatConditions = (conditions: Record<string, string>) => {
     return Object.entries(conditions)
       .map(([key, value]) => `${key}=${value}`)
@@ -130,6 +204,13 @@ export function ProductPricingRulesDialog({
     return `${campaignMappingIds.length} kampagner`;
   };
 
+  // Check if base values have changed
+  const hasBaseValueChanges = () => {
+    const currentCommission = parseFloat(localCommission.replace(",", ".")) || 0;
+    const currentRevenue = parseFloat(localRevenue.replace(",", ".")) || 0;
+    return currentCommission !== baseCommission || currentRevenue !== baseRevenue;
+  };
+
   // Show editor if creating or editing
   if (isCreating || editingRule) {
     return (
@@ -143,8 +224,8 @@ export function ProductPricingRulesDialog({
           <PricingRuleEditor
             productId={productId}
             productName={productName}
-            baseCommission={baseCommission}
-            baseRevenue={baseRevenue}
+            baseCommission={parseFloat(localCommission.replace(",", ".")) || 0}
+            baseRevenue={parseFloat(localRevenue.replace(",", ".")) || 0}
             campaigns={campaigns || []}
             existingRule={editingRule}
             onSave={handleSaveComplete}
@@ -167,108 +248,167 @@ export function ProductPricingRulesDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Base pricing info */}
-          <div className="bg-muted/50 p-3 rounded-md">
-            <p className="text-sm text-muted-foreground">
-              <strong>Base:</strong> {baseCommission} kr provision, {baseRevenue} kr omsætning
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Hvis ingen regel matcher, bruges base-prisen eller kampagne-override.
-            </p>
+        <div className="space-y-6">
+          {/* Editable base settings section */}
+          <div className="border rounded-lg p-4 space-y-4">
+            <div>
+              <h3 className="font-medium text-sm mb-1">Basis-indstillinger</h3>
+              <p className="text-xs text-muted-foreground">
+                Bruges hvis ingen regler matcher
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="base-commission">Provision (kr)</Label>
+                <Input
+                  id="base-commission"
+                  type="text"
+                  inputMode="decimal"
+                  value={localCommission}
+                  onChange={(e) => setLocalCommission(e.target.value)}
+                  onBlur={handleSaveBaseValues}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="base-revenue">Omsætning (kr)</Label>
+                <Input
+                  id="base-revenue"
+                  type="text"
+                  inputMode="decimal"
+                  value={localRevenue}
+                  onChange={(e) => setLocalRevenue(e.target.value)}
+                  onBlur={handleSaveBaseValues}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="counts-as-sale"
+                checked={localCountsAsSale}
+                onCheckedChange={handleCountsAsSaleChange}
+                disabled={updateCountsAsSale.isPending}
+              />
+              <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
+                Tæl som salg
+              </Label>
+              {updateCountsAsSale.isPending && (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            {hasBaseValueChanges() && (
+              <Button
+                size="sm"
+                onClick={handleSaveBaseValues}
+                disabled={updateBaseValues.isPending}
+              >
+                {updateBaseValues.isPending && (
+                  <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                )}
+                Gem ændringer
+              </Button>
+            )}
           </div>
 
           {/* Rules list */}
-          {rulesLoading ? (
-            <p className="text-sm text-muted-foreground">Indlæser regler...</p>
-          ) : rules && rules.length > 0 ? (
-            <div className="space-y-3">
-              {rules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className={`border rounded-lg p-3 ${
-                    rule.is_active ? "bg-background" : "bg-muted/30 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium">
-                          {rule.name || "Unavngivet regel"}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          Prioritet: {rule.priority}
-                        </Badge>
-                        {!rule.is_active && (
-                          <Badge variant="secondary" className="text-xs">
-                            Inaktiv
+          <div className="space-y-3">
+            <h3 className="font-medium text-sm">Avancerede regler</h3>
+            
+            {rulesLoading ? (
+              <p className="text-sm text-muted-foreground">Indlæser regler...</p>
+            ) : rules && rules.length > 0 ? (
+              <div className="space-y-3">
+                {rules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    className={`border rounded-lg p-3 ${
+                      rule.is_active ? "bg-background" : "bg-muted/30 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">
+                            {rule.name || "Unavngivet regel"}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            Prioritet: {rule.priority}
                           </Badge>
-                        )}
+                          {!rule.is_active && (
+                            <Badge variant="secondary" className="text-xs">
+                              Inaktiv
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-muted-foreground mb-1">
+                          Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                        </div>
+
+                        <div className="bg-muted/50 rounded p-2 text-sm mb-2">
+                          <span className="text-muted-foreground">Betingelser: </span>
+                          {Object.keys(rule.conditions).length > 0 ? (
+                            formatConditions(rule.conditions)
+                          ) : (
+                            <span className="italic">Ingen betingelser (matcher altid)</span>
+                          )}
+                        </div>
+
+                        <div className="text-sm">
+                          <span className="text-green-600 font-medium">
+                            → {rule.commission_dkk} kr prov
+                          </span>
+                          <span className="text-muted-foreground mx-2">/</span>
+                          <span className="text-blue-600 font-medium">
+                            {rule.revenue_dkk} kr oms
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="text-xs text-muted-foreground mb-1">
-                        Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingRule(rule)}
+                          title="Rediger"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(rule.id)}
+                          title="Slet"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-
-                      <div className="bg-muted/50 rounded p-2 text-sm mb-2">
-                        <span className="text-muted-foreground">Betingelser: </span>
-                        {Object.keys(rule.conditions).length > 0 ? (
-                          formatConditions(rule.conditions)
-                        ) : (
-                          <span className="italic">Ingen betingelser (matcher altid)</span>
-                        )}
-                      </div>
-
-                      <div className="text-sm">
-                        <span className="text-green-600 font-medium">
-                          → {rule.commission_dkk} kr prov
-                        </span>
-                        <span className="text-muted-foreground mx-2">/</span>
-                        <span className="text-blue-600 font-medium">
-                          {rule.revenue_dkk} kr oms
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingRule(rule)}
-                        title="Rediger"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(rule.id)}
-                        title="Slet"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-              <AlertCircle className="h-4 w-4" />
-              <span>Ingen prissætningsregler oprettet endnu</span>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                <AlertCircle className="h-4 w-4" />
+                <span>Ingen prissætningsregler oprettet endnu</span>
+              </div>
+            )}
 
-          {/* Add rule button */}
-          <Button
-            onClick={() => setIsCreating(true)}
-            className="w-full"
-            variant="outline"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Opret ny regel
-          </Button>
+            {/* Add rule button */}
+            <Button
+              onClick={() => setIsCreating(true)}
+              className="w-full"
+              variant="outline"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Opret ny regel
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

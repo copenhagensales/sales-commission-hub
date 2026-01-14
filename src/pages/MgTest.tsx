@@ -266,6 +266,7 @@ export default function MgTest() {
     productName: string;
     baseCommission: number;
     baseRevenue: number;
+    countsAsSale: boolean;
     clientId?: string;
   } | null>(null);
 
@@ -2039,15 +2040,11 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[20%]">{t("mgTest.adversusProductName")}</TableHead>
-                                <TableHead className="w-[10%]">{t("mgTest.externalId")}</TableHead>
-                                <TableHead className="w-[14%]">{t("mgTest.customer")}</TableHead>
-                                <TableHead className="w-[10%]">{t("mgTest.commission")}</TableHead>
-                                <TableHead className="w-[10%]">{t("mgTest.cpoRevenue")}</TableHead>
-                                <TableHead className="w-[10%] text-center">{t("mgTest.countAsSale")}</TableHead>
-                                
-                                <TableHead className="w-[8%] text-center">Regler</TableHead>
-                                <TableHead className="w-[4%] text-center">Synlig</TableHead>
+                                <TableHead className="w-[30%]">{t("mgTest.adversusProductName")}</TableHead>
+                                <TableHead className="w-[15%]">{t("mgTest.externalId")}</TableHead>
+                                <TableHead className="w-[20%]">{t("mgTest.customer")}</TableHead>
+                                <TableHead className="w-[10%] text-center">Regler</TableHead>
+                                <TableHead className="w-[8%] text-center">Synlig</TableHead>
                                 <TableHead className="w-[4%] text-center"></TableHead>
                               </TableRow>
                             </TableHeader>
@@ -2145,68 +2142,6 @@ export default function MgTest() {
                                           </Select>
                                         </div>
                                       </TableCell>
-                                      <TableCell>
-                                        <Input
-                                          type="text"
-                                          inputMode="decimal"
-                                          className="h-9"
-                                          value={
-                                            current?.provision ??
-                                            (row.product?.commission_dkk !== null &&
-                                            row.product?.commission_dkk !== undefined
-                                              ? String(row.product.commission_dkk)
-                                              : "0")
-                                          }
-                                          onChange={(e) => handleChange(row.key, "provision", e.target.value, row)}
-                                          placeholder="0,00"
-                                        />
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center gap-1">
-                                          <Input
-                                            type="text"
-                                            inputMode="decimal"
-                                            className="h-9"
-                                            value={
-                                              current?.cpo ??
-                                              (row.product?.revenue_dkk !== null &&
-                                              row.product?.revenue_dkk !== undefined
-                                                ? String(row.product.revenue_dkk)
-                                                : "0")
-                                            }
-                                            onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
-                                            placeholder="0,00"
-                                          />
-                                          {row.product?.id && (
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-8 w-8 shrink-0"
-                                              onClick={() => setEditingProduct({
-                                                productId: row.product!.id,
-                                                productName: row.product?.name || row.adversus_product_title || "Produkt",
-                                                commission: row.product?.commission_dkk ?? 0,
-                                                revenue: row.product?.revenue_dkk ?? 0,
-                                              })}
-                                              title="Rediger priser med gyldighedsdato"
-                                            >
-                                              <Pencil className="h-4 w-4" />
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-center">
-                                        <Checkbox
-                                          checked={row.product?.counts_as_sale ?? true}
-                                          onCheckedChange={(checked) => {
-                                            toggleCountsAsSale.mutate({
-                                              productId: row.product?.id ?? null,
-                                              countsAsSale: checked === true,
-                                              row,
-                                            });
-                                          }}
-                                        />
-                                      </TableCell>
                                       <TableCell className="text-center">
                                         {row.product?.id && (
                                           <Button
@@ -2218,9 +2153,10 @@ export default function MgTest() {
                                               productName: row.product?.name || row.adversus_product_title || "Produkt",
                                               baseCommission: row.product?.commission_dkk ?? 0,
                                               baseRevenue: row.product?.revenue_dkk ?? 0,
+                                              countsAsSale: row.product?.counts_as_sale ?? true,
                                               clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
                                             })}
-                                            title="Administrer avancerede prissætningsregler"
+                                            title="Administrer prissætning"
                                           >
                                             <Settings className="h-4 w-4" />
                                           </Button>
@@ -3467,7 +3403,12 @@ export default function MgTest() {
           productName={pricingRulesProduct.productName}
           baseCommission={pricingRulesProduct.baseCommission}
           baseRevenue={pricingRulesProduct.baseRevenue}
+          countsAsSale={pricingRulesProduct.countsAsSale}
           clientId={pricingRulesProduct.clientId}
+          onBaseValuesChange={() => {
+            queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+            queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+          }}
         />
       )}
     </MainLayout>
