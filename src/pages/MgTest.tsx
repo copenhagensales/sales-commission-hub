@@ -2162,13 +2162,14 @@ export default function MgTest() {
                                       </TableCell>
                                       <TableCell className="text-center">
                                         {row.product?.id && (() => {
-                                          const hasConfiguration = 
-                                            (row.product?.commission_dkk && row.product.commission_dkk > 0.01) ||
-                                            (row.product?.revenue_dkk && row.product.revenue_dkk > 0.01) ||
-                                            (row.product?.counts_as_sale === false) ||
-                                            ((productRuleCounts?.[row.product?.id] || 0) > 0);
+                                          const hasCommission = row.product?.commission_dkk && row.product.commission_dkk > 0.01;
+                                          const hasRevenue = row.product?.revenue_dkk && row.product.revenue_dkk > 0.01;
+                                          const hasCountsAsSale = row.product?.counts_as_sale === false;
+                                          const rulesCount = productRuleCounts?.[row.product?.id] || 0;
+                                          const hasRules = rulesCount > 0;
+                                          
                                           return (
-                                            <div className="flex items-center justify-center gap-1">
+                                            <div className="flex items-center justify-center gap-2">
                                               <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -2185,9 +2186,28 @@ export default function MgTest() {
                                               >
                                                 <Settings className="h-4 w-4" />
                                               </Button>
-                                              {hasConfiguration && (
-                                                <Check className="h-4 w-4 text-green-500" />
-                                              )}
+                                              <div className="flex items-center gap-1">
+                                                {hasCommission && (
+                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700" title={`Provision: ${row.product.commission_dkk} DKK`}>
+                                                    P
+                                                  </span>
+                                                )}
+                                                {hasRevenue && (
+                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700" title={`Omsætning: ${row.product.revenue_dkk} DKK`}>
+                                                    O
+                                                  </span>
+                                                )}
+                                                {hasCountsAsSale && (
+                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700" title="Tæl som salg: Nej">
+                                                    S
+                                                  </span>
+                                                )}
+                                                {hasRules && (
+                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700" title={`${rulesCount} aktive regler`}>
+                                                    R
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
                                           );
                                         })()}
