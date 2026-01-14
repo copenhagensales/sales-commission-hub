@@ -389,6 +389,84 @@ export function useUpdateAbsenceRequest() {
   });
 }
 
+// Delete pending absence request (employee's own)
+export function useDeleteAbsenceRequest() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("absence_request_v2")
+        .delete()
+        .eq("id", id)
+        .eq("status", "pending"); // Security: only pending can be deleted
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absence-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-absence-count"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-vacation-requests"] });
+      toast.success("Anmodning slettet");
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke slette anmodning: " + error.message);
+    },
+  });
+}
+
+// Edit pending absence request (employee's own)
+export function useEditAbsenceRequest() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      start_date, 
+      end_date, 
+      start_time, 
+      end_time, 
+      is_full_day, 
+      comment 
+    }: { 
+      id: string; 
+      start_date: string; 
+      end_date: string;
+      start_time: string | null;
+      end_time: string | null;
+      is_full_day: boolean;
+      comment: string | null;
+    }) => {
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .update({
+          start_date,
+          end_date,
+          start_time,
+          end_time,
+          is_full_day,
+          comment,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .eq("status", "pending") // Security: only pending can be edited
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absence-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-vacation-requests"] });
+      toast.success("Anmodning opdateret");
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke opdatere anmodning: " + error.message);
+    },
+  });
+}
+
 // Time entries
 export function useTimeEntries(employeeId: string | undefined, startDate: string, endDate: string) {
   return useQuery({

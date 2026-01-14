@@ -4,14 +4,14 @@ import { da } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Clock, AlarmClock, UserX, CalendarX2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useCurrentEmployee, useMyShifts, useDanishHolidays, useAbsenceRequests, useAbsencesForDateRange } from "@/hooks/useShiftPlanning";
 import { useTimeStampsForRange } from "@/hooks/useTimeStamps";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
+import { PendingAbsencesList } from "@/components/shift-planning/PendingAbsencesList";
 import { cn } from "@/lib/utils";
 import VagtMinUge from "@/pages/vagt-flow/MinUge";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
@@ -508,36 +508,8 @@ export default function MySchedule() {
               </CardContent>
             </Card>
 
-            {/* Pending Absence Requests */}
-            {pendingAbsences.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Afventende anmodninger</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {pendingAbsences.slice(0, 3).map(absence => (
-                      <div key={absence.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
-                        <div>
-                          <p className="font-medium">
-                            {absence.type === "vacation" ? "Ferie" : 
-                             absence.type === "sick" ? "Sygdom" :
-                             absence.type === "day_off" ? "Fridag" : "Udeblivelse"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(absence.start_date), "d. MMM", { locale: da })}
-                            {absence.start_date !== absence.end_date && ` - ${format(new Date(absence.end_date), "d. MMM", { locale: da })}`}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          Afventer
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Pending Absence Requests with Edit/Delete */}
+            <PendingAbsencesList absences={pendingAbsences} />
         </div>
 
         {/* Create Absence Dialog - only vacation */}
