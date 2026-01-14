@@ -23,7 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
-import { ProductCampaignOverrides } from "@/components/mg-test/ProductCampaignOverrides";
+// ProductCampaignOverrides removed - functionality merged into pricing rules
 import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
 import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 
@@ -201,7 +201,7 @@ export default function MgTest() {
   // Performance: limit visible items per section
   const ITEMS_PER_SECTION = 3;
   const [expandedProductSections, setExpandedProductSections] = useState<Record<string, boolean>>({});
-  const [productOverridesEnabled, setProductOverridesEnabled] = useState<Record<string, boolean>>({});
+  
   const [expandedCampaignSections, setExpandedCampaignSections] = useState<Record<string, boolean>>({});
   
   // Hide products state
@@ -422,33 +422,7 @@ export default function MgTest() {
     },
   });
 
-  // Hent produkt-IDs der har kampagne-specifikke overrides (for at vise checkmark)
-  const { data: productsWithOverrides } = useQuery({
-    queryKey: ["mg-products-with-overrides"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id");
-      if (error) throw error;
-      // Return unique product IDs
-      return new Set((data ?? []).map((row) => row.product_id as string));
-    },
-  });
-
-  // Initialize productOverridesEnabled from database when data loads
-  useEffect(() => {
-    if (productsWithOverrides && productsWithOverrides.size > 0) {
-      setProductOverridesEnabled(prev => {
-        const updated = { ...prev };
-        productsWithOverrides.forEach(productId => {
-          if (updated[productId] === undefined) {
-            updated[productId] = true;
-          }
-        });
-        return updated;
-      });
-    }
-  }, [productsWithOverrides]);
+  // Note: Campaign overrides are now managed via product_pricing_rules
 
   // Medarbejderkilder og master-profiler
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
@@ -2071,7 +2045,7 @@ export default function MgTest() {
                                 <TableHead className="w-[10%]">{t("mgTest.commission")}</TableHead>
                                 <TableHead className="w-[10%]">{t("mgTest.cpoRevenue")}</TableHead>
                                 <TableHead className="w-[10%] text-center">{t("mgTest.countAsSale")}</TableHead>
-                                <TableHead className="w-[8%] text-center">Kamp. provi</TableHead>
+                                
                                 <TableHead className="w-[8%] text-center">Regler</TableHead>
                                 <TableHead className="w-[4%] text-center">Synlig</TableHead>
                                 <TableHead className="w-[4%] text-center"></TableHead>
@@ -2235,19 +2209,6 @@ export default function MgTest() {
                                       </TableCell>
                                       <TableCell className="text-center">
                                         {row.product?.id && (
-                                          <Checkbox
-                                            checked={productOverridesEnabled[row.product.id] ?? false}
-                                            onCheckedChange={(checked) => {
-                                              setProductOverridesEnabled(prev => ({
-                                                ...prev,
-                                                [row.product!.id]: checked === true,
-                                              }));
-                                            }}
-                                          />
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="text-center">
-                                        {row.product?.id && (
                                           <Button
                                             variant="ghost"
                                             size="icon"
@@ -2304,19 +2265,6 @@ export default function MgTest() {
                                         )}
                                       </TableCell>
                                     </TableRow>
-                                    {row.product?.id && productOverridesEnabled[row.product.id] && (
-                                      <TableRow key={`${row.key}-overrides`} className="hover:bg-transparent">
-                                        <TableCell colSpan={10} className="pt-0 pb-2">
-                                          <ProductCampaignOverrides
-                                            productId={row.product.id}
-                                            productName={row.product.name || row.adversus_product_title || "Produkt"}
-                                            baseCommission={row.product.commission_dkk ?? 0}
-                                            baseRevenue={row.product.revenue_dkk ?? 0}
-                                            clientId={clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id}
-                                          />
-                                        </TableCell>
-                                      </TableRow>
-                                    )}
                                   </>
                                 );
                               })}

@@ -495,19 +495,65 @@ export default function DailyReports() {
         }
       });
       
-      // Fetch product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+      // Fetch product pricing rules (replaces product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk, priority, is_active")
+        .eq("is_active", true);
       
-      // Build a map: product_id + campaign_mapping_id -> { commission, revenue }
-      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      productCampaignOverrides?.forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, {
-          commission: o.commission_dkk ?? 0,
-          revenue: o.revenue_dkk ?? 0
+      // Build a map for pricing rules lookup
+      const pricingRulesMap = new Map<string, Array<{ 
+        campaign_mapping_ids: string[] | null; 
+        commission: number; 
+        revenue: number; 
+        priority: number;
+      }>>();
+      
+      productPricingRules?.forEach(rule => {
+        if (!rule.product_id) return;
+        const existing = pricingRulesMap.get(rule.product_id) || [];
+        existing.push({
+          campaign_mapping_ids: rule.campaign_mapping_ids,
+          commission: rule.commission_dkk ?? 0,
+          revenue: rule.revenue_dkk ?? 0,
+          priority: rule.priority ?? 0,
         });
+        existing.sort((a, b) => b.priority - a.priority);
+        pricingRulesMap.set(rule.product_id, existing);
+      });
+      
+      // Helper function to find best matching rule
+      const findMatchingRule = (productId: string, campaignMappingId: string | null) => {
+        const rules = pricingRulesMap.get(productId);
+        if (!rules || rules.length === 0) return null;
+        
+        for (const rule of rules) {
+          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
+            return rule;
+          }
+          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
+            return rule;
+          }
+        }
+        return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) || null;
+      };
+      
+      // Build a map: product_id + campaign_mapping_id -> { commission, revenue } for backward compatibility
+      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
+      productPricingRules?.forEach(o => {
+        if (!o.product_id) return;
+        // For each rule, populate the map for all its campaign mappings
+        if (o.campaign_mapping_ids && o.campaign_mapping_ids.length > 0) {
+          o.campaign_mapping_ids.forEach(campId => {
+            const key = `${o.product_id}_${campId}`;
+            if (!campaignOverrideMap.has(key)) {
+              campaignOverrideMap.set(key, {
+                commission: o.commission_dkk ?? 0,
+                revenue: o.revenue_dkk ?? 0
+              });
+            }
+          });
+        }
       });
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
@@ -539,26 +585,22 @@ export default function DailyReports() {
         .from("products")
         .select("id, name, commission_dkk, revenue_dkk");
       
-      // Get campaign overrides - use the first override found per product (simplification)
-      const { data: campaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, commission_dkk, revenue_dkk");
-      
-      // Build commission and revenue maps: prefer campaign override, fallback to base values
-      const productCommissionMap = new Map<string, number>();
-      const productRevenueMap = new Map<string, number>();
+      // Use pricing rules for FM products as well
       const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
-      
-      campaignOverrides?.forEach(o => {
-        // Take first override found (highest commission to be generous)
-        const existing = overrideByProductId.get(o.product_id);
-        if (!existing || (o.commission_dkk ?? 0) > (existing.commission ?? 0)) {
-          overrideByProductId.set(o.product_id, { 
-            commission: o.commission_dkk ?? 0, 
-            revenue: o.revenue_dkk ?? 0 
+      productPricingRules?.forEach((rule) => {
+        if (!rule.product_id) return;
+        const existing = overrideByProductId.get(rule.product_id);
+        if (!existing || (rule.commission_dkk ?? 0) > (existing.commission ?? 0)) {
+          overrideByProductId.set(rule.product_id, {
+            commission: rule.commission_dkk ?? 0,
+            revenue: rule.revenue_dkk ?? 0,
           });
         }
       });
+      
+      // Build commission and revenue maps: prefer pricing rule, fallback to base values
+      const productCommissionMap = new Map<string, number>();
+      const productRevenueMap = new Map<string, number>();
       
       allProducts?.forEach(p => {
         if (p.name) {

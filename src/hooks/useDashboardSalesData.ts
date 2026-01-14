@@ -208,32 +208,56 @@ export function useDashboardSalesData({
       });
       const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
 
-      // Fetch campaign mappings to resolve dialer_campaign_id -> campaign_mapping_id (for campaign overrides)
-      const { data: campaignMappings } = await supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id");
+      // Fetch product pricing rules for commission/revenue (replaces product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, conditions, commission_dkk, revenue_dkk, priority, is_active")
+        .eq("is_active", true);
       
-      const dialerCampaignToMappingId = new Map<string, string>();
-      campaignMappings?.forEach(m => {
-        if (m.adversus_campaign_id) {
-          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
-        }
-      });
+      // Build a map: product_id -> array of rules (sorted by priority desc for later selection)
+      const pricingRulesMap = new Map<string, Array<{ 
+        campaign_mapping_ids: string[] | null; 
+        conditions: any;
+        commission: number; 
+        revenue: number; 
+        priority: number;
+      }>>();
       
-      // Fetch product campaign overrides for commission/revenue
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
-      
-      // Build a map: product_id + campaign_mapping_id -> { commission, revenue }
-      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      productCampaignOverrides?.forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, {
-          commission: o.commission_dkk ?? 0,
-          revenue: o.revenue_dkk ?? 0
+      productPricingRules?.forEach(rule => {
+        if (!rule.product_id) return;
+        const existing = pricingRulesMap.get(rule.product_id) || [];
+        existing.push({
+          campaign_mapping_ids: rule.campaign_mapping_ids,
+          conditions: rule.conditions || {},
+          commission: rule.commission_dkk ?? 0,
+          revenue: rule.revenue_dkk ?? 0,
+          priority: rule.priority ?? 0,
         });
+        // Keep sorted by priority desc
+        existing.sort((a, b) => b.priority - a.priority);
+        pricingRulesMap.set(rule.product_id, existing);
       });
+      
+      // Helper function to find best matching rule
+      const findMatchingRule = (productId: string, campaignMappingId: string | null) => {
+        const rules = pricingRulesMap.get(productId);
+        if (!rules || rules.length === 0) return null;
+        
+        // Find the first rule that matches (highest priority wins due to sort)
+        for (const rule of rules) {
+          // If rule has no campaign restrictions (null or empty array), it applies to all
+          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
+            return rule;
+          }
+          // Check if the campaign matches
+          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
+            return rule;
+          }
+        }
+        
+        // Fallback: return rule with null campaign_mapping_ids (applies to all)
+        return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) || null;
+      };
 
       // Step 4: Fetch sales matched by agent_email - include dialer_campaign_id and product_id for override lookup
       let salesData: any[] = [];
@@ -286,22 +310,33 @@ export function useDashboardSalesData({
 
       const { data: fmSalesData } = await fmQuery;
 
+      // Fetch campaign mappings for dialer_campaign_id resolution
+      const { data: campaignMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id");
+      
+      const dialerCampaignToMappingId = new Map<string, string>();
+      campaignMappings?.forEach(m => {
+        if (m.adversus_campaign_id) {
+          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
+        }
+      });
+
       // Step 6: Get product commission/revenue maps for FM
       const { data: allProducts } = await supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
-      const { data: campaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, commission_dkk, revenue_dkk");
 
       const productCommissionMap = new Map<string, number>();
       const productRevenueMap = new Map<string, number>();
       const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
 
-      campaignOverrides?.forEach((o) => {
-        const existing = overrideByProductId.get(o.product_id);
-        if (!existing || (o.commission_dkk ?? 0) > (existing.commission ?? 0)) {
-          overrideByProductId.set(o.product_id, {
-            commission: o.commission_dkk ?? 0,
-            revenue: o.revenue_dkk ?? 0,
+      // Use pricing rules for FM products as well
+      productPricingRules?.forEach((rule) => {
+        if (!rule.product_id) return;
+        const existing = overrideByProductId.get(rule.product_id);
+        if (!existing || (rule.commission_dkk ?? 0) > (existing.commission ?? 0)) {
+          overrideByProductId.set(rule.product_id, {
+            commission: rule.commission_dkk ?? 0,
+            revenue: rule.revenue_dkk ?? 0,
           });
         }
       });
@@ -404,14 +439,13 @@ export function useDashboardSalesData({
                 totalSales += Number(item.quantity) || 1;
               }
               
-              // Check for campaign override - use it if exists, otherwise fallback to mapped values
-              const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-              const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+              // Check for pricing rule - use it if exists, otherwise fallback to mapped values
+              const matchingRule = item.product_id ? findMatchingRule(item.product_id, campaignMappingId || null) : null;
               
-              if (override) {
-                // Use campaign-specific commission/revenue
-                totalRevenue += override.revenue;
-                totalCommission += override.commission;
+              if (matchingRule) {
+                // Use rule-specific commission/revenue
+                totalRevenue += matchingRule.revenue;
+                totalCommission += matchingRule.commission;
               } else {
                 // Fallback to mapped values from sale_items
                 totalRevenue += Number(item.mapped_revenue) || 0;

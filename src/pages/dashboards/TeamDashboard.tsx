@@ -828,16 +828,29 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
         }
       });
       
-      // Fetch product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk");
+      // Fetch product pricing rules (replaces product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, commission_dkk, priority, is_active")
+        .eq("is_active", true);
       
-      const campaignOverrideMap = new Map<string, number>();
-      productCampaignOverrides?.forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
-      });
+      // Helper to find best matching rule
+      const findMatchingCommission = (productId: string, campaignMappingId: string | null): number | null => {
+        if (!productPricingRules) return null;
+        const rules = productPricingRules
+          .filter(r => r.product_id === productId)
+          .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        
+        for (const rule of rules) {
+          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
+            return rule.commission_dkk ?? null;
+          }
+          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
+            return rule.commission_dkk ?? null;
+          }
+        }
+        return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0)?.commission_dkk ?? null;
+      };
 
       const { data: sales, error } = await supabase
         .from("sales")
@@ -907,12 +920,11 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
           const qty = Number(item.quantity) || 1;
           agentStats[displayName].sales += qty;
           
-          // Check for campaign override
-          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          // Check for pricing rule
+          const ruleCommission = findMatchingCommission(item.product_id, campaignMappingId);
           
-          if (overrideCommission !== null && overrideCommission !== undefined) {
-            agentStats[displayName].commission += overrideCommission;
+          if (ruleCommission !== null) {
+            agentStats[displayName].commission += ruleCommission;
           } else {
             agentStats[displayName].commission += Number(item.mapped_commission) || 0;
           }
@@ -957,16 +969,29 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
         }
       });
       
-      // Fetch product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk");
+      // Fetch product pricing rules (replaces product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, commission_dkk, priority, is_active")
+        .eq("is_active", true);
       
-      const campaignOverrideMap = new Map<string, number>();
-      productCampaignOverrides?.forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
-      });
+      // Helper to find best matching rule
+      const findMatchingCommission = (productId: string, campaignMappingId: string | null): number | null => {
+        if (!productPricingRules) return null;
+        const rules = productPricingRules
+          .filter(r => r.product_id === productId)
+          .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        
+        for (const rule of rules) {
+          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
+            return rule.commission_dkk ?? null;
+          }
+          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
+            return rule.commission_dkk ?? null;
+          }
+        }
+        return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0)?.commission_dkk ?? null;
+      };
 
       const { data: sales, error } = await supabase
         .from("sales")
@@ -1036,12 +1061,11 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
           const qty = Number(item.quantity) || 1;
           agentStats[displayName].sales += qty;
           
-          // Check for campaign override
-          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          // Check for pricing rule
+          const ruleCommission = findMatchingCommission(item.product_id, campaignMappingId);
           
-          if (overrideCommission !== null && overrideCommission !== undefined) {
-            agentStats[displayName].commission += overrideCommission;
+          if (ruleCommission !== null) {
+            agentStats[displayName].commission += ruleCommission;
           } else {
             agentStats[displayName].commission += Number(item.mapped_commission) || 0;
           }
@@ -1083,16 +1107,29 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
         }
       });
       
-      // Fetch product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk");
+      // Fetch product pricing rules (replaces product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, commission_dkk, priority, is_active")
+        .eq("is_active", true);
       
-      const campaignOverrideMap = new Map<string, number>();
-      productCampaignOverrides?.forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, o.commission_dkk ?? 0);
-      });
+      // Helper to find best matching rule
+      const findMatchingCommission = (productId: string, campaignMappingId: string | null): number | null => {
+        if (!productPricingRules) return null;
+        const rules = productPricingRules
+          .filter(r => r.product_id === productId)
+          .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        
+        for (const rule of rules) {
+          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
+            return rule.commission_dkk ?? null;
+          }
+          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
+            return rule.commission_dkk ?? null;
+          }
+        }
+        return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0)?.commission_dkk ?? null;
+      };
 
       const { data, error } = await supabase
         .from("sales")
@@ -1153,11 +1190,10 @@ const SingleClientDashboard = ({ clients, teamName, tvData, isTvMode }: SingleCl
         // Only count items where counts_as_sale !== false
         const validItems = (sale.sale_items || []).filter((item: any) => item.products?.counts_as_sale !== false);
         const total_commission = validItems.reduce((sum: number, item: any) => {
-          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const overrideCommission = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+          const ruleCommission = findMatchingCommission(item.product_id, campaignMappingId);
           
-          if (overrideCommission !== null && overrideCommission !== undefined) {
-            return sum + overrideCommission;
+          if (ruleCommission !== null) {
+            return sum + ruleCommission;
           }
           return sum + (Number(item.mapped_commission) || 0);
         }, 0);
