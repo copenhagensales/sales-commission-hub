@@ -8261,6 +8261,10 @@ export type Database = {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_sale_as_employee: {
+        Args: { _sale_id: string; _user_id: string }
+        Returns: boolean
+      }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
       consume_password_reset_token: {
         Args: { _token_hash: string }
