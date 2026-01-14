@@ -5,11 +5,12 @@ import { KpiDefinitionList } from "@/components/kpi/KpiDefinitionList";
 import { KpiDefinitionDetail } from "@/components/kpi/KpiDefinitionDetail";
 import { KpiDefinitionForm } from "@/components/kpi/KpiDefinitionForm";
 import { KpiFormulaBuilder } from "@/components/kpi/KpiFormulaBuilder";
+import { KpiOverview } from "@/components/kpi/KpiOverview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2 } from "lucide-react";
+import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2, LayoutGrid } from "lucide-react";
 
 export default function KpiDefinitions() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -55,6 +56,10 @@ export default function KpiDefinitions() {
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
+            <TabsTrigger value="overview" className="gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Oversigt
+            </TabsTrigger>
             <TabsTrigger value="definitions" className="gap-2">
               <BookOpen className="h-4 w-4" />
               Definitioner
@@ -64,6 +69,11 @@ export default function KpiDefinitions() {
               Formelbygger
             </TabsTrigger>
           </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview">
+            <KpiOverview />
+          </TabsContent>
 
           {/* Definitions Tab */}
           <TabsContent value="definitions" className="space-y-6">

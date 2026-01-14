@@ -15,6 +15,8 @@ export interface KpiDefinition {
   data_sources: string[];
   important_notes: string[];
   example_value: string | null;
+  is_active: boolean;
+  dashboard_slugs: string[];
   created_at: string;
   updated_at: string;
 }
