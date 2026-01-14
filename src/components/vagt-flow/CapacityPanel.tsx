@@ -80,6 +80,35 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
 
   const fieldmarketingIds = allEmployees?.map(e => e.id) || [];
 
+  // Fetch employee special shifts to identify "no shift" employees
+  const { data: employeesWithNoShifts = [] } = useQuery({
+    queryKey: ["employee-no-shifts-capacity", fieldmarketingIds],
+    queryFn: async () => {
+      if (fieldmarketingIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select("employee_id, shift_id")
+        .in("employee_id", fieldmarketingIds);
+      if (error) throw error;
+      
+      // Get shift IDs and check which have no days configured
+      const shiftIds = [...new Set(data?.map(d => d.shift_id) || [])];
+      if (shiftIds.length === 0) return [];
+      
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("shift_id")
+        .in("shift_id", shiftIds);
+      
+      const shiftsWithDays = new Set((days || []).map(d => d.shift_id));
+      
+      // Return employees whose shift has no days (= "Ingen vagter")
+      return data?.filter(d => !shiftsWithDays.has(d.shift_id)).map(d => d.employee_id) || [];
+    },
+    enabled: fieldmarketingIds.length > 0,
+  });
+
   const { data: absencesData, isLoading: absencesLoading } = useQuery({
     queryKey: ["vagt-week-absences-capacity-v2", year, weekNumber, fieldmarketingIds],
     queryFn: async () => {
@@ -123,10 +152,11 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     },
   });
 
-  // Get employee count per client (based on department matching client name)
+  // Get employee count per client (excluding "no shift" employees)
   const getEmployeeCountForClient = (clientName: string) => {
     return allEmployees?.filter(e => 
-      e.team?.toLowerCase().includes(clientName.toLowerCase())
+      e.team?.toLowerCase().includes(clientName.toLowerCase()) &&
+      !employeesWithNoShifts.includes(e.id)
     ).length || 0;
   };
 
