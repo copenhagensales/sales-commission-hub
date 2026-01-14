@@ -1208,6 +1208,44 @@ export default function MgTest() {
     },
   });
 
+  // Create and open pricing for unmapped product mutation
+  const createAndOpenPricing = useMutation({
+    mutationFn: async (row: AggregatedProduct) => {
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name: row.adversus_product_title || "Ukendt produkt",
+          external_product_code: row.adversus_external_id,
+          commission_dkk: 0,
+          revenue_dkk: 0,
+          counts_as_sale: true,
+          is_hidden: false,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, row };
+    },
+    onSuccess: ({ data, row }) => {
+      // Open pricing dialog with newly created product
+      setPricingRulesProduct({
+        productId: data.id,
+        productName: data.name,
+        baseCommission: data.commission_dkk ?? 0,
+        baseRevenue: data.revenue_dkk ?? 0,
+        countsAsSale: data.counts_as_sale ?? true,
+        clientId: undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Produkt oprettet");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette produkt");
+    },
+  });
+
   // Create campaign mutation
   const createManualCampaign = useMutation({
     mutationFn: async (campaignData: typeof newCampaign) => {
@@ -2240,7 +2278,7 @@ export default function MgTest() {
                                         </div>
                                       </TableCell>
                                       <TableCell className="text-center">
-                                        {row.product?.id && (() => {
+                                        {row.product?.id ? (() => {
                                           const hasCommission = row.product?.commission_dkk && row.product.commission_dkk > 0.01;
                                           const hasRevenue = row.product?.revenue_dkk && row.product.revenue_dkk > 0.01;
                                           const hasCountsAsSale = row.product?.counts_as_sale === true;
@@ -2289,7 +2327,18 @@ export default function MgTest() {
                                               </div>
                                             </div>
                                           );
-                                        })()}
+                                        })() : (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => createAndOpenPricing.mutate(row)}
+                                            disabled={createAndOpenPricing.isPending}
+                                            title="Opret produkt og administrer prissætning"
+                                          >
+                                            <Settings className="h-4 w-4 text-muted-foreground" />
+                                          </Button>
+                                        )}
                                       </TableCell>
                                       <TableCell className="text-center">
                                         {row.product?.id ? (
