@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
 import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 import { ProductCampaignOverrides } from "@/components/mg-test/ProductCampaignOverrides";
 import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
+import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 
 interface InspectorField {
   fieldId: string;
@@ -253,6 +254,15 @@ export default function MgTest() {
     productName: string;
     commission: number;
     revenue: number;
+  } | null>(null);
+
+  // Product pricing rules dialog state
+  const [pricingRulesProduct, setPricingRulesProduct] = useState<{
+    productId: string;
+    productName: string;
+    baseCommission: number;
+    baseRevenue: number;
+    clientId?: string;
   } | null>(null);
 
   // Inspector mutation - fetch sample fields from Adversus
@@ -2014,14 +2024,15 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[22%]">{t("mgTest.adversusProductName")}</TableHead>
+                                <TableHead className="w-[20%]">{t("mgTest.adversusProductName")}</TableHead>
                                 <TableHead className="w-[10%]">{t("mgTest.externalId")}</TableHead>
-                                <TableHead className="w-[16%]">{t("mgTest.customer")}</TableHead>
+                                <TableHead className="w-[14%]">{t("mgTest.customer")}</TableHead>
                                 <TableHead className="w-[10%]">{t("mgTest.commission")}</TableHead>
                                 <TableHead className="w-[10%]">{t("mgTest.cpoRevenue")}</TableHead>
-                                <TableHead className="w-[12%] text-center">{t("mgTest.countAsSale")}</TableHead>
-                                <TableHead className="w-[12%] text-center">Kamp. provi</TableHead>
-                                <TableHead className="w-[8%] text-center"></TableHead>
+                                <TableHead className="w-[10%] text-center">{t("mgTest.countAsSale")}</TableHead>
+                                <TableHead className="w-[8%] text-center">Kamp. provi</TableHead>
+                                <TableHead className="w-[8%] text-center">Regler</TableHead>
+                                <TableHead className="w-[6%] text-center"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2194,6 +2205,25 @@ export default function MgTest() {
                                         )}
                                       </TableCell>
                                       <TableCell className="text-center">
+                                        {row.product?.id && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setPricingRulesProduct({
+                                              productId: row.product!.id,
+                                              productName: row.product?.name || row.adversus_product_title || "Produkt",
+                                              baseCommission: row.product?.commission_dkk ?? 0,
+                                              baseRevenue: row.product?.revenue_dkk ?? 0,
+                                              clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
+                                            })}
+                                            title="Administrer avancerede prissætningsregler"
+                                          >
+                                            <Settings className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-center">
                                         {row.isManual && row.product?.id && !row.sale_source && (
                                           <Button
                                             variant="ghost"
@@ -2213,7 +2243,7 @@ export default function MgTest() {
                                     </TableRow>
                                     {row.product?.id && productOverridesEnabled[row.product.id] && (
                                       <TableRow key={`${row.key}-overrides`} className="hover:bg-transparent">
-                                        <TableCell colSpan={8} className="pt-0 pb-2">
+                                        <TableCell colSpan={9} className="pt-0 pb-2">
                                           <ProductCampaignOverrides
                                             productId={row.product.id}
                                             productName={row.product.name || row.adversus_product_title || "Produkt"}
@@ -3414,6 +3444,19 @@ export default function MgTest() {
           productName={editingProduct.productName}
           currentCommission={editingProduct.commission}
           currentRevenue={editingProduct.revenue}
+        />
+      )}
+
+      {/* Product Pricing Rules Dialog */}
+      {pricingRulesProduct && (
+        <ProductPricingRulesDialog
+          open={!!pricingRulesProduct}
+          onOpenChange={(open) => !open && setPricingRulesProduct(null)}
+          productId={pricingRulesProduct.productId}
+          productName={pricingRulesProduct.productName}
+          baseCommission={pricingRulesProduct.baseCommission}
+          baseRevenue={pricingRulesProduct.baseRevenue}
+          clientId={pricingRulesProduct.clientId}
         />
       )}
     </MainLayout>

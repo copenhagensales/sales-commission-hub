@@ -6173,6 +6173,63 @@ export type Database = {
           },
         ]
       }
+      product_pricing_rules: {
+        Row: {
+          campaign_mapping_id: string | null
+          commission_dkk: number
+          conditions: Json
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string | null
+          priority: number | null
+          product_id: string
+          revenue_dkk: number
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_mapping_id?: string | null
+          commission_dkk: number
+          conditions?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string | null
+          priority?: number | null
+          product_id: string
+          revenue_dkk: number
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_mapping_id?: string | null
+          commission_dkk?: number
+          conditions?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string | null
+          priority?: number | null
+          product_id?: string
+          revenue_dkk?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_pricing_rules_campaign_mapping_id_fkey"
+            columns: ["campaign_mapping_id"]
+            isOneToOne: false
+            referencedRelation: "adversus_campaign_mappings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_pricing_rules_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           client_campaign_id: string | null
