@@ -7,12 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2, History } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 
@@ -248,168 +249,184 @@ export function ProductPricingRulesDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Editable base settings section */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <div>
-              <h3 className="font-medium text-sm mb-1">Basis-indstillinger</h3>
-              <p className="text-xs text-muted-foreground">
-                Bruges hvis ingen regler matcher
-              </p>
-            </div>
+        <Tabs defaultValue="hovedside" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="hovedside">Hovedside</TabsTrigger>
+            <TabsTrigger value="regler">Regler</TabsTrigger>
+            <TabsTrigger value="historik">Historik</TabsTrigger>
+          </TabsList>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="base-commission">Provision (kr)</Label>
-                <Input
-                  id="base-commission"
-                  type="text"
-                  inputMode="decimal"
-                  value={localCommission}
-                  onChange={(e) => setLocalCommission(e.target.value)}
-                  onBlur={handleSaveBaseValues}
-                  placeholder="0"
-                />
+          {/* Hovedside Tab */}
+          <TabsContent value="hovedside" className="mt-4">
+            <div className="border rounded-lg p-4 space-y-4">
+              <div>
+                <h3 className="font-medium text-sm mb-1">Basis-indstillinger</h3>
+                <p className="text-xs text-muted-foreground">
+                  Bruges hvis ingen regler matcher
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="base-revenue">Omsætning (kr)</Label>
-                <Input
-                  id="base-revenue"
-                  type="text"
-                  inputMode="decimal"
-                  value={localRevenue}
-                  onChange={(e) => setLocalRevenue(e.target.value)}
-                  onBlur={handleSaveBaseValues}
-                  placeholder="0"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="counts-as-sale"
-                checked={localCountsAsSale}
-                onCheckedChange={handleCountsAsSaleChange}
-                disabled={updateCountsAsSale.isPending}
-              />
-              <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
-                Tæl som salg
-              </Label>
-              {updateCountsAsSale.isPending && (
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="base-commission">Provision (kr)</Label>
+                  <Input
+                    id="base-commission"
+                    type="text"
+                    inputMode="decimal"
+                    value={localCommission}
+                    onChange={(e) => setLocalCommission(e.target.value)}
+                    onBlur={handleSaveBaseValues}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="base-revenue">Omsætning (kr)</Label>
+                  <Input
+                    id="base-revenue"
+                    type="text"
+                    inputMode="decimal"
+                    value={localRevenue}
+                    onChange={(e) => setLocalRevenue(e.target.value)}
+                    onBlur={handleSaveBaseValues}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="counts-as-sale"
+                  checked={localCountsAsSale}
+                  onCheckedChange={handleCountsAsSaleChange}
+                  disabled={updateCountsAsSale.isPending}
+                />
+                <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
+                  Tæl som salg
+                </Label>
+                {updateCountsAsSale.isPending && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                )}
+              </div>
+
+              {hasBaseValueChanges() && (
+                <Button
+                  size="sm"
+                  onClick={handleSaveBaseValues}
+                  disabled={updateBaseValues.isPending}
+                >
+                  {updateBaseValues.isPending && (
+                    <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                  )}
+                  Gem ændringer
+                </Button>
               )}
             </div>
+          </TabsContent>
 
-            {hasBaseValueChanges() && (
-              <Button
-                size="sm"
-                onClick={handleSaveBaseValues}
-                disabled={updateBaseValues.isPending}
-              >
-                {updateBaseValues.isPending && (
-                  <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                )}
-                Gem ændringer
-              </Button>
-            )}
-          </div>
-
-          {/* Rules list */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-sm">Avancerede regler</h3>
-            
-            {rulesLoading ? (
-              <p className="text-sm text-muted-foreground">Indlæser regler...</p>
-            ) : rules && rules.length > 0 ? (
-              <div className="space-y-3">
-                {rules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    className={`border rounded-lg p-3 ${
-                      rule.is_active ? "bg-background" : "bg-muted/30 opacity-60"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">
-                            {rule.name || "Unavngivet regel"}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            Prioritet: {rule.priority}
-                          </Badge>
-                          {!rule.is_active && (
-                            <Badge variant="secondary" className="text-xs">
-                              Inaktiv
+          {/* Regler Tab */}
+          <TabsContent value="regler" className="mt-4">
+            <div className="space-y-3">
+              {rulesLoading ? (
+                <p className="text-sm text-muted-foreground">Indlæser regler...</p>
+              ) : rules && rules.length > 0 ? (
+                <div className="space-y-3">
+                  {rules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className={`border rounded-lg p-3 ${
+                        rule.is_active ? "bg-background" : "bg-muted/30 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">
+                              {rule.name || "Unavngivet regel"}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              Prioritet: {rule.priority}
                             </Badge>
-                          )}
+                            {!rule.is_active && (
+                              <Badge variant="secondary" className="text-xs">
+                                Inaktiv
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="text-xs text-muted-foreground mb-1">
+                            Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                          </div>
+
+                          <div className="bg-muted/50 rounded p-2 text-sm mb-2">
+                            <span className="text-muted-foreground">Betingelser: </span>
+                            {Object.keys(rule.conditions).length > 0 ? (
+                              formatConditions(rule.conditions)
+                            ) : (
+                              <span className="italic">Ingen betingelser (matcher altid)</span>
+                            )}
+                          </div>
+
+                          <div className="text-sm">
+                            <span className="text-green-600 font-medium">
+                              → {rule.commission_dkk} kr prov
+                            </span>
+                            <span className="text-muted-foreground mx-2">/</span>
+                            <span className="text-blue-600 font-medium">
+                              {rule.revenue_dkk} kr oms
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRule(rule)}
+                            title="Rediger"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(rule.id)}
+                            title="Slet"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-
-                        <div className="bg-muted/50 rounded p-2 text-sm mb-2">
-                          <span className="text-muted-foreground">Betingelser: </span>
-                          {Object.keys(rule.conditions).length > 0 ? (
-                            formatConditions(rule.conditions)
-                          ) : (
-                            <span className="italic">Ingen betingelser (matcher altid)</span>
-                          )}
-                        </div>
-
-                        <div className="text-sm">
-                          <span className="text-green-600 font-medium">
-                            → {rule.commission_dkk} kr prov
-                          </span>
-                          <span className="text-muted-foreground mx-2">/</span>
-                          <span className="text-blue-600 font-medium">
-                            {rule.revenue_dkk} kr oms
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingRule(rule)}
-                          title="Rediger"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(rule.id)}
-                          title="Slet"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                <AlertCircle className="h-4 w-4" />
-                <span>Ingen prissætningsregler oprettet endnu</span>
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Ingen prissætningsregler oprettet endnu</span>
+                </div>
+              )}
 
-            {/* Add rule button */}
-            <Button
-              onClick={() => setIsCreating(true)}
-              className="w-full"
-              variant="outline"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Opret ny regel
-            </Button>
-          </div>
-        </div>
+              {/* Add rule button */}
+              <Button
+                onClick={() => setIsCreating(true)}
+                className="w-full"
+                variant="outline"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Opret ny regel
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Historik Tab */}
+          <TabsContent value="historik" className="mt-4">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <History className="h-12 w-12 mb-4 opacity-50" />
+              <p className="text-sm">Historik kommer snart</p>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
