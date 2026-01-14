@@ -153,3 +153,20 @@ export function useDeleteKpiDefinition() {
     },
   });
 }
+
+export function useUpdateKpiDefinitionStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("kpi_definitions")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kpi-definitions"] });
+    },
+  });
+}
