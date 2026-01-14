@@ -8306,6 +8306,7 @@ export type Database = {
           client_name: string
           commission_dkk: number
           counts_as_sale: boolean
+          is_hidden: boolean
           product_client_campaign_id: string
           product_id: string
           product_name: string
