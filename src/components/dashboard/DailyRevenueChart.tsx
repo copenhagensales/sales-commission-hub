@@ -34,7 +34,7 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
             sale_datetime, 
             client_campaign_id,
             client_campaigns(client_id, clients(name)),
-            adversus_campaign_id
+            dialer_campaign_id
           `)
           .gte("sale_datetime", `${startDateStr}T00:00:00`)
           .lte("sale_datetime", `${todayStr}T23:59:59`)
@@ -97,8 +97,8 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
       salesData.forEach((sale) => {
         const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
         const items = saleItemsBySaleId[sale.id] || [];
-        const campaignMappingId = sale.adversus_campaign_id 
-          ? campaignIdToMappingId.get(sale.adversus_campaign_id) 
+        const campaignMappingId = sale.dialer_campaign_id 
+          ? campaignIdToMappingId.get(sale.dialer_campaign_id) 
           : null;
         
         let saleRevenue = 0;
