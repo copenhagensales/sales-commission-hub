@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2, LayoutGrid } from "lucide-react";
+import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2, CheckSquare } from "lucide-react";
 
 export default function KpiDefinitions() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -57,8 +57,8 @@ export default function KpiDefinitions() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Oversigt
+              <CheckSquare className="h-4 w-4" />
+              Vælg til dashboard
             </TabsTrigger>
             <TabsTrigger value="definitions" className="gap-2">
               <BookOpen className="h-4 w-4" />
