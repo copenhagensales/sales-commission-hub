@@ -200,6 +200,23 @@ export function EditBookingDialog({
     enabled: open && employeeIds.length > 0,
   });
 
+  // Fetch current booking's assignments to check staffing
+  const { data: currentBookingAssignments = [] } = useQuery({
+    queryKey: ["current-booking-assignments", booking?.id],
+    queryFn: async () => {
+      if (!booking?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("booking_assignment")
+        .select("id, employee_id, date")
+        .eq("booking_id", booking.id);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!booking?.id,
+  });
+
   const { data: fieldmarketingTeam } = useQuery({
     queryKey: ["fieldmarketing-team-id-dialog-edit"],
     queryFn: async () => {
@@ -439,6 +456,26 @@ export function EditBookingDialog({
     return selectedEmployees.some((empId) => empId && !hasShiftOnDay(empId, dayIndex));
   };
 
+  // Calculate which booked days are missing employees
+  const daysWithoutStaff = useMemo(() => {
+    if (!booking?.booked_days || booking.booked_days.length === 0) return [];
+    
+    const bookedDays = booking.booked_days as number[];
+    const missingDays: number[] = [];
+    
+    bookedDays.forEach((dayIndex: number) => {
+      const dateStr = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+      const hasStaff = currentBookingAssignments.some(
+        (a: { date: string }) => a.date === dateStr
+      );
+      if (!hasStaff) {
+        missingDays.push(dayIndex);
+      }
+    });
+    
+    return missingDays;
+  }, [booking?.booked_days, currentBookingAssignments, weekStart]);
+
   // Booking tab mutation
   const updateBookingMutation = useMutation({
     mutationFn: async (updates: {
@@ -469,6 +506,12 @@ export function EditBookingDialog({
     }
     if (!campaignId) {
       toast.error("Vælg venligst en kampagne");
+      return;
+    }
+    // Block Bekræftet status if missing staff
+    if (status === "Bekræftet" && daysWithoutStaff.length > 0) {
+      const missingDayNames = daysWithoutStaff.map(d => DAY_NAMES[d]).join(", ");
+      toast.error(`Kan ikke bekræfte: Mangler medarbejder på ${missingDayNames}`);
       return;
     }
     updateBookingMutation.mutate({
@@ -639,6 +682,26 @@ export function EditBookingDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Warning for missing staff */}
+            {daysWithoutStaff.length > 0 && (
+              <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/20 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-amber-800 dark:text-amber-200">
+                      Mangler medarbejder på følgende dage:
+                    </p>
+                    <p className="mt-1 text-amber-700 dark:text-amber-300">
+                      {daysWithoutStaff.map(d => `${DAY_NAMES[d]} (${format(addDays(weekStart, d), "d. MMM", { locale: da })})`).join(", ")}
+                    </p>
+                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                      Tilføj mindst 1 medarbejder per dag for at kunne sætte status til "Bekræftet"
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
