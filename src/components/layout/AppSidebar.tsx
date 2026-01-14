@@ -526,6 +526,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   H2H Admin
                 </NavLink>
               )}
+
+              {/* Team H2H - for teamledere */}
+              {p.canSeeTeamData && (
+                <NavLink
+                  to="/team/h2h"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                    location.pathname === "/team/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Users className="h-4 w-4" />
+                  Team H2H
+                </NavLink>
+              )}
               
               {/* Beskeder */}
               <NavLink
