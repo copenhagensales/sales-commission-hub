@@ -159,7 +159,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch unread messages count
+  // Fetch unread messages count using optimized server-side function
   const { data: unreadMessagesCount = 0 } = useQuery({
     queryKey: ["unread-messages-count", user?.email],
     queryFn: async () => {
@@ -174,38 +174,22 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
       if (!currentEmployee) return 0;
 
-      // Get all conversations the user is a member of
-      const { data: memberships } = await supabase
-        .from("chat_conversation_members")
-        .select("conversation_id, last_read_at")
-        .eq("employee_id", currentEmployee.id);
+      // Use optimized server-side function instead of N+1 queries
+      const { data, error } = await supabase.rpc("get_unread_message_count", { 
+        p_employee_id: currentEmployee.id 
+      });
 
-      if (!memberships?.length) return 0;
-
-      let totalUnread = 0;
-
-      for (const membership of memberships) {
-        const query = supabase
-          .from("chat_messages")
-          .select("*", { count: "exact", head: true })
-          .eq("conversation_id", membership.conversation_id)
-          .neq("sender_id", currentEmployee.id)
-          .is("deleted_at", null);
-
-        if (membership.last_read_at) {
-          query.gt("created_at", membership.last_read_at);
-        }
-
-        const { count } = await query;
-        totalUnread += count || 0;
+      if (error) {
+        console.error("Error fetching unread count:", error);
+        return 0;
       }
 
-      return totalUnread;
+      return data || 0;
     },
     enabled: !!user?.email,
-    staleTime: 10000, // Refresh every 10 seconds
+    staleTime: 10000,
     refetchOnWindowFocus: true,
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   // Fetch pending H2H challenges count

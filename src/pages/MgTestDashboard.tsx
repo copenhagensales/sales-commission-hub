@@ -58,141 +58,147 @@ export default function MgTestDashboard() {
     },
   });
 
-  // Get dashboard data for all clients using the unified hook pattern
-  // We need to fetch per client, so we use a combined query
+  // Get dashboard data for all clients using PARALLEL fetching
   const { data: allClientData, isLoading, isFetching } = useQuery({
     queryKey: ["mg-test-dashboard-all-clients", clients.map((c) => c.id).join(",")],
     queryFn: async () => {
       if (clients.length === 0) return [];
 
-      const results: ClientDashboardData[] = [];
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || supabaseKey;
+      const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Accept: "application/json" };
 
-      for (const client of clients) {
-        // This would be better with parallel fetching but keeping simple for now
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const { data: { session } } = await supabase.auth.getSession();
-        const authToken = session?.access_token || supabaseKey;
-        const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
+      const monthStartStr = monthStart.toISOString().split("T")[0];
+      const todayStr = todayStart.toISOString().split("T")[0];
+      const nowStr = today.toISOString().split("T")[0];
 
-        const monthStartStr = monthStart.toISOString().split("T")[0];
-        const todayStr = todayStart.toISOString().split("T")[0];
-        const nowStr = today.toISOString().split("T")[0];
+      // Pre-fetch shared data once (agent mappings & employee names)
+      const [agentMappingsRes, campaignsRes] = await Promise.all([
+        supabase.from("employee_agent_mapping").select("employee_id, agents(email)"),
+        supabase.from("client_campaigns").select("id, client_id"),
+      ]);
 
-        // Get campaigns for this client
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id")
-          .eq("client_id", client.id);
+      const agentMappings = agentMappingsRes.data || [];
+      const allCampaigns = campaignsRes.data || [];
 
-        if (!campaigns || campaigns.length === 0) continue;
+      const mappedEmails = new Set(
+        agentMappings.map((m: any) => m.agents?.email?.toLowerCase()).filter(Boolean)
+      );
 
-        const campaignIds = campaigns.map((c) => c.id);
+      // Get employee names for mapped agents
+      const employeeMap = new Map<string, string>();
+      if (agentMappings.length > 0) {
+        const empIds = [...new Set(agentMappings.map((m) => m.employee_id))];
+        const { data: employees } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name")
+          .in("id", empIds);
 
-        // Get sales for this month with employee mapping
+        (employees || []).forEach((e) => {
+          employeeMap.set(e.id, `${e.first_name} ${e.last_name}`.trim());
+        });
+
+        agentMappings.forEach((m: any) => {
+          if (m.agents?.email) {
+            const empName = employeeMap.get(m.employee_id);
+            if (empName) {
+              employeeMap.set(m.agents.email.toLowerCase(), empName);
+            }
+          }
+        });
+      }
+
+      // Group campaigns by client
+      const campaignsByClient = new Map<string, string[]>();
+      allCampaigns.forEach((c) => {
+        const existing = campaignsByClient.get(c.client_id) || [];
+        existing.push(c.id);
+        campaignsByClient.set(c.client_id, existing);
+      });
+
+      // PARALLEL fetch sales for all clients
+      const clientFetchPromises = clients.map(async (client): Promise<ClientDashboardData | null> => {
+        const campaignIds = campaignsByClient.get(client.id);
+        if (!campaignIds || campaignIds.length === 0) return null;
+
         const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,sale_datetime,sale_items(quantity,mapped_commission,mapped_revenue,products(counts_as_sale))&client_campaign_id=in.(${campaignIds.join(",")})&sale_datetime=gte.${monthStartStr}T00:00:00&sale_datetime=lte.${nowStr}T23:59:59`;
 
-        const salesRes = await fetch(salesUrl, { headers: { ...headers, Accept: "application/json" } });
-        const salesData = salesRes.ok ? await salesRes.json() : [];
+        try {
+          const salesRes = await fetch(salesUrl, { headers });
+          const salesData = salesRes.ok ? await salesRes.json() : [];
 
-        // Get agent mappings to filter only mapped sales
-        const { data: agentMappings } = await supabase
-          .from("employee_agent_mapping")
-          .select("employee_id, agents(email)");
+          let salesToday = 0;
+          let salesMonth = 0;
+          let commissionToday = 0;
+          let commissionMonth = 0;
+          let revenueMonth = 0;
 
-        const mappedEmails = new Set(
-          (agentMappings || []).map((m: any) => m.agents?.email?.toLowerCase()).filter(Boolean)
-        );
+          const sellerStats = new Map<string, { sales: number; commission: number }>();
 
-        // Get employee names for mapped agents
-        const employeeMap = new Map<string, string>();
-        if (agentMappings && agentMappings.length > 0) {
-          const empIds = [...new Set((agentMappings || []).map((m) => m.employee_id))];
-          const { data: employees } = await supabase
-            .from("employee_master_data")
-            .select("id, first_name, last_name")
-            .in("id", empIds);
+          for (const sale of salesData) {
+            const email = (sale.agent_email || "").toLowerCase();
+            if (!mappedEmails.has(email)) continue;
 
-          (employees || []).forEach((e) => {
-            employeeMap.set(e.id, `${e.first_name} ${e.last_name}`.trim());
-          });
+            const employeeName = employeeMap.get(email) || email;
+            const isToday = sale.sale_datetime >= `${todayStr}T00:00:00`;
 
-          // Map email to employee name
-          (agentMappings || []).forEach((m: any) => {
-            if (m.agents?.email) {
-              const empName = employeeMap.get(m.employee_id);
-              if (empName) {
-                employeeMap.set(m.agents.email.toLowerCase(), empName);
+            for (const item of sale.sale_items || []) {
+              if (item.products?.counts_as_sale === false) continue;
+
+              const qty = Number(item.quantity) || 1;
+              const commission = Number(item.mapped_commission) || 0;
+              const revenue = Number(item.mapped_revenue) || 0;
+
+              salesMonth += qty;
+              commissionMonth += commission;
+              revenueMonth += revenue;
+
+              if (isToday) {
+                salesToday += qty;
+                commissionToday += commission;
               }
+
+              const existing = sellerStats.get(employeeName) || { sales: 0, commission: 0 };
+              existing.sales += qty;
+              existing.commission += commission;
+              sellerStats.set(employeeName, existing);
             }
-          });
-        }
-
-        // Aggregate
-        let salesToday = 0;
-        let salesMonth = 0;
-        let commissionToday = 0;
-        let commissionMonth = 0;
-        let revenueMonth = 0;
-
-        const sellerStats = new Map<string, { sales: number; commission: number }>();
-
-        for (const sale of salesData) {
-          const email = (sale.agent_email || "").toLowerCase();
-          if (!mappedEmails.has(email)) continue;
-
-          const employeeName = employeeMap.get(email) || email;
-          const isToday = sale.sale_datetime >= `${todayStr}T00:00:00`;
-
-          for (const item of sale.sale_items || []) {
-            if (item.products?.counts_as_sale === false) continue;
-
-            const qty = Number(item.quantity) || 1;
-            const commission = Number(item.mapped_commission) || 0;
-            const revenue = Number(item.mapped_revenue) || 0;
-
-            salesMonth += qty;
-            commissionMonth += commission;
-            revenueMonth += revenue;
-
-            if (isToday) {
-              salesToday += qty;
-              commissionToday += commission;
-            }
-
-            const existing = sellerStats.get(employeeName) || { sales: 0, commission: 0 };
-            existing.sales += qty;
-            existing.commission += commission;
-            sellerStats.set(employeeName, existing);
           }
-        }
 
-        const topSellers = Array.from(sellerStats.entries())
-          .map(([name, stats]) => ({ name, ...stats }))
-          .sort((a, b) => b.commission - a.commission)
-          .slice(0, 3);
+          const topSellers = Array.from(sellerStats.entries())
+            .map(([name, stats]) => ({ name, ...stats }))
+            .sort((a, b) => b.commission - a.commission)
+            .slice(0, 3);
 
-        if (salesMonth > 0) {
-          results.push({
-            clientId: client.id,
-            clientName: client.name,
-            salesToday,
-            salesMonth,
-            commissionToday: Math.round(commissionToday),
-            commissionMonth: Math.round(commissionMonth),
-            revenueMonth: Math.round(revenueMonth),
-            hoursMonth: 0, // Would need separate calculation
-            topSellers,
-          });
+          if (salesMonth > 0) {
+            return {
+              clientId: client.id,
+              clientName: client.name,
+              salesToday,
+              salesMonth,
+              commissionToday: Math.round(commissionToday),
+              commissionMonth: Math.round(commissionMonth),
+              revenueMonth: Math.round(revenueMonth),
+              hoursMonth: 0,
+              topSellers,
+            };
+          }
+        } catch (err) {
+          console.error(`Error fetching sales for ${client.name}:`, err);
         }
-      }
+        return null;
+      });
+
+      const results = (await Promise.all(clientFetchPromises)).filter(Boolean) as ClientDashboardData[];
 
       setLastUpdated(new Date().toLocaleTimeString("da-DK"));
       return results.sort((a, b) => b.salesMonth - a.salesMonth);
     },
     enabled: clients.length > 0,
     refetchInterval: 30000,
-    staleTime: 0,
+    staleTime: 30000, // Cache for 30 seconds
   });
 
   const formatCurrency = (value: number) => {
