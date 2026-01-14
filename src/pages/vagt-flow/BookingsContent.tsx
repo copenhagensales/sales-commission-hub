@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
@@ -38,8 +38,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
-import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
 import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -65,8 +63,6 @@ export default function BookingsContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
-  const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
-  const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
 
   // Update URL when week/year changes
@@ -214,7 +210,6 @@ export default function BookingsContent() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
       toast({ title: "Medarbejdere tilføjet", description: `${data.length} tildelinger oprettet` });
-      setAddEmployeeDialogBooking(null);
     },
     onError: (error: any) => {
       console.error("Fejl ved tilføjelse af medarbejdere:", error);
@@ -504,27 +499,7 @@ export default function BookingsContent() {
                         })}
                       </div>
 
-                      {/* Quick actions - only show if user can edit */}
-                      {canEditFmBookings && (
-                        <div className="flex gap-2 mt-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setAddEmployeeDialogBooking(booking)}
-                          >
-                            <Users className="h-4 w-4 mr-1" />
-                            Tilføj medarbejder
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setAddVehicleDialogBooking(booking)}
-                          >
-                            <Car className="h-4 w-4 mr-1" />
-                            Tilføj bil
-                          </Button>
-                        </div>
-                      )}
+                      {/* Quick actions removed - now in EditBookingDialog */}
                     </div>
                   ))}
                 </div>
@@ -555,47 +530,41 @@ export default function BookingsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Add Employee Dialog */}
-      <AddEmployeeDialog
-        open={!!addEmployeeDialogBooking}
-        onOpenChange={(open) => !open && setAddEmployeeDialogBooking(null)}
-        booking={addEmployeeDialogBooking}
+      {/* Edit Booking Dialog - now includes employee and vehicle tabs */}
+      <EditBookingDialog
+        open={!!editBookingDialogBooking}
+        onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
+        booking={editBookingDialogBooking}
         weekNumber={selectedWeek}
         year={selectedYear}
         weekStart={weekStart}
         employees={employees}
-        onAddAssignments={(assignments) => {
-          if (!addEmployeeDialogBooking) return;
+        vehicles={vehicles}
+        onAddEmployeeAssignments={(assignments) => {
+          if (!editBookingDialogBooking) return;
           bulkAssignMutation.mutate(
             assignments.map(a => ({
-              bookingId: addEmployeeDialogBooking.id,
+              bookingId: editBookingDialogBooking.id,
               employeeId: a.employeeId,
               dates: a.dates,
             }))
           );
         }}
-      />
-
-      {/* Add Vehicle Dialog */}
-      <AddVehicleDialog
-        open={!!addVehicleDialogBooking}
-        onOpenChange={(open) => !open && setAddVehicleDialogBooking(null)}
-        booking={addVehicleDialogBooking}
-        weekNumber={selectedWeek}
-        year={selectedYear}
-        weekStart={weekStart}
-        vehicles={vehicles}
-        onAddAssignments={() => {
-          queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
-          setAddVehicleDialogBooking(null);
+        onAddVehicleAssignment={async (assignment) => {
+          if (!editBookingDialogBooking) return;
+          const inserts = assignment.dates.map(date => ({
+            booking_id: editBookingDialogBooking.id,
+            vehicle_id: assignment.vehicleId,
+            date,
+          }));
+          const { error } = await supabase.from("booking_vehicle").insert(inserts);
+          if (error) {
+            toast({ title: "Fejl", description: error.message, variant: "destructive" });
+          } else {
+            queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+            toast({ title: "Bil tilføjet" });
+          }
         }}
-      />
-
-      {/* Edit Booking Dialog */}
-      <EditBookingDialog
-        open={!!editBookingDialogBooking}
-        onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
-        booking={editBookingDialogBooking}
       />
 
     </div>
