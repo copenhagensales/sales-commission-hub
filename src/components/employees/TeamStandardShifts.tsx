@@ -920,9 +920,16 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                           })}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-xs">
-                          Alle dage {formatTime(shift.start_time)}-{formatTime(shift.end_time)}
-                        </span>
+                        // Check if this is a "no shifts" configuration (00:00-00:00)
+                        shift.start_time === "00:00:00" && shift.end_time === "00:00:00" ? (
+                          <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
+                            Ingen vagter
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">
+                            Alle dage {formatTime(shift.start_time)}-{formatTime(shift.end_time)}
+                          </span>
+                        )
                       )}
                     </TableCell>
                     <TableCell>
