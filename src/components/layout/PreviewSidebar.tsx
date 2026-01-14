@@ -72,7 +72,6 @@ const SHIFT_PLANNING_ITEMS = {
 
 const VAGT_FLOW_ITEMS = {
   menu_fm_overview: { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
-  menu_fm_my_week: { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
   menu_fm_book_week: { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
   menu_fm_bookings: { name: "Bookinger", href: "/vagt-flow/bookings", icon: Calendar },
   menu_fm_locations: { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
