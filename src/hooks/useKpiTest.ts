@@ -1564,8 +1564,9 @@ async function testDayOffDays(start: Date, end: Date, employeeId?: string): Prom
 // ============================================================================
 // HELPER: Beregn timer fra start_time og end_time
 // Følger Vagtplan leder logik med fleksibel pause
+// EXPORTED for reuse in FormulaLiveTest
 // ============================================================================
-function calculateHoursFromTimes(
+export function calculateHoursFromTimes(
   startTime: string,
   endTime: string,
   breakMinutes?: number | null
@@ -1586,8 +1587,9 @@ function calculateHoursFromTimes(
 // ============================================================================
 // HELPER: Core timer-beregning baseret på Vagtplan leder logik
 // Returnerer timer fordelt på type (normal, sick, vacation, day_off, no_show)
+// EXPORTED for reuse in FormulaLiveTest
 // ============================================================================
-interface HoursResult {
+export interface HoursResult {
   normalHours: number;
   sickHours: number;
   vacationHours: number;
@@ -1598,7 +1600,7 @@ interface HoursResult {
   dayCount: number;
 }
 
-async function calculateHoursByType(start: Date, end: Date, employeeId?: string): Promise<HoursResult> {
+export async function calculateHoursByType(start: Date, end: Date, employeeId?: string): Promise<HoursResult> {
   const startStr = format(start, "yyyy-MM-dd");
   const endStr = format(end, "yyyy-MM-dd");
 
