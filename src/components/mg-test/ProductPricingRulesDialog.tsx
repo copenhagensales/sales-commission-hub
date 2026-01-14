@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, AlertCircle, Loader2, History } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 
@@ -60,6 +60,7 @@ export function ProductPricingRulesDialog({
   const queryClient = useQueryClient();
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditingBase, setIsEditingBase] = useState(false);
 
   // Local state for editable base values
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
@@ -185,6 +186,18 @@ export function ProductPricingRulesDialog({
     updateBaseValues.mutate({ commission, revenue });
   };
 
+  const handleSaveAndCloseEdit = () => {
+    handleSaveBaseValues();
+    setIsEditingBase(false);
+  };
+
+  const handleCancelEdit = () => {
+    setLocalCommission(String(baseCommission));
+    setLocalRevenue(String(baseRevenue));
+    setLocalCountsAsSale(countsAsSale);
+    setIsEditingBase(false);
+  };
+
   const handleCountsAsSaleChange = (checked: boolean) => {
     setLocalCountsAsSale(checked);
     updateCountsAsSale.mutate(checked);
@@ -259,66 +272,106 @@ export function ProductPricingRulesDialog({
           {/* Hovedside Tab */}
           <TabsContent value="hovedside" className="mt-4">
             <div className="border rounded-lg p-4 space-y-4">
-              <div>
-                <h3 className="font-medium text-sm mb-1">Basis-indstillinger</h3>
-                <p className="text-xs text-muted-foreground">
-                  Bruges hvis ingen regler matcher
-                </p>
-              </div>
+              {!isEditingBase ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-sm mb-1">Basis-indstillinger</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Bruges hvis ingen regler matcher
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingBase(true)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Rediger
+                    </Button>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="base-commission">Provision (kr)</Label>
-                  <Input
-                    id="base-commission"
-                    type="text"
-                    inputMode="decimal"
-                    value={localCommission}
-                    onChange={(e) => setLocalCommission(e.target.value)}
-                    onBlur={handleSaveBaseValues}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="base-revenue">Omsætning (kr)</Label>
-                  <Input
-                    id="base-revenue"
-                    type="text"
-                    inputMode="decimal"
-                    value={localRevenue}
-                    onChange={(e) => setLocalRevenue(e.target.value)}
-                    onBlur={handleSaveBaseValues}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Provision (kr)</Label>
+                      <p className="font-medium">{localCommission || "0"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Omsætning (kr)</Label>
+                      <p className="font-medium">{localRevenue || "0"}</p>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="counts-as-sale"
-                  checked={localCountsAsSale}
-                  onCheckedChange={handleCountsAsSaleChange}
-                  disabled={updateCountsAsSale.isPending}
-                />
-                <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
-                  Tæl som salg
-                </Label>
-                {updateCountsAsSale.isPending && (
-                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                )}
-              </div>
+                  <div className="flex items-center gap-2">
+                    {localCountsAsSale ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <span className="text-sm">Tæl som salg</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="font-medium text-sm mb-1">Rediger basis-indstillinger</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Bruges hvis ingen regler matcher
+                    </p>
+                  </div>
 
-              {hasBaseValueChanges() && (
-                <Button
-                  size="sm"
-                  onClick={handleSaveBaseValues}
-                  disabled={updateBaseValues.isPending}
-                >
-                  {updateBaseValues.isPending && (
-                    <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                  )}
-                  Gem ændringer
-                </Button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="base-commission">Provision (kr)</Label>
+                      <Input
+                        id="base-commission"
+                        type="text"
+                        inputMode="decimal"
+                        value={localCommission}
+                        onChange={(e) => setLocalCommission(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="base-revenue">Omsætning (kr)</Label>
+                      <Input
+                        id="base-revenue"
+                        type="text"
+                        inputMode="decimal"
+                        value={localRevenue}
+                        onChange={(e) => setLocalRevenue(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="counts-as-sale"
+                      checked={localCountsAsSale}
+                      onCheckedChange={handleCountsAsSaleChange}
+                      disabled={updateCountsAsSale.isPending}
+                    />
+                    <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
+                      Tæl som salg
+                    </Label>
+                    {updateCountsAsSale.isPending && (
+                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveAndCloseEdit}
+                      disabled={updateBaseValues.isPending}
+                    >
+                      {updateBaseValues.isPending && (
+                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                      )}
+                      Gem ændringer
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                      Annuller
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           </TabsContent>
