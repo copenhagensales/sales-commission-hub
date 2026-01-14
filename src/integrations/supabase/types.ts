@@ -4954,11 +4954,13 @@ export type Database = {
           calculation_formula: string | null
           category: string
           created_at: string | null
+          dashboard_slugs: string[] | null
           data_sources: string[] | null
           description: string | null
           example_value: string | null
           id: string
           important_notes: string[] | null
+          is_active: boolean | null
           name: string
           slug: string
           sql_query: string | null
@@ -4968,11 +4970,13 @@ export type Database = {
           calculation_formula?: string | null
           category: string
           created_at?: string | null
+          dashboard_slugs?: string[] | null
           data_sources?: string[] | null
           description?: string | null
           example_value?: string | null
           id?: string
           important_notes?: string[] | null
+          is_active?: boolean | null
           name: string
           slug: string
           sql_query?: string | null
@@ -4982,11 +4986,13 @@ export type Database = {
           calculation_formula?: string | null
           category?: string
           created_at?: string | null
+          dashboard_slugs?: string[] | null
           data_sources?: string[] | null
           description?: string | null
           example_value?: string | null
           id?: string
           important_notes?: string[] | null
+          is_active?: boolean | null
           name?: string
           slug?: string
           sql_query?: string | null

@@ -48,6 +48,8 @@ export function KpiDefinitionForm({ open, onOpenChange, onSuccess }: KpiDefiniti
       data_sources: formData.data_sources.split(",").map((s) => s.trim()).filter(Boolean),
       important_notes: formData.important_notes.split("\n").filter(Boolean),
       example_value: formData.example_value || null,
+      is_active: true,
+      dashboard_slugs: [],
     });
     setFormData({
       slug: "",
