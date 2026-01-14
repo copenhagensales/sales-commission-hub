@@ -824,13 +824,13 @@ export function EditBookingDialog({
                       return DAY_NAMES[dayIndex]?.slice(0, 3) || format(parseISO(d), "d/M");
                     });
                     return (
-                      <div key={empId} className="flex items-center justify-between bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5">
+                      <div key={empId} className="flex items-center justify-between bg-card border rounded-lg px-3 py-2.5">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
-                            <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
+                          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
+                            <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
                           </div>
-                          <div>
-                            <p className="font-medium text-sm text-foreground">{employeeName}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{employeeName}</p>
                             <p className="text-xs text-muted-foreground">
                               {dateLabels.join(" • ")}
                             </p>
@@ -839,7 +839,7 @@ export function EditBookingDialog({
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
                           onClick={() => removeEmployeeAssignmentMutation.mutate(empId)}
                           disabled={removeEmployeeAssignmentMutation.isPending}
                         >
