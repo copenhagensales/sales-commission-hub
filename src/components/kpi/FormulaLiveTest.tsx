@@ -478,7 +478,166 @@ async function fetchKpiValue(
       return count;
     }
 
+    case "live_sales_hours": {
+      const now = new Date();
+      const todayStr = format(now, "yyyy-MM-dd");
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      
+      // Only count hours for dates UP TO today (not future dates)
+      const effectiveEnd = now < end ? now : end;
+      
+      // 1. Calculate completed sales hours for days BEFORE today
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(23, 59, 59, 999);
+      
+      let completedHours = 0;
+      if (start <= yesterday) {
+        const completedEnd = yesterday < end ? yesterday : end;
+        const result = await calculateHoursByType(start, completedEnd, employeeId || undefined);
+        completedHours = result.normalHours; // normalHours already excludes sick/vacation/day_off/no_show
+      }
+      
+      // 2. Calculate TODAY's live hours (only if today is within period and no absence)
+      let todayLiveHours = 0;
+      if (todayStr >= startStr && todayStr <= endStr) {
+        const hasAbsenceToday = await checkTodayAbsence(employeeId, todayStr);
+        
+        if (!hasAbsenceToday) {
+          todayLiveHours = await calculateTodayLiveHours(employeeId, now);
+        }
+      }
+      
+      return Math.round((completedHours + todayLiveHours) * 100) / 100;
+    }
+
     default:
       return 0;
   }
+}
+
+// Check if employee has approved absence (sick, vacation, day_off, no_show) today
+async function checkTodayAbsence(employeeId: string | null, dateStr: string): Promise<boolean> {
+  if (!employeeId) return false;
+  
+  const { data } = await supabase
+    .from("absence_request_v2")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .eq("status", "approved")
+    .in("type", ["sick", "vacation", "day_off", "no_show"])
+    .lte("start_date", dateStr)
+    .gte("end_date", dateStr)
+    .limit(1);
+  
+  return (data?.length || 0) > 0;
+}
+
+// Calculate live hours for today based on shift hierarchy
+async function calculateTodayLiveHours(employeeId: string | null, now: Date): Promise<number> {
+  if (!employeeId) return 0;
+  
+  const todayStr = format(now, "yyyy-MM-dd");
+  const dayOfWeek = now.getDay();
+  const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+  
+  // Fetch shift data using hierarchy
+  const [
+    individualShiftRes,
+    employeeStandardShiftRes,
+    employeeDataRes,
+    teamStandardShiftsRes,
+    shiftDaysRes
+  ] = await Promise.all([
+    // Individual shift for today
+    supabase
+      .from("shift")
+      .select("start_time, end_time, break_minutes")
+      .eq("employee_id", employeeId)
+      .eq("date", todayStr)
+      .maybeSingle(),
+    
+    // Employee standard shift
+    supabase
+      .from("employee_standard_shifts")
+      .select("shift_id")
+      .eq("employee_id", employeeId)
+      .maybeSingle(),
+    
+    // Employee team info
+    supabase
+      .from("employee_master_data")
+      .select("team_id")
+      .eq("id", employeeId)
+      .single(),
+    
+    // Team standard shifts
+    supabase
+      .from("team_standard_shifts")
+      .select("id, team_id, is_active, start_time, end_time, hours_source"),
+    
+    // Shift days
+    supabase
+      .from("team_standard_shift_days")
+      .select("shift_id, day_of_week, start_time, end_time")
+  ]);
+  
+  let shiftStartTime: string | null = null;
+  let breakMinutes: number | null = null;
+  
+  // 1. Individual shift (highest priority)
+  if (individualShiftRes.data?.start_time) {
+    shiftStartTime = individualShiftRes.data.start_time;
+    breakMinutes = individualShiftRes.data.break_minutes;
+  }
+  // 2. Employee standard shift
+  else if (employeeStandardShiftRes.data?.shift_id) {
+    const empShiftId = employeeStandardShiftRes.data.shift_id;
+    const dayConfig = shiftDaysRes.data?.find(
+      d => d.shift_id === empShiftId && d.day_of_week === dayNumber
+    );
+    if (dayConfig?.start_time) {
+      shiftStartTime = dayConfig.start_time;
+    } else {
+      // Fallback to shift default times
+      const shiftDefault = teamStandardShiftsRes.data?.find(s => s.id === empShiftId);
+      shiftStartTime = shiftDefault?.start_time || null;
+    }
+  }
+  // 3. Team primary shift
+  else if (employeeDataRes.data?.team_id) {
+    const teamId = employeeDataRes.data.team_id;
+    const teamActiveShift = teamStandardShiftsRes.data?.find(
+      s => s.team_id === teamId && s.is_active
+    );
+    if (teamActiveShift) {
+      const dayConfig = shiftDaysRes.data?.find(
+        d => d.shift_id === teamActiveShift.id && d.day_of_week === dayNumber
+      );
+      if (dayConfig?.start_time) {
+        shiftStartTime = dayConfig.start_time;
+      } else {
+        shiftStartTime = teamActiveShift.start_time;
+      }
+    }
+  }
+  
+  if (!shiftStartTime) return 0;
+  
+  // Parse shift start time
+  const [h, m] = shiftStartTime.split(':').map(Number);
+  const shiftStart = new Date(now);
+  shiftStart.setHours(h, m, 0, 0);
+  
+  // If shift hasn't started yet, return 0
+  if (now <= shiftStart) return 0;
+  
+  // Calculate hours elapsed
+  const hoursElapsed = (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
+  
+  // Apply break: use explicit break_minutes or 30 min if > 6 hours
+  const effectiveBreakMins = breakMinutes ?? (hoursElapsed > 6 ? 30 : 0);
+  
+  return Math.max(0, hoursElapsed - effectiveBreakMins / 60);
 }

@@ -117,6 +117,9 @@ export function useKpiTest() {
         case "lateness_hours":
           testResult = await testLatenessHours(start, end, params.employeeId);
           break;
+        case "live_sales_hours":
+          testResult = await testLiveSalesHours(start, end, params.employeeId);
+          break;
         default:
           testResult = {
             value: "Test ikke tilgængelig for denne KPI",
@@ -2053,4 +2056,168 @@ async function testLatenessHours(start: Date, end: Date, employeeId?: string): P
     },
     rowCount: data?.length || 0,
   };
+}
+
+// ============================================================================
+// LIVE SALES HOURS - Live salgstimer
+// ============================================================================
+// Salgstimer der er gået i perioden frem til det aktuelle tidspunkt
+// Ekskluderer syg, ferie, fridage og no-show
+// Beregner afsluttede dage + dagens timer (fra vagtstart til nu)
+// ============================================================================
+async function testLiveSalesHours(start: Date, end: Date, employeeId?: string): Promise<TestResult> {
+  const startTime = performance.now();
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+  
+  // Only count hours for dates UP TO today
+  const effectiveEnd = now < end ? now : end;
+  
+  // 1. Calculate completed sales hours for days BEFORE today
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(23, 59, 59, 999);
+  
+  let completedHours = 0;
+  let completedDays = 0;
+  if (start <= yesterday) {
+    const completedEnd = yesterday < end ? yesterday : end;
+    const result = await calculateHoursByType(start, completedEnd, employeeId);
+    completedHours = result.normalHours;
+    completedDays = result.dayCount;
+  }
+  
+  // 2. Calculate TODAY's live hours
+  let todayLiveHours = 0;
+  let todayHasAbsence = false;
+  
+  if (todayStr >= format(start, "yyyy-MM-dd") && todayStr <= format(end, "yyyy-MM-dd") && employeeId) {
+    // Check for absence today
+    const { data: absences } = await supabase
+      .from("absence_request_v2")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .eq("status", "approved")
+      .in("type", ["sick", "vacation", "day_off", "no_show"])
+      .lte("start_date", todayStr)
+      .gte("end_date", todayStr)
+      .limit(1);
+    
+    todayHasAbsence = (absences?.length || 0) > 0;
+    
+    if (!todayHasAbsence) {
+      todayLiveHours = await calculateTodayLiveHoursInternal(employeeId, now);
+    }
+  }
+  
+  const totalLiveHours = Math.round((completedHours + todayLiveHours) * 100) / 100;
+
+  return {
+    value: totalLiveHours.toFixed(2),
+    queryTimeMs: Math.round(performance.now() - startTime),
+    breakdown: {
+      "Afsluttede dage (timer)": completedHours.toFixed(2),
+      "I dag live (timer)": todayLiveHours.toFixed(2),
+      "Total live timer": totalLiveHours.toFixed(2),
+      "Har fravær i dag": todayHasAbsence ? "Ja" : "Nej",
+      "Nuværende tidspunkt": format(now, "HH:mm"),
+    },
+    rowCount: completedDays + (todayLiveHours > 0 ? 1 : 0),
+  };
+}
+
+// Helper function to calculate today's live hours
+async function calculateTodayLiveHoursInternal(employeeId: string, now: Date): Promise<number> {
+  const todayStr = format(now, "yyyy-MM-dd");
+  const dayOfWeek = now.getDay();
+  const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+  
+  // Fetch shift data using hierarchy
+  const [
+    individualShiftRes,
+    employeeStandardShiftRes,
+    employeeDataRes,
+    teamStandardShiftsRes,
+    shiftDaysRes
+  ] = await Promise.all([
+    supabase
+      .from("shift")
+      .select("start_time, end_time, break_minutes")
+      .eq("employee_id", employeeId)
+      .eq("date", todayStr)
+      .maybeSingle(),
+    
+    supabase
+      .from("employee_standard_shifts")
+      .select("shift_id")
+      .eq("employee_id", employeeId)
+      .maybeSingle(),
+    
+    supabase
+      .from("employee_master_data")
+      .select("team_id")
+      .eq("id", employeeId)
+      .single(),
+    
+    supabase
+      .from("team_standard_shifts")
+      .select("id, team_id, is_active, start_time, end_time"),
+    
+    supabase
+      .from("team_standard_shift_days")
+      .select("shift_id, day_of_week, start_time, end_time")
+  ]);
+  
+  let shiftStartTime: string | null = null;
+  let breakMinutes: number | null = null;
+  
+  // 1. Individual shift (highest priority)
+  if (individualShiftRes.data?.start_time) {
+    shiftStartTime = individualShiftRes.data.start_time;
+    breakMinutes = individualShiftRes.data.break_minutes;
+  }
+  // 2. Employee standard shift
+  else if (employeeStandardShiftRes.data?.shift_id) {
+    const empShiftId = employeeStandardShiftRes.data.shift_id;
+    const dayConfig = shiftDaysRes.data?.find(
+      d => d.shift_id === empShiftId && d.day_of_week === dayNumber
+    );
+    if (dayConfig?.start_time) {
+      shiftStartTime = dayConfig.start_time;
+    } else {
+      const shiftDefault = teamStandardShiftsRes.data?.find(s => s.id === empShiftId);
+      shiftStartTime = shiftDefault?.start_time || null;
+    }
+  }
+  // 3. Team primary shift
+  else if (employeeDataRes.data?.team_id) {
+    const teamId = employeeDataRes.data.team_id;
+    const teamActiveShift = teamStandardShiftsRes.data?.find(
+      s => s.team_id === teamId && s.is_active
+    );
+    if (teamActiveShift) {
+      const dayConfig = shiftDaysRes.data?.find(
+        d => d.shift_id === teamActiveShift.id && d.day_of_week === dayNumber
+      );
+      shiftStartTime = dayConfig?.start_time || teamActiveShift.start_time;
+    }
+  }
+  
+  if (!shiftStartTime) return 0;
+  
+  // Parse shift start time
+  const [h, m] = shiftStartTime.split(':').map(Number);
+  const shiftStart = new Date(now);
+  shiftStart.setHours(h, m, 0, 0);
+  
+  // If shift hasn't started yet, return 0
+  if (now <= shiftStart) return 0;
+  
+  // Calculate hours elapsed
+  const hoursElapsed = (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
+  
+  // Apply break: use explicit break_minutes or 30 min if > 6 hours
+  const effectiveBreakMins = breakMinutes ?? (hoursElapsed > 6 ? 30 : 0);
+  
+  return Math.max(0, hoursElapsed - effectiveBreakMins / 60);
 }
