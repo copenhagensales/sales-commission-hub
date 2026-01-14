@@ -298,6 +298,25 @@ export function useAbsencesForDateRange(startDate: string, endDate: string) {
   });
 }
 
+// Fetch pending vacation requests for a date range (for shift overview indicator)
+export function usePendingVacationRequests(startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ["pending-vacation-requests", startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .select("id, employee_id, start_date, end_date")
+        .eq("status", "pending")
+        .eq("type", "vacation")
+        .lte("start_date", endDate)
+        .gte("end_date", startDate);
+
+      if (error) throw error;
+      return data as { id: string; employee_id: string; start_date: string; end_date: string }[];
+    },
+  });
+}
+
 // Create absence request
 export function useCreateAbsenceRequest() {
   const queryClient = useQueryClient();
