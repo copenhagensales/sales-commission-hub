@@ -1184,7 +1184,7 @@ export default function MgTest() {
   // Create and hide unmapped product mutation
   const createAndHideProduct = useMutation({
     mutationFn: async (row: AggregatedProduct) => {
-      const { data, error } = await supabase
+      const { data: newProduct, error: insertError } = await supabase
         .from("products")
         .insert({
           name: row.adversus_product_title || "Ukendt produkt",
@@ -1196,8 +1196,22 @@ export default function MgTest() {
         })
         .select()
         .single();
-      if (error) throw error;
-      return data;
+      if (insertError) throw insertError;
+
+      // Link alle sale_items med matchende adversus_external_id til det nye produkt
+      if (row.adversus_external_id) {
+        const { error: updateError } = await supabase
+          .from("sale_items")
+          .update({ product_id: newProduct.id })
+          .eq("adversus_external_id", row.adversus_external_id)
+          .is("product_id", null);
+        
+        if (updateError) {
+          console.error("Kunne ikke linke sale_items:", updateError);
+        }
+      }
+
+      return newProduct;
     },
     onSuccess: () => {
       toast.success("Produkt oprettet og skjult");
@@ -1226,6 +1240,16 @@ export default function MgTest() {
         .select()
         .single();
       if (error) throw error;
+
+      // Link alle sale_items med matchende adversus_external_id til det nye produkt
+      if (row.adversus_external_id) {
+        await supabase
+          .from("sale_items")
+          .update({ product_id: data.id })
+          .eq("adversus_external_id", row.adversus_external_id)
+          .is("product_id", null);
+      }
+
       return { data, row };
     },
     onSuccess: ({ data, row }) => {
