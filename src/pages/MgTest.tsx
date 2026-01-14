@@ -1159,6 +1159,26 @@ export default function MgTest() {
     },
   });
 
+  // Hide/show all products mutation
+  const toggleAllProductsHidden = useMutation({
+    mutationFn: async (isHidden: boolean) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_hidden: isHidden })
+        .neq("id", "");
+      if (error) throw error;
+    },
+    onSuccess: (_, isHidden) => {
+      toast.success(isHidden ? "Alle produkter skjult" : "Alle produkter vist");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere synlighed");
+    },
+  });
+
   // Create campaign mutation
   const createManualCampaign = useMutation({
     mutationFn: async (campaignData: typeof newCampaign) => {
@@ -1965,15 +1985,45 @@ export default function MgTest() {
 
           <TabsContent value="product" className="space-y-4">
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="showHiddenProducts"
-                  checked={showHiddenProducts}
-                  onCheckedChange={(checked) => setShowHiddenProducts(checked === true)}
-                />
-                <Label htmlFor="showHiddenProducts" className="text-sm text-muted-foreground cursor-pointer">
-                  Vis skjulte produkter
-                </Label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="showHiddenProducts"
+                    checked={showHiddenProducts}
+                    onCheckedChange={(checked) => setShowHiddenProducts(checked === true)}
+                  />
+                  <Label htmlFor="showHiddenProducts" className="text-sm text-muted-foreground cursor-pointer">
+                    Vis skjulte produkter
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleAllProductsHidden.mutate(true)}
+                    disabled={toggleAllProductsHidden.isPending}
+                  >
+                    {toggleAllProductsHidden.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 mr-2" />
+                    )}
+                    Skjul alle
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleAllProductsHidden.mutate(false)}
+                    disabled={toggleAllProductsHidden.isPending}
+                  >
+                    {toggleAllProductsHidden.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    Vis alle
+                  </Button>
+                </div>
               </div>
               <Button onClick={() => setCreateProductDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
