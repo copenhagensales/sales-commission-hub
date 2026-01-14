@@ -331,28 +331,59 @@ async function fetchKpiValue(
 
   switch (slug) {
     case "sales_count": {
-      // Fetch telesales
-      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity)`;
-      salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+      let count = 0;
+      
+      // 1. Find employee's agent emails via mapping
+      let agentEmails: string[] = [];
+      
       if (employeeId) {
-        salesUrl += `&agent_id=eq.${employeeId}`;
+        const mappingsUrl = `${supabaseUrl}/rest/v1/employee_agent_mapping?select=agents(email,external_dialer_id)&employee_id=eq.${employeeId}`;
+        const mappingsRes = await fetch(mappingsUrl, { headers });
+        const mappingsData = mappingsRes.ok ? await mappingsRes.json() : [];
+        
+        mappingsData.forEach((m: any) => {
+          if (m.agents?.email) {
+            agentEmails.push(m.agents.email.toLowerCase());
+          }
+          if (m.agents?.external_dialer_id) {
+            // Also match on agent-DIALER_ID@adversus.local format
+            agentEmails.push(`agent-${m.agents.external_dialer_id}@adversus.local`);
+          }
+        });
+      }
+      
+      // 2. Build sales query with agent_email filter
+      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))`;
+      salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+      
+      if (employeeId && agentEmails.length > 0) {
+        // Match on agent_email (case-insensitive)
+        const emailFilters = agentEmails
+          .map(e => `agent_email.ilike.${encodeURIComponent(e)}`)
+          .join(",");
+        salesUrl += `&or=(${emailFilters})`;
+      } else if (employeeId) {
+        // No mapping found - return 0 sales
+        return 0;
       }
       
       const salesRes = await fetch(salesUrl, { headers });
       const salesData = salesRes.ok ? await salesRes.json() : [];
       
-      let count = 0;
+      // 3. Count only products where counts_as_sale = true
       salesData.forEach((sale: any) => {
         (sale.sale_items || []).forEach((item: any) => {
-          count += Number(item.quantity) || 1;
+          if (item.products?.counts_as_sale !== false) {
+            count += Number(item.quantity) || 1;
+          }
         });
       });
 
-      // Add fieldmarketing
+      // 4. Add fieldmarketing sales (uses seller_id)
       let fmUrl = `${supabaseUrl}/rest/v1/fieldmarketing_sales?select=id`;
       fmUrl += `&registered_at=gte.${startStr}T00:00:00&registered_at=lte.${endStr}T23:59:59`;
       if (employeeId) {
-        fmUrl += `&employee_id=eq.${employeeId}`;
+        fmUrl += `&seller_id=eq.${employeeId}`;
       }
       
       const fmRes = await fetch(fmUrl, { headers: { ...headers, Prefer: "count=exact" } });
@@ -362,10 +393,35 @@ async function fetchKpiValue(
     }
 
     case "total_commission": {
+      // 1. Find employee's agent emails via mapping
+      let agentEmails: string[] = [];
+      
+      if (employeeId) {
+        const mappingsUrl = `${supabaseUrl}/rest/v1/employee_agent_mapping?select=agents(email,external_dialer_id)&employee_id=eq.${employeeId}`;
+        const mappingsRes = await fetch(mappingsUrl, { headers });
+        const mappingsData = mappingsRes.ok ? await mappingsRes.json() : [];
+        
+        mappingsData.forEach((m: any) => {
+          if (m.agents?.email) {
+            agentEmails.push(m.agents.email.toLowerCase());
+          }
+          if (m.agents?.external_dialer_id) {
+            agentEmails.push(`agent-${m.agents.external_dialer_id}@adversus.local`);
+          }
+        });
+      }
+      
+      // 2. Build query with agent_email filter
       let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-      if (employeeId) {
-        url += `&agent_id=eq.${employeeId}`;
+      
+      if (employeeId && agentEmails.length > 0) {
+        const emailFilters = agentEmails
+          .map(e => `agent_email.ilike.${encodeURIComponent(e)}`)
+          .join(",");
+        url += `&or=(${emailFilters})`;
+      } else if (employeeId) {
+        return 0;
       }
       
       const res = await fetch(url, { headers });
