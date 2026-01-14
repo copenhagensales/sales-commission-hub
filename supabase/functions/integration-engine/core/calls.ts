@@ -2,6 +2,28 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardCall } from "../types.ts"
 import { chunk } from "../utils/batch.ts"
 
+/**
+ * List of email domains that should be excluded from syncing.
+ * These are internal/partner accounts that shouldn't be visible to users.
+ */
+const EXCLUDED_EMAIL_DOMAINS = [
+  "@relatel.dk",
+  "@ps-marketing.dk",
+  "@finansforbundet.dk",
+  "@straightlineagency.dk",
+  "@staightlineagency.dk",
+  "@tele-part.dk",
+  "@aogtil.dk",
+  "@ase.dk",
+];
+
+function isExcludedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const emailLower = email.toLowerCase();
+  return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+}
+
+
 async function processCallsBatch(
   supabase: SupabaseClient,
   calls: StandardCall[],
@@ -78,10 +100,24 @@ export async function processCalls(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
   if (calls.length === 0) return { processed: 0, errors: 0, matched: 0 }
-  const sampleCall = calls[0]
+  
+  // Filter out calls from excluded email domains
+  const filteredCalls = calls.filter(call => {
+    const agentEmail = (call.metadata as any)?.agentEmail
+    return !isExcludedEmail(agentEmail)
+  })
+  const skippedByDomain = calls.length - filteredCalls.length
+  
+  if (skippedByDomain > 0) {
+    log("INFO", `Skipped ${skippedByDomain} calls from excluded email domains`)
+  }
+  
+  if (filteredCalls.length === 0) return { processed: 0, errors: 0, matched: 0 }
+  
+  const sampleCall = filteredCalls[0]
   log(
     "INFO",
-    `Procesando ${calls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
+    `Procesando ${filteredCalls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
   )
   const { data: agents } = await supabase.from("agents").select("id, external_adversus_id, external_dialer_id, email")
   const agentMapByExtId = new Map<string, string>(
@@ -96,7 +132,7 @@ export async function processCalls(
   let totalProcessed = 0
   let totalErrors = 0
   let totalMatched = 0
-  const batches = chunk(calls, batchSize)
+  const batches = chunk(filteredCalls, batchSize)
   const totalBatches = batches.length
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]
