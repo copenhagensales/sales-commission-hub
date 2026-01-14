@@ -114,6 +114,7 @@ import {
   LeagueAdminDashboard,
   H2HAdminBoard,
   KpiDefinitions,
+  TeamH2H,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -125,6 +126,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/home", component: Home, access: "protected" },
   { path: "/head-to-head", component: HeadToHead, access: "protected" },
+  { path: "/team/h2h", component: TeamH2H, access: "protected" },
   { path: "/my-schedule", component: MySchedule, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "protected" },
   { path: "/my-goals", component: MyGoals, access: "protected" },
