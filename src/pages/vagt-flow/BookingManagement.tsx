@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense } from "react";
@@ -9,6 +9,7 @@ import { lazy, Suspense } from "react";
 const BookWeekContent = lazy(() => import("./BookWeekContent"));
 const LocationsContent = lazy(() => import("./LocationsContent"));
 const BookingsContent = lazy(() => import("./BookingsContent"));
+const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 
 export default function BookingManagement() {
   const { t } = useTranslation();
@@ -34,7 +35,7 @@ export default function BookingManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="book-week" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               {t("sidebar.bookWeek", "Book uge")}
@@ -46,6 +47,10 @@ export default function BookingManagement() {
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               {t("sidebar.locations", "Lokationer")}
+            </TabsTrigger>
+            <TabsTrigger value="vagtplan-fm" className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Vagtplan FM
             </TabsTrigger>
           </TabsList>
 
@@ -64,6 +69,12 @@ export default function BookingManagement() {
           <TabsContent value="locations" className="mt-6">
             <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
               <LocationsContent />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="vagtplan-fm" className="mt-6">
+            <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <VagtplanFMContent />
             </Suspense>
           </TabsContent>
         </Tabs>
