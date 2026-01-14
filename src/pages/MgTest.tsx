@@ -43,7 +43,6 @@ interface AggregatedProductRpc {
   revenue_dkk: number | null;
   product_client_campaign_id: string | null;
   counts_as_sale: boolean;
-  is_hidden: boolean | null;
   client_id: string | null;
   client_name: string | null;
   sale_source: string | null;
@@ -534,7 +533,7 @@ export default function MgTest() {
 
         if (!seenKeys.has(fullKey)) {
           seenKeys.add(fullKey);
-        products.push({
+          products.push({
             key: fullKey,
             adversus_external_id: item.adversus_external_id,
             adversus_product_title: item.adversus_product_title,
@@ -546,7 +545,6 @@ export default function MgTest() {
                   revenue_dkk: item.revenue_dkk,
                   client_campaign_id: item.product_client_campaign_id,
                   counts_as_sale: item.counts_as_sale ?? true,
-                  is_hidden: item.is_hidden ?? false,
                 }
               : null,
             campaignId: clientId,
