@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -424,6 +424,24 @@ export default function MgTest() {
   });
 
   // Note: Campaign overrides are now managed via product_pricing_rules
+
+  // Hent antal aktive regler per produkt
+  const { data: productRuleCounts } = useQuery({
+    queryKey: ["product-rule-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id")
+        .eq("is_active", true);
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      data?.forEach(rule => {
+        counts[rule.product_id] = (counts[rule.product_id] || 0) + 1;
+      });
+      return counts;
+    },
+  });
 
   // Medarbejderkilder og master-profiler
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
@@ -2143,24 +2161,36 @@ export default function MgTest() {
                                         </div>
                                       </TableCell>
                                       <TableCell className="text-center">
-                                        {row.product?.id && (
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => setPricingRulesProduct({
-                                              productId: row.product!.id,
-                                              productName: row.product?.name || row.adversus_product_title || "Produkt",
-                                              baseCommission: row.product?.commission_dkk ?? 0,
-                                              baseRevenue: row.product?.revenue_dkk ?? 0,
-                                              countsAsSale: row.product?.counts_as_sale ?? true,
-                                              clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
-                                            })}
-                                            title="Administrer prissætning"
-                                          >
-                                            <Settings className="h-4 w-4" />
-                                          </Button>
-                                        )}
+                                        {row.product?.id && (() => {
+                                          const hasConfiguration = 
+                                            (row.product?.commission_dkk && row.product.commission_dkk > 0.01) ||
+                                            (row.product?.revenue_dkk && row.product.revenue_dkk > 0.01) ||
+                                            (row.product?.counts_as_sale === false) ||
+                                            ((productRuleCounts?.[row.product?.id] || 0) > 0);
+                                          return (
+                                            <div className="flex items-center justify-center gap-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => setPricingRulesProduct({
+                                                  productId: row.product!.id,
+                                                  productName: row.product?.name || row.adversus_product_title || "Produkt",
+                                                  baseCommission: row.product?.commission_dkk ?? 0,
+                                                  baseRevenue: row.product?.revenue_dkk ?? 0,
+                                                  countsAsSale: row.product?.counts_as_sale ?? true,
+                                                  clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
+                                                })}
+                                                title="Administrer prissætning"
+                                              >
+                                                <Settings className="h-4 w-4" />
+                                              </Button>
+                                              {hasConfiguration && (
+                                                <Check className="h-4 w-4 text-green-500" />
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                       </TableCell>
                                       <TableCell className="text-center">
                                         {row.product?.id && (
