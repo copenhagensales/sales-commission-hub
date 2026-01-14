@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Play, Clock, Database, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Play, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useKpiDefinitions } from "@/hooks/useKpiDefinitions";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
+import { calculateHoursByType } from "@/hooks/useKpiTest";
 
 type TestPeriod = "today" | "yesterday" | "this_week" | "this_month" | "last_30_days";
 
@@ -379,9 +380,46 @@ async function fetchKpiValue(
       return Math.round(total);
     }
 
-    case "all_hours":
+    case "all_hours": {
+      // Use the correct Vagtplan leder hierarchy calculation
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      const result = await calculateHoursByType(start, end, employeeId || undefined);
+      return result.totalHours;
+    }
+
     case "sales_hours": {
-      let url = `${supabaseUrl}/rest/v1/shift?select=id,start_time,end_time`;
+      // Use the correct Vagtplan leder hierarchy calculation (normal hours = sales hours)
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      const result = await calculateHoursByType(start, end, employeeId || undefined);
+      return result.normalHours;
+    }
+
+    case "vacation_hours": {
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      const result = await calculateHoursByType(start, end, employeeId || undefined);
+      return result.vacationHours;
+    }
+
+    case "sick_hours": {
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      const result = await calculateHoursByType(start, end, employeeId || undefined);
+      return result.sickHours;
+    }
+
+    case "day_off_hours": {
+      const start = new Date(`${startStr}T00:00:00`);
+      const end = new Date(`${endStr}T23:59:59`);
+      const result = await calculateHoursByType(start, end, employeeId || undefined);
+      return result.dayOffHours;
+    }
+
+    case "lateness_hours": {
+      // Lateness hours from lateness_record table (minutes / 60)
+      let url = `${supabaseUrl}/rest/v1/lateness_record?select=minutes`;
       url += `&date=gte.${startStr}&date=lte.${endStr}`;
       if (employeeId) {
         url += `&employee_id=eq.${employeeId}`;
@@ -390,16 +428,11 @@ async function fetchKpiValue(
       const res = await fetch(url, { headers });
       const data = res.ok ? await res.json() : [];
       
-      let totalHours = 0;
-      data.forEach((shift: any) => {
-        if (shift.start_time && shift.end_time) {
-          const start = new Date(`1970-01-01T${shift.start_time}`);
-          const end = new Date(`1970-01-01T${shift.end_time}`);
-          const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          totalHours += Math.max(0, hours - 0.5);
-        }
+      let totalMinutes = 0;
+      data.forEach((record: any) => {
+        totalMinutes += Number(record.minutes) || 0;
       });
-      return Math.round(totalHours * 10) / 10;
+      return Math.round((totalMinutes / 60) * 100) / 100;
     }
 
     case "shifts": {
