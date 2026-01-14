@@ -2164,7 +2164,7 @@ export default function MgTest() {
                                         {row.product?.id && (() => {
                                           const hasCommission = row.product?.commission_dkk && row.product.commission_dkk > 0.01;
                                           const hasRevenue = row.product?.revenue_dkk && row.product.revenue_dkk > 0.01;
-                                          const hasCountsAsSale = row.product?.counts_as_sale === false;
+                                          const hasCountsAsSale = row.product?.counts_as_sale === true;
                                           const rulesCount = productRuleCounts?.[row.product?.id] || 0;
                                           const hasRules = rulesCount > 0;
                                           
@@ -2198,7 +2198,7 @@ export default function MgTest() {
                                                   </span>
                                                 )}
                                                 {hasCountsAsSale && (
-                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700" title="Tæl som salg: Nej">
+                                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700" title="Tæl som salg: Ja">
                                                     S
                                                   </span>
                                                 )}
