@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, addDays, isWithinInterval, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -136,6 +136,118 @@ export function AddEmployeeDialog({
     enabled: open && employeeIds.length > 0,
   });
 
+  // Fetch Fieldmarketing team ID
+  const { data: fieldmarketingTeam } = useQuery({
+    queryKey: ["fieldmarketing-team-id-dialog"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "Fieldmarketing")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Fetch primary shift data for Fieldmarketing team
+  const { data: primaryShiftsData } = useQuery({
+    queryKey: ["primary-shifts-for-booking", fieldmarketingTeam?.id],
+    queryFn: async () => {
+      if (!fieldmarketingTeam?.id) return { shifts: [], days: [] };
+      
+      const { data: shiftData, error } = await supabase
+        .from("team_standard_shifts")
+        .select("id, start_time, end_time")
+        .eq("team_id", fieldmarketingTeam.id)
+        .eq("is_active", true)
+        .limit(1);
+      if (error) throw error;
+      if (!shiftData || shiftData.length === 0) return { shifts: [], days: [] };
+
+      const { data: days } = await supabase
+        .from("team_standard_shift_days")
+        .select("shift_id, day_of_week")
+        .eq("shift_id", shiftData[0].id);
+
+      return { shifts: shiftData, days: days || [] };
+    },
+    enabled: open && !!fieldmarketingTeam?.id,
+  });
+
+  // Fetch employee special shifts
+  const { data: employeeSpecialShifts } = useQuery({
+    queryKey: ["employee-special-shifts-for-booking", employeeIds],
+    queryFn: async () => {
+      if (employeeIds.length === 0) return { assignments: [], shiftDays: {} as Record<string, number[]> };
+      
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select("employee_id, shift_id")
+        .in("employee_id", employeeIds);
+      if (error) throw error;
+      
+      const shiftIds = [...new Set(data?.map(d => d.shift_id) || [])];
+      let shiftDaysMap: Record<string, number[]> = {};
+      
+      if (shiftIds.length > 0) {
+        const { data: days } = await supabase
+          .from("team_standard_shift_days")
+          .select("shift_id, day_of_week")
+          .in("shift_id", shiftIds);
+        
+        (days || []).forEach(d => {
+          if (!shiftDaysMap[d.shift_id]) shiftDaysMap[d.shift_id] = [];
+          shiftDaysMap[d.shift_id].push(d.day_of_week);
+        });
+      }
+      
+      return { assignments: data || [], shiftDays: shiftDaysMap };
+    },
+    enabled: open && employeeIds.length > 0,
+  });
+
+  // Helper to check if employee has shift on day
+  const hasShiftOnDay = useCallback((employeeId: string, dayIndex: number): boolean => {
+    // dayIndex 0-6 where 0=Monday, convert to DB format 1=Monday, 7=Sunday
+    const dbDayOfWeek = dayIndex + 1;
+    
+    // 1. Check special shift first
+    const specialShift = employeeSpecialShifts?.assignments?.find(
+      s => s.employee_id === employeeId
+    );
+    
+    if (specialShift) {
+      const days = employeeSpecialShifts?.shiftDays?.[specialShift.shift_id] || [];
+      if (days.length === 0) return false; // "Ingen vagter" special shift
+      return days.includes(dbDayOfWeek);
+    }
+    
+    // 2. Fallback to team primary shift
+    const primaryShift = primaryShiftsData?.shifts?.[0];
+    if (!primaryShift) return false;
+    
+    // Check if the day is configured
+    const hasDayConfig = primaryShiftsData?.days?.some(d => d.day_of_week === dbDayOfWeek);
+    if (hasDayConfig) return true;
+    
+    // Default: weekdays have shift (Mon-Fri = 1-5)
+    return dbDayOfWeek >= 1 && dbDayOfWeek <= 5;
+  }, [primaryShiftsData, employeeSpecialShifts]);
+
+  // Check if employee has no shifts at all
+  const hasNoShiftsAtAll = useCallback((employeeId: string): boolean => {
+    const specialShift = employeeSpecialShifts?.assignments?.find(
+      s => s.employee_id === employeeId
+    );
+    if (specialShift) {
+      const days = employeeSpecialShifts?.shiftDays?.[specialShift.shift_id] || [];
+      return days.length === 0;
+    }
+    return false;
+  }, [employeeSpecialShifts]);
+
   // Create a map of employee absences by day with type info
   const absencesByEmployeeAndDay = useMemo(() => {
     const map = new Map<string, Map<number, string>>();
@@ -264,6 +376,34 @@ export function AddEmployeeDialog({
     return selectedEmployees.some((empId) => empId && isBookedOnDay(empId, dayIndex));
   };
 
+  // Check if any selected employee has no shift on a specific day
+  const anySelectedHasNoShiftOnDay = (dayIndex: number) => {
+    return selectedEmployees.some((empId) => empId && !hasShiftOnDay(empId, dayIndex));
+  };
+
+  // Get employees with no shift on selected days
+  const employeesWithNoShift = useMemo(() => {
+    const result: { employeeId: string; employeeName: string; days: number[] }[] = [];
+    
+    selectedEmployees.forEach((empId) => {
+      if (!empId) return;
+      const daysWithoutShift = Array.from(selectedDays).filter(dayIndex => !hasShiftOnDay(empId, dayIndex));
+      
+      if (daysWithoutShift.length > 0) {
+        const emp = filteredEmployees.find((e) => e.id === empId);
+        if (emp) {
+          result.push({
+            employeeId: empId,
+            employeeName: emp.full_name,
+            days: daysWithoutShift,
+          });
+        }
+      }
+    });
+    
+    return result;
+  }, [selectedEmployees, selectedDays, hasShiftOnDay, filteredEmployees]);
+
   useEffect(() => {
     if (open) {
       setSelectedEmployees([null]);
@@ -316,12 +456,15 @@ export function AddEmployeeDialog({
     const validEmployees = selectedEmployees.filter((e): e is string => e !== null);
     if (validEmployees.length === 0 || selectedDays.size === 0) return;
 
+    // Filter only days where employee has shift
     const assignments = validEmployees.map(employeeId => ({
       employeeId,
-      dates: Array.from(selectedDays).map(dayIndex => 
-        format(addDays(weekStart, dayIndex), "yyyy-MM-dd")
-      ),
-    }));
+      dates: Array.from(selectedDays)
+        .filter(dayIndex => hasShiftOnDay(employeeId, dayIndex))
+        .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
+    })).filter(a => a.dates.length > 0);
+
+    if (assignments.length === 0) return;
 
     onAddAssignments(assignments);
     onOpenChange(false);
@@ -376,6 +519,7 @@ export function AddEmployeeDialog({
                           const empBookings = bookingsByEmployeeAndDay.get(employee.id);
                           const empHasAbsence = !!empAbsences;
                           const empHasBooking = !!empBookings;
+                          const empHasNoShifts = hasNoShiftsAtAll(employee.id);
                           const empAbsenceTypes = empHasAbsence 
                             ? [...new Set(Array.from(empAbsences.values()))]
                             : [];
@@ -386,17 +530,23 @@ export function AddEmployeeDialog({
                             <SelectItem 
                               key={employee.id} 
                               value={employee.id} 
-                              className={`text-popover-foreground ${empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : empHasBooking ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                              className={`text-popover-foreground ${empHasNoShifts ? "text-gray-400 bg-gray-50 dark:bg-gray-950/20" : empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : empHasBooking ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : ""}`}
                             >
                               <span className="flex items-center gap-2">
                                 {employee.full_name}
-                                {empHasAbsence && (
+                                {empHasNoShifts && (
+                                  <>
+                                    <Ban className="h-3 w-3 text-gray-400" />
+                                    <span className="text-xs text-gray-400">(Ingen vagter)</span>
+                                  </>
+                                )}
+                                {!empHasNoShifts && empHasAbsence && (
                                   <>
                                     <AlertTriangle className="h-3 w-3 text-red-500" />
                                     <span className="text-xs text-red-500">({empAbsenceTypes.join(", ")})</span>
                                   </>
                                 )}
-                                {empHasBooking && !empHasAbsence && (
+                                {!empHasNoShifts && empHasBooking && !empHasAbsence && (
                                   <>
                                     <AlertTriangle className="h-3 w-3 text-amber-500" />
                                     <span className="text-xs text-amber-500">(Booket)</span>
@@ -500,6 +650,30 @@ export function AddEmployeeDialog({
             </div>
           )}
 
+          {/* Warning for employees with no shift */}
+          {employeesWithNoShift.length > 0 && (
+            <div className="rounded-lg border border-gray-400 bg-gray-50 dark:bg-gray-950/20 p-3">
+              <div className="flex items-start gap-2">
+                <Ban className="h-5 w-5 text-gray-500 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-gray-700 dark:text-gray-300">
+                    Ingen vagt planlagt - følgende kan ikke bookes:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-gray-600 dark:text-gray-400">
+                    {employeesWithNoShift.map((e) => (
+                      <li key={e.employeeId} className="flex flex-col">
+                        <span className="font-medium">{e.employeeName}</span>
+                        <span className="text-xs">
+                          Ingen vagt: {e.days.map(d => DAY_NAMES[d]).join(", ")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-sm font-medium">Vælg hvilke dage medarbejderne skal bookes:</p>
             <div className="space-y-1">
@@ -507,14 +681,17 @@ export function AddEmployeeDialog({
                 const inRange = isDayInBookingRange(index);
                 const hasAbsenceWarning = anySelectedHasAbsenceOnDay(index);
                 const hasBookingWarning = anySelectedIsBookedOnDay(index);
-                const hasWarning = hasAbsenceWarning || hasBookingWarning;
+                const hasNoShiftWarning = anySelectedHasNoShiftOnDay(index);
+                const hasWarning = hasAbsenceWarning || hasBookingWarning || hasNoShiftWarning;
                 return (
                   <div
                     key={index}
                     className={`flex items-center justify-between p-3 rounded-lg border ${
                       inRange ? "hover:bg-muted/50 cursor-pointer" : "opacity-50"
                     } ${selectedDays.has(index) ? "border-primary bg-primary/5" : ""} ${
-                      hasAbsenceWarning && inRange ? "border-red-500" : hasBookingWarning && inRange ? "border-amber-500" : ""
+                      hasAbsenceWarning && inRange ? "border-red-500" : 
+                      hasBookingWarning && inRange ? "border-amber-500" : 
+                      hasNoShiftWarning && inRange ? "border-gray-400 bg-gray-50 dark:bg-gray-950/20" : ""
                     }`}
                     onClick={() => inRange && toggleDay(index)}
                   >
@@ -532,6 +709,9 @@ export function AddEmployeeDialog({
                       )}
                       {hasBookingWarning && !hasAbsenceWarning && inRange && (
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      )}
+                      {hasNoShiftWarning && !hasAbsenceWarning && !hasBookingWarning && inRange && (
+                        <span className="text-xs text-gray-400">Ingen vagt</span>
                       )}
                       <span className="text-sm text-muted-foreground">{getDateForDay(index)}</span>
                     </div>

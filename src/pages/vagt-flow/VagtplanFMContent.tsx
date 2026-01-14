@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Users, Clock, Palmtree, Thermometer, CalendarDays, Coins, Eye, EyeOff, Umbrella } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Clock, Palmtree, Thermometer, CalendarDays, Coins, Eye, EyeOff, Umbrella, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -219,6 +220,35 @@ export default function VagtplanFMContent() {
       return { assignments: data, shiftDays: shiftDaysMap };
     },
   });
+
+  // Fetch booking assignments for the week to show booking locations
+  const { data: bookingAssignments } = useQuery({
+    queryKey: ["booking-assignments-fm", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("booking_assignment")
+        .select(`
+          id, employee_id, date,
+          booking:booking_id(
+            id, week_number, year,
+            location:location_id(id, name),
+            client:client_id(id, name)
+          )
+        `)
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(weekEnd, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Helper to get booking for employee and date
+  const getBookingForEmployeeAndDate = useCallback((employeeId: string, date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return bookingAssignments?.find(
+      (ba: any) => ba.employee_id === employeeId && ba.date === dateStr
+    );
+  }, [bookingAssignments]);
 
   // Helper to get work times from primary shift (respects special shift hierarchy)
   // Returns: string (work times) or null (no shift for this day/employee)
@@ -530,6 +560,14 @@ export default function VagtplanFMContent() {
           <div className="w-3 h-3 rounded-sm bg-destructive/10" />
           <span>Helligdag</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <MapPin className="h-3 w-3 text-blue-500" />
+          <span>Booket lokation</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-orange-500 italic">Ikke booket</span>
+          <span>Mangler booking</span>
+        </div>
       </div>
 
       {/* Schedule Table */}
@@ -591,8 +629,11 @@ export default function VagtplanFMContent() {
                   const bonusPaid = getBonusPaidForDate(employee.id, day);
                   const holidayName = getHolidayName(day);
                   const hasPendingVacation = hasPendingVacationForDate(employee.id, day);
+                  const booking = getBookingForEmployeeAndDate(employee.id, day);
                   
                   const hasShift = dayShifts.length > 0 || !!workTimes;
+                  const dayOfWeek = getDay(day); // 0=Sunday, 1=Monday, etc.
+                  const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
                   
                   // Determine cell background
                   let cellBg = "";
@@ -648,6 +689,22 @@ export default function VagtplanFMContent() {
                               )}
                             </div>
                           ) : null}
+                          
+                          {/* Booking location indicator */}
+                          {booking && (
+                            <Link 
+                              to={`/vagt-flow/booking?tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
+                              className="flex items-center justify-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate max-w-[70px]">{(booking as any).booking?.location?.name}</span>
+                            </Link>
+                          )}
+                          
+                          {/* "Ikke booket" indicator for weekdays with shift but no booking */}
+                          {!booking && isWeekday && !holidayName && (
+                            <span className="text-[10px] text-orange-500 italic">Ikke booket</span>
+                          )}
                           
                           {/* Indicators */}
                           <div className="flex items-center gap-1">
