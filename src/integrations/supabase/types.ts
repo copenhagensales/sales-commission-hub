@@ -6175,7 +6175,7 @@ export type Database = {
       }
       product_pricing_rules: {
         Row: {
-          campaign_mapping_id: string | null
+          campaign_mapping_ids: string[] | null
           commission_dkk: number
           conditions: Json
           created_at: string | null
@@ -6188,7 +6188,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          campaign_mapping_id?: string | null
+          campaign_mapping_ids?: string[] | null
           commission_dkk: number
           conditions?: Json
           created_at?: string | null
@@ -6201,7 +6201,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          campaign_mapping_id?: string | null
+          campaign_mapping_ids?: string[] | null
           commission_dkk?: number
           conditions?: Json
           created_at?: string | null
@@ -6214,13 +6214,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "product_pricing_rules_campaign_mapping_id_fkey"
-            columns: ["campaign_mapping_id"]
-            isOneToOne: false
-            referencedRelation: "adversus_campaign_mappings"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "product_pricing_rules_product_id_fkey"
             columns: ["product_id"]
