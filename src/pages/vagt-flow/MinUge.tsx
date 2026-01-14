@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useVagtEmployee } from "@/hooks/useVagtEmployee";
 import { useOpenMarkets, useMyApplications, useApplyToMarket } from "@/hooks/useMarketApplications";
+import { useAbsenceRequests } from "@/hooks/useShiftPlanning";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
+import { PendingAbsencesList } from "@/components/shift-planning/PendingAbsencesList";
 
 export default function VagtMinUge() {
   const { data: vagtEmployee } = useVagtEmployee();
@@ -87,6 +89,10 @@ export default function VagtMinUge() {
     },
     enabled: !!vagtEmployee?.id,
   });
+
+  // Fetch pending absence requests for this employee
+  const { data: myAbsences } = useAbsenceRequests(undefined, vagtEmployee?.id);
+  const pendingAbsences = myAbsences?.filter(a => a.status === "pending") || [];
 
   const onMyWayMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
@@ -526,6 +532,12 @@ export default function VagtMinUge() {
             )}
           </div>
         ) : null}
+
+        {/* Pending Absence Requests Section */}
+        <PendingAbsencesList 
+          absences={pendingAbsences} 
+          title="Mine anmodninger" 
+        />
       </div>
 
       {/* Day Detail Dialog */}
