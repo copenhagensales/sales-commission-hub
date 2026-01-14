@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { TimeSelect } from "@/components/ui/time-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Clock, X, Star, Calendar, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, X, Calendar, Users, Ban } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StandardShift {
@@ -117,7 +117,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     hours_source: "shift" as 'timestamp' | 'shift',
   });
   const [breaks, setBreaks] = useState<BreakInput[]>([]);
-  const [useDifferentTimes, setUseDifferentTimes] = useState(false);
+  // 'same' = same times for all days, 'different' = different times per day, 'none' = no shifts
+  const [shiftTimeMode, setShiftTimeMode] = useState<'same' | 'different' | 'none'>('same');
   
   // Day configurations - indexed by day_of_week (0-6)
   const [dayConfigs, setDayConfigs] = useState<Record<number, DayConfig>>(() => {
@@ -514,7 +515,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       hours_source: "shift",
     });
     setBreaks([]);
-    setUseDifferentTimes(false);
+    setShiftTimeMode('same');
     setSelectedEmployees([]);
     setIsSpecialShift(false);
     // Reset day configs
@@ -601,12 +602,50 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       }
     }
     setDayConfigs(newDayConfigs);
-    setUseDifferentTimes(hasDifferentTimes);
+    
+    // Check if this is a "no shifts" configuration (no days enabled with 00:00 times)
+    const hasNoDays = !Object.values(newDayConfigs).some(c => c.enabled);
+    const hasZeroTimes = shift.start_time.slice(0, 5) === "00:00" && shift.end_time.slice(0, 5) === "00:00";
+    
+    if (hasNoDays && hasZeroTimes) {
+      setShiftTimeMode('none');
+    } else {
+      setShiftTimeMode(hasDifferentTimes ? 'different' : 'same');
+    }
     
     setDialogOpen(true);
   };
 
   const handleSave = () => {
+    // For "Ingen vagter" mode, only require name
+    if (shiftTimeMode === 'none') {
+      if (!formData.name) {
+        toast({ title: "Udfyld navn", variant: "destructive" });
+        return;
+      }
+      // For special shifts, require at least one employee
+      if (isSpecialShift && selectedEmployees.length === 0) {
+        toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
+        return;
+      }
+      
+      // Create "no shifts" configuration - all days disabled, times set to 00:00
+      const noShiftsDayConfigs: Record<number, DayConfig> = {};
+      for (let i = 0; i < 7; i++) {
+        noShiftsDayConfigs[i] = { enabled: false, start_time: "00:00", end_time: "00:00", breaks: [] };
+      }
+      
+      const employeeIds = isSpecialShift ? selectedEmployees : undefined;
+      const noShiftsFormData = { ...formData, start_time: "00:00", end_time: "00:00" };
+      
+      if (editingShift) {
+        updateMutation.mutate({ ...noShiftsFormData, id: editingShift.id, breaks: [], dayConfigs: noShiftsDayConfigs, employeeIds });
+      } else {
+        createMutation.mutate({ ...noShiftsFormData, breaks: [], dayConfigs: noShiftsDayConfigs, employeeIds });
+      }
+      return;
+    }
+    
     if (!formData.name || !formData.start_time || !formData.end_time) {
       toast({ title: "Udfyld navn og tidspunkter", variant: "destructive" });
       return;
@@ -620,7 +659,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     
     // If using "Samme tider" mode, update all enabled dayConfigs to use the general times
     let finalDayConfigs = dayConfigs;
-    if (!useDifferentTimes) {
+    if (shiftTimeMode === 'same') {
       finalDayConfigs = { ...dayConfigs };
       Object.keys(finalDayConfigs).forEach(day => {
         const dayNum = parseInt(day);
@@ -724,13 +763,15 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   };
 
   // Calculate working time for display
-  const workingMinutes = useDifferentTimes
-    ? Object.entries(dayConfigs)
-        .filter(([_, config]) => config.enabled)
-        .reduce((sum, [_, config]) => {
-          return sum + calculateWorkingTime(config.start_time, config.end_time, config.breaks);
-        }, 0)
-    : calculateWorkingTime(formData.start_time, formData.end_time, breaks);
+  const workingMinutes = shiftTimeMode === 'none' 
+    ? 0 
+    : shiftTimeMode === 'different'
+      ? Object.entries(dayConfigs)
+          .filter(([_, config]) => config.enabled)
+          .reduce((sum, [_, config]) => {
+            return sum + calculateWorkingTime(config.start_time, config.end_time, config.breaks);
+          }, 0)
+      : calculateWorkingTime(formData.start_time, formData.end_time, breaks);
 
   // Get enabled days count
   const enabledDaysCount = Object.values(dayConfigs).filter(c => c.enabled).length;
@@ -995,14 +1036,14 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </div>
             )}
 
-            {/* Toggle for same/different times - at the top */}
+            {/* Toggle for same/different/none times - at the top */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
               <div className="flex gap-1">
                 <button
                   type="button"
-                  onClick={() => setUseDifferentTimes(false)}
+                  onClick={() => setShiftTimeMode('same')}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    !useDifferentTimes 
+                    shiftTimeMode === 'same' 
                       ? "bg-primary text-primary-foreground" 
                       : "bg-background hover:bg-muted"
                   }`}
@@ -1011,23 +1052,53 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setUseDifferentTimes(true)}
+                  onClick={() => setShiftTimeMode('different')}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    useDifferentTimes 
+                    shiftTimeMode === 'different' 
                       ? "bg-primary text-primary-foreground" 
                       : "bg-background hover:bg-muted"
                   }`}
                 >
                   Forskellige tider
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShiftTimeMode('none')}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    shiftTimeMode === 'none' 
+                      ? "bg-destructive text-destructive-foreground" 
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Ingen vagter
+                </button>
               </div>
               <span className="text-xs text-muted-foreground">
-                {useDifferentTimes ? "Angiv tid pr. dag" : "Alle dage har samme tid"}
+                {shiftTimeMode === 'different' 
+                  ? "Angiv tid pr. dag" 
+                  : shiftTimeMode === 'none'
+                    ? "Medarbejderne har 0 planlagte vagter"
+                    : "Alle dage har samme tid"}
               </span>
             </div>
 
+            {/* No shifts mode - show info message */}
+            {shiftTimeMode === 'none' && (
+              <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <Ban className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Ingen planlagte vagter
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    De valgte medarbejdere vil ikke have nogen planlagte vagter. Timer beregnes kun fra stemplet tid (hvis relevant).
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Standard times - only show when "Samme tider" */}
-            {!useDifferentTimes && (
+            {shiftTimeMode === 'same' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start tid *</Label>
@@ -1048,39 +1119,40 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </div>
             )}
 
-            {/* Day selection */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Label>Vælg dage (valgfrit)</Label>
-              </div>
+            {/* Day selection - hide when "Ingen vagter" */}
+            {shiftTimeMode !== 'none' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label>Vælg dage (valgfrit)</Label>
+                </div>
 
-              {/* Day checkboxes - always visible */}
-              <div className="flex flex-wrap gap-2">
-                {WEEKDAY_ORDER.map(day => {
-                  const config = dayConfigs[day];
-                  return (
-                    <label
-                      key={day}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
-                        config.enabled 
-                          ? "bg-primary/10 border-primary text-primary" 
-                          : "bg-muted/30 border-border hover:bg-muted/50"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={config.enabled}
-                        onCheckedChange={() => toggleDay(day)}
-                        className="sr-only"
-                      />
-                      <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
-                    </label>
-                  );
-                })}
-              </div>
+                {/* Day checkboxes - always visible */}
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAY_ORDER.map(day => {
+                    const config = dayConfigs[day];
+                    return (
+                      <label
+                        key={day}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                          config.enabled 
+                            ? "bg-primary/10 border-primary text-primary" 
+                            : "bg-muted/30 border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={config.enabled}
+                          onCheckedChange={() => toggleDay(day)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
 
-              {/* Individual day times and breaks - only show when "Forskellige tider" is selected and days are enabled */}
-              {useDifferentTimes && enabledDaysCount > 0 && (
+                {/* Individual day times and breaks - only show when "Forskellige tider" is selected and days are enabled */}
+                {shiftTimeMode === 'different' && enabledDaysCount > 0 && (
                     <div className="space-y-4 p-3 border rounded-lg bg-background">
                       {WEEKDAY_ORDER.filter(day => dayConfigs[day].enabled).map(day => {
                         const config = dayConfigs[day];
@@ -1149,15 +1221,16 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     </div>
                   )}
 
-              <p className="text-xs text-muted-foreground">
-                {enabledDaysCount === 0 
-                  ? "Ingen dage valgt = medarbejderen får 0 vagter" 
-                  : `${enabledDaysCount} dag(e) valgt`}
-              </p>
-            </div>
+                <p className="text-xs text-muted-foreground">
+                  {enabledDaysCount === 0 
+                    ? "Ingen dage valgt = medarbejderen får 0 vagter" 
+                    : `${enabledDaysCount} dag(e) valgt`}
+                </p>
+              </div>
+            )}
 
             {/* Breaks - only show when "Samme tider" is selected */}
-            {!useDifferentTimes && (
+            {shiftTimeMode === 'same' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Pauser</Label>
