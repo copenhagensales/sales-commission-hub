@@ -80,7 +80,7 @@ export function KpiOverview() {
       } else {
         await updateFormulaStatus.mutateAsync({ id: kpi.originalId, is_active: checked });
       }
-      toast.success(checked ? "KPI aktiveret" : "KPI deaktiveret");
+      toast.success(checked ? "KPI tilføjet til dashboard-liste" : "KPI fjernet fra dashboard-liste");
     } catch (error) {
       toast.error("Kunne ikke opdatere status");
     } finally {
@@ -201,7 +201,7 @@ export function KpiOverview() {
                 <div className="text-2xl font-bold">
                   {unifiedKpis.filter((k) => k.is_active).length}
                 </div>
-                <div className="text-xs text-muted-foreground">Aktive</div>
+                <div className="text-xs text-muted-foreground">Valgt til dashboard</div>
               </div>
             </div>
           </CardContent>
@@ -251,8 +251,8 @@ export function KpiOverview() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Alle</SelectItem>
-            <SelectItem value="active">Aktive</SelectItem>
-            <SelectItem value="inactive">Inaktive</SelectItem>
+            <SelectItem value="active">Valgte</SelectItem>
+            <SelectItem value="inactive">Ikke valgte</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -323,7 +323,7 @@ export function KpiOverview() {
 
       {/* Info text */}
       <p className="text-sm text-muted-foreground text-center">
-        Denne liste viser alle tilgængelige KPI'er og formler. Brug den som reference når du designer dashboards.
+        Marker hvilke KPI'er og formler der skal være tilgængelige når du designer dashboards og statistik.
       </p>
     </div>
   );
