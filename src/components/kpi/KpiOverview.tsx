@@ -1,16 +1,18 @@
 import { useState, useMemo } from "react";
-import { useKpiDefinitions, KpiDefinition } from "@/hooks/useKpiDefinitions";
-import { useKpiFormulas, KpiFormula } from "@/hooks/useKpiFormulas";
+import { useKpiDefinitions, KpiDefinition, useUpdateKpiDefinitionStatus } from "@/hooks/useKpiDefinitions";
+import { useKpiFormulas, KpiFormula, useUpdateKpiFormulaStatus } from "@/hooks/useKpiFormulas";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Search, BookOpen, Calculator, Loader2, LayoutGrid, Check, CheckCircle2, Circle } from "lucide-react";
+import { toast } from "sonner";
 
 // Unified KPI item type
 interface UnifiedKpi {
   id: string;
+  originalId: string;
   name: string;
   type: "definition" | "formula";
   category: string | null;
@@ -24,9 +26,13 @@ export function KpiOverview() {
   const [typeFilter, setTypeFilter] = useState<"all" | "definition" | "formula">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const { data: definitions, isLoading: loadingDefs } = useKpiDefinitions();
   const { data: formulas, isLoading: loadingFormulas } = useKpiFormulas();
+  
+  const updateDefinitionStatus = useUpdateKpiDefinitionStatus();
+  const updateFormulaStatus = useUpdateKpiFormulaStatus();
 
   const isLoading = loadingDefs || loadingFormulas;
 
@@ -38,6 +44,7 @@ export function KpiOverview() {
     (definitions || []).forEach((def) => {
       items.push({
         id: `def-${def.id}`,
+        originalId: def.id,
         name: def.name,
         type: "definition",
         category: def.category,
@@ -51,17 +58,35 @@ export function KpiOverview() {
     (formulas || []).forEach((formula) => {
       items.push({
         id: `formula-${formula.id}`,
+        originalId: formula.id,
         name: formula.name,
         type: "formula",
         category: formula.kpi_type,
         description: formula.description,
-        is_active: true,
+        is_active: (formula as any).is_active ?? true,
         source: formula,
       });
     });
 
     return items;
   }, [definitions, formulas]);
+
+  // Handle toggle status
+  const handleToggleStatus = async (kpi: UnifiedKpi, checked: boolean) => {
+    setUpdatingId(kpi.id);
+    try {
+      if (kpi.type === "definition") {
+        await updateDefinitionStatus.mutateAsync({ id: kpi.originalId, is_active: checked });
+      } else {
+        await updateFormulaStatus.mutateAsync({ id: kpi.originalId, is_active: checked });
+      }
+      toast.success(checked ? "KPI aktiveret" : "KPI deaktiveret");
+    } catch (error) {
+      toast.error("Kunne ikke opdatere status");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   // Filter logic
   const filteredKpis = useMemo(() => {
@@ -285,7 +310,8 @@ export function KpiOverview() {
                   {/* Active switch */}
                   <Switch
                     checked={kpi.is_active}
-                    disabled
+                    onCheckedChange={(checked) => handleToggleStatus(kpi, checked)}
+                    disabled={updatingId === kpi.id}
                     className="flex-shrink-0"
                   />
                 </div>

@@ -140,6 +140,23 @@ export function useDeleteKpiFormula() {
   });
 }
 
+export function useUpdateKpiFormulaStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("dashboard_kpis")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kpi-formulas"] });
+    },
+  });
+}
+
 // Available base metrics for formula building
 export const BASE_METRICS = [
   { key: "antal_salg", label: "Antal salg", description: "Totalt antal godkendte salg" },
