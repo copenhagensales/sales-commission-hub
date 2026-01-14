@@ -1179,6 +1179,35 @@ export default function MgTest() {
     },
   });
 
+  // Create and hide unmapped product mutation
+  const createAndHideProduct = useMutation({
+    mutationFn: async (row: AggregatedProduct) => {
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name: row.adversus_product_title || "Ukendt produkt",
+          external_product_code: row.adversus_external_id,
+          commission_dkk: 0,
+          revenue_dkk: 0,
+          counts_as_sale: true,
+          is_hidden: true,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Produkt oprettet og skjult");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette produkt");
+    },
+  });
+
   // Create campaign mutation
   const createManualCampaign = useMutation({
     mutationFn: async (campaignData: typeof newCampaign) => {
@@ -2263,7 +2292,7 @@ export default function MgTest() {
                                         })()}
                                       </TableCell>
                                       <TableCell className="text-center">
-                                        {row.product?.id && (
+                                        {row.product?.id ? (
                                           <Button
                                             variant="ghost"
                                             size="icon"
@@ -2280,6 +2309,17 @@ export default function MgTest() {
                                             ) : (
                                               <Eye className="h-4 w-4" />
                                             )}
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => createAndHideProduct.mutate(row)}
+                                            disabled={createAndHideProduct.isPending}
+                                            title="Opret og skjul produkt"
+                                          >
+                                            <EyeOff className="h-4 w-4" />
                                           </Button>
                                         )}
                                       </TableCell>
