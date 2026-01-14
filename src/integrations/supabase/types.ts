@@ -6134,7 +6134,9 @@ export type Database = {
       }
       product_price_history: {
         Row: {
+          applied_at: string | null
           commission_dkk: number | null
+          counts_as_sale: boolean | null
           created_at: string
           created_by: string | null
           effective_from: string
@@ -6144,7 +6146,9 @@ export type Database = {
           revenue_dkk: number | null
         }
         Insert: {
+          applied_at?: string | null
           commission_dkk?: number | null
+          counts_as_sale?: boolean | null
           created_at?: string
           created_by?: string | null
           effective_from: string
@@ -6154,7 +6158,9 @@ export type Database = {
           revenue_dkk?: number | null
         }
         Update: {
+          applied_at?: string | null
           commission_dkk?: number | null
+          counts_as_sale?: boolean | null
           created_at?: string
           created_by?: string | null
           effective_from?: string

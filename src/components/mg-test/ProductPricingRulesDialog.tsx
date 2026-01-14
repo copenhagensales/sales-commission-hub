@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { format, isSameDay, isBefore, startOfDay } from "date-fns";
+import { da } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 
@@ -61,6 +69,7 @@ export function ProductPricingRulesDialog({
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditingBase, setIsEditingBase] = useState(false);
+  const [effectiveDate, setEffectiveDate] = useState<Date>(new Date());
 
   // Local state for editable base values
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
@@ -180,15 +189,56 @@ export function ProductPricingRulesDialog({
     queryClient.invalidateQueries({ queryKey: ["product-pricing-rules", productId] });
   };
 
-  const handleSaveBaseValues = () => {
+  // Determine if selected date is in the past
+  const today = startOfDay(new Date());
+  const isRetroactive = isBefore(effectiveDate, today);
+  const isToday = isSameDay(effectiveDate, today);
+
+  const handleSaveWithDate = async () => {
     const commission = parseFloat(localCommission.replace(",", ".")) || 0;
     const revenue = parseFloat(localRevenue.replace(",", ".")) || 0;
-    updateBaseValues.mutate({ commission, revenue });
-  };
-
-  const handleSaveAndCloseEdit = () => {
-    handleSaveBaseValues();
+    
+    if (isToday || isRetroactive) {
+      // Immediate or retroactive change - update products table directly
+      await updateBaseValues.mutateAsync({ commission, revenue });
+      await updateCountsAsSale.mutateAsync(localCountsAsSale);
+      
+      // Insert into history
+      await supabase.from("product_price_history").insert({
+        product_id: productId,
+        commission_dkk: commission,
+        revenue_dkk: revenue,
+        counts_as_sale: localCountsAsSale,
+        effective_from: format(effectiveDate, "yyyy-MM-dd"),
+        is_retroactive: isRetroactive,
+        applied_at: new Date().toISOString()
+      });
+      
+      if (isRetroactive) {
+        toast.warning("Prisændring gemt med retroaktiv dato");
+      }
+    } else {
+      // Future change - save only in history (pending)
+      const { error } = await supabase.from("product_price_history").insert({
+        product_id: productId,
+        commission_dkk: commission,
+        revenue_dkk: revenue,
+        counts_as_sale: localCountsAsSale,
+        effective_from: format(effectiveDate, "yyyy-MM-dd"),
+        is_retroactive: false,
+        applied_at: null
+      });
+      
+      if (error) {
+        toast.error("Kunne ikke gemme planlagt ændring: " + error.message);
+        return;
+      }
+      
+      toast.success(`Ændring planlagt til ${format(effectiveDate, "d. MMMM yyyy", { locale: da })}`);
+    }
+    
     setIsEditingBase(false);
+    setEffectiveDate(new Date());
   };
 
   const handleCancelEdit = () => {
@@ -196,11 +246,11 @@ export function ProductPricingRulesDialog({
     setLocalRevenue(String(baseRevenue));
     setLocalCountsAsSale(countsAsSale);
     setIsEditingBase(false);
+    setEffectiveDate(new Date());
   };
 
   const handleCountsAsSaleChange = (checked: boolean) => {
     setLocalCountsAsSale(checked);
-    updateCountsAsSale.mutate(checked);
   };
 
   const formatConditions = (conditions: Record<string, string>) => {
@@ -346,20 +396,49 @@ export function ProductPricingRulesDialog({
                       id="counts-as-sale"
                       checked={localCountsAsSale}
                       onCheckedChange={handleCountsAsSaleChange}
-                      disabled={updateCountsAsSale.isPending}
                     />
                     <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
                       Tæl som salg
                     </Label>
-                    {updateCountsAsSale.isPending && (
-                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                    )}
                   </div>
+
+                  {/* Date picker */}
+                  <div className="space-y-2 pt-2">
+                    <Label>Ikrafttrædelsesdato</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(effectiveDate, "d. MMMM yyyy", { locale: da })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={effectiveDate}
+                          onSelect={(date) => date && setEffectiveDate(date)}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Retroactive warning */}
+                  {isRetroactive && (
+                    <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-800">
+                      <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Advarsel: Retroaktiv ændring</p>
+                        <p>Du har valgt en dato i fortiden. Dette overskriver tidligere prishistorik!</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-2 pt-2">
                     <Button
                       size="sm"
-                      onClick={handleSaveAndCloseEdit}
+                      onClick={handleSaveWithDate}
                       disabled={updateBaseValues.isPending}
                     >
                       {updateBaseValues.isPending && (
