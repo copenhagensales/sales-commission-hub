@@ -6,7 +6,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Phone, Mail, Trash2 } from "lucide-react";
+import { Calendar, Phone, Mail, Trash2, ChevronDown, History } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -21,6 +21,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UpcomingInterview {
   id: string;
@@ -105,6 +111,25 @@ export default function UpcomingInterviews() {
     },
   });
 
+  const { data: pastInterviews = [] } = useQuery({
+    queryKey: ["past-interviews"],
+    queryFn: async () => {
+      const now = new Date().toISOString();
+
+      const { data: candidates, error } = await supabase
+        .from("candidates")
+        .select("id, first_name, last_name, phone, email, interview_date, applied_position")
+        .lt("interview_date", now)
+        .not("interview_date", "is", null)
+        .order("interview_date", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      return candidates || [];
+    },
+  });
+
   const deleteInterviewMutation = useMutation({
     mutationFn: async (candidateId: string) => {
       const { error } = await supabase
@@ -136,11 +161,49 @@ export default function UpcomingInterviews() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende samtaler</h1>
-          <p className="text-muted-foreground">
-            Oversigt over planlagte jobsamtaler
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende samtaler</h1>
+            <p className="text-muted-foreground">
+              Oversigt over planlagte jobsamtaler
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <History className="h-4 w-4" />
+                Tidligere samtaler
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
+              {pastInterviews.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                  Ingen tidligere samtaler
+                </div>
+              ) : (
+                pastInterviews.map((interview) => (
+                  <DropdownMenuItem
+                    key={interview.id}
+                    className="flex flex-col items-start gap-1 py-3 cursor-pointer"
+                    onClick={() => navigate(`/recruitment/candidates/${interview.id}`)}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-medium">
+                        {interview.first_name} {interview.last_name}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {roleLabels[interview.applied_position || ""] || interview.applied_position || "Ukendt"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {interview.interview_date && format(new Date(interview.interview_date), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                    </span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {upcomingInterviews.length === 0 ? (
