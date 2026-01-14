@@ -8466,6 +8466,10 @@ export type Database = {
           work_email: string
         }[]
       }
+      get_unread_message_count: {
+        Args: { p_employee_id: string }
+        Returns: number
+      }
       get_user_granted_permissions: {
         Args: { _user_id: string }
         Returns: string[]
