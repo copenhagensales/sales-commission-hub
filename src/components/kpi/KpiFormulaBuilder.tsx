@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Calculator, Pencil, Trash2, Loader2, X, Parentheses, BookOpen } from "lucide-react";
+import { Plus, Calculator, Pencil, Trash2, Loader2, X, Parentheses, BookOpen, BarChart3 } from "lucide-react";
 import {
   useKpiFormulas,
   useCreateKpiFormula,
@@ -388,20 +389,22 @@ export function KpiFormulaBuilder() {
               <BookOpen className="h-4 w-4" />
               KPI Definitioner
             </CardTitle>
-            <CardDescription>Dokumenterede KPI'er fra Definitioner-fanen</CardDescription>
+            <CardDescription>
+              {kpiDefinitions?.length || 0} dokumenterede KPI'er fra Definitioner-fanen
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {kpiDefinitions?.slice(0, 8).map((kpi) => (
-                <Badge key={kpi.id} variant="outline" className="text-xs bg-purple-500/10">
-                  {kpi.name}
-                </Badge>
+            <div className="space-y-2">
+              {Object.entries(kpisByCategory || {}).map(([category, kpis]) => (
+                <div key={category} className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {categoryLabels[category] || category}
+                  </span>
+                  <Badge variant="secondary" className="text-xs">
+                    {kpis.length}
+                  </Badge>
+                </div>
               ))}
-              {(kpiDefinitions?.length || 0) > 8 && (
-                <Badge variant="outline" className="text-xs">
-                  +{(kpiDefinitions?.length || 0) - 8} flere
-                </Badge>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -681,61 +684,80 @@ export function KpiFormulaBuilder() {
                   </div>
                 </div>
 
-                {/* Base metrics */}
-                <div className="space-y-2">
-                  <span className="text-xs text-muted-foreground">Basis-metriker:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {BASE_METRICS.map((metric) => (
-                      <Button
-                        key={metric.key}
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/20"
-                        onClick={() =>
-                          addToken({ type: "metric", value: metric.key, label: metric.label })
-                        }
-                      >
-                        {metric.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* KPI Definitions */}
-                {kpiDefinitions && kpiDefinitions.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      KPI Definitioner:
-                    </span>
-                    <ScrollArea className="h-[120px]">
-                      <div className="space-y-2">
-                        {Object.entries(kpisByCategory || {}).map(([category, kpis]) => (
-                          <div key={category} className="space-y-1">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {categoryLabels[category] || category}
-                            </span>
-                            <div className="flex flex-wrap gap-1">
-                              {kpis.map((kpi) => (
-                                <Button
-                                  key={kpi.id}
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs bg-purple-500/5 hover:bg-purple-500/10 border-purple-500/20"
-                                  onClick={() =>
-                                    addToken({ type: "kpi", value: kpi.slug, label: kpi.name })
-                                  }
-                                >
-                                  {kpi.name}
-                                </Button>
-                              ))}
+                {/* Tabs for KPI Definitions and Base Metrics */}
+                <Tabs defaultValue="kpis" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-3">
+                    <TabsTrigger value="kpis" className="text-xs">
+                      <BookOpen className="h-3 w-3 mr-1.5" />
+                      KPI Definitioner ({kpiDefinitions?.length || 0})
+                    </TabsTrigger>
+                    <TabsTrigger value="metrics" className="text-xs">
+                      <BarChart3 className="h-3 w-3 mr-1.5" />
+                      Basis-metriker ({BASE_METRICS.length})
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="kpis" className="mt-0">
+                    {kpiDefinitions && kpiDefinitions.length > 0 ? (
+                      <ScrollArea className="h-[200px]">
+                        <div className="space-y-4 pr-3">
+                          {Object.entries(kpisByCategory || {}).map(([category, kpis]) => (
+                            <div key={category} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold uppercase text-muted-foreground">
+                                  {categoryLabels[category] || category}
+                                </span>
+                                <Badge variant="outline" className="text-xs h-5">
+                                  {kpis.length}
+                                </Badge>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {kpis.map((kpi) => (
+                                  <Button
+                                    key={kpi.id}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-auto py-1.5 px-2.5 flex-col items-start text-left bg-purple-500/5 hover:bg-purple-500/10 border-purple-500/20"
+                                    onClick={() =>
+                                      addToken({ type: "kpi", value: kpi.slug, label: kpi.name })
+                                    }
+                                  >
+                                    <span className="font-medium text-xs">{kpi.name}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      {kpi.slug}
+                                    </span>
+                                  </Button>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="text-center py-6 text-sm text-muted-foreground">
+                        Ingen KPI-definitioner fundet. Opret dem i Definitioner-fanen.
                       </div>
-                    </ScrollArea>
-                  </div>
-                )}
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="metrics" className="mt-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      {BASE_METRICS.map((metric) => (
+                        <Button
+                          key={metric.key}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/20"
+                          onClick={() =>
+                            addToken({ type: "metric", value: metric.key, label: metric.label })
+                          }
+                        >
+                          {metric.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
           </div>
