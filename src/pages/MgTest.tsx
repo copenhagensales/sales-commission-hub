@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -59,6 +59,7 @@ interface AggregatedProduct {
     revenue_dkk: number | null;
     client_campaign_id: string | null;
     counts_as_sale: boolean;
+    is_hidden?: boolean;
   } | null;
   campaignId: string | null;
   campaignLabel: string;
@@ -202,6 +203,9 @@ export default function MgTest() {
   const [expandedProductSections, setExpandedProductSections] = useState<Record<string, boolean>>({});
   const [productOverridesEnabled, setProductOverridesEnabled] = useState<Record<string, boolean>>({});
   const [expandedCampaignSections, setExpandedCampaignSections] = useState<Record<string, boolean>>({});
+  
+  // Hide products state
+  const [showHiddenProducts, setShowHiddenProducts] = useState(false);
 
   // Field Inspector state
   const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
@@ -390,6 +394,7 @@ export default function MgTest() {
           revenue_dkk,
           external_product_code,
           counts_as_sale,
+          is_hidden,
           client_campaign_id,
           client_campaigns!inner(
             id,
@@ -586,6 +591,7 @@ export default function MgTest() {
               revenue_dkk: p.revenue_dkk,
               client_campaign_id: p.client_campaign_id,
               counts_as_sale: p.counts_as_sale ?? true,
+              is_hidden: p.is_hidden ?? false,
             },
             campaignId: clientId,
             campaignLabel: clientName,
@@ -604,6 +610,12 @@ export default function MgTest() {
       return titleA.localeCompare(titleB, "da");
     });
   }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds]);
+
+  // Filter products based on showHiddenProducts toggle
+  const filteredAggregatedProducts = useMemo(() => {
+    if (showHiddenProducts) return aggregatedProducts;
+    return aggregatedProducts.filter(p => !p.product?.is_hidden);
+  }, [aggregatedProducts, showHiddenProducts]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
@@ -629,8 +641,8 @@ export default function MgTest() {
       }
     });
 
-    // Fordel produkter i grupper
-    aggregatedProducts.forEach((row) => {
+    // Fordel produkter i grupper (use filtered products)
+    filteredAggregatedProducts.forEach((row) => {
       const clientId = row.campaignId; // her bruger vi campaignId som kunde-id
       const groupKey = clientId ?? "unmapped";
       const existing = groups.get(groupKey);
@@ -658,7 +670,7 @@ export default function MgTest() {
 
       return a.campaignLabel.localeCompare(b.campaignLabel, "da");
     });
-  }, [aggregatedProducts, clients]);
+  }, [filteredAggregatedProducts, clients]);
 
   const emailSuggestions = useMemo<EmailMatchSuggestion[]>(() => {
     if (!agents || !vagtEmployees || !employeeIdentities) return [];
@@ -1131,6 +1143,26 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke slette produkt");
+    },
+  });
+
+  // Toggle product visibility mutation
+  const toggleProductHidden = useMutation({
+    mutationFn: async ({ productId, isHidden }: { productId: string; isHidden: boolean }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_hidden: isHidden })
+        .eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Synlighed opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere synlighed");
     },
   });
 
@@ -1938,9 +1970,18 @@ export default function MgTest() {
             <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
           </TabsList>
 
-          {/* Mapping produkt */}
           <TabsContent value="product" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="showHiddenProducts"
+                  checked={showHiddenProducts}
+                  onCheckedChange={(checked) => setShowHiddenProducts(checked === true)}
+                />
+                <Label htmlFor="showHiddenProducts" className="text-sm text-muted-foreground cursor-pointer">
+                  Vis skjulte produkter
+                </Label>
+              </div>
               <Button onClick={() => setCreateProductDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Opret produkt
@@ -2032,7 +2073,8 @@ export default function MgTest() {
                                 <TableHead className="w-[10%] text-center">{t("mgTest.countAsSale")}</TableHead>
                                 <TableHead className="w-[8%] text-center">Kamp. provi</TableHead>
                                 <TableHead className="w-[8%] text-center">Regler</TableHead>
-                                <TableHead className="w-[6%] text-center"></TableHead>
+                                <TableHead className="w-[4%] text-center">Synlig</TableHead>
+                                <TableHead className="w-[4%] text-center"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2058,7 +2100,7 @@ export default function MgTest() {
 
                                 return (
                                   <>
-                                    <TableRow key={row.key}>
+                                    <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
                                       <TableCell>
                                         <div className="flex flex-col">
                                           <span className="font-medium">
@@ -2224,6 +2266,27 @@ export default function MgTest() {
                                         )}
                                       </TableCell>
                                       <TableCell className="text-center">
+                                        {row.product?.id && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className={`h-8 w-8 ${row.product.is_hidden ? 'text-muted-foreground' : ''}`}
+                                            onClick={() => toggleProductHidden.mutate({
+                                              productId: row.product!.id,
+                                              isHidden: !row.product!.is_hidden,
+                                            })}
+                                            disabled={toggleProductHidden.isPending}
+                                            title={row.product.is_hidden ? "Vis produkt" : "Skjul produkt"}
+                                          >
+                                            {row.product.is_hidden ? (
+                                              <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                              <Eye className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-center">
                                         {row.isManual && row.product?.id && !row.sale_source && (
                                           <Button
                                             variant="ghost"
@@ -2243,7 +2306,7 @@ export default function MgTest() {
                                     </TableRow>
                                     {row.product?.id && productOverridesEnabled[row.product.id] && (
                                       <TableRow key={`${row.key}-overrides`} className="hover:bg-transparent">
-                                        <TableCell colSpan={9} className="pt-0 pb-2">
+                                        <TableCell colSpan={10} className="pt-0 pb-2">
                                           <ProductCampaignOverrides
                                             productId={row.product.id}
                                             productName={row.product.name || row.adversus_product_title || "Produkt"}
