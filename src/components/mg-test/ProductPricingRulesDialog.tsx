@@ -26,7 +26,7 @@ interface ProductPricingRulesDialogProps {
 interface PricingRule {
   id: string;
   product_id: string;
-  campaign_mapping_id: string | null;
+  campaign_mapping_ids: string[] | null;
   conditions: Record<string, string>;
   commission_dkk: number;
   revenue_dkk: number;
@@ -121,10 +121,13 @@ export function ProductPricingRulesDialog({
       .join(", ");
   };
 
-  const getCampaignName = (campaignMappingId: string | null) => {
-    if (!campaignMappingId) return "Alle kampagner";
-    const campaign = campaigns?.find((c) => c.id === campaignMappingId);
-    return campaign?.adversus_campaign_name || "Ukendt kampagne";
+  const getCampaignNames = (campaignMappingIds: string[] | null) => {
+    if (!campaignMappingIds || campaignMappingIds.length === 0) return "Alle kampagner";
+    if (campaignMappingIds.length === 1) {
+      const campaign = campaigns?.find((c) => c.id === campaignMappingIds[0]);
+      return campaign?.adversus_campaign_name || "1 kampagne";
+    }
+    return `${campaignMappingIds.length} kampagner`;
   };
 
   // Show editor if creating or editing
@@ -204,7 +207,7 @@ export function ProductPricingRulesDialog({
                       </div>
 
                       <div className="text-xs text-muted-foreground mb-1">
-                        Kampagne: {getCampaignName(rule.campaign_mapping_id)}
+                        Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
                       </div>
 
                       <div className="bg-muted/50 rounded p-2 text-sm mb-2">
