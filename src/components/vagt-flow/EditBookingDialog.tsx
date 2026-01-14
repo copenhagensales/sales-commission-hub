@@ -208,14 +208,13 @@ export function EditBookingDialog({
       
       const { data, error } = await supabase
         .from("booking_assignment")
-        .select(`
-          id, employee_id, date,
-          employee:employee_id(id, full_name)
-        `)
+        .select("id, employee_id, date")
         .eq("booking_id", booking.id)
         .order("date");
       
       if (error) throw error;
+      
+      // Get employee names from employees prop
       return data || [];
     },
     enabled: open && !!booking?.id,
@@ -501,17 +500,18 @@ export function EditBookingDialog({
     return missingDays;
   }, [booking?.booked_days, currentBookingAssignments, weekStart]);
 
-  // Group current assignments by employee for display
+  // Group current assignments by employee for display (use employees prop for names)
   const groupedEmployeeAssignments = useMemo(() => {
-    const grouped: Record<string, { employee: any; dates: string[] }> = {};
+    const grouped: Record<string, { employeeName: string; dates: string[] }> = {};
     currentBookingAssignments.forEach((a: any) => {
       if (!grouped[a.employee_id]) {
-        grouped[a.employee_id] = { employee: a.employee, dates: [] };
+        const emp = employees.find(e => e.id === a.employee_id);
+        grouped[a.employee_id] = { employeeName: emp?.full_name || "Ukendt", dates: [] };
       }
       grouped[a.employee_id].dates.push(a.date);
     });
     return grouped;
-  }, [currentBookingAssignments]);
+  }, [currentBookingAssignments, employees]);
 
   // Group current vehicle assignments for display
   const groupedVehicleAssignments = useMemo(() => {
@@ -806,34 +806,44 @@ export function EditBookingDialog({
           <TabsContent value="employees" className="space-y-4 mt-4">
             {/* Existing employee assignments */}
             {Object.keys(groupedEmployeeAssignments).length > 0 && (
-              <div className="space-y-2 border-b pb-4">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  Tilknyttede medarbejdere ({currentBookingAssignments.length} vagter)
-                </p>
-                <div className="grid gap-1">
-                  {Object.entries(groupedEmployeeAssignments).map(([empId, { employee, dates }]) => {
-                    const dateLabels = dates.map((d: string) => {
+              <div className="space-y-3 border-b pb-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Users className="h-4 w-4 text-green-600" />
+                    Tilknyttede medarbejdere
+                  </p>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {Object.keys(groupedEmployeeAssignments).length} medarbejdere • {currentBookingAssignments.length} vagter
+                  </span>
+                </div>
+                <div className="grid gap-2">
+                  {Object.entries(groupedEmployeeAssignments).map(([empId, { employeeName, dates }]) => {
+                    const sortedDates = [...dates].sort();
+                    const dateLabels = sortedDates.map((d: string) => {
                       const dayIndex = Math.floor((parseISO(d).getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
-                      return `${DAY_NAMES[dayIndex]?.slice(0, 3) || '?'} ${format(parseISO(d), "d/M")}`;
+                      return DAY_NAMES[dayIndex]?.slice(0, 3) || format(parseISO(d), "d/M");
                     });
                     return (
-                      <div key={empId} className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 rounded-md px-3 py-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Check className="h-4 w-4 text-green-600 shrink-0" />
-                          <span className="font-medium">{(employee as any)?.full_name || "Ukendt"}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {dateLabels.join(", ")}
-                          </span>
+                      <div key={empId} className="flex items-center justify-between bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
+                            <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm text-foreground">{employeeName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {dateLabels.join(" • ")}
+                            </p>
+                          </div>
                         </div>
                         <Button 
                           variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0"
+                          size="sm"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
                           onClick={() => removeEmployeeAssignmentMutation.mutate(empId)}
                           disabled={removeEmployeeAssignmentMutation.isPending}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     );
