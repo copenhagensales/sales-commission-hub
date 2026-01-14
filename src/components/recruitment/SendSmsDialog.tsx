@@ -18,7 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, MessageSquare, Send, ArrowDown } from "lucide-react";
+import { Loader2, MessageSquare, Send, Smile } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -185,6 +190,8 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
   const charCount = message.length;
   const smsCount = Math.ceil(charCount / 160) || 1;
 
+  const commonEmojis = ["😊", "👍", "🎉", "✨", "❤️", "🙏", "👋", "😄", "🔥", "💪", "✅", "📞", "📅", "⏰", "🎯", "💼"];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border max-w-md sm:max-w-lg h-[80vh] max-h-[700px] flex flex-col p-0">
@@ -264,14 +271,44 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
           )}
 
           <div className="flex gap-2">
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="bg-background border-border min-h-[60px] max-h-[120px] resize-none flex-1"
-              placeholder="Skriv besked..."
-              disabled={!candidate.phone}
-            />
+            <div className="flex-1 relative">
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="bg-background border-border min-h-[60px] max-h-[120px] resize-none pr-10"
+                placeholder="Skriv besked..."
+                disabled={!candidate.phone}
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 bottom-1 h-8 w-8 text-muted-foreground hover:text-foreground"
+                    disabled={!candidate.phone}
+                  >
+                    <Smile className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="end" side="top">
+                  <div className="grid grid-cols-8 gap-1">
+                    {commonEmojis.map((emoji) => (
+                      <Button
+                        key={emoji}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-lg hover:bg-muted"
+                        onClick={() => setMessage(prev => prev + emoji)}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
             <Button 
               onClick={handleSend} 
               disabled={sendSmsMutation.isPending || !message.trim() || !candidate.phone}
