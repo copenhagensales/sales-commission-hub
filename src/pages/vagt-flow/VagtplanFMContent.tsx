@@ -186,12 +186,69 @@ export default function VagtplanFMContent() {
     },
   });
 
-  // Helper to get work times from primary shift
-  const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
-    if (!primaryShiftsData || primaryShiftsData.shifts.length === 0) return null;
+  // Fetch employee special shift assignments (employee_standard_shifts)
+  const { data: employeeSpecialShifts } = useQuery({
+    queryKey: ["employee-special-shifts-fm"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select(`
+          employee_id,
+          shift_id,
+          team_standard_shifts (
+            id, hours_source, start_time, end_time
+          )
+        `);
+      if (error) throw error;
+      
+      // Get all unique shift IDs and fetch day configurations
+      const shiftIds = [...new Set(data?.map(d => d.shift_id) || [])];
+      let shiftDaysMap: Record<string, { day_of_week: number; start_time: string; end_time: string }[]> = {};
+      if (shiftIds.length > 0) {
+        const { data: days } = await supabase
+          .from("team_standard_shift_days")
+          .select("shift_id, day_of_week, start_time, end_time")
+          .in("shift_id", shiftIds);
+        // Group by shift_id
+        (days || []).forEach(d => {
+          if (!shiftDaysMap[d.shift_id]) shiftDaysMap[d.shift_id] = [];
+          shiftDaysMap[d.shift_id].push(d);
+        });
+      }
+      
+      return { assignments: data, shiftDays: shiftDaysMap };
+    },
+  });
 
+  // Helper to get work times from primary shift (respects special shift hierarchy)
+  const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
     const jsDay = getDay(date);
     const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+    // 1. FIRST: Check if employee has a special shift assigned
+    const specialShiftAssignment = employeeSpecialShifts?.assignments?.find(
+      s => s.employee_id === employeeId
+    );
+    if (specialShiftAssignment) {
+      const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
+      
+      // If special shift has NO days configured, employee gets 0 shifts ("Ingen vagter")
+      if (specialShiftDays.length === 0) {
+        return null;
+      }
+      
+      // Check if this day is configured for the special shift
+      const dayConfig = specialShiftDays.find(d => d.day_of_week === dbDayOfWeek);
+      if (dayConfig) {
+        return `${dayConfig.start_time.slice(0, 5)}-${dayConfig.end_time.slice(0, 5)}`;
+      }
+      
+      // Day not configured in special shift = no shift for this day
+      return null;
+    }
+
+    // 2. FALLBACK: Use team's primary shift
+    if (!primaryShiftsData || primaryShiftsData.shifts.length === 0) return null;
 
     const primaryShift = primaryShiftsData.shifts[0];
     if (!primaryShift) return null;
@@ -212,7 +269,7 @@ export default function VagtplanFMContent() {
     const start = primaryShift.start_time.slice(0, 5);
     const end = primaryShift.end_time.slice(0, 5);
     return `${start}-${end}`;
-  }, [primaryShiftsData]);
+  }, [primaryShiftsData, employeeSpecialShifts]);
 
   const getTimeStampForDate = (employeeId: string, date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
