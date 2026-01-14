@@ -303,11 +303,23 @@ export default function ShiftOverview() {
 
     // 1. FIRST: Check if employee has a special shift assigned
     const specialShiftAssignment = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
+    
+    // Debug for Martin
+    if (employeeId === 'e776fbc5-911c-41d8-8f5e-3a78e1e2ab6b') {
+      console.log('[DEBUG ShiftOverview] Martin check:', {
+        hasSpecialShift: !!specialShiftAssignment,
+        shiftId: specialShiftAssignment?.shift_id,
+        daysForShift: specialShiftAssignment ? employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] : null,
+        allAssignmentsCount: employeeSpecialShifts?.assignments?.length,
+      });
+    }
+    
     if (specialShiftAssignment) {
       const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
       
       // If special shift has NO days configured, employee gets 0 shifts
       if (specialShiftDays.length === 0) {
+        console.log('[DEBUG ShiftOverview] Returning null - no days configured for:', employeeId);
         return null;
       }
       

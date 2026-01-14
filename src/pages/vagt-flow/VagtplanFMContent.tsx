@@ -229,11 +229,23 @@ export default function VagtplanFMContent() {
     const specialShiftAssignment = employeeSpecialShifts?.assignments?.find(
       s => s.employee_id === employeeId
     );
+    
+    // Debug logging
+    if (employeeId === 'e776fbc5-911c-41d8-8f5e-3a78e1e2ab6b') {
+      console.log('[DEBUG FM] Martin check:', {
+        hasAssignment: !!specialShiftAssignment,
+        shiftId: specialShiftAssignment?.shift_id,
+        allAssignments: employeeSpecialShifts?.assignments?.length,
+        shiftDaysMap: employeeSpecialShifts?.shiftDays
+      });
+    }
+    
     if (specialShiftAssignment) {
       const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
       
       // If special shift has NO days configured, employee gets 0 shifts ("Ingen vagter")
       if (specialShiftDays.length === 0) {
+        console.log('[DEBUG FM] Returning null for employee with no days configured:', employeeId);
         return null;
       }
       
