@@ -184,6 +184,32 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         custom_end_at: period === "custom" ? customEndAt : null,
       });
       if (error) throw error;
+      
+      // Send SMS notification to opponent
+      try {
+        // Get challenger name
+        const { data: challenger } = await supabase
+          .from("employee_master_data")
+          .select("first_name, last_name")
+          .eq("id", currentEmployeeId)
+          .single();
+        
+        if (challenger) {
+          const periodText = period === "today" ? "i dag" 
+            : period === "week" ? "denne uge"
+            : period === "target" ? `først til ${targetCommission} kr`
+            : "brugerdefineret periode";
+          
+          const smsMessage = `⚔️ ${challenger.first_name} ${challenger.last_name} har udfordret dig til en H2H duel (${periodText})! Åbn appen for at svare.`;
+          
+          await supabase.functions.invoke("send-employee-sms", {
+            body: { targetEmployeeId: opponentId, message: smsMessage }
+          });
+        }
+      } catch (smsError) {
+        // SMS failed silently - challenge was still created successfully
+        console.log("Could not send SMS notification:", smsError);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
