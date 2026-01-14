@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -200,16 +200,41 @@ export function EditBookingDialog({
     enabled: open && employeeIds.length > 0,
   });
 
-  // Fetch current booking's assignments to check staffing
-  const { data: currentBookingAssignments = [] } = useQuery({
+  // Fetch current booking's assignments with employee names
+  const { data: currentBookingAssignments = [], refetch: refetchAssignments } = useQuery({
     queryKey: ["current-booking-assignments", booking?.id],
     queryFn: async () => {
       if (!booking?.id) return [];
       
       const { data, error } = await supabase
         .from("booking_assignment")
-        .select("id, employee_id, date")
-        .eq("booking_id", booking.id);
+        .select(`
+          id, employee_id, date,
+          employee:employee_id(id, full_name)
+        `)
+        .eq("booking_id", booking.id)
+        .order("date");
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!booking?.id,
+  });
+
+  // Fetch current vehicle assignments
+  const { data: currentVehicleAssignments = [], refetch: refetchVehicleAssignments } = useQuery({
+    queryKey: ["current-vehicle-assignments", booking?.id],
+    queryFn: async () => {
+      if (!booking?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("booking_vehicle")
+        .select(`
+          id, vehicle_id, date,
+          vehicle:vehicle_id(id, name, license_plate)
+        `)
+        .eq("booking_id", booking.id)
+        .order("date");
       
       if (error) throw error;
       return data || [];
@@ -476,6 +501,30 @@ export function EditBookingDialog({
     return missingDays;
   }, [booking?.booked_days, currentBookingAssignments, weekStart]);
 
+  // Group current assignments by employee for display
+  const groupedEmployeeAssignments = useMemo(() => {
+    const grouped: Record<string, { employee: any; dates: string[] }> = {};
+    currentBookingAssignments.forEach((a: any) => {
+      if (!grouped[a.employee_id]) {
+        grouped[a.employee_id] = { employee: a.employee, dates: [] };
+      }
+      grouped[a.employee_id].dates.push(a.date);
+    });
+    return grouped;
+  }, [currentBookingAssignments]);
+
+  // Group current vehicle assignments for display
+  const groupedVehicleAssignments = useMemo(() => {
+    const grouped: Record<string, { vehicle: any; dates: string[] }> = {};
+    currentVehicleAssignments.forEach((a: any) => {
+      if (!grouped[a.vehicle_id]) {
+        grouped[a.vehicle_id] = { vehicle: a.vehicle, dates: [] };
+      }
+      grouped[a.vehicle_id].dates.push(a.date);
+    });
+    return grouped;
+  }, [currentVehicleAssignments]);
+
   // Booking tab mutation
   const updateBookingMutation = useMutation({
     mutationFn: async (updates: {
@@ -496,6 +545,46 @@ export function EditBookingDialog({
     },
     onError: (error: any) => {
       toast.error("Fejl ved opdatering: " + error.message);
+    },
+  });
+
+  // Remove employee assignment mutation
+  const removeEmployeeAssignmentMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { error } = await supabase
+        .from("booking_assignment")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("employee_id", employeeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Medarbejder fjernet fra booking");
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved fjernelse: " + error.message);
+    },
+  });
+
+  // Remove vehicle assignment mutation
+  const removeVehicleAssignmentMutation = useMutation({
+    mutationFn: async (vehicleId: string) => {
+      const { error } = await supabase
+        .from("booking_vehicle")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("vehicle_id", vehicleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchVehicleAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Bil fjernet fra booking");
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved fjernelse: " + error.message);
     },
   });
 
@@ -715,11 +804,49 @@ export function EditBookingDialog({
           
           {/* Employees Tab */}
           <TabsContent value="employees" className="space-y-4 mt-4">
+            {/* Existing employee assignments */}
+            {Object.keys(groupedEmployeeAssignments).length > 0 && (
+              <div className="space-y-2 border-b pb-4">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  Tilknyttede medarbejdere ({currentBookingAssignments.length} vagter)
+                </p>
+                <div className="grid gap-1">
+                  {Object.entries(groupedEmployeeAssignments).map(([empId, { employee, dates }]) => {
+                    const dateLabels = dates.map((d: string) => {
+                      const dayIndex = Math.floor((parseISO(d).getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+                      return `${DAY_NAMES[dayIndex]?.slice(0, 3) || '?'} ${format(parseISO(d), "d/M")}`;
+                    });
+                    return (
+                      <div key={empId} className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 rounded-md px-3 py-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Check className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="font-medium">{(employee as any)?.full_name || "Ukendt"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {dateLabels.join(", ")}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0"
+                          onClick={() => removeEmployeeAssignmentMutation.mutate(empId)}
+                          disabled={removeEmployeeAssignmentMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <p className="text-sm font-medium">
-                Medarbejdere {selectedEmployees.filter(e => e !== null).length > 0 && (
+                Tilføj medarbejdere {selectedEmployees.filter(e => e !== null).length > 0 && (
                   <span className="font-normal text-muted-foreground">
-                    {selectedEmployees.filter(e => e !== null).length} valgt
+                    ({selectedEmployees.filter(e => e !== null).length} valgt)
                   </span>
                 )}
               </p>
@@ -902,6 +1029,24 @@ export function EditBookingDialog({
               </div>
             </div>
 
+            {/* Summary of what will be added */}
+            {selectedEmployees.some(e => e !== null) && selectedEmployeeDays.size > 0 && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <p className="text-sm font-medium">Du er ved at tilføje:</p>
+                <ul className="mt-1 text-sm text-muted-foreground">
+                  {selectedEmployees.filter((e): e is string => e !== null).map(empId => {
+                    const emp = employees.find(e => e.id === empId);
+                    const validDays = Array.from(selectedEmployeeDays)
+                      .filter(d => hasShiftOnDay(empId, d) && isDayInBookingRange(d))
+                      .map(d => DAY_NAMES[d]);
+                    return validDays.length > 0 ? (
+                      <li key={empId}>• {emp?.full_name}: {validDays.join(", ")}</li>
+                    ) : null;
+                  })}
+                </ul>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 onClick={handleAddEmployees}
@@ -915,8 +1060,46 @@ export function EditBookingDialog({
           
           {/* Vehicles Tab */}
           <TabsContent value="vehicles" className="space-y-4 mt-4">
+            {/* Existing vehicle assignments */}
+            {Object.keys(groupedVehicleAssignments).length > 0 && (
+              <div className="space-y-2 border-b pb-4">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-600" />
+                  Tilknyttede biler ({currentVehicleAssignments.length} dage)
+                </p>
+                <div className="grid gap-1">
+                  {Object.entries(groupedVehicleAssignments).map(([vehId, { vehicle, dates }]) => {
+                    const dateLabels = dates.map((d: string) => {
+                      const dayIndex = Math.floor((parseISO(d).getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+                      return `${DAY_NAMES[dayIndex]?.slice(0, 3) || '?'} ${format(parseISO(d), "d/M")}`;
+                    });
+                    return (
+                      <div key={vehId} className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 rounded-md px-3 py-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Car className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="font-medium">{(vehicle as any)?.name || "Ukendt"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({(vehicle as any)?.license_plate}) • {dateLabels.join(", ")}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0"
+                          onClick={() => removeVehicleAssignmentMutation.mutate(vehId)}
+                          disabled={removeVehicleAssignmentMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <p className="text-sm font-medium">Vælg bil</p>
+              <p className="text-sm font-medium">Tilføj bil</p>
               <Select
                 value={selectedVehicle || ""}
                 onValueChange={setSelectedVehicle}
@@ -967,6 +1150,16 @@ export function EditBookingDialog({
                 })}
               </div>
             </div>
+
+            {/* Summary of what will be added */}
+            {selectedVehicle && selectedVehicleDays.size > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Du er ved at tilføje:</p>
+                <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                  • {vehicles.find(v => v.id === selectedVehicle)?.name}: {Array.from(selectedVehicleDays).filter(d => isDayInBookingRange(d)).map(d => DAY_NAMES[d]).join(", ")}
+                </p>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button
