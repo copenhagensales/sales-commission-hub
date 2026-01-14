@@ -221,6 +221,7 @@ export default function VagtplanFMContent() {
   });
 
   // Helper to get work times from primary shift (respects special shift hierarchy)
+  // Returns: string (work times) or null (no shift for this day/employee)
   const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
     const jsDay = getDay(date);
     const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
@@ -230,22 +231,11 @@ export default function VagtplanFMContent() {
       s => s.employee_id === employeeId
     );
     
-    // Debug logging
-    if (employeeId === 'e776fbc5-911c-41d8-8f5e-3a78e1e2ab6b') {
-      console.log('[DEBUG FM] Martin check:', {
-        hasAssignment: !!specialShiftAssignment,
-        shiftId: specialShiftAssignment?.shift_id,
-        allAssignments: employeeSpecialShifts?.assignments?.length,
-        shiftDaysMap: employeeSpecialShifts?.shiftDays
-      });
-    }
-    
     if (specialShiftAssignment) {
       const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
       
-      // If special shift has NO days configured, employee gets 0 shifts ("Ingen vagter")
+      // If special shift has NO days configured, employee gets 0 shifts ("Ingen vagter") - NO FALLBACK
       if (specialShiftDays.length === 0) {
-        console.log('[DEBUG FM] Returning null for employee with no days configured:', employeeId);
         return null;
       }
       
@@ -259,7 +249,7 @@ export default function VagtplanFMContent() {
       return null;
     }
 
-    // 2. FALLBACK: Use team's primary shift
+    // 2. FALLBACK: Use team's primary shift (only when no special shift assigned)
     if (!primaryShiftsData || primaryShiftsData.shifts.length === 0) return null;
 
     const primaryShift = primaryShiftsData.shifts[0];
