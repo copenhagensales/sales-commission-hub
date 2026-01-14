@@ -12,8 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Trash2, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
@@ -28,7 +34,7 @@ const CONDITION_OPTIONS: Record<string, string[]> = {
 interface PricingRule {
   id: string;
   product_id: string;
-  campaign_mapping_id: string | null;
+  campaign_mapping_ids: string[] | null;
   conditions: Record<string, string>;
   commission_dkk: number;
   revenue_dkk: number;
@@ -65,9 +71,10 @@ export function PricingRuleEditor({
 }: PricingRuleEditorProps) {
   const [name, setName] = useState(existingRule?.name || "");
   const [priority, setPriority] = useState(existingRule?.priority || 0);
-  const [campaignMappingId, setCampaignMappingId] = useState<string | null>(
-    existingRule?.campaign_mapping_id || null
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(
+    existingRule?.campaign_mapping_ids || []
   );
+  const [campaignsOpen, setCampaignsOpen] = useState(false);
   const [conditions, setConditions] = useState<Record<string, string>>(
     existingRule?.conditions || {}
   );
@@ -85,11 +92,27 @@ export function PricingRuleEditor({
     (key) => !usedKeys.includes(key)
   );
 
+  const toggleCampaign = (campaignId: string) => {
+    setSelectedCampaignIds((prev) =>
+      prev.includes(campaignId)
+        ? prev.filter((id) => id !== campaignId)
+        : [...prev, campaignId]
+    );
+  };
+
+  const selectAllCampaigns = () => {
+    setSelectedCampaignIds(campaigns.map((c) => c.id));
+  };
+
+  const clearAllCampaigns = () => {
+    setSelectedCampaignIds([]);
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const ruleData = {
         product_id: productId,
-        campaign_mapping_id: campaignMappingId,
+        campaign_mapping_ids: selectedCampaignIds.length > 0 ? selectedCampaignIds : null,
         conditions,
         commission_dkk: parseFloat(commission) || 0,
         revenue_dkk: parseFloat(revenue) || 0,
@@ -178,29 +201,70 @@ export function PricingRuleEditor({
         </div>
       </div>
 
-      {/* Campaign selection */}
+      {/* Campaign selection - Multi-select */}
       <div className="space-y-2">
-        <Label>Kampagne (valgfri)</Label>
-        <Select
-          value={campaignMappingId || "all"}
-          onValueChange={(value) =>
-            setCampaignMappingId(value === "all" ? null : value)
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Vælg kampagne" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle kampagner</SelectItem>
-            {campaigns.map((campaign) => (
-              <SelectItem key={campaign.id} value={campaign.id}>
-                {campaign.adversus_campaign_name || "Unavngivet"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Kampagner (valgfri)</Label>
+        <Collapsible open={campaignsOpen} onOpenChange={setCampaignsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-full justify-between font-normal"
+            >
+              <span>
+                {selectedCampaignIds.length === 0
+                  ? "Alle kampagner"
+                  : selectedCampaignIds.length === 1
+                    ? campaigns.find((c) => c.id === selectedCampaignIds[0])
+                        ?.adversus_campaign_name || "1 kampagne valgt"
+                    : `${selectedCampaignIds.length} kampagner valgt`}
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${campaignsOpen ? "rotate-180" : ""}`}
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
+              <div className="flex gap-2 pb-2 border-b">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAllCampaigns}
+                  className="text-xs"
+                >
+                  Vælg alle
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllCampaigns}
+                  className="text-xs"
+                >
+                  Ryd valg
+                </Button>
+              </div>
+              {campaigns.map((campaign) => (
+                <div
+                  key={campaign.id}
+                  className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded cursor-pointer"
+                  onClick={() => toggleCampaign(campaign.id)}
+                >
+                  <Checkbox
+                    checked={selectedCampaignIds.includes(campaign.id)}
+                    onCheckedChange={() => toggleCampaign(campaign.id)}
+                  />
+                  <span className="text-sm">
+                    {campaign.adversus_campaign_name || "Unavngivet"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
         <p className="text-xs text-muted-foreground">
-          Lad stå på "Alle kampagner" hvis reglen skal gælde uanset kampagne
+          Vælg ingen for at reglen gælder alle kampagner
         </p>
       </div>
 
