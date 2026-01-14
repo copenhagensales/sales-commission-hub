@@ -65,7 +65,7 @@ export function EmployeeCommissionHistory({
         .from("team_standard_shifts")
         .select("id, start_time, end_time, hours_source")
         .eq("team_id", teamMembership!.team_id)
-        .eq("is_primary", true)
+        .eq("is_active", true)
         .single();
       
       if (!shift) return null;

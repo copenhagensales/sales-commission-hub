@@ -7493,7 +7493,7 @@ export type Database = {
           end_time: string
           hours_source: string
           id: string
-          is_primary: boolean
+          is_active: boolean
           name: string
           start_time: string
           team_id: string
@@ -7504,7 +7504,7 @@ export type Database = {
           end_time: string
           hours_source?: string
           id?: string
-          is_primary?: boolean
+          is_active?: boolean
           name: string
           start_time: string
           team_id: string
@@ -7515,7 +7515,7 @@ export type Database = {
           end_time?: string
           hours_source?: string
           id?: string
-          is_primary?: boolean
+          is_active?: boolean
           name?: string
           start_time?: string
           team_id?: string

@@ -19,7 +19,7 @@ interface StandardShift {
   name: string;
   start_time: string;
   end_time: string;
-  is_primary: boolean;
+  is_active: boolean;
   hours_source: 'timestamp' | 'shift';
 }
 
@@ -489,12 +489,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     },
   });
 
-  // Toggle primary mutation - allows multiple primaries, special shifts override for assigned employees
-  const togglePrimaryMutation = useMutation({
-    mutationFn: async ({ shiftId, isPrimary }: { shiftId: string; isPrimary: boolean }) => {
+  // Toggle active mutation - allows multiple active shifts, special shifts override for assigned employees
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ shiftId, isActive }: { shiftId: string; isActive: boolean }) => {
       const { error } = await supabase
         .from("team_standard_shifts")
-        .update({ is_primary: isPrimary })
+        .update({ is_active: isActive })
         .eq("id", shiftId);
       if (error) throw error;
     },
@@ -777,7 +777,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs w-16">Primær</TableHead>
+                <TableHead className="text-xs w-16">Aktiv</TableHead>
                 <TableHead className="text-xs">Navn</TableHead>
                 <TableHead className="text-xs">Tilknyttede</TableHead>
                 <TableHead className="text-xs">Dage</TableHead>
@@ -817,17 +817,16 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     <TableCell>
                       <div className="flex items-center justify-center">
                         <Checkbox
-                          checked={shift.is_primary}
+                          checked={shift.is_active}
                           onCheckedChange={(checked) => 
-                            togglePrimaryMutation.mutate({ shiftId: shift.id, isPrimary: !!checked })
+                            toggleActiveMutation.mutate({ shiftId: shift.id, isActive: !!checked })
                           }
-                          disabled={togglePrimaryMutation.isPending}
+                          disabled={toggleActiveMutation.isPending}
                         />
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-1.5">
-                        {shift.is_primary && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
                         {shiftEmployees.length > 0 && <Users className="h-3.5 w-3.5 text-blue-500" />}
                         {shift.name}
                       </div>
@@ -851,8 +850,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                      ) : shift.is_primary ? (
-                        <span className="text-muted-foreground text-xs">Alle (primær)</span>
+                      ) : shift.is_active ? (
+                        <span className="text-muted-foreground text-xs">Alle aktive</span>
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}

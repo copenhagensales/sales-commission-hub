@@ -94,7 +94,7 @@ export function MissingShiftsAlert({
       const { data: shiftsData, error } = await supabase
         .from("team_standard_shifts" as any)
         .select("id, team_id, start_time, end_time")
-        .eq("is_primary", true);
+        .eq("is_active", true);
       if (error) throw error;
       if (!shiftsData || shiftsData.length === 0) return { shifts: [] as { id: string; team_id: string; start_time: string; end_time: string }[], days: [] as { shift_id: string; day_of_week: number; start_time: string; end_time: string }[] };
 

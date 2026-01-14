@@ -39,7 +39,7 @@ interface StandardShift {
   name: string;
   start_time: string;
   end_time: string;
-  is_primary: boolean;
+  is_active: boolean;
 }
 
 interface StandardShiftDay {
@@ -83,7 +83,7 @@ function usePrimaryStandardShift(teamId: string | null | undefined) {
         .from("team_standard_shifts")
         .select("*")
         .eq("team_id", teamId)
-        .eq("is_primary", true)
+        .eq("is_active", true)
         .order("created_at", { ascending: true })
         .limit(1);
       
@@ -161,7 +161,7 @@ function useEmployeeWorkDays(employeeId: string | undefined) {
           .from("team_standard_shifts")
           .select("id")
           .eq("team_id", teamId)
-          .eq("is_primary", true)
+          .eq("is_active", true)
           .limit(1);
         
         if (primaryShift?.[0]?.id) {

@@ -639,10 +639,10 @@ async function testNormalShifts(start: Date, end: Date, employeeId?: string): Pr
       .select("employee_id, team_id")
       .in("employee_id", employeeIds),
     
-    // 4. Team standard shifts (primary shifts)
+    // 4. Team standard shifts (active shifts)
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary"),
+      .select("id, team_id, is_active"),
     
     // 5. Team standard shift days (day_of_week per shift)
     supabase
@@ -676,11 +676,11 @@ async function testNormalShifts(start: Date, end: Date, employeeId?: string): Pr
     shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
   });
 
-  // Build team -> primary shift_id map
-  const teamPrimaryShiftMap = new Map<string, string>();
+  // Build team -> active shift_id map
+  const teamActiveShiftMap = new Map<string, string>();
   teamStandardShifts.forEach(s => {
-    if (s.is_primary) {
-      teamPrimaryShiftMap.set(s.team_id, s.id);
+    if (s.is_active) {
+      teamActiveShiftMap.set(s.team_id, s.id);
     }
   });
 
@@ -738,8 +738,8 @@ async function testNormalShifts(start: Date, end: Date, employeeId?: string): Pr
     const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
     
     // Team primary shift days
-    const teamPrimaryShiftId = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
-    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+    const teamActiveShiftId = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+    const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
 
     for (const dateStr of dates) {
       // Check absence first
@@ -855,10 +855,10 @@ async function testSickDays(start: Date, end: Date, employeeId?: string): Promis
       .select("employee_id, team_id")
       .in("employee_id", employeeIds),
     
-    // 4. Team standard shifts (primary shifts)
+    // 4. Team standard shifts (active shifts)
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary"),
+      .select("id, team_id, is_active"),
     
     // 5. Team standard shift days
     supabase
@@ -892,11 +892,11 @@ async function testSickDays(start: Date, end: Date, employeeId?: string): Promis
     shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
   });
 
-  // Build team -> primary shift_id map
-  const teamPrimaryShiftMap = new Map<string, string>();
+  // Build team -> active shift_id map
+  const teamActiveShiftMap = new Map<string, string>();
   teamStandardShifts.forEach(s => {
-    if (s.is_primary) {
-      teamPrimaryShiftMap.set(s.team_id, s.id);
+    if (s.is_active) {
+      teamActiveShiftMap.set(s.team_id, s.id);
     }
   });
 
@@ -950,8 +950,8 @@ async function testSickDays(start: Date, end: Date, employeeId?: string): Promis
     const empShiftId = employeeShiftIdMap.get(empId);
     const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
     
-    const teamPrimaryShiftId = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
-    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+    const teamActiveShiftId = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+    const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
 
     for (const dateStr of dates) {
       // Only count if employee was sick on this date
@@ -1063,10 +1063,10 @@ async function testVacationDays(start: Date, end: Date, employeeId?: string): Pr
       .select("employee_id, team_id")
       .in("employee_id", employeeIds),
     
-    // 4. Team standard shifts (primary shifts)
+    // 4. Team standard shifts (active shifts)
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary, created_at"),
+      .select("id, team_id, is_active, created_at"),
     
     // 5. Team standard shift days
     supabase
@@ -1100,14 +1100,14 @@ async function testVacationDays(start: Date, end: Date, employeeId?: string): Pr
     shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
   });
 
-  // Build team -> primary shift_id map (use oldest primary shift per team)
+  // Build team -> active shift_id map (use oldest active shift per team)
   const sortedTeamStandardShifts = [...teamStandardShifts].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
-  const teamPrimaryShiftMap = new Map<string, string>();
+  const teamActiveShiftMap = new Map<string, string>();
   sortedTeamStandardShifts.forEach(s => {
-    if (s.is_primary && !teamPrimaryShiftMap.has(s.team_id)) {
-      teamPrimaryShiftMap.set(s.team_id, s.id);
+    if (s.is_active && !teamActiveShiftMap.has(s.team_id)) {
+      teamActiveShiftMap.set(s.team_id, s.id);
     }
   });
 
@@ -1161,8 +1161,8 @@ async function testVacationDays(start: Date, end: Date, employeeId?: string): Pr
     const empShiftId = employeeShiftIdMap.get(empId);
     const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
     
-    const teamPrimaryShiftId = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
-    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+    const teamActiveShiftId = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+    const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
 
     for (const dateStr of dates) {
       // Only count if employee has vacation on this date
@@ -1278,10 +1278,10 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
       .select("employee_id, team_id")
       .in("employee_id", employeeIds),
     
-    // 4. Team standard shifts (primary shifts)
+    // 4. Team standard shifts (active shifts)
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary, created_at"),
+      .select("id, team_id, is_active, created_at"),
     
     // 5. Team standard shift days
     supabase
@@ -1315,14 +1315,14 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
     shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
   });
 
-  // Build team -> primary shift_id map (use oldest primary shift per team)
+  // Build team -> active shift_id map (use oldest active shift per team)
   const sortedTeamStandardShifts = [...teamStandardShifts].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
-  const teamPrimaryShiftMap = new Map<string, string>();
+  const teamActiveShiftMap = new Map<string, string>();
   sortedTeamStandardShifts.forEach(s => {
-    if (s.is_primary && !teamPrimaryShiftMap.has(s.team_id)) {
-      teamPrimaryShiftMap.set(s.team_id, s.id);
+    if (s.is_active && !teamActiveShiftMap.has(s.team_id)) {
+      teamActiveShiftMap.set(s.team_id, s.id);
     }
   });
 
@@ -1380,8 +1380,8 @@ async function testAllShiftTypes(start: Date, end: Date, employeeId?: string): P
     const empShiftId = employeeShiftIdMap.get(empId);
     const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
     
-    const teamPrimaryShiftId = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
-    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+    const teamActiveShiftId = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+    const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
 
     for (const dateStr of dates) {
       const dayOfWeek = new Date(dateStr).getDay();
@@ -1667,7 +1667,7 @@ async function calculateHoursByType(start: Date, end: Date, employeeId?: string)
     // 4. Team standard shifts with hours_source and times
     supabase
       .from("team_standard_shifts")
-      .select("id, team_id, is_primary, hours_source, start_time, end_time, created_at"),
+      .select("id, team_id, is_active, hours_source, start_time, end_time, created_at"),
     
     // 5. Team standard shift days with times
     supabase
@@ -1714,14 +1714,14 @@ async function calculateHoursByType(start: Date, end: Date, employeeId?: string)
     });
   });
 
-  // Build team -> primary shift map (use oldest primary shift per team)
+  // Build team -> active shift map (use oldest active shift per team)
   const sortedTeamStandardShifts = [...teamStandardShifts].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
-  const teamPrimaryShiftMap = new Map<string, typeof teamStandardShifts[0]>();
+  const teamActiveShiftMap = new Map<string, typeof teamStandardShifts[0]>();
   sortedTeamStandardShifts.forEach(s => {
-    if (s.is_primary && !teamPrimaryShiftMap.has(s.team_id)) {
-      teamPrimaryShiftMap.set(s.team_id, s);
+    if (s.is_active && !teamActiveShiftMap.has(s.team_id)) {
+      teamActiveShiftMap.set(s.team_id, s);
     }
   });
 
@@ -1790,12 +1790,12 @@ async function calculateHoursByType(start: Date, end: Date, employeeId?: string)
     const empStandardShift = empShiftId ? shiftDetailsMap.get(empShiftId) : undefined;
     const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
     
-    const teamPrimaryShift = teamId ? teamPrimaryShiftMap.get(teamId) : undefined;
-    const teamPrimaryShiftId = teamPrimaryShift?.id;
-    const teamDays = teamPrimaryShiftId ? shiftDaysMap.get(teamPrimaryShiftId) : undefined;
+    const teamActiveShift = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+    const teamActiveShiftId = teamActiveShift?.id;
+    const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
 
     // Determine hours_source: employee special shift → team primary shift → default 'shift'
-    const hoursSource = empStandardShift?.hours_source || teamPrimaryShift?.hours_source || 'shift';
+    const hoursSource = empStandardShift?.hours_source || teamActiveShift?.hours_source || 'shift';
 
     for (const dateStr of dates) {
       const dayOfWeek = new Date(dateStr).getDay();
@@ -1859,8 +1859,8 @@ async function calculateHoursByType(start: Date, end: Date, employeeId?: string)
             }
           } else {
             // Use day-specific times or fallback to team shift default times
-            const startTime = dayConfig.start_time || teamPrimaryShift?.start_time;
-            const endTime = dayConfig.end_time || teamPrimaryShift?.end_time;
+            const startTime = dayConfig.start_time || teamActiveShift?.start_time;
+            const endTime = dayConfig.end_time || teamActiveShift?.end_time;
             if (startTime && endTime) {
               shiftHours = calculateHoursFromTimes(startTime, endTime, null);
             }
