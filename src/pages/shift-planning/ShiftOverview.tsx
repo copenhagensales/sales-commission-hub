@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle, Timer, CalendarX2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX, Eye, EyeOff, AlertTriangle, Timer, CalendarX2, Umbrella } from "lucide-react";
 import { MissingShiftsAlert } from "@/components/shift-planning/MissingShiftsAlert";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, useUpdateShift, useDeleteShift, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
+import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, usePendingVacationRequests, useUpdateShift, useDeleteShift, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
@@ -93,6 +93,10 @@ export default function ShiftOverview() {
   const { data: employees } = useEmployeesForShifts(selectedDepartment);
   const { data: holidays } = useDanishHolidays(currentDate.getFullYear());
   const { data: absences } = useAbsencesForDateRange(
+    format(weekStart, "yyyy-MM-dd"),
+    format(weekEnd, "yyyy-MM-dd")
+  );
+  const { data: pendingVacations } = usePendingVacationRequests(
     format(weekStart, "yyyy-MM-dd"),
     format(weekEnd, "yyyy-MM-dd")
   );
@@ -403,6 +407,16 @@ export default function ShiftOverview() {
     
     return !hasTimestamp;
   }, [weeklySales, agentMappings, shifts, timeStamps, getWorkTimesForEmployeeAndDay]);
+
+  // Check if employee has pending vacation request for a specific date
+  const hasPendingVacationForDate = useCallback((employeeId: string, date: Date): boolean => {
+    if (!pendingVacations) return false;
+    const dateStr = format(date, "yyyy-MM-dd");
+    return pendingVacations.some(pv => {
+      if (pv.employee_id !== employeeId) return false;
+      return dateStr >= pv.start_date && dateStr <= pv.end_date;
+    });
+  }, [pendingVacations]);
 
   // Mutation to create absence
   const createAbsence = useMutation({
@@ -1209,6 +1223,9 @@ export default function ShiftOverview() {
             <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
               <CalendarX2 className="h-3 w-3" /> Fridag
             </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+              <Umbrella className="h-3 w-3" /> Afventer ferie
+            </span>
             <span className="text-muted-foreground/70 ml-auto">Klik på celle for handlinger</span>
           </div>
         </div>
@@ -1330,6 +1347,7 @@ export default function ShiftOverview() {
                     
                     // Missing shift detection (has sales but no shift/timestamp)
                     const isMissingShift = !hasShift && !timeStamp && hasMissingShiftForDate(employee.id, day);
+                    const hasPendingVacation = hasPendingVacationForDate(employee.id, day);
                     
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);
@@ -1367,6 +1385,15 @@ export default function ShiftOverview() {
                               <div className="absolute top-1 right-1">
                                 <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40">
                                   <Coins className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Pending vacation request indicator */}
+                            {hasPendingVacation && !isVacation && (
+                              <div className={cn("absolute top-1", bonusPaid ? "right-7" : "right-1")}>
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40" title="Afventer ferieansøgning">
+                                  <Umbrella className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                 </span>
                               </div>
                             )}
