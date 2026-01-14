@@ -293,7 +293,11 @@ export default function ShiftOverview() {
     },
   });
 
+  // Sentinel value to indicate "no special shift assigned - fallback allowed"
+  const NO_SPECIAL_SHIFT = "__NO_SPECIAL_SHIFT__";
+
   // Helper to get work times from primary shift or special shift
+  // Returns: string (work times), null (special shift with no work), or NO_SPECIAL_SHIFT (allow fallback)
   const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
     if (!teamMemberships || !primaryShiftsData) return null;
 
@@ -304,22 +308,11 @@ export default function ShiftOverview() {
     // 1. FIRST: Check if employee has a special shift assigned
     const specialShiftAssignment = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
     
-    // Debug for Martin
-    if (employeeId === 'e776fbc5-911c-41d8-8f5e-3a78e1e2ab6b') {
-      console.log('[DEBUG ShiftOverview] Martin check:', {
-        hasSpecialShift: !!specialShiftAssignment,
-        shiftId: specialShiftAssignment?.shift_id,
-        daysForShift: specialShiftAssignment ? employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] : null,
-        allAssignmentsCount: employeeSpecialShifts?.assignments?.length,
-      });
-    }
-    
     if (specialShiftAssignment) {
       const specialShiftDays = employeeSpecialShifts?.shiftDays?.[specialShiftAssignment.shift_id] || [];
       
-      // If special shift has NO days configured, employee gets 0 shifts
+      // If special shift has NO days configured, employee gets 0 shifts - NO FALLBACK ALLOWED
       if (specialShiftDays.length === 0) {
-        console.log('[DEBUG ShiftOverview] Returning null - no days configured for:', employeeId);
         return null;
       }
       
@@ -337,11 +330,11 @@ export default function ShiftOverview() {
 
     // 2. FALLBACK: Use team's primary shift
     const membership = teamMemberships.find(m => m.employee_id === employeeId);
-    if (!membership) return null;
+    if (!membership) return NO_SPECIAL_SHIFT;
 
     // Find primary shift for team
     const primaryShift = primaryShiftsData.shifts.find(s => s.team_id === membership.team_id);
-    if (!primaryShift) return null;
+    if (!primaryShift) return NO_SPECIAL_SHIFT;
 
     // Check for day-specific times in primary shift
     const dayConfig = primaryShiftsData.days.find(
@@ -357,7 +350,7 @@ export default function ShiftOverview() {
     // For weekend days: only show time if there's explicit configuration
     const isWeekend = dbDayOfWeek === 6 || dbDayOfWeek === 7;
     if (isWeekend) {
-      return null; // No fallback for weekends
+      return NO_SPECIAL_SHIFT; // No fallback for weekends
     }
 
     // Fallback to main shift times only for weekdays
@@ -1348,8 +1341,12 @@ export default function ShiftOverview() {
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const isActive = isEmployeeActiveOnDate(employee.id, day);
                     const isDayWeekend = day.getDay() === 0 || day.getDay() === 6;
+                    const rawWorkTimes = getWorkTimesForEmployeeAndDay(employee.id, day);
+                    // Only use employee.standard_start_time fallback if NO special shift is assigned
                     const workTimes = isActive 
-                      ? (getWorkTimesForEmployeeAndDay(employee.id, day) || (isDayWeekend ? null : employee.standard_start_time)) 
+                      ? (rawWorkTimes === NO_SPECIAL_SHIFT 
+                          ? (isDayWeekend ? null : employee.standard_start_time)
+                          : rawWorkTimes)
                       : null;
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
