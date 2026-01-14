@@ -2,6 +2,27 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale } from "../types.ts"
 import { chunk } from "../utils/batch.ts"
 
+/**
+ * List of email domains that should be excluded from syncing.
+ * These are internal/partner accounts that shouldn't be visible to users.
+ */
+const EXCLUDED_EMAIL_DOMAINS = [
+  "@relatel.dk",
+  "@ps-marketing.dk",
+  "@finansforbundet.dk",
+  "@straightlineagency.dk",
+  "@staightlineagency.dk",
+  "@tele-part.dk",
+  "@aogtil.dk",
+  "@ase.dk",
+];
+
+function isExcludedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const emailLower = email.toLowerCase();
+  return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+}
+
 async function ensureCampaignMappings(
   supabase: SupabaseClient,
   sales: StandardSale[],
@@ -246,23 +267,33 @@ export async function processSales(
   const dedupedSales = Array.from(byExternalId.values())
   if (dedupedSales.length === 0) return { processed: 0, errors: 0 }
 
-  const sampleSale = dedupedSales[0]
+  // Filter out sales from excluded email domains
+  const filteredSales = dedupedSales.filter(s => !isExcludedEmail(s.agentEmail))
+  const skippedByDomain = dedupedSales.length - filteredSales.length
+  
+  if (skippedByDomain > 0) {
+    log("INFO", `Skipped ${skippedByDomain} sales from excluded email domains`)
+  }
+  
+  if (filteredSales.length === 0) return { processed: 0, errors: 0, skipped: skippedByDomain }
+
+  const sampleSale = filteredSales[0]
   log(
     "INFO",
-    `Procesando ${dedupedSales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`
+    `Procesando ${filteredSales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`
   )
   if (duplicates > 0) {
     log("WARN", `Detectados ${duplicates} external_id duplicados (deduplicados antes de upsert).`)
   }
 
-  await ensureCampaignMappings(supabase, dedupedSales, log)
+  await ensureCampaignMappings(supabase, filteredSales, log)
   const { data: dbProducts } = await supabase.from("products").select("id, name, commission_dkk, revenue_dkk")
   const { data: dbMappings } = await supabase.from("adversus_product_mappings").select("*")
   const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]))
   const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]))
   let totalProcessed = 0
   let totalErrors = 0
-  const batches = chunk(dedupedSales, batchSize)
+  const batches = chunk(filteredSales, batchSize)
   const totalBatches = batches.length
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]
@@ -279,9 +310,8 @@ export async function processSales(
     totalErrors += errors
     log(
       "INFO",
-      `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${dedupedSales.length}`
+      `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${filteredSales.length}`
     )
   }
-  return { processed: totalProcessed, errors: totalErrors }
   return { processed: totalProcessed, errors: totalErrors }
 }
