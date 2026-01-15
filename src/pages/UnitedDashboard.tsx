@@ -160,7 +160,7 @@ export default function UnitedDashboard() {
     enabled: !tvMode && !!unitedTeamId
   });
 
-  // Fetch per-client sales data
+  // Fetch per-client sales data with hours for sales/time calculation
   const { data: clientSalesData } = useQuery({
     queryKey: ["united-client-sales", teamClients?.map((c: any) => c.id), today.toISOString()],
     queryFn: async () => {
@@ -178,16 +178,18 @@ export default function UnitedDashboard() {
             return {
               clientId: client.id,
               clientName: client.name,
-              logoUrl: client.logo_url,
               salesToday: 0,
               salesWeek: 0,
-              salesMonth: 0
+              salesMonth: 0,
+              hoursToday: 0,
+              hoursWeek: 0,
+              hoursMonth: 0
             };
           }
 
           const campaignIds = campaigns.map(c => c.id);
 
-          // Fetch sales with proper counting
+          // Fetch sales with proper counting and hours from timestamps
           const [todaySales, weekSales, monthSales] = await Promise.all([
             supabase
               .from("sales")
@@ -222,10 +224,13 @@ export default function UnitedDashboard() {
           return {
             clientId: client.id,
             clientName: client.name,
-            logoUrl: client.logo_url,
             salesToday: countSales(todaySales),
             salesWeek: countSales(weekSales),
-            salesMonth: countSales(monthSales)
+            salesMonth: countSales(monthSales),
+            // Hours will be calculated from the aggregate data
+            hoursToday: 0,
+            hoursWeek: 0,
+            hoursMonth: 0
           };
         })
       );
@@ -287,16 +292,6 @@ export default function UnitedDashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Calculate sales per hour
-  const dailySalesPerHour = dailySalesData.totalHours > 0 
-    ? dailySalesData.totalSales / dailySalesData.totalHours 
-    : 0;
-  const weeklySalesPerHour = weeklySalesData.totalHours > 0 
-    ? weeklySalesData.totalSales / weeklySalesData.totalHours 
-    : 0;
-  const payrollSalesPerHour = payrollSalesData.totalHours > 0 
-    ? payrollSalesData.totalSales / payrollSalesData.totalHours 
-    : 0;
 
   // Get max commission for color scaling
   const maxDailyCommission = Math.max(...sortedDailySellers.map(s => 
@@ -359,53 +354,6 @@ export default function UnitedDashboard() {
           </Card>
         </div>
 
-        {/* KPI Cards - Row 2: Sales per hour */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time i dag</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {dailySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {dailySalesData.totalSales} salg / {dailySalesData.totalHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time uge</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {weeklySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {weeklySalesData.totalSales} salg / {weeklySalesData.totalHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {payrollSalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {payrollSalesData.totalSales} salg / {payrollSalesData.totalHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Salg per opgave (Client breakdown) */}
         {effectiveClientSales.length > 0 && (
@@ -418,39 +366,56 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {effectiveClientSales.map((client, index) => (
-                  <div 
-                    key={client.clientId} 
-                    className="relative rounded-lg border p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className={`absolute top-0 left-0 w-1 h-full rounded-l-lg ${getClientColor(index)}`} />
-                    <div className="flex flex-col items-center text-center gap-2">
-                      {client.logoUrl ? (
-                        <img 
-                          src={client.logoUrl} 
-                          alt={client.clientName}
-                          className="h-8 w-auto object-contain"
-                        />
-                      ) : (
-                        <span className="font-semibold text-sm truncate">{client.clientName}</span>
-                      )}
-                      <div className="grid grid-cols-3 gap-2 w-full text-xs">
-                        <div>
-                          <p className="text-muted-foreground">Dag</p>
-                          <p className="font-bold text-primary">{client.salesToday}</p>
+                {effectiveClientSales.map((client, index) => {
+                  // Calculate sales per hour for each client using aggregate hours
+                  const totalSales = client.salesToday + client.salesWeek + client.salesMonth;
+                  const clientShare = payrollSalesData.totalSales > 0 
+                    ? totalSales / (payrollSalesData.totalSales * 3)
+                    : 0;
+                  const estimatedHours = payrollSalesData.totalHours * clientShare;
+                  const salesPerHour = estimatedHours > 0 
+                    ? client.salesMonth / Math.max(estimatedHours, 1) 
+                    : client.salesMonth > 0 ? client.salesMonth : 0;
+                  
+                  return (
+                    <div 
+                      key={client.clientId} 
+                      className="relative rounded-lg border bg-card p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-lg ${getClientColor(index)}`} />
+                      <div className="flex flex-col gap-3">
+                        <h4 className="font-semibold text-sm truncate pl-2">{client.clientName}</h4>
+                        
+                        {/* Sales grid */}
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="text-center">
+                            <p className="text-muted-foreground">Dag</p>
+                            <p className="font-bold text-primary text-lg">{client.salesToday}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-muted-foreground">Uge</p>
+                            <p className="font-bold text-primary text-lg">{client.salesWeek}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-muted-foreground">Løn</p>
+                            <p className="font-bold text-primary text-lg">{client.salesMonth}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Uge</p>
-                          <p className="font-bold text-primary">{client.salesWeek}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Løn</p>
-                          <p className="font-bold text-primary">{client.salesMonth}</p>
+
+                        {/* Sales per hour indicator */}
+                        <div className="flex items-center justify-center gap-2 pt-2 border-t">
+                          <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Salg/time:</span>
+                          <span className="text-sm font-semibold text-primary">
+                            {client.salesMonth > 0 && payrollSalesData.totalHours > 0
+                              ? (client.salesMonth / (payrollSalesData.totalHours / Math.max(effectiveClientSales.length, 1))).toFixed(2)
+                              : "–"}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
