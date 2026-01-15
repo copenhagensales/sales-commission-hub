@@ -93,9 +93,17 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    const AUTH_TOKEN_KEY = 'sb-jwlimmeijpfmaksvmuru-auth-token';
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Catch failed token refreshes early - clear stale tokens
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          console.warn("[useAuth] Token refresh failed - clearing stored session");
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -142,11 +150,28 @@ export function useAuth() {
       // If Auth service is unreachable, clear stored tokens to prevent retry loops
       if (error.message === "Failed to fetch" || error.name === "AuthRetryableFetchError") {
         console.warn("Auth service unreachable - clearing stored session to prevent retry loop");
-        // Clear localStorage directly to avoid another network call
-        localStorage.removeItem('sb-jwlimmeijpfmaksvmuru-auth-token');
+        localStorage.removeItem(AUTH_TOKEN_KEY);
       }
       
       setLoading(false);
+    }).finally(() => {
+      // Safety net: If still loading after timeout with a stored token, clear it
+      setTimeout(() => {
+        const stillHasToken = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (stillHasToken) {
+          // Check if we actually have a valid session now
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session && stillHasToken) {
+              console.warn("[useAuth] Stale token detected after timeout - clearing");
+              localStorage.removeItem(AUTH_TOKEN_KEY);
+            }
+          }).catch(() => {
+            // On error, clear the token
+            console.warn("[useAuth] Session check failed after timeout - clearing token");
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+          });
+        }
+      }, 6000); // Run 1s after the main timeout
     });
 
     return () => subscription.unsubscribe();
