@@ -439,6 +439,7 @@ interface NewRoleForm {
   color: string;
   icon: string;
   priority: number;
+  copyFromRole: string | null;
 }
 
 const ROLE_COLORS = [
@@ -469,6 +470,7 @@ export function PermissionEditor() {
     color: 'muted',
     icon: 'user',
     priority: 100,
+    copyFromRole: null,
   });
   
   // Delete role state
@@ -546,6 +548,58 @@ export function PermissionEditor() {
     }
   };
 
+  // Copy permissions from an existing role
+  const copyPermissionsFromRole = async (newRoleKey: string, sourceRoleKey: string) => {
+    setIsSeeding(true);
+    
+    try {
+      // Get all permissions from source role
+      const sourcePermissions = permissionsByRole[sourceRoleKey] || [];
+      
+      if (sourcePermissions.length === 0) {
+        // If source has no permissions, fall back to regular seeding
+        toast.info('Kilderollen har ingen rettigheder - opretter standard rettigheder');
+        setIsSeeding(false);
+        await seedPermissionsForRole(newRoleKey);
+        return;
+      }
+      
+      // Create new permission records copying values from source
+      const newPermissions = sourcePermissions.map(p => ({
+        role_key: newRoleKey,
+        permission_key: p.permission_key,
+        parent_key: p.parent_key || PERMISSION_HIERARCHY[p.permission_key] || null,
+        permission_type: p.permission_type || getPermissionTypeFromKey(p.permission_key),
+        can_view: p.can_view,
+        can_edit: p.can_edit,
+        visibility: p.visibility || 'self',
+        description: p.description,
+      }));
+      
+      // Insert in batches to avoid timeout
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < newPermissions.length; i += BATCH_SIZE) {
+        const batch = newPermissions.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('role_page_permissions')
+          .insert(batch);
+        
+        if (error) {
+          console.error('Error copying permissions batch:', error);
+          throw error;
+        }
+      }
+      
+      toast.success(`${newPermissions.length} rettigheder kopieret fra ${sourceRoleKey}`);
+      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+    } catch (error: any) {
+      console.error('Error copying permissions:', error);
+      toast.error('Kunne ikke kopiere rettigheder: ' + error.message);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   // Auto-seed when selecting a role with no permissions
   useEffect(() => {
     if (selectedRole && !permissionsLoading) {
@@ -618,9 +672,9 @@ export function PermissionEditor() {
         });
       
       if (error) throw error;
-      return form.key;
+      return { roleKey: form.key, copyFromRole: form.copyFromRole };
     },
-    onSuccess: async (roleKey) => {
+    onSuccess: async ({ roleKey, copyFromRole }) => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
       toast.success('Rolle oprettet');
       setIsCreateRoleOpen(false);
@@ -631,8 +685,14 @@ export function PermissionEditor() {
         color: 'muted',
         icon: 'user',
         priority: 100,
+        copyFromRole: null,
       });
-      // Auto-seed permissions for new role
+      
+      // Copy permissions from source role or auto-seed
+      if (copyFromRole) {
+        await copyPermissionsFromRole(roleKey, copyFromRole);
+      }
+      
       setSelectedRole(roleKey);
     },
     onError: (error) => {
@@ -1148,6 +1208,42 @@ export function PermissionEditor() {
                 onChange={(e) => setNewRoleForm({ ...newRoleForm, description: e.target.value })}
                 placeholder="Kort beskrivelse af rollens ansvar"
               />
+            </div>
+
+            {/* Copy from existing role */}
+            <div className="space-y-2">
+              <Label>Kopier rettigheder fra</Label>
+              <Select
+                value={newRoleForm.copyFromRole || 'none'}
+                onValueChange={(v) => setNewRoleForm({ 
+                  ...newRoleForm, 
+                  copyFromRole: v === 'none' ? null : v 
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Start fra bunden" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Start fra bunden (alle slået fra)</span>
+                  </SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.key} value={role.key}>
+                      <div className="flex items-center gap-2">
+                        <Badge className={colorMap[role.color || "gray"]}>
+                          {role.label}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          ({permissionsByRole[role.key]?.length || 0} rettigheder)
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Vælg en rolle at kopiere rettigheder fra, eller start fra bunden
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
