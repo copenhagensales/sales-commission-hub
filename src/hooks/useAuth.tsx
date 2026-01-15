@@ -16,13 +16,21 @@ export function useAuth() {
     }
     
     const lowerEmail = userEmail.toLowerCase();
-    const { data } = await supabase
+    
+    // Add 3s timeout to prevent blocking - fall back to false (no forced change)
+    const timeoutPromise = new Promise<null>((resolve) => 
+      setTimeout(() => resolve(null), 3000)
+    );
+    
+    const queryPromise = supabase
       .from("employee_master_data")
       .select("must_change_password")
       .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
       .eq("is_active", true)
-      .maybeSingle();
+      .maybeSingle()
+      .then(res => res.data);
     
+    const data = await Promise.race([queryPromise, timeoutPromise]);
     setMustChangePassword(data?.must_change_password === true);
   }, []);
 
@@ -51,12 +59,20 @@ export function useAuth() {
     (async () => {
       try {
         const lowerEmail = currentSession.user.email?.toLowerCase() || "";
-        const { data: employee } = await supabase
+        
+        // Add 2s timeout to employee lookup - fall back to null
+        const employeePromise = supabase
           .from("employee_master_data")
           .select("first_name, last_name")
           .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .eq("is_active", true)
           .maybeSingle();
+        
+        const timeoutPromise = new Promise<{ data: null }>((resolve) => 
+          setTimeout(() => resolve({ data: null }), 2000)
+        );
+        
+        const { data: employee } = await Promise.race([employeePromise, timeoutPromise]);
 
         const userName = employee 
           ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() 
