@@ -128,7 +128,8 @@ export default function TdcErhvervDashboard() {
       return response.json();
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
+    staleTime: 60000,
   });
 
   // Fetch sales for today

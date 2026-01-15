@@ -115,7 +115,8 @@ export default function CsTop20Dashboard() {
       return response.json();
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
+    staleTime: 60000,
   });
 
   // Fetch sales for today (all clients)
@@ -123,7 +124,7 @@ export default function CsTop20Dashboard() {
     startDate: today,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch sales for this week (all clients)
@@ -131,7 +132,7 @@ export default function CsTop20Dashboard() {
     startDate: weekStart,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch sales for payroll period (all clients)
@@ -139,7 +140,7 @@ export default function CsTop20Dashboard() {
     startDate: payrollPeriod.start,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch employee avatars, IDs, and team memberships
