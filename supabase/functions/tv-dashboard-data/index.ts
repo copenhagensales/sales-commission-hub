@@ -38,6 +38,11 @@ Deno.serve(async (req) => {
       return await handleTdcErhvervData(supabase, corsHeaders);
     }
 
+    // Handle relatel-data request (bypasses RLS for TV boards)
+    if (action === "relatel-data") {
+      return await handleRelatelData(supabase, corsHeaders);
+    }
+
     // Verify access code if provided
     if (accessCode) {
       const { data: accessData, error: accessError } = await supabase
@@ -1297,6 +1302,209 @@ async function handleTdcErhvervData(
   };
 
   console.log("[TdcErhvervData] Returning:", result);
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle Relatel data request (bypasses RLS for TV boards)
+async function handleRelatelData(
+  supabase: any,
+  corsHeaders: Record<string, string>
+) {
+  console.log("[RelatelData] Fetching data");
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  
+  // Calculate week start (Monday)
+  const dayOfWeek = today.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - daysToMonday);
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+  
+  // Calculate payroll period (15th to 14th)
+  const currentDay = today.getDate();
+  let payrollStart: Date;
+  let payrollEnd: Date;
+  
+  if (currentDay >= 15) {
+    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
+    payrollEnd = new Date(today.getFullYear(), today.getMonth() + 1, 14);
+  } else {
+    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
+    payrollEnd = new Date(today.getFullYear(), today.getMonth(), 14);
+  }
+  const payrollStartStr = payrollStart.toISOString().split("T")[0];
+
+  // Relatel client ID (look it up or use the known ID)
+  const { data: relatelClient } = await supabase
+    .from("clients")
+    .select("id")
+    .ilike("name", "%relatel%")
+    .limit(1)
+    .maybeSingle();
+
+  if (!relatelClient) {
+    console.log("[RelatelData] Relatel client not found");
+    return new Response(JSON.stringify({
+      salesToday: 0,
+      salesWeek: 0,
+      salesMonth: 0,
+      sellersToday: [],
+      sellersWeek: [],
+      sellersMonth: [],
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const RELATEL_CLIENT_ID = relatelClient.id;
+  console.log("[RelatelData] Found Relatel client:", RELATEL_CLIENT_ID);
+
+  const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
+
+  // Fetch today's sales
+  const { data: salesToday } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
+    .gte("sale_datetime", `${todayStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch week's sales
+  const { data: salesWeek } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
+    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch payroll period sales
+  const { data: salesPayroll } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
+    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Calculate totals with seller breakdown
+  const calculateTotals = (sales: any[]) => {
+    let totalSales = 0;
+    let totalCommission = 0;
+    const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
+
+    sales?.forEach((sale) => {
+      const agentEmail = sale.agent_email || "Unknown";
+      if (!sellerStats[agentEmail]) {
+        sellerStats[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
+      }
+
+      sale.sale_items?.forEach((item: any) => {
+        const countsAsSale = item.products?.counts_as_sale !== false;
+        if (countsAsSale) {
+          totalSales += Number(item.quantity) || 1;
+          sellerStats[agentEmail].sales += Number(item.quantity) || 1;
+        }
+        totalCommission += Number(item.mapped_commission) || 0;
+        sellerStats[agentEmail].commission += Number(item.mapped_commission) || 0;
+      });
+    });
+
+    return { totalSales, totalCommission, sellerStats };
+  };
+
+  const todayData = calculateTotals(salesToday || []);
+  const weekData = calculateTotals(salesWeek || []);
+  const payrollData = calculateTotals(salesPayroll || []);
+
+  // Build sorted seller arrays for each period
+  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number }>) => {
+    return Object.values(sellerStats)
+      .filter(s => s.sales > 0)
+      .sort((a, b) => b.commission - a.commission);
+  };
+
+  const sellersToday = buildSellerArray(todayData.sellerStats);
+  const sellersWeek = buildSellerArray(weekData.sellerStats);
+  const sellersMonth = buildSellerArray(payrollData.sellerStats);
+
+  // Resolve agent emails to employee names for all sellers
+  const allEmails = new Set<string>();
+  Object.keys(todayData.sellerStats).forEach(e => allEmails.add(e));
+  Object.keys(weekData.sellerStats).forEach(e => allEmails.add(e));
+  Object.keys(payrollData.sellerStats).forEach(e => allEmails.add(e));
+
+  if (allEmails.size > 0) {
+    const nameMap = await resolveAgentNames(supabase, Array.from(allEmails));
+    
+    // Resolve names for each period's sellers
+    const resolveNames = (sellers: any[], stats: Record<string, any>) => {
+      sellers.forEach((seller) => {
+        const email = Object.keys(stats).find(e => stats[e].sales === seller.sales && stats[e].commission === seller.commission);
+        if (email) {
+          const resolvedName = nameMap.get(email.toLowerCase());
+          if (resolvedName) {
+            seller.name = resolvedName;
+          }
+        }
+      });
+    };
+    
+    resolveNames(sellersToday, todayData.sellerStats);
+    resolveNames(sellersWeek, weekData.sellerStats);
+    resolveNames(sellersMonth, payrollData.sellerStats);
+  }
+
+  // Get avatars for sellers
+  const sellerNames = new Set<string>();
+  [...sellersToday, ...sellersWeek, ...sellersMonth].forEach(s => sellerNames.add(s.name.toLowerCase()));
+  
+  const { data: employees } = await supabase
+    .from("employee_master_data")
+    .select("first_name, last_name, avatar_url")
+    .eq("is_active", true);
+
+  const avatarMap = new Map<string, string>();
+  (employees || []).forEach((emp: any) => {
+    const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+    if (emp.avatar_url) {
+      avatarMap.set(fullName, emp.avatar_url);
+    }
+  });
+
+  // Add avatar URLs to sellers
+  const addAvatars = (sellers: any[]) => {
+    sellers.forEach(s => {
+      s.avatarUrl = avatarMap.get(s.name.toLowerCase()) || null;
+    });
+  };
+  
+  addAvatars(sellersToday);
+  addAvatars(sellersWeek);
+  addAvatars(sellersMonth);
+
+  const result = {
+    salesToday: todayData.totalSales,
+    salesWeek: weekData.totalSales,
+    salesMonth: payrollData.totalSales,
+    sellersToday,
+    sellersWeek,
+    sellersMonth,
+  };
+
+  console.log("[RelatelData] Returning:", {
+    salesToday: result.salesToday,
+    salesWeek: result.salesWeek,
+    salesMonth: result.salesMonth,
+    sellerCounts: {
+      today: sellersToday.length,
+      week: sellersWeek.length,
+      month: sellersMonth.length
+    }
+  });
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
