@@ -38,7 +38,7 @@ export function useAuth() {
     setMustChangePassword(false);
   }, [user?.email]);
 
-  const logLoginEvent = useCallback(async (currentSession: Session) => {
+  const logLoginEvent = useCallback((currentSession: Session) => {
     const sessionKey = `${currentSession.user.id}-${currentSession.access_token.substring(0, 20)}`;
     
     // Only log once per unique session
@@ -47,32 +47,33 @@ export function useAuth() {
     }
     loggedSessionsRef.current.add(sessionKey);
 
-    try {
-      // Get user's name from employee_master_data
-      const lowerEmail = currentSession.user.email?.toLowerCase() || "";
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("first_name, last_name")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .eq("is_active", true)
-        .maybeSingle();
+    // Fire-and-forget: Don't block login flow with logging
+    (async () => {
+      try {
+        const lowerEmail = currentSession.user.email?.toLowerCase() || "";
+        const { data: employee } = await supabase
+          .from("employee_master_data")
+          .select("first_name, last_name")
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+          .eq("is_active", true)
+          .maybeSingle();
 
-      const userName = employee 
-        ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() 
-        : null;
+        const userName = employee 
+          ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() 
+          : null;
 
-      // Call edge function to log the event
-      await supabase.functions.invoke("log-login-event", {
-        body: {
-          user_id: currentSession.user.id,
-          user_email: currentSession.user.email,
-          user_name: userName,
-          session_id: currentSession.access_token.substring(0, 20),
-        },
-      });
-    } catch (error) {
-      console.error("Failed to log login event:", error);
-    }
+        supabase.functions.invoke("log-login-event", {
+          body: {
+            user_id: currentSession.user.id,
+            user_email: currentSession.user.email,
+            user_name: userName,
+            session_id: currentSession.access_token.substring(0, 20),
+          },
+        }).catch(err => console.warn("Login logging failed (non-blocking):", err));
+      } catch (error) {
+        console.warn("Failed to prepare login event (non-blocking):", error);
+      }
+    })();
   }, []);
 
   useEffect(() => {
