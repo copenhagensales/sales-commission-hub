@@ -1242,7 +1242,7 @@ async function handleTdcErhvervData(
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // TDC Erhverv client ID
-  const TDC_ERHVERV_CLIENT_ID = "87c3e0cf-7c46-4428-ae4e-ee19ca7fa6c2";
+  const TDC_ERHVERV_CLIENT_ID = "20744525-7466-4b2c-afa7-6ee09a9112b0";
 
   const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
