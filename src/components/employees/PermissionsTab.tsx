@@ -3,42 +3,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Users, Settings, Calendar, FileText, BarChart3, Loader2 } from "lucide-react";
+import { Shield, Users, Settings, Calendar, FileText, BarChart3, Loader2, Crown, User } from "lucide-react";
 
-const roleDescriptions: Record<string, { label: string; description: string; color: string; icon: React.ReactNode }> = {
-  ejer: {
-    label: "Ejer",
-    description: "Fuld adgang til alle funktioner og data i systemet",
-    color: "bg-primary text-primary-foreground",
-    icon: <Shield className="h-4 w-4" />,
-  },
-  teamleder: {
-    label: "Teamleder",
-    description: "Adgang til eget team, vagtplan, fravær og kontrakter",
-    color: "bg-blue-500 text-white",
-    icon: <Users className="h-4 w-4" />,
-  },
-  rekruttering: {
-    label: "Rekruttering",
-    description: "Adgang til kandidater, ansættelser og kontrakter",
-    color: "bg-amber-500 text-white",
-    icon: <FileText className="h-4 w-4" />,
-  },
-  some: {
-    label: "SOME",
-    description: "Adgang til sociale medier og indholdsplanlægning",
-    color: "bg-purple-500 text-white",
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  medarbejder: {
-    label: "Medarbejder",
-    description: "Begrænset adgang til egen profil og vagtplan",
-    color: "bg-muted text-muted-foreground",
-    icon: <Settings className="h-4 w-4" />,
-  },
+// Icon mapping from database string to component
+const iconMap: Record<string, React.ReactNode> = {
+  crown: <Crown className="h-4 w-4" />,
+  shield: <Shield className="h-4 w-4" />,
+  users: <Users className="h-4 w-4" />,
+  "file-text": <FileText className="h-4 w-4" />,
+  calendar: <Calendar className="h-4 w-4" />,
+  user: <User className="h-4 w-4" />,
+  settings: <Settings className="h-4 w-4" />,
 };
 
-const accessMatrix: Record<string, { feature: string; ejer: boolean; teamleder: boolean; rekruttering: boolean; some: boolean; medarbejder: boolean }[]> = {
+// Color mapping from database string to Tailwind classes
+const colorMap: Record<string, string> = {
+  primary: "bg-primary text-primary-foreground",
+  blue: "bg-blue-500 text-white",
+  amber: "bg-amber-500 text-white",
+  purple: "bg-purple-500 text-white",
+  muted: "bg-muted text-muted-foreground",
+  gray: "bg-muted text-muted-foreground",
+};
+
+const accessMatrix = {
   pages: [
     { feature: "Dashboard", ejer: true, teamleder: true, rekruttering: true, some: true, medarbejder: true },
     { feature: "Løn & Økonomi", ejer: true, teamleder: false, rekruttering: false, some: false, medarbejder: false },
@@ -54,8 +42,31 @@ const accessMatrix: Record<string, { feature: string; ejer: boolean; teamleder: 
   ],
 };
 
+interface RoleDefinition {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  detailed_description: string | null;
+  color: string | null;
+  icon: string | null;
+  priority: number | null;
+}
+
 export function PermissionsTab() {
-  const { data: positions = [], isLoading } = useQuery({
+  const { data: roleDefinitions = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ["system-role-definitions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_role_definitions")
+        .select("*")
+        .order("priority", { ascending: false });
+      if (error) throw error;
+      return data as RoleDefinition[];
+    },
+  });
+
+  const { data: positions = [], isLoading: positionsLoading } = useQuery({
     queryKey: ["positions-with-roles"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -68,6 +79,14 @@ export function PermissionsTab() {
     },
   });
 
+  const isLoading = rolesLoading || positionsLoading;
+
+  // Create a lookup map for roles
+  const roleMap = roleDefinitions.reduce((acc, role) => {
+    acc[role.key] = role;
+    return acc;
+  }, {} as Record<string, RoleDefinition>);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -78,7 +97,7 @@ export function PermissionsTab() {
 
   return (
     <div className="space-y-6">
-      {/* Role descriptions */}
+      {/* Role descriptions from database */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -90,16 +109,21 @@ export function PermissionsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(roleDescriptions).map(([key, role]) => (
-              <div key={key} className="p-4 border rounded-lg space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {roleDefinitions.map((role) => (
+              <div key={role.id} className="p-4 border rounded-lg space-y-3">
                 <div className="flex items-center gap-2">
-                  <Badge className={role.color}>
-                    {role.icon}
+                  <Badge className={colorMap[role.color || "gray"]}>
+                    {iconMap[role.icon || "shield"]}
                     <span className="ml-1">{role.label}</span>
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{role.description}</p>
+                <p className="text-sm font-medium text-foreground">{role.description}</p>
+                {role.detailed_description && (
+                  <div className="text-sm text-muted-foreground whitespace-pre-line border-t pt-3 mt-2">
+                    {role.detailed_description}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -127,13 +151,16 @@ export function PermissionsTab() {
             </TableHeader>
             <TableBody>
               {positions.map((position) => {
-                const roleInfo = roleDescriptions[position.system_role || "medarbejder"];
+                const role = roleMap[position.system_role || "medarbejder"];
                 return (
                   <TableRow key={position.id}>
                     <TableCell className="font-medium">{position.name}</TableCell>
                     <TableCell>
-                      {roleInfo ? (
-                        <Badge className={roleInfo.color}>{roleInfo.label}</Badge>
+                      {role ? (
+                        <Badge className={colorMap[role.color || "gray"]}>
+                          {iconMap[role.icon || "shield"]}
+                          <span className="ml-1">{role.label}</span>
+                        </Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -163,9 +190,9 @@ export function PermissionsTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Side/Funktion</TableHead>
-                  {Object.entries(roleDescriptions).map(([key, role]) => (
-                    <TableHead key={key} className="text-center">
-                      <Badge className={role.color} variant="outline">
+                  {roleDefinitions.map((role) => (
+                    <TableHead key={role.key} className="text-center">
+                      <Badge className={colorMap[role.color || "gray"]} variant="outline">
                         {role.label}
                       </Badge>
                     </TableHead>
@@ -176,21 +203,15 @@ export function PermissionsTab() {
                 {accessMatrix.pages.map((row) => (
                   <TableRow key={row.feature}>
                     <TableCell className="font-medium">{row.feature}</TableCell>
-                    <TableCell className="text-center">
-                      {row.ejer ? "✓" : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.teamleder ? "✓" : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.rekruttering ? "✓" : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.some ? "✓" : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.medarbejder ? "✓" : "—"}
-                    </TableCell>
+                    {roleDefinitions.map((role) => (
+                      <TableCell key={role.key} className="text-center">
+                        {row[role.key as keyof typeof row] ? (
+                          <span className="text-green-600 font-medium">✓</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
