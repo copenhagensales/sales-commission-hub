@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,14 +53,10 @@ import { toast } from "sonner";
 import { 
   usePagePermissions, 
   useRoleDefinitions,
-  useDataVisibilityRules,
   permissionKeyLabels,
-  dataScopeLabels,
-  visibilityLabels,
   type PagePermission,
   type RoleDefinition,
-  type Visibility,
-  type DataVisibilityRule
+  type Visibility
 } from "@/hooks/useUnifiedPermissions";
 
 type PermissionType = 'page' | 'tab' | 'action';
@@ -276,35 +272,11 @@ const ROLE_COLORS = [
   { value: 'muted', label: 'Grå', class: 'bg-muted text-muted-foreground' },
 ];
 
-// Data scopes with descriptions for UI
-const DATA_SCOPES = [
-  { key: 'employees', label: 'Medarbejdere', description: 'Medarbejderdata og profiler' },
-  { key: 'sales', label: 'Salg', description: 'Salgsdata og statistik' },
-  { key: 'shifts', label: 'Vagter', description: 'Vagtplaner og timer' },
-  { key: 'absences', label: 'Fravær', description: 'Fraværsregistreringer' },
-  { key: 'coaching', label: 'Coaching', description: 'Coaching sessioner og feedback' },
-  { key: 'contracts', label: 'Kontrakter', description: 'Kontraktinformation' },
-  { key: 'payroll', label: 'Løn', description: 'Løndata og udbetalinger' },
-  { key: 'leaderboard_ranking', label: 'Leaderboard', description: 'Rangering på leaderboards' },
-  { key: 'sales_count_others', label: 'Andres salgstal', description: 'Se antal salg for andre medarbejdere' },
-  { key: 'commission_details', label: 'Provisionsdetaljer', description: 'Detaljeret provisionsberegning' },
-  { key: 'salary_breakdown', label: 'Lønspecifikation', description: 'Detaljeret lønspecifikation' },
-  { key: 'h2h_stats', label: 'Head-to-Head', description: 'H2H statistik mod andre' },
-  { key: 'employee_performance', label: 'Performance', description: 'Performancerapporter' },
-];
-
-const visibilityColors: Record<Visibility, string> = {
-  all: "bg-green-100 text-green-700 border-green-300",
-  team: "bg-blue-100 text-blue-700 border-blue-300",
-  self: "bg-amber-100 text-amber-700 border-amber-300",
-  none: "bg-red-100 text-red-700 border-red-300",
-};
 
 export function PermissionEditor() {
   const queryClient = useQueryClient();
   const { data: permissions = [], isLoading: permissionsLoading } = usePagePermissions();
   const { data: roles = [], isLoading: rolesLoading } = useRoleDefinitions();
-  const { data: visibilityRules = [], isLoading: visibilityLoading } = useDataVisibilityRules();
   
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [editingPermission, setEditingPermission] = useState<EditingPermission | null>(null);
@@ -477,14 +449,6 @@ export function PermissionEditor() {
         .eq('role_key', roleKey);
       
       if (permError) throw permError;
-      
-      // Delete data visibility rules
-      const { error: visError } = await supabase
-        .from('data_visibility_rules')
-        .delete()
-        .eq('role_key', roleKey);
-      
-      if (visError) throw visError;
       
       // Clear system_role_key from job_positions
       const { error: posError } = await supabase
@@ -684,7 +648,7 @@ export function PermissionEditor() {
     queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
   };
 
-  if (permissionsLoading || rolesLoading || visibilityLoading) {
+  if (permissionsLoading || rolesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -692,57 +656,6 @@ export function PermissionEditor() {
     );
   }
 
-  // Helper to get current visibility for a role and scope
-  const getVisibilityForRole = (roleKey: string, scope: string): Visibility => {
-    const rule = visibilityRules.find(
-      r => r.role_key === roleKey && r.data_scope === scope
-    );
-    return (rule?.visibility as Visibility) || 'none';
-  };
-
-  // Update visibility mutation
-  const updateVisibility = async (roleKey: string, scope: string, visibility: Visibility) => {
-    console.log('updateVisibility called:', { roleKey, scope, visibility });
-    
-    const existing = visibilityRules.find(
-      r => r.role_key === roleKey && r.data_scope === scope
-    );
-
-    try {
-      if (existing) {
-        console.log('Updating existing rule:', existing.id);
-        const { data, error } = await supabase
-          .from('data_visibility_rules')
-          .update({ visibility })
-          .eq('id', existing.id)
-          .select();
-        
-        console.log('Update result:', { data, error, rowsAffected: data?.length });
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error('Ingen rækker opdateret - RLS blokerer muligvis');
-        }
-      } else {
-        console.log('Creating new rule');
-        const scopeData = DATA_SCOPES.find(s => s.key === scope);
-        const { error } = await supabase
-          .from('data_visibility_rules')
-          .insert({
-            role_key: roleKey,
-            data_scope: scope,
-            visibility,
-            description: scopeData?.description || scope,
-          });
-        if (error) throw error;
-      }
-      
-      queryClient.invalidateQueries({ queryKey: ['data-visibility-rules'] });
-      toast.success('Synlighed opdateret');
-    } catch (error: any) {
-      console.error('Visibility update error:', error);
-      toast.error('Kunne ikke opdatere synlighed: ' + error.message);
-    }
-  };
 
   const selectedRoleData = roles.find(r => r.key === selectedRole);
   const rolePermissions = selectedRole ? (permissionsByRole[selectedRole] || []) : [];
@@ -872,89 +785,6 @@ export function PermissionEditor() {
                   </TableRow>
                 )}
                 
-                {/* Data-synlighed sektion */}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={9} className="font-semibold text-sm py-2">
-                    DATA-SYNLIGHED
-                  </TableCell>
-                </TableRow>
-                {DATA_SCOPES.map((scope) => {
-                  const currentVisibility = getVisibilityForRole(selectedRole, scope.key);
-                  return (
-                    <TableRow key={scope.key}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Data</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {scope.label}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {scope.description}
-                      </TableCell>
-                      {/* Kan se / Kan redigere - disabled for data visibility */}
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center opacity-30">
-                          <Switch disabled checked={false} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center opacity-30">
-                          <Switch disabled checked={false} />
-                        </div>
-                      </TableCell>
-                      {/* Visibility columns */}
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center">
-                          <Switch
-                            checked={currentVisibility === 'all'}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                updateVisibility(selectedRole, scope.key, 'all');
-                              } else if (currentVisibility === 'all') {
-                                updateVisibility(selectedRole, scope.key, 'none');
-                              }
-                            }}
-                            className="data-[state=checked]:bg-green-500"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center">
-                          <Switch
-                            checked={currentVisibility === 'team'}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                updateVisibility(selectedRole, scope.key, 'team');
-                              } else if (currentVisibility === 'team') {
-                                updateVisibility(selectedRole, scope.key, 'none');
-                              }
-                            }}
-                            className="data-[state=checked]:bg-blue-500"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center">
-                          <Switch
-                            checked={currentVisibility === 'self'}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                updateVisibility(selectedRole, scope.key, 'self');
-                              } else if (currentVisibility === 'self') {
-                                updateVisibility(selectedRole, scope.key, 'none');
-                              }
-                            }}
-                            className="data-[state=checked]:bg-amber-500"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  );
-                })}
               </TableBody>
             </Table>
           </CardContent>
