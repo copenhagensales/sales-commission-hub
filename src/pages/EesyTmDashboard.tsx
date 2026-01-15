@@ -15,6 +15,24 @@ import { Badge } from "@/components/ui/badge";
 import { DateRange } from "react-day-picker";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 
+// Check if we're in TV mode (accessed via /tv route with sessionStorage code)
+const isTvMode = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/tv/') || 
+         window.location.pathname.startsWith('/t/') || 
+         sessionStorage.getItem('tv_board_code') !== null;
+};
+
+interface TvEesyData {
+  salesToday: number;
+  salesWeek: number;
+  salesMonth: number;
+  commissionToday: number;
+  commissionWeek: number;
+  commissionMonth: number;
+  topSellers: Array<{ name: string; sales: number; commission: number }>;
+}
+
 const EESY_TM_TEAM_ID = "53bb1f37-e08e-42b2-9f71-ab7b69495e55"; // Eesy TM team ID
 
 interface ProductStat {
@@ -79,18 +97,36 @@ const getMedal = (rank: number) => {
 
 export default function EesyTmDashboard() {
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
+  const tvMode = isTvMode();
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfDay(new Date()),
     to: new Date()
   });
 
-  // Use the unified dashboard sales data hook
+  // Fetch TV data from edge function (bypasses RLS for TV mode)
+  const { data: tvData } = useQuery<TvEesyData>({
+    queryKey: ["tv-eesy-tm-data"],
+    queryFn: async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=eesy-tm-data&dashboard=eesy-tm`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch TV data");
+      }
+      return response.json();
+    },
+    enabled: tvMode,
+    refetchInterval: 30000,
+  });
+
+  // Use the unified dashboard sales data hook (only in non-TV mode)
   const dashboardData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: dateRange?.from || payrollPeriod.start,
     endDate: dateRange?.to || new Date(),
-    enabled: !!dateRange?.from
+    enabled: !!dateRange?.from && !tvMode
   });
 
   // Fetch sales for today, this week, and this month
@@ -102,21 +138,21 @@ export default function EesyTmDashboard() {
     clientName: "Eesy",
     startDate: today,
     endDate: new Date(),
-    enabled: true
+    enabled: !tvMode
   });
 
   const weeklySalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: weekStart,
     endDate: new Date(),
-    enabled: true
+    enabled: !tvMode
   });
 
   const monthlySalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: monthStart,
     endDate: new Date(),
-    enabled: true
+    enabled: !tvMode
   });
 
   // Fetch team goal for payroll period
@@ -323,7 +359,9 @@ export default function EesyTmDashboard() {
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{dailySalesData.totalSales}</div>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
           </Card>
@@ -334,7 +372,9 @@ export default function EesyTmDashboard() {
               <CalendarRange className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{weeklySalesData.totalSales}</div>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
           </Card>
@@ -345,7 +385,9 @@ export default function EesyTmDashboard() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{monthlySalesData.totalSales}</div>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
             </CardContent>
           </Card>
