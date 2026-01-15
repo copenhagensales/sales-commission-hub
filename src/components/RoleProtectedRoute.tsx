@@ -87,13 +87,17 @@ export function RoleProtectedRoute({
 // Simple protected route that just checks auth AND active employee status
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: permLoading, position } = usePermissions();
+  const { isLoading: permLoading, position, isError } = usePermissions();
   
   const isLoading = authLoading || permLoading;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/auth";
+  };
+
+  const handleRetry = () => {
+    window.location.reload();
   };
   
   if (isLoading) {
@@ -108,7 +112,27 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Check if employee is active (has a position)
+  // Handle database error/timeout - show retry option, don't log out
+  if (isError) {
+    console.log("ProtectedRoute: Database error - showing retry option");
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="text-destructive font-medium">Kunne ikke indlæse dine rettigheder</div>
+        <p className="text-muted-foreground text-sm">Der opstod en forbindelsesfejl. Prøv venligst igen.</p>
+        <div className="flex gap-2 mt-2">
+          <Button onClick={handleRetry}>
+            Prøv igen
+          </Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Log ud
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Only if NO error and NO position = genuinely deactivated user
   if (!position) {
     console.log("ProtectedRoute: User deactivated - signing out");
     // Sign out deactivated users
