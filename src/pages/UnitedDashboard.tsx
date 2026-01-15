@@ -256,9 +256,9 @@ export default function UnitedDashboard() {
     enabled: !tvMode && !!teamClients && teamClients.length > 0
   });
 
-  // Fetch actual hours per client using shift data
+  // Fetch actual hours per client using shift data via employee_agent_mapping
   const clientHoursQueries = useQuery({
-    queryKey: ["united-client-hours", teamClients?.map((c: any) => c.id), payrollPeriod.start.toISOString()],
+    queryKey: ["united-client-hours-v2", teamClients?.map((c: any) => c.id), payrollPeriod.start.toISOString()],
     queryFn: async () => {
       if (!teamClients || teamClients.length === 0) return new Map<string, number>();
 
@@ -266,13 +266,7 @@ export default function UnitedDashboard() {
       
       await Promise.all(
         teamClients.map(async (client: any) => {
-          // Get agent mappings for this client using agents table
-          const { data: agents } = await supabase
-            .from("agents")
-            .select("id, email")
-            .eq("is_active", true);
-
-          // Get employees for this client's campaigns
+          // Get campaigns for this client
           const { data: campaigns } = await supabase
             .from("client_campaigns")
             .select("id")
@@ -283,10 +277,10 @@ export default function UnitedDashboard() {
             return;
           }
 
-          // Get sales for this client to find active sellers
+          // Get sales for this client to find active agent emails
           const { data: sales } = await supabase
             .from("sales")
-            .select("agent_name, agent_email")
+            .select("agent_email")
             .in("client_campaign_id", campaigns.map(c => c.id))
             .gte("sale_datetime", payrollPeriod.start.toISOString());
 
@@ -297,13 +291,26 @@ export default function UnitedDashboard() {
             return;
           }
 
-          // Get employees by email
-          const { data: employees } = await supabase
-            .from("employee")
+          // Get agents by email to find agent IDs
+          const { data: agents } = await supabase
+            .from("agents")
             .select("id, email")
             .in("email", agentEmails as string[]);
 
-          const employeeIds = (employees || []).map(e => e.id);
+          const agentIds = (agents || []).map(a => a.id);
+
+          if (agentIds.length === 0) {
+            hoursMap.set(client.id, 0);
+            return;
+          }
+
+          // Map agent IDs to employee IDs via employee_agent_mapping
+          const { data: agentMappings } = await supabase
+            .from("employee_agent_mapping")
+            .select("employee_id, agent_id")
+            .in("agent_id", agentIds);
+
+          const employeeIds = [...new Set((agentMappings || []).map(m => m.employee_id))];
 
           if (employeeIds.length === 0) {
             hoursMap.set(client.id, 0);
@@ -458,48 +465,50 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {effectiveClientSales.map((client, index) => {
-                  // Get actual hours for this client from the hours query
-                  const clientHours = clientHoursQueries.data?.get(client.clientId) || 0;
-                  const salesPerHour = clientHours > 0 ? client.salesMonth / clientHours : 0;
-                  
-                  return (
-                    <div 
-                      key={client.clientId} 
-                      className="relative rounded-lg border bg-card p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-lg ${getClientColor(index)}`} />
-                      <div className="flex flex-col gap-3">
-                        <h4 className="font-semibold text-sm truncate pl-2">{client.clientName}</h4>
-                        
-                        {/* Sales grid */}
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div className="text-center">
-                            <p className="text-muted-foreground">Dag</p>
-                            <p className="font-bold text-primary text-lg">{client.salesToday}</p>
+                {effectiveClientSales
+                  .filter(client => client.salesWeek > 0)
+                  .map((client, index) => {
+                    // Get actual hours for this client from the hours query
+                    const clientHours = clientHoursQueries.data?.get(client.clientId) || 0;
+                    const salesPerHour = clientHours > 0 ? client.salesMonth / clientHours : 0;
+                    
+                    return (
+                      <div 
+                        key={client.clientId} 
+                        className="relative rounded-lg border bg-card p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className={`absolute top-0 left-0 w-1 h-full rounded-l-lg ${getClientColor(index)}`} />
+                        <div className="flex flex-col gap-3">
+                          <h4 className="font-semibold text-sm truncate pl-2">{client.clientName}</h4>
+                          
+                          {/* Sales grid */}
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="text-center">
+                              <p className="text-muted-foreground">Dag</p>
+                              <p className="font-bold text-primary text-lg">{client.salesToday}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-muted-foreground">Uge</p>
+                              <p className="font-bold text-primary text-lg">{client.salesWeek}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-muted-foreground">Løn</p>
+                              <p className="font-bold text-primary text-lg">{client.salesMonth}</p>
+                            </div>
                           </div>
-                          <div className="text-center">
-                            <p className="text-muted-foreground">Uge</p>
-                            <p className="font-bold text-primary text-lg">{client.salesWeek}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-muted-foreground">Løn</p>
-                            <p className="font-bold text-primary text-lg">{client.salesMonth}</p>
-                          </div>
-                        </div>
 
-                        {/* Sales per hour indicator */}
-                        <div className="flex items-center justify-center gap-2 pt-2 border-t">
-                          <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Salg/time:</span>
-                          <span className="text-sm font-semibold text-primary">
-                            {salesPerHour > 0 ? salesPerHour.toFixed(2) : "–"}
-                          </span>
+                          {/* Sales per hour indicator */}
+                          <div className="flex items-center justify-center gap-2 pt-2 border-t">
+                            <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Salg/time:</span>
+                            <span className="text-sm font-semibold text-primary">
+                              {salesPerHour > 0 ? salesPerHour.toFixed(2) : "–"}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </CardContent>
           </Card>
