@@ -26,6 +26,7 @@ import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
 import { PositionsTab } from "@/components/employees/PositionsTab";
 import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
+import { PermissionsTab } from "@/components/employees/PermissionsTab";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 
@@ -1054,6 +1055,7 @@ export default function EmployeeMasterData() {
             <TabsTrigger value="staff-employees">Backoffice</TabsTrigger>
             <TabsTrigger value="teams">{t("employees.tabs.teams")}</TabsTrigger>
             <TabsTrigger value="positions">{t("employees.tabs.positions")}</TabsTrigger>
+            <TabsTrigger value="permissions">Rettigheder</TabsTrigger>
             <TabsTrigger value="dialer-mapping">{t("employees.tabs.dialerMapping")}</TabsTrigger>
           </TabsList>
 
@@ -1483,6 +1485,10 @@ export default function EmployeeMasterData() {
 
           <TabsContent value="positions" className="space-y-6">
             <PositionsTab />
+          </TabsContent>
+
+          <TabsContent value="permissions" className="space-y-6">
+            <PermissionsTab />
           </TabsContent>
 
           <TabsContent value="dialer-mapping" className="space-y-6">
