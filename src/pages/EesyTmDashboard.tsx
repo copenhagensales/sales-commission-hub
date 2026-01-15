@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -230,7 +231,8 @@ export default function EesyTmDashboard() {
                           : timeProgress.dayExpectedPercent;
     
     const progress = (commission / target) * 100;
-    return { target, progress, expectedPercent };
+    const expectedAmount = (expectedPercent / 100) * target;
+    return { target, progress, expectedPercent, expectedAmount };
   };
 
   // Sort employees by commission for each period
@@ -436,13 +438,20 @@ export default function EesyTmDashboard() {
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>{formatCurrency(commission)}</span>
                           </TableCell>
-                          <TableCell className="text-right py-2">
-                            {goalInfo ? (
-                              <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>{Math.round(goalInfo.progress)}%</span>
-                                <span className="text-xs text-muted-foreground">{formatCurrency(commission)} / {formatCurrency(goalInfo.target)}</span>
-                              </div>
-                            ) : <span className="text-xs text-muted-foreground">–</span>}
+                          <TableCell className="py-2">
+                            <div className="flex justify-end">
+                              {goalInfo ? (
+                                <GoalProgressRing
+                                  progress={goalInfo.progress}
+                                  expectedPercent={goalInfo.expectedPercent}
+                                  current={commission}
+                                  target={goalInfo.target}
+                                  expectedAmount={goalInfo.expectedAmount}
+                                />
+                              ) : (
+                                <GoalProgressRingEmpty />
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -508,19 +517,20 @@ export default function EesyTmDashboard() {
                               {formatCurrency(commission)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right py-2">
-                            {goalInfo ? (
-                              <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>
-                                  {Math.round(goalInfo.progress)}%
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatCurrency(commission)} / {formatCurrency(goalInfo.target)}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">–</span>
-                            )}
+                          <TableCell className="py-2">
+                            <div className="flex justify-end">
+                              {goalInfo ? (
+                                <GoalProgressRing
+                                  progress={goalInfo.progress}
+                                  expectedPercent={goalInfo.expectedPercent}
+                                  current={commission}
+                                  target={goalInfo.target}
+                                  expectedAmount={goalInfo.expectedAmount}
+                                />
+                              ) : (
+                                <GoalProgressRingEmpty />
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -586,19 +596,20 @@ export default function EesyTmDashboard() {
                               {formatCurrency(commission)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right py-2">
-                            {goalInfo ? (
-                              <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>
-                                  {Math.round(goalInfo.progress)}%
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatCurrency(commission)} / {formatCurrency(goalInfo.target)}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">–</span>
-                            )}
+                          <TableCell className="py-2">
+                            <div className="flex justify-end">
+                              {goalInfo ? (
+                                <GoalProgressRing
+                                  progress={goalInfo.progress}
+                                  expectedPercent={goalInfo.expectedPercent}
+                                  current={commission}
+                                  target={goalInfo.target}
+                                  expectedAmount={goalInfo.expectedAmount}
+                                />
+                              ) : (
+                                <GoalProgressRingEmpty />
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
