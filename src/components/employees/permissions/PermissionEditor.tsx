@@ -94,18 +94,16 @@ export function PermissionEditor() {
     return acc;
   }, {} as Record<string, typeof extendedPermissions>);
 
-  // Get pages (no parent) and their children
+  // Get pages (no parent) and their children - fixed hierarchy logic
   const getPermissionHierarchy = (rolePermissions: typeof extendedPermissions) => {
-    const pages = rolePermissions.filter(p => !p.parent_key || p.permission_type === 'page');
-    const tabs = rolePermissions.filter(p => p.permission_type === 'tab');
-    const actions = rolePermissions.filter(p => p.permission_type === 'action');
+    // Pages are items WITHOUT a parent_key
+    const pages = rolePermissions.filter(p => !p.parent_key);
+    // Children are items WITH a parent_key
+    const children = rolePermissions.filter(p => p.parent_key);
     
     return pages.map(page => ({
       ...page,
-      children: [
-        ...tabs.filter(t => t.parent_key === page.permission_key),
-        ...actions.filter(a => a.parent_key === page.permission_key),
-      ]
+      children: children.filter(c => c.parent_key === page.permission_key)
     }));
   };
 
