@@ -78,6 +78,7 @@ import {
   RolePreview,
   LoginLog,
   TeamDashboard,
+  EesyTmDashboard,
   FieldmarketingDashboardFull,
   CphSalesDashboard,
   DashboardSettings,
@@ -348,7 +349,7 @@ export const routes: RouteConfig[] = [
   },
   {
     path: "/dashboards/eesy-tm",
-    component: TeamDashboard,
+    component: EesyTmDashboard,
     access: "role",
     positionPermission: "menu_dashboard_eesy_tm",
   },
