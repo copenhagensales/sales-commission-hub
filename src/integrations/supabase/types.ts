@@ -8242,6 +8242,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
