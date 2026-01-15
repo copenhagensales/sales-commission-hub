@@ -173,21 +173,15 @@ function PermissionRow({
             />
           </div>
         </TableCell>
-        {/* Empty cells for visibility columns (only applicable for data visibility rows) */}
+        {/* Empty cells for visibility columns - not applicable for page access rows */}
         <TableCell className="text-center">
-          <div className="flex items-center justify-center opacity-30">
-            <Switch disabled checked={false} />
-          </div>
+          <span className="text-muted-foreground text-xs">—</span>
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex items-center justify-center opacity-30">
-            <Switch disabled checked={false} />
-          </div>
+          <span className="text-muted-foreground text-xs">—</span>
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex items-center justify-center opacity-30">
-            <Switch disabled checked={false} />
-          </div>
+          <span className="text-muted-foreground text-xs">—</span>
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
