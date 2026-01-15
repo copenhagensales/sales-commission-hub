@@ -5,10 +5,45 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ============= IN-MEMORY CACHE =============
+// Cache results for 30 seconds to reduce database load
+const CACHE_TTL_MS = 30000;
+const cache = new Map<string, { data: any; timestamp: number }>();
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
+    console.log(`[Cache] HIT for ${key}`);
+    return entry.data as T;
+  }
+  if (entry) {
+    cache.delete(key); // Clean up expired entry
+  }
+  return null;
+}
+
+function setCache(key: string, data: any): void {
+  cache.set(key, { data, timestamp: Date.now() });
+  console.log(`[Cache] SET for ${key}`);
+}
+
+// Clean up old cache entries periodically (keep last 100)
+function cleanupCache(): void {
+  if (cache.size > 100) {
+    const entries = Array.from(cache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toDelete = entries.slice(0, entries.length - 50);
+    toDelete.forEach(([key]) => cache.delete(key));
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  
+  // Cleanup old cache entries periodically
+  cleanupCache();
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -25,27 +60,62 @@ Deno.serve(async (req) => {
 
     // Handle celebration data request (bypasses RLS for TV boards)
     if (action === "celebration-data") {
-      return await handleCelebrationData(supabase, dashboard, metric, corsHeaders);
+      const cacheKey = `celebration-${dashboard}-${metric}`;
+      const cached = getCached<Response>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleCelebrationData(supabase, dashboard, metric, corsHeaders, cacheKey);
     }
 
     // Handle eesy-tm-data request (bypasses RLS for TV boards)
     if (action === "eesy-tm-data") {
-      return await handleEesyTmData(supabase, corsHeaders);
+      const cacheKey = `eesy-tm-data`;
+      const cached = getCached<Response>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleEesyTmData(supabase, corsHeaders, cacheKey);
     }
 
     // Handle tdc-erhverv-data request (bypasses RLS for TV boards)
     if (action === "tdc-erhverv-data") {
-      return await handleTdcErhvervData(supabase, corsHeaders);
+      const cacheKey = `tdc-erhverv-data`;
+      const cached = getCached<Response>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleTdcErhvervData(supabase, corsHeaders, cacheKey);
     }
 
     // Handle relatel-data request (bypasses RLS for TV boards)
     if (action === "relatel-data") {
-      return await handleRelatelData(supabase, corsHeaders);
+      const cacheKey = `relatel-data`;
+      const cached = getCached<Response>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleRelatelData(supabase, corsHeaders, cacheKey);
     }
 
     // Handle cs-top-20-data request (bypasses RLS for TV boards)
     if (action === "cs-top-20-data") {
-      return await handleCsTop20Data(supabase, corsHeaders);
+      const cacheKey = `cs-top-20-data`;
+      const cached = getCached<Response>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleCsTop20Data(supabase, corsHeaders, cacheKey);
     }
 
     // Verify access code if provided
@@ -902,7 +972,8 @@ async function handleCelebrationData(
   supabase: any,
   dashboardSlug: string,
   metric: string,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
 ) {
   console.log(`[CelebrationData] Fetching for dashboard: ${dashboardSlug}, metric: ${metric}`);
   
@@ -1074,6 +1145,11 @@ async function handleCelebrationData(
 
   console.log(`[CelebrationData] Returning:`, result);
 
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
+
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -1082,7 +1158,8 @@ async function handleCelebrationData(
 // Handle Eesy TM data request (bypasses RLS for TV boards)
 async function handleEesyTmData(
   supabase: any,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
 ) {
   console.log("[EesyTmData] Fetching data");
 
@@ -1296,6 +1373,11 @@ async function handleEesyTmData(
 
   console.log("[EesyTmData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, goalsCount: Object.keys(employeeGoals).length });
 
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
+
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -1304,7 +1386,8 @@ async function handleEesyTmData(
 // Handle TDC Erhverv data request (bypasses RLS for TV boards)
 async function handleTdcErhvervData(
   supabase: any,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
 ) {
   console.log("[TdcErhvervData] Fetching data");
 
@@ -1610,6 +1693,11 @@ async function handleTdcErhvervData(
 
   console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, hoursToday, hoursWeek, hoursPayroll, goalsCount: Object.keys(employeeGoals).length });
 
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
+
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -1618,7 +1706,8 @@ async function handleTdcErhvervData(
 // Handle Relatel data request (bypasses RLS for TV boards)
 async function handleRelatelData(
   supabase: any,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
 ) {
   console.log("[RelatelData] Fetching data");
 
@@ -1863,6 +1952,11 @@ async function handleRelatelData(
     goalsCount: Object.keys(employeeGoals).length
   });
 
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
+
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -1871,7 +1965,8 @@ async function handleRelatelData(
 // Handle CS Top 20 data request - all clients combined (bypasses RLS for TV boards)
 async function handleCsTop20Data(
   supabase: any,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
 ) {
   console.log("[CsTop20Data] Fetching data for all clients");
 
@@ -2130,6 +2225,11 @@ async function handleCsTop20Data(
       payroll: sellersPayroll.length
     }
   });
+
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
