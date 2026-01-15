@@ -178,20 +178,20 @@ export function useCanAccess() {
   const { data: rolesData, isPending, isLoading: queryLoading } = useCurrentUserRoles();
   const { isPreviewMode, previewRole } = useRolePreview();
 
-  // Fetch employee position to check if user has "Ejer" position
+  // PRIMARY: Fetch system_role from employee's position
   const { data: employeeData, isLoading: employeeLoading } = useQuery({
-    queryKey: ["employee-position", user?.id],
+    queryKey: ["employee-position-role", user?.id],
     queryFn: async () => {
       if (!user) return null;
       const { data } = await supabase
         .from("employee_master_data")
-        .select("position_id, positions(name)")
+        .select("position_id, positions(name, system_role)")
         .eq("auth_user_id", user.id)
         .maybeSingle();
       return data;
     },
     enabled: !!user && !authLoading,
-    staleTime: 1000 * 60, // Cache for 1 minute
+    staleTime: 1000 * 60,
   });
 
   // Show loading if no user yet, or if query is still loading
@@ -205,8 +205,6 @@ export function useCanAccess() {
     const isRekruttering = previewRoleLower === "rekruttering";
     const isSome = previewRoleLower === "some";
     const isMedarbejder = !isOwner && !isTeamleder && !isRekruttering && !isSome;
-    
-    console.log("useCanAccess PREVIEW MODE - role:", previewRole);
 
     return {
       isLoading: false,
@@ -219,7 +217,6 @@ export function useCanAccess() {
       isTeamlederOrAbove: isTeamleder || isOwner,
       isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
       isMedarbejder,
-      // Legacy - use usePermissions().canSeeAllData and usePermissions().canSeeTeamData instead
       canManageTeam: isTeamleder || isOwner,
       canManageRoles: isOwner,
       canCreateEmployees: isRekruttering || isTeamleder || isOwner,
@@ -228,31 +225,36 @@ export function useCanAccess() {
     };
   }
 
-  // NORMAL MODE: Use actual system roles
-  const roles = rolesData || [];
-  const roleNames = roles.map(r => r.role);
+  // NORMAL MODE: Primary source is positions.system_role, fallback to system_roles table
+  const positionData = employeeData?.positions as { name?: string; system_role?: string } | null;
+  const positionSystemRole = positionData?.system_role?.toLowerCase();
   
-  // Check position name for "Ejer" position (case-insensitive)
-  const positionName = (employeeData?.positions as { name?: string } | null)?.name?.toLowerCase();
-  const positionIsOwner = positionName === "ejer";
+  // Fallback roles from system_roles table
+  const fallbackRoles = rolesData || [];
+  const fallbackRoleNames = fallbackRoles.map(r => r.role);
   
-  // Check for each role type - check array for multi-role support OR position
-  const isOwner = roleNames.includes("ejer") || positionIsOwner;
-  const isTeamleder = roleNames.includes("teamleder");
-  const isRekruttering = roleNames.includes("rekruttering");
-  const isSome = roleNames.includes("some");
-  const isMedarbejder = roleNames.includes("medarbejder") || roles.length === 0;
+  // Determine effective role: position takes priority, then system_roles table
+  const effectiveRole = positionSystemRole || (fallbackRoleNames.length > 0 ? fallbackRoleNames[0] : "medarbejder");
   
-  // Debug logging for role detection
-  console.log("useCanAccess - roles:", roleNames, "positionIsOwner:", positionIsOwner, "isOwner:", isOwner);
+  // Check for each role type using position's system_role OR fallback
+  const isOwner = effectiveRole === "ejer" || fallbackRoleNames.includes("ejer");
+  const isTeamleder = effectiveRole === "teamleder" || fallbackRoleNames.includes("teamleder");
+  const isRekruttering = effectiveRole === "rekruttering" || fallbackRoleNames.includes("rekruttering");
+  const isSome = effectiveRole === "some" || fallbackRoleNames.includes("some");
+  const isMedarbejder = effectiveRole === "medarbejder" || (!isOwner && !isTeamleder && !isRekruttering && !isSome);
 
   // Primary role for display purposes (prioritize higher roles)
   const primaryRole = isOwner ? "ejer" : isTeamleder ? "teamleder" : isRekruttering ? "rekruttering" : isSome ? "some" : "medarbejder";
 
+  // Collect all effective roles for display
+  const allRoles = positionSystemRole 
+    ? [positionSystemRole, ...fallbackRoleNames.filter(r => r !== positionSystemRole)]
+    : fallbackRoleNames;
+
   return {
     isLoading: isRoleLoading,
     role: primaryRole,
-    roles: roleNames,
+    roles: allRoles.length > 0 ? allRoles : ["medarbejder"],
     isOwner,
     isTeamleder,
     isRekruttering,
@@ -260,11 +262,10 @@ export function useCanAccess() {
     isTeamlederOrAbove: isTeamleder || isOwner,
     isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
     isMedarbejder,
-    // Legacy - use usePermissions().canSeeAllData and usePermissions().canSeeTeamData instead
     canManageTeam: isTeamleder || isOwner,
     canManageRoles: isOwner,
     canCreateEmployees: isRekruttering || isTeamleder || isOwner,
     canSendContracts: isRekruttering || isTeamleder || isOwner,
-    hasMultipleRoles: roles.length > 1,
+    hasMultipleRoles: allRoles.length > 1,
   };
 }
