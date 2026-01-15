@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Users, Settings, Calendar, FileText, BarChart3, Loader2, Crown, User } from "lucide-react";
+import { Shield, Users, Settings, Calendar, FileText, BarChart3, Loader2, Crown, User, Eye } from "lucide-react";
+import { useDataVisibilityRules, type Visibility } from "@/hooks/useDataVisibility";
 
 // Icon mapping from database string to component
 const iconMap: Record<string, React.ReactNode> = {
@@ -24,6 +25,30 @@ const colorMap: Record<string, string> = {
   purple: "bg-purple-500 text-white",
   muted: "bg-muted text-muted-foreground",
   gray: "bg-muted text-muted-foreground",
+};
+
+// Visibility badge colors
+const visibilityColors: Record<Visibility, string> = {
+  all: "bg-green-100 text-green-700 border-green-200",
+  team: "bg-blue-100 text-blue-700 border-blue-200",
+  self: "bg-amber-100 text-amber-700 border-amber-200",
+  none: "bg-red-100 text-red-700 border-red-200",
+};
+
+const visibilityLabels: Record<Visibility, string> = {
+  all: "Alle",
+  team: "Team",
+  self: "Kun egen",
+  none: "Ingen",
+};
+
+const scopeLabels: Record<string, string> = {
+  leaderboard_ranking: "Leaderboards",
+  sales_count_others: "Andres salgsantal",
+  h2h_stats: "Head-to-Head statistik",
+  commission_details: "Provisionsdetaljer",
+  salary_breakdown: "Lønspecifikation",
+  employee_performance: "Performance-rapporter",
 };
 
 const accessMatrix = {
@@ -79,13 +104,24 @@ export function PermissionsTab() {
     },
   });
 
-  const isLoading = rolesLoading || positionsLoading;
+  const { data: visibilityRules = [], isLoading: visibilityLoading } = useDataVisibilityRules();
+
+  const isLoading = rolesLoading || positionsLoading || visibilityLoading;
 
   // Create a lookup map for roles
   const roleMap = roleDefinitions.reduce((acc, role) => {
     acc[role.key] = role;
     return acc;
   }, {} as Record<string, RoleDefinition>);
+
+  // Get unique data scopes
+  const dataScopes = [...new Set(visibilityRules.map(r => r.data_scope))];
+  
+  // Get visibility for a role/scope combination
+  const getVisibilityForRoleScope = (roleKey: string, scope: string): Visibility => {
+    const rule = visibilityRules.find(r => r.role_key === roleKey && r.data_scope === scope);
+    return (rule?.visibility as Visibility) || "none";
+  };
 
   if (isLoading) {
     return (
@@ -126,6 +162,71 @@ export function PermissionsTab() {
                 )}
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Visibility Rules - NEW SECTION */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Data-synlighed
+          </CardTitle>
+          <CardDescription>
+            Hvad kan hver rolle se af andres data? "Alle" = alle medarbejdere, "Team" = kun teammedlemmer, "Kun egen" = kun egne data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Datatype</TableHead>
+                  {roleDefinitions.map((role) => (
+                    <TableHead key={role.key} className="text-center">
+                      <Badge className={colorMap[role.color || "gray"]} variant="outline">
+                        {role.label}
+                      </Badge>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dataScopes.map((scope) => (
+                  <TableRow key={scope}>
+                    <TableCell className="font-medium">{scopeLabels[scope] || scope}</TableCell>
+                    {roleDefinitions.map((role) => {
+                      const visibility = getVisibilityForRoleScope(role.key, scope);
+                      return (
+                        <TableCell key={role.key} className="text-center">
+                          <Badge 
+                            variant="outline" 
+                            className={visibilityColors[visibility]}
+                          >
+                            {visibilityLabels[visibility]}
+                          </Badge>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className={visibilityColors.all}>Alle</Badge>
+              <span>Kan se data for alle medarbejdere</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className={visibilityColors.team}>Team</Badge>
+              <span>Kun teammedlemmer</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className={visibilityColors.self}>Kun egen</Badge>
+              <span>Kun egne data</span>
+            </div>
           </div>
         </CardContent>
       </Card>
