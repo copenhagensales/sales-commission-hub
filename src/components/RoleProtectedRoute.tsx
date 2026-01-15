@@ -112,14 +112,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Handle database error/timeout - show retry option, don't log out
+  // Handle database error/timeout - show retry option, don't log out or show "deactivated"
   if (isError) {
-    console.log("ProtectedRoute: Database error - showing retry option");
+    console.log("ProtectedRoute: Database error - showing retry option (NOT deactivated!)");
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <div className="text-destructive font-medium">Kunne ikke indlæse dine rettigheder</div>
-        <p className="text-muted-foreground text-sm">Der opstod en forbindelsesfejl. Prøv venligst igen.</p>
-        <div className="flex gap-2 mt-2">
+        <div className="text-destructive font-medium text-lg">Database forbindelse mislykkedes</div>
+        <p className="text-muted-foreground text-sm max-w-md text-center">
+          Systemet oplever midlertidige forbindelsesproblemer.<br />
+          <strong>Din konto er IKKE deaktiveret</strong> - dette er en teknisk fejl.
+        </p>
+        <div className="flex gap-2 mt-4">
           <Button onClick={handleRetry}>
             Prøv igen
           </Button>

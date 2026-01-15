@@ -55,8 +55,10 @@ export function usePositionPermissions() {
         .eq("is_active", true)
         .maybeSingle();
       
+      // THROW on database error - don't silently continue (causes false "deactivated" message)
       if (errPrivate) {
-        console.error("usePositionPermissions: Error fetching by private_email", errPrivate);
+        console.error("usePositionPermissions: Database error fetching by private_email", errPrivate);
+        throw new Error(`Database fejl: ${errPrivate.message}`);
       }
       
       employee = empByPrivate;
@@ -70,8 +72,10 @@ export function usePositionPermissions() {
           .eq("is_active", true)
           .maybeSingle();
         
+        // THROW on database error - don't silently continue
         if (errWork) {
-          console.error("usePositionPermissions: Error fetching by work_email", errWork);
+          console.error("usePositionPermissions: Database error fetching by work_email", errWork);
+          throw new Error(`Database fejl: ${errWork.message}`);
         }
         
         employee = empByWork;
@@ -113,9 +117,10 @@ export function usePositionPermissions() {
         .ilike("name", employee.job_title)
         .maybeSingle();
 
+      // THROW on database error - don't silently continue
       if (posError) {
-        console.error("Error fetching position:", posError);
-        return { position: null, permissions: {} };
+        console.error("usePositionPermissions: Database error fetching position", posError);
+        throw new Error(`Database fejl: ${posError.message}`);
       }
 
       if (!position) {
@@ -140,7 +145,8 @@ export function usePositionPermissions() {
     refetchOnWindowFocus: false, // Don't refetch on window focus - too expensive
     refetchOnMount: 'always', // Only refetch if stale
     refetchOnReconnect: false, // Don't refetch on reconnect - keep cached value
-    retry: 2,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff: 1s, 2s, 4s, max 10s
   });
 }
 
