@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, addDays, isWeekend } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, addDays, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart, Trophy, Clock, TrendingUp, Target } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, Trophy, Clock, TrendingUp, Target, CalendarDays, Calendar, CalendarRange } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +91,32 @@ export default function EesyTmDashboard() {
     startDate: dateRange?.from || payrollPeriod.start,
     endDate: dateRange?.to || new Date(),
     enabled: !!dateRange?.from
+  });
+
+  // Fetch sales for today, this week, and this month
+  const today = startOfDay(new Date());
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(today);
+
+  const dailySalesData = useDashboardSalesData({
+    clientName: "Eesy",
+    startDate: today,
+    endDate: new Date(),
+    enabled: true
+  });
+
+  const weeklySalesData = useDashboardSalesData({
+    clientName: "Eesy",
+    startDate: weekStart,
+    endDate: new Date(),
+    enabled: true
+  });
+
+  const monthlySalesData = useDashboardSalesData({
+    clientName: "Eesy",
+    startDate: monthStart,
+    endDate: new Date(),
+    enabled: true
   });
 
   // Fetch team goal for payroll period
@@ -289,7 +315,43 @@ export default function EesyTmDashboard() {
           </Card>
         )}
 
-        {/* KPI Cards */}
+        {/* KPI Cards - Row 1: Time-based sales */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{dailySalesData.totalSales}</div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg denne uge</CardTitle>
+              <CalendarRange className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{weeklySalesData.totalSales}</div>
+              <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{monthlySalesData.totalSales}</div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* KPI Cards - Row 2: Performance metrics */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
