@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarDays, Calendar, CalendarRange } from "lucide-react";
+import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -163,6 +163,17 @@ export default function TdcErhvervDashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
+  // Calculate sales per hour
+  const dailySalesPerHour = dailySalesData.totalHours > 0 
+    ? dailySalesData.totalSales / dailySalesData.totalHours 
+    : 0;
+  const weeklySalesPerHour = weeklySalesData.totalHours > 0 
+    ? weeklySalesData.totalSales / weeklySalesData.totalHours 
+    : 0;
+  const payrollSalesPerHour = payrollSalesData.totalHours > 0 
+    ? payrollSalesData.totalSales / payrollSalesData.totalHours 
+    : 0;
+
   // Get max commission for color scaling
   const maxDailyCommission = Math.max(...sortedDailySellers.map(s => 
     'totalCommission' in s ? s.totalCommission : s.commission), 1);
@@ -217,6 +228,54 @@ export default function TdcErhvervDashboard() {
                 {tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* KPI Cards - Row 2: Sales per hour */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg/time i dag</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {dailySalesPerHour.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {dailySalesData.totalSales} salg / {dailySalesData.totalHours.toFixed(1)} timer
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg/time uge</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {weeklySalesPerHour.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {weeklySalesData.totalSales} salg / {weeklySalesData.totalHours.toFixed(1)} timer
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {payrollSalesPerHour.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {payrollSalesData.totalSales} salg / {payrollSalesData.totalHours.toFixed(1)} timer
+              </p>
             </CardContent>
           </Card>
         </div>
