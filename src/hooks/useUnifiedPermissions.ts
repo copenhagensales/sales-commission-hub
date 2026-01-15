@@ -260,6 +260,23 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_onboarding_admin: 'Onboarding Admin',
   menu_recruitment_dashboard: 'Rekruttering Dashboard',
   menu_shift_overview: 'Vagtplan Oversigt',
+  
+  // Fieldmarketing sidebar-menuer (tabs)
+  menu_fm_overview: 'Oversigt',
+  menu_fm_booking: 'Booking',
+  menu_fm_vehicles: 'Køretøjer',
+  menu_fm_dashboard: 'Dashboard',
+  menu_fm_sales_registration: 'Salgsregistrering',
+  menu_fm_billing: 'Fakturering',
+  menu_fm_travel_expenses: 'Rejseudgifter',
+  menu_fm_edit_sales: 'Ret salg',
+  menu_fm_time_off: 'Fraværsanmodninger',
+  
+  // Fieldmarketing booking-faner (actions)
+  menu_fm_book_week: 'Book uge',
+  menu_fm_bookings: 'Kommende bookinger',
+  menu_fm_locations: 'Lokationer',
+  menu_fm_vagtplan_fm: 'Vagtplan FM',
 };
 
 export const dataScopeLabels: Record<string, string> = {
