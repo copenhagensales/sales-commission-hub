@@ -303,12 +303,15 @@ export default function TdcErhvervDashboard() {
   const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className={tvMode 
+      ? 'w-[1920px] h-[1080px] bg-background p-5 flex flex-col overflow-hidden' 
+      : 'min-h-screen bg-background p-6'
+    }>
       <DashboardHeader 
         title="TDC Erhverv – Overblik" 
         subtitle={`Dag, uge og lønperiode (${periodLabel})`}
       />
-      <div className="space-y-6">
+      <div className={tvMode ? 'space-y-4 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
 
         {/* KPI Cards - Row 1: Time-based sales */}
         <div className="grid grid-cols-4 gap-4">
@@ -414,16 +417,19 @@ export default function TdcErhvervDashboard() {
         </div>
 
         {/* Three leaderboard columns */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className={tvMode 
+          ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' 
+          : 'grid grid-cols-1 gap-4 lg:grid-cols-3'
+        }>
           
           {/* Top Løn Periode */}
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
+            <CardHeader className="pb-3 flex-shrink-0">
               <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
                 Top Løn Periode
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : sortedPayrollSellers.length === 0 ? (
@@ -497,13 +503,13 @@ export default function TdcErhvervDashboard() {
           </Card>
 
           {/* Top Uge */}
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
+            <CardHeader className="pb-3 flex-shrink-0">
               <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
                 Top Uge
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : sortedWeeklySellers.length === 0 ? (
@@ -577,13 +583,13 @@ export default function TdcErhvervDashboard() {
           </Card>
 
           {/* Top Dag */}
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
+            <CardHeader className="pb-3 flex-shrink-0">
               <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
                 Top Dag
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : sortedDailySellers.length === 0 ? (
