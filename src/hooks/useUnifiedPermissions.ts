@@ -17,10 +17,14 @@ export interface RoleDefinition {
   priority: number | null;
 }
 
+export type PermissionType = 'page' | 'tab' | 'action';
+
 export interface PagePermission {
   id: string;
   role_key: string;
   permission_key: string;
+  parent_key: string | null;
+  permission_type: PermissionType;
   can_view: boolean;
   can_edit: boolean;
   description: string | null;
