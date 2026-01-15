@@ -24,11 +24,23 @@ export function SmartRedirect() {
   const [redirectPath, setRedirectPath] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
     async function checkLandingPage() {
       if (!user) {
-        setRedirectPath("/auth");
+        if (isMounted) setRedirectPath("/auth");
         return;
       }
+      
+      // Set a timeout to prevent infinite hang on slow DB
+      timeoutId = setTimeout(() => {
+        if (isMounted && !redirectPath) {
+          console.warn("SmartRedirect: Landing page check timed out, defaulting to /home");
+          setRedirectPath("/home");
+        }
+      }, 5000);
+
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         
@@ -40,6 +52,8 @@ export function SmartRedirect() {
           .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .eq("is_active", true)
           .maybeSingle();
+        
+        if (!isMounted) return;
         
         // Priority: 1. Employee override, 2. Position default, 3. "/home"
         if (employee?.default_landing_page) {
@@ -55,6 +69,8 @@ export function SmartRedirect() {
             .eq("name", employee.job_title)
             .maybeSingle();
           
+          if (!isMounted) return;
+          
           if (position?.default_landing_page) {
             setRedirectPath(position.default_landing_page);
             return;
@@ -63,11 +79,17 @@ export function SmartRedirect() {
         
         setRedirectPath("/home");
       } catch {
-        setRedirectPath("/home");
+        if (isMounted) setRedirectPath("/home");
       }
     }
+    
     if (!loading) checkLandingPage();
-  }, [user, loading]);
+    
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [user, loading, redirectPath]);
 
   if (loading || !redirectPath) return <PageLoader />;
   return <Navigate to={redirectPath} replace />;
