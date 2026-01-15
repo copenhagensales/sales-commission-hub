@@ -101,10 +101,35 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.reload();
   };
   
+  // Check if we're offline
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="animate-pulse text-muted-foreground">
+          {isRetrying ? 'Forbinder til database...' : 'Indlæser...'}
+        </div>
+        {isRetrying && (
+          <p className="text-xs text-muted-foreground max-w-xs text-center">
+            Systemet oplever langsom forbindelse. Vent venligst...
+          </p>
+        )}
+      </div>
+    );
+  }
+  
+  // Handle offline state
+  if (isOffline) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="text-amber-600 font-medium text-lg">Ingen internetforbindelse</div>
+        <p className="text-muted-foreground text-sm max-w-md text-center">
+          Tjek din internetforbindelse og prøv igen.
+        </p>
+        <Button onClick={handleRetry}>
+          Prøv igen
+        </Button>
       </div>
     );
   }
