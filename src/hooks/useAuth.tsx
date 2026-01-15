@@ -138,6 +138,14 @@ export function useAuth() {
     }).catch((error) => {
       clearTimeout(sessionTimeout);
       console.error("Auth session check failed:", error);
+      
+      // If Auth service is unreachable, clear stored tokens to prevent retry loops
+      if (error.message === "Failed to fetch" || error.name === "AuthRetryableFetchError") {
+        console.warn("Auth service unreachable - clearing stored session to prevent retry loop");
+        // Clear localStorage directly to avoid another network call
+        localStorage.removeItem('sb-jwlimmeijpfmaksvmuru-auth-token');
+      }
+      
       setLoading(false);
     });
 
