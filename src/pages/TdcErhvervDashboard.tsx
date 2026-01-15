@@ -69,6 +69,15 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+// Format name for display: "Kasper M" (first name + last initial)
+const getDisplayName = (name: string) => {
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[parts.length - 1][0]}`;
+  }
+  return name;
+};
+
 // Commission color thresholds based on period type
 // Daily: Green ≥ 1250, Yellow ≥ 1000, Red < 1000
 // Weekly (5 days): Green ≥ 6250, Yellow ≥ 5000, Red < 5000
@@ -442,7 +451,7 @@ export default function TdcErhvervDashboard() {
                                   {getInitials(name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
@@ -521,7 +530,7 @@ export default function TdcErhvervDashboard() {
                                   {getInitials(name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
@@ -600,7 +609,7 @@ export default function TdcErhvervDashboard() {
                                   {getInitials(name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
