@@ -83,6 +83,7 @@ const Home = () => {
       return data;
     },
     enabled: !!(user?.email || (isPreviewMode && previewEmployee?.id)),
+    staleTime: 60000, // 1 minute cache
   });
 
   // Fetch upcoming birthdays and anniversaries (next 14 days)
@@ -177,6 +178,7 @@ const Home = () => {
       // Sort by date
       return results.sort((a, b) => a.date.getTime() - b.date.getTime());
     },
+    staleTime: 300000, // 5 minutes cache - celebrations don't change often
   });
 
   // Fetch company events
@@ -192,6 +194,7 @@ const Home = () => {
         .limit(5);
       return data || [];
     },
+    staleTime: 60000, // 1 minute cache
   });
 
   // Add event mutation
@@ -251,6 +254,7 @@ const Home = () => {
       return data || [];
     },
     enabled: !!employee?.id,
+    staleTime: 60000, // 1 minute cache
   });
 
   // For owners/teamleaders - fetch all teams they can manage
@@ -263,6 +267,7 @@ const Home = () => {
         .order("name");
       return data || [];
     },
+    staleTime: 120000, // 2 minutes cache - teams rarely change
   });
 
   // Calculate payroll period (15th-14th) - shared for all team goal queries
@@ -353,6 +358,7 @@ const Home = () => {
       return goalsWithProgress;
     },
     enabled: canEditHomeGoals,
+    staleTime: 30000, // 30 seconds cache - sales data updates frequently
   });
 
   // Fetch team sales goals with commission progress (for regular employees)
@@ -461,6 +467,7 @@ const Home = () => {
       };
     },
     enabled: userTeams.length > 0 && !canEditHomeGoals,
+    staleTime: 30000, // 30 seconds cache
   });
 
   // Add/update team goal mutation (using team_sales_goals with amounts)
@@ -680,6 +687,7 @@ const Home = () => {
       };
     },
     enabled: !!employee?.id,
+    staleTime: 30000, // 30 seconds cache
   });
 
   // Fetch employee's personal sales goal for the current payroll period
@@ -702,6 +710,7 @@ const Home = () => {
       return data;
     },
     enabled: !!employee?.id,
+    staleTime: 60000, // 1 minute cache
   });
 
   // Calculate daily goal stats
@@ -757,6 +766,7 @@ const Home = () => {
       
       return data || [];
     },
+    staleTime: 300000, // 5 minutes cache - new employees don't change often
   });
 
   // Fetch weekly recognition data for both last week and current week
@@ -946,6 +956,7 @@ const Home = () => {
         }
       };
     },
+    staleTime: 60000, // 1 minute cache
   });
 
   const getGreeting = () => {
