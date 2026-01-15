@@ -144,6 +144,8 @@ interface DiagnosticSummary {
   hostname: string;
   supabaseUrl: string;
   authEndpoint: string;
+  apikeyPresent: boolean;
+  apikeyLength: number;
   healthCheck: { status: string; time: number } | null;
   loginAttempt: { outcome: string; errorName?: string; errorMessage?: string; time: number } | null;
 }
@@ -345,14 +347,21 @@ export default function Auth() {
       } else {
         // ============ DIAGNOSTIC LOGIN MODE ============
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const authEndpoint = `${supabaseUrl}/auth/v1/token?grant_type=password`;
+        
+        // Check API key status
+        const apikeyPresent = Boolean(supabaseKey && supabaseKey.length > 0);
+        const apikeyLength = supabaseKey?.length || 0;
         
         // Initialize diagnostic summary
         const summary: DiagnosticSummary = {
           timestamp: new Date().toISOString(),
           hostname: window.location.hostname,
-          supabaseUrl: supabaseUrl.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].'),
-          authEndpoint: authEndpoint.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].'),
+          supabaseUrl: supabaseUrl?.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].') || 'NOT SET',
+          authEndpoint: authEndpoint?.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].') || 'NOT SET',
+          apikeyPresent,
+          apikeyLength,
           healthCheck: null,
           loginAttempt: null,
         };
@@ -360,6 +369,7 @@ export default function Auth() {
         console.log('[Auth Diagnostic] ========== LOGIN ATTEMPT ==========');
         console.log('[Auth Diagnostic] Hostname:', window.location.hostname);
         console.log('[Auth Diagnostic] VITE_SUPABASE_URL:', supabaseUrl);
+        console.log('[Auth Diagnostic] VITE_SUPABASE_PUBLISHABLE_KEY present:', apikeyPresent, 'length:', apikeyLength);
         console.log('[Auth Diagnostic] Auth endpoint:', authEndpoint);
         
         // Check if we're online first
@@ -604,6 +614,9 @@ export default function Auth() {
               <div><strong>Hostname:</strong> {diagSummary.hostname}</div>
               <div><strong>Supabase URL:</strong> {diagSummary.supabaseUrl}</div>
               <div><strong>Auth Endpoint:</strong> {diagSummary.authEndpoint}</div>
+              <div className={diagSummary.apikeyPresent ? "text-green-600" : "text-red-600"}>
+                <strong>API Key:</strong> {diagSummary.apikeyPresent ? `✅ Present (${diagSummary.apikeyLength} chars)` : '❌ MISSING'}
+              </div>
               <div className="border-t border-orange-500/30 pt-2 mt-2">
                 <strong>Health Check:</strong>{' '}
                 {diagSummary.healthCheck 
