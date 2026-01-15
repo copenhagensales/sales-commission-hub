@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -19,15 +19,23 @@ import {
   Megaphone,
   Activity,
   Table as TableIcon,
-  Play
+  Play,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import SalarySchemes from "./SalarySchemes";
 import RelatelEventsTable from "@/components/relatel/RelatelEventsTable";
 import { toast } from "sonner";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 
 const RELATEL_INTEGRATION_ID = "657c2050-1faa-4233-a964-900fb9e7b8c6";
+
+// Tab configuration with permission keys
+const allTabs = [
+  { value: "salary-schemes", label: "Lønordninger", icon: Percent, permissionKey: "tab_mg_salary_schemes" },
+  { value: "relatel-data", label: "Relatel Status", icon: Database, permissionKey: "tab_mg_relatel_status" },
+  { value: "relatel-events", label: "Relatel Events", icon: TableIcon, permissionKey: "tab_mg_relatel_events" },
+];
 
 interface IntegrationLog {
   id: string;
@@ -59,7 +67,38 @@ interface DilaerIntegration {
 }
 
 export default function MgTestPage() {
-  const [activeTab, setActiveTab] = useState("salary-schemes");
+  const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
+  
+  // Filter tabs based on permissions
+  const visibleTabs = useMemo(() => 
+    allTabs.filter(tab => canView(tab.permissionKey)),
+    [canView]
+  );
+  
+  const defaultTab = visibleTabs[0]?.value || "salary-schemes";
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  if (permissionsLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (visibleTabs.length === 0) {
+    return (
+      <MainLayout>
+        <div className="text-center py-12 text-muted-foreground">
+          Du har ikke adgang til denne side.
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const gridColsClass = `grid-cols-${visibleTabs.length}`;
 
   return (
     <MainLayout>
@@ -70,32 +109,32 @@ export default function MgTestPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-            <TabsTrigger value="salary-schemes" className="flex items-center gap-2">
-              <Percent className="h-4 w-4" />
-              Lønordninger
-            </TabsTrigger>
-            <TabsTrigger value="relatel-data" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Relatel Status
-            </TabsTrigger>
-            <TabsTrigger value="relatel-events" className="flex items-center gap-2">
-              <TableIcon className="h-4 w-4" />
-              Relatel Events
-            </TabsTrigger>
+          <TabsList className={`grid w-full ${gridColsClass} lg:w-[600px]`}>
+            {visibleTabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          <TabsContent value="salary-schemes" className="mt-6">
-            <SalarySchemesTab />
-          </TabsContent>
+          {visibleTabs.some(t => t.value === "salary-schemes") && (
+            <TabsContent value="salary-schemes" className="mt-6">
+              <SalarySchemesTab />
+            </TabsContent>
+          )}
 
-          <TabsContent value="relatel-data" className="mt-6">
-            <RelatelDataTab />
-          </TabsContent>
+          {visibleTabs.some(t => t.value === "relatel-data") && (
+            <TabsContent value="relatel-data" className="mt-6">
+              <RelatelDataTab />
+            </TabsContent>
+          )}
 
-          <TabsContent value="relatel-events" className="mt-6">
-            <RelatelEventsTable />
-          </TabsContent>
+          {visibleTabs.some(t => t.value === "relatel-events") && (
+            <TabsContent value="relatel-events" className="mt-6">
+              <RelatelEventsTable />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>
@@ -471,10 +510,12 @@ function RelatelDataTab() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(log.created_at), "d. MMM HH:mm:ss", { locale: da })}
+                      {format(new Date(log.created_at), "d. MMM yyyy HH:mm:ss", { locale: da })}
                     </p>
                     {log.status === "error" && log.details?.error && (
-                      <p className="text-xs text-destructive mt-1">{log.details.error}</p>
+                      <p className="text-xs text-destructive mt-1 truncate">
+                        {log.details.error}
+                      </p>
                     )}
                   </div>
                 </div>

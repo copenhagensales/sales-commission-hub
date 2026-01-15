@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 
 interface Application {
   id: string;
@@ -30,10 +31,26 @@ interface Candidate {
   applications?: Application[];
 }
 
+// Tab configuration with permission keys
+const allTabs = [
+  { value: "ghostet", label: "Ghostet", permissionKey: "tab_winback_ghostet" },
+  { value: "takket_nej", label: "Takket nej", permissionKey: "tab_winback_takket_nej" },
+  { value: "interesseret_i_kundeservice", label: "Kundeservice", permissionKey: "tab_winback_kundeservice" },
+];
+
 export default function Winback() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<string>("newest");
-  const [activeTab, setActiveTab] = useState<string>("ghostet");
+  const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
+  
+  // Filter tabs based on permissions
+  const visibleTabs = useMemo(() => 
+    allTabs.filter(tab => canView(tab.permissionKey)),
+    [canView]
+  );
+  
+  const defaultTab = visibleTabs[0]?.value || "ghostet";
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   const { data: candidates = [], isLoading, refetch } = useQuery({
     queryKey: ["winback-candidates", activeTab],
@@ -107,6 +124,28 @@ export default function Winback() {
     );
   };
 
+  if (permissionsLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (visibleTabs.length === 0) {
+    return (
+      <MainLayout>
+        <div className="text-center py-12 text-muted-foreground">
+          Du har ikke adgang til denne side.
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const gridColsClass = `grid-cols-${visibleTabs.length}`;
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -118,10 +157,12 @@ export default function Winback() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3">
-            <TabsTrigger value="ghostet">Ghostet</TabsTrigger>
-            <TabsTrigger value="takket_nej">Takket nej</TabsTrigger>
-            <TabsTrigger value="interesseret_i_kundeservice">Kundeservice</TabsTrigger>
+          <TabsList className={`grid w-full max-w-2xl ${gridColsClass}`}>
+            {visibleTabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <div className="mt-6 space-y-4">
@@ -150,17 +191,11 @@ export default function Winback() {
               </div>
             </div>
 
-            <TabsContent value="ghostet" className="mt-0">
-              {renderCandidateList()}
-            </TabsContent>
-
-            <TabsContent value="takket_nej" className="mt-0">
-              {renderCandidateList()}
-            </TabsContent>
-
-            <TabsContent value="interesseret_i_kundeservice" className="mt-0">
-              {renderCandidateList()}
-            </TabsContent>
+            {visibleTabs.map(tab => (
+              <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                {renderCandidateList()}
+              </TabsContent>
+            ))}
           </div>
         </Tabs>
       </div>

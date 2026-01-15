@@ -375,6 +375,50 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_my_shifts: 'Mine vagter',
   menu_my_absence: 'Mit fravær',
   menu_my_coaching: 'Min coaching',
+  
+  // ===== TAB PERMISSIONS =====
+  // EmployeeMasterData tabs
+  tab_employees_all: 'Fane: Alle medarbejdere',
+  tab_employees_staff: 'Fane: Backoffice',
+  tab_employees_teams: 'Fane: Teams',
+  tab_employees_positions: 'Fane: Stillinger',
+  tab_employees_permissions: 'Fane: Rettigheder',
+  tab_employees_dialer: 'Fane: Dialer-mapping',
+  
+  // OnboardingDashboard tabs
+  tab_onboarding_overview: 'Fane: Onboarding oversigt',
+  tab_onboarding_ramp: 'Fane: Forventninger',
+  tab_onboarding_leader: 'Fane: Leder',
+  tab_onboarding_drills: 'Fane: Drill-bibliotek',
+  tab_onboarding_template: 'Fane: Skabelon',
+  tab_onboarding_admin: 'Fane: Onboarding admin',
+  
+  // MgTestPage tabs
+  tab_mg_salary_schemes: 'Fane: Lønordninger',
+  tab_mg_relatel_status: 'Fane: Relatel Status',
+  tab_mg_relatel_events: 'Fane: Relatel Events',
+  
+  // Winback tabs
+  tab_winback_ghostet: 'Fane: Ghostet',
+  tab_winback_takket_nej: 'Fane: Takket nej',
+  tab_winback_kundeservice: 'Fane: Kundeservice',
+  
+  // Messages tabs
+  tab_messages_all: 'Fane: Alle beskeder',
+  tab_messages_sms: 'Fane: SMS',
+  tab_messages_email: 'Fane: Email',
+  tab_messages_call: 'Fane: Opkald',
+  tab_messages_sent: 'Fane: Sendt',
+  
+  // FieldmarketingDashboardFull tabs
+  tab_fm_eesy: 'Fane: Eesy FM',
+  tab_fm_yousee: 'Fane: Yousee',
+  
+  // BookingManagement tabs
+  tab_fm_book_week: 'Fane: Book uge',
+  tab_fm_bookings: 'Fane: Kommende bookinger',
+  tab_fm_locations: 'Fane: Lokationer',
+  tab_fm_vagtplan: 'Fane: Vagtplan FM',
 };
 
 export const dataScopeLabels: Record<string, string> = {
