@@ -84,11 +84,19 @@ export function RoleProtectedRoute({
   return <Navigate to="/my-schedule" replace />;
 }
 
-// Simple protected route that just checks auth (for employee-accessible pages)
+// Simple protected route that just checks auth AND active employee status
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isLoading: permLoading, position } = usePermissions();
   
-  if (loading) {
+  const isLoading = authLoading || permLoading;
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/auth";
+  };
+  
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -98,6 +106,18 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Check if employee is active (has a position)
+  if (!position) {
+    console.log("ProtectedRoute: User deactivated - signing out");
+    // Sign out deactivated users
+    handleLogout();
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="text-muted-foreground">Din konto er deaktiveret. Logger ud...</div>
+      </div>
+    );
   }
   
   return <>{children}</>;
