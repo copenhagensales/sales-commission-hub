@@ -86,8 +86,6 @@ const generateAllPermissions = (): RolePreviewPermissions => ({
   menu_sms_templates: { view: true, edit: true },
   menu_email_templates: { view: true, edit: true },
   // Boards menu
-  menu_boards_test: true,
-  menu_boards_economic: true,
   menu_boards_sales: true,
   // Personal menu
   menu_my_profile: { view: true, edit: true },
