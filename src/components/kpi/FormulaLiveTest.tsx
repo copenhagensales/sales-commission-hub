@@ -660,7 +660,7 @@ async function calculateTodayLiveHours(employeeId: string | null, now: Date): Pr
   const [
     individualShiftsRes,
     employeeStandardShiftsRes,
-    employeeDataRes,
+    teamMembersRes,
     teamStandardShiftsRes,
     shiftDaysRes,
     absencesRes
@@ -678,11 +678,11 @@ async function calculateTodayLiveHours(employeeId: string | null, now: Date): Pr
       .select("employee_id, shift_id")
       .in("employee_id", employeeIds),
     
-    // Employee team info
+    // Team members (authoritative source for team membership)
     supabase
-      .from("employee_master_data")
-      .select("id, team_id")
-      .in("id", employeeIds),
+      .from("team_members")
+      .select("employee_id, team_id")
+      .in("employee_id", employeeIds),
     
     // Team standard shifts
     supabase
@@ -707,10 +707,16 @@ async function calculateTodayLiveHours(employeeId: string | null, now: Date): Pr
   
   const individualShifts = individualShiftsRes.data || [];
   const employeeStandardShifts = employeeStandardShiftsRes.data || [];
-  const employeeData = employeeDataRes.data || [];
+  const teamMembers = teamMembersRes.data || [];
   const teamStandardShifts = teamStandardShiftsRes.data || [];
   const shiftDays = shiftDaysRes.data || [];
   const absences = new Set((absencesRes.data || []).map(a => a.employee_id));
+  
+  // Build employee -> team map from team_members (authoritative source)
+  const employeeTeamMap = new Map<string, string>();
+  teamMembers.forEach(m => {
+    if (m.team_id) employeeTeamMap.set(m.employee_id, m.team_id);
+  });
   
   let totalLiveHours = 0;
   
@@ -743,12 +749,12 @@ async function calculateTodayLiveHours(employeeId: string | null, now: Date): Pr
           shiftStartTime = shiftDefault?.start_time || null;
         }
       }
-      // 3. Team primary shift
+      // 3. Team primary shift (using team_members as authoritative source)
       else {
-        const empData = employeeData.find(e => e.id === empId);
-        if (empData?.team_id) {
+        const teamId = employeeTeamMap.get(empId);
+        if (teamId) {
           const teamActiveShift = teamStandardShifts.find(
-            s => s.team_id === empData.team_id && s.is_active
+            s => s.team_id === teamId && s.is_active
           );
           if (teamActiveShift) {
             const dayConfig = shiftDays.find(
