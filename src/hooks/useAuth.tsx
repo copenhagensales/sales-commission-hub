@@ -103,8 +103,8 @@ export function useAuth() {
     const sessionTimeout = setTimeout(() => {
       // If getSession takes too long, stop loading to prevent infinite hang
       setLoading(false);
-      console.warn("Auth session check timed out after 10s");
-    }, 10000);
+      console.warn("Auth session check timed out after 5s");
+    }, 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(sessionTimeout);
