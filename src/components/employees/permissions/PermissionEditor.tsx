@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
@@ -38,8 +37,6 @@ import {
 import { 
   Eye, 
   Pencil, 
-  Plus, 
-  Trash2, 
   Settings2, 
   Save,
   ChevronRight,
@@ -47,7 +44,8 @@ import {
   FileText,
   Zap,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -78,7 +76,7 @@ const permissionTypeIcons: Record<PermissionType, React.ReactNode> = {
   action: <Zap className="h-4 w-4" />,
 };
 
-const permissionTypeLabels: Record<PermissionType, string> = {
+const permissionTypeLabelsUI: Record<PermissionType, string> = {
   page: 'Side',
   tab: 'Fane',
   action: 'Handling',
@@ -92,6 +90,212 @@ const colorMap: Record<string, string> = {
   muted: "bg-muted text-muted-foreground",
   gray: "bg-muted text-muted-foreground",
 };
+
+// ===== PERMISSION HIERARCHY =====
+// Maps each permission key to its parent key (null = top-level)
+const PERMISSION_HIERARCHY: Record<string, string | null> = {
+  // ===== SEKTIONER (top-level) =====
+  menu_section_personal: null,
+  menu_section_personale: null,
+  menu_section_ledelse: null,
+  menu_section_test: null,
+  menu_section_mg: null,
+  menu_section_vagtplan: null,
+  menu_section_fieldmarketing: null,
+  menu_section_rekruttering: null,
+  menu_section_boards: null,
+  menu_section_salary: null,
+  menu_section_dashboards: null,
+  menu_section_onboarding: null,
+  menu_section_reports: null,
+  menu_section_admin: null,
+  menu_section_some: null,
+  
+  // ===== MIT HJEM (under menu_section_personal) =====
+  menu_home: 'menu_section_personal',
+  menu_h2h: 'menu_section_personal',
+  menu_commission_league: 'menu_section_personal',
+  menu_messages: 'menu_section_personal',
+  menu_my_schedule: 'menu_section_personal',
+  menu_my_profile: 'menu_section_personal',
+  menu_my_goals: 'menu_section_personal',
+  menu_my_contracts: 'menu_section_personal',
+  menu_career_wishes: 'menu_section_personal',
+  menu_my_feedback: 'menu_section_personal',
+  menu_refer_friend: 'menu_section_personal',
+  
+  // ===== PERSONALE (under menu_section_personale) =====
+  menu_dashboard: 'menu_section_personale',
+  menu_employees: 'menu_section_personale',
+  menu_teams: 'menu_section_personale',
+  menu_absence: 'menu_section_personale',
+  menu_permissions: 'menu_section_personale',
+  menu_login_log: 'menu_section_personale',
+  menu_upcoming_starts: 'menu_section_personale',
+  
+  // ===== LEDELSE (under menu_section_ledelse) =====
+  menu_company_overview: 'menu_section_ledelse',
+  menu_contracts: 'menu_section_ledelse',
+  menu_career_wishes_overview: 'menu_section_ledelse',
+  menu_email_templates_ledelse: 'menu_section_ledelse',
+  menu_security_dashboard: 'menu_section_ledelse',
+  
+  // ===== VAGTPLAN (under menu_section_vagtplan) =====
+  menu_shift_overview: 'menu_section_vagtplan',
+  menu_time_tracking: 'menu_section_vagtplan',
+  menu_time_stamp: 'menu_section_vagtplan',
+  menu_closing_shifts: 'menu_section_vagtplan',
+  
+  // ===== MG (under menu_section_mg) =====
+  menu_team_overview: 'menu_section_mg',
+  menu_tdc_erhverv: 'menu_section_mg',
+  menu_tdc_erhverv_dashboard: 'menu_section_mg',
+  menu_relatel_dashboard: 'menu_section_mg',
+  menu_tryg_dashboard: 'menu_section_mg',
+  menu_ase_dashboard: 'menu_section_mg',
+  menu_codan: 'menu_section_mg',
+  menu_mg_test: 'menu_section_mg',
+  menu_mg_test_dashboard: 'menu_section_mg',
+  menu_dialer_data: 'menu_section_mg',
+  menu_calls_data: 'menu_section_mg',
+  menu_adversus_data: 'menu_section_mg',
+  
+  // ===== TEST (under menu_section_test) =====
+  menu_car_quiz_admin: 'menu_section_test',
+  menu_coc_admin: 'menu_section_test',
+  menu_pulse_survey: 'menu_section_test',
+  
+  // ===== REKRUTTERING (under menu_section_rekruttering) =====
+  menu_recruitment_dashboard: 'menu_section_rekruttering',
+  menu_candidates: 'menu_section_rekruttering',
+  menu_upcoming_interviews: 'menu_section_rekruttering',
+  menu_winback: 'menu_section_rekruttering',
+  menu_upcoming_hires: 'menu_section_rekruttering',
+  menu_messages_recruitment: 'menu_section_rekruttering',
+  menu_sms_templates: 'menu_section_rekruttering',
+  menu_email_templates_recruitment: 'menu_section_rekruttering',
+  menu_referrals: 'menu_section_rekruttering',
+  
+  // ===== LØN (under menu_section_salary) =====
+  menu_payroll: 'menu_section_salary',
+  menu_salary_types: 'menu_section_salary',
+  
+  // ===== SOME (under menu_section_some) =====
+  menu_some: 'menu_section_some',
+  menu_extra_work: 'menu_section_some',
+  
+  // ===== DASHBOARDS (under menu_section_dashboards) =====
+  menu_dashboard_cph_sales: 'menu_section_dashboards',
+  menu_dashboard_cs_top_20: 'menu_section_dashboards',
+  menu_dashboard_fieldmarketing: 'menu_section_dashboards',
+  menu_dashboard_fm_goals: 'menu_section_dashboards',
+  menu_dashboard_eesy_tm: 'menu_section_dashboards',
+  menu_dashboard_tdc_erhverv: 'menu_section_dashboards',
+  menu_dashboard_tdc_goals: 'menu_section_dashboards',
+  menu_dashboard_relatel: 'menu_section_dashboards',
+  menu_dashboard_tryg: 'menu_section_dashboards',
+  menu_dashboard_ase: 'menu_section_dashboards',
+  menu_dashboard_mg_test: 'menu_section_dashboards',
+  menu_dashboard_united: 'menu_section_dashboards',
+  menu_dashboard_design: 'menu_section_dashboards',
+  menu_dashboard_settings: 'menu_section_dashboards',
+  
+  // ===== REPORTS (under menu_section_reports) =====
+  menu_reports_admin: 'menu_section_reports',
+  menu_reports_daily: 'menu_section_reports',
+  menu_reports_management: 'menu_section_reports',
+  menu_reports_employee: 'menu_section_reports',
+  
+  // ===== ONBOARDING (under menu_section_onboarding) =====
+  menu_onboarding_overview: 'menu_section_onboarding',
+  menu_onboarding_kursus: 'menu_section_onboarding',
+  menu_onboarding_ramp: 'menu_section_onboarding',
+  menu_onboarding_leader: 'menu_section_onboarding',
+  menu_onboarding_drills: 'menu_section_onboarding',
+  menu_onboarding_admin: 'menu_section_onboarding',
+  menu_coaching_templates: 'menu_section_onboarding',
+  
+  // ===== ADMIN (under menu_section_admin) =====
+  menu_kpi_definitions: 'menu_section_admin',
+  
+  // ===== FIELDMARKETING (under menu_section_fieldmarketing) =====
+  menu_fm_overview: 'menu_section_fieldmarketing',
+  menu_fm_booking: 'menu_section_fieldmarketing',
+  menu_fm_vehicles: 'menu_section_fieldmarketing',
+  menu_fm_dashboard: 'menu_section_fieldmarketing',
+  menu_fm_sales_registration: 'menu_section_fieldmarketing',
+  menu_fm_billing: 'menu_section_fieldmarketing',
+  menu_fm_travel_expenses: 'menu_section_fieldmarketing',
+  menu_fm_edit_sales: 'menu_section_fieldmarketing',
+  menu_fm_time_off: 'menu_section_fieldmarketing',
+  menu_fm_book_week: 'menu_section_fieldmarketing',
+  menu_fm_bookings: 'menu_section_fieldmarketing',
+  menu_fm_locations: 'menu_section_fieldmarketing',
+  menu_fm_vagtplan_fm: 'menu_section_fieldmarketing',
+  
+  // Legacy/andre
+  menu_sales: null,
+  menu_settings: null,
+  menu_leaderboard: null,
+  menu_my_sales: 'menu_section_personal',
+  menu_my_shifts: 'menu_section_personal',
+  menu_my_absence: 'menu_section_personal',
+  menu_my_coaching: 'menu_section_personal',
+  
+  // ===== TAB PERMISSIONS =====
+  // EmployeeMasterData tabs
+  tab_employees_all: 'menu_employees',
+  tab_employees_staff: 'menu_employees',
+  tab_employees_teams: 'menu_employees',
+  tab_employees_positions: 'menu_employees',
+  tab_employees_permissions: 'menu_employees',
+  tab_employees_dialer: 'menu_employees',
+  
+  // OnboardingDashboard tabs
+  tab_onboarding_overview: 'menu_onboarding_overview',
+  tab_onboarding_ramp: 'menu_onboarding_overview',
+  tab_onboarding_leader: 'menu_onboarding_overview',
+  tab_onboarding_drills: 'menu_onboarding_overview',
+  tab_onboarding_template: 'menu_onboarding_overview',
+  tab_onboarding_admin: 'menu_onboarding_overview',
+  
+  // MgTestPage tabs
+  tab_mg_salary_schemes: 'menu_mg_test',
+  tab_mg_relatel_status: 'menu_mg_test',
+  tab_mg_relatel_events: 'menu_mg_test',
+  
+  // Winback tabs
+  tab_winback_ghostet: 'menu_winback',
+  tab_winback_takket_nej: 'menu_winback',
+  tab_winback_kundeservice: 'menu_winback',
+  
+  // Messages tabs
+  tab_messages_all: 'menu_messages',
+  tab_messages_sms: 'menu_messages',
+  tab_messages_email: 'menu_messages',
+  tab_messages_call: 'menu_messages',
+  tab_messages_sent: 'menu_messages',
+  
+  // FieldmarketingDashboardFull tabs
+  tab_fm_eesy: 'menu_fm_dashboard',
+  tab_fm_yousee: 'menu_fm_dashboard',
+  
+  // BookingManagement tabs
+  tab_fm_book_week: 'menu_fm_booking',
+  tab_fm_bookings: 'menu_fm_booking',
+  tab_fm_locations: 'menu_fm_booking',
+  tab_fm_vagtplan: 'menu_fm_booking',
+};
+
+// Derive permission type from key
+const getPermissionTypeFromKey = (key: string): PermissionType => {
+  if (key.startsWith('tab_')) return 'tab';
+  if (key.startsWith('action_')) return 'action';
+  return 'page';
+};
+
+// Get all permission keys from permissionKeyLabels
+const ALL_PERMISSION_KEYS = Object.keys(permissionKeyLabels);
 
 // Recursive permission row component for multi-level hierarchy
 interface PermissionWithChildren {
@@ -114,8 +318,6 @@ interface PermissionRowProps {
   togglePermission: (permission: PermissionWithChildren, field: 'can_view' | 'can_edit') => void;
   isChildDisabled: (child: PermissionWithChildren, field: 'can_view' | 'can_edit') => boolean;
   openEditPermission: (permission: PermissionWithChildren) => void;
-  openNewPermission: (parentKey: string) => void;
-  deleteMutation: { mutate: (id: string) => void };
   updateRowVisibility: (permission: PermissionWithChildren, visibility: 'all' | 'team' | 'self') => void;
 }
 
@@ -126,8 +328,6 @@ function PermissionRow({
   togglePermission,
   isChildDisabled,
   openEditPermission,
-  openNewPermission,
-  deleteMutation,
   updateRowVisibility
 }: PermissionRowProps) {
   const paddingLeft = level * 16;
@@ -142,7 +342,7 @@ function PermissionRow({
             {level > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             {permissionTypeIcons[permission.permission_type || 'page']}
             <span className="text-xs text-muted-foreground">
-              {permissionTypeLabels[permission.permission_type || 'page']}
+              {permissionTypeLabelsUI[permission.permission_type || 'page']}
             </span>
           </div>
         </TableCell>
@@ -212,27 +412,6 @@ function PermissionRow({
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => openNewPermission(permission.permission_key)}
-              title="Tilføj fane/handling"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            {level > 0 && (
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => {
-                  if (confirm('Er du sikker?')) {
-                    deleteMutation.mutate(permission.id);
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            )}
           </div>
         </TableCell>
       </TableRow>
@@ -245,8 +424,6 @@ function PermissionRow({
           togglePermission={togglePermission}
           isChildDisabled={isChildDisabled}
           openEditPermission={openEditPermission}
-          openNewPermission={openNewPermission}
-          deleteMutation={deleteMutation}
           updateRowVisibility={updateRowVisibility}
         />
       ))}
@@ -281,6 +458,7 @@ export function PermissionEditor() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [editingPermission, setEditingPermission] = useState<EditingPermission | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   
   // Create role state
   const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false);
@@ -310,6 +488,73 @@ export function PermissionEditor() {
     acc[p.role_key].push(p);
     return acc;
   }, {} as Record<string, typeof extendedPermissions>);
+
+  // Seed all permissions for a role
+  const seedPermissionsForRole = async (roleKey: string) => {
+    setIsSeeding(true);
+    
+    try {
+      // Get existing permissions for this role
+      const existingKeys = permissionsByRole[roleKey]?.map(p => p.permission_key) || [];
+      
+      // Find missing keys
+      const missingKeys = ALL_PERMISSION_KEYS.filter(key => !existingKeys.includes(key));
+      
+      if (missingKeys.length === 0) {
+        toast.info('Alle rettigheder er allerede oprettet');
+        setIsSeeding(false);
+        return;
+      }
+      
+      // Determine default values based on role
+      const isOwner = roleKey === 'ejer';
+      const isTeamleder = roleKey === 'teamleder';
+      
+      // Create permission records for all missing keys
+      const newPermissions = missingKeys.map(key => ({
+        role_key: roleKey,
+        permission_key: key,
+        parent_key: PERMISSION_HIERARCHY[key] || null,
+        permission_type: getPermissionTypeFromKey(key),
+        can_view: isOwner, // Only owner gets view by default
+        can_edit: isOwner, // Only owner gets edit by default
+        visibility: isOwner ? 'all' : (isTeamleder ? 'team' : 'self'),
+        description: null,
+      }));
+      
+      // Insert in batches to avoid timeout
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < newPermissions.length; i += BATCH_SIZE) {
+        const batch = newPermissions.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('role_page_permissions')
+          .insert(batch);
+        
+        if (error) {
+          console.error('Error seeding permissions batch:', error);
+          throw error;
+        }
+      }
+      
+      toast.success(`${missingKeys.length} rettigheder oprettet for ${roleKey}`);
+      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+    } catch (error: any) {
+      console.error('Error seeding permissions:', error);
+      toast.error('Kunne ikke oprette rettigheder: ' + error.message);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // Auto-seed when selecting a role with no permissions
+  useEffect(() => {
+    if (selectedRole && !permissionsLoading) {
+      const rolePermissionCount = permissionsByRole[selectedRole]?.length || 0;
+      if (rolePermissionCount === 0) {
+        seedPermissionsForRole(selectedRole);
+      }
+    }
+  }, [selectedRole, permissionsLoading]);
 
   // Get multi-level hierarchy - now supports grandchildren
   const getPermissionHierarchy = (rolePermissions: typeof extendedPermissions) => {
@@ -358,53 +603,6 @@ export function PermissionEditor() {
     },
   });
 
-  // Create permission mutation
-  const createMutation = useMutation({
-    mutationFn: async (permission: EditingPermission) => {
-      const { error } = await supabase
-        .from('role_page_permissions')
-        .insert({
-          role_key: permission.role_key,
-          permission_key: permission.permission_key,
-          parent_key: permission.parent_key,
-          permission_type: permission.permission_type,
-          can_view: permission.can_view,
-          can_edit: permission.can_edit,
-          description: permission.description,
-        });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
-      toast.success('Rettighed oprettet');
-      setIsSheetOpen(false);
-      setEditingPermission(null);
-    },
-    onError: (error) => {
-      toast.error('Kunne ikke oprette rettighed: ' + error.message);
-    },
-  });
-
-  // Delete permission mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('role_page_permissions')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
-      toast.success('Rettighed slettet');
-    },
-    onError: (error) => {
-      toast.error('Kunne ikke slette rettighed: ' + error.message);
-    },
-  });
-
   // Create role mutation
   const createRoleMutation = useMutation({
     mutationFn: async (form: NewRoleForm) => {
@@ -420,8 +618,9 @@ export function PermissionEditor() {
         });
       
       if (error) throw error;
+      return form.key;
     },
-    onSuccess: () => {
+    onSuccess: async (roleKey) => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
       toast.success('Rolle oprettet');
       setIsCreateRoleOpen(false);
@@ -433,6 +632,8 @@ export function PermissionEditor() {
         icon: 'user',
         priority: 100,
       });
+      // Auto-seed permissions for new role
+      setSelectedRole(roleKey);
     },
     onError: (error) => {
       toast.error('Kunne ikke oprette rolle: ' + error.message);
@@ -515,22 +716,12 @@ export function PermissionEditor() {
   const togglePermission = async (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
     const newValue = !permission[field];
     
-    console.log('togglePermission called:', {
-      permissionId: permission.id,
-      permissionKey: permission.permission_key,
-      field,
-      currentValue: permission[field],
-      newValue,
-    });
-    
     // Update the permission itself
     const { data, error, status, statusText } = await supabase
       .from('role_page_permissions')
       .update({ [field]: newValue })
       .eq('id', permission.id)
       .select();
-    
-    console.log('Supabase update response:', { data, error, status, statusText, rowsAffected: data?.length });
     
     if (error) {
       console.error('Permission update error:', error);
@@ -580,19 +771,6 @@ export function PermissionEditor() {
     return parent ? !parent[field] : false;
   };
 
-  const openNewPermission = (roleKey: string, parentKey?: string) => {
-    setEditingPermission({
-      role_key: roleKey,
-      permission_key: '',
-      parent_key: parentKey || null,
-      permission_type: parentKey ? 'tab' : 'page',
-      can_view: true,
-      can_edit: false,
-      description: '',
-    });
-    setIsSheetOpen(true);
-  };
-
   const openEditPermission = (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }) => {
     setEditingPermission({
       id: permission.id,
@@ -617,15 +795,11 @@ export function PermissionEditor() {
 
     if (editingPermission.id) {
       updateMutation.mutate(editingPermission);
-    } else {
-      createMutation.mutate(editingPermission);
     }
   };
 
   // Update row visibility directly on permission row
   const updateRowVisibility = async (permission: PermissionWithChildren, newVisibility: 'all' | 'team' | 'self') => {
-    console.log('updateRowVisibility called:', { permissionId: permission.id, newVisibility });
-    
     const { data, error } = await supabase
       .from('role_page_permissions')
       .update({ visibility: newVisibility })
@@ -675,7 +849,7 @@ export function PermissionEditor() {
             Rediger rettigheder
           </CardTitle>
           <CardDescription>
-            Vælg en rolle for at redigere dens side-, fane- og handlingsrettigheder
+            Vælg en rolle for at redigere dens side-, fane- og handlingsrettigheder. Alle sider og faner oprettes automatisk fra kodebasen.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -691,25 +865,8 @@ export function PermissionEditor() {
                     {role.label}
                   </Badge>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleDeleteRoleClick(role)}
-                  title="Slet rolle"
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
               </div>
             ))}
-            <Button
-              variant="outline"
-              onClick={() => setIsCreateRoleOpen(true)}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Opret rolle
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -726,78 +883,101 @@ export function PermissionEditor() {
                   Rettigheder
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  {hierarchy.length} sider konfigureret
+                  {rolePermissions.length} rettigheder konfigureret (af {ALL_PERMISSION_KEYS.length} totalt)
                 </CardDescription>
               </div>
-              <Button onClick={() => openNewPermission(selectedRole)} size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Tilføj side
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => seedPermissionsForRole(selectedRole)}
+                  disabled={isSeeding}
+                >
+                  {isSeeding ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                  )}
+                  Synkroniser alle
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleDeleteRoleClick(selectedRoleData)}
+                >
+                  Slet rolle
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Nøgle</TableHead>
-                  <TableHead>Beskrivelse</TableHead>
-                  <TableHead className="text-center">Kan se</TableHead>
-                  <TableHead className="text-center">Kan redigere</TableHead>
-                  <TableHead className="text-center">
-                    <span className="text-green-600">Alle</span>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <span className="text-blue-600">Team</span>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <span className="text-amber-600">Kun egen</span>
-                  </TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Side-adgang sektion */}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={9} className="font-semibold text-sm py-2">
-                    SIDE-ADGANG
-                  </TableCell>
-                </TableRow>
-                {hierarchy.map((page) => (
-                  <PermissionRow 
-                    key={page.id}
-                    permission={page}
-                    level={0}
-                    rolePermissions={rolePermissions}
-                    togglePermission={togglePermission}
-                    isChildDisabled={isChildDisabled}
-                    openEditPermission={openEditPermission}
-                    openNewPermission={(parentKey) => openNewPermission(selectedRole, parentKey)}
-                    deleteMutation={deleteMutation}
-                    updateRowVisibility={updateRowVisibility}
-                  />
-                ))}
-                {hierarchy.length === 0 && (
+            {isSeeding ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Opretter rettigheder...</p>
+                </div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
-                      Ingen side-rettigheder konfigureret
+                    <TableHead>Type</TableHead>
+                    <TableHead>Nøgle</TableHead>
+                    <TableHead>Beskrivelse</TableHead>
+                    <TableHead className="text-center">Kan se</TableHead>
+                    <TableHead className="text-center">Kan redigere</TableHead>
+                    <TableHead className="text-center">
+                      <span className="text-green-600">Alle</span>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <span className="text-blue-600">Team</span>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <span className="text-amber-600">Kun egen</span>
+                    </TableHead>
+                    <TableHead className="w-16"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Side-adgang sektion */}
+                  <TableRow className="bg-muted/50">
+                    <TableCell colSpan={9} className="font-semibold text-sm py-2">
+                      SIDE-ADGANG
                     </TableCell>
                   </TableRow>
-                )}
-                
-              </TableBody>
-            </Table>
+                  {hierarchy.map((page) => (
+                    <PermissionRow 
+                      key={page.id}
+                      permission={page}
+                      level={0}
+                      rolePermissions={rolePermissions}
+                      togglePermission={togglePermission}
+                      isChildDisabled={isChildDisabled}
+                      openEditPermission={openEditPermission}
+                      updateRowVisibility={updateRowVisibility}
+                    />
+                  ))}
+                  {hierarchy.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
+                        Ingen side-rettigheder konfigureret
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
-
-      {/* Data Visibility Section removed - integrated into main table above */}
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent>
           <SheetHeader>
             <SheetTitle>
-              {editingPermission?.id ? 'Rediger rettighed' : 'Opret rettighed'}
+              Rediger rettighed
             </SheetTitle>
             <SheetDescription>
               Konfigurer side-, fane- eller handlingsrettighed
@@ -842,15 +1022,11 @@ export function PermissionEditor() {
                 <Label>Rettigheds-nøgle</Label>
                 <Input
                   value={editingPermission.permission_key}
-                  onChange={(e) => setEditingPermission({
-                    ...editingPermission,
-                    permission_key: e.target.value,
-                  })}
-                  placeholder="f.eks. menu_employees_overview"
-                  disabled={!!editingPermission.id}
+                  disabled
+                  className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Bruges i koden til at tjekke adgang
+                  Nøglen kan ikke ændres da den kommer fra kodebasen
                 </p>
               </div>
 
@@ -915,10 +1091,10 @@ export function PermissionEditor() {
               <div className="flex gap-2 pt-4">
                 <Button 
                   onClick={handleSave} 
-                  disabled={updateMutation.isPending || createMutation.isPending}
+                  disabled={updateMutation.isPending}
                   className="flex-1"
                 >
-                  {(updateMutation.isPending || createMutation.isPending) ? (
+                  {updateMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
@@ -940,7 +1116,7 @@ export function PermissionEditor() {
           <DialogHeader>
             <DialogTitle>Opret ny rolle</DialogTitle>
             <DialogDescription>
-              Opret en ny systemrolle med tilhørende rettigheder
+              Opret en ny systemrolle. Alle rettigheder oprettes automatisk.
             </DialogDescription>
           </DialogHeader>
           
@@ -967,14 +1143,13 @@ export function PermissionEditor() {
             
             <div className="space-y-2">
               <Label>Beskrivelse</Label>
-              <Textarea
+              <Input
                 value={newRoleForm.description}
                 onChange={(e) => setNewRoleForm({ ...newRoleForm, description: e.target.value })}
-                placeholder="Beskrivelse af rollens ansvarsområde"
-                rows={2}
+                placeholder="Kort beskrivelse af rollens ansvar"
               />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Farve</Label>
@@ -989,8 +1164,7 @@ export function PermissionEditor() {
                     {ROLE_COLORS.map((color) => (
                       <SelectItem key={color.value} value={color.value}>
                         <div className="flex items-center gap-2">
-                          <div className={`w-4 h-4 rounded ${color.class}`} />
-                          {color.label}
+                          <Badge className={color.class}>{color.label}</Badge>
                         </div>
                       </SelectItem>
                     ))}
@@ -1003,10 +1177,9 @@ export function PermissionEditor() {
                   type="number"
                   value={newRoleForm.priority}
                   onChange={(e) => setNewRoleForm({ ...newRoleForm, priority: parseInt(e.target.value) || 100 })}
-                  min={1}
-                  max={999}
+                  placeholder="100"
                 />
-                <p className="text-xs text-muted-foreground">Lavere = højere rang</p>
+                <p className="text-xs text-muted-foreground">Højere = mere adgang</p>
               </div>
             </div>
           </div>
@@ -1015,38 +1188,45 @@ export function PermissionEditor() {
             <Button variant="outline" onClick={() => setIsCreateRoleOpen(false)}>
               Annuller
             </Button>
-            <Button onClick={handleCreateRole} disabled={createRoleMutation.isPending}>
-              {createRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button 
+              onClick={handleCreateRole}
+              disabled={createRoleMutation.isPending}
+            >
+              {createRoleMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Opret rolle
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Role Confirmation Dialog */}
+      {/* Delete Role Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Slet rolle "{roleToDelete?.label}"?
+              Slet rolle: {roleToDelete?.label}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                {linkedPositions.length > 0 ? (
-                  <>
-                    <p className="text-destructive font-medium">
-                      Advarsel: Denne rolle er tilknyttet {linkedPositions.length} stilling(er):
+              <div className="space-y-2">
+                <p>Er du sikker på, at du vil slette denne rolle? Dette vil:</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>Slette alle {permissionsByRole[roleToDelete?.key || '']?.length || 0} rettigheder for rollen</li>
+                  <li>Fjerne rollen fra alle tilknyttede stillinger</li>
+                </ul>
+                {linkedPositions.length > 0 && (
+                  <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-md">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Følgende stillinger er tilknyttet denne rolle:
                     </p>
-                    <ul className="list-disc list-inside text-sm bg-muted p-3 rounded-md">
-                      {linkedPositions.map(name => <li key={name}>{name}</li>)}
+                    <ul className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                      {linkedPositions.map((pos, i) => (
+                        <li key={i}>• {pos}</li>
+                      ))}
                     </ul>
-                    <p>
-                      Stillingerne vil miste deres rolletildeling hvis du fortsætter.
-                    </p>
-                  </>
-                ) : (
-                  <p>Denne handling kan ikke fortrydes. Alle rettigheder og indstillinger for rollen vil blive slettet.</p>
+                  </div>
                 )}
               </div>
             </AlertDialogDescription>
@@ -1056,8 +1236,11 @@ export function PermissionEditor() {
             <AlertDialogAction
               onClick={() => roleToDelete && deleteRoleMutation.mutate(roleToDelete.key)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteRoleMutation.isPending}
             >
-              {deleteRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {deleteRoleMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Slet rolle
             </AlertDialogAction>
           </AlertDialogFooter>
