@@ -10,6 +10,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
 import { validatePassword } from "@/lib/password-validation";
 
+// Timeout helper - returns fallback value if promise takes too long
+const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+  const timeout = new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms));
+  return Promise.race([promise, timeout]);
+};
+
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -132,34 +138,36 @@ export default function Auth() {
         setIsResetMode(false);
         setExpiredLinkError(false);
       } else {
-        // Check if email is a work_email and get the auth email (private_email)
-        let authEmail = email;
-        
-        const { data: privateEmail } = await supabase
-          .rpc('get_auth_email_by_work_email', { _work_email: email });
-        
-        if (privateEmail) {
-          authEmail = privateEmail;
-        }
-        
-        // PRE-LOGIN SECURITY: Check if account is locked BEFORE attempting login
-        try {
-          const { data: lockCheck } = await supabase.functions.invoke('check-account-locked', {
-            body: { email: authEmail }
+        // Run work_email lookup and lock check in parallel with 3s timeouts
+        // This prevents login from hanging if database is slow
+        const emailLookupPromise = withTimeout(
+          Promise.resolve(supabase.rpc('get_auth_email_by_work_email', { _work_email: email }))
+            .then(res => res.data),
+          3000,
+          null as string | null
+        ).catch(() => null);
+
+        const lockCheckPromise = withTimeout(
+          supabase.functions.invoke('check-account-locked', { body: { email } })
+            .then(res => res.data),
+          3000,
+          null
+        ).catch(() => null);
+
+        const [privateEmail, lockCheck] = await Promise.all([emailLookupPromise, lockCheckPromise]);
+
+        // Use private email if found, otherwise use entered email
+        const authEmail = privateEmail || email;
+
+        // Check lock status (fail-open if timeout/error)
+        if (lockCheck?.locked) {
+          toast({
+            title: "Konto låst",
+            description: lockCheck.message || "Din konto er midlertidigt låst. Kontakt din teamleder.",
+            variant: "destructive",
           });
-          
-          if (lockCheck?.locked) {
-            toast({
-              title: "Konto låst",
-              description: lockCheck.message || "Din konto er midlertidigt låst. Kontakt din teamleder.",
-              variant: "destructive",
-            });
-            setLoading(false);
-            return;
-          }
-        } catch (lockCheckError) {
-          // If lock check fails, proceed with login (fail-open)
-          console.warn("Could not check account lock status:", lockCheckError);
+          setLoading(false);
+          return;
         }
         
         const { error } = await supabase.auth.signInWithPassword({
