@@ -45,7 +45,8 @@ import {
   Zap,
   Loader2,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -927,6 +928,14 @@ export function PermissionEditor() {
                 </Button>
               </div>
             ))}
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateRoleOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Opret rolle
+            </Button>
           </div>
         </CardContent>
       </Card>
