@@ -133,9 +133,10 @@ export default function LiveStats() {
   // Fetch employees data
   const { data: employeesData, isLoading: employeesLoading } = useQuery({
     queryKey: ["stats-employees"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("employee_master_data")
+    queryFn: async (): Promise<any[]> => {
+      // Use explicit any to avoid deep type instantiation with complex joins
+      const query = supabase
+        .from("employee_master_data" as any)
         .select(
           `
           id,
@@ -152,7 +153,8 @@ export default function LiveStats() {
         `,
         )
         .order("first_name");
-      return data || [];
+      const result = await query;
+      return result.data || [];
     },
   });
 
@@ -320,10 +322,10 @@ export default function LiveStats() {
       active: activeEmployees.length,
       inactive: inactiveEmployees.length,
       byTeam: Object.entries(byTeam)
-        .map(([name, count]) => ({ name, count }))
+        .map(([name, count]) => ({ name, count: count as number }))
         .sort((a, b) => b.count - a.count),
       byPosition: Object.entries(byPosition)
-        .map(([name, count]) => ({ name, count }))
+        .map(([name, count]) => ({ name, count: count as number }))
         .sort((a, b) => b.count - a.count),
       avgTenureDays: Math.round(avgTenureDays),
       recentHires: recentHires.length,
