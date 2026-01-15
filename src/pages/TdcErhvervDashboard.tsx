@@ -34,6 +34,9 @@ interface TvTdcData {
   salesToday: number;
   salesWeek: number;
   salesMonth: number;
+  hoursToday: number;
+  hoursWeek: number;
+  hoursPayroll: number;
   sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
   sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
   sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
@@ -268,16 +271,18 @@ export default function TdcErhvervDashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Calculate sales per hour
-  const dailySalesPerHour = dailySalesData.totalHours > 0 
-    ? dailySalesData.totalSales / dailySalesData.totalHours 
-    : 0;
-  const weeklySalesPerHour = weeklySalesData.totalHours > 0 
-    ? weeklySalesData.totalSales / weeklySalesData.totalHours 
-    : 0;
-  const payrollSalesPerHour = payrollSalesData.totalHours > 0 
-    ? payrollSalesData.totalSales / payrollSalesData.totalHours 
-    : 0;
+  // Calculate sales per hour (use TV data if in TV mode)
+  const todayHours = tvMode ? (tvData?.hoursToday ?? 0) : dailySalesData.totalHours;
+  const weekHours = tvMode ? (tvData?.hoursWeek ?? 0) : weeklySalesData.totalHours;
+  const payrollHours = tvMode ? (tvData?.hoursPayroll ?? 0) : payrollSalesData.totalHours;
+  
+  const todaySales = tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales;
+  const weekSales = tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales;
+  const payrollSales = tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales;
+
+  const dailySalesPerHour = todayHours > 0 ? todaySales / todayHours : 0;
+  const weeklySalesPerHour = weekHours > 0 ? weekSales / weekHours : 0;
+  const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -354,7 +359,7 @@ export default function TdcErhvervDashboard() {
                 {dailySalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {dailySalesData.totalSales} salg / {dailySalesData.totalHours.toFixed(1)} timer
+                {todaySales} salg / {todayHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
@@ -369,7 +374,7 @@ export default function TdcErhvervDashboard() {
                 {weeklySalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {weeklySalesData.totalSales} salg / {weeklySalesData.totalHours.toFixed(1)} timer
+                {weekSales} salg / {weekHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
@@ -384,7 +389,7 @@ export default function TdcErhvervDashboard() {
                 {payrollSalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {payrollSalesData.totalSales} salg / {payrollSalesData.totalHours.toFixed(1)} timer
+                {payrollSales} salg / {payrollHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>

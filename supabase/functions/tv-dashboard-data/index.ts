@@ -1270,7 +1270,7 @@ async function handleTdcErhvervData(
     .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-  // Fetch employee avatars
+  // Fetch employee avatars and IDs
   const { data: employees } = await supabase
     .from("employee_master_data")
     .select("id, first_name, last_name, avatar_url, email")
@@ -1278,15 +1278,121 @@ async function handleTdcErhvervData(
 
   const emailToAvatarMap = new Map<string, string>();
   const emailToNameMap = new Map<string, string>();
+  const emailToIdMap = new Map<string, string>();
   (employees || []).forEach((emp: any) => {
     const fullName = `${emp.first_name} ${emp.last_name}`;
     if (emp.email) {
-      emailToNameMap.set(emp.email.toLowerCase(), fullName);
+      const emailLower = emp.email.toLowerCase();
+      emailToNameMap.set(emailLower, fullName);
+      emailToIdMap.set(emailLower, emp.id);
       if (emp.avatar_url) {
-        emailToAvatarMap.set(emp.email.toLowerCase(), emp.avatar_url);
+        emailToAvatarMap.set(emailLower, emp.avatar_url);
       }
     }
   });
+
+  // Get unique agent emails from all sales
+  const allAgentEmails = new Set<string>();
+  [...(salesToday || []), ...(salesWeek || []), ...(salesMonth || [])].forEach((sale: any) => {
+    if (sale.agent_email) {
+      allAgentEmails.add(sale.agent_email.toLowerCase());
+    }
+  });
+
+  // Get employee IDs for hours calculation
+  const employeeIds = Array.from(allAgentEmails)
+    .map(email => emailToIdMap.get(email))
+    .filter(Boolean) as string[];
+
+  // Fetch team memberships for these employees
+  const { data: teamMembers } = await supabase
+    .from("team_members")
+    .select("employee_id, team_id")
+    .in("employee_id", employeeIds);
+
+  const teamIds = [...new Set(teamMembers?.map((tm: any) => tm.team_id) || [])];
+
+  // Fetch team shifts
+  const { data: primaryShifts } = await supabase
+    .from("team_standard_shifts")
+    .select("id, team_id, start_time, end_time, hours_source")
+    .in("team_id", teamIds)
+    .eq("is_active", true);
+
+  const { data: shiftDays } = await supabase
+    .from("team_standard_shift_days")
+    .select("shift_id, day_of_week, start_time, end_time")
+    .in("shift_id", primaryShifts?.map((s: any) => s.id) || []);
+
+  // Fetch timestamps for teams using 'timestamp' hours_source
+  const teamsUsingTimestamps = primaryShifts?.filter((s: any) => s.hours_source === "timestamp").map((s: any) => s.team_id) || [];
+  let timeStampsData: any[] = [];
+  if (teamsUsingTimestamps.length > 0) {
+    const employeesWithTimestampTeams = teamMembers
+      ?.filter((tm: any) => teamsUsingTimestamps.includes(tm.team_id))
+      .map((tm: any) => tm.employee_id) || [];
+
+    if (employeesWithTimestampTeams.length > 0) {
+      const { data: stamps } = await supabase
+        .from("time_stamps")
+        .select("employee_id, date, clock_in, clock_out, break_minutes")
+        .in("employee_id", employeesWithTimestampTeams)
+        .gte("date", payrollStartStr)
+        .lte("date", todayStr);
+      timeStampsData = stamps || [];
+    }
+  }
+
+  // Helper function to calculate hours for a date range
+  const calculateHoursForRange = (startDate: string, endDate: string) => {
+    let totalHours = 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split("T")[0];
+      const dayOfWeek = d.getDay();
+      const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+      employeeIds.forEach(empId => {
+        const empTeam = teamMembers?.find((tm: any) => tm.employee_id === empId);
+        if (!empTeam) return;
+
+        const empShift = primaryShifts?.find((s: any) => s.team_id === empTeam.team_id);
+        if (!empShift) return;
+
+        const hoursSource = empShift.hours_source || "shift";
+        const empShiftDays = shiftDays?.filter((sd: any) => sd.shift_id === empShift.id) || [];
+        const shiftForDay = empShiftDays.find((sd: any) => sd.day_of_week === adjustedDayOfWeek);
+
+        let hours = 0;
+        if (hoursSource === "timestamp") {
+          const empTimestamp = timeStampsData.find((ts: any) => ts.employee_id === empId && ts.date === dateStr);
+          if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
+            const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
+            const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
+            const rawHours = outH + outM / 60 - (inH + inM / 60);
+            const breakMins = empTimestamp.break_minutes || 0;
+            hours = Math.max(0, rawHours - breakMins / 60);
+          }
+        } else {
+          if (shiftForDay?.start_time && shiftForDay?.end_time) {
+            const [startH, startM] = shiftForDay.start_time.split(":").map(Number);
+            const [endH, endM] = shiftForDay.end_time.split(":").map(Number);
+            const rawHours = endH + endM / 60 - (startH + startM / 60);
+            const breakMinutes = rawHours > 6 ? 30 : 0;
+            hours = rawHours - breakMinutes / 60;
+          }
+        }
+        totalHours += hours;
+      });
+    }
+    return Math.round(totalHours * 100) / 100;
+  };
+
+  const hoursToday = calculateHoursForRange(todayStr, todayStr);
+  const hoursWeek = calculateHoursForRange(weekStartStr, todayStr);
+  const hoursPayroll = calculateHoursForRange(payrollStartStr, todayStr);
 
   // Calculate totals and seller stats
   const calculateTotals = (sales: any[]) => {
@@ -1338,6 +1444,9 @@ async function handleTdcErhvervData(
     salesToday: todayData.totalSales,
     salesWeek: weekData.totalSales,
     salesMonth: monthData.totalSales,
+    hoursToday,
+    hoursWeek,
+    hoursPayroll,
     commissionToday: todayData.totalCommission,
     commissionWeek: weekData.totalCommission,
     commissionMonth: monthData.totalCommission,
@@ -1347,7 +1456,7 @@ async function handleTdcErhvervData(
     topSellers: formatSellers(monthData.sellerStats).slice(0, 10),
   };
 
-  console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth });
+  console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, hoursToday, hoursWeek, hoursPayroll });
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
