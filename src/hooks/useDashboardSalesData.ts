@@ -28,6 +28,7 @@ interface UseDashboardSalesDataParams {
   endDate: Date;
   teamId?: string;
   enabled?: boolean;
+  refetchInterval?: number; // Auto-refresh interval in milliseconds
 }
 
 /**
@@ -42,6 +43,7 @@ export function useDashboardSalesData({
   endDate,
   teamId,
   enabled = true,
+  refetchInterval,
 }: UseDashboardSalesDataParams): DashboardSalesData {
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -52,6 +54,7 @@ export function useDashboardSalesData({
       format(endDate, "yyyy-MM-dd"),
       teamId,
     ],
+    refetchInterval,
     queryFn: async () => {
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(endDate, "yyyy-MM-dd");
