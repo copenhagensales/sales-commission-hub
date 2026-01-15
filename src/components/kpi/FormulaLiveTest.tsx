@@ -133,6 +133,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
 
       // Safely evaluate the formula
       let calculatedValue: number | string;
+      let divisionByZero = false;
       try {
         // Basic safety check - only allow numbers and math operators
         const sanitized = formulaString.replace(/[^0-9+\-*/().  ]/g, "");
@@ -142,7 +143,9 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
           // eslint-disable-next-line no-eval
           calculatedValue = eval(sanitized);
           if (typeof calculatedValue === "number" && !isFinite(calculatedValue)) {
-            calculatedValue = "Ugyldigt resultat (division med 0?)";
+            // Division by zero - show 0 with an info message
+            calculatedValue = 0;
+            divisionByZero = true;
           }
         }
       } catch (e) {
@@ -158,6 +161,11 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
         const kpiDef = kpiDefinitions?.find((k) => k.slug === slug);
         const label = kpiDef?.name || slug;
         breakdown[label] = typeof value === "number" ? value.toLocaleString("da-DK") : value;
+      }
+
+      // Add info message if division by zero occurred
+      if (divisionByZero) {
+        errors.push("Nævneren er 0 – resultat sat til 0");
       }
 
       setResult({
