@@ -135,11 +135,11 @@ export function usePositionPermissions() {
       };
     },
     enabled: !!user && !authLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes - reduce unnecessary refetches
-    gcTime: 10 * 60 * 1000, // 10 minutes cache
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-    refetchOnMount: true, // Refetch only if stale
-    refetchOnReconnect: true, // Refetch when network reconnects
+    staleTime: 15 * 60 * 1000, // 15 minutes - permissions rarely change during session
+    gcTime: 30 * 60 * 1000, // 30 minutes cache
+    refetchOnWindowFocus: false, // Don't refetch on window focus - too expensive
+    refetchOnMount: 'always', // Only refetch if stale
+    refetchOnReconnect: false, // Don't refetch on reconnect - keep cached value
     retry: 2,
   });
 }

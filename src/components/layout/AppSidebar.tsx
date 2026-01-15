@@ -71,6 +71,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   );
 
   // Fetch employee name and pending contracts count
+  // OPTIMIZED: Removed refetchInterval to reduce DB load - only refetch on window focus
   const { data: employeeData } = useQuery({
     queryKey: ["sidebar-employee-data", user?.email],
     queryFn: async () => {
@@ -97,10 +98,13 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       };
     },
     enabled: !!user?.email,
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
+    refetchOnWindowFocus: true,
   });
 
   // Fetch pending absence requests count
+  // OPTIMIZED: Removed refetchInterval - only refetch on window focus
   const { data: pendingAbsenceCount = 0 } = useQuery({
     queryKey: ["pending-absence-count", user?.email],
     queryFn: async () => {
@@ -155,11 +159,13 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       return count || 0;
     },
     enabled: !!user?.email && p.canViewAbsence,
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
   });
 
   // Fetch unread messages count using optimized server-side function
+  // OPTIMIZED: Removed refetchInterval - only refetch on window focus
   const { data: unreadMessagesCount = 0 } = useQuery({
     queryKey: ["unread-messages-count", user?.email],
     queryFn: async () => {
@@ -187,12 +193,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       return data || 0;
     },
     enabled: !!user?.email,
-    staleTime: 10000,
+    staleTime: 2 * 60 * 1000, // 2 minutes cache
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 30000,
+    // NO refetchInterval - reduces DB load significantly
   });
 
   // Fetch pending H2H challenges count
+  // OPTIMIZED: Removed refetchInterval - only refetch on window focus
   const { data: pendingH2hCount = 0 } = useQuery({
     queryKey: ["pending-h2h-count", user?.email],
     queryFn: async () => {
@@ -216,12 +224,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       return count || 0;
     },
     enabled: !!user?.email,
-    staleTime: 10000,
+    staleTime: 2 * 60 * 1000, // 2 minutes cache
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    // NO refetchInterval - reduces DB load significantly
   });
 
   // Fetch pending referrals count (for recruiters)
+  // OPTIMIZED: Removed refetchInterval - only refetch on window focus
   const { data: pendingReferralsCount = 0 } = useQuery({
     queryKey: ["pending-referrals-count"],
     queryFn: async () => {
@@ -235,12 +245,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       return count || 0;
     },
     enabled: p.canViewReferrals,
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 60000, // Auto-refresh every 60 seconds
+    // NO refetchInterval - reduces DB load significantly
   });
 
   // Fetch unread recruitment messages and missed calls count
+  // OPTIMIZED: Removed refetchInterval - only refetch on window focus
   const { data: recruitmentNotificationsCount = 0 } = useQuery({
     queryKey: ["recruitment-notifications-count"],
     queryFn: async () => {
@@ -269,9 +281,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       return (unreadSmsCount || 0) + (missedCallsCount || 0);
     },
     enabled: p.canViewMessages,
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 60000, // Auto-refresh every 60 seconds
+    // NO refetchInterval - reduces DB load significantly
   });
 
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;

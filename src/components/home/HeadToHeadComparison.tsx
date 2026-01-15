@@ -117,6 +117,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const queryClient = useQueryClient();
 
   // Fetch pending challenges received
+  // OPTIMIZED: Increased refetchInterval from 30s to 2 minutes
   const { data: pendingChallenges = [] } = useQuery({
     queryKey: ["h2h-pending-challenges", currentEmployeeId],
     queryFn: async () => {
@@ -134,10 +135,12 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       return data || [];
     },
     enabled: !!currentEmployeeId,
-    refetchInterval: 30000,
+    staleTime: 60000, // 1 minute cache
+    refetchInterval: 120000, // 2 minutes instead of 30s
   });
 
   // Fetch all active challenges for current employee (multi-battle support)
+  // OPTIMIZED: Increased refetchInterval from 30s to 2 minutes
   const { data: activeChallenges = [] } = useQuery({
     queryKey: ["h2h-active-challenges", currentEmployeeId],
     queryFn: async () => {
@@ -159,7 +162,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       return data || [];
     },
     enabled: !!currentEmployeeId,
-    refetchInterval: 30000,
+    staleTime: 60000, // 1 minute cache
+    refetchInterval: 120000, // 2 minutes instead of 30s
   });
 
   // Create challenge mutation
@@ -673,7 +677,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       };
     },
     enabled: myTeamNames.length > 0 && allEmployeeIds.length > 0,
-    refetchInterval: 30000, // Refresh every 30 seconds for live feel
+    staleTime: 60000, // 1 minute cache
+    refetchInterval: 120000, // 2 minutes instead of 30s - reduces DB load significantly
   });
 
   // Update momentum based on recent activity

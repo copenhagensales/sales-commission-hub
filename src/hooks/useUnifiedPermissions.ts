@@ -40,6 +40,7 @@ export interface DataVisibilityRule {
 }
 
 // Fetch all role definitions
+// OPTIMIZED: Extended staleTime to 15 minutes - role definitions rarely change
 export function useRoleDefinitions() {
   return useQuery({
     queryKey: ['role-definitions'],
@@ -52,11 +53,13 @@ export function useRoleDefinitions() {
       if (error) throw error;
       return data as RoleDefinition[];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes
+    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
   });
 }
 
 // Fetch all page permissions
+// OPTIMIZED: Extended staleTime to 15 minutes - permissions rarely change during session
 export function usePagePermissions() {
   return useQuery({
     queryKey: ['page-permissions'],
@@ -69,11 +72,13 @@ export function usePagePermissions() {
       if (error) throw error;
       return data as PagePermission[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
+    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
   });
 }
 
 // Fetch all data visibility rules
+// OPTIMIZED: Extended staleTime to 15 minutes - visibility rules rarely change during session
 export function useDataVisibilityRules() {
   return useQuery({
     queryKey: ['data-visibility-rules'],
@@ -86,11 +91,13 @@ export function useDataVisibilityRules() {
       if (error) throw error;
       return data as DataVisibilityRule[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
+    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
   });
 }
 
 // Get current user's role from employee data
+// OPTIMIZED: Extended staleTime to 15 minutes - user role doesn't change during session
 function useCurrentUserRole() {
   const { user } = useAuth();
   
@@ -129,7 +136,8 @@ function useCurrentUserRole() {
       return 'medarbejder' as SystemRole;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // 15 minutes - role doesn't change during session
+    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
   });
 }
 
