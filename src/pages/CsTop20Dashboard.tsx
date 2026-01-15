@@ -4,11 +4,11 @@ import { format, startOfDay, startOfWeek, differenceInBusinessDays, getDay, getH
 import { da } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
+import { Trophy, TrendingUp, Calendar, Clock } from "lucide-react";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -62,6 +62,15 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+// Format name as "Firstname L." for better display
+const getDisplayName = (name: string) => {
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[parts.length - 1][0]}`;
+  }
+  return name;
+};
+
 // Commission color thresholds based on period type
 const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payroll') => {
   const thresholds = {
@@ -73,6 +82,14 @@ const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payrol
   if (commission >= green) return "bg-green-500";
   if (commission >= yellow) return "bg-yellow-500";
   return "bg-red-500";
+};
+
+// Get rank badge for top 3
+const getRankBadge = (index: number) => {
+  if (index === 0) return "🥇";
+  if (index === 1) return "🥈";
+  if (index === 2) return "🥉";
+  return null;
 };
 
 export default function CsTop20Dashboard() {
@@ -248,250 +265,138 @@ export default function CsTop20Dashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
+  // Leaderboard card component
+  const LeaderboardCard = ({ 
+    title, 
+    icon: Icon, 
+    sellers, 
+    period,
+    accentColor
+  }: { 
+    title: string; 
+    icon: React.ElementType; 
+    sellers: typeof sortedPayrollSellers; 
+    period: 'day' | 'week' | 'payroll';
+    accentColor: string;
+  }) => (
+    <Card className="overflow-hidden border-0 shadow-lg bg-gradient-to-b from-card to-card/95">
+      <CardHeader className={`pb-4 bg-gradient-to-r ${accentColor} text-white`}>
+        <CardTitle className="flex items-center justify-center gap-2 text-lg font-bold uppercase tracking-wider">
+          <Icon className="h-5 w-5" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+          </div>
+        ) : sellers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <Trophy className="h-8 w-8 mb-2 opacity-50" />
+            <span>Ingen salg endnu</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {sellers.map((seller, index) => {
+              const name = 'employeeName' in seller ? seller.employeeName : seller.name;
+              const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
+              const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
+              const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
+              const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
+              const goalInfo = getGoalInfo(name, commission, period, sellerGoalTarget);
+              const rankBadge = getRankBadge(index);
+              const displayName = getDisplayName(name);
+              
+              return (
+                <div 
+                  key={name} 
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 ${
+                    index < 3 ? 'bg-muted/30' : ''
+                  }`}
+                >
+                  {/* Rank */}
+                  <div className="w-8 flex-shrink-0 text-center">
+                    {rankBadge ? (
+                      <span className="text-xl">{rankBadge}</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-muted-foreground">{index + 1}</span>
+                    )}
+                  </div>
+                  
+                  {/* Avatar */}
+                  <Avatar className={`h-10 w-10 flex-shrink-0 ring-2 ${index === 0 ? 'ring-yellow-400' : index < 3 ? 'ring-primary/30' : 'ring-transparent'}`}>
+                    <AvatarImage src={avatarUrl} alt={name} />
+                    <AvatarFallback className="text-xs font-semibold bg-primary/20 text-primary">
+                      {getInitials(name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  {/* Name & Sales */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate">{displayName}</div>
+                    <div className="text-xs text-muted-foreground">{sales} salg</div>
+                  </div>
+                  
+                  {/* Commission */}
+                  <div className={`px-3 py-1.5 rounded-full text-sm font-bold text-white ${getCommissionColor(commission, period)}`}>
+                    {formatCurrency(commission)}
+                  </div>
+                  
+                  {/* Goal */}
+                  <div className="flex-shrink-0">
+                    {goalInfo ? (
+                      <GoalProgressRing
+                        progress={goalInfo.progress}
+                        expectedPercent={goalInfo.expectedPercent}
+                        current={commission}
+                        target={goalInfo.target}
+                        expectedAmount={goalInfo.expectedAmount}
+                      />
+                    ) : (
+                      <GoalProgressRingEmpty />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-6">
       <DashboardHeader 
         title="CS Top 20" 
-        subtitle={`Top 20 på tværs af alle teams og opgaver (${periodLabel})`}
+        subtitle={`Top 20 på tværs af alle teams og opgaver • ${periodLabel}`}
       />
-      <div className="space-y-6">
-
-        {/* Three leaderboard columns - Top 20 */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          
-          {/* Top Løn Periode */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top 20 Løn Periode
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedPayrollSellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedPayrollSellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'payroll', sellerGoalTarget);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(name)}</AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">{sales}</TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>{formatCurrency(commission)}</span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Uge */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top 20 Uge
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedWeeklySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedWeeklySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'week', sellerGoalTarget);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'week')}`}>
-                              {formatCurrency(commission)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Dag */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top 20 Dag
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedDailySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDailySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'day', sellerGoalTarget);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'day')}`}>
-                              {formatCurrency(commission)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>
+      
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <LeaderboardCard 
+          title="Top Løn Periode" 
+          icon={Trophy}
+          sellers={sortedPayrollSellers}
+          period="payroll"
+          accentColor="from-amber-500 to-orange-600"
+        />
+        
+        <LeaderboardCard 
+          title="Top Uge" 
+          icon={Calendar}
+          sellers={sortedWeeklySellers}
+          period="week"
+          accentColor="from-blue-500 to-indigo-600"
+        />
+        
+        <LeaderboardCard 
+          title="Top Dag" 
+          icon={Clock}
+          sellers={sortedDailySellers}
+          period="day"
+          accentColor="from-emerald-500 to-teal-600"
+        />
       </div>
     </div>
   );
