@@ -5,6 +5,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ============= MAINTENANCE MODE =============
+// Set to true to disable all heavy queries and return empty data immediately
+// This frees up database connections for login/auth
+const MAINTENANCE_MODE = true;
+
 // ============= IN-MEMORY CACHE =============
 // Cache results for 30 seconds to reduce database load
 const CACHE_TTL_MS = 30000;
@@ -40,6 +45,25 @@ function cleanupCache(): void {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  
+  // MAINTENANCE MODE: Return empty data immediately without any DB queries
+  if (MAINTENANCE_MODE) {
+    console.log("[MAINTENANCE] Returning empty data - DB queries disabled");
+    const emptyResponse = {
+      maintenance: true,
+      message: "Dashboard data temporarily disabled for maintenance",
+      totalSales: 0,
+      totalCommission: 0,
+      totalHours: 0,
+      totalRevenue: 0,
+      sellers: [],
+      employeeStats: [],
+      teamMembers: []
+    };
+    return new Response(JSON.stringify(emptyResponse), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
   
   // Cleanup old cache entries periodically
