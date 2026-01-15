@@ -7195,6 +7195,45 @@ export type Database = {
         }
         Relationships: []
       }
+      system_role_definitions: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          detailed_description: string | null
+          icon: string | null
+          id: string
+          key: string
+          label: string
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          detailed_description?: string | null
+          icon?: string | null
+          id?: string
+          key: string
+          label: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          detailed_description?: string | null
+          icon?: string | null
+          id?: string
+          key?: string
+          label?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_roles: {
         Row: {
           created_at: string | null
