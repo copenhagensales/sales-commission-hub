@@ -32,12 +32,64 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<
   return Promise.race([wrappedPromise, timeoutPromise]);
 };
 
+// Check if auth server is healthy
+const checkAuthHealth = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`,
+      { 
+        signal: controller.signal,
+        headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }
+      }
+    );
+    clearTimeout(timeout);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+// Login with retry and exponential backoff
+const loginWithRetry = async (
+  email: string, 
+  password: string, 
+  onRetry: (attempt: number) => void,
+  retries = 3
+): Promise<{ data: any; error: any }> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await supabase.auth.signInWithPassword({ 
+        email: email.trim().toLowerCase(), 
+        password 
+      });
+      
+      // If we get a result (even with auth error), return it
+      return result;
+    } catch (error: any) {
+      // Only retry on network errors (Failed to fetch)
+      if (error.message === "Failed to fetch" && i < retries - 1) {
+        onRetry(i + 2); // Next attempt number (1-indexed)
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  // This shouldn't be reached, but TypeScript needs it
+  return { data: null, error: new Error("Max retries exceeded") };
+};
+
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [retryStatus, setRetryStatus] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
@@ -171,10 +223,8 @@ export default function Auth() {
         setIsResetMode(false);
         setExpiredLinkError(false);
       } else {
-        // ============ EMERGENCY LOGIN MODE ============
-        // Database is overloaded - bypass all pre-checks
-        // Only use Supabase Auth service directly
-        // TODO: Re-enable pre-checks when database is stable
+        // ============ ROBUST LOGIN MODE ============
+        // With retry logic and health checks
         
         // Check if we're online first
         if (!navigator.onLine) {
@@ -187,11 +237,36 @@ export default function Auth() {
           return;
         }
         
-        // Direct login - no database pre-checks
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
+        // Pre-flight health check
+        setRetryStatus("Tjekker server...");
+        const isHealthy = await checkAuthHealth();
+        
+        if (!isHealthy) {
+          toast({
+            title: "Server utilgængelig",
+            description: "Login-serveren svarer ikke lige nu. Prøv igen om 30 sekunder.",
+            variant: "destructive",
+          });
+          setRetryStatus(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Login with retry logic
+        setRetryStatus(null);
+        setRetryAttempt(1);
+        
+        const { data, error } = await loginWithRetry(
+          email,
           password,
-        });
+          (attempt) => {
+            setRetryAttempt(attempt);
+            setRetryStatus(`Serveren svarer langsomt - forsøg ${attempt}/3...`);
+          }
+        );
+        
+        setRetryAttempt(0);
+        setRetryStatus(null);
         
         if (error) throw error;
         
@@ -231,25 +306,37 @@ export default function Auth() {
         ============ END DISABLED ============ */
       }
     } catch (error: any) {
+      let title = "Fejl";
       let message = error.message;
       
-      // Provide user-friendly error messages
+      // Provide user-friendly error messages based on error type
       if (error.message === "Failed to fetch") {
-        message = "Kunne ikke forbinde til serveren. Tjek din internetforbindelse og prøv igen.";
-      } else if (error.name === "TimeoutError") {
-        message = "Login tog for lang tid. Serveren er muligvis overbelastet - prøv igen om lidt.";
+        title = "Server utilgængelig";
+        message = "Login-serveren svarer ikke efter flere forsøg. Prøv igen om 30 sekunder.";
+      } else if (error.name === "TimeoutError" || error.message?.includes("timeout")) {
+        title = "Timeout";
+        message = "Login tog for lang tid. Serveren er overbelastet - prøv igen om lidt.";
       } else if (error.message?.includes("Invalid login")) {
+        title = "Forkert login";
         message = "Forkert email eller adgangskode.";
+      } else if (error.message?.includes("Email not confirmed")) {
+        title = "Email ikke bekræftet";
+        message = "Tjek din indbakke for bekræftelsesmail.";
+      } else if (error.message?.includes("Max retries")) {
+        title = "Server utilgængelig";
+        message = "Kunne ikke forbinde efter flere forsøg. Prøv igen om lidt.";
       }
       
       console.error("[Auth] Login error:", error.message, error.name);
       toast({
-        title: "Fejl",
+        title,
         description: message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+      setRetryAttempt(0);
+      setRetryStatus(null);
     }
   };
 
@@ -425,6 +512,16 @@ export default function Auth() {
                 {confirmPassword.length > 0 && password !== confirmPassword && (
                   <p className="text-xs text-destructive">Adgangskoderne matcher ikke</p>
                 )}
+              </div>
+            )}
+
+            {/* Retry status indicator */}
+            {retryAttempt > 1 && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
+                <div className="flex items-center gap-2 text-amber-600">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Serveren svarer langsomt - forsøg {retryAttempt}/3...</span>
+                </div>
               </div>
             )}
 
