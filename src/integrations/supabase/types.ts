@@ -93,24 +93,6 @@ export type Database = {
           },
         ]
       }
-      accounts_map: {
-        Row: {
-          account_number: string
-          category: string
-          type: string
-        }
-        Insert: {
-          account_number: string
-          category: string
-          type: string
-        }
-        Update: {
-          account_number?: string
-          category?: string
-          type?: string
-        }
-        Relationships: []
-      }
       adversus_campaign_mappings: {
         Row: {
           adversus_campaign_id: string
@@ -3560,13 +3542,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_master_data_position_id_fkey"
-            columns: ["position_id"]
-            isOneToOne: false
-            referencedRelation: "positions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "employee_master_data_system_role_id_fkey"
             columns: ["system_role_id"]
             isOneToOne: false
@@ -6086,47 +6061,6 @@ export type Database = {
           review_date?: string
           review_period?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "performance_reviews_recruitment_employee_id_fkey"
-            columns: ["recruitment_employee_id"]
-            isOneToOne: false
-            referencedRelation: "recruitment_employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      positions: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          sort_order: number | null
-          system_role: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          sort_order?: number | null
-          system_role?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          sort_order?: number | null
-          system_role?: string | null
-          updated_at?: string | null
-        }
         Relationships: []
       }
       product_campaign_overrides: {
@@ -6489,63 +6423,6 @@ export type Database = {
         }
         Relationships: []
       }
-      recruitment_employees: {
-        Row: {
-          candidate_id: string
-          created_at: string
-          deadline: string | null
-          employment_end_reason: string | null
-          employment_ended_date: string | null
-          hired_date: string | null
-          id: string
-          role: string
-          sub_team: string | null
-          team_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          candidate_id: string
-          created_at?: string
-          deadline?: string | null
-          employment_end_reason?: string | null
-          employment_ended_date?: string | null
-          hired_date?: string | null
-          id?: string
-          role: string
-          sub_team?: string | null
-          team_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          candidate_id?: string
-          created_at?: string
-          deadline?: string | null
-          employment_end_reason?: string | null
-          employment_ended_date?: string | null
-          hired_date?: string | null
-          id?: string
-          role?: string
-          sub_team?: string | null
-          team_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recruitment_employees_candidate_id_fkey"
-            columns: ["candidate_id"]
-            isOneToOne: false
-            referencedRelation: "candidates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recruitment_employees_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       recruitment_notifications: {
         Row: {
           created_at: string
@@ -6581,38 +6458,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      revenue_data: {
-        Row: {
-          created_at: string
-          id: string
-          period: number
-          recruitment_employee_id: string
-          revenue: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          period: number
-          recruitment_employee_id: string
-          revenue?: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          period?: number
-          recruitment_employee_id?: string
-          revenue?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "revenue_data_recruitment_employee_id_fkey"
-            columns: ["recruitment_employee_id"]
-            isOneToOne: false
-            referencedRelation: "recruitment_employees"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       role_page_permissions: {
         Row: {
@@ -7227,35 +7072,6 @@ export type Database = {
           week_start_date?: string
         }
         Relationships: []
-      }
-      sub_teams: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          team_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          team_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          team_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sub_teams_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       sync_state: {
         Row: {

@@ -1207,7 +1207,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           {(p.canViewDashboardCphSales || p.canViewDashboardFieldmarketing || p.canViewDashboardEesyTm || 
             p.canViewDashboardTdcErhverv || p.canViewDashboardRelatel || p.canViewDashboardTryg || 
             p.canViewDashboardAse || p.canViewDashboardTest || p.canViewDashboardUnited || 
-            p.canViewDashboardDesign || p.canViewDashboardSettings || p.canViewBoardsTest) && (
+            p.canViewDashboardDesign || p.canViewDashboardSettings) && (
             <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -1326,15 +1326,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <BarChart3 className="h-4 w-4" />
                     United
-                  </NavLink>
-                )}
-                {p.canViewBoardsTest && (
-                  <NavLink to="/boards/test" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/boards/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Monitor className="h-4 w-4" />
-                    {t("sidebar.test")}
                   </NavLink>
                 )}
                 {p.canViewDashboardDesign && (
