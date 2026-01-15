@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,7 @@ import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
 import { PermissionsTab } from "@/components/employees/PermissionsTab";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 
 
 interface EmployeeMasterDataRecord {
@@ -1049,15 +1050,7 @@ export default function EmployeeMasterData() {
             </DialogContent>
           </Dialog>
 
-        <Tabs defaultValue="all-employees" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="all-employees">{t("employees.tabs.allEmployees")}</TabsTrigger>
-            <TabsTrigger value="staff-employees">Backoffice</TabsTrigger>
-            <TabsTrigger value="teams">{t("employees.tabs.teams")}</TabsTrigger>
-            <TabsTrigger value="positions">{t("employees.tabs.positions")}</TabsTrigger>
-            <TabsTrigger value="permissions">Rettigheder</TabsTrigger>
-            <TabsTrigger value="dialer-mapping">{t("employees.tabs.dialerMapping")}</TabsTrigger>
-          </TabsList>
+        <EmployeeTabs t={t} />
 
           <TabsContent value="all-employees" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">

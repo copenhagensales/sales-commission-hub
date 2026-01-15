@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -19,13 +19,21 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
+import { TrendingUp, Users, Calendar, Package, Trophy, Loader2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
   "yousee": FIELDMARKETING_CLIENTS.YOUSEE,
 };
+
+// Tab configuration with permission keys
+const allTabs = [
+  { value: "eesy-fm", label: "Eesy FM", permissionKey: "tab_fm_eesy" },
+  { value: "yousee", label: "Yousee", permissionKey: "tab_fm_yousee" },
+];
 
 const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientName: string }) => {
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
@@ -331,7 +339,16 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
 };
 
 const FieldmarketingDashboardFull = () => {
-  const [activeTab, setActiveTab] = useState<string>("eesy-fm");
+  const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
+  
+  // Filter tabs based on permissions
+  const visibleTabs = useMemo(() => 
+    allTabs.filter(tab => canView(tab.permissionKey)),
+    [canView]
+  );
+  
+  const defaultTab = visibleTabs[0]?.value || "eesy-fm";
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   // Fetch client logos dynamically from the database
   const { data: clients } = useQuery({
@@ -347,8 +364,30 @@ const FieldmarketingDashboardFull = () => {
     },
   });
 
+  if (permissionsLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (visibleTabs.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12 text-muted-foreground">
+          Du har ikke adgang til denne side.
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const activeClientId = TAB_TO_CLIENT_ID[activeTab];
   const activeClient = clients?.find(c => c.id === activeClientId);
+
+  const gridColsClass = `grid-cols-${visibleTabs.length}`;
 
   return (
     <DashboardLayout>
@@ -371,24 +410,22 @@ const FieldmarketingDashboardFull = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="eesy-fm">Eesy FM</TabsTrigger>
-          <TabsTrigger value="yousee">Yousee</TabsTrigger>
+        <TabsList className={`grid w-full max-w-md ${gridColsClass}`}>
+          {visibleTabs.map(tab => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="eesy-fm" className="mt-6">
-          <ClientDashboard 
-            clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
-            clientName="Eesy FM" 
-          />
-        </TabsContent>
-
-        <TabsContent value="yousee" className="mt-6">
-          <ClientDashboard 
-            clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
-            clientName="Yousee" 
-          />
-        </TabsContent>
+        {visibleTabs.map(tab => (
+          <TabsContent key={tab.value} value={tab.value} className="mt-6">
+            <ClientDashboard 
+              clientId={TAB_TO_CLIENT_ID[tab.value]} 
+              clientName={tab.label} 
+            />
+          </TabsContent>
+        ))}
       </Tabs>
     </DashboardLayout>
   );
