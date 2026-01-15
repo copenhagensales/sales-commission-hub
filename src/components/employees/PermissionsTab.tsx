@@ -2,15 +2,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Users, Calendar, FileText, Loader2, Crown, User, Eye, Lock, Pencil, Settings2 } from "lucide-react";
+import { Shield, Calendar, FileText, Loader2, Crown, User, Eye, Lock, Pencil, Settings2 } from "lucide-react";
 import { 
   useRoleDefinitions, 
   usePagePermissions, 
-  useDataVisibilityRules,
   permissionKeyLabels,
-  dataScopeLabels,
-  visibilityLabels,
-  type Visibility,
   type RoleDefinition
 } from "@/hooks/useUnifiedPermissions";
 import { PermissionEditor } from "./permissions/PermissionEditor";
@@ -19,7 +15,6 @@ import { PermissionEditor } from "./permissions/PermissionEditor";
 const iconMap: Record<string, React.ReactNode> = {
   crown: <Crown className="h-4 w-4" />,
   shield: <Shield className="h-4 w-4" />,
-  users: <Users className="h-4 w-4" />,
   "file-text": <FileText className="h-4 w-4" />,
   calendar: <Calendar className="h-4 w-4" />,
   user: <User className="h-4 w-4" />,
@@ -35,42 +30,19 @@ const colorMap: Record<string, string> = {
   gray: "bg-muted text-muted-foreground",
 };
 
-// Visibility badge colors
-const visibilityColors: Record<Visibility, string> = {
-  all: "bg-green-100 text-green-700 border-green-200",
-  team: "bg-blue-100 text-blue-700 border-blue-200",
-  self: "bg-amber-100 text-amber-700 border-amber-200",
-  none: "bg-red-100 text-red-700 border-red-200",
-};
 
 export function PermissionsTab() {
   const { data: roleDefinitions = [], isLoading: rolesLoading } = useRoleDefinitions();
   const { data: pagePermissions = [], isLoading: permissionsLoading } = usePagePermissions();
-  const { data: visibilityRules = [], isLoading: visibilityLoading } = useDataVisibilityRules();
 
-  const isLoading = rolesLoading || permissionsLoading || visibilityLoading;
-
-  // Create a lookup map for roles
-  const roleMap = roleDefinitions.reduce((acc, role) => {
-    acc[role.key] = role;
-    return acc;
-  }, {} as Record<string, RoleDefinition>);
+  const isLoading = rolesLoading || permissionsLoading;
 
   // Get unique permission keys sorted
   const permissionKeys = [...new Set(pagePermissions.map(p => p.permission_key))].sort();
   
-  // Get unique data scopes
-  const dataScopes = [...new Set(visibilityRules.map(r => r.data_scope))];
-  
   // Get page permission for a role/key combination
   const getPagePermission = (roleKey: string, permissionKey: string) => {
     return pagePermissions.find(p => p.role_key === roleKey && p.permission_key === permissionKey);
-  };
-  
-  // Get visibility for a role/scope combination
-  const getVisibilityForRoleScope = (roleKey: string, scope: string): Visibility => {
-    const rule = visibilityRules.find(r => r.role_key === roleKey && r.data_scope === scope);
-    return (rule?.visibility as Visibility) || "none";
   };
 
   if (isLoading) {
@@ -201,76 +173,6 @@ export function PermissionsTab() {
           </CardContent>
         </Card>
 
-        {/* Data Visibility Rules */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Data-synlighed
-            </CardTitle>
-            <CardDescription>
-              Hvad kan hver rolle se af andres data? "Alle" = alle medarbejdere, "Team" = kun teammedlemmer, "Kun egen" = kun egne data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Datatype</TableHead>
-                    {roleDefinitions.map((role) => (
-                      <TableHead key={role.key} className="text-center">
-                        <Badge className={colorMap[role.color || "gray"]} variant="outline">
-                          {role.label}
-                        </Badge>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dataScopes.map((scope) => (
-                    <TableRow key={scope}>
-                      <TableCell className="font-medium">
-                        {dataScopeLabels[scope] || scope.replace(/_/g, ' ')}
-                      </TableCell>
-                      {roleDefinitions.map((role) => {
-                        const visibility = getVisibilityForRoleScope(role.key, scope);
-                        return (
-                          <TableCell key={role.key} className="text-center">
-                            <Badge 
-                              variant="outline" 
-                              className={visibilityColors[visibility]}
-                            >
-                              {visibilityLabels[visibility]}
-                            </Badge>
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className={visibilityColors.all}>Alle</Badge>
-                <span>Kan se data for alle medarbejdere</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className={visibilityColors.team}>Team</Badge>
-                <span>Kun teammedlemmer</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className={visibilityColors.self}>Kun egen</Badge>
-                <span>Kun egne data</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className={visibilityColors.none}>Ingen</Badge>
-                <span>Ingen adgang</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </TabsContent>
 
       <TabsContent value="edit">

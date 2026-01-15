@@ -2705,39 +2705,6 @@ export type Database = {
         }
         Relationships: []
       }
-      data_visibility_rules: {
-        Row: {
-          context: string | null
-          created_at: string
-          data_scope: string
-          description: string | null
-          id: string
-          role_key: string
-          updated_at: string
-          visibility: string
-        }
-        Insert: {
-          context?: string | null
-          created_at?: string
-          data_scope: string
-          description?: string | null
-          id?: string
-          role_key: string
-          updated_at?: string
-          visibility: string
-        }
-        Update: {
-          context?: string | null
-          created_at?: string
-          data_scope?: string
-          description?: string | null
-          id?: string
-          role_key?: string
-          updated_at?: string
-          visibility?: string
-        }
-        Relationships: []
-      }
       deactivation_reminder_config: {
         Row: {
           created_at: string

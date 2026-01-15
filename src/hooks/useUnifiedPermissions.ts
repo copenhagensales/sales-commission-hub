@@ -31,14 +31,6 @@ export interface PagePermission {
   visibility: 'all' | 'team' | 'self' | null;
 }
 
-export interface DataVisibilityRule {
-  id: string;
-  role_key: string;
-  data_scope: string;
-  visibility: Visibility;
-  context: string | null;
-  description: string | null;
-}
 
 // Fetch all role definitions
 // OPTIMIZED: Extended staleTime to 15 minutes - role definitions rarely change
@@ -78,24 +70,6 @@ export function usePagePermissions() {
   });
 }
 
-// Fetch all data visibility rules
-// OPTIMIZED: Extended staleTime to 15 minutes - visibility rules rarely change during session
-export function useDataVisibilityRules() {
-  return useQuery({
-    queryKey: ['data-visibility-rules'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('data_visibility_rules')
-        .select('*')
-        .order('data_scope');
-      
-      if (error) throw error;
-      return data as DataVisibilityRule[];
-    },
-    staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
-    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
-  });
-}
 
 // Get current user's role from employee data
 // OPTIMIZED: Extended staleTime to 15 minutes - user role doesn't change during session
@@ -147,9 +121,8 @@ export function useUnifiedPermissions() {
   const { user } = useAuth();
   const { data: currentRole, isLoading: roleLoading } = useCurrentUserRole();
   const { data: pagePermissions, isLoading: permissionsLoading } = usePagePermissions();
-  const { data: visibilityRules, isLoading: visibilityLoading } = useDataVisibilityRules();
   
-  const isLoading = roleLoading || permissionsLoading || visibilityLoading;
+  const isLoading = roleLoading || permissionsLoading;
   const role = currentRole || 'medarbejder';
   
   // Role helper booleans
@@ -176,24 +149,24 @@ export function useUnifiedPermissions() {
     return permission?.can_edit ?? false;
   };
   
-  // Get data visibility scope for current role
-  const getDataScope = (scope: string, context?: string): Visibility => {
+  // Get data visibility scope for current role and permission
+  const getDataScope = (permissionKey: string): Visibility => {
     if (isOwner) return 'all'; // Owners see everything
     
-    const rule = visibilityRules?.find(
-      r => r.role_key === role && r.data_scope === scope && (r.context === context || !context)
+    const permission = pagePermissions?.find(
+      p => p.role_key === role && p.permission_key === permissionKey
     );
-    return (rule?.visibility as Visibility) ?? 'none';
+    return (permission?.visibility as Visibility) ?? 'self';
   };
   
   // Check if user can see data for a specific target
   const canSeeData = (
-    scope: string, 
+    permissionKey: string, 
     targetEmployeeId?: string, 
     currentEmployeeId?: string,
     isInUserTeam?: boolean
   ): boolean => {
-    const visibility = getDataScope(scope);
+    const visibility = getDataScope(permissionKey);
     
     switch (visibility) {
       case 'all':
@@ -231,7 +204,6 @@ export function useUnifiedPermissions() {
     
     // Raw data for UI display
     pagePermissions,
-    visibilityRules,
   };
 }
 
@@ -428,22 +400,6 @@ export const permissionKeyLabels: Record<string, string> = {
   tab_fm_bookings: 'Fane: Kommende bookinger',
   tab_fm_locations: 'Fane: Lokationer',
   tab_fm_vagtplan: 'Fane: Vagtplan FM',
-};
-
-export const dataScopeLabels: Record<string, string> = {
-  employees: 'Medarbejdere',
-  sales: 'Salg',
-  shifts: 'Vagter',
-  absences: 'Fravær',
-  coaching: 'Coaching',
-  contracts: 'Kontrakter',
-  payroll: 'Løn',
-  leaderboard_ranking: 'Leaderboard rangering',
-  sales_count_others: 'Andres salgstal',
-  commission_details: 'Provisionsdetaljer',
-  salary_breakdown: 'Lønspecifikation',
-  h2h_stats: 'Head-to-Head statistik',
-  employee_performance: 'Medarbejder performance',
 };
 
 export const visibilityLabels: Record<Visibility, string> = {
