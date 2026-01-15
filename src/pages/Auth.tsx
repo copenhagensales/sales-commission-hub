@@ -32,11 +32,11 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<
   return Promise.race([wrappedPromise, timeoutPromise]);
 };
 
-// Check if auth server is healthy
+// Check if auth server is healthy - with fallback to allow login during instability
 const checkAuthHealth = async (): Promise<boolean> => {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 10000); // Extended to 10s
     
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`,
@@ -47,8 +47,10 @@ const checkAuthHealth = async (): Promise<boolean> => {
     );
     clearTimeout(timeout);
     return response.ok;
-  } catch {
-    return false;
+  } catch (e) {
+    // Allow login attempt even if health check fails - user will get proper error from actual login
+    console.warn('[Auth] Health check failed, proceeding anyway:', e);
+    return true;
   }
 };
 
@@ -94,11 +96,65 @@ export default function Auth() {
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
   const [expiredLinkError, setExpiredLinkError] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const { toast } = useToast();
   const { mustChangePassword, clearMustChangePassword, user, loading: authLoading } = useAuth();
   
   // Derive connection status from auth loading state
   const connectionStatus = authLoading ? 'checking' : 'connected';
+  
+  // Run diagnostics to test connectivity
+  const runDiagnostics = async () => {
+    setDiagnostics(['Running tests...']);
+    const results: string[] = [];
+    
+    // Test 1: External connectivity
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5000);
+      await fetch('https://httpbin.org/get', { signal: controller.signal });
+      results.push('✅ Internet: OK');
+    } catch (e: any) {
+      results.push(`❌ Internet: ${e.message}`);
+    }
+    
+    // Test 2: Supabase Auth health
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`,
+        { signal: controller.signal, headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+      );
+      results.push(`✅ Auth server: ${res.status} ${res.statusText}`);
+    } catch (e: any) {
+      results.push(`❌ Auth server: ${e.message}`);
+    }
+    
+    // Test 3: Supabase Edge Functions
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/`,
+        { signal: controller.signal, headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+      );
+      results.push(`✅ Edge functions: ${res.status}`);
+    } catch (e: any) {
+      results.push(`❌ Edge functions: ${e.message}`);
+    }
+    
+    setDiagnostics(results);
+  };
+  
+  // Handle triple-click on logo for diagnostics
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (e.detail === 3) {
+      setShowDiagnostics(!showDiagnostics);
+    }
+  };
 
   // Check if user must change password after login
   useEffect(() => {
@@ -237,20 +293,9 @@ export default function Auth() {
           return;
         }
         
-        // Pre-flight health check
+        // Pre-flight health check - but allow login to proceed anyway
         setRetryStatus("Tjekker server...");
-        const isHealthy = await checkAuthHealth();
-        
-        if (!isHealthy) {
-          toast({
-            title: "Server utilgængelig",
-            description: "Login-serveren svarer ikke lige nu. Prøv igen om 30 sekunder.",
-            variant: "destructive",
-          });
-          setRetryStatus(null);
-          setLoading(false);
-          return;
-        }
+        await checkAuthHealth(); // Result is logged, but we proceed regardless
         
         // Login with retry logic
         setRetryStatus(null);
@@ -309,25 +354,33 @@ export default function Auth() {
       let title = "Fejl";
       let message = error.message;
       
+      // Track failed attempts for offline fallback
+      const newFailedAttempts = failedAttempts + 1;
+      setFailedAttempts(newFailedAttempts);
+      
       // Provide user-friendly error messages based on error type
       if (error.message === "Failed to fetch") {
         title = "Server utilgængelig";
-        message = "Login-serveren svarer ikke efter flere forsøg. Prøv igen om 30 sekunder.";
+        message = newFailedAttempts >= 3 
+          ? "Serveren kan ikke nås. Tjek din internetforbindelse eller prøv igen senere."
+          : `Login-serveren svarer ikke (forsøg ${newFailedAttempts}/3). Prøv igen.`;
       } else if (error.name === "TimeoutError" || error.message?.includes("timeout")) {
         title = "Timeout";
         message = "Login tog for lang tid. Serveren er overbelastet - prøv igen om lidt.";
       } else if (error.message?.includes("Invalid login")) {
         title = "Forkert login";
         message = "Forkert email eller adgangskode.";
+        setFailedAttempts(0); // Reset on auth error (not network error)
       } else if (error.message?.includes("Email not confirmed")) {
         title = "Email ikke bekræftet";
         message = "Tjek din indbakke for bekræftelsesmail.";
+        setFailedAttempts(0);
       } else if (error.message?.includes("Max retries")) {
         title = "Server utilgængelig";
         message = "Kunne ikke forbinde efter flere forsøg. Prøv igen om lidt.";
       }
       
-      console.error("[Auth] Login error:", error.message, error.name);
+      console.error("[Auth] Login error:", error.message, error.name, `(attempt ${newFailedAttempts})`);
       toast({
         title,
         description: message,
@@ -368,17 +421,70 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8 animate-fade-in">
-        {/* Logo */}
-        <div className="text-center">
+        {/* Logo - triple-click for diagnostics */}
+        <div className="text-center" onClick={handleLogoClick}>
           <img 
             src={cphSalesLogo} 
             alt="CPH Sales" 
-            className="mx-auto h-24 w-auto"
+            className="mx-auto h-24 w-auto cursor-pointer"
           />
           <p className="mt-4 text-sm text-muted-foreground">
             Løn- og performance-system
           </p>
         </div>
+        
+        {/* Hidden diagnostics panel */}
+        {showDiagnostics && (
+          <div className="rounded-lg border border-blue-500/50 bg-blue-500/10 p-4 font-mono text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-blue-600">Diagnostik</span>
+              <Button size="sm" variant="outline" onClick={runDiagnostics}>
+                Kør Test
+              </Button>
+            </div>
+            {diagnostics.length > 0 && (
+              <div className="space-y-1 mt-2">
+                {diagnostics.map((d, i) => (
+                  <div key={i} className="text-foreground">{d}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Server unavailable fallback after 3 failures */}
+        {failedAttempts >= 3 && (
+          <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-700">Serveren er utilgængelig</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Vi kan ikke forbinde til login-serveren efter flere forsøg.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      setFailedAttempts(0);
+                      handleClearCacheAndReload();
+                    }}
+                  >
+                    Ryd cache og prøv igen
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => setShowDiagnostics(true)}
+                  >
+                    Vis diagnostik
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Connection Status */}
 
