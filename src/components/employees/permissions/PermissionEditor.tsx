@@ -532,16 +532,36 @@ export function PermissionEditor() {
   const togglePermission = async (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
     const newValue = !permission[field];
     
+    console.log('togglePermission called:', {
+      permissionId: permission.id,
+      permissionKey: permission.permission_key,
+      field,
+      currentValue: permission[field],
+      newValue,
+    });
+    
     // Update the permission itself
-    const { error } = await supabase
+    const { error, count, status, statusText } = await supabase
       .from('role_page_permissions')
       .update({ [field]: newValue })
-      .eq('id', permission.id);
+      .eq('id', permission.id)
+      .select();
+    
+    console.log('Supabase update response:', { error, count, status, statusText });
     
     if (error) {
-      toast.error('Kunne ikke opdatere');
+      console.error('Permission update error:', error);
+      toast.error(`Kunne ikke opdatere: ${error.message}`);
       return;
     }
+    
+    if (count === 0) {
+      console.error('No rows updated - RLS may be blocking. Permission ID:', permission.id);
+      toast.error('Ingen rækker opdateret - kontroller rettigheder i databasen');
+      return;
+    }
+    
+    toast.success('Rettighed opdateret');
 
     // If it's a page and we're turning OFF, also turn off all children
     if ((permission.permission_type === 'page' || !permission.parent_key) && !newValue) {
@@ -637,18 +657,28 @@ export function PermissionEditor() {
 
   // Update visibility mutation
   const updateVisibility = async (roleKey: string, scope: string, visibility: Visibility) => {
+    console.log('updateVisibility called:', { roleKey, scope, visibility });
+    
     const existing = visibilityRules.find(
       r => r.role_key === roleKey && r.data_scope === scope
     );
 
     try {
       if (existing) {
-        const { error } = await supabase
+        console.log('Updating existing rule:', existing.id);
+        const { error, count } = await supabase
           .from('data_visibility_rules')
           .update({ visibility })
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select();
+        
+        console.log('Update result:', { error, count });
         if (error) throw error;
+        if (count === 0) {
+          throw new Error('Ingen rækker opdateret - RLS blokerer muligvis');
+        }
       } else {
+        console.log('Creating new rule');
         const scopeData = DATA_SCOPES.find(s => s.key === scope);
         const { error } = await supabase
           .from('data_visibility_rules')
@@ -664,6 +694,7 @@ export function PermissionEditor() {
       queryClient.invalidateQueries({ queryKey: ['data-visibility-rules'] });
       toast.success('Synlighed opdateret');
     } catch (error: any) {
+      console.error('Visibility update error:', error);
       toast.error('Kunne ikke opdatere synlighed: ' + error.message);
     }
   };
