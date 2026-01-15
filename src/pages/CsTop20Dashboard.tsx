@@ -251,14 +251,14 @@ export default function CsTop20Dashboard() {
     period: 'day' | 'week' | 'payroll';
     accentColor: string;
   }) => (
-    <Card className={`overflow-hidden border-0 shadow-2xl ${tvMode ? 'bg-slate-800/90' : 'bg-gradient-to-b from-card to-card/95'}`}>
-      <CardHeader className={`pb-4 bg-gradient-to-r ${accentColor} text-white`}>
-        <CardTitle className={`flex items-center justify-center gap-2 font-bold uppercase tracking-wider ${tvMode ? 'text-xl' : 'text-lg'}`}>
-          <Icon className={tvMode ? "h-6 w-6" : "h-5 w-5"} />
+    <Card className={`overflow-hidden border-0 shadow-2xl flex flex-col ${tvMode ? 'bg-slate-800/90 h-full' : 'bg-gradient-to-b from-card to-card/95'}`}>
+      <CardHeader className={`pb-2 flex-shrink-0 bg-gradient-to-r ${accentColor} text-white`}>
+        <CardTitle className={`flex items-center justify-center gap-2 font-bold uppercase tracking-wider ${tvMode ? 'text-lg' : 'text-lg'}`}>
+          <Icon className={tvMode ? "h-5 w-5" : "h-5 w-5"} />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className={`p-0 ${tvMode ? 'flex-1 overflow-y-auto' : ''}`}>
         {(tvMode ? false : isLoading) ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -281,40 +281,40 @@ export default function CsTop20Dashboard() {
               return (
                 <div 
                   key={name} 
-                  className={`flex items-center gap-3 transition-colors ${
-                    tvMode ? 'px-5 py-3.5' : 'px-4 py-3 hover:bg-muted/50'
+                  className={`flex items-center gap-2 transition-colors ${
+                    tvMode ? 'px-3 py-2' : 'px-4 py-3 hover:bg-muted/50'
                   } ${
                     index < 3 ? (tvMode ? 'bg-slate-700/40' : 'bg-muted/30') : ''
                   }`}
                 >
                   {/* Rank */}
-                  <div className={`flex-shrink-0 text-center ${tvMode ? 'w-10' : 'w-8'}`}>
+                  <div className={`flex-shrink-0 text-center ${tvMode ? 'w-8' : 'w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-2xl" : "text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-lg" : "text-xl"}>{rankBadge}</span>
                     ) : (
-                      <span className={`font-semibold ${tvMode ? 'text-base text-slate-400' : 'text-sm text-muted-foreground'}`}>{index + 1}</span>
+                      <span className={`font-semibold ${tvMode ? 'text-sm text-slate-400' : 'text-sm text-muted-foreground'}`}>{index + 1}</span>
                     )}
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ring-2 ${tvMode ? 'h-12 w-12' : 'h-10 w-10'} ${index === 0 ? 'ring-yellow-400' : index < 3 ? 'ring-primary/30' : 'ring-transparent'}`}>
+                  <Avatar className={`flex-shrink-0 ring-2 ${tvMode ? 'h-9 w-9' : 'h-10 w-10'} ${index === 0 ? 'ring-yellow-400' : index < 3 ? 'ring-primary/30' : 'ring-transparent'}`}>
                     <AvatarImage src={avatarUrl} alt={name} />
-                    <AvatarFallback className={`font-semibold bg-primary/20 text-primary ${tvMode ? 'text-sm' : 'text-xs'}`}>
+                    <AvatarFallback className={`font-semibold bg-primary/20 text-primary ${tvMode ? 'text-xs' : 'text-xs'}`}>
                       {getInitials(name)}
                     </AvatarFallback>
                   </Avatar>
                   
                   {/* Name & Sales & Team */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-semibold truncate ${tvMode ? 'text-base text-white' : 'text-sm'}`}>{displayName}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`font-semibold truncate ${tvMode ? 'text-sm text-white' : 'text-sm'}`}>{displayName}</span>
                       {(() => {
                         const teamName = 'teamName' in seller ? seller.teamName : getTeamName(name);
                         const shortTeam = getShortTeamName(teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 font-medium ${
+                          <span className={`flex-shrink-0 rounded px-1 py-0.5 font-medium ${
                             tvMode 
-                              ? 'bg-slate-600/80 text-slate-300 text-xs' 
+                              ? 'bg-slate-600/80 text-slate-300 text-[10px]' 
                               : 'bg-muted text-muted-foreground text-[10px]'
                           }`}>
                             {shortTeam}
@@ -322,11 +322,11 @@ export default function CsTop20Dashboard() {
                         ) : null;
                       })()}
                     </div>
-                    <div className={tvMode ? 'text-sm text-slate-400' : 'text-xs text-muted-foreground'}>{sales} salg</div>
+                    <div className={tvMode ? 'text-xs text-slate-400' : 'text-xs text-muted-foreground'}>{sales} salg</div>
                   </div>
                   
                   {/* Commission */}
-                  <div className={`rounded-full font-bold text-white ${getCommissionColor(commission, period)} ${tvMode ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-sm'}`}>
+                  <div className={`rounded-full font-bold text-white ${getCommissionColor(commission, period)} ${tvMode ? 'px-2.5 py-1 text-sm' : 'px-3 py-1.5 text-sm'}`}>
                     {formatCurrency(commission)}
                   </div>
                 </div>
@@ -339,12 +339,15 @@ export default function CsTop20Dashboard() {
   );
 
   return (
-    <div className={`min-h-screen ${tvMode ? 'bg-slate-900 p-8' : 'bg-gradient-to-br from-background via-background to-muted/30 p-6'}`}>
+    <div className={tvMode 
+      ? 'w-[1920px] h-[1080px] bg-slate-900 p-6 flex flex-col overflow-hidden' 
+      : 'min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-6'
+    }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-lg text-slate-400 mt-2">Top 20 på tværs af alle teams • {periodLabel}</p>
+        <div className="mb-4 text-center flex-shrink-0">
+          <h1 className="text-3xl font-bold text-white tracking-tight">CS Top 20</h1>
+          <p className="text-base text-slate-400 mt-1">Top 20 på tværs af alle teams • {periodLabel}</p>
         </div>
       ) : (
         <DashboardHeader 
@@ -353,7 +356,10 @@ export default function CsTop20Dashboard() {
         />
       )}
       
-      <div className={`grid grid-cols-1 gap-6 lg:grid-cols-3 ${tvMode ? 'mt-0' : 'mt-6'}`}>
+      <div className={tvMode 
+        ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' 
+        : 'grid grid-cols-1 gap-6 lg:grid-cols-3 mt-6'
+      }>
         <LeaderboardCard 
           title="Top Løn Periode" 
           icon={Trophy}
