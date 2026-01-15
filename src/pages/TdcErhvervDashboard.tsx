@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays, getDay, getHours } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,15 +189,28 @@ export default function TdcErhvervDashboard() {
     enabled: !tvMode
   });
 
-  // Calculate expected progress based on working days elapsed
-  const getExpectedProgress = useMemo(() => {
-    const today = new Date();
-    const totalWorkingDays = 21; // Payroll period is ~21 working days
-    const daysElapsed = Math.max(1, differenceInBusinessDays(today, payrollPeriod.start) + 1);
-    return Math.min(100, (daysElapsed / totalWorkingDays) * 100);
+  // Calculate time-based progress for relative goal tracking
+  const timeProgress = useMemo(() => {
+    const now = new Date();
+    const totalWorkingDays = 21;
+    
+    // Payroll period: days elapsed out of 21
+    const payrollDaysElapsed = Math.max(1, differenceInBusinessDays(now, payrollPeriod.start) + 1);
+    const payrollExpectedPercent = Math.min(100, (payrollDaysElapsed / totalWorkingDays) * 100);
+    
+    // Week: current weekday (1=Monday to 5=Friday)
+    const weekdayIndex = getDay(now); // 0=Sunday, 1=Monday...
+    const workDaysInWeekSoFar = weekdayIndex === 0 ? 5 : weekdayIndex === 6 ? 5 : weekdayIndex;
+    const weekExpectedPercent = (workDaysInWeekSoFar / 5) * 100;
+    
+    // Day: how much of the workday is done (8:00-17:00)
+    const hour = getHours(now);
+    const dayProgressPercent = Math.min(100, Math.max(0, ((hour - 8) / 9) * 100));
+    
+    return { payrollExpectedPercent, weekExpectedPercent, dayExpectedPercent: dayProgressPercent };
   }, [payrollPeriod.start]);
 
-  // Get goal info for an employee
+  // Get goal info for an employee with period-relative expected progress
   const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll') => {
     const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
     if (!employeeId) return null;
@@ -210,8 +223,13 @@ export default function TdcErhvervDashboard() {
                  : period === 'week' ? Math.round((payrollTarget / 21) * 5)
                  : Math.round(payrollTarget / 21);
     
+    // Get expected progress for this period
+    const expectedPercent = period === 'payroll' ? timeProgress.payrollExpectedPercent
+                          : period === 'week' ? timeProgress.weekExpectedPercent
+                          : timeProgress.dayExpectedPercent;
+    
     const progress = (commission / target) * 100;
-    return { target, progress };
+    return { target, progress, expectedPercent };
   };
 
   // Sort employees by commission for each period
@@ -428,7 +446,7 @@ export default function TdcErhvervDashboard() {
                           <TableCell className="text-right py-2">
                             {goalInfo ? (
                               <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, getExpectedProgress)}`}>
+                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>
                                   {Math.round(goalInfo.progress)}%
                                 </span>
                                 <span className="text-xs text-muted-foreground">
@@ -506,7 +524,7 @@ export default function TdcErhvervDashboard() {
                           <TableCell className="text-right py-2">
                             {goalInfo ? (
                               <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, 100)}`}>
+                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>
                                   {Math.round(goalInfo.progress)}%
                                 </span>
                                 <span className="text-xs text-muted-foreground">
@@ -584,7 +602,7 @@ export default function TdcErhvervDashboard() {
                           <TableCell className="text-right py-2">
                             {goalInfo ? (
                               <div className="flex flex-col items-end">
-                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, 100)}`}>
+                                <span className={`text-sm font-semibold ${getGoalProgressColor(goalInfo.progress, goalInfo.expectedPercent)}`}>
                                   {Math.round(goalInfo.progress)}%
                                 </span>
                                 <span className="text-xs text-muted-foreground">
