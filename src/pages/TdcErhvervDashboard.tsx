@@ -1,8 +1,8 @@
 import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfWeek, differenceInBusinessDays } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarDays, Calendar, CalendarRange, TrendingUp, Target } from "lucide-react";
+import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -98,6 +98,7 @@ export default function TdcErhvervDashboard() {
 
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(today);
 
   // Fetch TV data from edge function (bypasses RLS for TV mode)
   const { data: tvData } = useQuery<TvTdcData>({
@@ -136,6 +137,14 @@ export default function TdcErhvervDashboard() {
   const payrollSalesData = useDashboardSalesData({
     clientName: "TDC Erhverv",
     startDate: payrollPeriod.start,
+    endDate: new Date(),
+    enabled: !tvMode
+  });
+
+  // Fetch sales for this month
+  const monthlySalesData = useDashboardSalesData({
+    clientName: "TDC Erhverv",
+    startDate: monthStart,
     endDate: new Date(),
     enabled: !tvMode
   });
@@ -256,7 +265,7 @@ export default function TdcErhvervDashboard() {
       <div className="space-y-6">
 
         {/* KPI Cards - Row 1: Time-based sales */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
@@ -280,6 +289,19 @@ export default function TdcErhvervDashboard() {
                 {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
             </CardContent>
           </Card>
 
