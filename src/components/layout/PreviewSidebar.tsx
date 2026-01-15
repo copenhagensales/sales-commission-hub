@@ -137,18 +137,61 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   };
 
   const mainItems = getEnabledItems(MAIN_MENU_ITEMS);
-  const personalItems = getEnabledItems(PERSONAL_MENU_ITEMS);
-  const personnelItems = getEnabledItems(PERSONNEL_ITEMS);
-  const managementItems = getEnabledItems(MANAGEMENT_ITEMS);
-  const testItems = getEnabledItems(TEST_ITEMS);
-  const mgItems = getEnabledItems(MG_ITEMS);
-  const shiftItems = getEnabledItems(SHIFT_PLANNING_ITEMS);
-  const vagtFlowItems = getEnabledItems(VAGT_FLOW_ITEMS);
-  const recruitmentItems = getEnabledItems(RECRUITMENT_ITEMS);
-  const boardsItems = getEnabledItems(BOARDS_ITEMS);
-  const salaryItems = isOwner 
-    ? Object.values(SALARY_ITEMS) 
-    : getEnabledItems(SALARY_ITEMS);
+  
+  // Section visibility based on parent permission
+  const hasSectionPermission = (sectionKey: string): boolean => {
+    return hasPermission(sectionKey);
+  };
+  
+  // Personal section - check parent first
+  const personalItems = hasSectionPermission('menu_section_personal') 
+    ? getEnabledItems(PERSONAL_MENU_ITEMS)
+    : [];
+    
+  // Personnel section - check parent first  
+  const personnelItems = hasSectionPermission('menu_section_personale')
+    ? getEnabledItems(PERSONNEL_ITEMS)
+    : [];
+    
+  // Management section - check parent first
+  const managementItems = hasSectionPermission('menu_section_ledelse')
+    ? getEnabledItems(MANAGEMENT_ITEMS)
+    : [];
+    
+  // Test section - check parent first  
+  const testItems = hasSectionPermission('menu_section_test')
+    ? getEnabledItems(TEST_ITEMS)
+    : [];
+    
+  // MG section - check parent first
+  const mgItems = hasSectionPermission('menu_section_mg')
+    ? getEnabledItems(MG_ITEMS)
+    : [];
+    
+  // Shift planning section - check parent first
+  const shiftItems = hasSectionPermission('menu_section_vagtplan')
+    ? getEnabledItems(SHIFT_PLANNING_ITEMS)
+    : [];
+    
+  // Fieldmarketing section - check parent first
+  const vagtFlowItems = hasSectionPermission('menu_section_fieldmarketing')
+    ? getEnabledItems(VAGT_FLOW_ITEMS)
+    : [];
+    
+  // Recruitment section - check parent first
+  const recruitmentItems = hasSectionPermission('menu_section_rekruttering')
+    ? getEnabledItems(RECRUITMENT_ITEMS)
+    : [];
+    
+  // Boards section - check parent first
+  const boardsItems = hasSectionPermission('menu_section_boards')
+    ? getEnabledItems(BOARDS_ITEMS)
+    : [];
+    
+  // Salary section - check parent first
+  const salaryItems = hasSectionPermission('menu_section_salary')
+    ? (isOwner ? Object.values(SALARY_ITEMS) : getEnabledItems(SALARY_ITEMS))
+    : [];
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
