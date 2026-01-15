@@ -147,6 +147,20 @@ export default function EmployeeMasterData() {
   const currentUserPosition = position?.name;
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
+  const { canView } = useUnifiedPermissions();
+
+  // Tab configuration with permission keys
+  const allTabs = [
+    { value: "all-employees", label: t("employees.tabs.all"), permissionKey: "tab_employees_all" },
+    { value: "staff-employees", label: t("employees.tabs.staff"), permissionKey: "tab_employees_staff" },
+    { value: "teams", label: t("employees.tabs.teams"), permissionKey: "tab_employees_teams" },
+    { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions" },
+    { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions" },
+    { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer" },
+  ];
+
+  const visibleTabs = allTabs.filter(tab => canView(tab.permissionKey));
+  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.value || "all-employees");
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1050,7 +1064,14 @@ export default function EmployeeMasterData() {
             </DialogContent>
           </Dialog>
 
-        <EmployeeTabs t={t} />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={`grid w-full grid-cols-${visibleTabs.length} mb-6`}>
+            {visibleTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
           <TabsContent value="all-employees" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
