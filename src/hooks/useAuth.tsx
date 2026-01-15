@@ -99,8 +99,15 @@ export function useAuth() {
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session with timeout fallback
+    const sessionTimeout = setTimeout(() => {
+      // If getSession takes too long, stop loading to prevent infinite hang
+      setLoading(false);
+      console.warn("Auth session check timed out after 10s");
+    }, 10000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(sessionTimeout);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -111,6 +118,10 @@ export function useAuth() {
           checkMustChangePassword(session.user.email);
         }, 0);
       }
+    }).catch((error) => {
+      clearTimeout(sessionTimeout);
+      console.error("Auth session check failed:", error);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
