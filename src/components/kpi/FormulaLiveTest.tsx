@@ -133,7 +133,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
 
       // Safely evaluate the formula
       let calculatedValue: number | string;
-      let divisionByZero = false;
+      let noData = false;
       try {
         // Basic safety check - only allow numbers and math operators
         const sanitized = formulaString.replace(/[^0-9+\-*/().  ]/g, "");
@@ -143,9 +143,9 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
           // eslint-disable-next-line no-eval
           calculatedValue = eval(sanitized);
           if (typeof calculatedValue === "number" && !isFinite(calculatedValue)) {
-            // Division by zero - show 0 with an info message
-            calculatedValue = 0;
-            divisionByZero = true;
+            // Division by zero - show dash to indicate no data available
+            calculatedValue = "–";
+            noData = true;
           }
         }
       } catch (e) {
@@ -163,9 +163,9 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
         breakdown[label] = typeof value === "number" ? value.toLocaleString("da-DK") : value;
       }
 
-      // Add info message if division by zero occurred
-      if (divisionByZero) {
-        errors.push("Nævneren er 0 – resultat sat til 0");
+      // Add info message if no data available (division by zero)
+      if (noData) {
+        errors.push("Ingen data i perioden (nævner er 0)");
       }
 
       setResult({
