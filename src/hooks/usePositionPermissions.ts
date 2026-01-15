@@ -48,6 +48,39 @@ function mapJobTitleToRoleKey(jobTitle: string | null | undefined): string {
   return 'medarbejder';
 }
 
+// localStorage cache key for permissions
+const PERMISSIONS_CACHE_KEY = 'cached-permissions-v1';
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCachedPermissions(): { position: JobPosition | null; permissions: PositionPermissions; roleKey: string } | null {
+  try {
+    const cached = localStorage.getItem(PERMISSIONS_CACHE_KEY);
+    if (!cached) return null;
+    
+    const { timestamp, data } = JSON.parse(cached);
+    if (Date.now() - timestamp > CACHE_MAX_AGE_MS) {
+      localStorage.removeItem(PERMISSIONS_CACHE_KEY);
+      return null;
+    }
+    console.log('usePositionPermissions: Using cached permissions (database fallback)');
+    return data;
+  } catch (e) {
+    console.warn('usePositionPermissions: Failed to parse cached permissions', e);
+    return null;
+  }
+}
+
+function setCachedPermissions(data: { position: JobPosition | null; permissions: PositionPermissions; roleKey: string }) {
+  try {
+    localStorage.setItem(PERMISSIONS_CACHE_KEY, JSON.stringify({
+      timestamp: Date.now(),
+      data
+    }));
+  } catch (e) {
+    console.warn('usePositionPermissions: Failed to cache permissions', e);
+  }
+}
+
 export function usePositionPermissions() {
   const { user, loading: authLoading } = useAuth();
 
@@ -58,179 +91,196 @@ export function usePositionPermissions() {
         return { position: null, permissions: {}, roleKey: 'medarbejder' };
       }
 
-      // STRATEGY: Try auth_user_id first (fast, reliable), fallback to email
-      let employee = null;
-      let lookupMethod = '';
-      
-      // 1. Try auth_user_id lookup first (most reliable)
-      if (user?.id) {
-        const { data: empById, error: errById } = await supabase
-          .from("employee_master_data")
-          .select("job_title, auth_user_id")
-          .eq("auth_user_id", user.id)
-          .eq("is_active", true)
-          .maybeSingle();
+      try {
+        // STRATEGY: Try auth_user_id first (fast, reliable), fallback to email
+        let employee = null;
+        let lookupMethod = '';
         
-        if (errById) {
-          console.error("usePositionPermissions: Database error fetching by auth_user_id", errById);
-          throw new Error(`Database fejl: ${errById.message}`);
-        }
-        
-        if (empById) {
-          employee = empById;
-          lookupMethod = 'auth_user_id';
-        }
-      }
-      
-      // 2. Fallback to email lookup (for backwards compatibility)
-      if (!employee && user?.email) {
-        // Try private_email
-        const { data: empByPrivate, error: errPrivate } = await supabase
-          .from("employee_master_data")
-          .select("job_title, auth_user_id")
-          .ilike("private_email", user.email)
-          .eq("is_active", true)
-          .maybeSingle();
-        
-        if (errPrivate) {
-          console.error("usePositionPermissions: Database error fetching by private_email", errPrivate);
-          throw new Error(`Database fejl: ${errPrivate.message}`);
-        }
-        
-        if (empByPrivate) {
-          employee = empByPrivate;
-          lookupMethod = 'private_email';
-        } else {
-          // Try work_email
-          const { data: empByWork, error: errWork } = await supabase
+        // 1. Try auth_user_id lookup first (most reliable)
+        if (user?.id) {
+          const { data: empById, error: errById } = await supabase
             .from("employee_master_data")
             .select("job_title, auth_user_id")
-            .ilike("work_email", user.email)
+            .eq("auth_user_id", user.id)
             .eq("is_active", true)
             .maybeSingle();
           
-          if (errWork) {
-            console.error("usePositionPermissions: Database error fetching by work_email", errWork);
-            throw new Error(`Database fejl: ${errWork.message}`);
+          if (errById) {
+            console.error("usePositionPermissions: Database error fetching by auth_user_id", errById);
+            throw new Error(`Database fejl: ${errById.message}`);
           }
           
-          if (empByWork) {
-            employee = empByWork;
-            lookupMethod = 'work_email';
+          if (empById) {
+            employee = empById;
+            lookupMethod = 'auth_user_id';
           }
         }
-      }
-      
-      console.log("usePositionPermissions: employee lookup", { 
-        userId: user?.id, 
-        email: user?.email, 
-        employee,
-        lookupMethod 
-      });
-
-      if (!employee?.job_title) {
-        console.log("usePositionPermissions: No job_title found for user");
-        return { position: null, permissions: {}, roleKey: 'medarbejder' };
-      }
-
-      // Map job title to role key
-      const roleKey = mapJobTitleToRoleKey(employee.job_title);
-      console.log("usePositionPermissions: Mapped role", { 
-        jobTitle: employee.job_title, 
-        roleKey 
-      });
-
-      // Check if owner position - always full permissions
-      if (roleKey === 'ejer') {
-        const ownerPermissions = generateOwnerPermissions();
-        console.log("usePositionPermissions: Owner detected, returning full permissions");
-        return {
-          position: { 
-            id: "owner", 
-            name: OWNER_POSITION_NAME, 
-            permissions: ownerPermissions,
-            is_manager: true,
-            manager_data_scope: 'all' as ManagerDataScope,
-          },
-          permissions: ownerPermissions,
-          roleKey: 'ejer',
-        };
-      }
-
-      // CONSOLIDATED: Fetch permissions from role_page_permissions table (new system)
-      // instead of job_positions.permissions JSONB (old system)
-      const { data: rolePermissions, error: rolePermError } = await supabase
-        .from("role_page_permissions")
-        .select("permission_key, can_view, can_edit")
-        .eq("role_key", roleKey);
-
-      if (rolePermError) {
-        console.error("usePositionPermissions: Error fetching role permissions", rolePermError);
-        // Fallback to old system if new table has issues
-        console.log("usePositionPermissions: Falling back to job_positions lookup");
-      }
-
-      // Convert role_page_permissions to PositionPermissions format
-      const permissions: PositionPermissions = {};
-      if (rolePermissions && rolePermissions.length > 0) {
-        rolePermissions.forEach(rp => {
-          permissions[rp.permission_key] = { 
-            view: rp.can_view ?? false, 
-            edit: rp.can_edit ?? false 
-          };
+        
+        // 2. Fallback to email lookup (for backwards compatibility)
+        if (!employee && user?.email) {
+          // Try private_email
+          const { data: empByPrivate, error: errPrivate } = await supabase
+            .from("employee_master_data")
+            .select("job_title, auth_user_id")
+            .ilike("private_email", user.email)
+            .eq("is_active", true)
+            .maybeSingle();
+          
+          if (errPrivate) {
+            console.error("usePositionPermissions: Database error fetching by private_email", errPrivate);
+            throw new Error(`Database fejl: ${errPrivate.message}`);
+          }
+          
+          if (empByPrivate) {
+            employee = empByPrivate;
+            lookupMethod = 'private_email';
+          } else {
+            // Try work_email
+            const { data: empByWork, error: errWork } = await supabase
+              .from("employee_master_data")
+              .select("job_title, auth_user_id")
+              .ilike("work_email", user.email)
+              .eq("is_active", true)
+              .maybeSingle();
+            
+            if (errWork) {
+              console.error("usePositionPermissions: Database error fetching by work_email", errWork);
+              throw new Error(`Database fejl: ${errWork.message}`);
+            }
+            
+            if (empByWork) {
+              employee = empByWork;
+              lookupMethod = 'work_email';
+            }
+          }
+        }
+        
+        console.log("usePositionPermissions: employee lookup", { 
+          userId: user?.id, 
+          email: user?.email, 
+          employee,
+          lookupMethod 
         });
-        console.log("usePositionPermissions: Using role_page_permissions", { 
-          roleKey, 
-          permCount: rolePermissions.length 
-        });
-      } else {
-        // Fallback: try old job_positions table
-        const { data: position, error: posError } = await supabase
-          .from("job_positions")
-          .select("id, name, permissions, is_manager, manager_data_scope")
-          .ilike("name", employee.job_title)
-          .maybeSingle();
 
-        if (posError) {
-          console.error("usePositionPermissions: Database error fetching position", posError);
-          throw new Error(`Database fejl: ${posError.message}`);
+        if (!employee?.job_title) {
+          console.log("usePositionPermissions: No job_title found for user");
+          return { position: null, permissions: {}, roleKey: 'medarbejder' };
         }
 
-        if (position) {
-          const legacyPerms = (position.permissions as PositionPermissions) || {};
-          console.log("usePositionPermissions: Using legacy job_positions.permissions", { 
-            position: position.name,
-            permCount: Object.keys(legacyPerms).length 
-          });
-          
-          return {
+        // Map job title to role key
+        const roleKey = mapJobTitleToRoleKey(employee.job_title);
+        console.log("usePositionPermissions: Mapped role", { 
+          jobTitle: employee.job_title, 
+          roleKey 
+        });
+
+        // Check if owner position - always full permissions
+        if (roleKey === 'ejer') {
+          const ownerPermissions = generateOwnerPermissions();
+          console.log("usePositionPermissions: Owner detected, returning full permissions");
+          const result = {
             position: { 
-              ...position, 
-              permissions: legacyPerms,
-              is_manager: position.is_manager ?? false,
-              manager_data_scope: (position.manager_data_scope as ManagerDataScope) ?? 'self',
+              id: "owner", 
+              name: OWNER_POSITION_NAME, 
+              permissions: ownerPermissions,
+              is_manager: true,
+              manager_data_scope: 'all' as ManagerDataScope,
             },
-            permissions: legacyPerms,
-            roleKey,
+            permissions: ownerPermissions,
+            roleKey: 'ejer',
           };
+          setCachedPermissions(result);
+          return result;
         }
-      }
 
-      // Determine manager status from role
-      const isManager = roleKey === 'ejer' || roleKey === 'teamleder';
-      const managerScope: ManagerDataScope = roleKey === 'ejer' ? 'all' : roleKey === 'teamleder' ? 'team' : 'self';
+        // CONSOLIDATED: Fetch permissions from role_page_permissions table (new system)
+        // instead of job_positions.permissions JSONB (old system)
+        const { data: rolePermissions, error: rolePermError } = await supabase
+          .from("role_page_permissions")
+          .select("permission_key, can_view, can_edit")
+          .eq("role_key", roleKey);
 
-      return {
-        position: { 
-          id: roleKey, 
-          name: employee.job_title, 
+        if (rolePermError) {
+          console.error("usePositionPermissions: Error fetching role permissions", rolePermError);
+          // Fallback to old system if new table has issues
+          console.log("usePositionPermissions: Falling back to job_positions lookup");
+        }
+
+        // Convert role_page_permissions to PositionPermissions format
+        const permissions: PositionPermissions = {};
+        if (rolePermissions && rolePermissions.length > 0) {
+          rolePermissions.forEach(rp => {
+            permissions[rp.permission_key] = { 
+              view: rp.can_view ?? false, 
+              edit: rp.can_edit ?? false 
+            };
+          });
+          console.log("usePositionPermissions: Using role_page_permissions", { 
+            roleKey, 
+            permCount: rolePermissions.length 
+          });
+        } else {
+          // Fallback: try old job_positions table
+          const { data: position, error: posError } = await supabase
+            .from("job_positions")
+            .select("id, name, permissions, is_manager, manager_data_scope")
+            .ilike("name", employee.job_title)
+            .maybeSingle();
+
+          if (posError) {
+            console.error("usePositionPermissions: Database error fetching position", posError);
+            throw new Error(`Database fejl: ${posError.message}`);
+          }
+
+          if (position) {
+            const legacyPerms = (position.permissions as PositionPermissions) || {};
+            console.log("usePositionPermissions: Using legacy job_positions.permissions", { 
+              position: position.name,
+              permCount: Object.keys(legacyPerms).length 
+            });
+            
+            const result = {
+              position: { 
+                ...position, 
+                permissions: legacyPerms,
+                is_manager: position.is_manager ?? false,
+                manager_data_scope: (position.manager_data_scope as ManagerDataScope) ?? 'self',
+              },
+              permissions: legacyPerms,
+              roleKey,
+            };
+            setCachedPermissions(result);
+            return result;
+          }
+        }
+
+        // Determine manager status from role
+        const isManager = roleKey === 'ejer' || roleKey === 'teamleder';
+        const managerScope: ManagerDataScope = roleKey === 'ejer' ? 'all' : roleKey === 'teamleder' ? 'team' : 'self';
+
+        const result = {
+          position: { 
+            id: roleKey, 
+            name: employee.job_title, 
+            permissions,
+            is_manager: isManager,
+            manager_data_scope: managerScope,
+          },
           permissions,
-          is_manager: isManager,
-          manager_data_scope: managerScope,
-        },
-        permissions,
-        roleKey,
-      };
+          roleKey,
+        };
+        setCachedPermissions(result);
+        return result;
+      } catch (error) {
+        console.error("usePositionPermissions: Query failed, checking cache", error);
+        // On any error, try to use cached permissions
+        const cached = getCachedPermissions();
+        if (cached) {
+          return cached;
+        }
+        // If no cache, re-throw the error
+        throw error;
+      }
     },
     enabled: !!user && !authLoading,
     staleTime: 15 * 60 * 1000, // 15 minutes - permissions rarely change during session

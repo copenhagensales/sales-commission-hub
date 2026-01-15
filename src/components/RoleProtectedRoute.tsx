@@ -1,10 +1,10 @@
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   positionPermission?: string; // Position-based permission key to check
@@ -88,6 +88,7 @@ export function RoleProtectedRoute({
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { isLoading: permLoading, position, isError, isRetrying } = usePermissions();
+  const [retryCountdown, setRetryCountdown] = useState(15);
   
   // Include isRetrying in loading check - prevents false "deactivated" during DB retries
   const isLoading = authLoading || permLoading || isRetrying;
@@ -103,6 +104,29 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   // Check if we're offline
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  
+  // Basic pages that can work in limited mode
+  const basicPages = ['/home', '/my-schedule', '/my-profile'];
+  const isBasicPage = basicPages.some(p => window.location.pathname.startsWith(p));
+  
+  // Auto-retry countdown when database is down
+  useEffect(() => {
+    if (isError && !isRetrying && !isOffline) {
+      const interval = setInterval(() => {
+        setRetryCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            window.location.reload();
+            return 15;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setRetryCountdown(15);
+    }
+  }, [isError, isRetrying, isOffline]);
   
   if (isLoading) {
     return (
@@ -138,9 +162,23 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Handle database error/timeout - show retry option, don't log out or show "deactivated"
+  // Handle database error/timeout - show retry option with countdown
+  // If on a basic page, allow limited access instead of blocking
   if (isError) {
     console.log("ProtectedRoute: Database error - showing retry option (NOT deactivated!)");
+    
+    // For basic pages, allow access with warning banner
+    if (isBasicPage && position) {
+      return (
+        <>
+          <div className="bg-amber-500/10 border-b border-amber-500/50 p-2 text-center text-sm text-amber-700 dark:text-amber-400">
+            Systemet kører i begrænset tilstand. Nogle funktioner er midlertidigt utilgængelige.
+          </div>
+          {children}
+        </>
+      );
+    }
+    
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <div className="text-destructive font-medium text-lg">Database forbindelse mislykkedes</div>
@@ -148,9 +186,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           Systemet oplever midlertidige forbindelsesproblemer.<br />
           <strong>Din konto er IKKE deaktiveret</strong> - dette er en teknisk fejl.
         </p>
+        <p className="text-xs text-muted-foreground">
+          Prøver automatisk igen om {retryCountdown} sekunder...
+        </p>
         <div className="flex gap-2 mt-4">
           <Button onClick={handleRetry}>
-            Prøv igen
+            Prøv igen nu
           </Button>
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
