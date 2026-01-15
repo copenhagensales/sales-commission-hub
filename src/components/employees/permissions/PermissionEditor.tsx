@@ -402,7 +402,7 @@ export function PermissionEditor() {
                         </div>
                       </TableCell>
                     </TableRow>
-                    {page.children.map((child) => (
+                    {page.can_view && page.children.map((child) => (
                       <TableRow key={child.id} className="bg-background">
                         <TableCell>
                           <div className="flex items-center gap-2 pl-4">
