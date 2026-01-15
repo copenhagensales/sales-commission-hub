@@ -2029,7 +2029,10 @@ async function handleCsTop20Data(
 
   // Fetch employee sales goals for the payroll period
   let employeeGoals: Record<string, number> = {};
+  let employeeTeams: Record<string, string> = {};
+  
   if (employeeIds.length > 0) {
+    // Fetch goals
     const { data: goals } = await supabase
       .from("employee_sales_goals")
       .select("employee_id, target_amount")
@@ -2041,6 +2044,20 @@ async function handleCsTop20Data(
       employeeGoals[g.employee_id] = g.target_amount;
     });
     console.log("[CsTop20Data] Fetched goals for", Object.keys(employeeGoals).length, "employees");
+    
+    // Fetch team memberships
+    const { data: teamMembers } = await supabase
+      .from("team_members")
+      .select("employee_id, teams(name)")
+      .in("employee_id", employeeIds);
+    
+    (teamMembers || []).forEach((tm: any) => {
+      const teamName = tm.teams?.name;
+      if (teamName && tm.employee_id) {
+        employeeTeams[tm.employee_id] = teamName;
+      }
+    });
+    console.log("[CsTop20Data] Fetched teams for", Object.keys(employeeTeams).length, "employees");
   }
 
   // Calculate totals and seller stats
@@ -2083,13 +2100,14 @@ async function handleCsTop20Data(
   const weekData = calculateTotals(salesWeek);
   const payrollData = calculateTotals(salesPayroll);
 
-  // Build sorted seller arrays for each period with goal info - TOP 20
+  // Build sorted seller arrays for each period with goal and team info - TOP 20
   const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
     return Object.values(sellerStats)
       .filter(s => s.sales > 0)
       .map(s => ({
         ...s,
-        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null
+        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null,
+        teamName: s.employeeId ? employeeTeams[s.employeeId] || null : null
       }))
       .sort((a, b) => b.commission - a.commission)
       .slice(0, 20);
