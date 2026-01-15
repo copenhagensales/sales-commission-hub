@@ -92,7 +92,8 @@ export default function EesyTmDashboard() {
     clientName: "Eesy",
     startDate: today,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 30000 // Auto-refresh every 30 seconds
   });
 
   // Fetch sales for this week
@@ -100,7 +101,8 @@ export default function EesyTmDashboard() {
     clientName: "Eesy",
     startDate: weekStart,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 30000
   });
 
   // Fetch sales for payroll period (lønperiode)
@@ -108,7 +110,8 @@ export default function EesyTmDashboard() {
     clientName: "Eesy",
     startDate: payrollPeriod.start,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 30000
   });
 
   // Fetch employee avatars
