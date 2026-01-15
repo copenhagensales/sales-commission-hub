@@ -37,6 +37,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [retryStatus, setRetryStatus] = useState<string | null>(null);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
@@ -186,10 +187,28 @@ export default function Auth() {
           return;
         }
         
+        // Check if we're online first
+        if (!navigator.onLine) {
+          toast({
+            title: "Ingen internetforbindelse",
+            description: "Tjek din forbindelse og prøv igen.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
         // Login with retry logic for network failures
+        const maxAttempts = 3;
         let loginSuccess = false;
-        for (let attempt = 0; attempt < 2; attempt++) {
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
+            // Show retry status on subsequent attempts
+            if (attempt > 0) {
+              setRetryStatus(`Forbinder... (forsøg ${attempt + 1}/${maxAttempts})`);
+            }
+            
             const authResult = await withTimeout(
               supabase.auth.signInWithPassword({
                 email: authEmail,
@@ -200,18 +219,20 @@ export default function Auth() {
             );
             if (authResult.error) throw authResult.error;
             loginSuccess = true;
+            setRetryStatus(null);
             toast({
               title: "Velkommen tilbage!",
               description: "Du er nu logget ind.",
             });
             break; // Success - exit retry loop
           } catch (error: any) {
-            // Retry once on network failure
-            if (error.message === "Failed to fetch" && attempt < 1) {
-              console.log("[Auth] Network error on attempt", attempt + 1, "- retrying in 1s...");
-              await new Promise(r => setTimeout(r, 1000));
+            // Retry on network failure (up to maxAttempts - 1 retries)
+            if (error.message === "Failed to fetch" && attempt < maxAttempts - 1) {
+              console.log("[Auth] Network error on attempt", attempt + 1, "- retrying in 1.5s...");
+              await new Promise(r => setTimeout(r, 1500));
               continue;
             }
+            setRetryStatus(null);
             throw error; // Re-throw for outer catch
           }
         }
@@ -251,6 +272,7 @@ export default function Auth() {
   };
 
   const getButtonText = () => {
+    if (retryStatus) return retryStatus;
     if (loading) return "Vent venligst...";
     if (isForcedPasswordChange) return "Gem ny adgangskode";
     if (isNewPasswordMode) return "Gem ny adgangskode";
