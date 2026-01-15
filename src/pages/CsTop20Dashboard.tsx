@@ -29,9 +29,9 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
 };
 
 interface TvCsTop20Data {
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersPayroll: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
+  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
+  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
+  sellersPayroll: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
 }
 
 // Calculate payroll period (15th to 14th)
@@ -142,25 +142,46 @@ export default function CsTop20Dashboard() {
     refetchInterval: 30000
   });
 
-  // Fetch employee avatars and IDs
+  // Fetch employee avatars, IDs, and team memberships
   const { data: employeeData } = useQuery({
     queryKey: ["employee-data-cs-top-20"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, avatar_url")
         .eq("is_active", true);
       
+      // Fetch team memberships
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("employee_id, teams(name)");
+      
       const avatarMap = new Map<string, string>();
       const nameToIdMap = new Map<string, string>();
-      (data || []).forEach(emp => {
+      const teamMap = new Map<string, string>();
+      
+      (employees || []).forEach(emp => {
         const fullName = `${emp.first_name} ${emp.last_name}`;
         nameToIdMap.set(fullName.toLowerCase(), emp.id);
         if (emp.avatar_url) {
           avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
         }
       });
-      return { avatarMap, nameToIdMap };
+      
+      // Map employee IDs to team names
+      (teamMembers || []).forEach(tm => {
+        const teamName = (tm.teams as any)?.name;
+        if (teamName && tm.employee_id) {
+          // Get employee name from ID
+          const emp = (employees || []).find(e => e.id === tm.employee_id);
+          if (emp) {
+            const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+            teamMap.set(fullName, teamName);
+          }
+        }
+      });
+      
+      return { avatarMap, nameToIdMap, teamMap };
     },
     enabled: !tvMode
   });
@@ -193,6 +214,23 @@ export default function CsTop20Dashboard() {
   const getAvatarUrl = (name: string) => {
     if (!employeeData?.avatarMap) return undefined;
     return employeeData.avatarMap.get(name.toLowerCase());
+  };
+
+  const getTeamName = (name: string) => {
+    if (!employeeData?.teamMap) return undefined;
+    return employeeData.teamMap.get(name.toLowerCase());
+  };
+
+  // Get short team name (first word or abbreviation)
+  const getShortTeamName = (teamName?: string) => {
+    if (!teamName) return null;
+    // Common abbreviations
+    if (teamName.toLowerCase().includes('tdc')) return 'TDC';
+    if (teamName.toLowerCase().includes('eesy')) return 'Eesy';
+    if (teamName.toLowerCase().includes('relatel')) return 'Relatel';
+    if (teamName.toLowerCase().includes('united')) return 'United';
+    // Default: first word
+    return teamName.split(' ')[0];
   };
 
   const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
@@ -266,9 +304,24 @@ export default function CsTop20Dashboard() {
                     </AvatarFallback>
                   </Avatar>
                   
-                  {/* Name & Sales */}
+                  {/* Name & Sales & Team */}
                   <div className="flex-1 min-w-0">
-                    <div className={`font-semibold truncate ${tvMode ? 'text-base text-white' : 'text-sm'}`}>{displayName}</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold truncate ${tvMode ? 'text-base text-white' : 'text-sm'}`}>{displayName}</span>
+                      {(() => {
+                        const teamName = 'teamName' in seller ? seller.teamName : getTeamName(name);
+                        const shortTeam = getShortTeamName(teamName);
+                        return shortTeam ? (
+                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 font-medium ${
+                            tvMode 
+                              ? 'bg-slate-600/80 text-slate-300 text-xs' 
+                              : 'bg-muted text-muted-foreground text-[10px]'
+                          }`}>
+                            {shortTeam}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
                     <div className={tvMode ? 'text-sm text-slate-400' : 'text-xs text-muted-foreground'}>{sales} salg</div>
                   </div>
                   
