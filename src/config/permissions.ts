@@ -799,13 +799,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Boards menu",
     icon: "🖥️",
     permissions: [
-      { key: "menu_boards_test", label: "Test Board", description: "Adgang til test board", hasEditOption: false },
-      {
-        key: "menu_boards_economic",
-        label: "Economic Board",
-        description: "Adgang til economic board",
-        hasEditOption: false,
-      },
       {
         key: "menu_boards_sales",
         label: "Sales Dashboard",

@@ -324,8 +324,6 @@ export function usePermissions() {
     canViewReferrals: canView("menu_referrals"),
     canEditReferrals: canEdit("menu_referrals"),
     // Boards menu
-    canViewBoardsTest: hasPermission("menu_boards_test"),
-    canViewBoardsEconomic: hasPermission("menu_boards_economic"),
     canViewBoardsSales: hasPermission("menu_boards_sales"),
     // Dashboards menu
     canViewDashboardCphSales: canView("menu_dashboard_cph_sales"),
