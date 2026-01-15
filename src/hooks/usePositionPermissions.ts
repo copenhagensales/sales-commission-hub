@@ -169,7 +169,7 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
-  const { data, isLoading, isFetched } = usePositionPermissions();
+  const { data, isLoading, isFetched, isError, error } = usePositionPermissions();
   const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
   
   // Consider loading only on initial fetch - once we have data, don't show loading on refetches
@@ -221,6 +221,8 @@ export function usePermissions() {
 
   return {
     isLoading: actuallyLoading,
+    isError,
+    error,
     isPreviewMode,
     position: positionData,
     permissions,
