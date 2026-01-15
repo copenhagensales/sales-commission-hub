@@ -17,14 +17,16 @@ import FieldmarketingDashboardFull from "@/pages/dashboards/FieldmarketingDashbo
 import TeamDashboard from "@/pages/dashboards/TeamDashboard";
 import TdcErhvervGoalsDashboard from "@/pages/dashboards/TdcErhvervGoalsDashboard";
 import FieldmarketingGoalsDashboard from "@/pages/dashboards/FieldmarketingGoalsDashboard";
+import EesyTmDashboard from "@/pages/EesyTmDashboard";
+import TdcErhvervDashboard from "@/pages/TdcErhvervDashboard";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
   "fieldmarketing": FieldmarketingDashboardFull,
   "team": TeamDashboard,
-  "eesy-tm": TeamDashboard,
-  "tdc-erhverv": TeamDashboard,
+  "eesy-tm": EesyTmDashboard,
+  "tdc-erhverv": TdcErhvervDashboard,
   "relatel": TeamDashboard,
   "tryg": TeamDashboard,
   "ase": TeamDashboard,
