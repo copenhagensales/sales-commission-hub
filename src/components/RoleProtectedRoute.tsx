@@ -87,9 +87,10 @@ export function RoleProtectedRoute({
 // Simple protected route that just checks auth AND active employee status
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: permLoading, position, isError } = usePermissions();
+  const { isLoading: permLoading, position, isError, isRetrying } = usePermissions();
   
-  const isLoading = authLoading || permLoading;
+  // Include isRetrying in loading check - prevents false "deactivated" during DB retries
+  const isLoading = authLoading || permLoading || isRetrying;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
