@@ -541,13 +541,13 @@ export function PermissionEditor() {
     });
     
     // Update the permission itself
-    const { error, count, status, statusText } = await supabase
+    const { data, error, status, statusText } = await supabase
       .from('role_page_permissions')
       .update({ [field]: newValue })
       .eq('id', permission.id)
       .select();
     
-    console.log('Supabase update response:', { error, count, status, statusText });
+    console.log('Supabase update response:', { data, error, status, statusText, rowsAffected: data?.length });
     
     if (error) {
       console.error('Permission update error:', error);
@@ -555,7 +555,7 @@ export function PermissionEditor() {
       return;
     }
     
-    if (count === 0) {
+    if (!data || data.length === 0) {
       console.error('No rows updated - RLS may be blocking. Permission ID:', permission.id);
       toast.error('Ingen rækker opdateret - kontroller rettigheder i databasen');
       return;
@@ -666,15 +666,15 @@ export function PermissionEditor() {
     try {
       if (existing) {
         console.log('Updating existing rule:', existing.id);
-        const { error, count } = await supabase
+        const { data, error } = await supabase
           .from('data_visibility_rules')
           .update({ visibility })
           .eq('id', existing.id)
           .select();
         
-        console.log('Update result:', { error, count });
+        console.log('Update result:', { data, error, rowsAffected: data?.length });
         if (error) throw error;
-        if (count === 0) {
+        if (!data || data.length === 0) {
           throw new Error('Ingen rækker opdateret - RLS blokerer muligvis');
         }
       } else {
