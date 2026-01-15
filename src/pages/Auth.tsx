@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle, KeyRound } from "lucide-react";
+import { Mail, Lock, Wifi, RefreshCw, ArrowLeft, AlertTriangle, KeyRound } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
@@ -19,9 +19,11 @@ export default function Auth() {
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
   const [expiredLinkError, setExpiredLinkError] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
-  const { mustChangePassword, clearMustChangePassword, user } = useAuth();
+  const { mustChangePassword, clearMustChangePassword, user, loading: authLoading } = useAuth();
+  
+  // Derive connection status from auth loading state
+  const connectionStatus = authLoading ? 'checking' : 'connected';
 
   // Check if user must change password after login
   useEffect(() => {
@@ -32,22 +34,7 @@ export default function Auth() {
     }
   }, [mustChangePassword, user]);
 
-  const testConnection = async () => {
-    setConnectionStatus('checking');
-    try {
-      const { error } = await supabase.auth.getSession();
-      if (error) throw error;
-      setConnectionStatus('connected');
-      return true;
-    } catch (e) {
-      console.error("Connection test failed:", e);
-      setConnectionStatus('error');
-      return false;
-    }
-  };
-
   useEffect(() => {
-    testConnection();
 
     // Check URL for error parameters (expired/invalid token)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -77,17 +64,6 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    const isConnected = await testConnection();
-    if (!isConnected) {
-      toast({
-        title: "Ingen forbindelse til server",
-        description: "Prøv at genindlæse siden eller brug den publicerede version af appen.",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
 
     try {
       if (isForcedPasswordChange) {
@@ -210,21 +186,6 @@ export default function Auth() {
     }
   };
 
-  const handleRetryConnection = async () => {
-    const connected = await testConnection();
-    if (connected) {
-      toast({
-        title: "Forbindelse genoprettet!",
-        description: "Du kan nu logge ind.",
-      });
-    } else {
-      toast({
-        title: "Stadig ingen forbindelse",
-        description: "Prøv at genindlæse siden helt (Ctrl+Shift+R) eller brug den publicerede version.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getTitle = () => {
     if (isForcedPasswordChange) return "Skift din adgangskode";
@@ -265,23 +226,6 @@ export default function Auth() {
         </div>
 
         {/* Connection Status */}
-        {connectionStatus === 'error' && (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-            <div className="flex items-center gap-3">
-              <WifiOff className="h-5 w-5 text-destructive" />
-              <div className="flex-1">
-                <p className="font-medium text-destructive">Ingen forbindelse til server</p>
-                <p className="text-sm text-muted-foreground">
-                  Preview-miljøet kan ikke nå serveren. Prøv den publicerede version.
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleRetryConnection}>
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Prøv igen
-              </Button>
-            </div>
-          </div>
-        )}
 
         {connectionStatus === 'connected' && (
           <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3">
@@ -411,7 +355,7 @@ export default function Auth() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || connectionStatus === 'error' || (showPasswordChangeForm && !canSubmitPasswordChange)}
+              disabled={loading || authLoading || (showPasswordChangeForm && !canSubmitPasswordChange)}
             >
               {getButtonText()}
             </Button>

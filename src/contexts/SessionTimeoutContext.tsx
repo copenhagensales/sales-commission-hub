@@ -38,13 +38,17 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-  // TV board routes are exempt from timeout
+  // Routes exempt from timeout - TV board and auth page
   const isTvBoardRoute = location.pathname.startsWith("/tv-board") ||
                          location.pathname.startsWith("/t/") ||
                          location.pathname.startsWith("/tv/");
+  const isAuthRoute = location.pathname === "/auth";
+  const isExemptRoute = isTvBoardRoute || isAuthRoute;
 
-  // Fetch timeout settings based on user's position
+  // Fetch timeout settings based on user's position - skip on exempt routes
   useEffect(() => {
+    if (isExemptRoute) return;
+    
     const fetchTimeoutSettings = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.email) return;
@@ -70,10 +74,8 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
       }
     };
 
-    if (!isTvBoardRoute) {
-      fetchTimeoutSettings();
-    }
-  }, [isTvBoardRoute]);
+    fetchTimeoutSettings();
+  }, [isExemptRoute]);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -87,7 +89,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
   }, []);
 
   const checkTimeout = useCallback(() => {
-    if (isTvBoardRoute) return;
+    if (isExemptRoute) return;
 
     const now = Date.now();
     const timeSinceActivity = (now - lastActivityRef.current) / 1000;
@@ -116,11 +118,11 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
       setShowWarning(false);
       setRemainingTime(null);
     }
-  }, [isTvBoardRoute, timeoutMinutes, maxSessionHours, handleLogout]);
+  }, [isExemptRoute, timeoutMinutes, maxSessionHours, handleLogout]);
 
   // Activity tracking
   useEffect(() => {
-    if (isTvBoardRoute) return;
+    if (isExemptRoute) return;
 
     const handleActivity = () => {
       lastActivityRef.current = Date.now();
@@ -135,11 +137,11 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
         window.removeEventListener(event, handleActivity);
       });
     };
-  }, [isTvBoardRoute]);
+  }, [isExemptRoute]);
 
   // Timeout checking interval
   useEffect(() => {
-    if (isTvBoardRoute) return;
+    if (isExemptRoute) return;
 
     // Check every 10 seconds
     timeoutRef.current = setInterval(checkTimeout, 10000);
@@ -149,7 +151,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
         clearInterval(timeoutRef.current);
       }
     };
-  }, [isTvBoardRoute, checkTimeout]);
+  }, [isExemptRoute, checkTimeout]);
 
   // Countdown timer when warning is shown
   useEffect(() => {
