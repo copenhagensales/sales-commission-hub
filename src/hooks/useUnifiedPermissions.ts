@@ -228,13 +228,25 @@ export function useUnifiedPermissions() {
 
 // Helper labels for UI
 export const permissionKeyLabels: Record<string, string> = {
+  // Sektioner
+  menu_section_personal: 'Personlig',
+  menu_section_personale: 'Personale',
+  menu_section_ledelse: 'Ledelse',
+  menu_section_test: 'Test',
+  menu_section_mg: 'MG',
+  menu_section_vagtplan: 'Vagtplan',
+  menu_section_fieldmarketing: 'Fieldmarketing',
+  menu_section_rekruttering: 'Rekruttering',
+  menu_section_boards: 'Boards',
+  menu_section_salary: 'Løn',
+  
+  // Menupunkter
   menu_dashboard: 'Dashboard',
   menu_employees: 'Medarbejdere',
   menu_teams: 'Teams',
   menu_shifts: 'Vagter',
   menu_payroll: 'Løn',
   menu_sales: 'Salg',
-  menu_clients: 'Kunder',
   menu_recruitment: 'Rekruttering',
   menu_onboarding: 'Onboarding',
   menu_coaching: 'Coaching',
@@ -245,6 +257,13 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_chat: 'Chat',
   menu_economy: 'Økonomi',
   menu_permissions: 'Rettigheder',
+  menu_salary_types: 'Løntyper',
+  menu_leaderboard: 'Leaderboard',
+  menu_my_sales: 'Mine salg',
+  menu_my_shifts: 'Mine vagter',
+  menu_my_absence: 'Mit fravær',
+  menu_my_profile: 'Min profil',
+  menu_my_coaching: 'Min coaching',
 };
 
 export const dataScopeLabels: Record<string, string> = {
@@ -255,6 +274,12 @@ export const dataScopeLabels: Record<string, string> = {
   coaching: 'Coaching',
   contracts: 'Kontrakter',
   payroll: 'Løn',
+  leaderboard_ranking: 'Leaderboard rangering',
+  sales_count_others: 'Andres salgstal',
+  commission_details: 'Provisionsdetaljer',
+  salary_breakdown: 'Lønspecifikation',
+  h2h_stats: 'Head-to-Head statistik',
+  employee_performance: 'Medarbejder performance',
 };
 
 export const visibilityLabels: Record<Visibility, string> = {
