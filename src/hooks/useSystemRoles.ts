@@ -178,8 +178,24 @@ export function useCanAccess() {
   const { data: rolesData, isPending, isLoading: queryLoading } = useCurrentUserRoles();
   const { isPreviewMode, previewRole } = useRolePreview();
 
+  // Fetch employee position to check if user has "Ejer" position
+  const { data: employeeData, isLoading: employeeLoading } = useQuery({
+    queryKey: ["employee-position", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("position_id, positions(name)")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user && !authLoading,
+    staleTime: 1000 * 60, // Cache for 1 minute
+  });
+
   // Show loading if no user yet, or if query is still loading
-  const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading));
+  const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading || employeeLoading));
 
   // IN PREVIEW MODE: Use preview role instead of actual roles
   if (isPreviewMode && previewRole) {
@@ -216,15 +232,19 @@ export function useCanAccess() {
   const roles = rolesData || [];
   const roleNames = roles.map(r => r.role);
   
-  // Check for each role type - check array for multi-role support
-  const isOwner = roleNames.includes("ejer");
+  // Check position name for "Ejer" position (case-insensitive)
+  const positionName = (employeeData?.positions as { name?: string } | null)?.name?.toLowerCase();
+  const positionIsOwner = positionName === "ejer";
+  
+  // Check for each role type - check array for multi-role support OR position
+  const isOwner = roleNames.includes("ejer") || positionIsOwner;
   const isTeamleder = roleNames.includes("teamleder");
   const isRekruttering = roleNames.includes("rekruttering");
   const isSome = roleNames.includes("some");
   const isMedarbejder = roleNames.includes("medarbejder") || roles.length === 0;
   
   // Debug logging for role detection
-  console.log("useCanAccess - roles:", roleNames, "isRekruttering:", isRekruttering, "isTeamleder:", isTeamleder);
+  console.log("useCanAccess - roles:", roleNames, "positionIsOwner:", positionIsOwner, "isOwner:", isOwner);
 
   // Primary role for display purposes (prioritize higher roles)
   const primaryRole = isOwner ? "ejer" : isTeamleder ? "teamleder" : isRekruttering ? "rekruttering" : isSome ? "some" : "medarbejder";
