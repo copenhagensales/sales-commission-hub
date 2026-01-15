@@ -65,12 +65,19 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const getCommissionColor = (commission: number, maxCommission: number) => {
-  if (maxCommission === 0) return "bg-green-500";
-  const ratio = commission / maxCommission;
-  if (ratio >= 0.8) return "bg-green-500";
-  if (ratio >= 0.5) return "bg-yellow-500";
-  if (ratio >= 0.3) return "bg-orange-500";
+// Commission color thresholds based on period type
+// Daily: Green ≥ 1250, Yellow ≥ 1000, Red < 1000
+// Weekly (5 days): Green ≥ 6250, Yellow ≥ 5000, Red < 5000
+// Payroll (21 days): Green ≥ 26250, Yellow ≥ 21000, Red < 21000
+const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payroll') => {
+  const thresholds = {
+    day: { green: 1250, yellow: 1000 },
+    week: { green: 6250, yellow: 5000 },
+    payroll: { green: 26250, yellow: 21000 }
+  };
+  const { green, yellow } = thresholds[period];
+  if (commission >= green) return "bg-green-500";
+  if (commission >= yellow) return "bg-yellow-500";
   return "bg-red-500";
 };
 
@@ -188,14 +195,6 @@ export default function RelatelDashboard() {
   const payrollSalesPerHour = payrollSalesData.totalHours > 0 
     ? payrollSalesData.totalSales / payrollSalesData.totalHours 
     : 0;
-
-  // Get max commission for color scaling
-  const maxDailyCommission = Math.max(...sortedDailySellers.map(s => 
-    'totalCommission' in s ? s.totalCommission : s.commission), 1);
-  const maxWeeklyCommission = Math.max(...sortedWeeklySellers.map(s => 
-    'totalCommission' in s ? s.totalCommission : s.commission), 1);
-  const maxPayrollCommission = Math.max(...sortedPayrollSellers.map(s => 
-    'totalCommission' in s ? s.totalCommission : s.commission), 1);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -347,7 +346,7 @@ export default function RelatelDashboard() {
                             {sales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, maxPayrollCommission)}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>
                               {formatCurrency(commission)}
                             </span>
                           </TableCell>
@@ -409,7 +408,7 @@ export default function RelatelDashboard() {
                             {sales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, maxWeeklyCommission)}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'week')}`}>
                               {formatCurrency(commission)}
                             </span>
                           </TableCell>
@@ -471,7 +470,7 @@ export default function RelatelDashboard() {
                             {sales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, maxDailyCommission)}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'day')}`}>
                               {formatCurrency(commission)}
                             </span>
                           </TableCell>
