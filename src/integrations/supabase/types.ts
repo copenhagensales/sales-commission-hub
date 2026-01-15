@@ -4920,6 +4920,7 @@ export type Database = {
           permissions: Json
           requires_mfa: boolean | null
           session_timeout_minutes: number | null
+          system_role_key: string | null
           trusted_ip_ranges: Json | null
           updated_at: string | null
         }
@@ -4936,6 +4937,7 @@ export type Database = {
           permissions?: Json
           requires_mfa?: boolean | null
           session_timeout_minutes?: number | null
+          system_role_key?: string | null
           trusted_ip_ranges?: Json | null
           updated_at?: string | null
         }
@@ -4952,10 +4954,19 @@ export type Database = {
           permissions?: Json
           requires_mfa?: boolean | null
           session_timeout_minutes?: number | null
+          system_role_key?: string | null
           trusted_ip_ranges?: Json | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "job_positions_system_role_key_fkey"
+            columns: ["system_role_key"]
+            isOneToOne: false
+            referencedRelation: "system_role_definitions"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       kpi_definitions: {
         Row: {

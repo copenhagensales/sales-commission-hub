@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
@@ -16,6 +17,24 @@ import {
   SheetTitle, 
   SheetDescription 
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Eye, 
   Pencil, 
@@ -27,7 +46,8 @@ import {
   Folder,
   FileText,
   Zap,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -198,6 +218,24 @@ function PermissionRow({
   );
 }
 
+// New role form interface
+interface NewRoleForm {
+  key: string;
+  label: string;
+  description: string;
+  color: string;
+  icon: string;
+  priority: number;
+}
+
+const ROLE_COLORS = [
+  { value: 'primary', label: 'Primær', class: 'bg-primary text-primary-foreground' },
+  { value: 'blue', label: 'Blå', class: 'bg-blue-500 text-white' },
+  { value: 'amber', label: 'Gul', class: 'bg-amber-500 text-white' },
+  { value: 'purple', label: 'Lilla', class: 'bg-purple-500 text-white' },
+  { value: 'muted', label: 'Grå', class: 'bg-muted text-muted-foreground' },
+];
+
 export function PermissionEditor() {
   const queryClient = useQueryClient();
   const { data: permissions = [], isLoading: permissionsLoading } = usePagePermissions();
@@ -206,6 +244,22 @@ export function PermissionEditor() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [editingPermission, setEditingPermission] = useState<EditingPermission | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  // Create role state
+  const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false);
+  const [newRoleForm, setNewRoleForm] = useState<NewRoleForm>({
+    key: '',
+    label: '',
+    description: '',
+    color: 'muted',
+    icon: 'user',
+    priority: 100,
+  });
+  
+  // Delete role state
+  const [roleToDelete, setRoleToDelete] = useState<RoleDefinition | null>(null);
+  const [linkedPositions, setLinkedPositions] = useState<string[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Extended permissions with the new fields (assuming types will be updated)
   const extendedPermissions = permissions as (PagePermission & { 
@@ -313,6 +367,120 @@ export function PermissionEditor() {
       toast.error('Kunne ikke slette rettighed: ' + error.message);
     },
   });
+
+  // Create role mutation
+  const createRoleMutation = useMutation({
+    mutationFn: async (form: NewRoleForm) => {
+      const { error } = await supabase
+        .from('system_role_definitions')
+        .insert({
+          key: form.key,
+          label: form.label,
+          description: form.description,
+          color: form.color,
+          icon: form.icon,
+          priority: form.priority,
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
+      toast.success('Rolle oprettet');
+      setIsCreateRoleOpen(false);
+      setNewRoleForm({
+        key: '',
+        label: '',
+        description: '',
+        color: 'muted',
+        icon: 'user',
+        priority: 100,
+      });
+    },
+    onError: (error) => {
+      toast.error('Kunne ikke oprette rolle: ' + error.message);
+    },
+  });
+
+  // Delete role mutation
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleKey: string) => {
+      // First delete all permissions for this role
+      const { error: permError } = await supabase
+        .from('role_page_permissions')
+        .delete()
+        .eq('role_key', roleKey);
+      
+      if (permError) throw permError;
+      
+      // Delete data visibility rules
+      const { error: visError } = await supabase
+        .from('data_visibility_rules')
+        .delete()
+        .eq('role_key', roleKey);
+      
+      if (visError) throw visError;
+      
+      // Clear system_role_key from job_positions
+      const { error: posError } = await supabase
+        .from('job_positions')
+        .update({ system_role_key: null })
+        .eq('system_role_key', roleKey);
+      
+      if (posError) throw posError;
+      
+      // Finally delete the role itself
+      const { error } = await supabase
+        .from('system_role_definitions')
+        .delete()
+        .eq('key', roleKey);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
+      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['job-positions'] });
+      toast.success('Rolle slettet');
+      setIsDeleteDialogOpen(false);
+      setRoleToDelete(null);
+      if (selectedRole === roleToDelete?.key) {
+        setSelectedRole(null);
+      }
+    },
+    onError: (error) => {
+      toast.error('Kunne ikke slette rolle: ' + error.message);
+    },
+  });
+
+  // Handle delete role click - check for linked positions
+  const handleDeleteRoleClick = async (role: RoleDefinition) => {
+    const { data: positions } = await supabase
+      .from('job_positions')
+      .select('name')
+      .eq('system_role_key', role.key);
+    
+    setRoleToDelete(role);
+    setLinkedPositions(positions?.map(p => p.name) || []);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleCreateRole = () => {
+    if (!newRoleForm.key.trim()) {
+      toast.error('Nøgle er påkrævet');
+      return;
+    }
+    if (!newRoleForm.label.trim()) {
+      toast.error('Navn er påkrævet');
+      return;
+    }
+    // Check if key already exists
+    if (roles.some(r => r.key === newRoleForm.key)) {
+      toast.error('En rolle med denne nøgle eksisterer allerede');
+      return;
+    }
+    createRoleMutation.mutate(newRoleForm);
+  };
 
   // Toggle permission inline with automatic child inheritance
   const togglePermission = async (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
@@ -435,19 +603,37 @@ export function PermissionEditor() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {roles.map((role) => (
-              <Button
-                key={role.key}
-                variant={selectedRole === role.key ? "default" : "outline"}
-                onClick={() => setSelectedRole(role.key)}
-                className="gap-2"
-              >
-                <Badge className={colorMap[role.color || "gray"]} variant="secondary">
-                  {role.label}
-                </Badge>
-              </Button>
+              <div key={role.key} className="flex items-center gap-1">
+                <Button
+                  variant={selectedRole === role.key ? "default" : "outline"}
+                  onClick={() => setSelectedRole(role.key)}
+                  className="gap-2"
+                >
+                  <Badge className={colorMap[role.color || "gray"]} variant="secondary">
+                    {role.label}
+                  </Badge>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handleDeleteRoleClick(role)}
+                  title="Slet rolle"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
             ))}
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateRoleOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Opret rolle
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -652,6 +838,136 @@ export function PermissionEditor() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Create Role Dialog */}
+      <Dialog open={isCreateRoleOpen} onOpenChange={setIsCreateRoleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opret ny rolle</DialogTitle>
+            <DialogDescription>
+              Opret en ny systemrolle med tilhørende rettigheder
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nøgle *</Label>
+                <Input
+                  value={newRoleForm.key}
+                  onChange={(e) => setNewRoleForm({ ...newRoleForm, key: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                  placeholder="f.eks. salgschef"
+                />
+                <p className="text-xs text-muted-foreground">Unik identifikator (ingen mellemrum)</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Navn *</Label>
+                <Input
+                  value={newRoleForm.label}
+                  onChange={(e) => setNewRoleForm({ ...newRoleForm, label: e.target.value })}
+                  placeholder="f.eks. Salgschef"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Beskrivelse</Label>
+              <Textarea
+                value={newRoleForm.description}
+                onChange={(e) => setNewRoleForm({ ...newRoleForm, description: e.target.value })}
+                placeholder="Beskrivelse af rollens ansvarsområde"
+                rows={2}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Farve</Label>
+                <Select
+                  value={newRoleForm.color}
+                  onValueChange={(v) => setNewRoleForm({ ...newRoleForm, color: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_COLORS.map((color) => (
+                      <SelectItem key={color.value} value={color.value}>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded ${color.class}`} />
+                          {color.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Prioritet</Label>
+                <Input
+                  type="number"
+                  value={newRoleForm.priority}
+                  onChange={(e) => setNewRoleForm({ ...newRoleForm, priority: parseInt(e.target.value) || 100 })}
+                  min={1}
+                  max={999}
+                />
+                <p className="text-xs text-muted-foreground">Lavere = højere rang</p>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateRoleOpen(false)}>
+              Annuller
+            </Button>
+            <Button onClick={handleCreateRole} disabled={createRoleMutation.isPending}>
+              {createRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Opret rolle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Role Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Slet rolle "{roleToDelete?.label}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {linkedPositions.length > 0 ? (
+                  <>
+                    <p className="text-destructive font-medium">
+                      Advarsel: Denne rolle er tilknyttet {linkedPositions.length} stilling(er):
+                    </p>
+                    <ul className="list-disc list-inside text-sm bg-muted p-3 rounded-md">
+                      {linkedPositions.map(name => <li key={name}>{name}</li>)}
+                    </ul>
+                    <p>
+                      Stillingerne vil miste deres rolletildeling hvis du fortsætter.
+                    </p>
+                  </>
+                ) : (
+                  <p>Denne handling kan ikke fortrydes. Alle rettigheder og indstillinger for rollen vil blive slettet.</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => roleToDelete && deleteRoleMutation.mutate(roleToDelete.key)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Slet rolle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
