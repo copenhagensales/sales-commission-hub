@@ -75,6 +75,13 @@ interface JobPosition {
   max_session_hours: number;
   is_manager: boolean;
   manager_data_scope: ManagerDataScope | null;
+  system_role_key: string | null;
+}
+
+interface RoleDefinition {
+  key: string;
+  label: string;
+  color: string | null;
 }
 
 interface TrustedIpRange {
@@ -93,6 +100,7 @@ interface FormData {
   trusted_ip_ranges: TrustedIpRange[];
   is_manager: boolean;
   manager_data_scope: ManagerDataScope;
+  system_role_key: string | null;
 }
 
 interface Employee {
@@ -119,6 +127,7 @@ export function PositionsTab() {
     trusted_ip_ranges: [],
     is_manager: false,
     manager_data_scope: "team",
+    system_role_key: null,
   });
   const [newIpName, setNewIpName] = useState("");
   const [newIpAddress, setNewIpAddress] = useState("");
@@ -142,7 +151,22 @@ export function PositionsTab() {
         ...p,
         permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) || {},
         manager_data_scope: (p.manager_data_scope as ManagerDataScope) || "team",
+        system_role_key: p.system_role_key || null,
       })) as JobPosition[];
+    },
+  });
+
+  // Fetch role definitions
+  const { data: roleDefinitions = [] } = useQuery({
+    queryKey: ["role-definitions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_role_definitions")
+        .select("key, label, color")
+        .order("priority");
+
+      if (error) throw error;
+      return data as RoleDefinition[];
     },
   });
 
@@ -187,6 +211,7 @@ export function PositionsTab() {
         trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
         is_manager: data.is_manager,
         manager_data_scope: data.manager_data_scope,
+        system_role_key: data.system_role_key,
       });
       if (error) throw error;
     },
@@ -217,6 +242,7 @@ export function PositionsTab() {
           trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
           is_manager: data.is_manager,
           manager_data_scope: data.manager_data_scope,
+          system_role_key: data.system_role_key,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -262,6 +288,7 @@ export function PositionsTab() {
       trusted_ip_ranges: [],
       is_manager: false,
       manager_data_scope: "team",
+      system_role_key: null,
     });
     setNewIpName("");
     setNewIpAddress("");
@@ -285,6 +312,7 @@ export function PositionsTab() {
       trusted_ip_ranges: existingRanges,
       is_manager: isOwner ? true : position.is_manager ?? false,
       manager_data_scope: isOwner ? "all" : (position.manager_data_scope ?? "team"),
+      system_role_key: isOwner ? "ejer" : position.system_role_key,
     });
     setNewIpName("");
     setNewIpAddress("");
@@ -307,11 +335,32 @@ export function PositionsTab() {
       trusted_ip_ranges: [],
       is_manager: false,
       manager_data_scope: "team",
+      system_role_key: null,
     });
     setNewIpName("");
     setNewIpAddress("");
     setPermissionSearch("");
     setActiveCategory(null);
+  };
+
+  // Get role badge color
+  const getRoleBadgeClass = (roleKey: string | null) => {
+    if (!roleKey) return "bg-muted text-muted-foreground";
+    const role = roleDefinitions.find(r => r.key === roleKey);
+    const colorMap: Record<string, string> = {
+      primary: "bg-primary text-primary-foreground",
+      blue: "bg-blue-500 text-white",
+      amber: "bg-amber-500 text-white",
+      purple: "bg-purple-500 text-white",
+      muted: "bg-muted text-muted-foreground",
+    };
+    return colorMap[role?.color || "muted"] || "bg-muted text-muted-foreground";
+  };
+
+  const getRoleLabel = (roleKey: string | null) => {
+    if (!roleKey) return "Ingen rolle";
+    const role = roleDefinitions.find(r => r.key === roleKey);
+    return role?.label || roleKey;
   };
 
   const handleOpenTest = (position: JobPosition) => {
@@ -449,8 +498,8 @@ export function PositionsTab() {
         <TableHeader>
           <TableRow>
             <TableHead>Navn</TableHead>
+            <TableHead>Rolle</TableHead>
             <TableHead>Beskrivelse</TableHead>
-            <TableHead>Rettigheder</TableHead>
             <TableHead className="w-[100px]">Handlinger</TableHead>
           </TableRow>
         </TableHeader>
@@ -464,7 +513,6 @@ export function PositionsTab() {
           ) : (
             positions.map((position) => {
               const isOwner = isOwnerPosition(position.name);
-              const displayPermissions = isOwner ? generateAllPermissions() : position.permissions;
 
               return (
                 <TableRow key={position.id}>
@@ -479,17 +527,13 @@ export function PositionsTab() {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <Badge className={getRoleBadgeClass(position.system_role_key)}>
+                      {getRoleLabel(position.system_role_key)}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-muted-foreground max-w-[200px] truncate">
                     {position.description || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        {isOwner ? getTotalPermissions() : countActivePermissions(displayPermissions)} af{" "}
-                        {getTotalPermissions()}
-                      </span>
-                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -600,6 +644,35 @@ export function PositionsTab() {
                       disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                     />
                   </div>
+                </div>
+
+                {/* Role Assignment Section */}
+                <div className="space-y-2">
+                  <Label>Systemrolle</Label>
+                  <Select
+                    value={formData.system_role_key || ""}
+                    onValueChange={(value) => setFormData({ ...formData, system_role_key: value || null })}
+                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                  >
+                    <SelectTrigger className="w-full max-w-xs">
+                      <SelectValue placeholder="Vælg rolle" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-popover">
+                      <SelectItem value="">Ingen rolle</SelectItem>
+                      {roleDefinitions.map((role) => (
+                        <SelectItem key={role.key} value={role.key}>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getRoleBadgeClass(role.key)} variant="secondary">
+                              {role.label}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Rollen bestemmer stillingens rettigheder i systemet
+                  </p>
                 </div>
 
                 <div className="space-y-2">
