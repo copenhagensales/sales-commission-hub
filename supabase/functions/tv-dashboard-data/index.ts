@@ -1130,23 +1130,80 @@ async function handleEesyTmData(
     .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-  // Fetch employee avatars
-  const { data: employees } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name, avatar_url, email")
-    .eq("is_active", true);
-
-  const emailToAvatarMap = new Map<string, string>();
-  const emailToNameMap = new Map<string, string>();
-  (employees || []).forEach((emp: any) => {
-    const fullName = `${emp.first_name} ${emp.last_name}`;
-    if (emp.email) {
-      emailToNameMap.set(emp.email.toLowerCase(), fullName);
-      if (emp.avatar_url) {
-        emailToAvatarMap.set(emp.email.toLowerCase(), emp.avatar_url);
-      }
+  // Collect all unique agent emails from sales for name resolution
+  const allAgentEmails = new Set<string>();
+  [...(salesToday || []), ...(salesWeek || []), ...(salesMonth || [])].forEach((sale: any) => {
+    if (sale.agent_email) {
+      allAgentEmails.add(sale.agent_email.toLowerCase());
     }
   });
+
+  // Resolve agent emails to employee names and avatars using employee_agent_mapping
+  const emailToNameMap = new Map<string, string>();
+  const emailToAvatarMap = new Map<string, string>();
+  
+  if (allAgentEmails.size > 0) {
+    // Use the same pattern as resolveAgentNames but also get avatars
+    const { data: allAgents } = await supabase
+      .from("agents")
+      .select("id, email");
+    
+    if (allAgents && allAgents.length > 0) {
+      const matchingAgents = (allAgents as any[]).filter(
+        (a) => a.email && allAgentEmails.has(a.email.toLowerCase())
+      );
+      
+      if (matchingAgents.length > 0) {
+        const agentIds = matchingAgents.map((a) => a.id);
+        const emailToAgentId = new Map<string, string>(
+          matchingAgents.map((a) => [a.email.toLowerCase(), a.id])
+        );
+        
+        const { data: mappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, employee_id")
+          .in("agent_id", agentIds);
+        
+        if (mappings && mappings.length > 0) {
+          const employeeIds = (mappings as any[]).map((m) => m.employee_id);
+          const agentIdToEmployeeId = new Map<string, string>(
+            (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
+          );
+          
+          const { data: employees } = await supabase
+            .from("employee_master_data")
+            .select("id, first_name, last_name, avatar_url")
+            .in("id", employeeIds);
+          
+          if (employees) {
+            const employeeIdToData = new Map<string, any>(
+              (employees as any[]).map((e) => [e.id, e])
+            );
+            
+            // Build the email -> name and email -> avatar maps
+            for (const agent of matchingAgents) {
+              const agentEmail = agent.email?.toLowerCase();
+              if (!agentEmail) continue;
+              
+              const employeeId = agentIdToEmployeeId.get(agent.id);
+              if (!employeeId) continue;
+              
+              const emp = employeeIdToData.get(employeeId);
+              if (!emp) continue;
+              
+              const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+              emailToNameMap.set(agentEmail, fullName);
+              if (emp.avatar_url) {
+                emailToAvatarMap.set(agentEmail, emp.avatar_url);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.log("[EesyTmData] Resolved names:", emailToNameMap.size, "agents");
 
   // Calculate totals and seller stats
   const calculateTotals = (sales: any[]) => {
@@ -1270,27 +1327,6 @@ async function handleTdcErhvervData(
     .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-  // Fetch employee avatars and IDs
-  const { data: employees } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name, avatar_url, email")
-    .eq("is_active", true);
-
-  const emailToAvatarMap = new Map<string, string>();
-  const emailToNameMap = new Map<string, string>();
-  const emailToIdMap = new Map<string, string>();
-  (employees || []).forEach((emp: any) => {
-    const fullName = `${emp.first_name} ${emp.last_name}`;
-    if (emp.email) {
-      const emailLower = emp.email.toLowerCase();
-      emailToNameMap.set(emailLower, fullName);
-      emailToIdMap.set(emailLower, emp.id);
-      if (emp.avatar_url) {
-        emailToAvatarMap.set(emailLower, emp.avatar_url);
-      }
-    }
-  });
-
   // Get unique agent emails from all sales
   const allAgentEmails = new Set<string>();
   [...(salesToday || []), ...(salesWeek || []), ...(salesMonth || [])].forEach((sale: any) => {
@@ -1299,10 +1335,74 @@ async function handleTdcErhvervData(
     }
   });
 
-  // Get employee IDs for hours calculation
-  const employeeIds = Array.from(allAgentEmails)
-    .map(email => emailToIdMap.get(email))
-    .filter(Boolean) as string[];
+  // Resolve agent emails to employee names, avatars, and IDs using employee_agent_mapping
+  const emailToNameMap = new Map<string, string>();
+  const emailToAvatarMap = new Map<string, string>();
+  const emailToIdMap = new Map<string, string>();
+  let employeeIds: string[] = [];
+  
+  if (allAgentEmails.size > 0) {
+    const { data: allAgents } = await supabase
+      .from("agents")
+      .select("id, email");
+    
+    if (allAgents && allAgents.length > 0) {
+      const matchingAgents = (allAgents as any[]).filter(
+        (a) => a.email && allAgentEmails.has(a.email.toLowerCase())
+      );
+      
+      if (matchingAgents.length > 0) {
+        const agentIds = matchingAgents.map((a) => a.id);
+        const emailToAgentId = new Map<string, string>(
+          matchingAgents.map((a) => [a.email.toLowerCase(), a.id])
+        );
+        
+        const { data: mappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, employee_id")
+          .in("agent_id", agentIds);
+        
+        if (mappings && mappings.length > 0) {
+          employeeIds = (mappings as any[]).map((m) => m.employee_id);
+          const agentIdToEmployeeId = new Map<string, string>(
+            (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
+          );
+          
+          const { data: employees } = await supabase
+            .from("employee_master_data")
+            .select("id, first_name, last_name, avatar_url")
+            .in("id", employeeIds);
+          
+          if (employees) {
+            const employeeIdToData = new Map<string, any>(
+              (employees as any[]).map((e) => [e.id, e])
+            );
+            
+            // Build the email -> name, avatar, and id maps
+            for (const agent of matchingAgents) {
+              const agentEmail = agent.email?.toLowerCase();
+              if (!agentEmail) continue;
+              
+              const employeeId = agentIdToEmployeeId.get(agent.id);
+              if (!employeeId) continue;
+              
+              const emp = employeeIdToData.get(employeeId);
+              if (!emp) continue;
+              
+              const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+              emailToNameMap.set(agentEmail, fullName);
+              emailToIdMap.set(agentEmail, emp.id);
+              if (emp.avatar_url) {
+                emailToAvatarMap.set(agentEmail, emp.avatar_url);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.log("[TdcErhvervData] Resolved names:", emailToNameMap.size, "agents, employeeIds:", employeeIds.length);
 
   // Fetch team memberships for these employees
   const { data: teamMembers } = await supabase
