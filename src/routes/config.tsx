@@ -117,6 +117,7 @@ import {
   H2HAdminBoard,
   KpiDefinitions,
   TeamH2H,
+  SalaryTypes,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -421,6 +422,9 @@ export const routes: RouteConfig[] = [
 
   // MG Test (Salary Schemes + Relatel Data)
   { path: "/1234", component: MgTestPage, access: "role", positionPermission: "menu_mg_test" },
+
+  // Salary
+  { path: "/salary/types", component: SalaryTypes, access: "role", positionPermission: "menu_salary_types" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

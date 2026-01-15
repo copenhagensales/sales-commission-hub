@@ -164,3 +164,6 @@ export const TeamH2H = lazyPage(() => import("@/pages/TeamH2H"));
 // KPI Definitions (Owner only)
 export const KpiDefinitions = lazyPage(() => import("@/pages/admin/KpiDefinitions"));
 
+// Salary
+export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
+
