@@ -53,9 +53,14 @@ import { toast } from "sonner";
 import { 
   usePagePermissions, 
   useRoleDefinitions,
+  useDataVisibilityRules,
   permissionKeyLabels,
+  dataScopeLabels,
+  visibilityLabels,
   type PagePermission,
-  type RoleDefinition
+  type RoleDefinition,
+  type Visibility,
+  type DataVisibilityRule
 } from "@/hooks/useUnifiedPermissions";
 
 type PermissionType = 'page' | 'tab' | 'action';
@@ -236,10 +241,35 @@ const ROLE_COLORS = [
   { value: 'muted', label: 'Grå', class: 'bg-muted text-muted-foreground' },
 ];
 
+// Data scopes with descriptions for UI
+const DATA_SCOPES = [
+  { key: 'employees', label: 'Medarbejdere', description: 'Medarbejderdata og profiler' },
+  { key: 'sales', label: 'Salg', description: 'Salgsdata og statistik' },
+  { key: 'shifts', label: 'Vagter', description: 'Vagtplaner og timer' },
+  { key: 'absences', label: 'Fravær', description: 'Fraværsregistreringer' },
+  { key: 'coaching', label: 'Coaching', description: 'Coaching sessioner og feedback' },
+  { key: 'contracts', label: 'Kontrakter', description: 'Kontraktinformation' },
+  { key: 'payroll', label: 'Løn', description: 'Løndata og udbetalinger' },
+  { key: 'leaderboard_ranking', label: 'Leaderboard', description: 'Rangering på leaderboards' },
+  { key: 'sales_count_others', label: 'Andres salgstal', description: 'Se antal salg for andre medarbejdere' },
+  { key: 'commission_details', label: 'Provisionsdetaljer', description: 'Detaljeret provisionsberegning' },
+  { key: 'salary_breakdown', label: 'Lønspecifikation', description: 'Detaljeret lønspecifikation' },
+  { key: 'h2h_stats', label: 'Head-to-Head', description: 'H2H statistik mod andre' },
+  { key: 'employee_performance', label: 'Performance', description: 'Performancerapporter' },
+];
+
+const visibilityColors: Record<Visibility, string> = {
+  all: "bg-green-100 text-green-700 border-green-300",
+  team: "bg-blue-100 text-blue-700 border-blue-300",
+  self: "bg-amber-100 text-amber-700 border-amber-300",
+  none: "bg-red-100 text-red-700 border-red-300",
+};
+
 export function PermissionEditor() {
   const queryClient = useQueryClient();
   const { data: permissions = [], isLoading: permissionsLoading } = usePagePermissions();
   const { data: roles = [], isLoading: rolesLoading } = useRoleDefinitions();
+  const { data: visibilityRules = [], isLoading: visibilityLoading } = useDataVisibilityRules();
   
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [editingPermission, setEditingPermission] = useState<EditingPermission | null>(null);
@@ -573,13 +603,54 @@ export function PermissionEditor() {
     }
   };
 
-  if (permissionsLoading || rolesLoading) {
+  if (permissionsLoading || rolesLoading || visibilityLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
+  // Helper to get current visibility for a role and scope
+  const getVisibilityForRole = (roleKey: string, scope: string): Visibility => {
+    const rule = visibilityRules.find(
+      r => r.role_key === roleKey && r.data_scope === scope
+    );
+    return (rule?.visibility as Visibility) || 'none';
+  };
+
+  // Update visibility mutation
+  const updateVisibility = async (roleKey: string, scope: string, visibility: Visibility) => {
+    const existing = visibilityRules.find(
+      r => r.role_key === roleKey && r.data_scope === scope
+    );
+
+    try {
+      if (existing) {
+        const { error } = await supabase
+          .from('data_visibility_rules')
+          .update({ visibility })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const scopeData = DATA_SCOPES.find(s => s.key === scope);
+        const { error } = await supabase
+          .from('data_visibility_rules')
+          .insert({
+            role_key: roleKey,
+            data_scope: scope,
+            visibility,
+            description: scopeData?.description || scope,
+          });
+        if (error) throw error;
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['data-visibility-rules'] });
+      toast.success('Synlighed opdateret');
+    } catch (error: any) {
+      toast.error('Kunne ikke opdatere synlighed: ' + error.message);
+    }
+  };
 
   const selectedRoleData = roles.find(r => r.key === selectedRole);
   const rolePermissions = selectedRole ? (permissionsByRole[selectedRole] || []) : [];
@@ -692,6 +763,83 @@ export function PermissionEditor() {
                     </TableCell>
                   </TableRow>
                 )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Data Visibility Section */}
+      {selectedRole && selectedRoleData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Data synlighed for {selectedRoleData.label}
+            </CardTitle>
+            <CardDescription>
+              Vælg hvilken data denne rolle kan se - alle, team, kun egen, eller ingen adgang
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Datatype</TableHead>
+                  <TableHead>Beskrivelse</TableHead>
+                  <TableHead className="w-[180px]">Synlighed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {DATA_SCOPES.map((scope) => {
+                  const currentVisibility = getVisibilityForRole(selectedRole, scope.key);
+                  return (
+                    <TableRow key={scope.key}>
+                      <TableCell className="font-medium">
+                        {scope.label}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {scope.description}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={currentVisibility}
+                          onValueChange={(v) => updateVisibility(selectedRole, scope.key, v as Visibility)}
+                        >
+                          <SelectTrigger className={`${visibilityColors[currentVisibility]} border`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500" />
+                                Alle
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="team">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                Team
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="self">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                                Kun egen
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="none">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500" />
+                                Ingen
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
