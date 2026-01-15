@@ -54,35 +54,88 @@ const checkAuthHealth = async (): Promise<boolean> => {
   }
 };
 
-// Login with retry and exponential backoff
+// Login with retry, exponential backoff, and 15s global timeout
+const LOGIN_TIMEOUT_MS = 15000;
+
 const loginWithRetry = async (
   email: string, 
   password: string, 
   onRetry: (attempt: number) => void,
   retries = 3
 ): Promise<{ data: any; error: any }> => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const result = await supabase.auth.signInWithPassword({ 
-        email: email.trim().toLowerCase(), 
-        password 
-      });
+  const authUrl = `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+  console.log('[Auth Diagnostic] Starting login flow');
+  console.log('[Auth Diagnostic] Auth URL:', authUrl);
+  console.log('[Auth Diagnostic] Email:', email.trim().toLowerCase());
+  
+  // Global timeout with AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.log('[Auth Diagnostic] Global timeout triggered after 15s');
+    controller.abort();
+  }, LOGIN_TIMEOUT_MS);
+  
+  try {
+    for (let i = 0; i < retries; i++) {
+      console.log(`[Auth Diagnostic] Attempt ${i + 1}/${retries}`);
+      const attemptStart = Date.now();
       
-      // If we get a result (even with auth error), return it
-      return result;
-    } catch (error: any) {
-      // Only retry on network errors (Failed to fetch)
-      if (error.message === "Failed to fetch" && i < retries - 1) {
-        onRetry(i + 2); // Next attempt number (1-indexed)
-        // Exponential backoff: 1s, 2s, 4s
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
-        continue;
+      try {
+        // Check if already aborted
+        if (controller.signal.aborted) {
+          throw new Error('LOGIN_TIMEOUT');
+        }
+        
+        const result = await supabase.auth.signInWithPassword({ 
+          email: email.trim().toLowerCase(), 
+          password 
+        });
+        
+        const elapsed = Date.now() - attemptStart;
+        console.log(`[Auth Diagnostic] Attempt ${i + 1} completed in ${elapsed}ms`);
+        console.log('[Auth Diagnostic] Result:', result.data ? 'SUCCESS (user data received)' : 'NO DATA');
+        console.log('[Auth Diagnostic] Error:', result.error ? `${result.error.name}: ${result.error.message}` : 'NONE');
+        
+        clearTimeout(timeoutId);
+        return result;
+      } catch (error: any) {
+        const elapsed = Date.now() - attemptStart;
+        console.log(`[Auth Diagnostic] Attempt ${i + 1} EXCEPTION after ${elapsed}ms`);
+        console.log('[Auth Diagnostic] Error name:', error.name);
+        console.log('[Auth Diagnostic] Error message:', error.message);
+        console.log('[Auth Diagnostic] Error stack:', error.stack?.substring(0, 500));
+        
+        // Check for timeout abort
+        if (controller.signal.aborted || error.message === 'LOGIN_TIMEOUT') {
+          clearTimeout(timeoutId);
+          throw new Error('LOGIN_TIMEOUT');
+        }
+        
+        // Check for network errors (multiple patterns)
+        const isNetworkError = 
+          error.message === "Failed to fetch" ||
+          error.message?.includes("Failed to fetch") ||
+          error.name === "AuthRetryableFetchError" ||
+          error.name === "TypeError";
+        
+        if (isNetworkError && i < retries - 1) {
+          console.log(`[Auth Diagnostic] Network error detected, will retry in ${1000 * Math.pow(2, i)}ms`);
+          onRetry(i + 2);
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+          continue;
+        }
+        
+        clearTimeout(timeoutId);
+        throw error;
       }
-      throw error;
     }
+    
+    clearTimeout(timeoutId);
+    return { data: null, error: new Error("Max retries exceeded") };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
   }
-  // This shouldn't be reached, but TypeScript needs it
-  return { data: null, error: new Error("Max retries exceeded") };
 };
 
 export default function Auth() {
@@ -351,45 +404,66 @@ export default function Auth() {
         ============ END DISABLED ============ */
       }
     } catch (error: any) {
+      // ============ DIAGNOSTIC CATCH BLOCK ============
+      console.log('[Auth Diagnostic] CAUGHT ERROR in handleSubmit');
+      console.log('[Auth Diagnostic] error.name:', error.name);
+      console.log('[Auth Diagnostic] error.message:', error.message);
+      console.log('[Auth Diagnostic] error.stack:', error.stack?.substring(0, 500));
+      console.log('[Auth Diagnostic] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      
       let title = "Fejl";
-      let message = error.message;
+      let message = `${error.name || 'Error'}: ${error.message}`;
       
       // Track failed attempts for offline fallback
       const newFailedAttempts = failedAttempts + 1;
       setFailedAttempts(newFailedAttempts);
       
       // Provide user-friendly error messages based on error type
-      if (error.message === "Failed to fetch") {
+      if (error.message === "LOGIN_TIMEOUT") {
+        title = "Timeout (15 sek)";
+        message = "Login tog for lang tid. Serveren svarede ikke inden for 15 sekunder.";
+        console.log('[Auth Diagnostic] Classified as: TIMEOUT');
+      } else if (error.message === "Failed to fetch" || error.message?.includes("Failed to fetch") || error.name === "AuthRetryableFetchError") {
         title = "Server utilgængelig";
         message = newFailedAttempts >= 3 
-          ? "Serveren kan ikke nås. Tjek din internetforbindelse eller prøv igen senere."
-          : `Login-serveren svarer ikke (forsøg ${newFailedAttempts}/3). Prøv igen.`;
+          ? `Serveren kan ikke nås efter ${newFailedAttempts} forsøg. Fejl: ${error.name}`
+          : `Login-serveren svarer ikke (forsøg ${newFailedAttempts}/3). Fejl: ${error.name}`;
+        console.log('[Auth Diagnostic] Classified as: NETWORK_ERROR');
       } else if (error.name === "TimeoutError" || error.message?.includes("timeout")) {
         title = "Timeout";
         message = "Login tog for lang tid. Serveren er overbelastet - prøv igen om lidt.";
+        console.log('[Auth Diagnostic] Classified as: SDK_TIMEOUT');
       } else if (error.message?.includes("Invalid login")) {
         title = "Forkert login";
         message = "Forkert email eller adgangskode.";
-        setFailedAttempts(0); // Reset on auth error (not network error)
+        setFailedAttempts(0);
+        console.log('[Auth Diagnostic] Classified as: INVALID_CREDENTIALS');
       } else if (error.message?.includes("Email not confirmed")) {
         title = "Email ikke bekræftet";
         message = "Tjek din indbakke for bekræftelsesmail.";
         setFailedAttempts(0);
+        console.log('[Auth Diagnostic] Classified as: EMAIL_NOT_CONFIRMED');
       } else if (error.message?.includes("Max retries")) {
         title = "Server utilgængelig";
         message = "Kunne ikke forbinde efter flere forsøg. Prøv igen om lidt.";
+        console.log('[Auth Diagnostic] Classified as: MAX_RETRIES');
+      } else {
+        console.log('[Auth Diagnostic] Classified as: UNKNOWN');
       }
       
-      console.error("[Auth] Login error:", error.message, error.name, `(attempt ${newFailedAttempts})`);
+      console.log('[Auth Diagnostic] Will show toast:', { title, message });
       toast({
         title,
         description: message,
         variant: "destructive",
       });
     } finally {
+      // ============ DIAGNOSTIC FINALLY BLOCK ============
+      console.log('[Auth Diagnostic] FINALLY block executing - resetting loading state');
       setLoading(false);
       setRetryAttempt(0);
       setRetryStatus(null);
+      console.log('[Auth Diagnostic] Loading state reset complete');
     }
   };
 
