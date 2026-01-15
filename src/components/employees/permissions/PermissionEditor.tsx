@@ -173,6 +173,22 @@ function PermissionRow({
             />
           </div>
         </TableCell>
+        {/* Empty cells for visibility columns (only applicable for data visibility rows) */}
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center opacity-30">
+            <Switch disabled checked={false} />
+          </div>
+        </TableCell>
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center opacity-30">
+            <Switch disabled checked={false} />
+          </div>
+        </TableCell>
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center opacity-30">
+            <Switch disabled checked={false} />
+          </div>
+        </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
             <Button 
@@ -739,10 +755,25 @@ export function PermissionEditor() {
                   <TableHead>Beskrivelse</TableHead>
                   <TableHead className="text-center">Kan se</TableHead>
                   <TableHead className="text-center">Kan redigere</TableHead>
+                  <TableHead className="text-center">
+                    <span className="text-green-600">Alle</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="text-blue-600">Team</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="text-amber-600">Kun egen</span>
+                  </TableHead>
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Side-adgang sektion */}
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={9} className="font-semibold text-sm py-2">
+                    SIDE-ADGANG
+                  </TableCell>
+                </TableRow>
                 {hierarchy.map((page) => (
                   <PermissionRow 
                     key={page.id}
@@ -758,85 +789,92 @@ export function PermissionEditor() {
                 ))}
                 {hierarchy.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Ingen rettigheder konfigureret for denne rolle
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
+                      Ingen side-rettigheder konfigureret
                     </TableCell>
                   </TableRow>
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Data Visibility Section */}
-      {selectedRole && selectedRoleData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Data synlighed for {selectedRoleData.label}
-            </CardTitle>
-            <CardDescription>
-              Vælg hvilken data denne rolle kan se - alle, team, kun egen, eller ingen adgang
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Datatype</TableHead>
-                  <TableHead>Beskrivelse</TableHead>
-                  <TableHead className="w-[180px]">Synlighed</TableHead>
+                
+                {/* Data-synlighed sektion */}
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={9} className="font-semibold text-sm py-2">
+                    DATA-SYNLIGHED
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
                 {DATA_SCOPES.map((scope) => {
                   const currentVisibility = getVisibilityForRole(selectedRole, scope.key);
                   return (
                     <TableRow key={scope.key}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Data</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-medium">
                         {scope.label}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {scope.description}
                       </TableCell>
-                      <TableCell>
-                        <Select
-                          value={currentVisibility}
-                          onValueChange={(v) => updateVisibility(selectedRole, scope.key, v as Visibility)}
-                        >
-                          <SelectTrigger className={`${visibilityColors[currentVisibility]} border`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-green-500" />
-                                Alle
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="team">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                Team
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="self">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-amber-500" />
-                                Kun egen
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="none">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-red-500" />
-                                Ingen
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                      {/* Kan se / Kan redigere - disabled for data visibility */}
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center opacity-30">
+                          <Switch disabled checked={false} />
+                        </div>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center opacity-30">
+                          <Switch disabled checked={false} />
+                        </div>
+                      </TableCell>
+                      {/* Visibility columns */}
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={currentVisibility === 'all'}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateVisibility(selectedRole, scope.key, 'all');
+                              } else if (currentVisibility === 'all') {
+                                updateVisibility(selectedRole, scope.key, 'none');
+                              }
+                            }}
+                            className="data-[state=checked]:bg-green-500"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={currentVisibility === 'team'}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateVisibility(selectedRole, scope.key, 'team');
+                              } else if (currentVisibility === 'team') {
+                                updateVisibility(selectedRole, scope.key, 'none');
+                              }
+                            }}
+                            className="data-[state=checked]:bg-blue-500"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={currentVisibility === 'self'}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateVisibility(selectedRole, scope.key, 'self');
+                              } else if (currentVisibility === 'self') {
+                                updateVisibility(selectedRole, scope.key, 'none');
+                              }
+                            }}
+                            className="data-[state=checked]:bg-amber-500"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   );
                 })}
@@ -845,6 +883,8 @@ export function PermissionEditor() {
           </CardContent>
         </Card>
       )}
+
+      {/* Data Visibility Section removed - integrated into main table above */}
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent>
