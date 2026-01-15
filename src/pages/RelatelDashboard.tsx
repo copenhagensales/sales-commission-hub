@@ -425,7 +425,8 @@ export default function RelatelDashboard() {
                       const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
                       const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
                       const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const goalInfo = getGoalInfo(name, commission, 'payroll');
+                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
+                      const goalInfo = getGoalInfo(name, commission, 'payroll', sellerGoalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -504,7 +505,8 @@ export default function RelatelDashboard() {
                       const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
                       const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
                       const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const goalInfo = getGoalInfo(name, commission, 'week');
+                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
+                      const goalInfo = getGoalInfo(name, commission, 'week', sellerGoalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -583,7 +585,8 @@ export default function RelatelDashboard() {
                       const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
                       const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
                       const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const goalInfo = getGoalInfo(name, commission, 'day');
+                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
+                      const goalInfo = getGoalInfo(name, commission, 'day', sellerGoalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
