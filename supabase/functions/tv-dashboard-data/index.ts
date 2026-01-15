@@ -1231,9 +1231,15 @@ async function handleTdcErhvervData(
   weekStart.setDate(today.getDate() - daysToMonday);
   const weekStartStr = weekStart.toISOString().split("T")[0];
   
-  // Calculate month start
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().split("T")[0];
+  // Calculate payroll period (15th to 14th)
+  const currentDay = today.getDate();
+  let payrollStart: Date;
+  if (currentDay >= 15) {
+    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
+  } else {
+    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
+  }
+  const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // TDC Erhverv client ID
   const TDC_ERHVERV_CLIENT_ID = "87c3e0cf-7c46-4428-ae4e-ee19ca7fa6c2";
@@ -1256,34 +1262,61 @@ async function handleTdcErhvervData(
     .gte("sale_datetime", `${weekStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-  // Fetch month's sales
+  // Fetch payroll period sales (lønperiode)
   const { data: salesMonth } = await supabase
     .from("sales")
     .select(selectFields)
     .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
-    .gte("sale_datetime", `${monthStartStr}T00:00:00`)
+    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-  // Calculate totals
+  // Fetch employee avatars
+  const { data: employees } = await supabase
+    .from("employee_master_data")
+    .select("id, first_name, last_name, avatar_url, email")
+    .eq("is_active", true);
+
+  const emailToAvatarMap = new Map<string, string>();
+  const emailToNameMap = new Map<string, string>();
+  (employees || []).forEach((emp: any) => {
+    const fullName = `${emp.first_name} ${emp.last_name}`;
+    if (emp.email) {
+      emailToNameMap.set(emp.email.toLowerCase(), fullName);
+      if (emp.avatar_url) {
+        emailToAvatarMap.set(emp.email.toLowerCase(), emp.avatar_url);
+      }
+    }
+  });
+
+  // Calculate totals and seller stats
   const calculateTotals = (sales: any[]) => {
     let totalSales = 0;
     let totalCommission = 0;
-    const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
+    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string }> = {};
 
     sales?.forEach((sale) => {
       const agentEmail = sale.agent_email || "Unknown";
-      if (!sellerStats[agentEmail]) {
-        sellerStats[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
+      const emailLower = agentEmail.toLowerCase();
+      
+      if (!sellerStats[emailLower]) {
+        const resolvedName = emailToNameMap.get(emailLower) || agentEmail.split("@")[0];
+        sellerStats[emailLower] = { 
+          email: agentEmail,
+          name: resolvedName, 
+          sales: 0, 
+          commission: 0,
+          avatarUrl: emailToAvatarMap.get(emailLower)
+        };
       }
 
       sale.sale_items?.forEach((item: any) => {
         const countsAsSale = item.products?.counts_as_sale !== false;
         if (countsAsSale) {
           totalSales += Number(item.quantity) || 1;
-          sellerStats[agentEmail].sales += Number(item.quantity) || 1;
+          sellerStats[emailLower].sales += Number(item.quantity) || 1;
         }
         totalCommission += Number(item.mapped_commission) || 0;
-        sellerStats[agentEmail].commission += Number(item.mapped_commission) || 0;
+        sellerStats[emailLower].commission += Number(item.mapped_commission) || 0;
       });
     });
 
@@ -1294,25 +1327,12 @@ async function handleTdcErhvervData(
   const weekData = calculateTotals(salesWeek || []);
   const monthData = calculateTotals(salesMonth || []);
 
-  // Get top sellers from month data
-  const topSellers = Object.values(monthData.sellerStats)
-    .sort((a, b) => b.commission - a.commission)
-    .slice(0, 10);
-
-  // Resolve agent emails to employee names
-  const allEmails = Object.keys(monthData.sellerStats);
-  if (allEmails.length > 0) {
-    const nameMap = await resolveAgentNames(supabase, allEmails);
-    topSellers.forEach((seller) => {
-      const email = allEmails.find(e => monthData.sellerStats[e] === seller);
-      if (email) {
-        const resolvedName = nameMap.get(email.toLowerCase());
-        if (resolvedName) {
-          seller.name = resolvedName;
-        }
-      }
-    });
-  }
+  // Convert sellerStats to sorted arrays
+  const formatSellers = (stats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string }>) => {
+    return Object.values(stats)
+      .filter(s => s.sales > 0)
+      .sort((a, b) => b.commission - a.commission);
+  };
 
   const result = {
     salesToday: todayData.totalSales,
@@ -1321,10 +1341,13 @@ async function handleTdcErhvervData(
     commissionToday: todayData.totalCommission,
     commissionWeek: weekData.totalCommission,
     commissionMonth: monthData.totalCommission,
-    topSellers,
+    sellersToday: formatSellers(todayData.sellerStats),
+    sellersWeek: formatSellers(weekData.sellerStats),
+    sellersMonth: formatSellers(monthData.sellerStats),
+    topSellers: formatSellers(monthData.sellerStats).slice(0, 10),
   };
 
-  console.log("[TdcErhvervData] Returning:", result);
+  console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth });
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
