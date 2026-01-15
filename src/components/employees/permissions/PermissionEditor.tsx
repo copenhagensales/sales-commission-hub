@@ -183,18 +183,53 @@ export function PermissionEditor() {
     },
   });
 
-  // Toggle permission inline
+  // Toggle permission inline with automatic child inheritance
   const togglePermission = async (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
+    const newValue = !permission[field];
+    
+    // Update the permission itself
     const { error } = await supabase
       .from('role_page_permissions')
-      .update({ [field]: !permission[field] })
+      .update({ [field]: newValue })
       .eq('id', permission.id);
     
     if (error) {
       toast.error('Kunne ikke opdatere');
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+      return;
     }
+
+    // If it's a page and we're turning OFF, also turn off all children
+    if ((permission.permission_type === 'page' || !permission.parent_key) && !newValue) {
+      const children = rolePermissions.filter(p => p.parent_key === permission.permission_key);
+      if (children.length > 0) {
+        const childIds = children.map(c => c.id);
+        await supabase
+          .from('role_page_permissions')
+          .update({ [field]: false })
+          .in('id', childIds);
+      }
+    }
+    
+    // If it's a page and we're turning ON can_view, also turn on children's can_view
+    if ((permission.permission_type === 'page' || !permission.parent_key) && newValue && field === 'can_view') {
+      const children = rolePermissions.filter(p => p.parent_key === permission.permission_key);
+      if (children.length > 0) {
+        const childIds = children.map(c => c.id);
+        await supabase
+          .from('role_page_permissions')
+          .update({ can_view: true })
+          .in('id', childIds);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+  };
+
+  // Check if a child permission should be disabled (parent is off)
+  const isChildDisabled = (child: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
+    if (!child.parent_key) return false;
+    const parent = rolePermissions.find(p => p.permission_key === child.parent_key);
+    return parent ? !parent[field] : false;
   };
 
   const openNewPermission = (roleKey: string, parentKey?: string) => {
@@ -387,16 +422,24 @@ export function PermissionEditor() {
                           {child.description}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Switch
-                            checked={child.can_view}
-                            onCheckedChange={() => togglePermission(child, 'can_view')}
-                          />
+                          <div className="flex items-center justify-center" title={isChildDisabled(child, 'can_view') ? 'Slået fra - forælder er deaktiveret' : undefined}>
+                            <Switch
+                              checked={child.can_view}
+                              disabled={isChildDisabled(child, 'can_view')}
+                              onCheckedChange={() => togglePermission(child, 'can_view')}
+                              className={isChildDisabled(child, 'can_view') ? 'opacity-50' : ''}
+                            />
+                          </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Switch
-                            checked={child.can_edit}
-                            onCheckedChange={() => togglePermission(child, 'can_edit')}
-                          />
+                          <div className="flex items-center justify-center" title={isChildDisabled(child, 'can_edit') ? 'Slået fra - forælder er deaktiveret' : undefined}>
+                            <Switch
+                              checked={child.can_edit}
+                              disabled={isChildDisabled(child, 'can_edit')}
+                              onCheckedChange={() => togglePermission(child, 'can_edit')}
+                              className={isChildDisabled(child, 'can_edit') ? 'opacity-50' : ''}
+                            />
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
