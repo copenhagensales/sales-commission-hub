@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
+import { useCanAccess } from "@/hooks/useSystemRoles";
 import { 
   LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, 
   Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight,
@@ -105,6 +106,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   const location = useLocation();
   const navigate = useNavigate();
   const { previewPermissions } = useRolePreview();
+  const { isOwner } = useCanAccess();
   
   const [personnelOpen, setPersonnelOpen] = useState(false);
   const [managementOpen, setManagementOpen] = useState(false);
@@ -144,7 +146,9 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   const vagtFlowItems = getEnabledItems(VAGT_FLOW_ITEMS);
   const recruitmentItems = getEnabledItems(RECRUITMENT_ITEMS);
   const boardsItems = getEnabledItems(BOARDS_ITEMS);
-  const salaryItems = getEnabledItems(SALARY_ITEMS);
+  const salaryItems = isOwner 
+    ? Object.values(SALARY_ITEMS) 
+    : getEnabledItems(SALARY_ITEMS);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
