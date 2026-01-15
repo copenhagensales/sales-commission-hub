@@ -51,8 +51,8 @@ export function useTvCelebrationData({
       return result;
     },
     enabled: enabled && !!dashboardSlug,
-    refetchInterval: 30000,
-    staleTime: 15000,
+    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
+    staleTime: 60000,
   });
 
   return {

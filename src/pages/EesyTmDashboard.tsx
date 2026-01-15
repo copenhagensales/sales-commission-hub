@@ -113,7 +113,8 @@ export default function EesyTmDashboard() {
       return response.json();
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
+    staleTime: 60000, // 1 minute stale time
   });
 
   // Fetch sales for today
@@ -122,7 +123,7 @@ export default function EesyTmDashboard() {
     startDate: today,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000 // Auto-refresh every 30 seconds
+    refetchInterval: 60000, // 1 minute - reduced to lower DB load
   });
 
   // Fetch sales for this week
@@ -131,7 +132,7 @@ export default function EesyTmDashboard() {
     startDate: weekStart,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch sales for payroll period (lønperiode)
@@ -140,7 +141,7 @@ export default function EesyTmDashboard() {
     startDate: payrollPeriod.start,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch sales for this month
@@ -149,7 +150,7 @@ export default function EesyTmDashboard() {
     startDate: monthStart,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 30000
+    refetchInterval: 60000,
   });
 
   // Fetch employee avatars and IDs
