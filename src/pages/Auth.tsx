@@ -84,9 +84,25 @@ export default function Auth() {
   }, []);
 
 
+  const handleClearCacheAndReload = () => {
+    console.log("[Auth] User requested cache clear");
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Clear any stale auth tokens before attempting fresh login
+    const storedToken = localStorage.getItem('sb-jwlimmeijpfmaksvmuru-auth-token');
+    if (storedToken && !isResetMode && !isForcedPasswordChange && !isNewPasswordMode) {
+      console.log("[Auth] Clearing existing token before fresh login attempt");
+      localStorage.removeItem('sb-jwlimmeijpfmaksvmuru-auth-token');
+      // Give the SDK a moment to reset
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     try {
       if (isForcedPasswordChange) {
@@ -289,10 +305,18 @@ export default function Auth() {
         )}
 
         {connectionStatus === 'checking' && (
-          <div className="rounded-lg border border-border bg-muted/50 p-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Tjekker forbindelse...</span>
+          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-600">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Tjekker forbindelse...</span>
+              </div>
+              <button 
+                onClick={handleClearCacheAndReload}
+                className="text-xs text-amber-700 hover:text-amber-900 underline"
+              >
+                Ryd cache og prøv igen
+              </button>
             </div>
           </div>
         )}
