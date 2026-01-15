@@ -1138,9 +1138,11 @@ async function handleEesyTmData(
     }
   });
 
-  // Resolve agent emails to employee names and avatars using employee_agent_mapping
+  // Resolve agent emails to employee names, avatars, and IDs using employee_agent_mapping
   const emailToNameMap = new Map<string, string>();
   const emailToAvatarMap = new Map<string, string>();
+  const emailToIdMap = new Map<string, string>();
+  let employeeIds: string[] = [];
   
   if (allAgentEmails.size > 0) {
     // Use the same pattern as resolveAgentNames but also get avatars
@@ -1165,7 +1167,7 @@ async function handleEesyTmData(
           .in("agent_id", agentIds);
         
         if (mappings && mappings.length > 0) {
-          const employeeIds = (mappings as any[]).map((m) => m.employee_id);
+          employeeIds = (mappings as any[]).map((m) => m.employee_id);
           const agentIdToEmployeeId = new Map<string, string>(
             (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
           );
@@ -1180,7 +1182,7 @@ async function handleEesyTmData(
               (employees as any[]).map((e) => [e.id, e])
             );
             
-            // Build the email -> name and email -> avatar maps
+            // Build the email -> name, avatar, and id maps
             for (const agent of matchingAgents) {
               const agentEmail = agent.email?.toLowerCase();
               if (!agentEmail) continue;
@@ -1193,6 +1195,7 @@ async function handleEesyTmData(
               
               const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
               emailToNameMap.set(agentEmail, fullName);
+              emailToIdMap.set(agentEmail, emp.id);
               if (emp.avatar_url) {
                 emailToAvatarMap.set(agentEmail, emp.avatar_url);
               }
@@ -1203,13 +1206,29 @@ async function handleEesyTmData(
     }
   }
   
-  console.log("[EesyTmData] Resolved names:", emailToNameMap.size, "agents");
+  console.log("[EesyTmData] Resolved names:", emailToNameMap.size, "agents, employeeIds:", employeeIds.length);
+
+  // Fetch employee sales goals for the payroll period
+  let employeeGoals: Record<string, number> = {};
+  if (employeeIds.length > 0) {
+    const { data: goals } = await supabase
+      .from("employee_sales_goals")
+      .select("employee_id, target_amount")
+      .in("employee_id", employeeIds)
+      .gte("period_start", payrollStartStr)
+      .lte("period_start", payrollStartStr);
+    
+    (goals || []).forEach((g: any) => {
+      employeeGoals[g.employee_id] = g.target_amount;
+    });
+    console.log("[EesyTmData] Fetched goals for", Object.keys(employeeGoals).length, "employees");
+  }
 
   // Calculate totals and seller stats
   const calculateTotals = (sales: any[]) => {
     let totalSales = 0;
     let totalCommission = 0;
-    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string }> = {};
+    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }> = {};
 
     sales?.forEach((sale) => {
       const agentEmail = sale.agent_email || "Unknown";
@@ -1222,7 +1241,8 @@ async function handleEesyTmData(
           name: resolvedName, 
           sales: 0, 
           commission: 0,
-          avatarUrl: emailToAvatarMap.get(emailLower)
+          avatarUrl: emailToAvatarMap.get(emailLower),
+          employeeId: emailToIdMap.get(emailLower)
         };
       }
 
@@ -1244,10 +1264,14 @@ async function handleEesyTmData(
   const weekData = calculateTotals(salesWeek || []);
   const monthData = calculateTotals(salesMonth || []);
 
-  // Convert sellerStats to sorted arrays
-  const formatSellers = (stats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string }>) => {
+  // Convert sellerStats to sorted arrays with goal info
+  const formatSellers = (stats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
     return Object.values(stats)
       .filter(s => s.sales > 0)
+      .map(s => ({
+        ...s,
+        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null
+      }))
       .sort((a, b) => b.commission - a.commission);
   };
 
@@ -1262,9 +1286,10 @@ async function handleEesyTmData(
     sellersWeek: formatSellers(weekData.sellerStats),
     sellersMonth: formatSellers(monthData.sellerStats),
     topSellers: formatSellers(monthData.sellerStats).slice(0, 10),
+    employeeGoals, // Include raw goals for frontend flexibility
   };
 
-  console.log("[EesyTmData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth });
+  console.log("[EesyTmData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, goalsCount: Object.keys(employeeGoals).length });
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1404,6 +1429,22 @@ async function handleTdcErhvervData(
   
   console.log("[TdcErhvervData] Resolved names:", emailToNameMap.size, "agents, employeeIds:", employeeIds.length);
 
+  // Fetch employee sales goals for the payroll period
+  let employeeGoals: Record<string, number> = {};
+  if (employeeIds.length > 0) {
+    const { data: goals } = await supabase
+      .from("employee_sales_goals")
+      .select("employee_id, target_amount")
+      .in("employee_id", employeeIds)
+      .gte("period_start", payrollStartStr)
+      .lte("period_start", payrollStartStr);
+    
+    (goals || []).forEach((g: any) => {
+      employeeGoals[g.employee_id] = g.target_amount;
+    });
+    console.log("[TdcErhvervData] Fetched goals for", Object.keys(employeeGoals).length, "employees");
+  }
+
   // Fetch team memberships for these employees
   const { data: teamMembers } = await supabase
     .from("team_members")
@@ -1498,7 +1539,7 @@ async function handleTdcErhvervData(
   const calculateTotals = (sales: any[]) => {
     let totalSales = 0;
     let totalCommission = 0;
-    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string }> = {};
+    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }> = {};
 
     sales?.forEach((sale) => {
       const agentEmail = sale.agent_email || "Unknown";
@@ -1511,7 +1552,8 @@ async function handleTdcErhvervData(
           name: resolvedName, 
           sales: 0, 
           commission: 0,
-          avatarUrl: emailToAvatarMap.get(emailLower)
+          avatarUrl: emailToAvatarMap.get(emailLower),
+          employeeId: emailToIdMap.get(emailLower)
         };
       }
 
@@ -1533,10 +1575,14 @@ async function handleTdcErhvervData(
   const weekData = calculateTotals(salesWeek || []);
   const monthData = calculateTotals(salesMonth || []);
 
-  // Convert sellerStats to sorted arrays
-  const formatSellers = (stats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string }>) => {
+  // Convert sellerStats to sorted arrays with goal info
+  const formatSellers = (stats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
     return Object.values(stats)
       .filter(s => s.sales > 0)
+      .map(s => ({
+        ...s,
+        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null
+      }))
       .sort((a, b) => b.commission - a.commission);
   };
 
@@ -1554,9 +1600,10 @@ async function handleTdcErhvervData(
     sellersWeek: formatSellers(weekData.sellerStats),
     sellersMonth: formatSellers(monthData.sellerStats),
     topSellers: formatSellers(monthData.sellerStats).slice(0, 10),
+    employeeGoals, // Include raw goals for frontend flexibility
   };
 
-  console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, hoursToday, hoursWeek, hoursPayroll });
+  console.log("[TdcErhvervData] Returning:", { salesToday: result.salesToday, salesWeek: result.salesWeek, salesMonth: result.salesMonth, hoursToday, hoursWeek, hoursPayroll, goalsCount: Object.keys(employeeGoals).length });
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1645,26 +1692,125 @@ async function handleRelatelData(
     .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
+  // Get unique agent emails from all sales
+  const allAgentEmails = new Set<string>();
+  [...(salesToday || []), ...(salesWeek || []), ...(salesPayroll || [])].forEach((sale: any) => {
+    if (sale.agent_email) {
+      allAgentEmails.add(sale.agent_email.toLowerCase());
+    }
+  });
+
+  // Resolve agent emails to employee names, avatars, and IDs using employee_agent_mapping
+  const emailToNameMap = new Map<string, string>();
+  const emailToAvatarMap = new Map<string, string>();
+  const emailToIdMap = new Map<string, string>();
+  let employeeIds: string[] = [];
+  
+  if (allAgentEmails.size > 0) {
+    const { data: allAgents } = await supabase
+      .from("agents")
+      .select("id, email");
+    
+    if (allAgents && allAgents.length > 0) {
+      const matchingAgents = (allAgents as any[]).filter(
+        (a) => a.email && allAgentEmails.has(a.email.toLowerCase())
+      );
+      
+      if (matchingAgents.length > 0) {
+        const agentIds = matchingAgents.map((a) => a.id);
+        
+        const { data: mappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, employee_id")
+          .in("agent_id", agentIds);
+        
+        if (mappings && mappings.length > 0) {
+          employeeIds = (mappings as any[]).map((m) => m.employee_id);
+          const agentIdToEmployeeId = new Map<string, string>(
+            (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
+          );
+          
+          const { data: employees } = await supabase
+            .from("employee_master_data")
+            .select("id, first_name, last_name, avatar_url")
+            .in("id", employeeIds);
+          
+          if (employees) {
+            const employeeIdToData = new Map<string, any>(
+              (employees as any[]).map((e) => [e.id, e])
+            );
+            
+            // Build the email -> name, avatar, and id maps
+            for (const agent of matchingAgents) {
+              const agentEmail = agent.email?.toLowerCase();
+              if (!agentEmail) continue;
+              
+              const employeeId = agentIdToEmployeeId.get(agent.id);
+              if (!employeeId) continue;
+              
+              const emp = employeeIdToData.get(employeeId);
+              if (!emp) continue;
+              
+              const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+              emailToNameMap.set(agentEmail, fullName);
+              emailToIdMap.set(agentEmail, emp.id);
+              if (emp.avatar_url) {
+                emailToAvatarMap.set(agentEmail, emp.avatar_url);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.log("[RelatelData] Resolved names:", emailToNameMap.size, "agents, employeeIds:", employeeIds.length);
+
+  // Fetch employee sales goals for the payroll period
+  let employeeGoals: Record<string, number> = {};
+  if (employeeIds.length > 0) {
+    const { data: goals } = await supabase
+      .from("employee_sales_goals")
+      .select("employee_id, target_amount")
+      .in("employee_id", employeeIds)
+      .gte("period_start", payrollStartStr)
+      .lte("period_start", payrollStartStr);
+    
+    (goals || []).forEach((g: any) => {
+      employeeGoals[g.employee_id] = g.target_amount;
+    });
+    console.log("[RelatelData] Fetched goals for", Object.keys(employeeGoals).length, "employees");
+  }
+
   // Calculate totals with seller breakdown
   const calculateTotals = (sales: any[]) => {
     let totalSales = 0;
     let totalCommission = 0;
-    const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
+    const sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }> = {};
 
     sales?.forEach((sale) => {
       const agentEmail = sale.agent_email || "Unknown";
-      if (!sellerStats[agentEmail]) {
-        sellerStats[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
+      const emailLower = agentEmail.toLowerCase();
+      
+      if (!sellerStats[emailLower]) {
+        const resolvedName = emailToNameMap.get(emailLower) || agentEmail.split("@")[0];
+        sellerStats[emailLower] = { 
+          name: resolvedName, 
+          sales: 0, 
+          commission: 0,
+          avatarUrl: emailToAvatarMap.get(emailLower),
+          employeeId: emailToIdMap.get(emailLower)
+        };
       }
 
       sale.sale_items?.forEach((item: any) => {
         const countsAsSale = item.products?.counts_as_sale !== false;
         if (countsAsSale) {
           totalSales += Number(item.quantity) || 1;
-          sellerStats[agentEmail].sales += Number(item.quantity) || 1;
+          sellerStats[emailLower].sales += Number(item.quantity) || 1;
         }
         totalCommission += Number(item.mapped_commission) || 0;
-        sellerStats[agentEmail].commission += Number(item.mapped_commission) || 0;
+        sellerStats[emailLower].commission += Number(item.mapped_commission) || 0;
       });
     });
 
@@ -1675,71 +1821,20 @@ async function handleRelatelData(
   const weekData = calculateTotals(salesWeek || []);
   const payrollData = calculateTotals(salesPayroll || []);
 
-  // Build sorted seller arrays for each period
-  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number }>) => {
+  // Build sorted seller arrays for each period with goal info
+  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
     return Object.values(sellerStats)
       .filter(s => s.sales > 0)
+      .map(s => ({
+        ...s,
+        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null
+      }))
       .sort((a, b) => b.commission - a.commission);
   };
 
   const sellersToday = buildSellerArray(todayData.sellerStats);
   const sellersWeek = buildSellerArray(weekData.sellerStats);
   const sellersMonth = buildSellerArray(payrollData.sellerStats);
-
-  // Resolve agent emails to employee names for all sellers
-  const allEmails = new Set<string>();
-  Object.keys(todayData.sellerStats).forEach(e => allEmails.add(e));
-  Object.keys(weekData.sellerStats).forEach(e => allEmails.add(e));
-  Object.keys(payrollData.sellerStats).forEach(e => allEmails.add(e));
-
-  if (allEmails.size > 0) {
-    const nameMap = await resolveAgentNames(supabase, Array.from(allEmails));
-    
-    // Resolve names for each period's sellers
-    const resolveNames = (sellers: any[], stats: Record<string, any>) => {
-      sellers.forEach((seller) => {
-        const email = Object.keys(stats).find(e => stats[e].sales === seller.sales && stats[e].commission === seller.commission);
-        if (email) {
-          const resolvedName = nameMap.get(email.toLowerCase());
-          if (resolvedName) {
-            seller.name = resolvedName;
-          }
-        }
-      });
-    };
-    
-    resolveNames(sellersToday, todayData.sellerStats);
-    resolveNames(sellersWeek, weekData.sellerStats);
-    resolveNames(sellersMonth, payrollData.sellerStats);
-  }
-
-  // Get avatars for sellers
-  const sellerNames = new Set<string>();
-  [...sellersToday, ...sellersWeek, ...sellersMonth].forEach(s => sellerNames.add(s.name.toLowerCase()));
-  
-  const { data: employees } = await supabase
-    .from("employee_master_data")
-    .select("first_name, last_name, avatar_url")
-    .eq("is_active", true);
-
-  const avatarMap = new Map<string, string>();
-  (employees || []).forEach((emp: any) => {
-    const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
-    if (emp.avatar_url) {
-      avatarMap.set(fullName, emp.avatar_url);
-    }
-  });
-
-  // Add avatar URLs to sellers
-  const addAvatars = (sellers: any[]) => {
-    sellers.forEach(s => {
-      s.avatarUrl = avatarMap.get(s.name.toLowerCase()) || null;
-    });
-  };
-  
-  addAvatars(sellersToday);
-  addAvatars(sellersWeek);
-  addAvatars(sellersMonth);
 
   const result = {
     salesToday: todayData.totalSales,
@@ -1748,6 +1843,7 @@ async function handleRelatelData(
     sellersToday,
     sellersWeek,
     sellersMonth,
+    employeeGoals, // Include raw goals for frontend flexibility
   };
 
   console.log("[RelatelData] Returning:", {
@@ -1758,7 +1854,8 @@ async function handleRelatelData(
       today: sellersToday.length,
       week: sellersWeek.length,
       month: sellersMonth.length
-    }
+    },
+    goalsCount: Object.keys(employeeGoals).length
   });
 
   return new Response(JSON.stringify(result), {

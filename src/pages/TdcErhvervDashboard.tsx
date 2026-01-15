@@ -37,9 +37,10 @@ interface TvTdcData {
   hoursToday: number;
   hoursWeek: number;
   hoursPayroll: number;
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
-  sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
+  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
+  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
+  sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
+  employeeGoals?: Record<string, number>;
 }
 
 // Calculate payroll period (15th to 14th)
@@ -227,11 +228,19 @@ export default function TdcErhvervDashboard() {
   }, [payrollPeriod.start]);
 
   // Get goal info for an employee with period-relative expected progress
-  const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll') => {
-    const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-    if (!employeeId) return null;
+  // In TV mode, use goalTarget from seller data; otherwise use employeeGoals map
+  const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
+    let payrollTarget: number | undefined;
     
-    const payrollTarget = employeeGoals?.get(employeeId);
+    if (tvMode) {
+      // In TV mode, use the goalTarget passed from seller data
+      payrollTarget = sellerGoalTarget ?? undefined;
+    } else {
+      const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
+      if (!employeeId) return null;
+      payrollTarget = employeeGoals?.get(employeeId);
+    }
+    
     if (!payrollTarget) return null;
 
     // Calculate target for the specific period
