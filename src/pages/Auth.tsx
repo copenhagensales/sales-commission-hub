@@ -350,9 +350,22 @@ export default function Auth() {
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const authEndpoint = `${supabaseUrl}/auth/v1/token?grant_type=password`;
         
-        // Check API key status
+        // Check API key status - detailed debug
         const apikeyPresent = Boolean(supabaseKey && supabaseKey.length > 0);
         const apikeyLength = supabaseKey?.length || 0;
+        const apikeyType = typeof supabaseKey;
+        const apikeyFirst10 = supabaseKey ? supabaseKey.substring(0, 10) + '...' : 'N/A';
+        
+        // Also check all VITE env vars
+        const allViteEnvKeys = Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'));
+        
+        console.log('[Auth Diagnostic] ========== ENV VAR DEBUG ==========');
+        console.log('[Auth Diagnostic] All VITE_ env vars:', allViteEnvKeys);
+        console.log('[Auth Diagnostic] VITE_SUPABASE_URL:', supabaseUrl);
+        console.log('[Auth Diagnostic] VITE_SUPABASE_PUBLISHABLE_KEY type:', apikeyType);
+        console.log('[Auth Diagnostic] VITE_SUPABASE_PUBLISHABLE_KEY value:', apikeyPresent ? apikeyFirst10 : 'MISSING/EMPTY');
+        console.log('[Auth Diagnostic] VITE_SUPABASE_PUBLISHABLE_KEY length:', apikeyLength);
+        console.log('[Auth Diagnostic] Full import.meta.env:', JSON.stringify(import.meta.env, null, 2));
         
         // Initialize diagnostic summary
         const summary: DiagnosticSummary = {
@@ -368,8 +381,6 @@ export default function Auth() {
         
         console.log('[Auth Diagnostic] ========== LOGIN ATTEMPT ==========');
         console.log('[Auth Diagnostic] Hostname:', window.location.hostname);
-        console.log('[Auth Diagnostic] VITE_SUPABASE_URL:', supabaseUrl);
-        console.log('[Auth Diagnostic] VITE_SUPABASE_PUBLISHABLE_KEY present:', apikeyPresent, 'length:', apikeyLength);
         console.log('[Auth Diagnostic] Auth endpoint:', authEndpoint);
         
         // Check if we're online first
