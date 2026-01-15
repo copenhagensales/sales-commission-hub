@@ -72,6 +72,132 @@ const colorMap: Record<string, string> = {
   gray: "bg-muted text-muted-foreground",
 };
 
+// Recursive permission row component for multi-level hierarchy
+interface PermissionWithChildren {
+  id: string;
+  role_key: string;
+  permission_key: string;
+  parent_key: string | null;
+  permission_type: PermissionType | null;
+  can_view: boolean;
+  can_edit: boolean;
+  description: string | null;
+  children?: PermissionWithChildren[];
+}
+
+interface PermissionRowProps {
+  permission: PermissionWithChildren;
+  level: number;
+  rolePermissions: PermissionWithChildren[];
+  togglePermission: (permission: PermissionWithChildren, field: 'can_view' | 'can_edit') => void;
+  isChildDisabled: (child: PermissionWithChildren, field: 'can_view' | 'can_edit') => boolean;
+  openEditPermission: (permission: PermissionWithChildren) => void;
+  openNewPermission: (parentKey: string) => void;
+  deleteMutation: { mutate: (id: string) => void };
+}
+
+function PermissionRow({
+  permission,
+  level,
+  rolePermissions,
+  togglePermission,
+  isChildDisabled,
+  openEditPermission,
+  openNewPermission,
+  deleteMutation
+}: PermissionRowProps) {
+  const paddingLeft = level * 16;
+  const isTopLevel = level === 0;
+  const disabled = level > 0 && isChildDisabled(permission, 'can_view');
+  
+  return (
+    <>
+      <TableRow className={isTopLevel ? "bg-muted/30" : "bg-background"}>
+        <TableCell>
+          <div className="flex items-center gap-2" style={{ paddingLeft }}>
+            {level > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            {permissionTypeIcons[permission.permission_type || 'page']}
+            <span className="text-xs text-muted-foreground">
+              {permissionTypeLabels[permission.permission_type || 'page']}
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className="font-medium" style={{ paddingLeft: level > 0 ? paddingLeft + 8 : undefined }}>
+          {permissionKeyLabels[permission.permission_key] || permission.permission_key}
+        </TableCell>
+        <TableCell className="text-muted-foreground text-sm">
+          {permission.description}
+        </TableCell>
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center" title={disabled ? 'Slået fra - forælder er deaktiveret' : undefined}>
+            <Switch
+              checked={permission.can_view}
+              disabled={disabled}
+              onCheckedChange={() => togglePermission(permission, 'can_view')}
+              className={disabled ? 'opacity-50' : ''}
+            />
+          </div>
+        </TableCell>
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center" title={disabled ? 'Slået fra - forælder er deaktiveret' : undefined}>
+            <Switch
+              checked={permission.can_edit}
+              disabled={isChildDisabled(permission, 'can_edit')}
+              onCheckedChange={() => togglePermission(permission, 'can_edit')}
+              className={isChildDisabled(permission, 'can_edit') ? 'opacity-50' : ''}
+            />
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => openEditPermission(permission)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => openNewPermission(permission.permission_key)}
+              title="Tilføj fane/handling"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            {level > 0 && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  if (confirm('Er du sikker?')) {
+                    deleteMutation.mutate(permission.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+      {permission.can_view && permission.children?.map((child) => (
+        <PermissionRow
+          key={child.id}
+          permission={child}
+          level={level + 1}
+          rolePermissions={rolePermissions}
+          togglePermission={togglePermission}
+          isChildDisabled={isChildDisabled}
+          openEditPermission={openEditPermission}
+          openNewPermission={openNewPermission}
+          deleteMutation={deleteMutation}
+        />
+      ))}
+    </>
+  );
+}
+
 export function PermissionEditor() {
   const queryClient = useQueryClient();
   const { data: permissions = [], isLoading: permissionsLoading } = usePagePermissions();
@@ -94,16 +220,23 @@ export function PermissionEditor() {
     return acc;
   }, {} as Record<string, typeof extendedPermissions>);
 
-  // Get pages (no parent) and their children - fixed hierarchy logic
+  // Get multi-level hierarchy - now supports grandchildren
   const getPermissionHierarchy = (rolePermissions: typeof extendedPermissions) => {
-    // Pages are items WITHOUT a parent_key
-    const pages = rolePermissions.filter(p => !p.parent_key);
-    // Children are items WITH a parent_key
-    const children = rolePermissions.filter(p => p.parent_key);
+    // Top-level pages are items WITHOUT a parent_key
+    const topLevelPages = rolePermissions.filter(p => !p.parent_key);
     
-    return pages.map(page => ({
+    // Build nested children recursively
+    const getChildren = (parentKey: string): typeof extendedPermissions[0][] => {
+      const directChildren = rolePermissions.filter(p => p.parent_key === parentKey);
+      return directChildren.map(child => ({
+        ...child,
+        children: getChildren(child.permission_key)
+      })) as typeof extendedPermissions[0][];
+    };
+    
+    return topLevelPages.map(page => ({
       ...page,
-      children: children.filter(c => c.parent_key === page.permission_key)
+      children: getChildren(page.permission_key)
     }));
   };
 
@@ -354,116 +487,17 @@ export function PermissionEditor() {
               </TableHeader>
               <TableBody>
                 {hierarchy.map((page) => (
-                  <>
-                    <TableRow key={page.id} className="bg-muted/30">
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {permissionTypeIcons[page.permission_type || 'page']}
-                          <span className="text-xs text-muted-foreground">
-                            {permissionTypeLabels[page.permission_type || 'page']}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {permissionKeyLabels[page.permission_key] || page.permission_key}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {page.description}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={page.can_view}
-                          onCheckedChange={() => togglePermission(page, 'can_view')}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={page.can_edit}
-                          onCheckedChange={() => togglePermission(page, 'can_edit')}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => openEditPermission(page)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => openNewPermission(selectedRole, page.permission_key)}
-                            title="Tilføj fane/handling"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {page.can_view && page.children.map((child) => (
-                      <TableRow key={child.id} className="bg-background">
-                        <TableCell>
-                          <div className="flex items-center gap-2 pl-4">
-                            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                            {permissionTypeIcons[child.permission_type || 'tab']}
-                            <span className="text-xs text-muted-foreground">
-                              {permissionTypeLabels[child.permission_type || 'tab']}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium pl-6">
-                          {permissionKeyLabels[child.permission_key] || child.permission_key}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {child.description}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center" title={isChildDisabled(child, 'can_view') ? 'Slået fra - forælder er deaktiveret' : undefined}>
-                            <Switch
-                              checked={child.can_view}
-                              disabled={isChildDisabled(child, 'can_view')}
-                              onCheckedChange={() => togglePermission(child, 'can_view')}
-                              className={isChildDisabled(child, 'can_view') ? 'opacity-50' : ''}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center" title={isChildDisabled(child, 'can_edit') ? 'Slået fra - forælder er deaktiveret' : undefined}>
-                            <Switch
-                              checked={child.can_edit}
-                              disabled={isChildDisabled(child, 'can_edit')}
-                              onCheckedChange={() => togglePermission(child, 'can_edit')}
-                              className={isChildDisabled(child, 'can_edit') ? 'opacity-50' : ''}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => openEditPermission(child)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => {
-                                if (confirm('Er du sikker?')) {
-                                  deleteMutation.mutate(child.id);
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </>
+                  <PermissionRow 
+                    key={page.id}
+                    permission={page}
+                    level={0}
+                    rolePermissions={rolePermissions}
+                    togglePermission={togglePermission}
+                    isChildDisabled={isChildDisabled}
+                    openEditPermission={openEditPermission}
+                    openNewPermission={(parentKey) => openNewPermission(selectedRole, parentKey)}
+                    deleteMutation={deleteMutation}
+                  />
                 ))}
                 {hierarchy.length === 0 && (
                   <TableRow>
