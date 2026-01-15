@@ -97,6 +97,10 @@ const BOARDS_ITEMS = {
   menu_boards_sales: { name: "Sales Dashboard", href: "/boards/sales", icon: ShoppingCart },
 };
 
+const SALARY_ITEMS = {
+  menu_salary_types: { name: "Lønarter", href: "/salary/types", icon: Receipt },
+};
+
 export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,6 +114,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   const [vagtFlowOpen, setVagtFlowOpen] = useState(false);
   const [recruitmentOpen, setRecruitmentOpen] = useState(false);
   const [boardsOpen, setBoardsOpen] = useState(false);
+  const [salaryOpen, setSalaryOpen] = useState(false);
 
   // Helper to check if permission is enabled
   const hasPermission = (key: string): boolean => {
@@ -139,6 +144,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   const vagtFlowItems = getEnabledItems(VAGT_FLOW_ITEMS);
   const recruitmentItems = getEnabledItems(RECRUITMENT_ITEMS);
   const boardsItems = getEnabledItems(BOARDS_ITEMS);
+  const salaryItems = getEnabledItems(SALARY_ITEMS);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
@@ -274,6 +280,9 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
           
           {/* Boards submenu */}
           {renderCollapsibleMenu("Boards", Tv, boardsItems, boardsOpen, setBoardsOpen, ["/boards"])}
+          
+          {/* Salary submenu */}
+          {renderCollapsibleMenu("Løn", Wallet, salaryItems, salaryOpen, setSalaryOpen, ["/salary"])}
           
           {/* Settings */}
           {hasPermission("menu_settings") && (
