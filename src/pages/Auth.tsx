@@ -155,8 +155,37 @@ export default function Auth() {
         setIsResetMode(false);
         setExpiredLinkError(false);
       } else {
+        // ============ EMERGENCY LOGIN MODE ============
+        // Database is overloaded - bypass all pre-checks
+        // Only use Supabase Auth service directly
+        // TODO: Re-enable pre-checks when database is stable
+        
+        // Check if we're online first
+        if (!navigator.onLine) {
+          toast({
+            title: "Ingen internetforbindelse",
+            description: "Tjek din forbindelse og prøv igen.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // Direct login - no database pre-checks
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Velkommen tilbage!",
+          description: "Du er nu logget ind.",
+        });
+        
+        /* ============ DISABLED DURING EMERGENCY ============
         // Run work_email lookup and lock check in parallel with 3s timeouts
-        // This prevents login from hanging if database is slow
         const emailLookupPromise = withTimeout(
           Promise.resolve(supabase.rpc('get_auth_email_by_work_email', { _work_email: email }))
             .then(res => res.data),
@@ -172,73 +201,18 @@ export default function Auth() {
         ).catch(() => null);
 
         const [privateEmail, lockCheck] = await Promise.all([emailLookupPromise, lockCheckPromise]);
-
-        // Use private email if found, otherwise use entered email
         const authEmail = privateEmail || email;
 
-        // Check lock status (fail-open if timeout/error)
         if (lockCheck?.locked) {
           toast({
             title: "Konto låst",
-            description: lockCheck.message || "Din konto er midlertidigt låst. Kontakt din teamleder.",
+            description: lockCheck.message || "Din konto er midlertidigt låst.",
             variant: "destructive",
           });
           setLoading(false);
           return;
         }
-        
-        // Check if we're online first
-        if (!navigator.onLine) {
-          toast({
-            title: "Ingen internetforbindelse",
-            description: "Tjek din forbindelse og prøv igen.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // Login with retry logic for network failures
-        const maxAttempts = 3;
-        let loginSuccess = false;
-        
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          try {
-            // Show retry status on subsequent attempts
-            if (attempt > 0) {
-              setRetryStatus(`Forbinder... (forsøg ${attempt + 1}/${maxAttempts})`);
-            }
-            
-            const authResult = await withTimeout(
-              supabase.auth.signInWithPassword({
-                email: authEmail,
-                password,
-              }),
-              10000,
-              { data: { user: null, session: null }, error: { message: "Login tog for lang tid. Prøv igen.", name: "TimeoutError", status: 408 } as any }
-            );
-            if (authResult.error) throw authResult.error;
-            loginSuccess = true;
-            setRetryStatus(null);
-            toast({
-              title: "Velkommen tilbage!",
-              description: "Du er nu logget ind.",
-            });
-            break; // Success - exit retry loop
-          } catch (error: any) {
-            // Retry on network failure (up to maxAttempts - 1 retries)
-            if (error.message === "Failed to fetch" && attempt < maxAttempts - 1) {
-              console.log("[Auth] Network error on attempt", attempt + 1, "- retrying in 1.5s...");
-              await new Promise(r => setTimeout(r, 1500));
-              continue;
-            }
-            setRetryStatus(null);
-            throw error; // Re-throw for outer catch
-          }
-        }
-        if (!loginSuccess) {
-          throw new Error("Login mislykkedes efter flere forsøg.");
-        }
+        ============ END DISABLED ============ */
       }
     } catch (error: any) {
       let message = error.message;
