@@ -12,6 +12,7 @@ import FieldmarketingGoalsDashboard from "@/pages/dashboards/FieldmarketingGoals
 import EesyTmDashboard from "@/pages/EesyTmDashboard";
 import TdcErhvervDashboard from "@/pages/TdcErhvervDashboard";
 import RelatelDashboard from "@/pages/RelatelDashboard";
+import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 import { Loader2 } from "lucide-react";
 
 // Map dashboard slugs to components
@@ -27,6 +28,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "united": TeamDashboard,
   "tdc-erhverv-goals": TdcErhvervGoalsDashboard,
   "fieldmarketing-goals": FieldmarketingGoalsDashboard,
+  "cs-top-20": CsTop20Dashboard,
 };
 
 export default function TvBoardView() {

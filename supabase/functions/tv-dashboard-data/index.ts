@@ -43,6 +43,11 @@ Deno.serve(async (req) => {
       return await handleRelatelData(supabase, corsHeaders);
     }
 
+    // Handle cs-top-20-data request (bypasses RLS for TV boards)
+    if (action === "cs-top-20-data") {
+      return await handleCsTop20Data(supabase, corsHeaders);
+    }
+
     // Verify access code if provided
     if (accessCode) {
       const { data: accessData, error: accessError } = await supabase
@@ -1856,6 +1861,256 @@ async function handleRelatelData(
       month: sellersMonth.length
     },
     goalsCount: Object.keys(employeeGoals).length
+  });
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle CS Top 20 data request - all clients combined (bypasses RLS for TV boards)
+async function handleCsTop20Data(
+  supabase: any,
+  corsHeaders: Record<string, string>
+) {
+  console.log("[CsTop20Data] Fetching data for all clients");
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  
+  // Calculate week start (Monday)
+  const dayOfWeek = today.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - daysToMonday);
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+  
+  // Calculate payroll period (15th to 14th)
+  const currentDay = today.getDate();
+  let payrollStart: Date;
+  if (currentDay >= 15) {
+    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
+  } else {
+    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
+  }
+  const payrollStartStr = payrollStart.toISOString().split("T")[0];
+
+  const selectFields = "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
+
+  // Fetch today's sales - all clients with pagination
+  let salesToday: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: salesPage } = await supabase
+      .from("sales")
+      .select(selectFields)
+      .gte("sale_datetime", `${todayStr}T00:00:00`)
+      .lte("sale_datetime", `${todayStr}T23:59:59`)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (!salesPage || salesPage.length === 0) break;
+    salesToday = [...salesToday, ...salesPage];
+    if (salesPage.length < pageSize) break;
+    page++;
+  }
+
+  // Fetch week's sales - all clients with pagination
+  let salesWeek: any[] = [];
+  page = 0;
+  while (true) {
+    const { data: salesPage } = await supabase
+      .from("sales")
+      .select(selectFields)
+      .gte("sale_datetime", `${weekStartStr}T00:00:00`)
+      .lte("sale_datetime", `${todayStr}T23:59:59`)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (!salesPage || salesPage.length === 0) break;
+    salesWeek = [...salesWeek, ...salesPage];
+    if (salesPage.length < pageSize) break;
+    page++;
+  }
+
+  // Fetch payroll period sales - all clients with pagination
+  let salesPayroll: any[] = [];
+  page = 0;
+  while (true) {
+    const { data: salesPage } = await supabase
+      .from("sales")
+      .select(selectFields)
+      .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
+      .lte("sale_datetime", `${todayStr}T23:59:59`)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (!salesPage || salesPage.length === 0) break;
+    salesPayroll = [...salesPayroll, ...salesPage];
+    if (salesPage.length < pageSize) break;
+    page++;
+  }
+
+  console.log(`[CsTop20Data] Fetched: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesPayroll.length}`);
+
+  // Get unique agent emails from all sales
+  const allAgentEmails = new Set<string>();
+  [...salesToday, ...salesWeek, ...salesPayroll].forEach((sale: any) => {
+    if (sale.agent_email) {
+      allAgentEmails.add(sale.agent_email.toLowerCase());
+    }
+  });
+
+  // Resolve agent emails to employee names, avatars, and IDs
+  const emailToNameMap = new Map<string, string>();
+  const emailToAvatarMap = new Map<string, string>();
+  const emailToIdMap = new Map<string, string>();
+  let employeeIds: string[] = [];
+  
+  if (allAgentEmails.size > 0) {
+    const { data: allAgents } = await supabase
+      .from("agents")
+      .select("id, email");
+    
+    if (allAgents && allAgents.length > 0) {
+      const matchingAgents = (allAgents as any[]).filter(
+        (a) => a.email && allAgentEmails.has(a.email.toLowerCase())
+      );
+      
+      if (matchingAgents.length > 0) {
+        const agentIds = matchingAgents.map((a) => a.id);
+        const emailToAgentId = new Map<string, string>(
+          matchingAgents.map((a) => [a.email.toLowerCase(), a.id])
+        );
+        
+        const { data: mappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, employee_id")
+          .in("agent_id", agentIds);
+        
+        if (mappings && mappings.length > 0) {
+          employeeIds = (mappings as any[]).map((m) => m.employee_id);
+          const agentIdToEmployeeId = new Map<string, string>(
+            (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
+          );
+          
+          const { data: employees } = await supabase
+            .from("employee_master_data")
+            .select("id, first_name, last_name, avatar_url")
+            .in("id", employeeIds);
+          
+          if (employees) {
+            const employeeIdToData = new Map<string, any>(
+              (employees as any[]).map((e) => [e.id, e])
+            );
+            
+            for (const agent of matchingAgents) {
+              const agentEmail = agent.email?.toLowerCase();
+              if (!agentEmail) continue;
+              
+              const employeeId = agentIdToEmployeeId.get(agent.id);
+              if (!employeeId) continue;
+              
+              const emp = employeeIdToData.get(employeeId);
+              if (!emp) continue;
+              
+              const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+              emailToNameMap.set(agentEmail, fullName);
+              emailToIdMap.set(agentEmail, emp.id);
+              if (emp.avatar_url) {
+                emailToAvatarMap.set(agentEmail, emp.avatar_url);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.log("[CsTop20Data] Resolved names:", emailToNameMap.size, "agents");
+
+  // Fetch employee sales goals for the payroll period
+  let employeeGoals: Record<string, number> = {};
+  if (employeeIds.length > 0) {
+    const { data: goals } = await supabase
+      .from("employee_sales_goals")
+      .select("employee_id, target_amount")
+      .in("employee_id", employeeIds)
+      .gte("period_start", payrollStartStr)
+      .lte("period_start", payrollStartStr);
+    
+    (goals || []).forEach((g: any) => {
+      employeeGoals[g.employee_id] = g.target_amount;
+    });
+    console.log("[CsTop20Data] Fetched goals for", Object.keys(employeeGoals).length, "employees");
+  }
+
+  // Calculate totals and seller stats
+  const calculateTotals = (sales: any[]) => {
+    let totalSales = 0;
+    let totalCommission = 0;
+    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }> = {};
+
+    sales?.forEach((sale) => {
+      const agentEmail = sale.agent_email || "Unknown";
+      const emailLower = agentEmail.toLowerCase();
+      
+      if (!sellerStats[emailLower]) {
+        const resolvedName = emailToNameMap.get(emailLower) || agentEmail.split("@")[0];
+        sellerStats[emailLower] = { 
+          email: agentEmail,
+          name: resolvedName, 
+          sales: 0, 
+          commission: 0,
+          avatarUrl: emailToAvatarMap.get(emailLower),
+          employeeId: emailToIdMap.get(emailLower)
+        };
+      }
+
+      sale.sale_items?.forEach((item: any) => {
+        const countsAsSale = item.products?.counts_as_sale !== false;
+        if (countsAsSale) {
+          totalSales += Number(item.quantity) || 1;
+          sellerStats[emailLower].sales += Number(item.quantity) || 1;
+        }
+        totalCommission += Number(item.mapped_commission) || 0;
+        sellerStats[emailLower].commission += Number(item.mapped_commission) || 0;
+      });
+    });
+
+    return { totalSales, totalCommission, sellerStats };
+  };
+
+  const todayData = calculateTotals(salesToday);
+  const weekData = calculateTotals(salesWeek);
+  const payrollData = calculateTotals(salesPayroll);
+
+  // Build sorted seller arrays for each period with goal info - TOP 20
+  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
+    return Object.values(sellerStats)
+      .filter(s => s.sales > 0)
+      .map(s => ({
+        ...s,
+        goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null
+      }))
+      .sort((a, b) => b.commission - a.commission)
+      .slice(0, 20);
+  };
+
+  const sellersToday = buildSellerArray(todayData.sellerStats);
+  const sellersWeek = buildSellerArray(weekData.sellerStats);
+  const sellersPayroll = buildSellerArray(payrollData.sellerStats);
+
+  const result = {
+    sellersToday,
+    sellersWeek,
+    sellersPayroll,
+  };
+
+  console.log("[CsTop20Data] Returning:", {
+    sellerCounts: {
+      today: sellersToday.length,
+      week: sellersWeek.length,
+      payroll: sellersPayroll.length
+    }
   });
 
   return new Response(JSON.stringify(result), {
