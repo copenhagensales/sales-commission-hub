@@ -244,18 +244,10 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_dashboard: 'Dashboard',
   menu_employees: 'Medarbejdere',
   menu_teams: 'Teams',
-  menu_shifts: 'Vagter',
   menu_payroll: 'Løn',
   menu_sales: 'Salg',
-  menu_recruitment: 'Rekruttering',
-  menu_onboarding: 'Onboarding',
-  menu_coaching: 'Coaching',
   menu_settings: 'Indstillinger',
-  menu_integrations: 'Integrationer',
   menu_absence: 'Fravær',
-  menu_content: 'Indhold',
-  menu_chat: 'Chat',
-  menu_economy: 'Økonomi',
   menu_permissions: 'Rettigheder',
   menu_salary_types: 'Løntyper',
   menu_leaderboard: 'Leaderboard',
@@ -264,6 +256,10 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_my_absence: 'Mit fravær',
   menu_my_profile: 'Min profil',
   menu_my_coaching: 'Min coaching',
+  // Rettede keys (matcher sidebar)
+  menu_onboarding_admin: 'Onboarding Admin',
+  menu_recruitment_dashboard: 'Rekruttering Dashboard',
+  menu_shift_overview: 'Vagtplan Oversigt',
 };
 
 export const dataScopeLabels: Record<string, string> = {
