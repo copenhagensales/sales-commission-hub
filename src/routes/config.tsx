@@ -79,6 +79,7 @@ import {
   LoginLog,
   TeamDashboard,
   EesyTmDashboard,
+  UnitedDashboard,
   FieldmarketingDashboardFull,
   CphSalesDashboard,
   DashboardSettings,
@@ -353,7 +354,7 @@ export const routes: RouteConfig[] = [
     access: "role",
     positionPermission: "menu_dashboard_eesy_tm",
   },
-  { path: "/dashboards/united", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard_united" },
+  { path: "/dashboards/united", component: UnitedDashboard, access: "role", positionPermission: "menu_dashboard_united" },
 
   {
     path: "/dashboards/settings",
