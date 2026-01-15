@@ -138,6 +138,16 @@ const loginWithRetry = async (
   }
 };
 
+// Diagnostic summary type
+interface DiagnosticSummary {
+  timestamp: string;
+  hostname: string;
+  supabaseUrl: string;
+  authEndpoint: string;
+  healthCheck: { status: string; time: number } | null;
+  loginAttempt: { outcome: string; errorName?: string; errorMessage?: string; time: number } | null;
+}
+
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -152,6 +162,7 @@ export default function Auth() {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [diagSummary, setDiagSummary] = useState<DiagnosticSummary | null>(null);
   const { toast } = useToast();
   const { mustChangePassword, clearMustChangePassword, user, loading: authLoading } = useAuth();
   
@@ -332,8 +343,24 @@ export default function Auth() {
         setIsResetMode(false);
         setExpiredLinkError(false);
       } else {
-        // ============ ROBUST LOGIN MODE ============
-        // With retry logic and health checks
+        // ============ DIAGNOSTIC LOGIN MODE ============
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const authEndpoint = `${supabaseUrl}/auth/v1/token?grant_type=password`;
+        
+        // Initialize diagnostic summary
+        const summary: DiagnosticSummary = {
+          timestamp: new Date().toISOString(),
+          hostname: window.location.hostname,
+          supabaseUrl: supabaseUrl.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].'),
+          authEndpoint: authEndpoint.replace(/https:\/\/([^.]+)\./, 'https://[PROJECT_ID].'),
+          healthCheck: null,
+          loginAttempt: null,
+        };
+        
+        console.log('[Auth Diagnostic] ========== LOGIN ATTEMPT ==========');
+        console.log('[Auth Diagnostic] Hostname:', window.location.hostname);
+        console.log('[Auth Diagnostic] VITE_SUPABASE_URL:', supabaseUrl);
+        console.log('[Auth Diagnostic] Auth endpoint:', authEndpoint);
         
         // Check if we're online first
         if (!navigator.onLine) {
@@ -346,32 +373,88 @@ export default function Auth() {
           return;
         }
         
-        // Pre-flight health check - but allow login to proceed anyway
-        setRetryStatus("Tjekker server...");
-        await checkAuthHealth(); // Result is logged, but we proceed regardless
+        // ===== HEALTH CHECK WITH TIMING =====
+        setRetryStatus("Tjekker server health...");
+        const healthStart = Date.now();
+        try {
+          const controller = new AbortController();
+          const healthTimeout = setTimeout(() => controller.abort(), 10000);
+          
+          const healthRes = await fetch(
+            `${supabaseUrl}/auth/v1/health`,
+            { 
+              signal: controller.signal,
+              headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }
+            }
+          );
+          clearTimeout(healthTimeout);
+          
+          const healthTime = Date.now() - healthStart;
+          summary.healthCheck = { 
+            status: `${healthRes.status} ${healthRes.statusText}`, 
+            time: healthTime 
+          };
+          console.log(`[Auth Diagnostic] Health check: ${healthRes.status} in ${healthTime}ms`);
+        } catch (healthErr: any) {
+          const healthTime = Date.now() - healthStart;
+          summary.healthCheck = { 
+            status: `ERROR: ${healthErr.name} - ${healthErr.message}`, 
+            time: healthTime 
+          };
+          console.log(`[Auth Diagnostic] Health check FAILED after ${healthTime}ms:`, healthErr.name, healthErr.message);
+        }
         
-        // Login with retry logic
+        // ===== LOGIN ATTEMPT WITH TIMING =====
         setRetryStatus(null);
         setRetryAttempt(1);
         
-        const { data, error } = await loginWithRetry(
-          email,
-          password,
-          (attempt) => {
-            setRetryAttempt(attempt);
-            setRetryStatus(`Serveren svarer langsomt - forsøg ${attempt}/3...`);
+        const loginStart = Date.now();
+        try {
+          const { data, error } = await loginWithRetry(
+            email,
+            password,
+            (attempt) => {
+              setRetryAttempt(attempt);
+              setRetryStatus(`Serveren svarer langsomt - forsøg ${attempt}/3...`);
+            }
+          );
+          
+          const loginTime = Date.now() - loginStart;
+          
+          if (error) {
+            summary.loginAttempt = {
+              outcome: 'AUTH_ERROR',
+              errorName: error.name || 'AuthError',
+              errorMessage: error.message,
+              time: loginTime,
+            };
+            setDiagSummary(summary);
+            throw error;
           }
-        );
-        
-        setRetryAttempt(0);
-        setRetryStatus(null);
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Velkommen tilbage!",
-          description: "Du er nu logget ind.",
-        });
+          
+          summary.loginAttempt = { outcome: 'SUCCESS', time: loginTime };
+          setDiagSummary(summary);
+          console.log(`[Auth Diagnostic] Login SUCCESS in ${loginTime}ms`);
+          
+          setRetryAttempt(0);
+          setRetryStatus(null);
+          
+          toast({
+            title: "Velkommen tilbage!",
+            description: "Du er nu logget ind.",
+          });
+        } catch (loginErr: any) {
+          const loginTime = Date.now() - loginStart;
+          summary.loginAttempt = {
+            outcome: loginErr.message === 'LOGIN_TIMEOUT' ? 'TIMEOUT_15S' : 'EXCEPTION',
+            errorName: loginErr.name,
+            errorMessage: loginErr.message,
+            time: loginTime,
+          };
+          setDiagSummary(summary);
+          console.log(`[Auth Diagnostic] Login FAILED after ${loginTime}ms`);
+          throw loginErr;
+        }
         
         /* ============ DISABLED DURING EMERGENCY ============
         // Run work_email lookup and lock check in parallel with 3s timeouts
@@ -506,6 +589,41 @@ export default function Auth() {
             Løn- og performance-system
           </p>
         </div>
+        
+        {/* DIAGNOSTIC SUMMARY - Always visible after login attempt */}
+        {diagSummary && (
+          <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 p-4 font-mono text-xs">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-semibold text-orange-600">🔍 Login Diagnostic Summary</span>
+              <Button size="sm" variant="ghost" onClick={() => setDiagSummary(null)}>
+                ✕
+              </Button>
+            </div>
+            <div className="space-y-2 text-foreground">
+              <div><strong>Tid:</strong> {diagSummary.timestamp}</div>
+              <div><strong>Hostname:</strong> {diagSummary.hostname}</div>
+              <div><strong>Supabase URL:</strong> {diagSummary.supabaseUrl}</div>
+              <div><strong>Auth Endpoint:</strong> {diagSummary.authEndpoint}</div>
+              <div className="border-t border-orange-500/30 pt-2 mt-2">
+                <strong>Health Check:</strong>{' '}
+                {diagSummary.healthCheck 
+                  ? `${diagSummary.healthCheck.status} (${diagSummary.healthCheck.time}ms)`
+                  : 'Not run'}
+              </div>
+              <div className="border-t border-orange-500/30 pt-2">
+                <strong>Login Attempt:</strong>{' '}
+                {diagSummary.loginAttempt 
+                  ? `${diagSummary.loginAttempt.outcome} (${diagSummary.loginAttempt.time}ms)`
+                  : 'Not run'}
+              </div>
+              {diagSummary.loginAttempt?.errorName && (
+                <div className="text-red-500">
+                  <strong>Error:</strong> {diagSummary.loginAttempt.errorName}: {diagSummary.loginAttempt.errorMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Hidden diagnostics panel */}
         {showDiagnostics && (
