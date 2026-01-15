@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
@@ -16,6 +16,17 @@ const isTvMode = () => {
   return window.location.pathname.startsWith('/tv/') || 
          window.location.pathname.startsWith('/t/') || 
          sessionStorage.getItem('tv_board_code') !== null;
+};
+
+// Auto-reload page every 5 minutes to pick up code/layout changes
+const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => {
+      window.location.reload();
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [enabled, intervalMs]);
 };
 
 interface TvRelatelData {
@@ -66,6 +77,9 @@ const getCommissionColor = (commission: number, maxCommission: number) => {
 export default function RelatelDashboard() {
   const tvMode = isTvMode();
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
+  
+  // Auto-reload for TV mode to pick up layout/code changes
+  useAutoReload(tvMode);
 
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
