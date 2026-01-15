@@ -170,11 +170,16 @@ export default function Auth() {
           return;
         }
         
-        const { error } = await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password,
-        });
-        if (error) throw error;
+        // Add timeout to signInWithPassword to prevent hanging
+        const authResult = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email: authEmail,
+            password,
+          }),
+          10000,
+          { data: { user: null, session: null }, error: { message: "Login tog for lang tid. Prøv igen.", name: "TimeoutError", status: 408 } as any }
+        );
+        if (authResult.error) throw authResult.error;
         toast({
           title: "Velkommen tilbage!",
           description: "Du er nu logget ind.",
