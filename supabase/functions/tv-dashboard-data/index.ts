@@ -404,6 +404,7 @@ Deno.serve(async (req) => {
 });
 
 // Helper function to resolve agent email to display name
+// OPTIMIZED: Uses filtered queries instead of fetching all agents
 async function resolveAgentNames(
   supabase: any,
   agentEmails: string[]
@@ -414,32 +415,42 @@ async function resolveAgentNames(
   
   // Normalize emails to lowercase for consistent matching
   const lowerEmails = agentEmails.map(e => e.toLowerCase());
-  const uniqueLowerEmails = [...new Set(lowerEmails)];
+  const uniqueLowerEmails = [...new Set(lowerEmails)].slice(0, 100); // Limit to 100 emails max
   
-  // Get all agents and filter case-insensitively (agents table might have different casing)
-  const { data: allAgents } = await supabase
+  if (uniqueLowerEmails.length === 0) return nameMap;
+  
+  // OPTIMIZED: Fetch only matching agents using .in() filter with limit
+  const { data: matchingAgents } = await supabase
     .from("agents")
-    .select("id, email");
+    .select("id, email")
+    .in("email", uniqueLowerEmails)
+    .limit(100);
   
-  if (!allAgents || allAgents.length === 0) return nameMap;
+  if (!matchingAgents || matchingAgents.length === 0) {
+    // Fallback: try case-insensitive match for first few emails
+    const firstEmails = uniqueLowerEmails.slice(0, 10);
+    const orFilter = firstEmails.map(e => `email.ilike.${e}`).join(',');
+    const { data: fallbackAgents } = await supabase
+      .from("agents")
+      .select("id, email")
+      .or(orFilter)
+      .limit(50);
+    
+    if (!fallbackAgents || fallbackAgents.length === 0) return nameMap;
+    matchingAgents.push(...fallbackAgents);
+  }
   
-  // Filter agents that match our emails (case-insensitive)
-  const matchingAgents = (allAgents as any[]).filter(
-    (a) => a.email && uniqueLowerEmails.includes(a.email.toLowerCase())
-  );
-  
-  if (matchingAgents.length === 0) return nameMap;
-  
-  const agentIds = matchingAgents.map((a) => a.id);
+  const agentIds = matchingAgents.map((a: any) => a.id);
   const emailToAgentId = new Map<string, string>(
-    matchingAgents.map((a) => [a.email.toLowerCase(), a.id])
+    matchingAgents.map((a: any) => [a.email.toLowerCase(), a.id])
   );
   
-  // Get employee mappings
+  // Get employee mappings - only for matched agents
   const { data: mappings } = await supabase
     .from("employee_agent_mapping")
     .select("agent_id, employee_id")
-    .in("agent_id", agentIds);
+    .in("agent_id", agentIds)
+    .limit(100);
   
   if (!mappings || mappings.length === 0) return nameMap;
   
@@ -448,11 +459,12 @@ async function resolveAgentNames(
     (mappings as any[]).map((m) => [m.agent_id, m.employee_id])
   );
   
-  // Get employee names from master data (first_name + last_name, no full_name column)
+  // Get employee names from master data
   const { data: employees } = await supabase
     .from("employee_master_data")
     .select("id, first_name, last_name")
-    .in("id", employeeIds);
+    .in("id", employeeIds)
+    .limit(100);
   
   if (!employees) return nameMap;
   
