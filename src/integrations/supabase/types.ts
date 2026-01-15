@@ -6482,6 +6482,7 @@ export type Database = {
           permission_type: string | null
           role_key: string
           updated_at: string | null
+          visibility: string | null
         }
         Insert: {
           can_edit?: boolean | null
@@ -6494,6 +6495,7 @@ export type Database = {
           permission_type?: string | null
           role_key: string
           updated_at?: string | null
+          visibility?: string | null
         }
         Update: {
           can_edit?: boolean | null
@@ -6506,6 +6508,7 @@ export type Database = {
           permission_type?: string | null
           role_key?: string
           updated_at?: string | null
+          visibility?: string | null
         }
         Relationships: [
           {

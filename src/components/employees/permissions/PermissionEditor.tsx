@@ -107,6 +107,7 @@ interface PermissionWithChildren {
   can_view: boolean;
   can_edit: boolean;
   description: string | null;
+  visibility?: 'all' | 'team' | 'self';
   children?: PermissionWithChildren[];
 }
 
@@ -119,6 +120,7 @@ interface PermissionRowProps {
   openEditPermission: (permission: PermissionWithChildren) => void;
   openNewPermission: (parentKey: string) => void;
   deleteMutation: { mutate: (id: string) => void };
+  updateRowVisibility: (permission: PermissionWithChildren, visibility: 'all' | 'team' | 'self') => void;
 }
 
 function PermissionRow({
@@ -129,7 +131,8 @@ function PermissionRow({
   isChildDisabled,
   openEditPermission,
   openNewPermission,
-  deleteMutation
+  deleteMutation,
+  updateRowVisibility
 }: PermissionRowProps) {
   const paddingLeft = level * 16;
   const isTopLevel = level === 0;
@@ -173,15 +176,36 @@ function PermissionRow({
             />
           </div>
         </TableCell>
-        {/* Empty cells for visibility columns - not applicable for page access rows */}
+        {/* Data visibility columns - active for all rows */}
         <TableCell className="text-center">
-          <span className="text-muted-foreground text-xs">—</span>
+          <div className="flex items-center justify-center">
+            <Switch
+              checked={permission.visibility === 'all'}
+              disabled={disabled || !permission.can_view}
+              onCheckedChange={() => updateRowVisibility(permission, 'all')}
+              className={disabled || !permission.can_view ? 'opacity-50' : ''}
+            />
+          </div>
         </TableCell>
         <TableCell className="text-center">
-          <span className="text-muted-foreground text-xs">—</span>
+          <div className="flex items-center justify-center">
+            <Switch
+              checked={permission.visibility === 'team'}
+              disabled={disabled || !permission.can_view}
+              onCheckedChange={() => updateRowVisibility(permission, 'team')}
+              className={disabled || !permission.can_view ? 'opacity-50' : ''}
+            />
+          </div>
         </TableCell>
         <TableCell className="text-center">
-          <span className="text-muted-foreground text-xs">—</span>
+          <div className="flex items-center justify-center">
+            <Switch
+              checked={permission.visibility === 'self'}
+              disabled={disabled || !permission.can_view}
+              onCheckedChange={() => updateRowVisibility(permission, 'self')}
+              className={disabled || !permission.can_view ? 'opacity-50' : ''}
+            />
+          </div>
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
@@ -227,6 +251,7 @@ function PermissionRow({
           openEditPermission={openEditPermission}
           openNewPermission={openNewPermission}
           deleteMutation={deleteMutation}
+          updateRowVisibility={updateRowVisibility}
         />
       ))}
     </>
@@ -633,6 +658,32 @@ export function PermissionEditor() {
     }
   };
 
+  // Update row visibility directly on permission row
+  const updateRowVisibility = async (permission: PermissionWithChildren, newVisibility: 'all' | 'team' | 'self') => {
+    console.log('updateRowVisibility called:', { permissionId: permission.id, newVisibility });
+    
+    const { data, error } = await supabase
+      .from('role_page_permissions')
+      .update({ visibility: newVisibility })
+      .eq('id', permission.id)
+      .select();
+
+    if (error) {
+      console.error('Visibility update error:', error);
+      toast.error(`Kunne ikke opdatere synlighed: ${error.message}`);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      console.error('No rows updated - RLS may be blocking');
+      toast.error('Ingen rækker opdateret - kontroller rettigheder i databasen');
+      return;
+    }
+
+    toast.success('Data-synlighed opdateret');
+    queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+  };
+
   if (permissionsLoading || rolesLoading || visibilityLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -810,6 +861,7 @@ export function PermissionEditor() {
                     openEditPermission={openEditPermission}
                     openNewPermission={(parentKey) => openNewPermission(selectedRole, parentKey)}
                     deleteMutation={deleteMutation}
+                    updateRowVisibility={updateRowVisibility}
                   />
                 ))}
                 {hierarchy.length === 0 && (

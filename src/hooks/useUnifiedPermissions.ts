@@ -28,6 +28,7 @@ export interface PagePermission {
   can_view: boolean;
   can_edit: boolean;
   description: string | null;
+  visibility: 'all' | 'team' | 'self' | null;
 }
 
 export interface DataVisibilityRule {
