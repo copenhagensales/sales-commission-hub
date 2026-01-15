@@ -1229,6 +1229,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     Dagsboard CPH Sales
                   </NavLink>
                 )}
+                {p.canViewDashboardCphSales && (
+                  <NavLink to="/dashboards/cs-top-20" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/cs-top-20" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    CS Top 20
+                  </NavLink>
+                )}
                 {p.canViewDashboardFieldmarketing && (
                   <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
