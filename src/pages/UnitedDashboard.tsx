@@ -181,9 +181,9 @@ export default function UnitedDashboard() {
     enabled: !tvMode && !!unitedTeamId
   });
 
-  // Fetch per-client sales data with hours for sales/time calculation
+  // Fetch per-client sales data with actual hours using useDashboardSalesData pattern
   const { data: clientSalesData } = useQuery({
-    queryKey: ["united-client-sales", teamClients?.map((c: any) => c.id), today.toISOString()],
+    queryKey: ["united-client-sales-v2", teamClients?.map((c: any) => c.id), today.toISOString(), payrollPeriod.start.toISOString()],
     queryFn: async () => {
       if (!teamClients || teamClients.length === 0) return [];
 
@@ -202,15 +202,13 @@ export default function UnitedDashboard() {
               salesToday: 0,
               salesWeek: 0,
               salesMonth: 0,
-              hoursToday: 0,
-              hoursWeek: 0,
               hoursMonth: 0
             };
           }
 
           const campaignIds = campaigns.map(c => c.id);
 
-          // Fetch sales with proper counting and hours from timestamps
+          // Fetch sales with proper counting
           const [todaySales, weekSales, monthSales] = await Promise.all([
             supabase
               .from("sales")
@@ -248,15 +246,97 @@ export default function UnitedDashboard() {
             salesToday: countSales(todaySales),
             salesWeek: countSales(weekSales),
             salesMonth: countSales(monthSales),
-            // Hours will be calculated from the aggregate data
-            hoursToday: 0,
-            hoursWeek: 0,
-            hoursMonth: 0
+            hoursMonth: 0 // Will be enriched below
           };
         })
       );
 
       return results.sort((a, b) => b.salesMonth - a.salesMonth);
+    },
+    enabled: !tvMode && !!teamClients && teamClients.length > 0
+  });
+
+  // Fetch actual hours per client using shift data
+  const clientHoursQueries = useQuery({
+    queryKey: ["united-client-hours", teamClients?.map((c: any) => c.id), payrollPeriod.start.toISOString()],
+    queryFn: async () => {
+      if (!teamClients || teamClients.length === 0) return new Map<string, number>();
+
+      const hoursMap = new Map<string, number>();
+      
+      await Promise.all(
+        teamClients.map(async (client: any) => {
+          // Get agent mappings for this client using agents table
+          const { data: agents } = await supabase
+            .from("agents")
+            .select("id, email")
+            .eq("is_active", true);
+
+          // Get employees for this client's campaigns
+          const { data: campaigns } = await supabase
+            .from("client_campaigns")
+            .select("id")
+            .eq("client_id", client.id);
+
+          if (!campaigns || campaigns.length === 0) {
+            hoursMap.set(client.id, 0);
+            return;
+          }
+
+          // Get sales for this client to find active sellers
+          const { data: sales } = await supabase
+            .from("sales")
+            .select("agent_name, agent_email")
+            .in("client_campaign_id", campaigns.map(c => c.id))
+            .gte("sale_datetime", payrollPeriod.start.toISOString());
+
+          const agentEmails = [...new Set((sales || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean))];
+          
+          if (agentEmails.length === 0) {
+            hoursMap.set(client.id, 0);
+            return;
+          }
+
+          // Get employees by email
+          const { data: employees } = await supabase
+            .from("employee")
+            .select("id, email")
+            .in("email", agentEmails as string[]);
+
+          const employeeIds = (employees || []).map(e => e.id);
+
+          if (employeeIds.length === 0) {
+            hoursMap.set(client.id, 0);
+            return;
+          }
+
+          // Get shifts for these employees in payroll period
+          const { data: shifts } = await supabase
+            .from("shift")
+            .select("employee_id, start_time, end_time, break_minutes")
+            .in("employee_id", employeeIds)
+            .gte("date", format(payrollPeriod.start, "yyyy-MM-dd"))
+            .lte("date", format(new Date(), "yyyy-MM-dd"));
+
+          let totalHours = 0;
+          (shifts || []).forEach(shift => {
+            if (shift.start_time && shift.end_time) {
+              const start = new Date(`2000-01-01T${shift.start_time}`);
+              const end = new Date(`2000-01-01T${shift.end_time}`);
+              let diffMs = end.getTime() - start.getTime();
+              if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+              let hours = diffMs / (1000 * 60 * 60);
+              const breakMins = shift.break_minutes ?? (hours > 6 ? 30 : 0);
+              hours -= breakMins / 60;
+              totalHours += Math.max(0, hours);
+            }
+          });
+
+          hoursMap.set(client.id, totalHours);
+        })
+      );
+
+      return hoursMap;
     },
     enabled: !tvMode && !!teamClients && teamClients.length > 0
   });
@@ -379,15 +459,9 @@ export default function UnitedDashboard() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {effectiveClientSales.map((client, index) => {
-                  // Calculate sales per hour for each client using aggregate hours
-                  const totalSales = client.salesToday + client.salesWeek + client.salesMonth;
-                  const clientShare = payrollSalesData.totalSales > 0 
-                    ? totalSales / (payrollSalesData.totalSales * 3)
-                    : 0;
-                  const estimatedHours = payrollSalesData.totalHours * clientShare;
-                  const salesPerHour = estimatedHours > 0 
-                    ? client.salesMonth / Math.max(estimatedHours, 1) 
-                    : client.salesMonth > 0 ? client.salesMonth : 0;
+                  // Get actual hours for this client from the hours query
+                  const clientHours = clientHoursQueries.data?.get(client.clientId) || 0;
+                  const salesPerHour = clientHours > 0 ? client.salesMonth / clientHours : 0;
                   
                   return (
                     <div 
@@ -419,9 +493,7 @@ export default function UnitedDashboard() {
                           <TrendingUp className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">Salg/time:</span>
                           <span className="text-sm font-semibold text-primary">
-                            {client.salesMonth > 0 && payrollSalesData.totalHours > 0
-                              ? (client.salesMonth / (payrollSalesData.totalHours / Math.max(effectiveClientSales.length, 1))).toFixed(2)
-                              : "–"}
+                            {salesPerHour > 0 ? salesPerHour.toFixed(2) : "–"}
                           </span>
                         </div>
                       </div>
