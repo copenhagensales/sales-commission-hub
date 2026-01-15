@@ -178,21 +178,9 @@ export function useCanAccess() {
   const { data: rolesData, isPending, isLoading: queryLoading } = useCurrentUserRoles();
   const { isPreviewMode, previewRole } = useRolePreview();
 
-  // PRIMARY: Fetch system_role from employee's position
-  const { data: employeeData, isLoading: employeeLoading } = useQuery({
-    queryKey: ["employee-position-role", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("position_id, positions(name, system_role)")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user && !authLoading,
-    staleTime: 1000 * 60,
-  });
+  // Note: positions table was removed - rely solely on system_roles table now
+  const employeeLoading = false;
+  const employeeData = null;
 
   // Show loading if no user yet, or if query is still loading
   const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading || employeeLoading));
