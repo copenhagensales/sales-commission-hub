@@ -146,7 +146,7 @@ export function usePositionPermissions() {
     refetchOnMount: 'always', // Only refetch if stale
     refetchOnReconnect: false, // Don't refetch on reconnect - keep cached value
     retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff: 1s, 2s, 4s, max 10s
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s, max 5s
   });
 }
 
@@ -175,11 +175,16 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
-  const { data, isLoading, isFetched, isError, error } = usePositionPermissions();
+  const { data, isLoading, isFetched, isError, error, isFetching, isPending } = usePositionPermissions();
   const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
   
   // Consider loading only on initial fetch - once we have data, don't show loading on refetches
-  const actuallyLoading = isLoading || (!isFetched && !data);
+  // Include isPending to properly catch initial query states
+  const actuallyLoading = isLoading || isPending || (!isFetched && !data);
+  
+  // isRetrying = actively fetching but no valid position data yet
+  // This prevents false "deactivated" messages during database retry attempts
+  const isRetrying = isFetching && !data?.position;
   
   // Use preview permissions when in preview mode, otherwise use actual permissions
   const permissions = isPreviewMode && previewPermissions 
@@ -227,6 +232,7 @@ export function usePermissions() {
 
   return {
     isLoading: actuallyLoading,
+    isRetrying, // True during database retries - prevents false "deactivated" messages
     isError,
     error,
     isPreviewMode,
