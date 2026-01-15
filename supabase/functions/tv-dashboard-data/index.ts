@@ -33,6 +33,11 @@ Deno.serve(async (req) => {
       return await handleEesyTmData(supabase, corsHeaders);
     }
 
+    // Handle tdc-erhverv-data request (bypasses RLS for TV boards)
+    if (action === "tdc-erhverv-data") {
+      return await handleTdcErhvervData(supabase, corsHeaders);
+    }
+
     // Verify access code if provided
     if (accessCode) {
       const { data: accessData, error: accessError } = await supabase
@@ -1175,6 +1180,123 @@ async function handleEesyTmData(
   };
 
   console.log("[EesyTmData] Returning:", result);
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle TDC Erhverv data request (bypasses RLS for TV boards)
+async function handleTdcErhvervData(
+  supabase: any,
+  corsHeaders: Record<string, string>
+) {
+  console.log("[TdcErhvervData] Fetching data");
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  
+  // Calculate week start (Monday)
+  const dayOfWeek = today.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - daysToMonday);
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+  
+  // Calculate month start
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthStartStr = monthStart.toISOString().split("T")[0];
+
+  // TDC Erhverv client ID
+  const TDC_ERHVERV_CLIENT_ID = "87c3e0cf-7c46-4428-ae4e-ee19ca7fa6c2";
+
+  const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
+
+  // Fetch today's sales
+  const { data: salesToday } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
+    .gte("sale_datetime", `${todayStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch week's sales
+  const { data: salesWeek } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
+    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Fetch month's sales
+  const { data: salesMonth } = await supabase
+    .from("sales")
+    .select(selectFields)
+    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
+    .gte("sale_datetime", `${monthStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
+
+  // Calculate totals
+  const calculateTotals = (sales: any[]) => {
+    let totalSales = 0;
+    let totalCommission = 0;
+    const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
+
+    sales?.forEach((sale) => {
+      const agentEmail = sale.agent_email || "Unknown";
+      if (!sellerStats[agentEmail]) {
+        sellerStats[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
+      }
+
+      sale.sale_items?.forEach((item: any) => {
+        const countsAsSale = item.products?.counts_as_sale !== false;
+        if (countsAsSale) {
+          totalSales += Number(item.quantity) || 1;
+          sellerStats[agentEmail].sales += Number(item.quantity) || 1;
+        }
+        totalCommission += Number(item.mapped_commission) || 0;
+        sellerStats[agentEmail].commission += Number(item.mapped_commission) || 0;
+      });
+    });
+
+    return { totalSales, totalCommission, sellerStats };
+  };
+
+  const todayData = calculateTotals(salesToday || []);
+  const weekData = calculateTotals(salesWeek || []);
+  const monthData = calculateTotals(salesMonth || []);
+
+  // Get top sellers from month data
+  const topSellers = Object.values(monthData.sellerStats)
+    .sort((a, b) => b.commission - a.commission)
+    .slice(0, 10);
+
+  // Resolve agent emails to employee names
+  const allEmails = Object.keys(monthData.sellerStats);
+  if (allEmails.length > 0) {
+    const nameMap = await resolveAgentNames(supabase, allEmails);
+    topSellers.forEach((seller) => {
+      const email = allEmails.find(e => monthData.sellerStats[e] === seller);
+      if (email) {
+        const resolvedName = nameMap.get(email.toLowerCase());
+        if (resolvedName) {
+          seller.name = resolvedName;
+        }
+      }
+    });
+  }
+
+  const result = {
+    salesToday: todayData.totalSales,
+    salesWeek: weekData.totalSales,
+    salesMonth: monthData.totalSales,
+    commissionToday: todayData.totalCommission,
+    commissionWeek: weekData.totalCommission,
+    commissionMonth: monthData.totalCommission,
+    topSellers,
+  };
+
+  console.log("[TdcErhvervData] Returning:", result);
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },

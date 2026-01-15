@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, addDays, isWeekend } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, addDays, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart, Trophy, Clock, TrendingUp, Target } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, Trophy, Clock, TrendingUp, Target, CalendarDays, Calendar, CalendarRange } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,24 @@ import { DateRange } from "react-day-picker";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 
 const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
+
+// Check if we're in TV mode (accessed via /tv route with sessionStorage code)
+const isTvMode = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/tv/') || 
+         window.location.pathname.startsWith('/t/') || 
+         sessionStorage.getItem('tv_board_code') !== null;
+};
+
+interface TvTdcData {
+  salesToday: number;
+  salesWeek: number;
+  salesMonth: number;
+  commissionToday: number;
+  commissionWeek: number;
+  commissionMonth: number;
+  topSellers: Array<{ name: string; sales: number; commission: number }>;
+}
 
 interface ProductStat {
   name: string;
@@ -79,18 +97,62 @@ const getMedal = (rank: number) => {
 
 export default function TdcErhvervDashboard() {
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
+  const tvMode = isTvMode();
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfDay(new Date()),
     to: new Date()
   });
 
-  // Use the unified dashboard sales data hook
+  // Fetch TV data from edge function (bypasses RLS for TV mode)
+  const { data: tvData } = useQuery<TvTdcData>({
+    queryKey: ["tv-tdc-erhverv-data"],
+    queryFn: async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=tdc-erhverv-data&dashboard=tdc-erhverv`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch TV data");
+      }
+      return response.json();
+    },
+    enabled: tvMode,
+    refetchInterval: 30000,
+  });
+
+  // Use the unified dashboard sales data hook (only in non-TV mode)
   const dashboardData = useDashboardSalesData({
     clientName: "TDC Erhverv",
     startDate: dateRange?.from || payrollPeriod.start,
     endDate: dateRange?.to || new Date(),
-    enabled: !!dateRange?.from
+    enabled: !!dateRange?.from && !tvMode
+  });
+
+  // Fetch sales for today, this week, and this month
+  const today = startOfDay(new Date());
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(today);
+
+  const dailySalesData = useDashboardSalesData({
+    clientName: "TDC Erhverv",
+    startDate: today,
+    endDate: new Date(),
+    enabled: !tvMode
+  });
+
+  const weeklySalesData = useDashboardSalesData({
+    clientName: "TDC Erhverv",
+    startDate: weekStart,
+    endDate: new Date(),
+    enabled: !tvMode
+  });
+
+  const monthlySalesData = useDashboardSalesData({
+    clientName: "TDC Erhverv",
+    startDate: monthStart,
+    endDate: new Date(),
+    enabled: !tvMode
   });
 
   // Fetch team goal for payroll period
@@ -289,7 +351,49 @@ export default function TdcErhvervDashboard() {
           </Card>
         )}
 
-        {/* KPI Cards */}
+        {/* KPI Cards - Row 1: Time-based sales */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg denne uge</CardTitle>
+              <CalendarRange className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* KPI Cards - Row 2: Performance metrics */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
