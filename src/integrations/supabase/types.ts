@@ -6614,6 +6614,47 @@ export type Database = {
           },
         ]
       }
+      role_page_permissions: {
+        Row: {
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          description: string | null
+          id: string
+          permission_key: string
+          role_key: string
+          updated_at: string | null
+        }
+        Insert: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          permission_key: string
+          role_key: string
+          updated_at?: string | null
+        }
+        Update: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          permission_key?: string
+          role_key?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_page_permissions_role_key_fkey"
+            columns: ["role_key"]
+            isOneToOne: false
+            referencedRelation: "system_role_definitions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       salary_schemes: {
         Row: {
           created_at: string
