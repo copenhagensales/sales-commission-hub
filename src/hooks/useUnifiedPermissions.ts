@@ -228,8 +228,8 @@ export function useUnifiedPermissions() {
 
 // Helper labels for UI
 export const permissionKeyLabels: Record<string, string> = {
-  // Sektioner
-  menu_section_personal: 'Personlig',
+  // ===== SEKTIONER (page-niveau) =====
+  menu_section_personal: 'Mit Hjem',
   menu_section_personale: 'Personale',
   menu_section_ledelse: 'Ledelse',
   menu_section_test: 'Test',
@@ -239,29 +239,120 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_section_rekruttering: 'Rekruttering',
   menu_section_boards: 'Boards',
   menu_section_salary: 'Løn',
+  menu_section_dashboards: 'Dashboards',
+  menu_section_onboarding: 'Onboarding',
+  menu_section_reports: 'Rapporter',
+  menu_section_admin: 'Admin',
+  menu_section_some: 'SOME',
   
-  // Menupunkter
+  // ===== MIT HJEM (under menu_section_personal) =====
+  menu_home: 'Hjem',
+  menu_h2h: 'Head-to-Head',
+  menu_commission_league: 'Provisionsliga',
+  menu_messages: 'Beskeder',
+  menu_my_schedule: 'Min vagtplan',
+  menu_my_profile: 'Min profil',
+  menu_my_goals: 'Mine mål',
+  menu_my_contracts: 'Mine kontrakter',
+  menu_career_wishes: 'Karriereønsker',
+  menu_my_feedback: 'Min feedback',
+  menu_refer_friend: 'Henvis en ven',
+  
+  // ===== PERSONALE (under menu_section_personale) =====
   menu_dashboard: 'Dashboard',
   menu_employees: 'Medarbejdere',
   menu_teams: 'Teams',
-  menu_payroll: 'Løn',
-  menu_sales: 'Salg',
-  menu_settings: 'Indstillinger',
   menu_absence: 'Fravær',
   menu_permissions: 'Rettigheder',
-  menu_salary_types: 'Løntyper',
-  menu_leaderboard: 'Leaderboard',
-  menu_my_sales: 'Mine salg',
-  menu_my_shifts: 'Mine vagter',
-  menu_my_absence: 'Mit fravær',
-  menu_my_profile: 'Min profil',
-  menu_my_coaching: 'Min coaching',
-  // Rettede keys (matcher sidebar)
-  menu_onboarding_admin: 'Onboarding Admin',
-  menu_recruitment_dashboard: 'Rekruttering Dashboard',
-  menu_shift_overview: 'Vagtplan Oversigt',
+  menu_login_log: 'Login log',
+  menu_upcoming_starts: 'Kommende opstart',
   
-  // Fieldmarketing sidebar-menuer (tabs)
+  // ===== LEDELSE (under menu_section_ledelse) =====
+  menu_company_overview: 'Firmaoversigt',
+  menu_contracts: 'Kontrakter',
+  menu_career_wishes_overview: 'Karriereønsker overblik',
+  menu_email_templates_ledelse: 'E-mail skabeloner',
+  menu_security_dashboard: 'Sikkerhedsoversigt',
+  
+  // ===== VAGTPLAN (under menu_section_vagtplan) =====
+  menu_shift_overview: 'Vagtplan oversigt',
+  menu_time_tracking: 'Tidsregistrering',
+  menu_time_stamp: 'Tidsstempling',
+  menu_closing_shifts: 'Lukkevagter',
+  
+  // ===== MG (under menu_section_mg) =====
+  menu_team_overview: 'Team overblik',
+  menu_tdc_erhverv: 'TDC Erhverv',
+  menu_tdc_erhverv_dashboard: 'TDC Erhverv Dashboard',
+  menu_relatel_dashboard: 'Relatel Dashboard',
+  menu_tryg_dashboard: 'Tryg Dashboard',
+  menu_ase_dashboard: 'ASE Dashboard',
+  menu_codan: 'Codan',
+  menu_mg_test: 'MG Test',
+  menu_mg_test_dashboard: 'MG Test Dashboard',
+  menu_dialer_data: 'Dialer data',
+  menu_calls_data: 'Opkaldsdata',
+  menu_adversus_data: 'Adversus data',
+  
+  // ===== TEST (under menu_section_test) =====
+  menu_car_quiz_admin: 'Bilquiz admin',
+  menu_coc_admin: 'COC admin',
+  menu_pulse_survey: 'Pulsmåling',
+  
+  // ===== REKRUTTERING (under menu_section_rekruttering) =====
+  menu_recruitment_dashboard: 'Rekruttering Dashboard',
+  menu_candidates: 'Kandidater',
+  menu_upcoming_interviews: 'Kommende samtaler',
+  menu_winback: 'Winback',
+  menu_upcoming_hires: 'Kommende ansættelser',
+  menu_messages_recruitment: 'Beskeder (rekruttering)',
+  menu_sms_templates: 'SMS skabeloner',
+  menu_email_templates_recruitment: 'E-mail skabeloner',
+  menu_referrals: 'Henvisninger',
+  
+  // ===== LØN (under menu_section_salary) =====
+  menu_payroll: 'Løn',
+  menu_salary_types: 'Løntyper',
+  
+  // ===== SOME (under menu_section_some) =====
+  menu_some: 'SOME',
+  menu_extra_work: 'Ekstraarbejde',
+  
+  // ===== DASHBOARDS (under menu_section_dashboards) =====
+  menu_dashboard_cph_sales: 'CPH Salg',
+  menu_dashboard_cs_top_20: 'CS Top 20',
+  menu_dashboard_fieldmarketing: 'Fieldmarketing',
+  menu_dashboard_fm_goals: 'FM Mål',
+  menu_dashboard_eesy_tm: 'Eesy TM',
+  menu_dashboard_tdc_erhverv: 'TDC Erhverv',
+  menu_dashboard_tdc_goals: 'TDC Mål',
+  menu_dashboard_relatel: 'Relatel',
+  menu_dashboard_tryg: 'Tryg',
+  menu_dashboard_ase: 'ASE',
+  menu_dashboard_mg_test: 'MG Test',
+  menu_dashboard_united: 'United',
+  menu_dashboard_design: 'Design',
+  menu_dashboard_settings: 'Indstillinger',
+  
+  // ===== REPORTS (under menu_section_reports) =====
+  menu_reports_admin: 'Admin rapporter',
+  menu_reports_daily: 'Daglige rapporter',
+  menu_reports_management: 'Ledelsesrapporter',
+  menu_reports_employee: 'Medarbejderrapporter',
+  
+  // ===== ONBOARDING (under menu_section_onboarding) =====
+  menu_onboarding_overview: 'Onboarding overblik',
+  menu_onboarding_kursus: 'Kursus',
+  menu_onboarding_ramp: 'Ramp-up',
+  menu_onboarding_leader: 'Leder-onboarding',
+  menu_onboarding_drills: 'Drills',
+  menu_onboarding_admin: 'Onboarding admin',
+  menu_coaching_templates: 'Coaching skabeloner',
+  
+  // ===== ADMIN (under menu_section_admin) =====
+  menu_kpi_definitions: 'KPI definitioner',
+  
+  // ===== FIELDMARKETING (under menu_section_fieldmarketing) =====
   menu_fm_overview: 'Oversigt',
   menu_fm_booking: 'Booking',
   menu_fm_vehicles: 'Køretøjer',
@@ -271,12 +362,19 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_fm_travel_expenses: 'Rejseudgifter',
   menu_fm_edit_sales: 'Ret salg',
   menu_fm_time_off: 'Fraværsanmodninger',
-  
-  // Fieldmarketing booking-faner (actions)
   menu_fm_book_week: 'Book uge',
   menu_fm_bookings: 'Kommende bookinger',
   menu_fm_locations: 'Lokationer',
   menu_fm_vagtplan_fm: 'Vagtplan FM',
+  
+  // Legacy/andre
+  menu_sales: 'Salg',
+  menu_settings: 'Indstillinger',
+  menu_leaderboard: 'Leaderboard',
+  menu_my_sales: 'Mine salg',
+  menu_my_shifts: 'Mine vagter',
+  menu_my_absence: 'Mit fravær',
+  menu_my_coaching: 'Min coaching',
 };
 
 export const dataScopeLabels: Record<string, string> = {
