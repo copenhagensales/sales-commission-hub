@@ -1,14 +1,13 @@
 import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfWeek, differenceInBusinessDays, getDay, getHours } from "date-fns";
+import { format, startOfDay, startOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
-import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
-import { Trophy, TrendingUp, Calendar, Clock } from "lucide-react";
+import { Trophy, Calendar, Clock } from "lucide-react";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -166,71 +165,6 @@ export default function CsTop20Dashboard() {
     enabled: !tvMode
   });
 
-  // Fetch employee sales goals for payroll period
-  const { data: employeeGoals } = useQuery({
-    queryKey: ["employee-goals-cs-top-20", payrollPeriod.start.toISOString(), payrollPeriod.end.toISOString()],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("employee_sales_goals")
-        .select("employee_id, target_amount")
-        .gte("period_start", format(payrollPeriod.start, "yyyy-MM-dd"))
-        .lte("period_end", format(payrollPeriod.end, "yyyy-MM-dd"));
-      
-      const goalMap = new Map<string, number>();
-      (data || []).forEach(g => goalMap.set(g.employee_id, g.target_amount));
-      return goalMap;
-    },
-    enabled: !tvMode
-  });
-
-  // Calculate time-based progress for relative goal tracking
-  const timeProgress = useMemo(() => {
-    const now = new Date();
-    const totalWorkingDays = 21;
-    
-    // Payroll period: days elapsed out of 21
-    const payrollDaysElapsed = Math.max(1, differenceInBusinessDays(now, payrollPeriod.start) + 1);
-    const payrollExpectedPercent = Math.min(100, (payrollDaysElapsed / totalWorkingDays) * 100);
-    
-    // Week: current weekday (1=Monday to 5=Friday)
-    const weekdayIndex = getDay(now);
-    const workDaysInWeekSoFar = weekdayIndex === 0 ? 5 : weekdayIndex === 6 ? 5 : weekdayIndex;
-    const weekExpectedPercent = (workDaysInWeekSoFar / 5) * 100;
-    
-    // Day: how much of the workday is done (8:00-17:00)
-    const hour = getHours(now);
-    const dayProgressPercent = Math.min(100, Math.max(0, ((hour - 8) / 9) * 100));
-    
-    return { payrollExpectedPercent, weekExpectedPercent, dayExpectedPercent: dayProgressPercent };
-  }, [payrollPeriod.start]);
-
-  // Get goal info for an employee with period-relative expected progress
-  const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
-    let payrollTarget: number | undefined;
-    
-    if (tvMode) {
-      payrollTarget = sellerGoalTarget ?? undefined;
-    } else {
-      const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-      if (!employeeId) return null;
-      payrollTarget = employeeGoals?.get(employeeId);
-    }
-    
-    if (!payrollTarget) return null;
-
-    const target = period === 'payroll' ? payrollTarget 
-                 : period === 'week' ? Math.round((payrollTarget / 21) * 5)
-                 : Math.round(payrollTarget / 21);
-    
-    const expectedPercent = period === 'payroll' ? timeProgress.payrollExpectedPercent
-                          : period === 'week' ? timeProgress.weekExpectedPercent
-                          : timeProgress.dayExpectedPercent;
-    
-    const progress = (commission / target) * 100;
-    const expectedAmount = (expectedPercent / 100) * target;
-    return { target, progress, expectedPercent, expectedAmount };
-  };
-
   // Sort employees by commission for each period - TOP 20
   const sortedDailySellers = useMemo(() => {
     if (tvMode && tvData?.sellersToday) return tvData.sellersToday.slice(0, 20);
@@ -303,8 +237,6 @@ export default function CsTop20Dashboard() {
               const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
               const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
               const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-              const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-              const goalInfo = getGoalInfo(name, commission, period, sellerGoalTarget);
               const rankBadge = getRankBadge(index);
               const displayName = getDisplayName(name);
               
@@ -341,21 +273,6 @@ export default function CsTop20Dashboard() {
                   {/* Commission */}
                   <div className={`px-3 py-1.5 rounded-full text-sm font-bold text-white ${getCommissionColor(commission, period)}`}>
                     {formatCurrency(commission)}
-                  </div>
-                  
-                  {/* Goal */}
-                  <div className="flex-shrink-0">
-                    {goalInfo ? (
-                      <GoalProgressRing
-                        progress={goalInfo.progress}
-                        expectedPercent={goalInfo.expectedPercent}
-                        current={commission}
-                        target={goalInfo.target}
-                        expectedAmount={goalInfo.expectedAmount}
-                      />
-                    ) : (
-                      <GoalProgressRingEmpty />
-                    )}
                   </div>
                 </div>
               );
