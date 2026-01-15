@@ -10,10 +10,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
 import { validatePassword } from "@/lib/password-validation";
 
-// Timeout helper - returns fallback value if promise takes too long
+// Timeout helper - returns fallback value on timeout, but propagates actual errors
 const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
-  const timeout = new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms));
-  return Promise.race([promise, timeout]);
+  let timeoutId: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeoutId = setTimeout(() => resolve(fallback), ms);
+  });
+  
+  // Wrap original promise to clear timeout and propagate errors
+  const wrappedPromise = promise
+    .then((result) => {
+      clearTimeout(timeoutId);
+      return result;
+    })
+    .catch((error) => {
+      clearTimeout(timeoutId);
+      throw error; // Propagate the actual error instead of falling back
+    });
+  
+  return Promise.race([wrappedPromise, timeoutPromise]);
 };
 
 export default function Auth() {
@@ -170,25 +186,52 @@ export default function Auth() {
           return;
         }
         
-        // Add timeout to signInWithPassword to prevent hanging
-        const authResult = await withTimeout(
-          supabase.auth.signInWithPassword({
-            email: authEmail,
-            password,
-          }),
-          10000,
-          { data: { user: null, session: null }, error: { message: "Login tog for lang tid. Prøv igen.", name: "TimeoutError", status: 408 } as any }
-        );
-        if (authResult.error) throw authResult.error;
-        toast({
-          title: "Velkommen tilbage!",
-          description: "Du er nu logget ind.",
-        });
+        // Login with retry logic for network failures
+        let loginSuccess = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const authResult = await withTimeout(
+              supabase.auth.signInWithPassword({
+                email: authEmail,
+                password,
+              }),
+              10000,
+              { data: { user: null, session: null }, error: { message: "Login tog for lang tid. Prøv igen.", name: "TimeoutError", status: 408 } as any }
+            );
+            if (authResult.error) throw authResult.error;
+            loginSuccess = true;
+            toast({
+              title: "Velkommen tilbage!",
+              description: "Du er nu logget ind.",
+            });
+            break; // Success - exit retry loop
+          } catch (error: any) {
+            // Retry once on network failure
+            if (error.message === "Failed to fetch" && attempt < 1) {
+              console.log("[Auth] Network error on attempt", attempt + 1, "- retrying in 1s...");
+              await new Promise(r => setTimeout(r, 1000));
+              continue;
+            }
+            throw error; // Re-throw for outer catch
+          }
+        }
+        if (!loginSuccess) {
+          throw new Error("Login mislykkedes efter flere forsøg.");
+        }
       }
     } catch (error: any) {
-      const message = error.message === "Failed to fetch" 
-        ? "Kunne ikke forbinde til serveren. Prøv at genindlæse siden."
-        : error.message;
+      let message = error.message;
+      
+      // Provide user-friendly error messages
+      if (error.message === "Failed to fetch") {
+        message = "Kunne ikke forbinde til serveren. Tjek din internetforbindelse og prøv igen.";
+      } else if (error.name === "TimeoutError") {
+        message = "Login tog for lang tid. Serveren er muligvis overbelastet - prøv igen om lidt.";
+      } else if (error.message?.includes("Invalid login")) {
+        message = "Forkert email eller adgangskode.";
+      }
+      
+      console.error("[Auth] Login error:", error.message, error.name);
       toast({
         title: "Fejl",
         description: message,
