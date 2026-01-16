@@ -818,10 +818,19 @@ export function PermissionEditor() {
 
     const newValue = !permission[field];
     
+    // Prepare update object
+    const updateData: Record<string, boolean | string> = { [field]: newValue };
+    
+    // If turning OFF can_view, also turn off can_edit and reset visibility
+    if (field === 'can_view' && !newValue) {
+      updateData.can_edit = false;
+      updateData.visibility = 'self';
+    }
+    
     // Update the permission itself
     const { data, error, status, statusText } = await supabase
       .from('role_page_permissions')
-      .update({ [field]: newValue })
+      .update(updateData)
       .eq('id', permission.id)
       .select();
     
@@ -839,14 +848,30 @@ export function PermissionEditor() {
     
     toast.success('Rettighed opdateret');
 
-    // If it's a page and we're turning OFF, also turn off all children
-    if ((permission.permission_type === 'page' || !permission.parent_key) && !newValue) {
+    // If it's a page and we're turning OFF can_view, also turn off all children completely
+    if ((permission.permission_type === 'page' || !permission.parent_key) && !newValue && field === 'can_view') {
       const children = rolePermissions.filter(p => p.parent_key === permission.permission_key);
       if (children.length > 0) {
         const childIds = children.map(c => c.id);
         await supabase
           .from('role_page_permissions')
-          .update({ [field]: false })
+          .update({ 
+            can_view: false, 
+            can_edit: false,
+            visibility: 'self' 
+          })
+          .in('id', childIds);
+      }
+    }
+    
+    // If it's a page and we're turning OFF can_edit only, also turn off children's can_edit
+    if ((permission.permission_type === 'page' || !permission.parent_key) && !newValue && field === 'can_edit') {
+      const children = rolePermissions.filter(p => p.parent_key === permission.permission_key);
+      if (children.length > 0) {
+        const childIds = children.map(c => c.id);
+        await supabase
+          .from('role_page_permissions')
+          .update({ can_edit: false })
           .in('id', childIds);
       }
     }
