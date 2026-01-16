@@ -134,7 +134,6 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   menu_dashboard: 'menu_section_personale',
   menu_employees: 'menu_section_personale',
   menu_teams: 'menu_section_personale',
-  menu_absence: 'menu_section_personale',
   menu_permissions: 'menu_section_personale',
   menu_login_log: 'menu_section_personale',
   menu_upcoming_starts: 'menu_section_personale',
@@ -148,6 +147,7 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   
   // ===== VAGTPLAN (under menu_section_vagtplan) =====
   menu_shift_overview: 'menu_section_vagtplan',
+  menu_absence: 'menu_section_vagtplan',
   menu_time_tracking: 'menu_section_vagtplan',
   menu_time_stamp: 'menu_section_vagtplan',
   menu_closing_shifts: 'menu_section_vagtplan',

@@ -247,7 +247,6 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_dashboard: 'Dashboard',
   menu_employees: 'Medarbejdere',
   menu_teams: 'Teams',
-  menu_absence: 'Fravær',
   menu_permissions: 'Rettigheder',
   menu_login_log: 'Login log',
   menu_upcoming_starts: 'Kommende opstart',
@@ -261,9 +260,10 @@ export const permissionKeyLabels: Record<string, string> = {
   
   // ===== VAGTPLAN (under menu_section_vagtplan) =====
   menu_shift_overview: 'Vagtplan (leder)',
+  menu_absence: 'Fravær',
   menu_time_tracking: 'Tidsregistrering',
-  menu_time_stamp: 'Tidsstempling',
-  menu_closing_shifts: 'Lukkevagter',
+  menu_time_stamp: 'Stempelur',
+  menu_closing_shifts: 'Påmindelser',
   
   // ===== MG (under menu_section_mg) =====
   menu_team_overview: 'Team overblik',
