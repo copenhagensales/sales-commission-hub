@@ -8533,6 +8533,7 @@ export type Database = {
         Args: { _target_employee_id: string; _user_id: string }
         Returns: boolean
       }
+      trigger_kpi_calculation: { Args: never; Returns: undefined }
       unschedule_integration_sync: {
         Args: { p_job_name: string }
         Returns: boolean
