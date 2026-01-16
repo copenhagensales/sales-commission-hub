@@ -41,7 +41,12 @@ export function useCachedLeaderboard(
         query = query.is("scope_id", null);
       }
       
-      const { data, error } = await query.maybeSingle();
+      // Order by calculated_at desc and take the most recent one
+      // This handles cases where there might be duplicate entries
+      const { data, error } = await query
+        .order("calculated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) {
         console.error("Error fetching cached leaderboard:", error);
