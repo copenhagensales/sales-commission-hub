@@ -53,8 +53,8 @@ export function usePrecomputedKpi(
       return data;
     },
     enabled: !!kpiSlug,
-    staleTime: 15000, // 15 seconds - values are updated every 30 seconds
-    refetchInterval: 30000, // Refetch every 30 seconds to stay in sync
+    staleTime: 30000, // 30 sekunder - værdier opdateres hvert minut
+    refetchInterval: 60000, // 1 minut
   });
 }
 
@@ -110,8 +110,8 @@ export function usePrecomputedKpis(
       return result;
     },
     enabled: kpiSlugs.length > 0,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 }
 
@@ -165,8 +165,8 @@ export function useClientDashboardKpis(
       return result;
     },
     enabled: !!clientId,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 }
 

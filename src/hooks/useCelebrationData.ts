@@ -194,8 +194,8 @@ export function useCelebrationData({
       return result;
     },
     enabled: enabled && !!dashboardSlug,
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 15000,
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
+    staleTime: 60000,
   });
 
   return {

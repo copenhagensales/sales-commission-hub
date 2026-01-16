@@ -54,6 +54,7 @@ export interface QualificationStanding {
 export function useActiveSeason() {
   return useQuery({
     queryKey: ["league-active-season"],
+    staleTime: 300000, // 5 minutter - sæsoner ændrer sig sjældent
     queryFn: async () => {
       const { data, error } = await supabase
         .from("league_seasons")
@@ -75,6 +76,7 @@ export function useMyEnrollment(seasonId: string | undefined) {
   
   return useQuery({
     queryKey: ["league-my-enrollment", seasonId, user?.id],
+    staleTime: 60000, // 1 minut
     queryFn: async () => {
       if (!seasonId || !user?.id) return null;
       
@@ -171,6 +173,7 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
   
   return useQuery({
     queryKey: ["league-my-qualification-standing", seasonId, user?.id],
+    staleTime: 60000, // 1 minut
     queryFn: async () => {
       if (!seasonId || !user?.id) return null;
       
@@ -343,6 +346,7 @@ export function useUnenrollFromSeason() {
 export function useEnrollmentCount(seasonId: string | undefined) {
   return useQuery({
     queryKey: ["league-enrollment-count", seasonId],
+    staleTime: 60000, // 1 minut
     queryFn: async () => {
       if (!seasonId) return 0;
       

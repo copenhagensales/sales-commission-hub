@@ -40,7 +40,8 @@ export function useIntegrationDebugLogs() {
       if (error) throw error;
       return (data || []) as unknown as IntegrationDebugLog[];
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
+    staleTime: 60000,
   });
 }
 
@@ -58,6 +59,7 @@ export function useIntegrationDebugLog(provider: string, syncType: string) {
       if (error && error.code !== "PGRST116") throw error;
       return data as unknown as IntegrationDebugLog | null;
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutter
+    staleTime: 60000,
   });
 }

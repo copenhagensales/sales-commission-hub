@@ -238,7 +238,8 @@ export default function CphSalesDashboard() {
       };
     },
     enabled: !tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 60000, // 1 minut - reduceret fra 30s
+    staleTime: 30000,
   });
 
   const todaySales = todaySalesData?.sales || [];
