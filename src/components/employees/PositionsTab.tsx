@@ -53,14 +53,6 @@ const OWNER_POSITION_NAME = "Ejer";
 
 const isOwnerPosition = (name: string) => name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
 
-// Manager data scope options
-type ManagerDataScope = "all" | "team" | "self";
-
-const MANAGER_DATA_SCOPE_OPTIONS: { value: ManagerDataScope; label: string; description: string; icon: typeof Globe }[] = [
-  { value: "all", label: "Al data", description: "Adgang til data for alle medarbejdere", icon: Globe },
-  { value: "team", label: "Team data", description: "Kun data for medarbejdere i eget team", icon: Users },
-  { value: "self", label: "Kun egen data", description: "Kun adgang til egne data", icon: User },
-];
 
 interface JobPosition {
   id: string;
@@ -73,8 +65,6 @@ interface JobPosition {
   requires_mfa: boolean;
   session_timeout_minutes: number;
   max_session_hours: number;
-  is_manager: boolean;
-  manager_data_scope: ManagerDataScope | null;
   system_role_key: string | null;
 }
 
@@ -98,8 +88,6 @@ interface FormData {
   session_timeout_minutes: number;
   max_session_hours: number;
   trusted_ip_ranges: TrustedIpRange[];
-  is_manager: boolean;
-  manager_data_scope: ManagerDataScope;
   system_role_key: string | null;
 }
 
@@ -125,8 +113,6 @@ export function PositionsTab() {
     session_timeout_minutes: 60,
     max_session_hours: 10,
     trusted_ip_ranges: [],
-    is_manager: false,
-    manager_data_scope: "team",
     system_role_key: null,
   });
   const [newIpName, setNewIpName] = useState("");
@@ -150,7 +136,6 @@ export function PositionsTab() {
       return data.map((p) => ({
         ...p,
         permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) || {},
-        manager_data_scope: (p.manager_data_scope as ManagerDataScope) || "team",
         system_role_key: p.system_role_key || null,
       })) as JobPosition[];
     },
@@ -209,8 +194,6 @@ export function PositionsTab() {
         session_timeout_minutes: data.session_timeout_minutes,
         max_session_hours: data.max_session_hours,
         trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
-        is_manager: data.is_manager,
-        manager_data_scope: data.manager_data_scope,
         system_role_key: data.system_role_key,
       });
       if (error) throw error;
@@ -226,7 +209,6 @@ export function PositionsTab() {
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: FormData }) => {
       const { error } = await supabase
@@ -240,8 +222,6 @@ export function PositionsTab() {
           session_timeout_minutes: data.session_timeout_minutes,
           max_session_hours: data.max_session_hours,
           trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
-          is_manager: data.is_manager,
-          manager_data_scope: data.manager_data_scope,
           system_role_key: data.system_role_key,
           updated_at: new Date().toISOString(),
         })
@@ -286,8 +266,6 @@ export function PositionsTab() {
       session_timeout_minutes: 60,
       max_session_hours: 10,
       trusted_ip_ranges: [],
-      is_manager: false,
-      manager_data_scope: "team",
       system_role_key: null,
     });
     setNewIpName("");
@@ -310,8 +288,6 @@ export function PositionsTab() {
       session_timeout_minutes: position.session_timeout_minutes ?? 60,
       max_session_hours: position.max_session_hours ?? 10,
       trusted_ip_ranges: existingRanges,
-      is_manager: isOwner ? true : position.is_manager ?? false,
-      manager_data_scope: isOwner ? "all" : (position.manager_data_scope ?? "team"),
       system_role_key: isOwner ? "ejer" : position.system_role_key,
     });
     setNewIpName("");
@@ -333,8 +309,6 @@ export function PositionsTab() {
       session_timeout_minutes: 60,
       max_session_hours: 10,
       trusted_ip_ranges: [],
-      is_manager: false,
-      manager_data_scope: "team",
       system_role_key: null,
     });
     setNewIpName("");
@@ -698,79 +672,6 @@ export function PositionsTab() {
                   </p>
                 </div>
 
-                {/* Manager Position Section */}
-                <Card className="border-primary/20">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Manager-stilling
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="is-manager">Er dette en manager-stilling?</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Manager-stillinger har adgang til data for medarbejdere i deres team
-                        </p>
-                      </div>
-                      <Switch
-                        id="is-manager"
-                        checked={formData.is_manager}
-                        onCheckedChange={(checked) => setFormData({ ...formData, is_manager: checked })}
-                        disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                      />
-                    </div>
-
-                    {formData.is_manager && (
-                      <div className="pt-3 border-t space-y-3">
-                        <div className="space-y-1">
-                          <Label className="text-sm font-medium">Datascope</Label>
-                          <p className="text-xs text-muted-foreground">
-                            Vælg hvilket datascope denne manager-stilling har adgang til
-                          </p>
-                        </div>
-                        <RadioGroup
-                          value={formData.manager_data_scope}
-                          onValueChange={(value: ManagerDataScope) =>
-                            setFormData({ ...formData, manager_data_scope: value })
-                          }
-                          className="grid gap-2"
-                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                        >
-                          {MANAGER_DATA_SCOPE_OPTIONS.map((option) => {
-                            const Icon = option.icon;
-                            return (
-                              <label
-                                key={option.value}
-                                className={cn(
-                                  "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
-                                  formData.manager_data_scope === option.value
-                                    ? "border-primary bg-primary/5"
-                                    : "border-border bg-muted/20 hover:bg-muted/40"
-                                )}
-                              >
-                                <RadioGroupItem value={option.value} id={option.value} />
-                                <Icon className="h-4 w-4 text-muted-foreground" />
-                                <div className="space-y-0.5">
-                                  <div className="text-sm font-medium">{option.label}</div>
-                                  <div className="text-xs text-muted-foreground">{option.description}</div>
-                                </div>
-                              </label>
-                            );
-                          })}
-                        </RadioGroup>
-                      </div>
-                    )}
-
-                    {editingPosition && isOwnerPosition(editingPosition.name) && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                        <Info className="h-3.5 w-3.5" />
-                        Ejer-stillingen har altid fuld adgang til al data
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 

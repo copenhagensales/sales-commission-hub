@@ -14,14 +14,10 @@ export interface PositionPermissions {
   [key: string]: boolean | { view: boolean; edit: boolean } | DataScope;
 }
 
-export type ManagerDataScope = 'all' | 'team' | 'self';
-
 interface JobPosition {
   id: string;
   name: string;
   permissions: PositionPermissions;
-  is_manager?: boolean;
-  manager_data_scope?: ManagerDataScope;
 }
 
 // Owner position always has full access (except excluded permissions like softphone)
@@ -183,8 +179,6 @@ export function usePositionPermissions() {
               id: "owner", 
               name: OWNER_POSITION_NAME, 
               permissions: ownerPermissions,
-              is_manager: true,
-              manager_data_scope: 'all' as ManagerDataScope,
             },
             permissions: ownerPermissions,
             roleKey: 'ejer',
@@ -223,7 +217,7 @@ export function usePositionPermissions() {
           // Fallback: try old job_positions table
           const { data: position, error: posError } = await supabase
             .from("job_positions")
-            .select("id, name, permissions, is_manager, manager_data_scope")
+            .select("id, name, permissions")
             .ilike("name", employee.job_title)
             .maybeSingle();
 
@@ -243,8 +237,6 @@ export function usePositionPermissions() {
               position: { 
                 ...position, 
                 permissions: legacyPerms,
-                is_manager: position.is_manager ?? false,
-                manager_data_scope: (position.manager_data_scope as ManagerDataScope) ?? 'self',
               },
               permissions: legacyPerms,
               roleKey,
@@ -254,17 +246,11 @@ export function usePositionPermissions() {
           }
         }
 
-        // Determine manager status from role
-        const isManager = roleKey === 'ejer' || roleKey === 'teamleder';
-        const managerScope: ManagerDataScope = roleKey === 'ejer' ? 'all' : roleKey === 'teamleder' ? 'team' : 'self';
-
         const result = {
           position: { 
             id: roleKey, 
             name: employee.job_title, 
             permissions,
-            is_manager: isManager,
-            manager_data_scope: managerScope,
           },
           permissions,
           roleKey,
@@ -363,15 +349,9 @@ export function usePermissions() {
     return "egen"; // Default to own data only
   };
 
-  // Get manager scope from position (is_manager and manager_data_scope from job_positions table)
   const positionData = isPreviewMode && previewRole 
-    ? { id: "preview", name: previewRole, permissions, is_manager: previewRole.toLowerCase() === 'ejer' || previewRole.toLowerCase() === 'teamleder', manager_data_scope: previewRole.toLowerCase() === 'ejer' ? 'all' : previewRole.toLowerCase() === 'teamleder' ? 'team' : 'self' } 
+    ? { id: "preview", name: previewRole, permissions } 
     : data?.position;
-  
-  const isManager = positionData?.is_manager ?? false;
-  const managerDataScope: ManagerDataScope = (positionData?.manager_data_scope as ManagerDataScope) ?? 'self';
-  const canSeeAllData = managerDataScope === 'all';
-  const canSeeTeamData = managerDataScope === 'team' || managerDataScope === 'all';
 
   return {
     isLoading: actuallyLoading,
@@ -385,11 +365,6 @@ export function usePermissions() {
     canView,
     canEdit,
     getDataScope,
-    // Manager data scope (from job_positions.is_manager and manager_data_scope)
-    isManager,
-    managerDataScope,
-    canSeeAllData,
-    canSeeTeamData,
     // Data scope helpers (legacy - from JSONB permissions)
     scopeEmployees: getDataScope("scope_employees"),
     scopeShifts: getDataScope("scope_shifts"),

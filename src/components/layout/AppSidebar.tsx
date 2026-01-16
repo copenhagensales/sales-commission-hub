@@ -525,7 +525,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
 
               {/* Team H2H - for teamledere */}
-              {p.canSeeTeamData && (
+              {p.canView('menu_team_h2h') && (
                 <NavLink
                   to="/team/h2h"
                   onClick={handleNavClick}

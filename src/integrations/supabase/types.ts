@@ -4880,8 +4880,6 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
-          is_manager: boolean
-          manager_data_scope: string | null
           max_session_hours: number | null
           name: string
           permissions: Json
@@ -4897,8 +4895,6 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
-          is_manager?: boolean
-          manager_data_scope?: string | null
           max_session_hours?: number | null
           name: string
           permissions?: Json
@@ -4914,8 +4910,6 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
-          is_manager?: boolean
-          manager_data_scope?: string | null
           max_session_hours?: number | null
           name?: string
           permissions?: Json
@@ -8434,7 +8428,6 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string[]
       }
-      get_user_manager_scope: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["system_role"]
