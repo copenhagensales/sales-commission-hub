@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
@@ -105,11 +104,10 @@ export default function EesyTmDashboard() {
   // Get client ID for Eesy
   const eesyClientId = getClientId("Eesy");
 
-  // ========== PRE-COMPUTED KPIs (for hero cards) ==========
-  // Fetch cached KPI values for all periods in a single query
+  // Fetch cached KPIs for hero cards (fast, pre-computed) - now includes total_hours
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     eesyClientId || null,
-    ["sales_count", "total_commission", "total_revenue"]
+    ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
   // Fetch TV data from edge function (bypasses RLS for TV mode)
@@ -141,14 +139,7 @@ export default function EesyTmDashboard() {
     { enabled: !tvMode, limit: 30 }
   );
 
-  // Only keep ONE useDashboardSalesData call - for hours calculation
-  const payrollSalesData = useDashboardSalesData({
-    clientName: "Eesy",
-    startDate: payrollPeriod.start,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 300000, // 5 minutes
-  });
+  // No more useDashboardSalesData - hours now come from cached KPIs!
 
   // Fetch employee avatars and IDs
   const { data: employeeData } = useQuery({
@@ -273,7 +264,7 @@ export default function EesyTmDashboard() {
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = (!tvMode && kpisLoading) || leaderboardsLoading || payrollSalesData.isLoading;
+  const isLoading = (!tvMode && kpisLoading) || leaderboardsLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
@@ -281,10 +272,10 @@ export default function EesyTmDashboard() {
   const salesToday = tvMode ? (tvData?.salesToday ?? 0) : getKpiValue(cachedKpis?.today?.sales_count, 0);
   const salesWeek = tvMode ? (tvData?.salesWeek ?? 0) : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const salesMonth = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
+  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
 
-  // Hours come from payroll sales data
-  const payrollHours = payrollSalesData.totalHours;
+  // Hours now come from cached KPIs instead of useDashboardSalesData
+  const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
 
   // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
@@ -119,10 +118,10 @@ export default function TdcErhvervDashboard() {
   // Get client ID for cached KPIs
   const tdcClientId = getClientId("TDC Erhverv");
 
-  // Fetch cached KPIs for hero cards (fast, pre-computed)
+  // Fetch cached KPIs for hero cards (fast, pre-computed) - now includes total_hours
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     tdcClientId || null,
-    ["sales_count", "total_commission", "total_revenue"]
+    ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
   // Fetch TV data from edge function (bypasses RLS for TV mode)
@@ -154,14 +153,7 @@ export default function TdcErhvervDashboard() {
     { enabled: !tvMode, limit: 30 }
   );
 
-  // Only keep ONE useDashboardSalesData call - for hours calculation
-  const payrollSalesData = useDashboardSalesData({
-    clientName: "TDC Erhverv",
-    startDate: payrollPeriod.start,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 300000, // 5 minutes
-  });
+  // No more useDashboardSalesData - hours now come from cached KPIs!
 
   // Fetch employee avatars and IDs
   const { data: employeeData } = useQuery({
@@ -289,7 +281,7 @@ export default function TdcErhvervDashboard() {
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = kpisLoading || leaderboardsLoading || payrollSalesData.isLoading;
+  const isLoading = kpisLoading || leaderboardsLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
@@ -303,10 +295,10 @@ export default function TdcErhvervDashboard() {
   const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
   const payrollSales = tvMode 
     ? (tvData?.salesMonth ?? 0) 
-    : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
+    : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
 
-  // Hours come from payroll sales data
-  const payrollHours = tvMode ? (tvData?.hoursPayroll ?? 0) : payrollSalesData.totalHours;
+  // Hours now come from cached KPIs instead of useDashboardSalesData
+  const payrollHours = tvMode ? (tvData?.hoursPayroll ?? 0) : getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
 
   // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;

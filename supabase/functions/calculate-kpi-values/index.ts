@@ -43,9 +43,32 @@ interface FieldmarketingSale {
   revenue: number | null;
 }
 
-interface EmployeeShift {
-  hours: number | null;
+interface TeamMemberShift {
+  employee_id: string;
+  team_id: string;
+}
+
+interface TeamStandardShift {
+  id: string;
+  team_id: string;
+  start_time: string;
+  end_time: string;
+  hours_source: string | null;
+}
+
+interface ShiftDay {
+  shift_id: string;
+  day_of_week: number;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+interface TimeStampRecord {
+  employee_id: string;
   date: string;
+  clock_in: string | null;
+  clock_out: string | null;
+  break_minutes: number | null;
 }
 
 interface LeaderboardEntry {
@@ -193,7 +216,7 @@ Deno.serve(async (req) => {
     }
 
     // Calculate client-scoped KPIs for key metrics
-    const clientScopedKpis = ["sales_count", "total_commission", "total_revenue", "antal_salg", "total_provision"];
+    const clientScopedKpis = ["sales_count", "total_commission", "total_revenue", "total_hours", "antal_salg", "total_provision"];
     
     for (const client of clientList) {
       for (const period of periods) {
@@ -888,25 +911,148 @@ async function calculateTotalRevenue(
   return total;
 }
 
+// Shared shift data cache for performance (fetched once per execution)
+let shiftDataCache: {
+  teamMembers: TeamMemberShift[];
+  primaryShifts: TeamStandardShift[];
+  shiftDays: ShiftDay[];
+  timeStampsData: TimeStampRecord[];
+  startDate: string;
+  endDate: string;
+} | null = null;
+
+async function fetchShiftData(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string
+): Promise<typeof shiftDataCache> {
+  // Return cached data if available and date range matches
+  if (shiftDataCache && shiftDataCache.startDate === startStr && shiftDataCache.endDate === endStr) {
+    return shiftDataCache;
+  }
+
+  console.log("[HoursCalc] Fetching shift configuration data...");
+  
+  // Fetch team members
+  const { data: teamMembersData } = await supabase
+    .from("team_members")
+    .select("employee_id, team_id");
+  
+  const teamMembers = (teamMembersData || []) as TeamMemberShift[];
+  const teamIds = [...new Set(teamMembers.map(tm => tm.team_id))];
+  
+  // Fetch primary shifts for all teams
+  const { data: shiftsData } = await supabase
+    .from("team_standard_shifts")
+    .select("id, team_id, start_time, end_time, hours_source")
+    .in("team_id", teamIds)
+    .eq("is_active", true);
+  
+  const primaryShifts = (shiftsData || []) as TeamStandardShift[];
+  
+  // Fetch shift days for all shifts
+  const { data: daysData } = await supabase
+    .from("team_standard_shift_days")
+    .select("shift_id, day_of_week, start_time, end_time")
+    .in("shift_id", primaryShifts.map(s => s.id));
+  
+  const shiftDays = (daysData || []) as ShiftDay[];
+  
+  // Fetch timestamps for teams using 'timestamp' hours_source
+  const teamsUsingTimestamps = primaryShifts
+    .filter(s => s.hours_source === "timestamp")
+    .map(s => s.team_id);
+  
+  let timeStampsData: TimeStampRecord[] = [];
+  if (teamsUsingTimestamps.length > 0) {
+    const employeesWithTimestampTeams = teamMembers
+      .filter(tm => teamsUsingTimestamps.includes(tm.team_id))
+      .map(tm => tm.employee_id);
+    
+    if (employeesWithTimestampTeams.length > 0) {
+      const { data: stamps } = await supabase
+        .from("time_stamps")
+        .select("employee_id, date, clock_in, clock_out, break_minutes")
+        .in("employee_id", employeesWithTimestampTeams)
+        .gte("date", startStr.split("T")[0])
+        .lte("date", endStr.split("T")[0]);
+      
+      timeStampsData = (stamps || []) as TimeStampRecord[];
+    }
+  }
+  
+  shiftDataCache = { teamMembers, primaryShifts, shiftDays, timeStampsData, startDate: startStr, endDate: endStr };
+  console.log(`[HoursCalc] Loaded ${teamMembers.length} team members, ${primaryShifts.length} shifts, ${shiftDays.length} shift days`);
+  
+  return shiftDataCache;
+}
+
+function calculateHoursForEmployees(
+  employeeIds: string[],
+  startStr: string,
+  endStr: string,
+  shiftData: NonNullable<typeof shiftDataCache>
+): number {
+  const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
+  
+  let totalHours = 0;
+  const start = new Date(startStr.split("T")[0]);
+  const end = new Date(endStr.split("T")[0]);
+  
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split("T")[0];
+    const dayOfWeek = d.getDay();
+    const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+    
+    for (const empId of employeeIds) {
+      const empTeam = teamMembers.find(tm => tm.employee_id === empId);
+      if (!empTeam) continue;
+      
+      const empShift = primaryShifts.find(s => s.team_id === empTeam.team_id);
+      if (!empShift) continue;
+      
+      const hoursSource = empShift.hours_source || "shift";
+      const empShiftDays = shiftDays.filter(sd => sd.shift_id === empShift.id);
+      const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
+      
+      let hours = 0;
+      if (hoursSource === "timestamp") {
+        const empTimestamp = timeStampsData.find(ts => ts.employee_id === empId && ts.date === dateStr);
+        if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
+          const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
+          const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
+          const rawHours = outH + outM / 60 - (inH + inM / 60);
+          const breakMins = empTimestamp.break_minutes || 0;
+          hours = Math.max(0, rawHours - breakMins / 60);
+        }
+      } else {
+        if (shiftForDay?.start_time && shiftForDay?.end_time) {
+          const [startH, startM] = shiftForDay.start_time.split(":").map(Number);
+          const [endH, endM] = shiftForDay.end_time.split(":").map(Number);
+          const rawHours = endH + endM / 60 - (startH + startM / 60);
+          const breakMinutes = rawHours > 6 ? 30 : 0;
+          hours = rawHours - breakMinutes / 60;
+        }
+      }
+      totalHours += hours;
+    }
+  }
+  
+  return Math.round(totalHours * 100) / 100;
+}
+
 async function calculateTotalHours(
   supabase: SupabaseClient,
   startStr: string,
   endStr: string
 ): Promise<number> {
-  const { data, error } = await supabase
-    .from("employee_shifts")
-    .select("hours, date")
-    .gte("date", startStr.split("T")[0])
-    .lte("date", endStr.split("T")[0]);
-
-  if (error) {
-    console.error("Error fetching shifts:", error);
-    return 0;
-  }
-
-  const shifts = (data || []) as EmployeeShift[];
-
-  return shifts.reduce((sum, shift) => sum + (shift.hours || 0), 0);
+  const shiftData = await fetchShiftData(supabase, startStr, endStr);
+  if (!shiftData) return 0;
+  
+  // Get all employee IDs
+  const allEmployeeIds = [...new Set(shiftData.teamMembers.map(tm => tm.employee_id))];
+  
+  return calculateHoursForEmployees(allEmployeeIds, startStr, endStr, shiftData);
 }
 
 async function calculateActiveEmployees(
@@ -1061,6 +1207,45 @@ async function calculateClientKpiValue(
       return ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
         return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
       }, 0);
+    }
+
+    case "total_hours":
+    case "total_timer": {
+      // Find all agent emails with sales for this client
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("agent_email")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
+      
+      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+      
+      if (agentEmails.length === 0) return 0;
+      
+      // Get agent IDs from emails
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, email")
+        .in("email", agentEmails);
+      
+      const agentIds = (agents || []).map((a: any) => a.id);
+      if (agentIds.length === 0) return 0;
+      
+      // Map agent IDs to employee IDs
+      const { data: agentMappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id")
+        .in("agent_id", agentIds);
+      
+      const employeeIds = [...new Set((agentMappings || []).map((m: any) => m.employee_id))];
+      if (employeeIds.length === 0) return 0;
+      
+      // Calculate hours for these specific employees
+      const shiftData = await fetchShiftData(supabase, startStr, endStr);
+      if (!shiftData) return 0;
+      
+      return calculateHoursForEmployees(employeeIds, startStr, endStr, shiftData);
     }
 
     default:
