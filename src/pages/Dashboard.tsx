@@ -1,26 +1,39 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ShoppingCart, Clock, AlertTriangle } from "lucide-react";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
-import { startOfMonth } from "date-fns";
+import { DollarSign, ShoppingCart, Clock, RefreshCw } from "lucide-react";
+import { usePrecomputedKpis, getKpiValue, getKpiDisplay } from "@/hooks/usePrecomputedKpi";
 
 export default function Dashboard() {
-  const today = new Date();
-  const monthStart = startOfMonth(today);
+  // Use cached KPIs instead of direct database queries
+  const { data: monthKpis, isLoading, dataUpdatedAt } = usePrecomputedKpis(
+    ["sales_count", "total_commission", "total_revenue", "live_sales_hours"],
+    "this_month",
+    "global"
+  );
 
-  const { totalSales, totalRevenue, totalCommission, totalHours, employeeStats, isLoading } = useDashboardSalesData({
-    startDate: monthStart,
-    endDate: today,
-  });
+  const totalSales = getKpiValue(monthKpis?.sales_count, 0);
+  const totalCommission = getKpiValue(monthKpis?.total_commission, 0);
+  const totalRevenue = getKpiValue(monthKpis?.total_revenue, 0);
+  const totalHours = getKpiValue(monthKpis?.live_sales_hours, 0);
 
-  const unmappedEmployees = employeeStats.filter(e => e.totalSales === 0 && e.totalHours > 0).length;
+  const lastUpdated = dataUpdatedAt 
+    ? new Date(dataUpdatedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overblik over salg denne måned (kun mappede medarbejdere)</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Overblik over salg denne måned</p>
+          </div>
+          {lastUpdated && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RefreshCw className="h-3 w-3" />
+              <span>Opdateret {lastUpdated}</span>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
@@ -32,7 +45,7 @@ export default function Dashboard() {
               <div className="text-2xl font-bold">
                 {isLoading ? "..." : totalCommission.toLocaleString("da-DK")} DKK
               </div>
-              <p className="text-xs text-muted-foreground">Baseret på dagsrapporter</p>
+              <p className="text-xs text-muted-foreground">Fra cached KPIs</p>
             </CardContent>
           </Card>
           <Card>
@@ -44,7 +57,7 @@ export default function Dashboard() {
               <div className="text-2xl font-bold">
                 {isLoading ? "..." : totalRevenue.toLocaleString("da-DK")} DKK
               </div>
-              <p className="text-xs text-muted-foreground">Baseret på dagsrapporter</p>
+              <p className="text-xs text-muted-foreground">Fra cached KPIs</p>
             </CardContent>
           </Card>
           <Card>
@@ -54,7 +67,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{isLoading ? "..." : totalSales}</div>
-              <p className="text-xs text-muted-foreground">Kun mappede medarbejdere</p>
+              <p className="text-xs text-muted-foreground">Fra cached KPIs</p>
             </CardContent>
           </Card>
           <Card>
@@ -64,24 +77,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{isLoading ? "..." : totalHours.toLocaleString("da-DK")}</div>
-              <p className="text-xs text-muted-foreground">Fra vagtplaner/timestamps</p>
+              <p className="text-xs text-muted-foreground">Fra cached KPIs</p>
             </CardContent>
           </Card>
         </div>
-
-        {unmappedEmployees > 0 && (
-          <Card className="border-amber-500/50 bg-amber-500/5">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              <CardTitle className="text-amber-500">Medarbejdere uden salg</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                <span className="font-bold text-amber-500">{unmappedEmployees}</span> medarbejdere har timer men ingen registrerede salg.
-              </p>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </MainLayout>
   );
