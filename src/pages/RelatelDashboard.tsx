@@ -10,6 +10,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
+import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { getClientId } from "@/utils/clientIds";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -97,7 +99,15 @@ export default function RelatelDashboard() {
 
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(today);
+
+  // Get client ID for cached KPIs
+  const relatelClientId = getClientId("Relatel");
+
+  // Fetch cached KPIs for hero cards (fast, pre-computed)
+  const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
+    relatelClientId || null,
+    ["sales_count", "total_commission", "total_revenue"]
+  );
 
   // Fetch TV data from edge function (bypasses RLS for TV mode)
   const { data: tvData } = useQuery<TvRelatelData>({
@@ -113,39 +123,34 @@ export default function RelatelDashboard() {
       return response.json();
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes
+    staleTime: 60000,
   });
 
-  // Fetch sales for today
+  // Fetch sales data ONLY for leaderboards (need individual seller stats)
+  // Use longer refetch interval since hero KPIs come from cache
   const dailySalesData = useDashboardSalesData({
     clientName: "relatel",
     startDate: today,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000,
   });
 
-  // Fetch sales for this week
   const weeklySalesData = useDashboardSalesData({
     clientName: "relatel",
     startDate: weekStart,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000,
   });
 
-  // Fetch sales for payroll period (lønperiode)
   const payrollSalesData = useDashboardSalesData({
     clientName: "relatel",
     startDate: payrollPeriod.start,
     endDate: new Date(),
-    enabled: !tvMode
-  });
-
-  // Fetch sales for this month
-  const monthlySalesData = useDashboardSalesData({
-    clientName: "relatel",
-    startDate: monthStart,
-    endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000,
   });
 
   // Fetch employee avatars and IDs
@@ -267,20 +272,31 @@ export default function RelatelDashboard() {
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = kpisLoading || dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
+  // Get sales counts from cached KPIs (or TV data in TV mode, or fallback to live data)
+  const todaySales = tvMode 
+    ? (tvData?.salesToday ?? 0) 
+    : getKpiValue(cachedKpis?.today?.sales_count, dailySalesData.totalSales);
+  const weekSales = tvMode 
+    ? (tvData?.salesWeek ?? 0) 
+    : getKpiValue(cachedKpis?.this_week?.sales_count, weeklySalesData.totalSales);
+  const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
+  const payrollSales = tvMode 
+    ? (tvData?.salesMonth ?? 0) 
+    : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
+
+  // Hours still come from live data (for now)
+  const todayHours = dailySalesData.totalHours;
+  const weekHours = weeklySalesData.totalHours;
+  const payrollHours = payrollSalesData.totalHours;
+
   // Calculate sales per hour
-  const dailySalesPerHour = dailySalesData.totalHours > 0 
-    ? dailySalesData.totalSales / dailySalesData.totalHours 
-    : 0;
-  const weeklySalesPerHour = weeklySalesData.totalHours > 0 
-    ? weeklySalesData.totalSales / weeklySalesData.totalHours 
-    : 0;
-  const payrollSalesPerHour = payrollSalesData.totalHours > 0 
-    ? payrollSalesData.totalSales / payrollSalesData.totalHours 
-    : 0;
+  const dailySalesPerHour = todayHours > 0 ? todaySales / todayHours : 0;
+  const weeklySalesPerHour = weekHours > 0 ? weekSales / weekHours : 0;
+  const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;
 
   return (
     <div className={tvMode 
@@ -302,7 +318,7 @@ export default function RelatelDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+                {todaySales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -315,7 +331,7 @@ export default function RelatelDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+                {weekSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -328,7 +344,7 @@ export default function RelatelDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+                {monthSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
             </CardContent>
@@ -341,7 +357,7 @@ export default function RelatelDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales}
+                {payrollSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>
@@ -360,7 +376,7 @@ export default function RelatelDashboard() {
                 {dailySalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {dailySalesData.totalSales} salg / {dailySalesData.totalHours.toFixed(1)} timer
+                {todaySales} salg / {todayHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
@@ -375,7 +391,7 @@ export default function RelatelDashboard() {
                 {weeklySalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {weeklySalesData.totalSales} salg / {weeklySalesData.totalHours.toFixed(1)} timer
+                {weekSales} salg / {weekHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
@@ -390,7 +406,7 @@ export default function RelatelDashboard() {
                 {payrollSalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {payrollSalesData.totalSales} salg / {payrollSalesData.totalHours.toFixed(1)} timer
+                {payrollSales} salg / {payrollHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
