@@ -90,6 +90,32 @@ interface LeaderboardCache {
   calculated_at: string;
 }
 
+// Batch fetch sale_items to avoid 1000-row limit
+async function fetchAllSaleItems(
+  supabase: SupabaseClient,
+  saleIds: string[]
+): Promise<{ sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[]> {
+  if (saleIds.length === 0) return [];
+  
+  const BATCH_SIZE = 500;
+  const allItems: { sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[] = [];
+  
+  for (let i = 0; i < saleIds.length; i += BATCH_SIZE) {
+    const batch = saleIds.slice(i, i + BATCH_SIZE);
+    const { data: items } = await supabase
+      .from("sale_items")
+      .select("sale_id, quantity, mapped_commission, product_id")
+      .in("sale_id", batch);
+    
+    if (items) {
+      allItems.push(...items);
+    }
+  }
+  
+  console.log(`[fetchAllSaleItems] Fetched ${allItems.length} items from ${saleIds.length} sales in ${Math.ceil(saleIds.length / BATCH_SIZE)} batches`);
+  return allItems;
+}
+
 // Date helpers
 function getStartOfDay(date: Date): Date {
   const d = new Date(date);
@@ -635,11 +661,8 @@ async function calculateGlobalLeaderboard(
 
   const saleIds = sales.map(s => s.id);
   
-  // Get sale items with commission
-  const { data: saleItems } = await supabase
-    .from("sale_items")
-    .select("sale_id, quantity, mapped_commission, product_id")
-    .in("sale_id", saleIds);
+  // Get sale items with commission using batch fetch to avoid 1000-row limit
+  const saleItems = await fetchAllSaleItems(supabase, saleIds);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
@@ -715,7 +738,7 @@ async function calculateGlobalLeaderboard(
       // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
       const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
         ? item.mapped_commission
-        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+        : (item.product_id ? (productCommissionMap.get(item.product_id) || 0) : 0) * (item.quantity || 1);
       saleCommission += itemCommission;
     }
     
@@ -823,11 +846,8 @@ async function calculateTeamLeaderboard(
 
   const saleIds = teamSales.map(s => s.id);
   
-  // Get sale items with commission
-  const { data: saleItems } = await supabase
-    .from("sale_items")
-    .select("sale_id, quantity, mapped_commission, product_id")
-    .in("sale_id", saleIds);
+  // Get sale items with commission using batch fetch to avoid 1000-row limit
+  const saleItems = await fetchAllSaleItems(supabase, saleIds);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
@@ -864,7 +884,7 @@ async function calculateTeamLeaderboard(
       // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
       const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
         ? item.mapped_commission
-        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+        : (item.product_id ? (productCommissionMap.get(item.product_id) || 0) : 0) * (item.quantity || 1);
       saleCommission += itemCommission;
     }
     
@@ -941,11 +961,8 @@ async function calculateClientLeaderboard(
 
   const saleIds = sales.map(s => s.id);
   
-  // Get sale items with commission
-  const { data: saleItems } = await supabase
-    .from("sale_items")
-    .select("sale_id, quantity, mapped_commission, product_id")
-    .in("sale_id", saleIds);
+  // Get sale items with commission using batch fetch to avoid 1000-row limit
+  const saleItems = await fetchAllSaleItems(supabase, saleIds);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
@@ -1018,7 +1035,7 @@ async function calculateClientLeaderboard(
       // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
       const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
         ? item.mapped_commission
-        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+        : (item.product_id ? (productCommissionMap.get(item.product_id) || 0) : 0) * (item.quantity || 1);
       saleCommission += itemCommission;
     }
     
