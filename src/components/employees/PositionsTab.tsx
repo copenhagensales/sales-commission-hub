@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,36 +17,22 @@ import {
   Pencil,
   Trash2,
   Shield,
-  Eye,
-  Edit,
   Lock,
   Play,
-  Info,
-  Layers,
-  Database,
   User,
-  Users,
-  Globe,
   Search,
   Settings,
   Check,
-  X,
-  ChevronDown,
+  ExternalLink,
+  Eye,
+  Info,
 } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  PERMISSION_CATEGORIES,
-  LANDING_PAGE_OPTIONS,
-  generateAllPermissions,
-  type DataScope,
-  type Permission,
-  type PermissionCategory,
-} from "@/config/permissions";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { LANDING_PAGE_OPTIONS } from "@/config/permissions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Owner position name - this position is locked and cannot be edited
 const OWNER_POSITION_NAME = "Ejer";
@@ -59,7 +45,6 @@ interface JobPosition {
   name: string;
   description: string | null;
   default_landing_page: string | null;
-  permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
   is_active: boolean;
   created_at: string;
   requires_mfa: boolean;
@@ -83,7 +68,6 @@ interface FormData {
   name: string;
   description: string;
   default_landing_page: string;
-  permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
   requires_mfa: boolean;
   session_timeout_minutes: number;
   max_session_hours: number;
@@ -108,7 +92,6 @@ export function PositionsTab() {
     name: "",
     description: "",
     default_landing_page: "/home",
-    permissions: {},
     requires_mfa: false,
     session_timeout_minutes: 60,
     max_session_hours: 10,
@@ -117,8 +100,6 @@ export function PositionsTab() {
   });
   const [newIpName, setNewIpName] = useState("");
   const [newIpAddress, setNewIpAddress] = useState("");
-  const [permissionSearch, setPermissionSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // Test dialog state
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
@@ -135,7 +116,6 @@ export function PositionsTab() {
       if (error) throw error;
       return data.map((p) => ({
         ...p,
-        permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) || {},
         system_role_key: p.system_role_key || null,
       })) as JobPosition[];
     },
@@ -189,7 +169,6 @@ export function PositionsTab() {
         name: data.name,
         description: data.description || null,
         default_landing_page: data.default_landing_page || "/home",
-        permissions: data.permissions as unknown as Json,
         requires_mfa: data.requires_mfa,
         session_timeout_minutes: data.session_timeout_minutes,
         max_session_hours: data.max_session_hours,
@@ -217,7 +196,6 @@ export function PositionsTab() {
           name: data.name,
           description: data.description || null,
           default_landing_page: data.default_landing_page || "/home",
-          permissions: data.permissions as unknown as Json,
           requires_mfa: data.requires_mfa,
           session_timeout_minutes: data.session_timeout_minutes,
           max_session_hours: data.max_session_hours,
@@ -261,7 +239,6 @@ export function PositionsTab() {
       name: "",
       description: "",
       default_landing_page: "/home",
-      permissions: {},
       requires_mfa: false,
       session_timeout_minutes: 60,
       max_session_hours: 10,
@@ -270,8 +247,6 @@ export function PositionsTab() {
     });
     setNewIpName("");
     setNewIpAddress("");
-    setPermissionSearch("");
-    setActiveCategory(null);
     setIsDialogOpen(true);
   };
 
@@ -283,7 +258,6 @@ export function PositionsTab() {
       name: position.name,
       description: position.description || "",
       default_landing_page: position.default_landing_page || "/home",
-      permissions: isOwner ? generateAllPermissions() : position.permissions,
       requires_mfa: isOwner ? true : position.requires_mfa ?? false,
       session_timeout_minutes: position.session_timeout_minutes ?? 60,
       max_session_hours: position.max_session_hours ?? 10,
@@ -292,8 +266,6 @@ export function PositionsTab() {
     });
     setNewIpName("");
     setNewIpAddress("");
-    setPermissionSearch("");
-    setActiveCategory(null);
     setIsDialogOpen(true);
   };
 
@@ -304,7 +276,6 @@ export function PositionsTab() {
       name: "",
       description: "",
       default_landing_page: "/home",
-      permissions: {},
       requires_mfa: false,
       session_timeout_minutes: 60,
       max_session_hours: 10,
@@ -313,8 +284,6 @@ export function PositionsTab() {
     });
     setNewIpName("");
     setNewIpAddress("");
-    setPermissionSearch("");
-    setActiveCategory(null);
   };
 
   // Get role badge color
@@ -352,18 +321,6 @@ export function PositionsTab() {
     setIsTestDialogOpen(false);
   };
 
-  // Filter categories and permissions based on search
-  const filteredCategories = useMemo(() => {
-    if (!permissionSearch.trim()) return PERMISSION_CATEGORIES;
-    const search = permissionSearch.toLowerCase();
-    return PERMISSION_CATEGORIES.map((cat) => ({
-      ...cat,
-      permissions: cat.permissions.filter(
-        (p) => p.label.toLowerCase().includes(search) || p.description.toLowerCase().includes(search),
-      ),
-    })).filter((cat) => cat.permissions.length > 0);
-  }, [permissionSearch]);
-
   const handleSubmit = () => {
     if (!formData.name.trim()) {
       toast.error("Navn er påkrævet");
@@ -375,80 +332,6 @@ export function PositionsTab() {
     } else {
       createMutation.mutate(formData);
     }
-  };
-  const getPermissionValue = (key: string, type?: "view" | "edit"): boolean => {
-    const value = formData.permissions[key];
-    if (type) {
-      if (typeof value === "object" && value !== null) {
-        return value[type] || false;
-      }
-      return false;
-    }
-    if (typeof value === "boolean") return value;
-    if (typeof value === "object" && value !== null) {
-      return value.view || value.edit || false;
-    }
-    return false;
-  };
-
-  const handlePermissionChange = (key: string, checked: boolean, type?: "view" | "edit") => {
-    setFormData((prev) => {
-      const newPermissions = { ...prev.permissions };
-
-      if (type) {
-        const currentValue =
-          typeof newPermissions[key] === "object"
-            ? (newPermissions[key] as { view: boolean; edit: boolean })
-            : { view: false, edit: false };
-
-        if (type === "edit" && checked) {
-          // If enabling edit, also enable view
-          newPermissions[key] = { view: true, edit: true };
-        } else if (type === "view" && !checked) {
-          // If disabling view, also disable edit
-          newPermissions[key] = { view: false, edit: false };
-        } else {
-          newPermissions[key] = { ...currentValue, [type]: checked };
-        }
-      } else {
-        newPermissions[key] = checked;
-      }
-
-      return { ...prev, permissions: newPermissions };
-    });
-  };
-
-  const handleScopeChange = (key: string, scope: DataScope) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: { ...prev.permissions, [key]: scope },
-    }));
-  };
-
-  const getScopeValue = (key: string): DataScope => {
-    const value = formData.permissions[key];
-    if (value === "egen" || value === "team" || value === "alt") {
-      return value;
-    }
-    return "egen"; // Default
-  };
-
-  const countActivePermissions = (
-    permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope> | null | undefined,
-  ) => {
-    if (!permissions) return 0;
-    let count = 0;
-    Object.entries(permissions).forEach(([key, value]) => {
-      // Don't count data scope permissions in this count
-      if (key.startsWith("scope_")) return;
-      if (typeof value === "boolean" && value) count++;
-      if (typeof value === "object" && value !== null && (value.view || value.edit)) count++;
-    });
-    return count;
-  };
-
-  const getTotalPermissions = () => {
-    return PERMISSION_CATEGORIES.reduce((acc, cat) => acc + cat.permissions.length, 0);
   };
 
   if (isLoading) {
@@ -527,7 +410,7 @@ export function PositionsTab() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleOpenEdit(position)}
-                          title="Se rettigheder (kan ikke redigeres)"
+                          title="Se indstillinger (kan ikke redigeres)"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -559,13 +442,13 @@ export function PositionsTab() {
       </Table>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingPosition && isOwnerPosition(editingPosition.name) ? (
                 <>
                   <Lock className="h-5 w-5 text-muted-foreground" />
-                  Se rettigheder for Ejer
+                  Se indstillinger for Ejer
                 </>
               ) : editingPosition ? (
                 "Rediger stilling"
@@ -578,18 +461,11 @@ export function PositionsTab() {
             )}
           </DialogHeader>
 
-          <Tabs defaultValue="basic" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="mx-6 mt-4 w-fit">
+          <Tabs defaultValue="basic" className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="basic" className="gap-2">
                 <Settings className="h-4 w-4" />
                 Grundlæggende
-              </TabsTrigger>
-              <TabsTrigger value="permissions" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Rettigheder
-                <Badge variant="secondary" className="ml-1">
-                  {countActivePermissions(formData.permissions)}/{getTotalPermissions()}
-                </Badge>
               </TabsTrigger>
               <TabsTrigger value="security" className="gap-2">
                 <Lock className="h-4 w-4" />
@@ -597,437 +473,178 @@ export function PositionsTab() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="basic" className="flex-1 px-6 py-4 overflow-auto">
-              <div className="space-y-6 max-w-xl">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Navn *</Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="F.eks. Teamleder"
-                      disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Beskrivelse</Label>
-                    <Input
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Kort beskrivelse"
-                      disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                    />
-                  </div>
-                </div>
-
-                {/* Role Assignment Section */}
+            <TabsContent value="basic" className="space-y-6 mt-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Systemrolle</Label>
-                  <Select
-                    value={formData.system_role_key || "none"}
-                    onValueChange={(value) => setFormData({ ...formData, system_role_key: value === "none" ? null : value })}
-                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                  >
-                    <SelectTrigger className="w-full max-w-xs">
-                      <SelectValue placeholder="Vælg rolle" />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-popover">
-                      <SelectItem value="none">Ingen rolle</SelectItem>
-                      {roleDefinitions.map((role) => (
-                        <SelectItem key={role.key} value={role.key}>
-                          <div className="flex items-center gap-2">
-                            <Badge className={getRoleBadgeClass(role.key)} variant="secondary">
-                              {role.label}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Rollen bestemmer stillingens rettigheder i systemet
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Standardside ved login</Label>
-                  <Select
-                    value={formData.default_landing_page}
-                    onValueChange={(value) => setFormData({ ...formData, default_landing_page: value })}
-                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                  >
-                    <SelectTrigger className="w-full max-w-xs">
-                      <SelectValue placeholder="Vælg startside" />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-popover">
-                      {LANDING_PAGE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Siden medarbejdere med denne stilling ser først ved login
-                  </p>
-                </div>
-
-              </div>
-            </TabsContent>
-
-            <TabsContent value="permissions" className="flex-1 flex flex-col min-h-0 overflow-hidden px-6 py-4">
-              {/* Search */}
-              <div className="flex gap-4 mb-4 flex-shrink-0">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Label>Navn *</Label>
                   <Input
-                    placeholder="Søg i rettigheder..."
-                    value={permissionSearch}
-                    onChange={(e) => setPermissionSearch(e.target.value)}
-                    className="pl-9"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="F.eks. Teamleder"
+                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Beskrivelse</Label>
+                  <Input
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Kort beskrivelse"
                     disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                   />
                 </div>
               </div>
 
-              {/* Categories accordion */}
-              <ScrollArea className="flex-1 min-h-0 -mx-2 px-2">
-                <TooltipProvider delayDuration={200}>
-                  <div className="space-y-2 pb-4">
-                    {filteredCategories
-                      .filter((c) => !c.key.startsWith("tabs_"))
-                      .map((category) => {
-                        const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
-                        const activeCount = isOwnerLocked
-                          ? category.permissions.length
-                          : category.permissions.filter((p) => getPermissionValue(p.key)).length;
+              {/* Role Assignment Section */}
+              <div className="space-y-2">
+                <Label>Systemrolle</Label>
+                <Select
+                  value={formData.system_role_key || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, system_role_key: value === "none" ? null : value })}
+                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                >
+                  <SelectTrigger className="w-full max-w-xs">
+                    <SelectValue placeholder="Vælg rolle" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50 bg-popover">
+                    <SelectItem value="none">Ingen rolle</SelectItem>
+                    {roleDefinitions.map((role) => (
+                      <SelectItem key={role.key} value={role.key}>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getRoleBadgeClass(role.key)} variant="secondary">
+                            {role.label}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Rollen bestemmer stillingens rettigheder i systemet
+                </p>
+              </div>
 
-                        // Find associated tab categories for this menu
-                        const tabCategories = filteredCategories.filter(
-                          (c) =>
-                            c.key.startsWith("tabs_") &&
-                            c.key.replace("tabs_", "menu_").replace(/_.*$/, "") ===
-                              category.key.replace("menu_", "").replace(/_.*$/, ""),
-                        );
+              <div className="space-y-2">
+                <Label>Standardside ved login</Label>
+                <Select
+                  value={formData.default_landing_page}
+                  onValueChange={(value) => setFormData({ ...formData, default_landing_page: value })}
+                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                >
+                  <SelectTrigger className="w-full max-w-xs">
+                    <SelectValue placeholder="Vælg startside" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50 bg-popover">
+                    {LANDING_PAGE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Siden medarbejdere med denne stilling ser først ved login
+                </p>
+              </div>
 
-                        // Calculate total tabs count
-                        const totalTabsCount = tabCategories.reduce((sum, tc) => sum + tc.permissions.length, 0);
-                        const activeTabsCount = isOwnerLocked
-                          ? totalTabsCount
-                          : tabCategories.reduce(
-                              (sum, tc) => sum + tc.permissions.filter((p) => getPermissionValue(p.key)).length,
-                              0,
-                            );
-
-                        const isExpanded = activeCategory === category.key;
-                        const hasAllPermissions =
-                          activeCount === category.permissions.length &&
-                          (totalTabsCount === 0 || activeTabsCount === totalTabsCount);
-
-                        return (
-                          <Card
-                            key={category.key}
-                            className={cn(
-                              "overflow-hidden transition-colors",
-                              hasAllPermissions && !isOwnerLocked && "border-green-500/50",
-                              isExpanded && "ring-1 ring-primary/30",
-                            )}
-                          >
-                            {/* Clickable header */}
-                            <button
-                              type="button"
-                              onClick={() => setActiveCategory(isExpanded ? null : category.key)}
-                              className={cn(
-                                "w-full py-3 px-4 flex items-center justify-between gap-3 transition-colors text-left",
-                                isExpanded ? "bg-primary/10" : "bg-muted/30 hover:bg-muted/50",
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="text-xl">{category.icon}</span>
-                                <div className="text-left">
-                                  <div className="text-sm font-medium">{category.label}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {category.permissions.length} menupunkter
-                                    {totalTabsCount > 0 && ` • ${totalTabsCount} faner`}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge
-                                  variant={hasAllPermissions ? "default" : "secondary"}
-                                  className={cn("text-xs", hasAllPermissions && !isOwnerLocked && "bg-green-600")}
-                                >
-                                  {activeCount + activeTabsCount}/{category.permissions.length + totalTabsCount}
-                                </Badge>
-                                <ChevronDown
-                                  className={cn(
-                                    "h-4 w-4 text-muted-foreground transition-transform",
-                                    isExpanded && "rotate-180",
-                                  )}
-                                />
-                              </div>
-                            </button>
-
-                            {/* Expandable content */}
-                            {isExpanded && (
-                              <CardContent className="p-0">
-                                {/* Menu permissions */}
-                                <div className="border-t">
-                                  <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground flex items-center gap-1.5 border-b">
-                                    <Shield className="h-3.5 w-3.5" />
-                                    Menupunkter
-                                  </div>
-                                  <div className="divide-y">
-                                    {category.permissions.map((permission) => (
-                                      <PermissionRow
-                                        key={permission.key}
-                                        permission={permission}
-                                        isOwnerLocked={!!isOwnerLocked}
-                                        getPermissionValue={getPermissionValue}
-                                        handlePermissionChange={handlePermissionChange}
-                                        getScopeValue={getScopeValue}
-                                        handleScopeChange={handleScopeChange}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Associated tabs - grouped by category */}
-                                {tabCategories.map(
-                                  (tabCategory) =>
-                                    tabCategory.permissions.length > 0 && (
-                                      <div key={tabCategory.key} className="border-t bg-muted/10">
-                                        <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground flex items-center gap-1.5 border-b">
-                                          <Layers className="h-3.5 w-3.5" />
-                                          {tabCategory.label}
-                                        </div>
-                                        <div className="divide-y">
-                                          {tabCategory.permissions.map((permission) => (
-                                            <PermissionRow
-                                              key={permission.key}
-                                              permission={permission}
-                                              isOwnerLocked={!!isOwnerLocked}
-                                              getPermissionValue={getPermissionValue}
-                                              handlePermissionChange={handlePermissionChange}
-                                              getScopeValue={getScopeValue}
-                                              handleScopeChange={handleScopeChange}
-                                              isSubItem
-                                            />
-                                          ))}
-                                        </div>
-                                      </div>
-                                    ),
-                                )}
-                              </CardContent>
-                            )}
-                          </Card>
-                        );
-                      })}
-                  </div>
-                </TooltipProvider>
-              </ScrollArea>
+              {/* Permission Editor Reference */}
+              <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 dark:text-blue-200">
+                  <span className="font-medium">Rettigheder administreres centralt.</span>{" "}
+                  For at redigere side- og funktionsadgang for denne rolle, gå til{" "}
+                  <Link 
+                    to="/employees" 
+                    className="font-medium underline hover:no-underline inline-flex items-center gap-1"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Medarbejdere → Rettigheder
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </AlertDescription>
+              </Alert>
             </TabsContent>
 
-            <TabsContent value="security" className="px-6 py-4 overflow-auto">
-              <div className="space-y-4 max-w-xl">
-                {/* MFA Settings */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      To-faktor-godkendelse (MFA)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="requires-mfa">Kræv MFA for denne stilling</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Medarbejdere med denne stilling skal bruge en authenticator-app ved login
-                        </p>
-                      </div>
-                      <Switch
-                        id="requires-mfa"
-                        checked={formData.requires_mfa}
-                        onCheckedChange={(checked) => setFormData({ ...formData, requires_mfa: checked })}
+            <TabsContent value="security" className="space-y-4 mt-4">
+              {/* MFA Settings */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    To-faktor-godkendelse (MFA)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="requires-mfa">Kræv MFA for denne stilling</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Medarbejdere med denne stilling skal bruge en authenticator-app ved login
+                      </p>
+                    </div>
+                    <Switch
+                      id="requires-mfa"
+                      checked={formData.requires_mfa}
+                      onCheckedChange={(checked) => setFormData({ ...formData, requires_mfa: checked })}
+                      disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Session Settings */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    Session-indstillinger
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="session-timeout">Inaktivitets-timeout (minutter)</Label>
+                      <Input
+                        id="session-timeout"
+                        type="number"
+                        min={5}
+                        max={480}
+                        value={formData.session_timeout_minutes}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          session_timeout_minutes: Math.max(5, Math.min(480, parseInt(e.target.value) || 60))
+                        })}
                         disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                       />
-                    </div>
-                    {editingPosition && isOwnerPosition(editingPosition.name) && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                        <Info className="h-3.5 w-3.5" />
-                        Ejer-stillingen har altid MFA aktiveret
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Trusted IP Ranges - only show when MFA is enabled */}
-                {formData.requires_mfa && (
-                  <Card className="border-dashed">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-primary" />
-                        Betroede IP-adresser (undtaget fra MFA)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Brugere på disse netværk springer MFA over automatisk ved login.
+                      <p className="text-xs text-muted-foreground">
+                        Tid før automatisk logout ved inaktivitet
                       </p>
-                      
-                      {/* List of existing IP ranges */}
-                      {formData.trusted_ip_ranges.length > 0 ? (
-                        <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
-                          {formData.trusted_ip_ranges.map((range, index) => (
-                            <div key={index} className="flex items-center justify-between p-2.5 bg-background rounded-md border">
-                              <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <Globe className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium">{range.name}</div>
-                                  <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                    {range.ip}
-                                  </code>
-                                </div>
-                              </div>
-                              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => {
-                                    setFormData(prev => ({
-                                      ...prev,
-                                      trusted_ip_ranges: prev.trusted_ip_ranges.filter((_, i) => i !== index)
-                                    }));
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed p-4 text-center">
-                          <Globe className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">
-                            Ingen betroede IP-adresser tilføjet endnu
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Add new IP range */}
-                      {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
-                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
-                          <div className="text-sm font-medium flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
-                            Tilføj ny IP-adresse
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">Navn</Label>
-                              <Input
-                                placeholder="F.eks. Hovedkontor"
-                                value={newIpName}
-                                onChange={(e) => setNewIpName(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">IP/CIDR</Label>
-                              <Input
-                                placeholder="82.103.140.0/24"
-                                value={newIpAddress}
-                                onChange={(e) => setNewIpAddress(e.target.value)}
-                                className="font-mono"
-                              />
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Format: Enkelt IP, CIDR (82.103.140.0/24), eller wildcard (82.103.*.*)
-                          </p>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              if (newIpName.trim() && newIpAddress.trim()) {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  trusted_ip_ranges: [
-                                    ...prev.trusted_ip_ranges,
-                                    { name: newIpName.trim(), ip: newIpAddress.trim() }
-                                  ]
-                                }));
-                                setNewIpName("");
-                                setNewIpAddress("");
-                              }
-                            }}
-                            disabled={!newIpName.trim() || !newIpAddress.trim()}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Tilføj
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Session Timeout Settings */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Settings className="h-4 w-4" />
-                      Session-indstillinger
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="session-timeout">Inaktivitets-timeout (minutter)</Label>
-                        <Input
-                          id="session-timeout"
-                          type="number"
-                          min={5}
-                          max={480}
-                          value={formData.session_timeout_minutes}
-                          onChange={(e) => setFormData({ 
-                            ...formData, 
-                            session_timeout_minutes: Math.max(5, Math.min(480, parseInt(e.target.value) || 60))
-                          })}
-                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Tid før automatisk logout ved inaktivitet
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="max-session">Max session-varighed (timer)</Label>
-                        <Input
-                          id="max-session"
-                          type="number"
-                          min={1}
-                          max={24}
-                          value={formData.max_session_hours}
-                          onChange={(e) => setFormData({ 
-                            ...formData, 
-                            max_session_hours: Math.max(1, Math.min(24, parseInt(e.target.value) || 10))
-                          })}
-                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Maksimal tid før tvungen logout
-                        </p>
-                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="max-session">Max session-varighed (timer)</Label>
+                      <Input
+                        id="max-session"
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={formData.max_session_hours}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          max_session_hours: Math.max(1, Math.min(24, parseInt(e.target.value) || 10))
+                        })}
+                        disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maksimal tid før tvungen logout
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="px-6 py-4 border-t">
+          <DialogFooter className="mt-6">
             <Button variant="outline" onClick={handleCloseDialog}>
               {editingPosition && isOwnerPosition(editingPosition.name) ? "Luk" : "Annuller"}
             </Button>
@@ -1122,143 +739,6 @@ export function PositionsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// Separate component for permission row to keep things clean
-function PermissionRow({
-  permission,
-  isOwnerLocked,
-  getPermissionValue,
-  handlePermissionChange,
-  getScopeValue,
-  handleScopeChange,
-  isSubItem = false,
-}: {
-  permission: Permission;
-  isOwnerLocked: boolean;
-  getPermissionValue: (key: string, type?: "view" | "edit") => boolean;
-  handlePermissionChange: (key: string, checked: boolean, type?: "view" | "edit") => void;
-  getScopeValue: (key: string) => DataScope;
-  handleScopeChange: (key: string, scope: DataScope) => void;
-  isSubItem?: boolean;
-}) {
-  const hasView = isOwnerLocked || getPermissionValue(permission.key, "view");
-  const hasEdit = isOwnerLocked || getPermissionValue(permission.key, "edit");
-  const isActive = isOwnerLocked || getPermissionValue(permission.key);
-
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-3 px-3 py-2.5 transition-colors",
-        isOwnerLocked && "bg-green-500/5",
-        !isOwnerLocked && "hover:bg-muted/30",
-        isSubItem && "pl-6 bg-muted/10",
-      )}
-    >
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-primary cursor-help shrink-0" />
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-xs">
-            <p className="font-medium mb-1">{permission.label}</p>
-            <p className="text-muted-foreground text-xs">{permission.description}</p>
-          </TooltipContent>
-        </Tooltip>
-        <span className={cn("text-sm truncate", isActive ? "text-foreground" : "text-muted-foreground")}>
-          {permission.label}
-        </span>
-      </div>
-
-      {permission.hasEditOption ? (
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 bg-muted/50 rounded-md px-1.5 py-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => !isOwnerLocked && handlePermissionChange(permission.key, !hasView, "view")}
-                  disabled={isOwnerLocked}
-                  className={cn(
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors",
-                    hasView ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-                    isOwnerLocked && "cursor-default",
-                  )}
-                >
-                  <Eye className="h-3 w-3" />
-                  Se
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Kan se indhold</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => !isOwnerLocked && handlePermissionChange(permission.key, !hasEdit, "edit")}
-                  disabled={isOwnerLocked || !hasView}
-                  className={cn(
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors",
-                    hasEdit ? "bg-orange-500 text-white" : "text-muted-foreground hover:bg-muted",
-                    (isOwnerLocked || !hasView) && "cursor-default opacity-50",
-                  )}
-                >
-                  <Edit className="h-3 w-3" />
-                  Ret
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{!hasView ? "Aktiver 'Se' først" : "Kan redigere indhold"}</TooltipContent>
-            </Tooltip>
-          </div>
-          {/* 
-          {permission.scopeKey && hasView && (
-            <div className="flex items-center gap-1 text-xs border-l pl-2">
-              <Database className="h-3 w-3 text-muted-foreground" />
-              <RadioGroup
-                value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
-                onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
-                className="flex items-center gap-1"
-                disabled={isOwnerLocked}
-              >
-                {[
-                  { value: "egen", icon: User, label: "Egen" },
-                  { value: "team", icon: Users, label: "Team" },
-                  { value: "alt", icon: Globe, label: "Alt" },
-                ].map(({ value, icon: Icon, label }) => (
-                  <Tooltip key={value}>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center">
-                        <RadioGroupItem value={value} id={`${permission.scopeKey}-${value}`} className="sr-only" />
-                        <Label 
-                          htmlFor={`${permission.scopeKey}-${value}`} 
-                          className={cn(
-                            "px-1.5 py-0.5 rounded cursor-pointer flex items-center gap-0.5 transition-colors",
-                            (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey!)) === value 
-                              ? "bg-primary/20 text-primary font-medium" 
-                              : "text-muted-foreground hover:bg-muted",
-                            isOwnerLocked && "cursor-default"
-                          )}
-                        >
-                          <Icon className="h-3 w-3" />
-                        </Label>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>{label} data</TooltipContent>
-                  </Tooltip>
-                ))}
-              </RadioGroup>
-            </div>
-          )} */}
-        </div>
-      ) : (
-        <Switch
-          checked={isActive}
-          onCheckedChange={(checked) => handlePermissionChange(permission.key, checked)}
-          disabled={isOwnerLocked}
-        />
-      )}
     </div>
   );
 }
