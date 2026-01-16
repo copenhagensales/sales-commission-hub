@@ -54,9 +54,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Ret til at ændre virksomhedens kundemål på hjemsiden",
         hasEditOption: true,
       },
+      { key: "menu_h2h", label: "Head to Head", description: "Adgang til Head to Head", hasEditOption: false },
+      { key: "menu_commission_league", label: "Cph Sales Ligaen", description: "Adgang til provisionsligaen", hasEditOption: false },
       { key: "menu_messages_personal", label: "Beskeder", description: "Adgang til beskeder", hasEditOption: false },
       { key: "menu_my_schedule", label: "Min kalender", description: "Adgang til egen kalender", hasEditOption: false },
       { key: "menu_my_profile", label: "Min profil", description: "Adgang til egen profil", hasEditOption: true },
+      { key: "menu_my_goals", label: "Mine Mål", description: "Adgang til personlige mål", hasEditOption: false },
       {
         key: "menu_my_contracts",
         label: "Mine kontrakter",
@@ -69,6 +72,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til at udfylde karriereønsker",
         hasEditOption: false,
       },
+      { key: "menu_my_feedback", label: "Min Feedback", description: "Adgang til feedback", hasEditOption: false },
       {
         key: "menu_refer_a_friend",
         label: "Anbefal en ven",

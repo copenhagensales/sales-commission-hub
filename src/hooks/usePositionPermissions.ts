@@ -505,10 +505,15 @@ export function usePermissions() {
     canViewDashboardDesign: canView("menu_dashboard_design"),
     canViewDashboardSettings: canView("menu_dashboard_settings"),
     canViewDashboards: canView("menu_dashboards"),
-    // Personal menu
+    // Personal menu (Mit Hjem)
+    canViewHome: hasPermission("menu_home"),
+    canViewH2h: hasPermission("menu_h2h"),
+    canViewCommissionLeague: hasPermission("menu_commission_league"),
     canViewMyProfile: canView("menu_my_profile"),
+    canViewMyGoals: hasPermission("menu_my_goals"),
     canViewMyContracts: hasPermission("menu_my_contracts"),
     canViewCareerWishes: hasPermission("menu_career_wishes"),
+    canViewMyFeedback: hasPermission("menu_my_feedback"),
     canViewReferAFriend: hasPermission("menu_refer_a_friend"),
     canViewTimeStamp: hasPermission("menu_time_stamp"),
     // System menu
