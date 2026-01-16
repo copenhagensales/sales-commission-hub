@@ -115,7 +115,7 @@ export default function UnitedDashboard() {
       return response.json();
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s for at mindske database load
   });
 
   // Fetch United team's clients
@@ -162,7 +162,8 @@ export default function UnitedDashboard() {
     teamId: unitedTeamId || undefined,
     startDate: today,
     endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId
+    enabled: !tvMode && !!unitedTeamId,
+    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
   });
 
   // Fetch sales for this week
@@ -170,7 +171,8 @@ export default function UnitedDashboard() {
     teamId: unitedTeamId || undefined,
     startDate: weekStart,
     endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId
+    enabled: !tvMode && !!unitedTeamId,
+    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
   });
 
   // Fetch sales for payroll period (lønperiode)
@@ -178,7 +180,8 @@ export default function UnitedDashboard() {
     teamId: unitedTeamId || undefined,
     startDate: payrollPeriod.start,
     endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId
+    enabled: !tvMode && !!unitedTeamId,
+    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
   });
 
   // Fetch per-client sales data with actual hours using useDashboardSalesData pattern

@@ -23,6 +23,7 @@ const TrygDashboard = () => {
     clientName: "tryg",
     startDate: dateRange?.from || new Date(),
     endDate: dateRange?.to || new Date(),
+    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
   });
 
   const getSubtitle = () => {
