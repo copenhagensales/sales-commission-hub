@@ -260,7 +260,7 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_security_dashboard: 'Sikkerhedsoversigt',
   
   // ===== VAGTPLAN (under menu_section_vagtplan) =====
-  menu_shift_overview: 'Vagtplan oversigt',
+  menu_shift_overview: 'Vagtplan (leder)',
   menu_time_tracking: 'Tidsregistrering',
   menu_time_stamp: 'Tidsstempling',
   menu_closing_shifts: 'Lukkevagter',
