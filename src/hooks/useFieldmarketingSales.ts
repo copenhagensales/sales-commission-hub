@@ -26,6 +26,7 @@ export interface FieldmarketingSale {
 export function useFieldmarketingSales(clientId?: string) {
   return useQuery({
     queryKey: ["fieldmarketing-sales", clientId],
+    staleTime: 60000, // 1 minut
     queryFn: async () => {
       let query = supabase
         .from("fieldmarketing_sales")
@@ -51,6 +52,7 @@ export function useFieldmarketingSales(clientId?: string) {
 export function useFieldmarketingSalesStats(clientId?: string) {
   return useQuery({
     queryKey: ["fieldmarketing-sales-stats", clientId],
+    staleTime: 60000, // 1 minut
     queryFn: async () => {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();

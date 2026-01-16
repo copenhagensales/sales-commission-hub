@@ -48,7 +48,7 @@ export function IntegrationLogs() {
       if (error) throw error;
       return (data || []) as IntegrationLog[];
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
   });
 
   const getStatusBadge = (status: string) => {

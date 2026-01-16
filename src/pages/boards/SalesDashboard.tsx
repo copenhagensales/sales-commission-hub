@@ -90,8 +90,8 @@ export default function SalesDashboard() {
         })) as TopSeller[],
       })) as ClientStats[];
     },
-    refetchInterval: 30000,
-    staleTime: 0,
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
+    staleTime: 60000,
     enabled: isUnlocked,
   });
 

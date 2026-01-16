@@ -197,8 +197,8 @@ export default function MgTestDashboard() {
       return results.sort((a, b) => b.salesMonth - a.salesMonth);
     },
     enabled: clients.length > 0,
-    refetchInterval: 30000,
-    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
+    staleTime: 60000,
   });
 
   const formatCurrency = (value: number) => {

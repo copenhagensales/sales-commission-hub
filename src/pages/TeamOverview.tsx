@@ -185,7 +185,8 @@ export default function TeamOverview() {
 
       return teamData;
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
+    staleTime: 60000,
   });
 
   const toggleTeam = (teamId: string) => {
