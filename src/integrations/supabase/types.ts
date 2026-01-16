@@ -5019,6 +5019,39 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_leaderboard_cache: {
+        Row: {
+          calculated_at: string
+          created_at: string | null
+          id: string
+          leaderboard_data: Json
+          period_type: string
+          scope_id: string | null
+          scope_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          leaderboard_data?: Json
+          period_type: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          leaderboard_data?: Json
+          period_type?: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lateness_record: {
         Row: {
           created_at: string

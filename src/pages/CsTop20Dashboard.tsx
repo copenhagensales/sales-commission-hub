@@ -1,12 +1,11 @@
 import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfWeek } from "date-fns";
+import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+import { useCachedLeaderboards, getInitials as getInitialsFromHook, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { Trophy, Calendar, Clock } from "lucide-react";
 
 // Check if we're in TV mode
@@ -28,12 +27,6 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
   }, [enabled, intervalMs]);
 };
 
-interface TvCsTop20Data {
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
-  sellersPayroll: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null; teamName?: string }>;
-}
-
 // Calculate payroll period (15th to 14th)
 function calculatePayrollPeriod(): { start: Date; end: Date } {
   const today = new Date();
@@ -53,22 +46,7 @@ function calculatePayrollPeriod(): { start: Date; end: Date } {
 const formatCurrency = (value: number) => 
   new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value);
 
-const getInitials = (name: string) => {
-  const parts = name.split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  }
-  return name.substring(0, 2).toUpperCase();
-};
-
-// Format name as "Firstname L." for better display
-const getDisplayName = (name: string) => {
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}`;
-  }
-  return name;
-};
+const getInitials = (name: string) => getInitialsFromHook(name);
 
 // Commission color thresholds based on period type
 const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payroll') => {
@@ -91,6 +69,18 @@ const getRankBadge = (index: number) => {
   return null;
 };
 
+// Get short team name (first word or abbreviation)
+const getShortTeamName = (teamName?: string | null) => {
+  if (!teamName) return null;
+  // Common abbreviations
+  if (teamName.toLowerCase().includes('tdc')) return 'TDC';
+  if (teamName.toLowerCase().includes('eesy')) return 'Eesy';
+  if (teamName.toLowerCase().includes('relatel')) return 'Relatel';
+  if (teamName.toLowerCase().includes('united')) return 'United';
+  // Default: first word
+  return teamName.split(' ')[0];
+};
+
 export default function CsTop20Dashboard() {
   const tvMode = isTvMode();
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
@@ -98,11 +88,18 @@ export default function CsTop20Dashboard() {
   // Auto-reload for TV mode to pick up layout/code changes
   useAutoReload(tvMode);
 
-  const today = startOfDay(new Date());
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  // Use cached leaderboards - massively reduces database queries
+  const { sellersToday, sellersWeek, sellersPayroll, isLoading } = useCachedLeaderboards(
+    { type: "global" },
+    { enabled: true, limit: 20 }
+  );
 
-  // Fetch TV data from edge function (bypasses RLS for TV mode)
-  const { data: tvData } = useQuery<TvCsTop20Data>({
+  // For TV mode, also fetch from edge function as fallback (will be phased out)
+  const { data: tvData } = useQuery<{
+    sellersToday: LeaderboardEntry[];
+    sellersWeek: LeaderboardEntry[];
+    sellersPayroll: LeaderboardEntry[];
+  }>({
     queryKey: ["tv-cs-top-20-data"],
     queryFn: async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -114,127 +111,29 @@ export default function CsTop20Dashboard() {
       }
       return response.json();
     },
-    enabled: tvMode,
-    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
+    enabled: tvMode && sellersPayroll.length === 0, // Only use edge function if cache is empty
+    refetchInterval: 120000,
     staleTime: 60000,
   });
 
-  // Fetch sales for today (all clients)
-  const dailySalesData = useDashboardSalesData({
-    startDate: today,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 60s for at mindske database load
-  });
-
-  // Fetch sales for this week (all clients)
-  const weeklySalesData = useDashboardSalesData({
-    startDate: weekStart,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 60s for at mindske database load
-  });
-
-  // Fetch sales for payroll period (all clients)
-  const payrollSalesData = useDashboardSalesData({
-    startDate: payrollPeriod.start,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 60s for at mindske database load
-  });
-
-  // Fetch employee avatars, IDs, and team memberships
-  const { data: employeeData } = useQuery({
-    queryKey: ["employee-data-cs-top-20"],
-    queryFn: async () => {
-      const { data: employees } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, avatar_url")
-        .eq("is_active", true);
-      
-      // Fetch team memberships
-      const { data: teamMembers } = await supabase
-        .from("team_members")
-        .select("employee_id, teams(name)");
-      
-      const avatarMap = new Map<string, string>();
-      const nameToIdMap = new Map<string, string>();
-      const teamMap = new Map<string, string>();
-      
-      (employees || []).forEach(emp => {
-        const fullName = `${emp.first_name} ${emp.last_name}`;
-        nameToIdMap.set(fullName.toLowerCase(), emp.id);
-        if (emp.avatar_url) {
-          avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
-        }
-      });
-      
-      // Map employee IDs to team names
-      (teamMembers || []).forEach(tm => {
-        const teamName = (tm.teams as any)?.name;
-        if (teamName && tm.employee_id) {
-          // Get employee name from ID
-          const emp = (employees || []).find(e => e.id === tm.employee_id);
-          if (emp) {
-            const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
-            teamMap.set(fullName, teamName);
-          }
-        }
-      });
-      
-      return { avatarMap, nameToIdMap, teamMap };
-    },
-    enabled: !tvMode
-  });
-
-  // Sort employees by commission for each period - TOP 20
-  const sortedDailySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersToday) return tvData.sellersToday.slice(0, 20);
-    return [...dailySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission)
-      .slice(0, 20);
-  }, [dailySalesData.employeeStats, tvMode, tvData]);
+  // Use cached data, fallback to TV data for TV mode
+  const sortedPayrollSellers = useMemo(() => {
+    if (sellersPayroll.length > 0) return sellersPayroll;
+    if (tvMode && tvData?.sellersPayroll) return tvData.sellersPayroll;
+    return [];
+  }, [sellersPayroll, tvMode, tvData]);
 
   const sortedWeeklySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek.slice(0, 20);
-    return [...weeklySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission)
-      .slice(0, 20);
-  }, [weeklySalesData.employeeStats, tvMode, tvData]);
+    if (sellersWeek.length > 0) return sellersWeek;
+    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
+    return [];
+  }, [sellersWeek, tvMode, tvData]);
 
-  const sortedPayrollSellers = useMemo(() => {
-    if (tvMode && tvData?.sellersPayroll) return tvData.sellersPayroll.slice(0, 20);
-    return [...payrollSalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission)
-      .slice(0, 20);
-  }, [payrollSalesData.employeeStats, tvMode, tvData]);
-
-  const getAvatarUrl = (name: string) => {
-    if (!employeeData?.avatarMap) return undefined;
-    return employeeData.avatarMap.get(name.toLowerCase());
-  };
-
-  const getTeamName = (name: string) => {
-    if (!employeeData?.teamMap) return undefined;
-    return employeeData.teamMap.get(name.toLowerCase());
-  };
-
-  // Get short team name (first word or abbreviation)
-  const getShortTeamName = (teamName?: string) => {
-    if (!teamName) return null;
-    // Common abbreviations
-    if (teamName.toLowerCase().includes('tdc')) return 'TDC';
-    if (teamName.toLowerCase().includes('eesy')) return 'Eesy';
-    if (teamName.toLowerCase().includes('relatel')) return 'Relatel';
-    if (teamName.toLowerCase().includes('united')) return 'United';
-    // Default: first word
-    return teamName.split(' ')[0];
-  };
-
-  const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const sortedDailySellers = useMemo(() => {
+    if (sellersToday.length > 0) return sellersToday;
+    if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
+    return [];
+  }, [sellersToday, tvMode, tvData]);
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
@@ -248,7 +147,7 @@ export default function CsTop20Dashboard() {
   }: { 
     title: string; 
     icon: React.ElementType; 
-    sellers: typeof sortedPayrollSellers; 
+    sellers: LeaderboardEntry[]; 
     period: 'day' | 'week' | 'payroll';
     accentColor: string;
   }) => (
@@ -272,16 +171,16 @@ export default function CsTop20Dashboard() {
         ) : (
           <div className={`divide-y ${tvMode ? 'divide-slate-700/50' : 'divide-border/50'}`}>
             {sellers.map((seller, index) => {
-              const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-              const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-              const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-              const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
+              const name = seller.employeeName;
+              const sales = seller.salesCount;
+              const commission = seller.commission;
+              const avatarUrl = seller.avatarUrl;
               const rankBadge = getRankBadge(index);
-              const displayName = getDisplayName(name);
+              const displayName = seller.displayName;
               
               return (
                 <div 
-                  key={name} 
+                  key={seller.employeeId || name} 
                   className={`flex items-center gap-2 transition-colors ${
                     tvMode ? 'px-3 py-2' : 'px-4 py-3 hover:bg-muted/50'
                   } ${
@@ -299,7 +198,7 @@ export default function CsTop20Dashboard() {
                   
                   {/* Avatar */}
                   <Avatar className={`flex-shrink-0 ring-2 ${tvMode ? 'h-9 w-9' : 'h-10 w-10'} ${index === 0 ? 'ring-yellow-400' : index < 3 ? 'ring-primary/30' : 'ring-transparent'}`}>
-                    <AvatarImage src={avatarUrl} alt={name} />
+                    <AvatarImage src={avatarUrl || undefined} alt={name} />
                     <AvatarFallback className={`font-semibold bg-primary/20 text-primary ${tvMode ? 'text-xs' : 'text-xs'}`}>
                       {getInitials(name)}
                     </AvatarFallback>
@@ -310,8 +209,7 @@ export default function CsTop20Dashboard() {
                     <div className="flex items-center gap-1.5">
                       <span className={`font-semibold truncate ${tvMode ? 'text-sm text-white' : 'text-sm'}`}>{displayName}</span>
                       {(() => {
-                        const teamName = 'teamName' in seller ? seller.teamName : getTeamName(name);
-                        const shortTeam = getShortTeamName(teamName);
+                        const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
                           <span className={`flex-shrink-0 rounded px-1 py-0.5 font-medium ${
                             tvMode 
