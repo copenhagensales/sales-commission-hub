@@ -48,6 +48,25 @@ interface EmployeeShift {
   date: string;
 }
 
+interface LeaderboardEntry {
+  employeeId: string;
+  employeeName: string;
+  displayName: string;
+  avatarUrl: string | null;
+  teamName: string | null;
+  salesCount: number;
+  commission: number;
+  goalTarget: number | null;
+}
+
+interface LeaderboardCache {
+  period_type: string;
+  scope_type: string;
+  scope_id: string | null;
+  leaderboard_data: LeaderboardEntry[];
+  calculated_at: string;
+}
+
 // Date helpers
 function getStartOfDay(date: Date): Date {
   const d = new Date(date);
@@ -103,6 +122,14 @@ function formatValue(value: number, category: string): string {
   return new Intl.NumberFormat("da-DK").format(value);
 }
 
+function formatDisplayName(fullName: string): string {
+  const parts = fullName.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+  }
+  return fullName;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -134,6 +161,7 @@ Deno.serve(async (req) => {
     }
 
     const cachedValues: CachedValue[] = [];
+    const leaderboardCaches: LeaderboardCache[] = [];
     const calculatedAt = now.toISOString();
 
     // Fetch clients for client-scoped KPIs
@@ -189,7 +217,98 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert all cached values
+    // ============= LEADERBOARD CACHE CALCULATION =============
+    console.log("Calculating global leaderboards...");
+    
+    // Fetch employee data for leaderboards
+    const { data: employees } = await supabase
+      .from("employee_master_data")
+      .select("id, first_name, last_name, avatar_url")
+      .eq("is_active", true);
+    
+    const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
+    (employees || []).forEach(emp => {
+      const fullName = `${emp.first_name} ${emp.last_name}`;
+      employeeMap.set(fullName.toLowerCase(), {
+        id: emp.id,
+        name: fullName,
+        avatarUrl: emp.avatar_url,
+      });
+    });
+    
+    // Fetch team memberships
+    const { data: teamMembers } = await supabase
+      .from("team_members")
+      .select("employee_id, teams(id, name)");
+    
+    const employeeTeamMap = new Map<string, string>();
+    (teamMembers || []).forEach(tm => {
+      const teamName = (tm.teams as any)?.name;
+      if (teamName && tm.employee_id) {
+        employeeTeamMap.set(tm.employee_id, teamName);
+      }
+    });
+    
+    // Calculate global leaderboards for each period
+    for (const period of periods) {
+      try {
+        const leaderboard = await calculateGlobalLeaderboard(
+          supabase,
+          period.start,
+          period.end,
+          employeeMap,
+          employeeTeamMap,
+          30 // Top 30
+        );
+        
+        leaderboardCaches.push({
+          period_type: period.type,
+          scope_type: "global",
+          scope_id: null,
+          leaderboard_data: leaderboard,
+          calculated_at: calculatedAt,
+        });
+        
+        console.log(`Calculated global leaderboard for ${period.type}: ${leaderboard.length} entries`);
+      } catch (err) {
+        console.error(`Error calculating global leaderboard for ${period.type}:`, err);
+      }
+    }
+    
+    // Fetch teams for team-scoped leaderboards
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id, name")
+      .eq("is_active", true);
+    
+    // Calculate team-scoped leaderboards
+    for (const team of (teams || []) as { id: string; name: string }[]) {
+      for (const period of periods) {
+        try {
+          const leaderboard = await calculateTeamLeaderboard(
+            supabase,
+            team.id,
+            period.start,
+            period.end,
+            employeeMap,
+            team.name,
+            20 // Top 20 per team
+          );
+          
+          leaderboardCaches.push({
+            period_type: period.type,
+            scope_type: "team",
+            scope_id: team.id,
+            leaderboard_data: leaderboard,
+            calculated_at: calculatedAt,
+          });
+        } catch (err) {
+          console.error(`Error calculating team leaderboard for ${team.name} ${period.type}:`, err);
+        }
+      }
+    }
+
+    // Upsert all cached KPI values
     if (cachedValues.length > 0) {
       const { error: upsertError } = await supabase
         .from("kpi_cached_values")
@@ -203,12 +322,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Successfully calculated ${cachedValues.length} KPI values`);
+    // Upsert all leaderboard caches
+    if (leaderboardCaches.length > 0) {
+      const { error: leaderboardError } = await supabase
+        .from("kpi_leaderboard_cache")
+        .upsert(leaderboardCaches, {
+          onConflict: "period_type,scope_type,scope_id",
+        });
+
+      if (leaderboardError) {
+        console.error("Error upserting leaderboard caches:", leaderboardError);
+        throw leaderboardError;
+      }
+    }
+
+    console.log(`Successfully calculated ${cachedValues.length} KPI values and ${leaderboardCaches.length} leaderboards`);
 
     return new Response(
       JSON.stringify({
         success: true,
         calculated: cachedValues.length,
+        leaderboards: leaderboardCaches.length,
         timestamp: calculatedAt,
       }),
       {
@@ -228,6 +362,234 @@ Deno.serve(async (req) => {
   }
 });
 
+// ============= LEADERBOARD CALCULATION FUNCTIONS =============
+
+async function calculateGlobalLeaderboard(
+  supabase: SupabaseClient,
+  startDate: Date,
+  endDate: Date,
+  employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
+  employeeTeamMap: Map<string, string>,
+  limit: number = 30
+): Promise<LeaderboardEntry[]> {
+  const startStr = startDate.toISOString();
+  const endStr = endDate.toISOString();
+
+  // Get all sales with agent info
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id, agent_name")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
+
+  if (!sales || sales.length === 0) return [];
+
+  const saleIds = sales.map(s => s.id);
+  
+  // Get sale items with commission
+  const { data: saleItems } = await supabase
+    .from("sale_items")
+    .select("sale_id, quantity, mapped_commission, product_id")
+    .in("sale_id", saleIds);
+
+  // Get products to check counts_as_sale
+  const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
+  let countingProductIds = new Set<string>();
+  
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, counts_as_sale")
+      .in("id", productIds);
+    
+    countingProductIds = new Set(
+      (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
+    );
+  }
+
+  // Aggregate by agent
+  const agentStats = new Map<string, { sales: number; commission: number }>();
+  
+  for (const sale of sales) {
+    if (!sale.agent_name) continue;
+    
+    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    let saleSales = 0;
+    let saleCommission = 0;
+    
+    for (const item of items) {
+      if (!item.product_id || countingProductIds.has(item.product_id)) {
+        saleSales += item.quantity || 1;
+      }
+      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+    }
+    
+    // If no items, count as 1 sale
+    if (items.length === 0) {
+      saleSales = 1;
+    }
+    
+    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
+    agentStats.set(sale.agent_name, {
+      sales: existing.sales + saleSales,
+      commission: existing.commission + saleCommission,
+    });
+  }
+
+  // Convert to leaderboard entries and sort
+  const entries: LeaderboardEntry[] = [];
+  
+  for (const [agentName, stats] of agentStats) {
+    if (stats.sales === 0) continue;
+    
+    const empInfo = employeeMap.get(agentName.toLowerCase());
+    const employeeId = empInfo?.id || "";
+    const teamName = employeeId ? employeeTeamMap.get(employeeId) || null : null;
+    
+    entries.push({
+      employeeId,
+      employeeName: empInfo?.name || agentName,
+      displayName: formatDisplayName(empInfo?.name || agentName),
+      avatarUrl: empInfo?.avatarUrl || null,
+      teamName,
+      salesCount: stats.sales,
+      commission: stats.commission,
+      goalTarget: null, // Could be added later
+    });
+  }
+  
+  // Sort by commission descending
+  entries.sort((a, b) => b.commission - a.commission);
+  
+  return entries.slice(0, limit);
+}
+
+async function calculateTeamLeaderboard(
+  supabase: SupabaseClient,
+  teamId: string,
+  startDate: Date,
+  endDate: Date,
+  employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
+  teamName: string,
+  limit: number = 20
+): Promise<LeaderboardEntry[]> {
+  const startStr = startDate.toISOString();
+  const endStr = endDate.toISOString();
+
+  // Get team member employee IDs
+  const { data: teamMemberData } = await supabase
+    .from("team_members")
+    .select("employee_id")
+    .eq("team_id", teamId);
+  
+  if (!teamMemberData || teamMemberData.length === 0) return [];
+  
+  const teamEmployeeIds = teamMemberData.map(tm => tm.employee_id);
+  
+  // Get employee names for matching
+  const { data: teamEmployees } = await supabase
+    .from("employee_master_data")
+    .select("id, first_name, last_name, avatar_url")
+    .in("id", teamEmployeeIds);
+  
+  const teamEmployeeNames = new Set(
+    (teamEmployees || []).map(e => `${e.first_name} ${e.last_name}`.toLowerCase())
+  );
+
+  // Get all sales with agent info
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id, agent_name")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
+
+  if (!sales || sales.length === 0) return [];
+
+  // Filter to team members only
+  const teamSales = sales.filter(s => 
+    s.agent_name && teamEmployeeNames.has(s.agent_name.toLowerCase())
+  );
+  
+  if (teamSales.length === 0) return [];
+
+  const saleIds = teamSales.map(s => s.id);
+  
+  // Get sale items with commission
+  const { data: saleItems } = await supabase
+    .from("sale_items")
+    .select("sale_id, quantity, mapped_commission, product_id")
+    .in("sale_id", saleIds);
+
+  // Get products to check counts_as_sale
+  const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
+  let countingProductIds = new Set<string>();
+  
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, counts_as_sale")
+      .in("id", productIds);
+    
+    countingProductIds = new Set(
+      (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
+    );
+  }
+
+  // Aggregate by agent
+  const agentStats = new Map<string, { sales: number; commission: number }>();
+  
+  for (const sale of teamSales) {
+    if (!sale.agent_name) continue;
+    
+    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    let saleSales = 0;
+    let saleCommission = 0;
+    
+    for (const item of items) {
+      if (!item.product_id || countingProductIds.has(item.product_id)) {
+        saleSales += item.quantity || 1;
+      }
+      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+    }
+    
+    if (items.length === 0) {
+      saleSales = 1;
+    }
+    
+    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
+    agentStats.set(sale.agent_name, {
+      sales: existing.sales + saleSales,
+      commission: existing.commission + saleCommission,
+    });
+  }
+
+  // Convert to leaderboard entries
+  const entries: LeaderboardEntry[] = [];
+  
+  for (const [agentName, stats] of agentStats) {
+    if (stats.sales === 0) continue;
+    
+    const empInfo = employeeMap.get(agentName.toLowerCase());
+    
+    entries.push({
+      employeeId: empInfo?.id || "",
+      employeeName: empInfo?.name || agentName,
+      displayName: formatDisplayName(empInfo?.name || agentName),
+      avatarUrl: empInfo?.avatarUrl || null,
+      teamName,
+      salesCount: stats.sales,
+      commission: stats.commission,
+      goalTarget: null,
+    });
+  }
+  
+  entries.sort((a, b) => b.commission - a.commission);
+  
+  return entries.slice(0, limit);
+}
+
+// ============= ORIGINAL KPI CALCULATION FUNCTIONS =============
+
 async function calculateKpiValue(
   supabase: SupabaseClient,
   kpi: KpiDefinition,
@@ -237,7 +599,6 @@ async function calculateKpiValue(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Handle specific KPI slugs with hardcoded logic
   switch (kpi.slug) {
     case "sales_count":
     case "antal_salg":
@@ -266,7 +627,6 @@ async function calculateKpiValue(
       return hours > 0 ? sales / hours : 0;
     
     default:
-      // If we have a formula, try to evaluate it
       if (kpi.calculation_formula) {
         return evaluateFormula(supabase, kpi.calculation_formula, startStr, endStr);
       }
@@ -279,7 +639,6 @@ async function calculateSalesCount(
   startStr: string,
   endStr: string
 ): Promise<number> {
-  // Count from sale_items where counts_as_sale = true
   const { data, error: siError } = await supabase
     .from("sale_items")
     .select("quantity, product_id, sale_id")
@@ -293,7 +652,6 @@ async function calculateSalesCount(
 
   const saleItems = (data || []) as SaleItem[];
 
-  // Get products to check counts_as_sale
   const productIds = [...new Set(saleItems.map(si => si.product_id).filter(Boolean))] as string[];
   
   let countingProductIds = new Set<string>();
@@ -311,7 +669,6 @@ async function calculateSalesCount(
     );
   }
 
-  // Sum quantities for counting products
   let count = 0;
   for (const item of saleItems) {
     if (!item.product_id || countingProductIds.has(item.product_id)) {
@@ -319,7 +676,6 @@ async function calculateSalesCount(
     }
   }
 
-  // Add fieldmarketing sales
   const { count: fmCount } = await supabase
     .from("fieldmarketing_sales")
     .select("*", { count: "exact", head: true })
@@ -374,7 +730,6 @@ async function calculateTotalRevenue(
     return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
   }, 0);
 
-  // Add fieldmarketing revenue
   const { data: fmData } = await supabase
     .from("fieldmarketing_sales")
     .select("revenue")
@@ -392,7 +747,6 @@ async function calculateTotalHours(
   startStr: string,
   endStr: string
 ): Promise<number> {
-  // Get from employee_shifts
   const { data, error } = await supabase
     .from("employee_shifts")
     .select("hours, date")
@@ -426,7 +780,6 @@ async function evaluateFormula(
   _startStr: string,
   _endStr: string
 ): Promise<number> {
-  // Simple formula evaluation - replace tokens like {sales_count} with actual values
   let evalFormula = formula;
   
   const tokenMatches = formula.match(/\{([^}]+)\}/g) || [];
@@ -434,7 +787,6 @@ async function evaluateFormula(
   for (const token of tokenMatches) {
     const slug = token.replace(/[{}]/g, "");
     
-    // Recursively get the cached value or calculate
     const { data: cached } = await supabase
       .from("kpi_cached_values")
       .select("value")
@@ -449,7 +801,6 @@ async function evaluateFormula(
   }
   
   try {
-    // Safe eval using Function constructor
     const result = new Function(`return ${evalFormula}`)();
     return typeof result === "number" && isFinite(result) ? result : 0;
   } catch {
@@ -468,10 +819,7 @@ async function calculateClientKpiValue(
 ): Promise<number> {
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
-  const startDateStr = startStr.split("T")[0];
-  const endDateStr = endStr.split("T")[0];
 
-  // Get all campaigns for this client
   const { data: campaigns } = await supabase
     .from("client_campaigns")
     .select("id")
@@ -486,7 +834,6 @@ async function calculateClientKpiValue(
   switch (kpiSlug) {
     case "sales_count":
     case "antal_salg": {
-      // Get sales for these campaigns
       const { data: sales } = await supabase
         .from("sales")
         .select("id")
@@ -497,13 +844,11 @@ async function calculateClientKpiValue(
       const saleIds = (sales || []).map((s: { id: string }) => s.id);
       if (saleIds.length === 0) return 0;
 
-      // Get sale_items for these sales
       const { data: saleItems } = await supabase
         .from("sale_items")
         .select("quantity, product_id")
         .in("sale_id", saleIds);
 
-      // Get products to check counts_as_sale
       const productIds = [...new Set((saleItems || []).map((si: any) => si.product_id).filter(Boolean))] as string[];
       
       let countingProductIds = new Set<string>();
