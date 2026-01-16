@@ -42,6 +42,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   // Fetch product commissions for this client
   const { data: productCommissions } = useQuery({
     queryKey: ["fieldmarketing-product-commissions", clientId],
+    staleTime: 120000, // 2 minutter
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
@@ -69,6 +70,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   // Fetch ALL sellers with sales this month and calculate commission
   const { data: topSellers } = useQuery({
     queryKey: ["fieldmarketing-month-sellers", clientId, productCommissions],
+    staleTime: 120000, // 2 minutter
     queryFn: async () => {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -106,6 +108,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   // Calculate today's sellers with sales and commission
   const { data: todaySellers } = useQuery({
     queryKey: ["fieldmarketing-today-sellers", clientId, productCommissions],
+    staleTime: 120000, // 2 minutter
     queryFn: async () => {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -353,6 +356,7 @@ const FieldmarketingDashboardFull = () => {
   // Fetch client logos dynamically from the database
   const { data: clients } = useQuery({
     queryKey: ["fieldmarketing-clients", Object.values(FIELDMARKETING_CLIENTS)],
+    staleTime: 300000, // 5 minutter - client data ændrer sig sjældent
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")

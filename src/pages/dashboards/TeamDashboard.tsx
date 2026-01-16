@@ -95,7 +95,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
       return res.json();
     },
     enabled: !!isTvMode,
-    refetchInterval: 30000, // Refresh every 30 seconds in TV mode
+    refetchInterval: 120000, // 2 minutter - reduceret fra 30s for at mindske database load
   });
   
   // Fetch team and its clients from team_clients table (only when not in TV mode)
