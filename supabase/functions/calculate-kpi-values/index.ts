@@ -442,10 +442,11 @@ Deno.serve(async (req) => {
       .select("id, first_name, last_name, avatar_url")
       .eq("is_active", true);
     
+    // Use employee ID as key for reliable lookups (not name which may not match agent_name)
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
     (employees || []).forEach(emp => {
       const fullName = `${emp.first_name} ${emp.last_name}`;
-      employeeMap.set(fullName.toLowerCase(), {
+      employeeMap.set(emp.id, {
         id: emp.id,
         name: fullName,
         avatarUrl: emp.avatar_url,
@@ -623,10 +624,10 @@ async function calculateGlobalLeaderboard(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Get all sales with agent info
+  // Get all sales with agent_email for proper matching
   const { data: sales } = await supabase
     .from("sales")
-    .select("id, agent_name")
+    .select("id, agent_email, agent_name")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
 
@@ -655,11 +656,51 @@ async function calculateGlobalLeaderboard(
     );
   }
 
-  // Aggregate by agent
-  const agentStats = new Map<string, { sales: number; commission: number }>();
+  // Collect unique agent emails for mapping lookup
+  const agentEmails = new Set<string>();
+  for (const sale of sales) {
+    if (sale.agent_email) {
+      agentEmails.add(sale.agent_email.toLowerCase());
+    }
+  }
+
+  // Get agents by email
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, email");
+  
+  const emailToAgentId = new Map<string, string>();
+  for (const agent of (agents || [])) {
+    if (agent.email) {
+      emailToAgentId.set(agent.email.toLowerCase(), agent.id);
+    }
+  }
+
+  // Get employee_agent_mapping to link agents to employees
+  const { data: agentMappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("agent_id, employee_id");
+  
+  const agentIdToEmployeeId = new Map<string, string>();
+  for (const mapping of (agentMappings || [])) {
+    agentIdToEmployeeId.set(mapping.agent_id, mapping.employee_id);
+  }
+
+  // Build email -> employee lookup
+  const emailToEmployeeId = new Map<string, string>();
+  for (const [email, agentId] of emailToAgentId) {
+    const employeeId = agentIdToEmployeeId.get(agentId);
+    if (employeeId) {
+      emailToEmployeeId.set(email, employeeId);
+    }
+  }
+
+  // Aggregate by agent email (use email as key for proper aggregation)
+  const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
   for (const sale of sales) {
-    if (!sale.agent_name) continue;
+    const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
+    if (!key) continue;
     
     const items = (saleItems || []).filter(si => si.sale_id === sale.id);
     let saleSales = 0;
@@ -677,32 +718,37 @@ async function calculateGlobalLeaderboard(
       saleSales = 1;
     }
     
-    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
-    agentStats.set(sale.agent_name, {
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: sale.agent_name || key };
+    agentStats.set(key, {
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
+      agentName: existing.agentName,
     });
   }
 
-  // Convert to leaderboard entries and sort
+  // Convert to leaderboard entries using proper employee mapping
   const entries: LeaderboardEntry[] = [];
   
-  for (const [agentName, stats] of agentStats) {
+  for (const [agentKey, stats] of agentStats) {
     if (stats.sales === 0) continue;
     
-    const empInfo = employeeMap.get(agentName.toLowerCase());
-    const employeeId = empInfo?.id || "";
+    // Try to find employee via email -> agent -> mapping -> employee
+    const employeeId = emailToEmployeeId.get(agentKey) || "";
+    const empInfo = employeeId ? employeeMap.get(employeeId) : null;
     const teamName = employeeId ? employeeTeamMap.get(employeeId) || null : null;
+    
+    // Use employee name if found, otherwise fallback to agent_name or email
+    const displayNameSource = empInfo?.name || stats.agentName || agentKey;
     
     entries.push({
       employeeId,
-      employeeName: empInfo?.name || agentName,
-      displayName: formatDisplayName(empInfo?.name || agentName),
+      employeeName: empInfo?.name || stats.agentName || agentKey,
+      displayName: formatDisplayName(displayNameSource),
       avatarUrl: empInfo?.avatarUrl || null,
       teamName,
       salesCount: stats.sales,
       commission: stats.commission,
-      goalTarget: null, // Could be added later
+      goalTarget: null,
     });
   }
   
@@ -732,30 +778,39 @@ async function calculateTeamLeaderboard(
   
   if (!teamMemberData || teamMemberData.length === 0) return [];
   
-  const teamEmployeeIds = teamMemberData.map(tm => tm.employee_id);
+  const teamEmployeeIds = new Set(teamMemberData.map(tm => tm.employee_id));
   
-  // Get employee names for matching
-  const { data: teamEmployees } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name, avatar_url")
-    .in("id", teamEmployeeIds);
+  // Get agent mappings for team members
+  const { data: agentMappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("employee_id, agent_id, agents(id, email)");
   
-  const teamEmployeeNames = new Set(
-    (teamEmployees || []).map(e => `${e.first_name} ${e.last_name}`.toLowerCase())
-  );
+  // Build set of agent emails that belong to team members
+  const teamAgentEmails = new Set<string>();
+  const emailToEmployeeId = new Map<string, string>();
+  
+  for (const mapping of (agentMappings || [])) {
+    if (teamEmployeeIds.has(mapping.employee_id)) {
+      const email = (mapping.agents as any)?.email?.toLowerCase();
+      if (email) {
+        teamAgentEmails.add(email);
+        emailToEmployeeId.set(email, mapping.employee_id);
+      }
+    }
+  }
 
-  // Get all sales with agent info
+  // Get all sales with agent_email
   const { data: sales } = await supabase
     .from("sales")
-    .select("id, agent_name")
+    .select("id, agent_email, agent_name")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
 
   if (!sales || sales.length === 0) return [];
 
-  // Filter to team members only
+  // Filter to team members by agent_email
   const teamSales = sales.filter(s => 
-    s.agent_name && teamEmployeeNames.has(s.agent_name.toLowerCase())
+    s.agent_email && teamAgentEmails.has(s.agent_email.toLowerCase())
   );
   
   if (teamSales.length === 0) return [];
@@ -783,11 +838,12 @@ async function calculateTeamLeaderboard(
     );
   }
 
-  // Aggregate by agent
-  const agentStats = new Map<string, { sales: number; commission: number }>();
+  // Aggregate by agent email
+  const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
   for (const sale of teamSales) {
-    if (!sale.agent_name) continue;
+    const key = sale.agent_email?.toLowerCase() || "";
+    if (!key) continue;
     
     const items = (saleItems || []).filter(si => si.sale_id === sale.id);
     let saleSales = 0;
@@ -804,25 +860,27 @@ async function calculateTeamLeaderboard(
       saleSales = 1;
     }
     
-    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
-    agentStats.set(sale.agent_name, {
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: sale.agent_name || key };
+    agentStats.set(key, {
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
+      agentName: existing.agentName,
     });
   }
 
   // Convert to leaderboard entries
   const entries: LeaderboardEntry[] = [];
   
-  for (const [agentName, stats] of agentStats) {
+  for (const [agentEmail, stats] of agentStats) {
     if (stats.sales === 0) continue;
     
-    const empInfo = employeeMap.get(agentName.toLowerCase());
+    const employeeId = emailToEmployeeId.get(agentEmail) || "";
+    const empInfo = employeeId ? employeeMap.get(employeeId) : null;
     
     entries.push({
-      employeeId: empInfo?.id || "",
-      employeeName: empInfo?.name || agentName,
-      displayName: formatDisplayName(empInfo?.name || agentName),
+      employeeId,
+      employeeName: empInfo?.name || stats.agentName || agentEmail,
+      displayName: formatDisplayName(empInfo?.name || stats.agentName || agentEmail),
       avatarUrl: empInfo?.avatarUrl || null,
       teamName,
       salesCount: stats.sales,
@@ -859,10 +917,10 @@ async function calculateClientLeaderboard(
   const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
   if (campaignIds.length === 0) return [];
 
-  // Get all sales for this client's campaigns
+  // Get all sales for this client's campaigns with agent_email
   const { data: sales } = await supabase
     .from("sales")
-    .select("id, agent_name")
+    .select("id, agent_email, agent_name")
     .in("client_campaign_id", campaignIds)
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
@@ -892,11 +950,48 @@ async function calculateClientLeaderboard(
     );
   }
 
-  // Aggregate by agent
-  const agentStats = new Map<string, { sales: number; commission: number }>();
+  // Build email -> employee mapping for this function
+  const agentEmails = new Set<string>();
+  for (const sale of sales) {
+    if (sale.agent_email) {
+      agentEmails.add(sale.agent_email.toLowerCase());
+    }
+  }
+
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, email");
+  
+  const emailToAgentId = new Map<string, string>();
+  for (const agent of (agents || [])) {
+    if (agent.email) {
+      emailToAgentId.set(agent.email.toLowerCase(), agent.id);
+    }
+  }
+
+  const { data: agentMappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("agent_id, employee_id");
+  
+  const agentIdToEmployeeId = new Map<string, string>();
+  for (const mapping of (agentMappings || [])) {
+    agentIdToEmployeeId.set(mapping.agent_id, mapping.employee_id);
+  }
+
+  const emailToEmployeeId = new Map<string, string>();
+  for (const [email, agentId] of emailToAgentId) {
+    const employeeId = agentIdToEmployeeId.get(agentId);
+    if (employeeId) {
+      emailToEmployeeId.set(email, employeeId);
+    }
+  }
+
+  // Aggregate by agent email
+  const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
   for (const sale of sales) {
-    if (!sale.agent_name) continue;
+    const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
+    if (!key) continue;
     
     const items = (saleItems || []).filter(si => si.sale_id === sale.id);
     let saleSales = 0;
@@ -909,32 +1004,32 @@ async function calculateClientLeaderboard(
       saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
     }
     
-    // If no items, count as 1 sale
     if (items.length === 0) {
       saleSales = 1;
     }
     
-    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
-    agentStats.set(sale.agent_name, {
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: sale.agent_name || key };
+    agentStats.set(key, {
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
+      agentName: existing.agentName,
     });
   }
 
-  // Convert to leaderboard entries and sort
+  // Convert to leaderboard entries
   const entries: LeaderboardEntry[] = [];
   
-  for (const [agentName, stats] of agentStats) {
+  for (const [agentKey, stats] of agentStats) {
     if (stats.sales === 0) continue;
     
-    const empInfo = employeeMap.get(agentName.toLowerCase());
-    const employeeId = empInfo?.id || "";
+    const employeeId = emailToEmployeeId.get(agentKey) || "";
+    const empInfo = employeeId ? employeeMap.get(employeeId) : null;
     const teamName = employeeId ? employeeTeamMap.get(employeeId) || null : null;
     
     entries.push({
       employeeId,
-      employeeName: empInfo?.name || agentName,
-      displayName: formatDisplayName(empInfo?.name || agentName),
+      employeeName: empInfo?.name || stats.agentName || agentKey,
+      displayName: formatDisplayName(empInfo?.name || stats.agentName || agentKey),
       avatarUrl: empInfo?.avatarUrl || null,
       teamName,
       salesCount: stats.sales,
