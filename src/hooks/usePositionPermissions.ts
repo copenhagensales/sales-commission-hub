@@ -44,6 +44,33 @@ function mapJobTitleToRoleKey(jobTitle: string | null | undefined): string {
   return 'medarbejder';
 }
 
+// Map visibility values from database to DataScope format
+function mapVisibilityToScope(visibility: string): DataScope {
+  switch (visibility) {
+    case 'all': return 'alt';
+    case 'team': return 'team';
+    case 'self': return 'egen';
+    default: return 'egen';
+  }
+}
+
+// Map permission keys to their corresponding scope keys
+// This connects role_page_permissions.visibility to the old scope_* system
+const PERMISSION_SCOPE_MAP: Record<string, string> = {
+  'menu_employees': 'scope_employees',
+  'menu_absence': 'scope_absence',
+  'menu_shift_overview': 'scope_shifts',
+  'menu_time_tracking': 'scope_time_tracking',
+  'menu_contracts': 'scope_contracts',
+  'menu_payroll': 'scope_payroll',
+  'menu_career_wishes_overview': 'scope_career_wishes',
+  'menu_fm_overview': 'scope_fieldmarketing',
+  'menu_extra_work': 'scope_extra_work',
+  'menu_some': 'scope_some',
+  'menu_sales': 'scope_sales',
+  'menu_car_quiz_admin': 'scope_quiz',
+};
+
 // localStorage cache key for permissions
 const PERMISSIONS_CACHE_KEY = 'cached-permissions-v1';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -188,10 +215,10 @@ export function usePositionPermissions() {
         }
 
         // CONSOLIDATED: Fetch permissions from role_page_permissions table (new system)
-        // instead of job_positions.permissions JSONB (old system)
+        // INCLUDING visibility for data scope
         const { data: rolePermissions, error: rolePermError } = await supabase
           .from("role_page_permissions")
-          .select("permission_key, can_view, can_edit")
+          .select("permission_key, can_view, can_edit, visibility")
           .eq("role_key", roleKey);
 
         if (rolePermError) {
@@ -208,8 +235,15 @@ export function usePositionPermissions() {
               view: rp.can_view ?? false, 
               edit: rp.can_edit ?? false 
             };
+            
+            // Map visibility to scope key for data access control
+            // Converts 'all'/'team'/'self' to 'alt'/'team'/'egen'
+            const scopeKey = PERMISSION_SCOPE_MAP[rp.permission_key];
+            if (scopeKey && rp.visibility) {
+              permissions[scopeKey] = mapVisibilityToScope(rp.visibility);
+            }
           });
-          console.log("usePositionPermissions: Using role_page_permissions", { 
+          console.log("usePositionPermissions: Using role_page_permissions with visibility", { 
             roleKey, 
             permCount: rolePermissions.length 
           });
