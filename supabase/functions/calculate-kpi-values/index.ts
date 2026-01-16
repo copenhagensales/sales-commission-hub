@@ -136,7 +136,14 @@ Deno.serve(async (req) => {
     const cachedValues: CachedValue[] = [];
     const calculatedAt = now.toISOString();
 
-    // Calculate each KPI for each period
+    // Fetch clients for client-scoped KPIs
+    const { data: clients } = await supabase
+      .from("clients")
+      .select("id, name");
+    
+    const clientList = (clients || []) as { id: string; name: string }[];
+
+    // Calculate each KPI for each period (global scope)
     for (const kpi of (kpiDefinitions as KpiDefinition[]) || []) {
       for (const period of periods) {
         try {
@@ -153,7 +160,31 @@ Deno.serve(async (req) => {
           });
         } catch (err) {
           console.error(`Error calculating ${kpi.slug} for ${period.type}:`, err);
-          // Continue with other KPIs
+        }
+      }
+    }
+
+    // Calculate client-scoped KPIs for key metrics
+    const clientScopedKpis = ["sales_count", "total_commission", "total_revenue", "antal_salg", "total_provision"];
+    
+    for (const client of clientList) {
+      for (const period of periods) {
+        for (const kpiSlug of clientScopedKpis) {
+          try {
+            const value = await calculateClientKpiValue(supabase, kpiSlug, client.id, period.start, period.end);
+            
+            cachedValues.push({
+              kpi_slug: kpiSlug,
+              period_type: period.type,
+              scope_type: "client",
+              scope_id: client.id,
+              value,
+              formatted_value: formatValue(value, kpiSlug.includes("commission") || kpiSlug.includes("revenue") ? "revenue" : "count"),
+              calculated_at: calculatedAt,
+            });
+          } catch (err) {
+            console.error(`Error calculating ${kpiSlug} for client ${client.id} ${period.type}:`, err);
+          }
         }
       }
     }
@@ -424,5 +455,124 @@ async function evaluateFormula(
   } catch {
     console.error("Error evaluating formula:", evalFormula);
     return 0;
+  }
+}
+
+// Client-scoped KPI calculation
+async function calculateClientKpiValue(
+  supabase: SupabaseClient,
+  kpiSlug: string,
+  clientId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<number> {
+  const startStr = startDate.toISOString();
+  const endStr = endDate.toISOString();
+  const startDateStr = startStr.split("T")[0];
+  const endDateStr = endStr.split("T")[0];
+
+  // Get all campaigns for this client
+  const { data: campaigns } = await supabase
+    .from("client_campaigns")
+    .select("id")
+    .eq("client_id", clientId);
+  
+  const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
+  
+  if (campaignIds.length === 0) {
+    return 0;
+  }
+
+  switch (kpiSlug) {
+    case "sales_count":
+    case "antal_salg": {
+      // Get sales for these campaigns
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("id")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
+      
+      const saleIds = (sales || []).map((s: { id: string }) => s.id);
+      if (saleIds.length === 0) return 0;
+
+      // Get sale_items for these sales
+      const { data: saleItems } = await supabase
+        .from("sale_items")
+        .select("quantity, product_id")
+        .in("sale_id", saleIds);
+
+      // Get products to check counts_as_sale
+      const productIds = [...new Set((saleItems || []).map((si: any) => si.product_id).filter(Boolean))] as string[];
+      
+      let countingProductIds = new Set<string>();
+      if (productIds.length > 0) {
+        const { data: productsData } = await supabase
+          .from("products")
+          .select("id, counts_as_sale")
+          .in("id", productIds);
+        
+        const products = (productsData || []) as Product[];
+        countingProductIds = new Set(
+          products.filter(p => p.counts_as_sale !== false).map(p => p.id)
+        );
+      }
+
+      let count = 0;
+      for (const item of (saleItems || []) as SaleItem[]) {
+        if (!item.product_id || countingProductIds.has(item.product_id)) {
+          count += item.quantity || 1;
+        }
+      }
+      return count;
+    }
+
+    case "total_commission":
+    case "total_provision": {
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("id")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
+      
+      const saleIds = (sales || []).map((s: { id: string }) => s.id);
+      if (saleIds.length === 0) return 0;
+
+      const { data: saleItems } = await supabase
+        .from("sale_items")
+        .select("mapped_commission, quantity")
+        .in("sale_id", saleIds);
+
+      return ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+        return sum + (item.mapped_commission || 0) * (item.quantity || 1);
+      }, 0);
+    }
+
+    case "total_revenue":
+    case "total_omsætning": {
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("id")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
+      
+      const saleIds = (sales || []).map((s: { id: string }) => s.id);
+      if (saleIds.length === 0) return 0;
+
+      const { data: saleItems } = await supabase
+        .from("sale_items")
+        .select("mapped_revenue, quantity")
+        .in("sale_id", saleIds);
+
+      return ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+        return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
+      }, 0);
+    }
+
+    default:
+      return 0;
   }
 }

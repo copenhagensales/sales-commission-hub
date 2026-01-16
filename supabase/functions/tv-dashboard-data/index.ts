@@ -8,7 +8,7 @@ const corsHeaders = {
 // ============= MAINTENANCE MODE =============
 // Set to true to disable all heavy queries and return empty data immediately
 // This frees up database connections for login/auth
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 // ============= IN-MEMORY CACHE =============
 // Cache results for 30 seconds to reduce database load
@@ -81,6 +81,24 @@ Deno.serve(async (req) => {
     const dashboard = url.searchParams.get("dashboard") || "cph-sales";
     const action = url.searchParams.get("action");
     const metric = url.searchParams.get("metric") || "sales_today";
+
+    // Handle cached KPI data request - reads from pre-computed kpi_cached_values table
+    if (action === "cached-kpis") {
+      const period = url.searchParams.get("period") || "today";
+      const scope = url.searchParams.get("scope") || "global";
+      const scopeId = url.searchParams.get("scope_id") || null;
+      const kpiSlugsParam = url.searchParams.get("kpis") || "";
+      const kpiSlugs = kpiSlugsParam.split(",").filter(Boolean);
+      
+      const cacheKey = `cached-kpis-${period}-${scope}-${scopeId || 'null'}-${kpiSlugs.join(",")}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleCachedKpis(supabase, kpiSlugs, period, scope, scopeId, corsHeaders, cacheKey);
+    }
 
     // Handle celebration data request (bypasses RLS for TV boards)
     if (action === "celebration-data") {
@@ -2261,6 +2279,76 @@ async function handleCsTop20Data(
       payroll: sellersPayroll.length
     }
   });
+
+  // Cache the result
+  if (cacheKey) {
+    setCache(cacheKey, result);
+  }
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle cached KPI data request - reads from pre-computed kpi_cached_values table
+// This is the primary endpoint for fetching KPI data for TV dashboards
+async function handleCachedKpis(
+  supabase: any,
+  kpiSlugs: string[],
+  period: string,
+  scopeType: string,
+  scopeId: string | null,
+  corsHeaders: Record<string, string>,
+  cacheKey?: string
+) {
+  console.log(`[CachedKpis] Fetching KPIs: ${kpiSlugs.join(", ")} for period=${period}, scope=${scopeType}, scopeId=${scopeId}`);
+
+  let query = supabase
+    .from("kpi_cached_values")
+    .select("kpi_slug, value, formatted_value, calculated_at")
+    .eq("period_type", period)
+    .eq("scope_type", scopeType);
+
+  if (kpiSlugs.length > 0) {
+    query = query.in("kpi_slug", kpiSlugs);
+  }
+
+  if (scopeId) {
+    query = query.eq("scope_id", scopeId);
+  } else {
+    query = query.is("scope_id", null);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[CachedKpis] Error fetching KPIs:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Convert to a map for easy access
+  const kpiMap: Record<string, { value: number; formatted_value: string | null; calculated_at: string }> = {};
+  (data || []).forEach((row: any) => {
+    kpiMap[row.kpi_slug] = {
+      value: row.value,
+      formatted_value: row.formatted_value,
+      calculated_at: row.calculated_at,
+    };
+  });
+
+  const result = {
+    kpis: kpiMap,
+    period,
+    scopeType,
+    scopeId,
+    fetchedAt: new Date().toISOString(),
+    count: Object.keys(kpiMap).length,
+  };
+
+  console.log(`[CachedKpis] Returning ${result.count} KPIs`);
 
   // Cache the result
   if (cacheKey) {
