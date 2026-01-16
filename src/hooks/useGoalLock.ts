@@ -48,11 +48,10 @@ export function useGoalLock() {
       if (!user?.id) return { isLocked: false, employeeId: null, payrollPeriod: null };
       
       // Get employee data to check salary type
-      // @ts-ignore - Supabase type chain too deep
       const { data: employee, error: empError } = await supabase
         .from("employee_master_data")
         .select("id, salary_type")
-        .eq("user_id", user.id)
+        .eq("auth_user_id", user.id)
         .maybeSingle();
       
       if (empError) throw empError;
