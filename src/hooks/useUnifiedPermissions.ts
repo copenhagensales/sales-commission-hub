@@ -225,6 +225,7 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_section_reports: 'Rapporter',
   menu_section_admin: 'Admin',
   menu_section_some: 'SOME',
+  menu_section_sales_system: 'Salg & System',
   
   // ===== MIT HJEM (under menu_section_personal) =====
   menu_home: 'Hjem',
@@ -352,9 +353,13 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_fm_locations: 'Lokationer',
   menu_fm_vagtplan_fm: 'Vagtplan FM',
   
-  // Legacy/andre
+  // ===== SALG & SYSTEM (under menu_section_sales_system) =====
   menu_sales: 'Salg',
+  menu_logics: 'Logikker',
+  menu_live_stats: 'Live Stats',
   menu_settings: 'Indstillinger',
+  
+  // Legacy/andre
   menu_leaderboard: 'Leaderboard',
   menu_my_sales: 'Mine salg',
   menu_my_shifts: 'Mine vagter',
