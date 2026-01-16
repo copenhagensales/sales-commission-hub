@@ -71,6 +71,20 @@ const formatValue = (value: number, kpiTypeId: string): string => {
   return formatted.replace(/\./g, " ");
 };
 
+// Mapping from hook KPI types to cached slugs
+const kpiTypeToSlug: Record<string, string> = {
+  "sales-count": "sales_count",
+  "commission": "total_commission",
+  "sales-revenue": "total_revenue",
+};
+
+// Mapping from hook periods to cache periods
+const periodToKpiPeriod: Record<string, string> = {
+  "today": "today",
+  "this-week": "this_week",
+  "this-month": "this_month",
+};
+
 export const useDashboardKpiData = () => {
   const [cache, setCache] = useState<Map<string, KpiDataResult>>(new Map());
 
@@ -80,8 +94,45 @@ export const useDashboardKpiData = () => {
 
   const fetchKpiData = useCallback(async (params: FetchParams): Promise<KpiDataResult> => {
     const { kpiTypeId, timePeriodId, customFromDate, clientId, teamId } = params;
-    const { start, end } = getDateRange(timePeriodId, customFromDate);
     
+    // ============= CACHE-FIRST OPTIMIZATION (Fase 9) =============
+    // Try to serve from kpi_cached_values first for standard periods
+    const cachedSlug = kpiTypeToSlug[kpiTypeId];
+    const cachedPeriod = periodToKpiPeriod[timePeriodId];
+    
+    if (cachedSlug && cachedPeriod && !customFromDate) {
+      try {
+        const scopeType = clientId ? "client" : teamId ? "team" : "global";
+        const scopeId = clientId || teamId || null;
+        
+        let query = supabase
+          .from("kpi_cached_values")
+          .select("value, formatted_value")
+          .eq("kpi_slug", cachedSlug)
+          .eq("period_type", cachedPeriod)
+          .eq("scope_type", scopeType);
+        
+        if (scopeId) {
+          query = query.eq("scope_id", scopeId);
+        } else {
+          query = query.is("scope_id", null);
+        }
+        
+        const { data } = await query.maybeSingle();
+        
+        if (data) {
+          return {
+            value: data.formatted_value || formatValue(data.value, kpiTypeId),
+            loading: false,
+          };
+        }
+      } catch (cacheError) {
+        console.warn("Cache lookup failed, falling back to direct query:", cacheError);
+      }
+    }
+    
+    // ============= FALLBACK: Direct database query =============
+    const { start, end } = getDateRange(timePeriodId, customFromDate);
     const startISO = start.toISOString();
     const endISO = end.toISOString();
 
