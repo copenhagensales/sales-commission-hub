@@ -10,6 +10,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
+import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { getClientId } from "@/utils/clientIds";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -112,7 +114,15 @@ export default function TdcErhvervDashboard() {
 
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(today);
+
+  // Get client ID for cached KPIs
+  const tdcClientId = getClientId("TDC Erhverv");
+
+  // Fetch cached KPIs for hero cards (fast, pre-computed)
+  const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
+    tdcClientId || null,
+    ["sales_count", "total_commission", "total_revenue"]
+  );
 
   // Fetch TV data from edge function (bypasses RLS for TV mode)
   const { data: tvData } = useQuery<TvTdcData>({
@@ -132,36 +142,30 @@ export default function TdcErhvervDashboard() {
     staleTime: 60000,
   });
 
-  // Fetch sales for today
+  // Fetch sales data ONLY for leaderboards (need individual seller stats)
+  // Use longer refetch interval since hero KPIs come from cache
   const dailySalesData = useDashboardSalesData({
     clientName: "TDC Erhverv",
     startDate: today,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000, // 2 minutes
   });
 
-  // Fetch sales for this week
   const weeklySalesData = useDashboardSalesData({
     clientName: "TDC Erhverv",
     startDate: weekStart,
     endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000,
   });
 
-  // Fetch sales for payroll period (lønperiode)
   const payrollSalesData = useDashboardSalesData({
     clientName: "TDC Erhverv",
     startDate: payrollPeriod.start,
     endDate: new Date(),
-    enabled: !tvMode
-  });
-
-  // Fetch sales for this month
-  const monthlySalesData = useDashboardSalesData({
-    clientName: "TDC Erhverv",
-    startDate: monthStart,
-    endDate: new Date(),
-    enabled: !tvMode
+    enabled: !tvMode,
+    refetchInterval: 120000,
   });
 
   // Fetch employee avatars and IDs
@@ -286,18 +290,26 @@ export default function TdcErhvervDashboard() {
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = kpisLoading || dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Calculate sales per hour (use TV data if in TV mode)
+  // Get sales counts from cached KPIs (or TV data in TV mode, or fallback to live data)
+  const todaySales = tvMode 
+    ? (tvData?.salesToday ?? 0) 
+    : getKpiValue(cachedKpis?.today?.sales_count, dailySalesData.totalSales);
+  const weekSales = tvMode 
+    ? (tvData?.salesWeek ?? 0) 
+    : getKpiValue(cachedKpis?.this_week?.sales_count, weeklySalesData.totalSales);
+  const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
+  const payrollSales = tvMode 
+    ? (tvData?.salesMonth ?? 0) 
+    : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
+
+  // Hours still come from live data (for now, until we cache them)
   const todayHours = tvMode ? (tvData?.hoursToday ?? 0) : dailySalesData.totalHours;
   const weekHours = tvMode ? (tvData?.hoursWeek ?? 0) : weeklySalesData.totalHours;
   const payrollHours = tvMode ? (tvData?.hoursPayroll ?? 0) : payrollSalesData.totalHours;
-  
-  const todaySales = tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales;
-  const weekSales = tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales;
-  const payrollSales = tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales;
 
   const dailySalesPerHour = todayHours > 0 ? todaySales / todayHours : 0;
   const weeklySalesPerHour = weekHours > 0 ? weekSales / weekHours : 0;
@@ -323,7 +335,7 @@ export default function TdcErhvervDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+                {todaySales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -336,7 +348,7 @@ export default function TdcErhvervDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+                {weekSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -349,7 +361,7 @@ export default function TdcErhvervDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+                {monthSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
             </CardContent>
@@ -362,7 +374,7 @@ export default function TdcErhvervDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales}
+                {payrollSales}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>

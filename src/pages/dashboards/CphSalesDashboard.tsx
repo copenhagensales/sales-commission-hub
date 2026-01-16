@@ -11,6 +11,7 @@ import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
 import { useMemo } from "react";
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
+import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 
 interface TopSeller {
   name: string;
@@ -69,6 +70,13 @@ export default function CphSalesDashboard() {
   const todayStr = format(today, "yyyy-MM-dd");
   const tvMode = isTvMode();
 
+  // Fetch global cached KPIs for main stats (fast, pre-computed)
+  const { data: globalKpis } = usePrecomputedKpis(
+    ["sales_count", "active_employees", "sick_days", "vacation_days"],
+    "today",
+    "global"
+  );
+
   // Use edge function for TV mode (bypasses RLS)
   const { data: tvData } = useQuery<TvDashboardData>({
     queryKey: ["tv-dashboard-data", todayStr],
@@ -82,7 +90,8 @@ export default function CphSalesDashboard() {
       return response.data;
     },
     enabled: tvMode,
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes
+    staleTime: 60000,
   });
 
   // Fetch candidates for recruitment KPI (only in non-TV mode)
@@ -235,8 +244,10 @@ export default function CphSalesDashboard() {
   const todaySales = todaySalesData?.sales || [];
   const clientLogos = todaySalesData?.clientLogos || {};
 
-  // Fetch active employees count for display
-  const { data: activeEmployees = 0 } = useQuery({
+  // Get active employees from cached KPIs (fallback to query if not cached)
+  const cachedActiveEmployees = getKpiValue(globalKpis?.active_employees, 0);
+  
+  const { data: activeEmployeesQuery = 0 } = useQuery({
     queryKey: ["cph-dashboard-active-employees"],
     queryFn: async () => {
       const { count, error } = await supabase
@@ -247,9 +258,12 @@ export default function CphSalesDashboard() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: !tvMode,
-    refetchInterval: 60000,
+    enabled: !tvMode && cachedActiveEmployees === 0, // Only query if cache is empty
+    refetchInterval: 300000, // 5 minutes - much slower since we have cache
+    staleTime: 120000,
   });
+
+  const activeEmployees = cachedActiveEmployees > 0 ? cachedActiveEmployees : activeEmployeesQuery;
 
   // Fetch absence data for today (sick & vacation) with team info
   const { data: absenceData } = useQuery({
