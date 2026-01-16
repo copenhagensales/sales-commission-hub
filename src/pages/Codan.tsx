@@ -8,7 +8,8 @@ import { Shield, TrendingUp, DollarSign, ShoppingCart, Clock, Users } from "luci
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
-import { startOfDay, startOfMonth, format } from "date-fns";
+import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { startOfDay, isSameDay, format } from "date-fns";
 import { da } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 
@@ -31,24 +32,62 @@ export default function Codan() {
         .limit(1);
       return data?.[0]?.id || null;
     },
+    staleTime: 300000,
   });
+
+  // Determine if we can use cached KPIs (only for "today")
+  const isToday = useMemo(() => {
+    if (!dateRange?.from) return false;
+    const today = startOfDay(new Date());
+    return isSameDay(dateRange.from, today) && (!dateRange.to || isSameDay(dateRange.to, today));
+  }, [dateRange]);
 
   const startDate = dateRange?.from || startOfDay(new Date());
   const endDate = dateRange?.to || new Date();
 
-  const { totalSales, totalRevenue, totalCommission, totalHours, employeeStats, isLoading } = useDashboardSalesData({
+  // Use cached KPIs for today
+  const { data: cachedKpis, isLoading: cachedLoading } = useClientDashboardKpis(
+    isToday ? codanClientId : null,
+    ["sales_count", "total_commission", "total_revenue", "total_hours"]
+  );
+
+  // Fallback to useDashboardSalesData for custom date ranges
+  const { 
+    totalSales: fallbackSales, 
+    totalRevenue: fallbackRevenue, 
+    totalCommission: fallbackCommission, 
+    totalHours: fallbackHours, 
+    employeeStats, 
+    isLoading: fallbackLoading 
+  } = useDashboardSalesData({
     clientId: codanClientId || undefined,
     startDate,
     endDate,
-    enabled: !!codanClientId,
+    enabled: !!codanClientId && !isToday,
   });
+
+  // Use cached values when available
+  const totalSales = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.sales_count) 
+    : fallbackSales;
+  const totalCommission = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.total_commission) 
+    : fallbackCommission;
+  const totalRevenue = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.total_revenue) 
+    : fallbackRevenue;
+  const totalHours = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.total_hours) 
+    : fallbackHours;
+
+  const isLoading = isToday ? cachedLoading : fallbackLoading;
 
   const getSubtitle = () => {
     if (!dateRange?.from) return "Salgsdata baseret på dagsrapporter";
     const isSingleDay = !dateRange.to || startOfDay(dateRange.from).getTime() === startOfDay(dateRange.to).getTime();
     if (isSingleDay) {
-      const isToday = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
-      return `Salg for ${isToday ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })}`;
+      const isTodayView = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
+      return `Salg for ${isTodayView ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })}${isToday ? " • Cached" : ""}`;
     }
     return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })}`;
   };

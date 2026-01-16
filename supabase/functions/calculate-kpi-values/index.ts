@@ -235,10 +235,203 @@ Deno.serve(async (req) => {
             });
           } catch (err) {
             console.error(`Error calculating ${kpiSlug} for client ${client.id} ${period.type}:`, err);
-          }
         }
       }
     }
+  }
+
+  // ============= EMPLOYEE-SCOPED KPIs =============
+  console.log("Calculating employee-scoped KPIs...");
+  
+  // Get active employees with agent mappings
+  const { data: activeEmployees } = await supabase
+    .from("employee_master_data")
+    .select("id, first_name, last_name")
+    .eq("is_active", true);
+  
+  // Get all agent mappings
+  const { data: allAgentMappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("employee_id, agent_id, agents(email, external_dialer_id)");
+  
+  // Build employee -> agent identifiers map
+  const employeeAgentMap = new Map<string, { emails: string[]; externalIds: string[] }>();
+  for (const mapping of (allAgentMappings || [])) {
+    const empId = mapping.employee_id;
+    const email = (mapping.agents as any)?.email?.toLowerCase();
+    const externalId = (mapping.agents as any)?.external_dialer_id;
+    
+    if (!employeeAgentMap.has(empId)) {
+      employeeAgentMap.set(empId, { emails: [], externalIds: [] });
+    }
+    const current = employeeAgentMap.get(empId)!;
+    if (email) current.emails.push(email);
+    if (externalId) current.externalIds.push(externalId);
+  }
+  
+  // Only calculate for payroll_period and today (most used)
+  const employeePeriods = periods.filter(p => p.type === "payroll_period" || p.type === "today");
+  const employeeScopedKpis = ["sales_count", "total_commission"];
+  
+  // Fetch all sales data once for efficiency
+  const payrollPeriodDates = getPayrollPeriod(now);
+  const { data: allPeriodSales } = await supabase
+    .from("sales")
+    .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
+    .gte("sale_datetime", payrollPeriodDates.start.toISOString())
+    .lte("sale_datetime", payrollPeriodDates.end.toISOString());
+  
+  // Fetch products for counts_as_sale check
+  const allProductIds = [...new Set((allPeriodSales || []).flatMap((s: any) => 
+    (s.sale_items || []).map((si: any) => si.product_id).filter(Boolean)
+  ))];
+  
+  let allCountingProductIds = new Set<string>();
+  if (allProductIds.length > 0) {
+    const { data: allProducts } = await supabase
+      .from("products")
+      .select("id, counts_as_sale")
+      .in("id", allProductIds);
+    
+    allCountingProductIds = new Set(
+      (allProducts || []).filter((p: Product) => p.counts_as_sale !== false).map((p: Product) => p.id)
+    );
+  }
+  
+  // Calculate for each active employee with mappings
+  for (const emp of (activeEmployees || [])) {
+    const agentData = employeeAgentMap.get(emp.id);
+    if (!agentData || (agentData.emails.length === 0 && agentData.externalIds.length === 0)) {
+      continue; // Skip employees without agent mappings
+    }
+    
+    for (const period of employeePeriods) {
+      // Filter sales for this employee in this period
+      const empSales = (allPeriodSales || []).filter((sale: any) => {
+        const saleDate = new Date(sale.sale_datetime);
+        if (saleDate < period.start || saleDate > period.end) return false;
+        
+        const saleEmail = sale.agent_email?.toLowerCase();
+        const saleExternalId = sale.agent_external_id;
+        
+        return (saleEmail && agentData.emails.includes(saleEmail)) ||
+               (saleExternalId && agentData.externalIds.includes(saleExternalId));
+      });
+      
+      // Calculate sales count
+      let salesCount = 0;
+      let totalCommission = 0;
+      
+      for (const sale of empSales) {
+        for (const item of (sale.sale_items || [])) {
+          const productId = (item as any).product_id;
+          if (!productId || allCountingProductIds.has(productId)) {
+            salesCount += (item as any).quantity || 1;
+          }
+          totalCommission += ((item as any).mapped_commission || 0) * ((item as any).quantity || 1);
+        }
+        // If no items, count as 1 sale
+        if (!sale.sale_items || sale.sale_items.length === 0) {
+          salesCount += 1;
+        }
+      }
+      
+      // Add sales_count
+      cachedValues.push({
+        kpi_slug: "sales_count",
+        period_type: period.type,
+        scope_type: "employee",
+        scope_id: emp.id,
+        value: salesCount,
+        formatted_value: salesCount.toString(),
+        calculated_at: calculatedAt,
+      });
+      
+      // Add total_commission
+      cachedValues.push({
+        kpi_slug: "total_commission",
+        period_type: period.type,
+        scope_type: "employee",
+        scope_id: emp.id,
+        value: totalCommission,
+        formatted_value: formatValue(totalCommission, "commission"),
+        calculated_at: calculatedAt,
+      });
+    }
+  }
+  
+  console.log(`Calculated employee-scoped KPIs for ${(activeEmployees || []).length} employees`);
+
+  // ============= TEAM-SCOPED COMMISSION =============
+  console.log("Calculating team-scoped commission for goals...");
+  
+  // Fetch teams with active goals for payroll period
+  const payrollStart = payrollPeriodDates.start.toISOString().split("T")[0];
+  const payrollEnd = payrollPeriodDates.end.toISOString().split("T")[0];
+  
+  const { data: teamGoals } = await supabase
+    .from("team_sales_goals")
+    .select("team_id, target_amount, teams(id, name)")
+    .eq("period_start", payrollStart)
+    .eq("period_end", payrollEnd);
+  
+  // For each team with a goal, calculate commission
+  for (const goal of (teamGoals || [])) {
+    const teamId = goal.team_id;
+    
+    // Get team members
+    const { data: teamMemberData } = await supabase
+      .from("team_members")
+      .select("employee_id")
+      .eq("team_id", teamId);
+    
+    const memberIds = (teamMemberData || []).map((m: any) => m.employee_id);
+    if (memberIds.length === 0) continue;
+    
+    // Get agent mappings for team members
+    const teamAgentEmails: string[] = [];
+    const teamExternalIds: string[] = [];
+    
+    for (const memberId of memberIds) {
+      const agentData = employeeAgentMap.get(memberId);
+      if (agentData) {
+        teamAgentEmails.push(...agentData.emails);
+        teamExternalIds.push(...agentData.externalIds);
+      }
+    }
+    
+    if (teamAgentEmails.length === 0 && teamExternalIds.length === 0) continue;
+    
+    // Calculate team commission from already-fetched sales data
+    let teamCommission = 0;
+    
+    for (const sale of (allPeriodSales || [])) {
+      const saleEmail = (sale as any).agent_email?.toLowerCase();
+      const saleExternalId = (sale as any).agent_external_id;
+      
+      const isTeamSale = (saleEmail && teamAgentEmails.includes(saleEmail)) ||
+                         (saleExternalId && teamExternalIds.includes(saleExternalId));
+      
+      if (isTeamSale) {
+        for (const item of ((sale as any).sale_items || [])) {
+          teamCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+        }
+      }
+    }
+    
+    // Cache team commission for payroll_period
+    cachedValues.push({
+      kpi_slug: "total_commission",
+      period_type: "payroll_period",
+      scope_type: "team",
+      scope_id: teamId,
+      value: teamCommission,
+      formatted_value: formatValue(teamCommission, "commission"),
+      calculated_at: calculatedAt,
+    });
+  }
+  
+  console.log(`Calculated team-scoped commission for ${(teamGoals || []).length} teams with goals`);
 
     // ============= LEADERBOARD CACHE CALCULATION =============
     console.log("Calculating global leaderboards...");

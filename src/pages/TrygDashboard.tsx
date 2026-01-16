@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { format, startOfDay } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, startOfDay, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,9 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const formatCurrency = (value: number) => 
   new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
@@ -19,19 +22,67 @@ const TrygDashboard = () => {
     to: new Date()
   });
 
-  const { totalSales, totalCommission, totalHours, employeeStats, isLoading } = useDashboardSalesData({
+  // Find Tryg client ID
+  const { data: trygClientId } = useQuery({
+    queryKey: ["tryg-client-id"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id")
+        .ilike("name", "%tryg%")
+        .limit(1);
+      return data?.[0]?.id || null;
+    },
+    staleTime: 300000,
+  });
+
+  // Determine if we can use cached KPIs (only for "today")
+  const isToday = useMemo(() => {
+    if (!dateRange?.from) return false;
+    const today = startOfDay(new Date());
+    return isSameDay(dateRange.from, today) && (!dateRange.to || isSameDay(dateRange.to, today));
+  }, [dateRange]);
+
+  // Use cached KPIs for today
+  const { data: cachedKpis, isLoading: cachedLoading } = useClientDashboardKpis(
+    isToday ? trygClientId : null,
+    ["sales_count", "total_commission", "total_hours"]
+  );
+
+  // Fallback to useDashboardSalesData for custom date ranges
+  const { 
+    totalSales: fallbackSales, 
+    totalCommission: fallbackCommission, 
+    totalHours: fallbackHours, 
+    employeeStats, 
+    isLoading: fallbackLoading 
+  } = useDashboardSalesData({
     clientName: "tryg",
     startDate: dateRange?.from || new Date(),
     endDate: dateRange?.to || new Date(),
-    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
+    refetchInterval: 120000,
+    enabled: !isToday, // Only fetch when NOT using cache
   });
+
+  // Use cached values when available, otherwise use fallback
+  const totalSales = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.sales_count) 
+    : fallbackSales;
+  const totalCommission = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.total_commission) 
+    : fallbackCommission;
+  const totalHours = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.today?.total_hours) 
+    : fallbackHours;
+  
+  const isLoading = isToday ? cachedLoading : fallbackLoading;
 
   const getSubtitle = () => {
     if (!dateRange?.from) return "Baseret på dagsrapporter";
     const isSingleDay = !dateRange.to || startOfDay(dateRange.from).getTime() === startOfDay(dateRange.to).getTime();
     if (isSingleDay) {
-      const isToday = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
-      return `Salg for ${isToday ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })} • Baseret på dagsrapporter`;
+      const isTodayView = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
+      return `Salg for ${isTodayView ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })}${isToday ? " • Cached data" : " • Baseret på dagsrapporter"}`;
     }
     return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })} • Baseret på dagsrapporter`;
   };
