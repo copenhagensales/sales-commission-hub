@@ -22,24 +22,16 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
-  const client = supabase as any;
-  const { data } = await client
+  const { data } = await supabase
     .from("employee_master_data")
     .select("id, first_name, last_name")
-    .eq("user_id", user.id)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
   
-  // Fallback: try with auth_user_id
-  if (!data) {
-    const { data: dataAlt } = await client
-      .from("employee_master_data")
-      .select("id, first_name, last_name")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-    return dataAlt ? { id: dataAlt.id, full_name: `${dataAlt.first_name || ''} ${dataAlt.last_name || ''}`.trim() } : null;
-  }
-  
-  return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() } : null;
+  return data ? { 
+    id: data.id, 
+    full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() 
+  } : null;
 }
 
 export function ChatView({ conversationId }: ChatViewProps) {
