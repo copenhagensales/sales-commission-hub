@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -29,13 +29,20 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
   }, [enabled, intervalMs]);
 };
 
+interface SellerData {
+  name: string;
+  sales: number;
+  commission: number;
+  avatarUrl?: string;
+}
+
 interface TvUnitedData {
   salesToday: number;
   salesWeek: number;
   salesMonth: number;
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
-  sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string }>;
+  sellersToday: SellerData[];
+  sellersWeek: SellerData[];
+  sellersMonth: SellerData[];
   clientSales?: Array<{ clientId: string; clientName: string; logoUrl?: string; salesToday: number; salesWeek: number; salesMonth: number }>;
 }
 
@@ -157,32 +164,16 @@ export default function UnitedDashboard() {
     enabled: !tvMode
   });
 
-  // Fetch sales for today - aggregated across all United clients
-  const dailySalesData = useDashboardSalesData({
-    teamId: unitedTeamId || undefined,
-    startDate: today,
-    endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId,
-    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
-  });
-
-  // Fetch sales for this week
-  const weeklySalesData = useDashboardSalesData({
-    teamId: unitedTeamId || undefined,
-    startDate: weekStart,
-    endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId,
-    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
-  });
-
-  // Fetch sales for payroll period (lønperiode)
-  const payrollSalesData = useDashboardSalesData({
-    teamId: unitedTeamId || undefined,
-    startDate: payrollPeriod.start,
-    endDate: new Date(),
-    enabled: !tvMode && !!unitedTeamId,
-    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
-  });
+  // Use cached leaderboards for team-scoped data (much faster than useDashboardSalesData)
+  const { 
+    sellersToday: cachedSellersToday, 
+    sellersWeek: cachedSellersWeek, 
+    sellersPayroll: cachedSellersPayroll,
+    isLoading: leaderboardsLoading 
+  } = useCachedLeaderboards(
+    { type: "team", id: unitedTeamId || null },
+    { enabled: !tvMode && !!unitedTeamId, limit: 30 }
+  );
 
   // Fetch per-client sales data with actual hours using useDashboardSalesData pattern
   const { data: clientSalesData } = useQuery({
@@ -372,34 +363,41 @@ export default function UnitedDashboard() {
     enabled: !tvMode
   });
 
+  // Map cached leaderboard entries to seller format
+  const mapLeaderboardToSeller = (entry: LeaderboardEntry): SellerData => ({
+    name: entry.employeeName,
+    sales: entry.salesCount,
+    commission: entry.commission,
+    avatarUrl: entry.avatarUrl || undefined,
+  });
+
   // Sort employees by commission for each period
-  const sortedDailySellers = useMemo(() => {
+  const sortedDailySellers: SellerData[] = useMemo(() => {
     if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
-    return [...dailySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [dailySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersToday.map(mapLeaderboardToSeller);
+  }, [cachedSellersToday, tvMode, tvData]);
 
-  const sortedWeeklySellers = useMemo(() => {
+  const sortedWeeklySellers: SellerData[] = useMemo(() => {
     if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
-    return [...weeklySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [weeklySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersWeek.map(mapLeaderboardToSeller);
+  }, [cachedSellersWeek, tvMode, tvData]);
 
-  const sortedPayrollSellers = useMemo(() => {
+  const sortedPayrollSellers: SellerData[] = useMemo(() => {
     if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
-    return [...payrollSalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [payrollSalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersPayroll.map(mapLeaderboardToSeller);
+  }, [cachedSellersPayroll, tvMode, tvData]);
 
   const getAvatarUrl = (name: string) => {
     if (!employeeAvatars) return undefined;
     return employeeAvatars.get(name.toLowerCase());
   };
 
-  const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = leaderboardsLoading;
+
+  // Calculate total sales from cached leaderboards
+  const totalSalesToday = cachedSellersToday.reduce((sum, s) => sum + s.salesCount, 0);
+  const totalSalesWeek = cachedSellersWeek.reduce((sum, s) => sum + s.salesCount, 0);
+  const totalSalesPayroll = cachedSellersPayroll.reduce((sum, s) => sum + s.salesCount, 0);
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
@@ -426,7 +424,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+                {tvMode ? (tvData?.salesToday ?? 0) : totalSalesToday}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -439,7 +437,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+                {tvMode ? (tvData?.salesWeek ?? 0) : totalSalesWeek}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -452,7 +450,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales}
+                {tvMode ? (tvData?.salesMonth ?? 0) : totalSalesPayroll}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>
@@ -549,39 +547,32 @@ export default function UnitedDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedPayrollSellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>
-                              {formatCurrency(commission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedPayrollSellers.map((seller, index) => (
+                      <TableRow key={seller.name} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || getAvatarUrl(seller.name)} alt={seller.name} />
+                              <AvatarFallback className="text-xs bg-primary/20">
+                                {getInitials(seller.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">
+                          {seller.sales}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'payroll')}`}>
+                            {formatCurrency(seller.commission)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -611,39 +602,32 @@ export default function UnitedDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedWeeklySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'week')}`}>
-                              {formatCurrency(commission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedWeeklySellers.map((seller, index) => (
+                      <TableRow key={seller.name} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || getAvatarUrl(seller.name)} alt={seller.name} />
+                              <AvatarFallback className="text-xs bg-primary/20">
+                                {getInitials(seller.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">
+                          {seller.sales}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'week')}`}>
+                            {formatCurrency(seller.commission)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -673,39 +657,32 @@ export default function UnitedDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedDailySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'day')}`}>
-                              {formatCurrency(commission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedDailySellers.map((seller, index) => (
+                      <TableRow key={seller.name} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || getAvatarUrl(seller.name)} alt={seller.name} />
+                              <AvatarFallback className="text-xs bg-primary/20">
+                                {getInitials(seller.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">
+                          {seller.sales}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'day')}`}>
+                            {formatCurrency(seller.commission)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
