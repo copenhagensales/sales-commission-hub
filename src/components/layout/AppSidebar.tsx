@@ -551,24 +551,26 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
               
               {/* Beskeder */}
-              <NavLink
-                to="/messages"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="h-4 w-4" />
-                  {t("sidebar.messages", "Beskeder")}
-                </div>
-                {(unreadMessagesCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {(unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
-                  </Badge>
-                )}
-              </NavLink>
+              {p.canViewMessages && (
+                <NavLink
+                  to="/messages"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="h-4 w-4" />
+                    {t("sidebar.messages", "Beskeder")}
+                  </div>
+                  {(unreadMessagesCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                      {(unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
+                    </Badge>
+                  )}
+                </NavLink>
+              )}
               
               {/* Min Kalender */}
               {p.canViewMySchedule && (
