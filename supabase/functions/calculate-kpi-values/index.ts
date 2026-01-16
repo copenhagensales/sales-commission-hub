@@ -663,6 +663,10 @@ async function calculateGlobalLeaderboard(
   
   // Get sale items with commission using batch fetch to avoid 1000-row limit
   const saleItems = await fetchAllSaleItems(supabase, saleIds);
+  
+  // Debug: Log totals
+  const totalMappedCommission = saleItems.reduce((sum, item) => sum + (item.mapped_commission || 0), 0);
+  console.log(`[GlobalLeaderboard ${startStr.slice(0,10)} to ${endStr.slice(0,10)}] Sales: ${sales.length}, Items: ${saleItems.length}, Total mapped_commission: ${totalMappedCommission}`);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
