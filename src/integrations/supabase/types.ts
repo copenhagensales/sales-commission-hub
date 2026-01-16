@@ -4929,6 +4929,45 @@ export type Database = {
           },
         ]
       }
+      kpi_cached_values: {
+        Row: {
+          calculated_at: string
+          created_at: string
+          formatted_value: string | null
+          id: string
+          kpi_slug: string
+          period_type: string
+          scope_id: string | null
+          scope_type: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          calculated_at?: string
+          created_at?: string
+          formatted_value?: string | null
+          id?: string
+          kpi_slug: string
+          period_type: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          calculated_at?: string
+          created_at?: string
+          formatted_value?: string | null
+          id?: string
+          kpi_slug?: string
+          period_type?: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       kpi_definitions: {
         Row: {
           calculation_formula: string | null
