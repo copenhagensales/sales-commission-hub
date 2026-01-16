@@ -117,6 +117,7 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   menu_home: 'menu_section_personal',
   menu_h2h: 'menu_section_personal',
   menu_commission_league: 'menu_section_personal',
+  menu_league_admin: 'menu_commission_league',
   menu_messages: 'menu_section_personal',
   menu_my_schedule: 'menu_section_personal',
   menu_my_profile: 'menu_section_personal',
