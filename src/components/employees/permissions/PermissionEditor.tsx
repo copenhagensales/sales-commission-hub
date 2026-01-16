@@ -1059,24 +1059,25 @@ export function PermissionEditor() {
                 </div>
               </div>
             ) : (
+              <div className="max-h-[600px] overflow-y-auto relative border rounded-md">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Nøgle</TableHead>
-                    <TableHead>Beskrivelse</TableHead>
-                    <TableHead className="text-center">Kan se</TableHead>
-                    <TableHead className="text-center">Kan redigere</TableHead>
-                    <TableHead className="text-center">
+                    <TableHead className="bg-background">Type</TableHead>
+                    <TableHead className="bg-background">Nøgle</TableHead>
+                    <TableHead className="bg-background">Beskrivelse</TableHead>
+                    <TableHead className="text-center bg-background">Kan se</TableHead>
+                    <TableHead className="text-center bg-background">Kan redigere</TableHead>
+                    <TableHead className="text-center bg-background">
                       <span className="text-green-600">Alle</span>
                     </TableHead>
-                    <TableHead className="text-center">
+                    <TableHead className="text-center bg-background">
                       <span className="text-blue-600">Team</span>
                     </TableHead>
-                    <TableHead className="text-center">
+                    <TableHead className="text-center bg-background">
                       <span className="text-amber-600">Kun egen</span>
                     </TableHead>
-                    <TableHead className="w-16"></TableHead>
+                    <TableHead className="w-16 bg-background"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1108,6 +1109,7 @@ export function PermissionEditor() {
                   
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
