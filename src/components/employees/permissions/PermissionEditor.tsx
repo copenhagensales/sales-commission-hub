@@ -359,13 +359,18 @@ function PermissionRow({
           {permission.description}
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex items-center justify-center" title={disabled ? 'Slået fra - forælder er deaktiveret' : undefined}>
+          <div 
+            className="flex items-center justify-center gap-1" 
+            title={disabled ? 'Klik for at aktivere forælder automatisk' : undefined}
+          >
             <Switch
               checked={permission.can_view}
-              disabled={disabled}
               onCheckedChange={() => togglePermission(permission, 'can_view')}
               className={disabled ? 'opacity-50' : ''}
             />
+            {disabled && (
+              <Lock className="h-3 w-3 text-muted-foreground" />
+            )}
           </div>
         </TableCell>
         <TableCell className="text-center">
@@ -373,15 +378,14 @@ function PermissionRow({
             className="flex items-center justify-center gap-1" 
             title={
               isChildDisabled(permission, 'can_edit') 
-                ? `Låst - aktiver først "Rediger" på ${permissionKeyLabels[permission.parent_key || ''] || 'forælderen'}`
+                ? 'Klik for at aktivere forælder automatisk'
                 : undefined
             }
           >
             <Switch
               checked={permission.can_edit}
-              disabled={isChildDisabled(permission, 'can_edit')}
               onCheckedChange={() => togglePermission(permission, 'can_edit')}
-              className={isChildDisabled(permission, 'can_edit') ? 'opacity-50 cursor-not-allowed' : ''}
+              className={isChildDisabled(permission, 'can_edit') ? 'opacity-50' : ''}
             />
             {isChildDisabled(permission, 'can_edit') && (
               <Lock className="h-3 w-3 text-muted-foreground" />
@@ -788,8 +792,30 @@ export function PermissionEditor() {
     createRoleMutation.mutate(newRoleForm);
   };
 
-  // Toggle permission inline with automatic child inheritance
+  // Toggle permission inline with automatic child inheritance AND automatic parent activation
   const togglePermission = async (permission: PagePermission & { parent_key?: string | null; permission_type?: PermissionType }, field: 'can_view' | 'can_edit') => {
+    // If permission is locked (parent is missing permission), activate parent first
+    if (isChildDisabled(permission, field)) {
+      const parent = rolePermissions.find(p => p.permission_key === permission.parent_key);
+      if (parent) {
+        // Activate the parent first
+        const { error: parentError } = await supabase
+          .from('role_page_permissions')
+          .update({ [field]: true })
+          .eq('id', parent.id)
+          .select();
+        
+        if (parentError) {
+          console.error('Parent activation error:', parentError);
+          toast.error(`Kunne ikke aktivere forælder: ${parentError.message}`);
+          return;
+        }
+        
+        const parentLabel = permissionKeyLabels[parent.permission_key] || parent.permission_key;
+        toast.success(`Aktiverede automatisk "${parentLabel}"`);
+      }
+    }
+
     const newValue = !permission[field];
     
     // Update the permission itself
