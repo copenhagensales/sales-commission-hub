@@ -6327,6 +6327,7 @@ export type Database = {
       }
       pulse_survey_responses: {
         Row: {
+          attrition_risk_score: number | null
           created_at: string
           department: string | null
           development_score: number | null
@@ -6347,6 +6348,7 @@ export type Database = {
           wellbeing_score: number | null
         }
         Insert: {
+          attrition_risk_score?: number | null
           created_at?: string
           department?: string | null
           development_score?: number | null
@@ -6367,6 +6369,7 @@ export type Database = {
           wellbeing_score?: number | null
         }
         Update: {
+          attrition_risk_score?: number | null
           created_at?: string
           department?: string | null
           development_score?: number | null
