@@ -348,41 +348,52 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
   // Non-personal menu items (Salg and Logikker moved to bottom)
 
+  // SECTION-PERMISSION ENFORCEMENT: Section permission must be true for ANY child items to show
+  // This ensures the sidebar matches what the Permission Editor shows
+  
   // Check if SOME menu should be visible
   const showSomeMenu = p.canViewSome || p.canViewExtraWork;
 
-  // Check if any Personnel menu items are visible
-  const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts;
+  // Check if any Personnel menu items are visible (requires section permission)
+  const showPersonnelMenu = p.canView("menu_section_personale") && 
+    (p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts);
   
-  // Check if any Ledelse menu items are visible
-  const showLedelseMenu = p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard;
+  // Check if any Ledelse menu items are visible (requires section permission)
+  const showLedelseMenu = p.canView("menu_section_ledelse") && 
+    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard);
   
-  // Check if any MG menu items are visible
-  const showMgMenu = p.canViewPayroll || p.canViewMgTest || p.canViewTestDashboard || 
-                     p.canViewDialerData || p.canViewCallsData || p.canViewAdversusData ||
-                     p.canViewTdcErhverv || p.canViewCodan;
+  // Check if any MG menu items are visible (requires section permission)
+  const showMgMenu = p.canView("menu_section_mg") && 
+    (p.canViewPayroll || p.canViewMgTest || p.canViewTestDashboard || 
+     p.canViewDialerData || p.canViewCallsData || p.canViewAdversusData ||
+     p.canViewTdcErhverv || p.canViewCodan);
   
-  // Check if any Fieldmarketing items are visible
-  const showFieldmarketingMenu = p.canViewFmOverview || p.canViewFmBookWeek || 
-                                  p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
-                                  p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration;
+  // Check if any Fieldmarketing items are visible (requires section permission)
+  const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
+    (p.canViewFmOverview || p.canViewFmBookWeek || 
+     p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
+     p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration);
   
-  // Check if any Shift Planning items are visible
-  const showShiftPlanningMenu = p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts;
+  // Check if any Shift Planning items are visible (requires section permission)
+  const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
+    (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts);
   
-  // Check if any Test menu items are visible
-  const showTestMenu = p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey;
+  // Check if any Test menu items are visible (requires section permission)
+  const showTestMenu = p.canView("menu_section_test") && 
+    (p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey);
   
-  // Check if any Recruitment items are visible
-  const showRecruitmentMenu = p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
-                               p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
-                               p.canViewUpcomingInterviews || p.canViewUpcomingHires;
+  // Check if any Recruitment items are visible (requires section permission)
+  const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
+    (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
+     p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
+     p.canViewUpcomingInterviews || p.canViewUpcomingHires);
   
-  // Check if any Onboarding items are visible - only show for admin users (system not ready for employees yet)
-  const showOnboardingMenu = p.canViewOnboardingAdmin;
+  // Check if any Onboarding items are visible (requires section permission) - only show for admin users
+  const showOnboardingMenu = p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
 
-  // Check if any Reports menu items are visible
-  const showReportsMenu = p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee;
+  // Check if any Reports menu items are visible (requires section permission)
+  const showReportsMenu = p.canView("menu_section_reports") && 
+    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
