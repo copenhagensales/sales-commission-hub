@@ -1,14 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Trophy, Users, Building2, RefreshCw, Clock } from "lucide-react";
+import { Trophy, Users, Building2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TvPreviewOverlay } from "@/components/tv-preview/TvPreviewOverlay";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfDay, startOfMonth } from "date-fns";
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 
 // Client brand colors for visual distinction
 const clientColors: Record<string, { bg: string; accent: string; text: string }> = {
@@ -37,17 +35,12 @@ interface ClientDashboardData {
   commissionToday: number;
   commissionMonth: number;
   revenueMonth: number;
-  hoursMonth: number;
   topSellers: { name: string; sales: number; commission: number }[];
 }
 
 export default function MgTestDashboard() {
   const queryClient = useQueryClient();
   const [lastUpdated, setLastUpdated] = useState<string>("");
-
-  const today = new Date();
-  const todayStart = startOfDay(today);
-  const monthStart = startOfMonth(today);
 
   // Fetch all clients
   const { data: clients = [] } = useQuery({
@@ -56,150 +49,104 @@ export default function MgTestDashboard() {
       const { data } = await supabase.from("clients").select("id, name").order("name");
       return data || [];
     },
+    staleTime: 300000, // 5 minutes
   });
 
-  // Get dashboard data for all clients using PARALLEL fetching
-  const { data: allClientData, isLoading, isFetching } = useQuery({
-    queryKey: ["mg-test-dashboard-all-clients", clients.map((c) => c.id).join(",")],
+  // Fetch all cached KPIs for clients in a single query
+  const { data: cachedKpiData, isLoading, isFetching } = useQuery({
+    queryKey: ["mg-test-cached-kpis", clients.map(c => c.id).join(",")],
     queryFn: async () => {
-      if (clients.length === 0) return [];
+      if (clients.length === 0) return { kpis: [], leaderboards: [] };
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || supabaseKey;
-      const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Accept: "application/json" };
+      const clientIds = clients.map(c => c.id);
 
-      const monthStartStr = monthStart.toISOString().split("T")[0];
-      const todayStr = todayStart.toISOString().split("T")[0];
-      const nowStr = today.toISOString().split("T")[0];
+      // Fetch KPIs for all clients
+      const { data: kpis } = await supabase
+        .from("kpi_cached_values")
+        .select("kpi_slug, period_type, scope_id, value")
+        .in("kpi_slug", ["sales_count", "total_commission", "total_revenue"])
+        .eq("scope_type", "client")
+        .in("scope_id", clientIds)
+        .in("period_type", ["today", "this_month"]);
 
-      // Pre-fetch shared data once (agent mappings & employee names)
-      const [agentMappingsRes, campaignsRes] = await Promise.all([
-        supabase.from("employee_agent_mapping").select("employee_id, agents(email)"),
-        supabase.from("client_campaigns").select("id, client_id"),
-      ]);
-
-      const agentMappings = agentMappingsRes.data || [];
-      const allCampaigns = campaignsRes.data || [];
-
-      const mappedEmails = new Set(
-        agentMappings.map((m: any) => m.agents?.email?.toLowerCase()).filter(Boolean)
-      );
-
-      // Get employee names for mapped agents
-      const employeeMap = new Map<string, string>();
-      if (agentMappings.length > 0) {
-        const empIds = [...new Set(agentMappings.map((m) => m.employee_id))];
-        const { data: employees } = await supabase
-          .from("employee_master_data")
-          .select("id, first_name, last_name")
-          .in("id", empIds);
-
-        (employees || []).forEach((e) => {
-          employeeMap.set(e.id, `${e.first_name} ${e.last_name}`.trim());
-        });
-
-        agentMappings.forEach((m: any) => {
-          if (m.agents?.email) {
-            const empName = employeeMap.get(m.employee_id);
-            if (empName) {
-              employeeMap.set(m.agents.email.toLowerCase(), empName);
-            }
-          }
-        });
-      }
-
-      // Group campaigns by client
-      const campaignsByClient = new Map<string, string[]>();
-      allCampaigns.forEach((c) => {
-        const existing = campaignsByClient.get(c.client_id) || [];
-        existing.push(c.id);
-        campaignsByClient.set(c.client_id, existing);
-      });
-
-      // PARALLEL fetch sales for all clients
-      const clientFetchPromises = clients.map(async (client): Promise<ClientDashboardData | null> => {
-        const campaignIds = campaignsByClient.get(client.id);
-        if (!campaignIds || campaignIds.length === 0) return null;
-
-        const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,sale_datetime,sale_items(quantity,mapped_commission,mapped_revenue,products(counts_as_sale))&client_campaign_id=in.(${campaignIds.join(",")})&sale_datetime=gte.${monthStartStr}T00:00:00&sale_datetime=lte.${nowStr}T23:59:59`;
-
-        try {
-          const salesRes = await fetch(salesUrl, { headers });
-          const salesData = salesRes.ok ? await salesRes.json() : [];
-
-          let salesToday = 0;
-          let salesMonth = 0;
-          let commissionToday = 0;
-          let commissionMonth = 0;
-          let revenueMonth = 0;
-
-          const sellerStats = new Map<string, { sales: number; commission: number }>();
-
-          for (const sale of salesData) {
-            const email = (sale.agent_email || "").toLowerCase();
-            if (!mappedEmails.has(email)) continue;
-
-            const employeeName = employeeMap.get(email) || email;
-            const isToday = sale.sale_datetime >= `${todayStr}T00:00:00`;
-
-            for (const item of sale.sale_items || []) {
-              if (item.products?.counts_as_sale === false) continue;
-
-              const qty = Number(item.quantity) || 1;
-              const commission = Number(item.mapped_commission) || 0;
-              const revenue = Number(item.mapped_revenue) || 0;
-
-              salesMonth += qty;
-              commissionMonth += commission;
-              revenueMonth += revenue;
-
-              if (isToday) {
-                salesToday += qty;
-                commissionToday += commission;
-              }
-
-              const existing = sellerStats.get(employeeName) || { sales: 0, commission: 0 };
-              existing.sales += qty;
-              existing.commission += commission;
-              sellerStats.set(employeeName, existing);
-            }
-          }
-
-          const topSellers = Array.from(sellerStats.entries())
-            .map(([name, stats]) => ({ name, ...stats }))
-            .sort((a, b) => b.commission - a.commission)
-            .slice(0, 3);
-
-          if (salesMonth > 0) {
-            return {
-              clientId: client.id,
-              clientName: client.name,
-              salesToday,
-              salesMonth,
-              commissionToday: Math.round(commissionToday),
-              commissionMonth: Math.round(commissionMonth),
-              revenueMonth: Math.round(revenueMonth),
-              hoursMonth: 0,
-              topSellers,
-            };
-          }
-        } catch (err) {
-          console.error(`Error fetching sales for ${client.name}:`, err);
-        }
-        return null;
-      });
-
-      const results = (await Promise.all(clientFetchPromises)).filter(Boolean) as ClientDashboardData[];
+      // Fetch leaderboards for all clients
+      const { data: leaderboards } = await supabase
+        .from("kpi_leaderboard_cache")
+        .select("scope_id, leaderboard_data")
+        .eq("scope_type", "client")
+        .eq("period_type", "this_month")
+        .in("scope_id", clientIds);
 
       setLastUpdated(new Date().toLocaleTimeString("da-DK"));
-      return results.sort((a, b) => b.salesMonth - a.salesMonth);
+      return { kpis: kpis || [], leaderboards: leaderboards || [] };
     },
     enabled: clients.length > 0,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
-    staleTime: 60000,
+    refetchInterval: 60000, // 1 minute - uses cached values
+    staleTime: 30000,
   });
+
+  // Process data into client dashboard format
+  const allClientData = useMemo((): ClientDashboardData[] => {
+    if (!cachedKpiData) return [];
+
+    const { kpis, leaderboards } = cachedKpiData;
+
+    // Group KPIs by client
+    const kpisByClient = new Map<string, Record<string, Record<string, number>>>();
+    for (const kpi of kpis) {
+      if (!kpi.scope_id) continue;
+      if (!kpisByClient.has(kpi.scope_id)) {
+        kpisByClient.set(kpi.scope_id, {});
+      }
+      const clientKpis = kpisByClient.get(kpi.scope_id)!;
+      if (!clientKpis[kpi.period_type]) {
+        clientKpis[kpi.period_type] = {};
+      }
+      clientKpis[kpi.period_type][kpi.kpi_slug] = kpi.value;
+    }
+
+    // Group leaderboards by client
+    const leaderboardsByClient = new Map<string, any[]>();
+    for (const lb of leaderboards) {
+      if (lb.scope_id && lb.leaderboard_data && Array.isArray(lb.leaderboard_data)) {
+        leaderboardsByClient.set(lb.scope_id, lb.leaderboard_data as any[]);
+      }
+    }
+
+    // Build dashboard data
+    const results: ClientDashboardData[] = [];
+    for (const client of clients) {
+      const kpiData = kpisByClient.get(client.id);
+      const todayData = kpiData?.today || {};
+      const monthData = kpiData?.this_month || {};
+
+      const salesToday = todayData.sales_count || 0;
+      const salesMonth = monthData.sales_count || 0;
+
+      // Skip clients with no sales this month
+      if (salesMonth === 0) continue;
+
+      const leaderboard = leaderboardsByClient.get(client.id) || [];
+      const topSellers = leaderboard.slice(0, 3).map((entry: any) => ({
+        name: entry.displayName || entry.employeeName || "Unknown",
+        sales: entry.salesCount || 0,
+        commission: entry.commission || 0,
+      }));
+
+      results.push({
+        clientId: client.id,
+        clientName: client.name,
+        salesToday,
+        salesMonth,
+        commissionToday: Math.round(todayData.total_commission || 0),
+        commissionMonth: Math.round(monthData.total_commission || 0),
+        revenueMonth: Math.round(monthData.total_revenue || 0),
+        topSellers,
+      });
+    }
+
+    return results.sort((a, b) => b.salesMonth - a.salesMonth);
+  }, [cachedKpiData, clients]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("da-DK", {
@@ -210,12 +157,11 @@ export default function MgTestDashboard() {
     }).format(value);
   };
 
-  const allClients = allClientData || [];
-  const totalSalesToday = allClients.reduce((sum, c) => sum + c.salesToday, 0);
-  const totalSalesMonth = allClients.reduce((sum, c) => sum + c.salesMonth, 0);
+  const totalSalesToday = allClientData.reduce((sum, c) => sum + c.salesToday, 0);
+  const totalSalesMonth = allClientData.reduce((sum, c) => sum + c.salesMonth, 0);
 
   const refetch = () => {
-    queryClient.invalidateQueries({ queryKey: ["mg-test-dashboard-all-clients"] });
+    queryClient.invalidateQueries({ queryKey: ["mg-test-cached-kpis"] });
   };
 
   const statsContent = (
@@ -237,7 +183,11 @@ export default function MgTestDashboard() {
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <DashboardHeader title="Test Dashboard" subtitle="Data fra dagsrapporter (kun mappede medarbejdere)" rightContent={statsContent} />
+      <DashboardHeader 
+        title="Test Dashboard" 
+        subtitle="Cached KPI data (opdateres hvert minut)" 
+        rightContent={statsContent} 
+      />
       <TvPreviewOverlay>
         <div className="flex flex-col overflow-hidden box-border">
           {isLoading ? (
@@ -253,7 +203,7 @@ export default function MgTestDashboard() {
             </div>
           ) : (
             <div className="grid gap-1.5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 flex-1 min-h-0 overflow-hidden">
-              {allClients.map((client, index) => {
+              {allClientData.map((client, index) => {
                 const colors = clientColors[client.clientName] || defaultColors;
                 const medals = ["🥇", "🥈", "🥉"];
 
@@ -320,11 +270,11 @@ export default function MgTestDashboard() {
             </div>
           )}
 
-          {!isLoading && allClients.length === 0 && (
+          {!isLoading && allClientData.length === 0 && (
             <div className="text-center py-8">
               <Users className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
               <h3 className="text-sm font-medium">Ingen salgsdata fundet</h3>
-              <p className="text-xs text-muted-foreground">Kun mappede medarbejdere vises</p>
+              <p className="text-xs text-muted-foreground">Cached data opdateres hvert minut</p>
             </div>
           )}
         </div>

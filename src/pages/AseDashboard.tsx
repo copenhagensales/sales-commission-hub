@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, startOfDay, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,6 +8,7 @@ import { TrendingUp, Users, Clock } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
+import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { DateRange } from "react-day-picker";
 
 const formatCurrency = (value: number) =>
@@ -21,28 +20,57 @@ const AseDashboard = () => {
     to: new Date(),
   });
 
-  // Find ASE client ID - ASE sales are matched by source containing 'ase'
-  // For now, we'll use a generic approach without client filtering
-  // since ASE is source-based, not client-based
+  // Determine if we can use cached KPIs (only for "today")
+  const isToday = useMemo(() => {
+    if (!dateRange?.from) return false;
+    const today = startOfDay(new Date());
+    return isSameDay(dateRange.from, today) && (!dateRange.to || isSameDay(dateRange.to, today));
+  }, [dateRange]);
 
   const startDate = dateRange?.from || startOfDay(new Date());
   const endDate = dateRange?.to || new Date();
 
-  // We need a client-agnostic approach for ASE since it's source-based
-  // Using the hook without clientId to get all mapped employees
-  const { totalSales, totalCommission, totalHours, employeeStats, isLoading } = useDashboardSalesData({
+  // Use global cached KPIs for today (ASE is source-based, not client-based)
+  const { data: cachedKpis, isLoading: cachedLoading } = usePrecomputedKpis(
+    isToday ? ["sales_count", "total_commission", "total_hours"] : [],
+    "today",
+    "global"
+  );
+
+  // Fallback to useDashboardSalesData for custom date ranges
+  const { 
+    totalSales: fallbackSales, 
+    totalCommission: fallbackCommission, 
+    totalHours: fallbackHours, 
+    employeeStats, 
+    isLoading: fallbackLoading 
+  } = useDashboardSalesData({
     startDate,
     endDate,
-    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
+    refetchInterval: 120000,
+    enabled: !isToday, // Only fetch when NOT using cache
   });
+
+  // Use cached values when available
+  const totalSales = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.sales_count) 
+    : fallbackSales;
+  const totalCommission = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.total_commission) 
+    : fallbackCommission;
+  const totalHours = isToday && cachedKpis 
+    ? getKpiValue(cachedKpis.total_hours) 
+    : fallbackHours;
+
+  const isLoading = isToday ? cachedLoading : fallbackLoading;
 
   const getSubtitle = () => {
     if (!dateRange?.from) return "Salgsdata baseret på dagsrapporter";
     const isSingleDay =
       !dateRange.to || startOfDay(dateRange.from).getTime() === startOfDay(dateRange.to).getTime();
     if (isSingleDay) {
-      const isToday = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
-      return `Salg for ${isToday ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })} • Baseret på dagsrapporter`;
+      const isTodayView = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
+      return `Salg for ${isTodayView ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })}${isToday ? " • Cached" : " • Baseret på dagsrapporter"}`;
     }
     return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })} • Baseret på dagsrapporter`;
   };
