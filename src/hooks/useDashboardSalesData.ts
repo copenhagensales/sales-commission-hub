@@ -194,10 +194,10 @@ export function useDashboardSalesData({
         if (employeesWithTimestampTeams.length > 0) {
           const { data: stamps } = await supabase
             .from("time_stamps")
-            .select("employee_id, date, clock_in, clock_out, break_minutes")
+            .select("employee_id, clock_in, clock_out, break_minutes")
             .in("employee_id", employeesWithTimestampTeams)
-            .gte("date", startStr)
-            .lte("date", endStr);
+            .gte("clock_in", startStr)
+            .lte("clock_in", endStr + "T23:59:59");
           timeStampsData = stamps || [];
         }
       }

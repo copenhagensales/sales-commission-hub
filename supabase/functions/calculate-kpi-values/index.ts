@@ -494,8 +494,7 @@ Deno.serve(async (req) => {
     // Fetch teams for team-scoped leaderboards
     const { data: teams } = await supabase
       .from("teams")
-      .select("id, name")
-      .eq("is_active", true);
+      .select("id, name");
     
     // Calculate team-scoped leaderboards
     for (const team of (teams || []) as { id: string; name: string }[]) {
@@ -1165,10 +1164,10 @@ async function fetchShiftData(
     if (employeesWithTimestampTeams.length > 0) {
       const { data: stamps } = await supabase
         .from("time_stamps")
-        .select("employee_id, date, clock_in, clock_out, break_minutes")
+        .select("employee_id, clock_in, clock_out, break_minutes")
         .in("employee_id", employeesWithTimestampTeams)
-        .gte("date", startStr.split("T")[0])
-        .lte("date", endStr.split("T")[0]);
+        .gte("clock_in", startStr)
+        .lte("clock_in", endStr);
       
       timeStampsData = (stamps || []) as TimeStampRecord[];
     }
