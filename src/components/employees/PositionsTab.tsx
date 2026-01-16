@@ -650,15 +650,15 @@ export function PositionsTab() {
                 <div className="space-y-2">
                   <Label>Systemrolle</Label>
                   <Select
-                    value={formData.system_role_key || ""}
-                    onValueChange={(value) => setFormData({ ...formData, system_role_key: value || null })}
+                    value={formData.system_role_key || "none"}
+                    onValueChange={(value) => setFormData({ ...formData, system_role_key: value === "none" ? null : value })}
                     disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                   >
                     <SelectTrigger className="w-full max-w-xs">
                       <SelectValue placeholder="Vælg rolle" />
                     </SelectTrigger>
                     <SelectContent className="z-50 bg-popover">
-                      <SelectItem value="">Ingen rolle</SelectItem>
+                      <SelectItem value="none">Ingen rolle</SelectItem>
                       {roleDefinitions.map((role) => (
                         <SelectItem key={role.key} value={role.key}>
                           <div className="flex items-center gap-2">
