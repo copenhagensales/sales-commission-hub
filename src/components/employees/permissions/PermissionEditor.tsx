@@ -46,7 +46,8 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
-  Plus
+  Plus,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -364,13 +365,23 @@ function PermissionRow({
           </div>
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex items-center justify-center" title={disabled ? 'Slået fra - forælder er deaktiveret' : undefined}>
+          <div 
+            className="flex items-center justify-center gap-1" 
+            title={
+              isChildDisabled(permission, 'can_edit') 
+                ? `Låst - aktiver først "Rediger" på ${permissionKeyLabels[permission.parent_key || ''] || 'forælderen'}`
+                : undefined
+            }
+          >
             <Switch
               checked={permission.can_edit}
               disabled={isChildDisabled(permission, 'can_edit')}
               onCheckedChange={() => togglePermission(permission, 'can_edit')}
-              className={isChildDisabled(permission, 'can_edit') ? 'opacity-50' : ''}
+              className={isChildDisabled(permission, 'can_edit') ? 'opacity-50 cursor-not-allowed' : ''}
             />
+            {isChildDisabled(permission, 'can_edit') && (
+              <Lock className="h-3 w-3 text-muted-foreground" />
+            )}
           </div>
         </TableCell>
         {/* Data visibility columns - active for all rows */}
