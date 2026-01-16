@@ -19,6 +19,28 @@ export interface PermissionCategory {
 }
 
 export const PERMISSION_CATEGORIES: PermissionCategory[] = [
+  // ==================== MENU SEKTIONER (Parent permissions for sidebars) ====================
+  {
+    key: "menu_sections",
+    label: "Menu sektioner",
+    icon: "📁",
+    permissions: [
+      { key: "menu_section_personal", label: "Mit Hjem sektion", description: "Adgang til Mit Hjem menuen", hasEditOption: false },
+      { key: "menu_section_some", label: "SOME sektion", description: "Adgang til SOME menuen", hasEditOption: false },
+      { key: "menu_section_personale", label: "Personale sektion", description: "Adgang til Personale menuen", hasEditOption: false },
+      { key: "menu_section_ledelse", label: "Ledelse sektion", description: "Adgang til Ledelse menuen", hasEditOption: false },
+      { key: "menu_section_test", label: "Test sektion", description: "Adgang til Test menuen", hasEditOption: false },
+      { key: "menu_section_mg", label: "MG sektion", description: "Adgang til MG menuen", hasEditOption: false },
+      { key: "menu_section_vagtplan", label: "Vagtplan sektion", description: "Adgang til Vagtplan menuen", hasEditOption: false },
+      { key: "menu_section_fieldmarketing", label: "Fieldmarketing sektion", description: "Adgang til Fieldmarketing menuen", hasEditOption: false },
+      { key: "menu_section_rekruttering", label: "Rekruttering sektion", description: "Adgang til Rekruttering menuen", hasEditOption: false },
+      { key: "menu_section_boards", label: "Boards sektion", description: "Adgang til Boards menuen", hasEditOption: false },
+      { key: "menu_section_salary", label: "Løn sektion", description: "Adgang til Løn menuen", hasEditOption: false },
+      { key: "menu_section_reports", label: "Rapporter sektion", description: "Adgang til Rapporter menuen", hasEditOption: false },
+      { key: "menu_section_onboarding", label: "Onboarding sektion", description: "Adgang til Onboarding menuen", hasEditOption: false },
+    ],
+  },
+
   // ==================== MIT HJEM ====================
   {
     key: "menu_mit_hjem",
