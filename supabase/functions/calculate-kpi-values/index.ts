@@ -641,19 +641,21 @@ async function calculateGlobalLeaderboard(
     .select("sale_id, quantity, mapped_commission, product_id")
     .in("sale_id", saleIds);
 
-  // Get products to check counts_as_sale
+  // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
   let countingProductIds = new Set<string>();
+  const productCommissionMap = new Map<string, number>();
   
   if (productIds.length > 0) {
     const { data: products } = await supabase
       .from("products")
-      .select("id, counts_as_sale")
+      .select("id, counts_as_sale, commission_dkk")
       .in("id", productIds);
     
     countingProductIds = new Set(
       (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
     );
+    (products || []).forEach(p => productCommissionMap.set(p.id, p.commission_dkk || 0));
   }
 
   // Collect unique agent emails for mapping lookup
@@ -710,7 +712,11 @@ async function calculateGlobalLeaderboard(
       if (!item.product_id || countingProductIds.has(item.product_id)) {
         saleSales += item.quantity || 1;
       }
-      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+      // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
+      const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
+        ? item.mapped_commission
+        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+      saleCommission += itemCommission;
     }
     
     // If no items, count as 1 sale
@@ -823,19 +829,21 @@ async function calculateTeamLeaderboard(
     .select("sale_id, quantity, mapped_commission, product_id")
     .in("sale_id", saleIds);
 
-  // Get products to check counts_as_sale
+  // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
   let countingProductIds = new Set<string>();
+  const productCommissionMap = new Map<string, number>();
   
   if (productIds.length > 0) {
     const { data: products } = await supabase
       .from("products")
-      .select("id, counts_as_sale")
+      .select("id, counts_as_sale, commission_dkk")
       .in("id", productIds);
     
     countingProductIds = new Set(
       (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
     );
+    (products || []).forEach(p => productCommissionMap.set(p.id, p.commission_dkk || 0));
   }
 
   // Aggregate by agent email
@@ -853,7 +861,11 @@ async function calculateTeamLeaderboard(
       if (!item.product_id || countingProductIds.has(item.product_id)) {
         saleSales += item.quantity || 1;
       }
-      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+      // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
+      const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
+        ? item.mapped_commission
+        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+      saleCommission += itemCommission;
     }
     
     if (items.length === 0) {
@@ -935,19 +947,21 @@ async function calculateClientLeaderboard(
     .select("sale_id, quantity, mapped_commission, product_id")
     .in("sale_id", saleIds);
 
-  // Get products to check counts_as_sale
+  // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
   let countingProductIds = new Set<string>();
+  const productCommissionMap = new Map<string, number>();
   
   if (productIds.length > 0) {
     const { data: products } = await supabase
       .from("products")
-      .select("id, counts_as_sale")
+      .select("id, counts_as_sale, commission_dkk")
       .in("id", productIds);
     
     countingProductIds = new Set(
       (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
     );
+    (products || []).forEach(p => productCommissionMap.set(p.id, p.commission_dkk || 0));
   }
 
   // Build email -> employee mapping for this function
@@ -1001,7 +1015,11 @@ async function calculateClientLeaderboard(
       if (!item.product_id || countingProductIds.has(item.product_id)) {
         saleSales += item.quantity || 1;
       }
-      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+      // mapped_commission already includes quantity; fallback to product.commission_dkk * quantity
+      const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
+        ? item.mapped_commission
+        : (productCommissionMap.get(item.product_id) || 0) * (item.quantity || 1);
+      saleCommission += itemCommission;
     }
     
     if (items.length === 0) {
