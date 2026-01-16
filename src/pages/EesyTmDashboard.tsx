@@ -10,6 +10,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
+import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { getClientId } from "@/utils/clientIds";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -99,6 +101,16 @@ export default function EesyTmDashboard() {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const monthStart = startOfMonth(today);
 
+  // Get client ID for Eesy
+  const eesyClientId = getClientId("Eesy");
+
+  // ========== PRE-COMPUTED KPIs (for hero cards) ==========
+  // Fetch cached KPI values for all periods in a single query
+  const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
+    eesyClientId || null,
+    ["sales_count", "total_commission", "total_revenue"]
+  );
+
   // Fetch TV data from edge function (bypasses RLS for TV mode)
   const { data: tvData } = useQuery<TvEesyData>({
     queryKey: ["tv-eesy-tm-data"],
@@ -117,40 +129,30 @@ export default function EesyTmDashboard() {
     staleTime: 60000, // 1 minute stale time
   });
 
-  // Fetch sales for today
+  // ========== LEADERBOARD DATA (requires individual employee stats) ==========
+  // Only fetch detailed sales data for leaderboards, not for hero KPIs
   const dailySalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: today,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 60000, // 1 minute - reduced to lower DB load
+    refetchInterval: 120000, // 2 minutes - increased to reduce DB load
   });
 
-  // Fetch sales for this week
   const weeklySalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: weekStart,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 60000,
+    refetchInterval: 120000,
   });
 
-  // Fetch sales for payroll period (lønperiode)
   const payrollSalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: payrollPeriod.start,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 60000,
-  });
-
-  // Fetch sales for this month
-  const monthlySalesData = useDashboardSalesData({
-    clientName: "Eesy",
-    startDate: monthStart,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 60000,
+    refetchInterval: 120000,
   });
 
   // Fetch employee avatars and IDs
@@ -272,11 +274,18 @@ export default function EesyTmDashboard() {
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = (!tvMode && kpisLoading) || dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Calculate sales per hour
+  // ========== KPI VALUES FROM CACHE ==========
+  // Use pre-computed KPIs for hero cards (fast, updated every 30s)
+  const salesToday = tvMode ? (tvData?.salesToday ?? 0) : getKpiValue(cachedKpis?.today?.sales_count, 0);
+  const salesWeek = tvMode ? (tvData?.salesWeek ?? 0) : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
+  const salesMonth = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.this_month?.sales_count, 0);
+  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
+
+  // Calculate sales per hour using leaderboard data (which has hours)
   const dailySalesPerHour = dailySalesData.totalHours > 0 
     ? dailySalesData.totalSales / dailySalesData.totalHours 
     : 0;
@@ -307,7 +316,7 @@ export default function EesyTmDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesToday ?? 0) : dailySalesData.totalSales}
+                {salesToday}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -320,7 +329,7 @@ export default function EesyTmDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesWeek ?? 0) : weeklySalesData.totalSales}
+                {salesWeek}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -333,7 +342,7 @@ export default function EesyTmDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : monthlySalesData.totalSales}
+                {salesMonth}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
             </CardContent>
@@ -346,7 +355,7 @@ export default function EesyTmDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : payrollSalesData.totalSales}
+                {salesPayroll}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>
