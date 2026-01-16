@@ -112,6 +112,7 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   menu_section_reports: null,
   menu_section_admin: null,
   menu_section_some: null,
+  menu_section_sales_system: null,
   
   // ===== MIT HJEM (under menu_section_personal) =====
   menu_home: 'menu_section_personal',
@@ -239,9 +240,13 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   menu_fm_locations: 'menu_section_fieldmarketing',
   menu_fm_vagtplan_fm: 'menu_section_fieldmarketing',
   
+  // ===== SALG & SYSTEM (under menu_section_sales_system) =====
+  menu_sales: 'menu_section_sales_system',
+  menu_logics: 'menu_section_sales_system',
+  menu_live_stats: 'menu_section_sales_system',
+  menu_settings: 'menu_section_sales_system',
+  
   // Legacy/andre
-  menu_sales: null,
-  menu_settings: null,
   menu_leaderboard: null,
   menu_my_sales: 'menu_section_personal',
   menu_my_shifts: 'menu_section_personal',

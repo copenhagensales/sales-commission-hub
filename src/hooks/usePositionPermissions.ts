@@ -386,6 +386,7 @@ export function usePermissions() {
     canViewSales: canView("menu_sales"),
     canEditSales: canEdit("menu_sales"),
     canViewLogics: canView("menu_logics"),
+    canViewLiveStats: canView("menu_live_stats"),
     canViewClosingShifts: canView("menu_closing_shifts"),
     // Personnel menu
     canViewEmployees: canView("menu_employees"),
