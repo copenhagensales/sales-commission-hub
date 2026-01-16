@@ -1618,10 +1618,10 @@ async function handleTdcErhvervData(
     if (employeesWithTimestampTeams.length > 0) {
       const { data: stamps } = await supabase
         .from("time_stamps")
-        .select("employee_id, date, clock_in, clock_out, break_minutes")
+        .select("employee_id, clock_in, clock_out, break_minutes")
         .in("employee_id", employeesWithTimestampTeams)
-        .gte("date", payrollStartStr)
-        .lte("date", todayStr);
+        .gte("clock_in", payrollStartStr)
+        .lte("clock_in", todayStr + "T23:59:59");
       timeStampsData = stamps || [];
     }
   }
