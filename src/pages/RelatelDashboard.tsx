@@ -12,6 +12,7 @@ import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
+import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -127,30 +128,25 @@ export default function RelatelDashboard() {
     staleTime: 60000,
   });
 
-  // Fetch sales data ONLY for leaderboards (need individual seller stats)
-  // Use longer refetch interval since hero KPIs come from cache
-  const dailySalesData = useDashboardSalesData({
-    clientName: "relatel",
-    startDate: today,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000,
-  });
+  // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
+  // This replaces 3 heavy useDashboardSalesData calls with 3 simple cache reads
+  const { 
+    sellersToday: cachedSellersToday, 
+    sellersWeek: cachedSellersWeek, 
+    sellersPayroll: cachedSellersPayroll,
+    isLoading: leaderboardsLoading 
+  } = useCachedLeaderboards(
+    { type: "client", id: relatelClientId || null },
+    { enabled: !tvMode, limit: 30 }
+  );
 
-  const weeklySalesData = useDashboardSalesData({
-    clientName: "relatel",
-    startDate: weekStart,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000,
-  });
-
+  // Only keep ONE useDashboardSalesData call - for hours calculation (sales/time KPI)
   const payrollSalesData = useDashboardSalesData({
     clientName: "relatel",
     startDate: payrollPeriod.start,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 120000,
+    refetchInterval: 300000, // 5 minutes - increased since only used for hours
   });
 
   // Fetch employee avatars and IDs
@@ -245,57 +241,57 @@ export default function RelatelDashboard() {
     return { target, progress, expectedPercent, expectedAmount };
   };
 
-  // Sort employees by commission for each period
+  // Convert cached leaderboard entries to component-expected format
+  const mapCachedToSeller = (entry: LeaderboardEntry) => ({
+    name: entry.employeeName,
+    totalSales: entry.salesCount,
+    totalCommission: entry.commission,
+    avatarUrl: entry.avatarUrl,
+    employeeId: entry.employeeId,
+    goalTarget: entry.goalTarget,
+  });
+
+  // Sort employees by commission for each period (use cached data)
   const sortedDailySellers = useMemo(() => {
     if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
-    return [...dailySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [dailySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersToday.map(mapCachedToSeller);
+  }, [cachedSellersToday, tvMode, tvData]);
 
   const sortedWeeklySellers = useMemo(() => {
     if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
-    return [...weeklySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [weeklySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersWeek.map(mapCachedToSeller);
+  }, [cachedSellersWeek, tvMode, tvData]);
 
   const sortedPayrollSellers = useMemo(() => {
     if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
-    return [...payrollSalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [payrollSalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersPayroll.map(mapCachedToSeller);
+  }, [cachedSellersPayroll, tvMode, tvData]);
 
   const getAvatarUrl = (name: string) => {
     if (!employeeData?.avatarMap) return undefined;
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = kpisLoading || dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = kpisLoading || leaderboardsLoading || payrollSalesData.isLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Get sales counts from cached KPIs (or TV data in TV mode, or fallback to live data)
+  // Get sales counts from cached KPIs (or TV data in TV mode)
   const todaySales = tvMode 
     ? (tvData?.salesToday ?? 0) 
-    : getKpiValue(cachedKpis?.today?.sales_count, dailySalesData.totalSales);
+    : getKpiValue(cachedKpis?.today?.sales_count, 0);
   const weekSales = tvMode 
     ? (tvData?.salesWeek ?? 0) 
-    : getKpiValue(cachedKpis?.this_week?.sales_count, weeklySalesData.totalSales);
+    : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
   const payrollSales = tvMode 
     ? (tvData?.salesMonth ?? 0) 
     : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
 
-  // Hours still come from live data (for now)
-  const todayHours = dailySalesData.totalHours;
-  const weekHours = weeklySalesData.totalHours;
+  // Hours come from payroll sales data (the only remaining useDashboardSalesData call)
   const payrollHours = payrollSalesData.totalHours;
 
-  // Calculate sales per hour
-  const dailySalesPerHour = todayHours > 0 ? todaySales / todayHours : 0;
-  const weeklySalesPerHour = weekHours > 0 ? weekSales / weekHours : 0;
+  // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;
 
   return (
@@ -364,38 +360,8 @@ export default function RelatelDashboard() {
           </Card>
         </div>
 
-        {/* KPI Cards - Row 2: Sales per hour */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time i dag</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {dailySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {todaySales} salg / {todayHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time uge</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {weeklySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {weekSales} salg / {weekHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
+        {/* KPI Card - Sales per hour (payroll period only - simplified from 3 cards) */}
+        <div className="grid grid-cols-1 gap-4">
           <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
