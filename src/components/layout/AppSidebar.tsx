@@ -434,61 +434,67 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </CollapsibleTrigger>
             <CollapsibleContent className="pl-4 space-y-1 mt-1">
               {/* Hjem */}
-              <NavLink
-                to="/home"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <Home className="h-4 w-4" />
-                {t("sidebar.home")}
-              </NavLink>
+              {p.canViewHome && (
+                <NavLink
+                  to="/home"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Home className="h-4 w-4" />
+                  {t("sidebar.home")}
+                </NavLink>
+              )}
 
               {/* Head to Head */}
-              <NavLink
-                to="/head-to-head"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <Swords className="h-4 w-4" />
-                  Head to Head
-                </div>
-                {pendingH2hCount > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
-                  </Badge>
-                )}
-              </NavLink>
+              {p.canViewH2h && (
+                <NavLink
+                  to="/head-to-head"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Swords className="h-4 w-4" />
+                    Head to Head
+                  </div>
+                  {pendingH2hCount > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                      {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
+                    </Badge>
+                  )}
+                </NavLink>
+              )}
 
               {/* Provisionsliga */}
-              <NavLink
-                to="/commission-league"
-                onClick={(e) => {
-                  handleNavClick(e);
-                  // Mark as seen to hide "NY" badge
-                  localStorage.setItem("league-sidebar-seen", "true");
-                }}
-                className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-4 w-4" />
-                  Cph Sales Ligaen
-                </div>
-                {!localStorage.getItem("league-sidebar-seen") && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
-                    NY
-                  </span>
-                )}
-              </NavLink>
+              {p.canViewCommissionLeague && (
+                <NavLink
+                  to="/commission-league"
+                  onClick={(e) => {
+                    handleNavClick(e);
+                    // Mark as seen to hide "NY" badge
+                    localStorage.setItem("league-sidebar-seen", "true");
+                  }}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-4 w-4" />
+                    Cph Sales Ligaen
+                  </div>
+                  {!localStorage.getItem("league-sidebar-seen") && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
+                      NY
+                    </span>
+                  )}
+                </NavLink>
+              )}
               
               {/* Liga Test Board - kun for ejere */}
               {p.position?.name?.toLowerCase() === "ejer" && (
@@ -603,17 +609,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
               
               {/* Mine Mål */}
-              <NavLink
-                to="/my-goals"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/my-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <Target className="h-4 w-4" />
-                {t("sidebar.myGoals", "Mine Mål")}
-              </NavLink>
+              {p.canViewMyGoals && (
+                <NavLink
+                  to="/my-goals"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Target className="h-4 w-4" />
+                  {t("sidebar.myGoals", "Mine Mål")}
+                </NavLink>
+              )}
               
               {/* Mine Kontrakter */}
               {p.canViewMyContracts && (
@@ -653,17 +661,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
               
               {/* Min Feedback */}
-              <NavLink
-                to="/my-feedback"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/my-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <MessageSquare className="h-4 w-4" />
-                Min Feedback
-              </NavLink>
+              {p.canViewMyFeedback && (
+                <NavLink
+                  to="/my-feedback"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Min Feedback
+                </NavLink>
+              )}
               
               {/* Anbefal en ven */}
               {p.canViewReferAFriend && (
