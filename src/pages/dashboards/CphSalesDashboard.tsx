@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 
 interface TopSeller {
   name: string;
@@ -76,6 +77,12 @@ export default function CphSalesDashboard() {
     "today",
     "global"
   );
+
+  // Fetch cached top 20 sellers (fast, pre-computed)
+  const { data: cachedTopSellers = [] } = useCachedLeaderboard("today", { type: "global" }, {
+    enabled: !tvMode,
+    limit: 20,
+  });
 
   // Use edge function for TV mode (bypasses RLS)
   const { data: tvData } = useQuery<TvDashboardData>({
@@ -900,7 +907,15 @@ export default function CphSalesDashboard() {
   const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
   const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : calculateSellersOnBoard(knownClientSales);
   const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
-  const displayTopSellers = tvMode && tvData ? tvData.topSellers : calculateTopSellers(knownClientSales);
+  
+  // Use cached leaderboard for top sellers (much faster than calculating from sales)
+  const displayTopSellers: TopSeller[] = tvMode && tvData 
+    ? tvData.topSellers 
+    : cachedTopSellers.map((entry, index) => ({
+        name: formatDisplayName(entry.employeeName),
+        commission: entry.commission,
+        rank: index + 1,
+      }));
 
   // Format commission as DKK
   const formatCommission = (amount: number) => {
