@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
+import { usePrecomputedKpis, usePrecomputedKpi, getKpiValue } from "@/hooks/usePrecomputedKpi";
 
 const Home = () => {
   const { user } = useAuth();
@@ -299,72 +300,67 @@ const Home = () => {
     }).format(amount);
   };
 
-  // Fetch ALL team sales goals for owners/managers (using team_sales_goals with amounts)
-  const { data: allTeamGoals = [] } = useQuery({
-    queryKey: ["home-all-team-goals", canEditHomeGoals, periodStartStr, periodEndStr],
+  // ============= CACHED TEAM GOALS (Fase 9 Optimization) =============
+  // Fetch team goals metadata, then use cached commission values
+  const { data: teamGoalsMetadata = [] } = useQuery({
+    queryKey: ["home-team-goals-metadata", canEditHomeGoals, periodStartStr, periodEndStr],
     queryFn: async () => {
       const { data: goals } = await supabase
         .from("team_sales_goals")
-        .select("*, teams(id, name)")
+        .select("id, team_id, target_amount, teams(id, name)")
         .eq("period_start", periodStartStr)
         .eq("period_end", periodEndStr);
-
-      if (!goals || goals.length === 0) return [];
-
-      // Calculate progress for each goal (using commission amounts)
-      const goalsWithProgress = await Promise.all(goals.map(async (goal) => {
-        const { data: teamMembers } = await supabase
-          .from("team_members")
-          .select("employee_id")
-          .eq("team_id", goal.team_id);
-
-        const employeeIds = teamMembers?.map(m => m.employee_id) || [];
-        if (employeeIds.length === 0) return { ...goal, currentAmount: 0, progress: 0 };
-
-        const { data: agentMappings } = await supabase
-          .from("employee_agent_mapping")
-          .select("agent_id, agents(email, external_dialer_id)")
-          .in("employee_id", employeeIds);
-
-        const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
-        const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
-        
-        if (agentEmails.length === 0 && externalIds.length === 0) return { ...goal, currentAmount: 0, progress: 0 };
-
-        let query = supabase
-          .from("sales")
-          .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
-          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
-
-        if (agentEmails.length > 0 && externalIds.length > 0) {
-          query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
-        } else if (agentEmails.length > 0) {
-          query = query.in("agent_email", agentEmails);
-        } else {
-          query = query.in("agent_external_id", externalIds);
-        }
-
-        const { data: sales } = await query;
-
-        const currentAmount = sales?.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
-        }, 0) || 0;
-
-        const progress = goal.target_amount > 0 ? Math.min((currentAmount / goal.target_amount) * 100, 100) : 0;
-        return { ...goal, currentAmount, progress };
-      }));
-
-      return goalsWithProgress;
+      return goals || [];
     },
     enabled: canEditHomeGoals,
-    staleTime: 30000, // 30 seconds cache - sales data updates frequently
+    staleTime: 60000, // Goals don't change often
   });
+  
+  // Fetch cached team commission values for all teams with goals
+  const teamIdsWithGoals = useMemo(() => 
+    teamGoalsMetadata.map((g: any) => g.team_id), 
+    [teamGoalsMetadata]
+  );
+  
+  const { data: cachedTeamCommissions } = useQuery({
+    queryKey: ["home-cached-team-commissions", teamIdsWithGoals],
+    queryFn: async () => {
+      if (teamIdsWithGoals.length === 0) return {};
+      
+      const { data } = await supabase
+        .from("kpi_cached_values")
+        .select("scope_id, value")
+        .eq("kpi_slug", "total_commission")
+        .eq("period_type", "payroll_period")
+        .eq("scope_type", "team")
+        .in("scope_id", teamIdsWithGoals);
+      
+      // Convert to map
+      const result: Record<string, number> = {};
+      (data || []).forEach(item => {
+        if (item.scope_id) result[item.scope_id] = item.value;
+      });
+      return result;
+    },
+    enabled: teamIdsWithGoals.length > 0,
+    staleTime: 30000,
+  });
+  
+  // Combine metadata with cached commission values
+  const allTeamGoals = useMemo(() => {
+    return teamGoalsMetadata.map((goal: any) => {
+      const currentAmount = cachedTeamCommissions?.[goal.team_id] || 0;
+      const progress = goal.target_amount > 0 
+        ? Math.min((currentAmount / goal.target_amount) * 100, 100) 
+        : 0;
+      return { ...goal, currentAmount, progress };
+    });
+  }, [teamGoalsMetadata, cachedTeamCommissions]);
 
-  // Fetch team sales goals with commission progress (for regular employees)
-  // Fallback: If no explicit team goal exists, sum individual employee_sales_goals
-  const { data: teamGoal } = useQuery({
-    queryKey: ["home-team-goal", userTeams, periodStartStr, periodEndStr],
+  // ============= CACHED TEAM GOAL FOR REGULAR EMPLOYEES =============
+  // Fetch team goal metadata, use cached commission
+  const { data: teamGoalMetadata } = useQuery({
+    queryKey: ["home-team-goal-metadata", userTeams, periodStartStr, periodEndStr],
     queryFn: async () => {
       if (userTeams.length === 0) return null;
 
@@ -376,66 +372,25 @@ const Home = () => {
       // First try to get explicit team goal
       const { data: explicitGoal } = await supabase
         .from("team_sales_goals")
-        .select("*, teams(id, name)")
+        .select("id, team_id, target_amount, teams(id, name)")
         .eq("period_start", periodStartStr)
         .eq("period_end", periodEndStr)
         .in("team_id", teamIds)
         .limit(1)
         .maybeSingle();
 
-      // Get team members for calculating progress (needed for both explicit and fallback)
-      const { data: teamMembers } = await supabase
-        .from("team_members")
-        .select("employee_id")
-        .eq("team_id", explicitGoal?.team_id || primaryTeamId);
-
-      const employeeIds = teamMembers?.map(m => m.employee_id) || [];
-
-      // Helper function to calculate team sales progress
-      const calculateTeamProgress = async (targetAmount: number) => {
-        if (employeeIds.length === 0) return { currentAmount: 0, progress: 0 };
-
-        const { data: agentMappings } = await supabase
-          .from("employee_agent_mapping")
-          .select("agent_id, agents(email, external_dialer_id)")
-          .in("employee_id", employeeIds);
-
-        const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
-        const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
-        
-        if (agentEmails.length === 0 && externalIds.length === 0) return { currentAmount: 0, progress: 0 };
-
-        let query = supabase
-          .from("sales")
-          .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
-          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
-
-        if (agentEmails.length > 0 && externalIds.length > 0) {
-          query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
-        } else if (agentEmails.length > 0) {
-          query = query.in("agent_email", agentEmails);
-        } else {
-          query = query.in("agent_external_id", externalIds);
-        }
-
-        const { data: sales } = await query;
-
-        const currentAmount = sales?.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
-        }, 0) || 0;
-
-        const progress = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0;
-        return { currentAmount, progress };
-      };
-
-      // If explicit goal exists, use it
       if (explicitGoal) {
-        const { currentAmount, progress } = await calculateTeamProgress(explicitGoal.target_amount);
-        return { ...explicitGoal, currentAmount, progress, isFallback: false };
+        return { ...explicitGoal, isFallback: false };
       }
 
       // Fallback: Sum individual employee_sales_goals for this team
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .eq("team_id", primaryTeamId);
+
+      const employeeIds = teamMembers?.map(m => m.employee_id) || [];
+
       const { data: individualGoals } = await supabase
         .from("employee_sales_goals")
         .select("target_amount")
@@ -444,31 +399,45 @@ const Home = () => {
         .eq("period_end", periodEndStr);
 
       const summedTarget = individualGoals?.reduce((sum, g) => sum + (g.target_amount || 0), 0) || 0;
-
       if (summedTarget === 0) return null;
 
-      // Get team name for display
       const { data: teamData } = await supabase
         .from("teams")
         .select("id, name")
         .eq("id", primaryTeamId)
         .single();
 
-      const { currentAmount, progress } = await calculateTeamProgress(summedTarget);
-
       return {
         id: `fallback-${primaryTeamId}`,
         team_id: primaryTeamId,
         target_amount: summedTarget,
         teams: teamData,
-        currentAmount,
-        progress,
-        isFallback: true, // Mark as fallback so we can show info message
+        isFallback: true,
       };
     },
     enabled: userTeams.length > 0 && !canEditHomeGoals,
-    staleTime: 30000, // 30 seconds cache
+    staleTime: 60000, // Goals don't change often
   });
+  
+  // Fetch cached team commission for the user's team goal
+  const { data: userTeamCommission } = usePrecomputedKpi(
+    "total_commission",
+    "payroll_period",
+    "team",
+    teamGoalMetadata?.team_id
+  );
+  
+  // Combine metadata with cached commission
+  const teamGoal = useMemo(() => {
+    if (!teamGoalMetadata) return null;
+    
+    const currentAmount = getKpiValue(userTeamCommission);
+    const progress = teamGoalMetadata.target_amount > 0 
+      ? Math.min((currentAmount / teamGoalMetadata.target_amount) * 100, 100) 
+      : 0;
+    
+    return { ...teamGoalMetadata, currentAmount, progress };
+  }, [teamGoalMetadata, userTeamCommission]);
 
   // Add/update team goal mutation (using team_sales_goals with amounts)
   const addTeamGoalMutation = useMutation({
@@ -484,8 +453,8 @@ const Home = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["home-team-goal"] });
-      queryClient.invalidateQueries({ queryKey: ["home-all-team-goals"] });
+      queryClient.invalidateQueries({ queryKey: ["home-team-goal-metadata"] });
+      queryClient.invalidateQueries({ queryKey: ["home-team-goals-metadata"] });
       setAddTeamGoalOpen(false);
       setNewSalesTarget("100000");
       toast.success("Teammål opdateret");
@@ -503,8 +472,8 @@ const Home = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["home-team-goal"] });
-      queryClient.invalidateQueries({ queryKey: ["home-all-team-goals"] });
+      queryClient.invalidateQueries({ queryKey: ["home-team-goal-metadata"] });
+      queryClient.invalidateQueries({ queryKey: ["home-team-goals-metadata"] });
       toast.success("Teammål slettet");
     }
   });
@@ -542,153 +511,33 @@ const Home = () => {
     return { currentAmount, targetAmount, progress, progressVsExpected };
   }, [teamGoal, workingDaysStats]);
 
-  // Fetch employee's personal sales stats via agent mapping (same logic as DailyReports)
-  const { data: personalStats } = useQuery({
-    queryKey: ["home-personal-stats", employee?.id, periodStartStr, periodEndStr],
-    queryFn: async () => {
-      if (!employee?.id) return null;
-      
-      // Get agent mappings for this employee with email and external_dialer_id
-      const { data: mappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(email, external_dialer_id)")
-        .eq("employee_id", employee.id);
-      
-      const agentEmails = mappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
-      const externalIds = mappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
-      
-      const now = new Date();
-      const todayStr = format(now, "yyyy-MM-dd");
-      const todayStart = `${todayStr}T00:00:00`;
-      const todayEnd = `${todayStr}T23:59:59`;
-      
-      let periodSales: any[] = [];
-      let todaySales: any[] = [];
-      
-      // Fetch dialer sales if we have agent identifiers
-      // Use direct in() for emails - Supabase handles the encoding
-      const normalizedEmails = agentEmails.map(e => e.toLowerCase());
-      
-      if (normalizedEmails.length > 0 || externalIds.length > 0) {
-        // Build query for period sales - use separate queries and merge results
-        let periodSalesFromEmail: any[] = [];
-        let periodSalesFromId: any[] = [];
-        
-        if (normalizedEmails.length > 0) {
-          const { data } = await supabase
-            .from("sales")
-            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-            .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-            .lte("sale_datetime", `${periodEndStr}T23:59:59`)
-            .in("agent_email", normalizedEmails);
-          periodSalesFromEmail = data || [];
-        }
-        
-        if (externalIds.length > 0) {
-          const { data } = await supabase
-            .from("sales")
-            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-            .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-            .lte("sale_datetime", `${periodEndStr}T23:59:59`)
-            .in("agent_external_id", externalIds);
-          periodSalesFromId = data || [];
-        }
-        
-        // Merge and dedupe by sale id
-        const periodSalesMap = new Map<string, any>();
-        [...periodSalesFromEmail, ...periodSalesFromId].forEach(s => periodSalesMap.set(s.id, s));
-        periodSales = Array.from(periodSalesMap.values());
-        
-        // Same for today's sales
-        let todaySalesFromEmail: any[] = [];
-        let todaySalesFromId: any[] = [];
-        
-        if (normalizedEmails.length > 0) {
-          const { data } = await supabase
-            .from("sales")
-            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-            .gte("sale_datetime", todayStart)
-            .lte("sale_datetime", todayEnd)
-            .in("agent_email", normalizedEmails);
-          todaySalesFromEmail = data || [];
-        }
-        
-        if (externalIds.length > 0) {
-          const { data } = await supabase
-            .from("sales")
-            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-            .gte("sale_datetime", todayStart)
-            .lte("sale_datetime", todayEnd)
-            .in("agent_external_id", externalIds);
-          todaySalesFromId = data || [];
-        }
-        
-        const todaySalesMap = new Map<string, any>();
-        [...todaySalesFromEmail, ...todaySalesFromId].forEach(s => todaySalesMap.set(s.id, s));
-        todaySales = Array.from(todaySalesMap.values());
-      }
-      
-      // Fetch Fieldmarketing sales for this employee
-      const { data: fmPeriodSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, registered_at, product_name")
-        .eq("seller_id", employee.id)
-        .gte("registered_at", `${periodStartStr}T00:00:00`)
-        .lte("registered_at", `${periodEndStr}T23:59:59`);
-      
-      const { data: fmTodaySales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, registered_at, product_name")
-        .eq("seller_id", employee.id)
-        .gte("registered_at", todayStart)
-        .lte("registered_at", todayEnd);
-      
-      // Fetch products for FM commission calculation
-      const { data: products } = await supabase
-        .from("products")
-        .select("name, commission_dkk");
-      
-      const productCommissionMap = new Map<string, number>();
-      products?.forEach(p => {
-        if (p.name) productCommissionMap.set(p.name.toLowerCase(), p.commission_dkk || 0);
-      });
-      
-      // Calculate dialer commission
-      const dialerPeriodCommission = periodSales.reduce((total, sale) => {
-        return total + (sale.sale_items?.reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0) || 0);
-      }, 0);
-      
-      const dialerTodayCommission = todaySales.reduce((total, sale) => {
-        return total + (sale.sale_items?.reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0) || 0);
-      }, 0);
-      
-      // Calculate FM commission
-      const fmPeriodCommission = fmPeriodSales?.reduce((sum, sale) => {
-        const commission = productCommissionMap.get(sale.product_name?.toLowerCase() || "") || 0;
-        return sum + commission;
-      }, 0) || 0;
-      
-      const fmTodayCommission = fmTodaySales?.reduce((sum, sale) => {
-        const commission = productCommissionMap.get(sale.product_name?.toLowerCase() || "") || 0;
-        return sum + commission;
-      }, 0) || 0;
-      
-      // Combine totals
-      const periodCommission = dialerPeriodCommission + fmPeriodCommission;
-      const todayCommission = dialerTodayCommission + fmTodayCommission;
-      const periodSalesCount = periodSales.length + (fmPeriodSales?.length || 0);
-      const todaySalesCount = todaySales.length + (fmTodaySales?.length || 0);
-      
-      return {
-        periodCommission,
-        periodSalesCount,
-        todaySalesCount,
-        todayCommission
-      };
-    },
-    enabled: !!employee?.id,
-    staleTime: 30000, // 30 seconds cache
-  });
+  // ============= CACHED PERSONAL STATS (Fase 9 Optimization) =============
+  // Use pre-computed employee-scoped KPIs from edge function cache
+  const { data: cachedPersonalPayroll } = usePrecomputedKpis(
+    ["sales_count", "total_commission"],
+    "payroll_period",
+    "employee",
+    employee?.id
+  );
+  
+  const { data: cachedPersonalToday } = usePrecomputedKpis(
+    ["sales_count", "total_commission"],
+    "today",
+    "employee",
+    employee?.id
+  );
+  
+  // Derive personalStats from cached values
+  const personalStats = useMemo(() => {
+    if (!employee?.id) return null;
+    
+    return {
+      periodCommission: getKpiValue(cachedPersonalPayroll?.total_commission),
+      periodSalesCount: getKpiValue(cachedPersonalPayroll?.sales_count),
+      todaySalesCount: getKpiValue(cachedPersonalToday?.sales_count),
+      todayCommission: getKpiValue(cachedPersonalToday?.total_commission),
+    };
+  }, [employee?.id, cachedPersonalPayroll, cachedPersonalToday]);
 
   // Fetch employee's personal sales goal for the current payroll period
   const { data: personalGoal } = useQuery({
