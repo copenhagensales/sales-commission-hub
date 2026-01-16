@@ -110,28 +110,24 @@ export default function PublicPulseSurvey() {
     }
   });
 
-  // Submit mutation via edge function
+  // Submit mutation via edge function - sends all dynamic score fields
   const submitMutation = useMutation({
     mutationFn: async (response: PulseSurveyResponse & { teamId: string; surveyId: string }) => {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
+      // Build payload dynamically - extract all score fields from form data
+      const { teamId, surveyId, tenure, nps_comment, improvement_suggestions, ...scores } = response;
+      
       const res = await supabase.functions.invoke('submit-pulse-survey', {
         body: {
-          survey_id: response.surveyId,
-          nps_score: response.nps_score,
-          tenure: response.tenure,
-          development_score: response.development_score,
-          leadership_score: response.leadership_score,
-          recognition_score: response.recognition_score,
-          energy_score: response.energy_score,
-          seriousness_score: response.seriousness_score,
-          leader_availability_score: response.leader_availability_score,
-          wellbeing_score: response.wellbeing_score,
-          psychological_safety_score: response.psychological_safety_score,
-          nps_comment: response.nps_comment || null,
-          improvement_suggestions: response.improvement_suggestions || null,
-          submitted_team_id: response.teamId,
+          survey_id: surveyId,
+          tenure: tenure,
+          nps_comment: nps_comment || null,
+          improvement_suggestions: improvement_suggestions || null,
+          submitted_team_id: teamId,
           department: teamName,
+          // Spread all dynamic scores (nps_score, development_score, attrition_risk_score, etc.)
+          ...scores,
         }
       });
       
