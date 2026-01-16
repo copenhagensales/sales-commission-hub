@@ -12,6 +12,21 @@ type DataScope = "egen" | "team" | "alt";
 
 // Generate all permissions for owner - visible menu items and tabs
 const generateAllPermissions = (): RolePreviewPermissions => ({
+  // Menu section permissions (for PreviewSidebar)
+  menu_section_personal: true,
+  menu_section_some: true,
+  menu_section_personale: true,
+  menu_section_ledelse: true,
+  menu_section_test: true,
+  menu_section_mg: true,
+  menu_section_vagtplan: true,
+  menu_section_fieldmarketing: true,
+  menu_section_rekruttering: true,
+  menu_section_boards: true,
+  menu_section_salary: true,
+  menu_section_reports: true,
+  menu_section_onboarding: true,
+  
   // Main menu
   menu_dashboard: true,
   menu_some: { view: true, edit: true },
