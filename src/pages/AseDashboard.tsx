@@ -33,6 +33,7 @@ const AseDashboard = () => {
   const { totalSales, totalCommission, totalHours, employeeStats, isLoading } = useDashboardSalesData({
     startDate,
     endDate,
+    refetchInterval: 120000, // 2 minutter - reduceret for at mindske database load
   });
 
   const getSubtitle = () => {
