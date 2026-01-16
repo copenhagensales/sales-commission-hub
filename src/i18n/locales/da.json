@@ -366,9 +366,12 @@
     "title": "Medarbejdere",
     "subtitle": "Stamkort og medarbejderdata",
     "tabs": {
+      "all": "Alle medarbejdere",
+      "staff": "Personale",
       "allEmployees": "Alle medarbejdere",
       "teams": "Teams",
       "positions": "Stillinger",
+      "permissions": "Rettigheder",
       "dialerMapping": "Dialer mapping"
     },
     "stats": {

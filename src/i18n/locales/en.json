@@ -364,9 +364,12 @@
     "title": "Employees",
     "subtitle": "Master data and employee information",
     "tabs": {
+      "all": "All employees",
+      "staff": "Staff",
       "allEmployees": "All employees",
       "teams": "Teams",
       "positions": "Positions",
+      "permissions": "Permissions",
       "dialerMapping": "Dialer mapping"
     },
     "stats": {
