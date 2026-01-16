@@ -2,21 +2,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Shield, Calendar, FileText, Loader2, Crown, User, Eye, Lock, Pencil, Settings2,
   Home, Users, ClipboardList, Car, FlaskConical, Phone, Monitor, GraduationCap, 
   FileBarChart, Wrench, Settings, ShoppingCart, ListChecks, Activity, Video, 
   HeartHandshake, MessageSquare, UserCheck, Target, Sparkles, Gift, Swords, 
   Trophy, Building2, Mail, Clock, Timer, LayoutDashboard, Receipt, CreditCard, 
-  BarChart3, Database, UserPlus, BookOpen, CalendarDays
+  BarChart3, Database, UserPlus, BookOpen, CalendarDays, Globe, Users2, UserCircle
 } from "lucide-react";
 import { 
   useRoleDefinitions, 
   usePagePermissions, 
   permissionKeyLabels,
-  type RoleDefinition
+  type RoleDefinition,
+  type Visibility
 } from "@/hooks/useUnifiedPermissions";
 import { PermissionEditor } from "./permissions/PermissionEditor";
+
+// Visibility icon mapping
+const visibilityConfig: Record<Visibility, { icon: React.ReactNode; label: string; color: string }> = {
+  all: { icon: <Globe className="h-4 w-4" />, label: "Ser alt data", color: "text-purple-600" },
+  team: { icon: <Users2 className="h-4 w-4" />, label: "Ser team data", color: "text-amber-600" },
+  self: { icon: <UserCircle className="h-4 w-4" />, label: "Kun egen data", color: "text-gray-400" },
+  none: { icon: <UserCircle className="h-4 w-4" />, label: "Ingen adgang", color: "text-muted-foreground/30" },
+};
 
 // Icon mapping from database string to component (for roles)
 const roleIconMap: Record<string, React.ReactNode> = {
@@ -271,71 +281,99 @@ export function PermissionsTab() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5" />
-              Side-adgang
+              Side-adgang & Data synlighed
             </CardTitle>
             <CardDescription>
-              Hvem kan se og redigere hvilke sider? <Eye className="inline h-3 w-3" /> = kan se, <Pencil className="inline h-3 w-3" /> = kan redigere
+              Hvem kan se og redigere hvilke sider, og hvilke data kan de se?
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Side/Funktion</TableHead>
-                    {roleDefinitions.map((role) => (
-                      <TableHead key={role.key} className="text-center">
-                        <Badge className={colorMap[role.color || "gray"]} variant="outline">
-                          {role.label}
-                        </Badge>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orderedPermissionKeys.map((permKey) => {
-                    const isSectionRow = isSection(permKey);
-                    
-                    return (
-                      <TableRow 
-                        key={permKey} 
-                        className={isSectionRow ? "bg-muted/50 font-semibold" : ""}
-                      >
-                        <TableCell className={isSectionRow ? "font-semibold" : "font-medium"}>
-                          <div className={`flex items-center gap-2 ${!isSectionRow ? 'pl-4' : ''}`}>
-                            {permissionIconMap[permKey] || <Shield className="h-4 w-4 text-muted-foreground" />}
-                            <span>{permissionKeyLabels[permKey] || permKey.replace('menu_', '').replace(/_/g, ' ')}</span>
-                          </div>
-                        </TableCell>
-                        {roleDefinitions.map((role) => {
-                          const perm = getPagePermission(role.key, permKey);
-                          const canView = perm?.can_view ?? false;
-                          const canEdit = perm?.can_edit ?? false;
-                          
-                          return (
-                            <TableCell key={role.key} className="text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                {canView ? (
-                                  <Eye className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Eye className="h-4 w-4 text-muted-foreground/30" />
-                                )}
-                                {canEdit ? (
-                                  <Pencil className="h-4 w-4 text-blue-600" />
-                                ) : (
-                                  <Pencil className="h-4 w-4 text-muted-foreground/30" />
-                                )}
-                              </div>
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+            <TooltipProvider>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Side/Funktion</TableHead>
+                      {roleDefinitions.map((role) => (
+                        <TableHead key={role.key} className="text-center">
+                          <Badge className={colorMap[role.color || "gray"]} variant="outline">
+                            {role.label}
+                          </Badge>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orderedPermissionKeys.map((permKey) => {
+                      const isSectionRow = isSection(permKey);
+                      
+                      return (
+                        <TableRow 
+                          key={permKey} 
+                          className={isSectionRow ? "bg-muted/50 font-semibold" : ""}
+                        >
+                          <TableCell className={isSectionRow ? "font-semibold" : "font-medium"}>
+                            <div className={`flex items-center gap-2 ${!isSectionRow ? 'pl-4' : ''}`}>
+                              {permissionIconMap[permKey] || <Shield className="h-4 w-4 text-muted-foreground" />}
+                              <span>{permissionKeyLabels[permKey] || permKey.replace('menu_', '').replace(/_/g, ' ')}</span>
+                            </div>
+                          </TableCell>
+                          {roleDefinitions.map((role) => {
+                            const perm = getPagePermission(role.key, permKey);
+                            const canView = perm?.can_view ?? false;
+                            const canEdit = perm?.can_edit ?? false;
+                            const visibility = (perm?.visibility as Visibility) ?? 'none';
+                            const visConfig = visibilityConfig[visibility] || visibilityConfig.none;
+                            
+                            return (
+                              <TableCell key={role.key} className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={canView ? "text-green-600" : "text-muted-foreground/30"}>
+                                        <Eye className="h-4 w-4" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {canView ? "Kan se" : "Kan ikke se"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={canEdit ? "text-blue-600" : "text-muted-foreground/30"}>
+                                        <Pencil className="h-4 w-4" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {canEdit ? "Kan redigere" : "Kan ikke redigere"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={canView ? visConfig.color : "text-muted-foreground/30"}>
+                                        {canView ? visConfig.icon : <UserCircle className="h-4 w-4" />}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {canView ? visConfig.label : "Ingen data adgang"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </TooltipProvider>
+            
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground border-t pt-4">
               <div className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4 text-green-600" />
                 <span>Kan se</span>
@@ -343,6 +381,18 @@ export function PermissionsTab() {
               <div className="flex items-center gap-1.5">
                 <Pencil className="h-4 w-4 text-blue-600" />
                 <span>Kan redigere</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Globe className="h-4 w-4 text-purple-600" />
+                <span>Ser alt data</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Users2 className="h-4 w-4 text-amber-600" />
+                <span>Ser team data</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <UserCircle className="h-4 w-4 text-gray-400" />
+                <span>Kun egen data</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4 text-muted-foreground/30" />
