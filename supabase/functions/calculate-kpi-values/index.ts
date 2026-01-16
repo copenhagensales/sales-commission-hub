@@ -308,6 +308,39 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ============= CLIENT-SCOPED LEADERBOARD CACHE CALCULATION =============
+    console.log("Calculating client-scoped leaderboards...");
+    
+    for (const client of clientList) {
+      for (const period of periods) {
+        try {
+          const leaderboard = await calculateClientLeaderboard(
+            supabase,
+            client.id,
+            period.start,
+            period.end,
+            employeeMap,
+            employeeTeamMap,
+            30 // Top 30 per client
+          );
+          
+          leaderboardCaches.push({
+            period_type: period.type,
+            scope_type: "client",
+            scope_id: client.id,
+            leaderboard_data: leaderboard,
+            calculated_at: calculatedAt,
+          });
+          
+          if (leaderboard.length > 0) {
+            console.log(`Calculated client leaderboard for ${client.name} ${period.type}: ${leaderboard.length} entries`);
+          }
+        } catch (err) {
+          console.error(`Error calculating client leaderboard for ${client.name} ${period.type}:`, err);
+        }
+      }
+    }
+
     // Upsert all cached KPI values
     if (cachedValues.length > 0) {
       const { error: upsertError } = await supabase
@@ -583,6 +616,119 @@ async function calculateTeamLeaderboard(
     });
   }
   
+  entries.sort((a, b) => b.commission - a.commission);
+  
+  return entries.slice(0, limit);
+}
+
+// ============= CLIENT-SCOPED LEADERBOARD CALCULATION =============
+
+async function calculateClientLeaderboard(
+  supabase: SupabaseClient,
+  clientId: string,
+  startDate: Date,
+  endDate: Date,
+  employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
+  employeeTeamMap: Map<string, string>,
+  limit: number = 30
+): Promise<LeaderboardEntry[]> {
+  const startStr = startDate.toISOString();
+  const endStr = endDate.toISOString();
+
+  // Get campaigns for this client
+  const { data: campaigns } = await supabase
+    .from("client_campaigns")
+    .select("id")
+    .eq("client_id", clientId);
+  
+  const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
+  if (campaignIds.length === 0) return [];
+
+  // Get all sales for this client's campaigns
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id, agent_name")
+    .in("client_campaign_id", campaignIds)
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
+
+  if (!sales || sales.length === 0) return [];
+
+  const saleIds = sales.map(s => s.id);
+  
+  // Get sale items with commission
+  const { data: saleItems } = await supabase
+    .from("sale_items")
+    .select("sale_id, quantity, mapped_commission, product_id")
+    .in("sale_id", saleIds);
+
+  // Get products to check counts_as_sale
+  const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
+  let countingProductIds = new Set<string>();
+  
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, counts_as_sale")
+      .in("id", productIds);
+    
+    countingProductIds = new Set(
+      (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
+    );
+  }
+
+  // Aggregate by agent
+  const agentStats = new Map<string, { sales: number; commission: number }>();
+  
+  for (const sale of sales) {
+    if (!sale.agent_name) continue;
+    
+    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    let saleSales = 0;
+    let saleCommission = 0;
+    
+    for (const item of items) {
+      if (!item.product_id || countingProductIds.has(item.product_id)) {
+        saleSales += item.quantity || 1;
+      }
+      saleCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+    }
+    
+    // If no items, count as 1 sale
+    if (items.length === 0) {
+      saleSales = 1;
+    }
+    
+    const existing = agentStats.get(sale.agent_name) || { sales: 0, commission: 0 };
+    agentStats.set(sale.agent_name, {
+      sales: existing.sales + saleSales,
+      commission: existing.commission + saleCommission,
+    });
+  }
+
+  // Convert to leaderboard entries and sort
+  const entries: LeaderboardEntry[] = [];
+  
+  for (const [agentName, stats] of agentStats) {
+    if (stats.sales === 0) continue;
+    
+    const empInfo = employeeMap.get(agentName.toLowerCase());
+    const employeeId = empInfo?.id || "";
+    const teamName = employeeId ? employeeTeamMap.get(employeeId) || null : null;
+    
+    entries.push({
+      employeeId,
+      employeeName: empInfo?.name || agentName,
+      displayName: formatDisplayName(empInfo?.name || agentName),
+      avatarUrl: empInfo?.avatarUrl || null,
+      teamName,
+      salesCount: stats.sales,
+      commission: stats.commission,
+      goalTarget: null,
+    });
+  }
+  
+  // Sort by commission descending
   entries.sort((a, b) => b.commission - a.commission);
   
   return entries.slice(0, limit);

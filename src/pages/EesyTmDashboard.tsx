@@ -12,6 +12,7 @@ import { useDashboardSalesData } from "@/hooks/useDashboardSalesData";
 import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
+import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -129,30 +130,24 @@ export default function EesyTmDashboard() {
     staleTime: 60000, // 1 minute stale time
   });
 
-  // ========== LEADERBOARD DATA (requires individual employee stats) ==========
-  // Only fetch detailed sales data for leaderboards, not for hero KPIs
-  const dailySalesData = useDashboardSalesData({
-    clientName: "Eesy",
-    startDate: today,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000, // 2 minutes - increased to reduce DB load
-  });
+  // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
+  const { 
+    sellersToday: cachedSellersToday, 
+    sellersWeek: cachedSellersWeek, 
+    sellersPayroll: cachedSellersPayroll,
+    isLoading: leaderboardsLoading 
+  } = useCachedLeaderboards(
+    { type: "client", id: eesyClientId || null },
+    { enabled: !tvMode, limit: 30 }
+  );
 
-  const weeklySalesData = useDashboardSalesData({
-    clientName: "Eesy",
-    startDate: weekStart,
-    endDate: new Date(),
-    enabled: !tvMode,
-    refetchInterval: 120000,
-  });
-
+  // Only keep ONE useDashboardSalesData call - for hours calculation
   const payrollSalesData = useDashboardSalesData({
     clientName: "Eesy",
     startDate: payrollPeriod.start,
     endDate: new Date(),
     enabled: !tvMode,
-    refetchInterval: 120000,
+    refetchInterval: 300000, // 5 minutes
   });
 
   // Fetch employee avatars and IDs
@@ -247,54 +242,52 @@ export default function EesyTmDashboard() {
     return { target, progress, expectedPercent, expectedAmount };
   };
 
-  // Sort employees by commission for each period
+  // Convert cached leaderboard entries to component-expected format
+  const mapCachedToSeller = (entry: LeaderboardEntry) => ({
+    name: entry.employeeName,
+    totalSales: entry.salesCount,
+    totalCommission: entry.commission,
+    avatarUrl: entry.avatarUrl,
+    employeeId: entry.employeeId,
+    goalTarget: entry.goalTarget,
+  });
+
+  // Sort employees by commission for each period (use cached data)
   const sortedDailySellers = useMemo(() => {
     if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
-    return [...dailySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [dailySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersToday.map(mapCachedToSeller);
+  }, [cachedSellersToday, tvMode, tvData]);
 
   const sortedWeeklySellers = useMemo(() => {
     if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
-    return [...weeklySalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [weeklySalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersWeek.map(mapCachedToSeller);
+  }, [cachedSellersWeek, tvMode, tvData]);
 
   const sortedPayrollSellers = useMemo(() => {
     if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
-    return [...payrollSalesData.employeeStats]
-      .filter(emp => emp.totalSales > 0)
-      .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [payrollSalesData.employeeStats, tvMode, tvData]);
+    return cachedSellersPayroll.map(mapCachedToSeller);
+  }, [cachedSellersPayroll, tvMode, tvData]);
 
   const getAvatarUrl = (name: string) => {
     if (!employeeData?.avatarMap) return undefined;
     return employeeData.avatarMap.get(name.toLowerCase());
   };
 
-  const isLoading = (!tvMode && kpisLoading) || dailySalesData.isLoading || weeklySalesData.isLoading || payrollSalesData.isLoading;
+  const isLoading = (!tvMode && kpisLoading) || leaderboardsLoading || payrollSalesData.isLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // ========== KPI VALUES FROM CACHE ==========
-  // Use pre-computed KPIs for hero cards (fast, updated every 30s)
+  // Get sales counts from cached KPIs (or TV data in TV mode)
   const salesToday = tvMode ? (tvData?.salesToday ?? 0) : getKpiValue(cachedKpis?.today?.sales_count, 0);
   const salesWeek = tvMode ? (tvData?.salesWeek ?? 0) : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const salesMonth = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
+  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, payrollSalesData.totalSales);
 
-  // Calculate sales per hour using leaderboard data (which has hours)
-  const dailySalesPerHour = dailySalesData.totalHours > 0 
-    ? dailySalesData.totalSales / dailySalesData.totalHours 
-    : 0;
-  const weeklySalesPerHour = weeklySalesData.totalHours > 0 
-    ? weeklySalesData.totalSales / weeklySalesData.totalHours 
-    : 0;
-  const payrollSalesPerHour = payrollSalesData.totalHours > 0 
-    ? payrollSalesData.totalSales / payrollSalesData.totalHours 
-    : 0;
+  // Hours come from payroll sales data
+  const payrollHours = payrollSalesData.totalHours;
+
+  // Calculate sales per hour for payroll period
+  const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;
 
   return (
     <div className={tvMode 
@@ -362,38 +355,8 @@ export default function EesyTmDashboard() {
           </Card>
         </div>
 
-        {/* KPI Cards - Row 2: Sales per hour */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time i dag</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {dailySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {dailySalesData.totalSales} salg / {dailySalesData.totalHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time uge</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {weeklySalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {weeklySalesData.totalSales} salg / {weeklySalesData.totalHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-
+        {/* KPI Card - Sales per hour (payroll period only) */}
+        <div className="grid grid-cols-1 gap-4">
           <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
@@ -404,7 +367,7 @@ export default function EesyTmDashboard() {
                 {payrollSalesPerHour.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {payrollSalesData.totalSales} salg / {payrollSalesData.totalHours.toFixed(1)} timer
+                {salesPayroll} salg / {payrollHours.toFixed(1)} timer
               </p>
             </CardContent>
           </Card>
