@@ -131,6 +131,17 @@ serve(async (req) => {
       );
     }
 
+    // Update invitation_status to completed for the employee
+    const { error: statusError } = await supabaseAdmin
+      .from("employee_master_data")
+      .update({ invitation_status: "completed" })
+      .eq("private_email", email.toLowerCase());
+
+    if (statusError) {
+      console.error("Error updating invitation_status:", statusError);
+      // Don't fail the request, password was updated successfully
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: "Adgangskode opdateret" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
