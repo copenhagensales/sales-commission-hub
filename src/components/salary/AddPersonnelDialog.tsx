@@ -81,14 +81,13 @@ export function AddPersonnelDialog({
     },
   });
 
-  // Fetch already added employees for this salary type
+  // Fetch employees already added to ANY salary type (not just this one)
   const { data: existingEmployeeIds = [] } = useQuery({
-    queryKey: ["existing-personnel-salaries", salaryType],
+    queryKey: ["existing-personnel-salaries-all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("personnel_salaries")
-        .select("employee_id")
-        .eq("salary_type", salaryType);
+        .select("employee_id");
 
       if (error) throw error;
       return data.map((d) => d.employee_id);
