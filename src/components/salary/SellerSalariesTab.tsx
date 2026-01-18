@@ -35,8 +35,8 @@ export function SellerSalariesTab() {
     seller.name.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const totalSales = filteredData.reduce((sum, s) => sum + s.sales, 0);
   const totalCommission = filteredData.reduce((sum, s) => sum + s.commission, 0);
+  const totalCancellations = filteredData.reduce((sum, s) => sum + s.cancellations, 0);
   const totalVacationPay = filteredData.reduce((sum, s) => sum + s.vacationPay, 0);
 
   const formatCurrency = (amount: number) => 
@@ -96,8 +96,8 @@ export function SellerSalariesTab() {
               <TableRow>
                 <TableHead>Navn</TableHead>
                 <TableHead>Team</TableHead>
-                <TableHead className="text-right">Salg</TableHead>
                 <TableHead className="text-right">Provision</TableHead>
+                <TableHead className="text-right">Annulleringer</TableHead>
                 <TableHead className="text-right">Feriepenge</TableHead>
               </TableRow>
             </TableHeader>
@@ -120,16 +120,16 @@ export function SellerSalariesTab() {
                     <TableRow key={seller.id}>
                       <TableCell className="font-medium">{seller.name}</TableCell>
                       <TableCell>{seller.team}</TableCell>
-                      <TableCell className="text-right">{seller.sales}</TableCell>
                       <TableCell className="text-right">{formatCurrency(seller.commission)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(seller.cancellations)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(seller.vacationPay)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-medium">
                     <TableCell>Total</TableCell>
                     <TableCell></TableCell>
-                    <TableCell className="text-right">{totalSales}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalCancellations)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalVacationPay)}</TableCell>
                   </TableRow>
                 </>

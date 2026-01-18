@@ -7,8 +7,8 @@ interface SellerData {
   name: string;
   team: string;
   teamId: string | null;
-  sales: number;
   commission: number;
+  cancellations: number;
   vacationType: "vacation_pay" | "vacation_bonus" | null;
   vacationPay: number;
 }
@@ -60,7 +60,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
         .select("kpi_slug, scope_id, value, calculated_at")
         .eq("scope_type", "employee")
         .eq("period_type", "payroll_period")
-        .in("kpi_slug", ["sales_count", "total_commission"]);
+        .in("kpi_slug", ["total_commission"]);
       
       if (error) throw error;
       return data || [];
@@ -108,20 +108,18 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build a map of employee_id -> { sales_count, total_commission }
-    const kpiMap: Record<string, { sales: number; commission: number }> = {};
+    // Build a map of employee_id -> { commission }
+    const kpiMap: Record<string, { commission: number }> = {};
     let latestCalculatedAt: Date | null = null;
 
     for (const kpi of cachedKpis || []) {
       if (!kpi.scope_id) continue;
       
       if (!kpiMap[kpi.scope_id]) {
-        kpiMap[kpi.scope_id] = { sales: 0, commission: 0 };
+        kpiMap[kpi.scope_id] = { commission: 0 };
       }
 
-      if (kpi.kpi_slug === "sales_count") {
-        kpiMap[kpi.scope_id].sales = kpi.value || 0;
-      } else if (kpi.kpi_slug === "total_commission") {
+      if (kpi.kpi_slug === "total_commission") {
         kpiMap[kpi.scope_id].commission = kpi.value || 0;
       }
 
@@ -146,7 +144,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
     const sellers: SellerData[] = filteredEmployees.map((emp: any) => {
       const teamMember = emp.team_members?.[0];
       const teamData = teamMember?.teams;
-      const kpis = kpiMap[emp.id] || { sales: 0, commission: 0 };
+      const kpis = kpiMap[emp.id] || { commission: 0 };
       const vacationType = emp.vacation_type as "vacation_pay" | "vacation_bonus" | null;
       const vacationRate = getVacationPayRate(vacationType);
       const vacationPay = kpis.commission * vacationRate;
@@ -156,8 +154,8 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
         name: `${emp.first_name} ${emp.last_name}`,
         team: teamData?.name || "Ikke tildelt",
         teamId: teamMember?.team_id || null,
-        sales: kpis.sales,
         commission: kpis.commission,
+        cancellations: 0, // TODO: Implement when cancellation data is available
         vacationType,
         vacationPay,
       };
