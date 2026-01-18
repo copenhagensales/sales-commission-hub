@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,20 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users } from "lucide-react";
-import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
+import { Search, Users, Database, RefreshCw } from "lucide-react";
+import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 export function SellerSalariesTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [periodStart, setPeriodStart] = useState<Date>(new Date());
-  const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
 
-  const handlePeriodChange = useCallback((start: Date, end: Date) => {
-    setPeriodStart(start);
-    setPeriodEnd(end);
-  }, []);
+  // Use the cached KPI data
+  const { sellerData, isLoading, lastUpdated } = useSellerSalariesCached(selectedTeam);
 
+  // Fetch teams for filter dropdown
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-filter"],
     queryFn: async () => {
@@ -29,93 +28,6 @@ export function SellerSalariesTab() {
         .order("name");
       if (error) throw error;
       return data || [];
-    },
-  });
-
-  // Fetch seller salaries (non-staff employees)
-  const { data: sellerData, isLoading } = useQuery({
-    queryKey: ["seller-salaries", periodStart.toISOString(), periodEnd.toISOString(), selectedTeam],
-    queryFn: async () => {
-      // Get non-staff employees with team memberships
-      const { data: employees, error: empError } = await (supabase
-        .from("employee_master_data") as any)
-        .select(`
-          id, 
-          first_name, 
-          last_name,
-          team_members!left(
-            team_id,
-            teams!left(id, name)
-          )
-        `)
-        .eq("is_active", true)
-        .eq("is_staff_employee", false);
-      if (empError) throw empError;
-
-      // Filter by selected team if needed
-      let filteredEmployees = employees || [];
-      if (selectedTeam !== "all") {
-        filteredEmployees = filteredEmployees.filter((e: any) => 
-          e.team_members?.some((tm: any) => tm.team_id === selectedTeam)
-        );
-      }
-
-      // Get sales data for these employees via agent mapping
-      const employeeIds = employees?.map(e => e.id) || [];
-      
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(id, email, external_dialer_id)")
-        .in("employee_id", employeeIds);
-
-      // Get sale items for the period
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select(`
-          id,
-          quantity,
-          mapped_commission,
-          sales!inner(
-            id,
-            sale_datetime,
-            agent_email,
-            agent_external_id
-          )
-        `)
-        .gte("sales.sale_datetime", periodStart.toISOString())
-        .lte("sales.sale_datetime", periodEnd.toISOString());
-
-      // Calculate per employee
-      const employeeStats = filteredEmployees.map(emp => {
-        const empAgents = agentMappings?.filter(am => am.employee_id === emp.id) || [];
-        const agentEmails = empAgents.map(a => (a.agents as { email?: string } | null)?.email?.toLowerCase()).filter(Boolean);
-        const agentExternalIds = empAgents.map(a => (a.agents as { external_dialer_id?: string } | null)?.external_dialer_id).filter(Boolean);
-
-        const empSales = saleItems?.filter(si => {
-          const sale = si.sales as { agent_email?: string; agent_external_id?: string } | null;
-          const saleEmail = sale?.agent_email?.toLowerCase();
-          const saleExtId = sale?.agent_external_id;
-          return agentEmails.includes(saleEmail) || agentExternalIds.includes(saleExtId);
-        }) || [];
-
-        const totalSales = empSales.reduce((sum, si) => sum + (si.quantity || 1), 0);
-        const totalCommission = empSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0), 0);
-
-        // Get team from team_members junction table
-        const teamMember = emp.team_members?.[0];
-        const teamData = teamMember?.teams;
-
-        return {
-          id: emp.id,
-          name: `${emp.first_name} ${emp.last_name}`,
-          team: teamData?.name || "Ikke tildelt",
-          teamId: teamMember?.team_id || null,
-          sales: totalSales,
-          commission: totalCommission,
-        };
-      });
-
-      return employeeStats.sort((a, b) => b.commission - a.commission);
     },
   });
 
@@ -138,13 +50,21 @@ export function SellerSalariesTab() {
             <Users className="h-3 w-3" />
             {filteredData.length} sælgere
           </Badge>
+          <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+            <Database className="h-3 w-3 text-green-500" />
+            Lønperiode (cached)
+          </Badge>
         </div>
+        {lastUpdated && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <RefreshCw className="h-3 w-3" />
+            Opdateret {format(lastUpdated, "HH:mm", { locale: da })}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Period selector and filters */}
+        {/* Filters */}
         <div className="flex flex-wrap items-center gap-4">
-          <PayrollPeriodSelector onChange={handlePeriodChange} />
-
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Vælg team" />
