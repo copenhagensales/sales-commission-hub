@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useKpiDefinitions, useKpiDefinition, KpiCategory } from "@/hooks/useKpiDefinitions";
+import { useCachedKpiSlugs } from "@/hooks/useCachedKpiSlugs";
 import { KpiDefinitionList } from "@/components/kpi/KpiDefinitionList";
 import { KpiDefinitionDetail } from "@/components/kpi/KpiDefinitionDetail";
 import { KpiDefinitionForm } from "@/components/kpi/KpiDefinitionForm";
@@ -23,6 +24,7 @@ export default function KpiDefinitions() {
     categoryFilter === "all" ? undefined : categoryFilter
   );
   const { data: selectedDefinition } = useKpiDefinition(selectedId);
+  const { data: cachedSlugs } = useCachedKpiSlugs();
 
   // Filter by search
   const filteredDefinitions = definitions?.filter((def) => {
@@ -183,6 +185,7 @@ export default function KpiDefinitions() {
                         definitions={filteredDefinitions || []}
                         selectedId={selectedId}
                         onSelect={setSelectedId}
+                        cachedSlugs={cachedSlugs || []}
                       />
                     )}
                   </CardContent>
