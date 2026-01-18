@@ -23,7 +23,7 @@ export default function SalaryTypes() {
         <Tabs defaultValue="salary-types">
           <TabsList className="flex-wrap">
             <TabsTrigger value="salary-types">Lønarter</TabsTrigger>
-            <TabsTrigger value="all-salaries">Alle lønninger</TabsTrigger>
+            <TabsTrigger value="all-salaries">Personale løn</TabsTrigger>
             <TabsTrigger value="seller-salaries">Sælgerlønninger</TabsTrigger>
             <TabsTrigger value="team-expenses">Teamomkostninger</TabsTrigger>
             <TabsTrigger value="db-overview">DB Oversigt</TabsTrigger>
