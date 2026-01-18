@@ -7394,6 +7394,50 @@ export type Database = {
           },
         ]
       }
+      team_expenses: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          description: string
+          expense_date: string
+          id: string
+          notes: string | null
+          team_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          description: string
+          expense_date: string
+          id?: string
+          notes?: string | null
+          team_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          description?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          team_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_expenses_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string | null
