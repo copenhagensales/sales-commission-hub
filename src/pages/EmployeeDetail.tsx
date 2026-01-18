@@ -455,8 +455,8 @@ export default function EmployeeDetail() {
 
   const getVacationTypeLabel = (type: string | null) => {
     switch (type) {
-      case "vacation_pay": return "Ferieløn";
-      case "vacation_bonus": return "Feriebonus";
+      case "vacation_pay": return "Feriepenge";
+      case "vacation_bonus": return "Ferie med løn";
       default: return null;
     }
   };
@@ -833,8 +833,8 @@ export default function EmployeeDetail() {
                     value={employee.vacation_type} 
                     field="vacation_type" 
                     options={[
-                      { value: "vacation_pay", label: "Ferieløn" },
-                      { value: "vacation_bonus", label: "Feriebonus" },
+                      { value: "vacation_pay", label: "Feriepenge" },
+                      { value: "vacation_bonus", label: "Ferie med løn" },
                     ]}
                     onSave={handleSave}
                     displayValue={getVacationTypeLabel(employee.vacation_type)}

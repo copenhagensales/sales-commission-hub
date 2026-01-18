@@ -139,7 +139,7 @@ const salaryTypeLabels: Record<string, string> = {
 
 const vacationTypeLabels: Record<string, string> = {
   vacation_pay: "Feriepenge",
-  vacation_with_pay: "Ferie med løn",
+  vacation_bonus: "Ferie med løn",
 };
 
 export function SendContractDialog({
