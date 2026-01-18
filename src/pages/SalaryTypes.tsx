@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -236,7 +237,8 @@ export default function SalaryTypes() {
   );
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <MainLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Receipt className="h-8 w-8 text-primary" />
@@ -494,6 +496,7 @@ export default function SalaryTypes() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
