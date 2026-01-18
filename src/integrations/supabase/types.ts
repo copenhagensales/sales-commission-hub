@@ -8408,6 +8408,12 @@ export type Database = {
         Args: { p_encryption_key: string; p_integration_id: string }
         Returns: Json
       }
+      get_distinct_cached_kpi_slugs: {
+        Args: never
+        Returns: {
+          kpi_slug: string
+        }[]
+      }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_employee_roles_for_admin: {
         Args: never
