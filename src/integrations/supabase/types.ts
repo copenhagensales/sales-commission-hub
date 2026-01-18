@@ -6107,6 +6107,61 @@ export type Database = {
         }
         Relationships: []
       }
+      personnel_salaries: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          is_active: boolean | null
+          monthly_salary: number | null
+          notes: string | null
+          salary_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_active?: boolean | null
+          monthly_salary?: number | null
+          notes?: string | null
+          salary_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_active?: boolean | null
+          monthly_salary?: number | null
+          notes?: string | null
+          salary_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personnel_salaries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personnel_salaries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personnel_salaries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_campaign_overrides: {
         Row: {
           campaign_mapping_id: string
