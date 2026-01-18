@@ -9,6 +9,8 @@ interface SellerData {
   teamId: string | null;
   sales: number;
   commission: number;
+  vacationType: "vacation_pay" | "vacation_bonus" | null;
+  vacationPay: number;
 }
 
 interface UseSellerSalariesCachedResult {
@@ -24,7 +26,7 @@ interface UseSellerSalariesCachedResult {
  * Uses kpi_cached_values with scope_type='employee' and period_type='payroll_period'
  */
 export function useSellerSalariesCached(selectedTeam?: string | null): UseSellerSalariesCachedResult {
-  // Query 1: Get all active non-staff employees with team info
+  // Query 1: Get all active non-staff employees with team info and vacation_type
   const { data: employees, isLoading: employeesLoading } = useQuery({
     queryKey: ["seller-employees-cached"],
     queryFn: async () => {
@@ -34,6 +36,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
           id, 
           first_name, 
           last_name,
+          vacation_type,
           team_members!left(
             team_id,
             teams!left(id, name)
@@ -65,6 +68,39 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
     staleTime: 30000, // 30 seconds
     refetchInterval: 60000, // Refetch every minute
   });
+
+  // Query 3: Get Feriepenge salary type rates
+  const { data: salaryTypes, isLoading: salaryTypesLoading } = useQuery({
+    queryKey: ["feriepenge-rates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("description, amount")
+        .eq("name", "Feriepenge")
+        .eq("is_active", true);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000, // 5 minutes - rates change rarely
+  });
+
+  // Helper to find the correct vacation pay rate based on vacation type
+  const getVacationPayRate = (vacationType: string | null): number => {
+    if (!vacationType || !salaryTypes) return 0;
+    
+    const matchingType = salaryTypes.find(st => {
+      const desc = st.description?.toLowerCase() || "";
+      if (vacationType === "vacation_pay") {
+        return desc.includes("medarbejder");
+      } else if (vacationType === "vacation_bonus") {
+        return desc.includes("betalt ferie");
+      }
+      return false;
+    });
+    
+    return matchingType?.amount ? matchingType.amount / 100 : 0;
+  };
 
   // Combine employees with their cached KPI values
   const { sellerData, lastUpdated } = useMemo(() => {
@@ -111,6 +147,9 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       const teamMember = emp.team_members?.[0];
       const teamData = teamMember?.teams;
       const kpis = kpiMap[emp.id] || { sales: 0, commission: 0 };
+      const vacationType = emp.vacation_type as "vacation_pay" | "vacation_bonus" | null;
+      const vacationRate = getVacationPayRate(vacationType);
+      const vacationPay = kpis.commission * vacationRate;
 
       return {
         id: emp.id,
@@ -119,6 +158,8 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
         teamId: teamMember?.team_id || null,
         sales: kpis.sales,
         commission: kpis.commission,
+        vacationType,
+        vacationPay,
       };
     });
 
@@ -126,11 +167,11 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: latestCalculatedAt };
-  }, [employees, cachedKpis, selectedTeam]);
+  }, [employees, cachedKpis, selectedTeam, salaryTypes]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || kpisLoading,
+    isLoading: employeesLoading || kpisLoading || salaryTypesLoading,
     lastUpdated,
   };
 }
