@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserCheck, Plus, Search, MoreHorizontal, Trash2 } from "lucide-react";
+import { UserCheck, Plus, Search, MoreHorizontal, Trash2, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AddPersonnelDialog } from "./AddPersonnelDialog";
+import { EditPersonnelDialog } from "./EditPersonnelDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,8 @@ interface PersonnelSalary {
   employee_id: string;
   salary_type: string;
   monthly_salary: number;
+  percentage_rate: number | null;
+  minimum_salary: number | null;
   is_active: boolean;
   notes: string | null;
   employee: {
@@ -34,6 +37,8 @@ interface PersonnelSalary {
 export function AssistantSalary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedSalary, setSelectedSalary] = useState<PersonnelSalary | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -47,6 +52,8 @@ export function AssistantSalary() {
           employee_id,
           salary_type,
           monthly_salary,
+          percentage_rate,
+          minimum_salary,
           is_active,
           notes,
           employee:employee_master_data(first_name, last_name, job_title)
@@ -107,6 +114,16 @@ export function AssistantSalary() {
     }).format(amount);
   };
 
+  const formatPercentage = (rate: number | null) => {
+    if (rate === null || rate === 0) return "-";
+    return `${rate}%`;
+  };
+
+  const handleEdit = (salary: PersonnelSalary) => {
+    setSelectedSalary(salary);
+    setEditDialogOpen(true);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -146,6 +163,8 @@ export function AssistantSalary() {
                 <TableRow>
                   <TableHead>Navn</TableHead>
                   <TableHead>Stilling</TableHead>
+                  <TableHead>Procentsats</TableHead>
+                  <TableHead>Minimumsløn</TableHead>
                   <TableHead>Månedsløn</TableHead>
                   <TableHead>Aktiv</TableHead>
                   <TableHead className="w-10"></TableHead>
@@ -158,6 +177,8 @@ export function AssistantSalary() {
                       {salary.employee?.first_name} {salary.employee?.last_name}
                     </TableCell>
                     <TableCell>{salary.employee?.job_title || "-"}</TableCell>
+                    <TableCell>{formatPercentage(salary.percentage_rate)}</TableCell>
+                    <TableCell>{salary.minimum_salary ? formatCurrency(salary.minimum_salary) : "-"}</TableCell>
                     <TableCell>{formatCurrency(salary.monthly_salary)}</TableCell>
                     <TableCell>
                       <Switch
@@ -175,6 +196,10 @@ export function AssistantSalary() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(salary)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Rediger
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => deleteMutation.mutate(salary.id)}
@@ -198,6 +223,12 @@ export function AssistantSalary() {
         onOpenChange={setDialogOpen}
         salaryType="assistant"
         title="Tilføj assistent"
+      />
+
+      <EditPersonnelDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        salary={selectedSalary}
       />
     </Card>
   );

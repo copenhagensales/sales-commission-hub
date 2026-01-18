@@ -6113,8 +6113,10 @@ export type Database = {
           employee_id: string
           id: string
           is_active: boolean | null
+          minimum_salary: number | null
           monthly_salary: number | null
           notes: string | null
+          percentage_rate: number | null
           salary_type: string
           updated_at: string
         }
@@ -6123,8 +6125,10 @@ export type Database = {
           employee_id: string
           id?: string
           is_active?: boolean | null
+          minimum_salary?: number | null
           monthly_salary?: number | null
           notes?: string | null
+          percentage_rate?: number | null
           salary_type: string
           updated_at?: string
         }
@@ -6133,8 +6137,10 @@ export type Database = {
           employee_id?: string
           id?: string
           is_active?: boolean | null
+          minimum_salary?: number | null
           monthly_salary?: number | null
           notes?: string | null
+          percentage_rate?: number | null
           salary_type?: string
           updated_at?: string
         }
