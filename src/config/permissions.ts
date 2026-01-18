@@ -624,6 +624,21 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
+  // ==================== LØN MENU ====================
+  {
+    key: "menu_salary",
+    label: "Løn menu",
+    icon: "💰",
+    permissions: [
+      {
+        key: "menu_salary_types",
+        label: "Lønarter",
+        description: "Adgang til lønarter administration",
+        hasEditOption: true,
+      },
+    ],
+  },
+
   // ==================== TEST MENU ====================
   {
     key: "menu_test",
