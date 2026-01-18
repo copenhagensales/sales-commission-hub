@@ -8,9 +8,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from "date-fns";
+import { da } from "date-fns/locale";
+import { CalendarIcon, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PersonnelSalary {
   id: string;
@@ -19,6 +30,7 @@ interface PersonnelSalary {
   monthly_salary: number;
   percentage_rate: number | null;
   minimum_salary: number | null;
+  start_date: string | null;
   is_active: boolean;
   notes: string | null;
   employee: {
@@ -43,8 +55,44 @@ export function EditPersonnelDialog({
   const [minimumSalary, setMinimumSalary] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [notes, setNotes] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch team info where employee is team leader
+  const { data: teamData } = useQuery({
+    queryKey: ["team-for-leader", salary?.employee_id],
+    queryFn: async () => {
+      if (!salary?.employee_id) return null;
+      
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name")
+        .eq("team_leader_id", salary.employee_id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!salary?.employee_id && salary?.salary_type === "team_leader",
+  });
+
+  // Fetch clients for the team
+  const { data: clientsData } = useQuery({
+    queryKey: ["team-clients", teamData?.id],
+    queryFn: async () => {
+      if (!teamData?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("client:clients(id, name)")
+        .eq("team_id", teamData.id);
+
+      if (error) throw error;
+      return data?.map((tc) => tc.client).filter(Boolean) || [];
+    },
+    enabled: !!teamData?.id,
+  });
 
   useEffect(() => {
     if (salary) {
@@ -52,6 +100,7 @@ export function EditPersonnelDialog({
       setMinimumSalary(salary.minimum_salary?.toString() || "0");
       setMonthlySalary(salary.monthly_salary?.toString() || "0");
       setNotes(salary.notes || "");
+      setStartDate(salary.start_date ? parseISO(salary.start_date) : undefined);
     }
   }, [salary]);
 
@@ -66,6 +115,7 @@ export function EditPersonnelDialog({
           minimum_salary: parseFloat(minimumSalary) || 0,
           monthly_salary: parseFloat(monthlySalary) || 0,
           notes: notes || null,
+          start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         })
         .eq("id", salary.id);
 
@@ -87,6 +137,8 @@ export function EditPersonnelDialog({
 
   if (!salary) return null;
 
+  const isTeamLeader = salary.salary_type === "team_leader";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -97,6 +149,59 @@ export function EditPersonnelDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Team info for team leaders */}
+          {isTeamLeader && (
+            <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Team:</span>
+                <span className="text-sm">
+                  {teamData?.name || "Ingen team tildelt"}
+                </span>
+              </div>
+              
+              {clientsData && clientsData.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-sm font-medium">Kunder:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {clientsData.map((client: { id: string; name: string }) => (
+                      <Badge key={client.id} variant="secondary" className="text-xs">
+                        {client.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="start-date">Startdato</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP", { locale: da }) : "Vælg dato"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={setStartDate}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="percentage-rate">Procentsats (%)</Label>
             <Input

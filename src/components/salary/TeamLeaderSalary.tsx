@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AddPersonnelDialog } from "./AddPersonnelDialog";
 import { EditPersonnelDialog } from "./EditPersonnelDialog";
+import { format, parseISO } from "date-fns";
+import { da } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +27,7 @@ interface PersonnelSalary {
   monthly_salary: number;
   percentage_rate: number | null;
   minimum_salary: number | null;
+  start_date: string | null;
   is_active: boolean;
   notes: string | null;
   employee: {
@@ -32,6 +35,12 @@ interface PersonnelSalary {
     last_name: string;
     job_title: string | null;
   } | null;
+}
+
+interface TeamInfo {
+  id: string;
+  name: string;
+  clients: { id: string; name: string }[];
 }
 
 export function TeamLeaderSalary() {
@@ -54,6 +63,7 @@ export function TeamLeaderSalary() {
           monthly_salary,
           percentage_rate,
           minimum_salary,
+          start_date,
           is_active,
           notes,
           employee:employee_master_data(first_name, last_name, job_title)
@@ -64,6 +74,49 @@ export function TeamLeaderSalary() {
       if (error) throw error;
       return data as PersonnelSalary[];
     },
+  });
+
+  // Fetch teams for all team leaders
+  const { data: teamsData = {} } = useQuery({
+    queryKey: ["teams-for-leaders", salaries.map(s => s.employee_id)],
+    queryFn: async () => {
+      if (salaries.length === 0) return {};
+      
+      const employeeIds = salaries.map(s => s.employee_id);
+      const { data: teams, error } = await supabase
+        .from("teams")
+        .select("id, name, team_leader_id")
+        .in("team_leader_id", employeeIds);
+
+      if (error) throw error;
+      
+      // Fetch clients for each team
+      const teamIds = teams?.map(t => t.id) || [];
+      const { data: teamClients, error: clientsError } = await supabase
+        .from("team_clients")
+        .select("team_id, client:clients(id, name)")
+        .in("team_id", teamIds);
+
+      if (clientsError) throw clientsError;
+
+      // Build a map of employee_id -> team info with clients
+      const teamMap: Record<string, TeamInfo> = {};
+      teams?.forEach(team => {
+        const clients = teamClients
+          ?.filter(tc => tc.team_id === team.id)
+          .map(tc => tc.client)
+          .filter(Boolean) as { id: string; name: string }[] || [];
+        
+        teamMap[team.team_leader_id] = {
+          id: team.id,
+          name: team.name,
+          clients,
+        };
+      });
+
+      return teamMap;
+    },
+    enabled: salaries.length > 0,
   });
 
   const toggleMutation = useMutation({
@@ -119,6 +172,15 @@ export function TeamLeaderSalary() {
     return `${rate}%`;
   };
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    return format(parseISO(dateStr), "d. MMM yyyy", { locale: da });
+  };
+
+  const getTeamInfo = (employeeId: string): TeamInfo | null => {
+    return teamsData[employeeId] || null;
+  };
+
   const handleEdit = (salary: PersonnelSalary) => {
     setSelectedSalary(salary);
     setEditDialogOpen(true);
@@ -162,7 +224,9 @@ export function TeamLeaderSalary() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Navn</TableHead>
-                  <TableHead>Stilling</TableHead>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Kunder</TableHead>
+                  <TableHead>Startdato</TableHead>
                   <TableHead>Procentsats</TableHead>
                   <TableHead>Minimumsløn</TableHead>
                   <TableHead>Månedsløn</TableHead>
@@ -171,12 +235,31 @@ export function TeamLeaderSalary() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSalaries.map((salary) => (
+                {filteredSalaries.map((salary) => {
+                  const teamInfo = getTeamInfo(salary.employee_id);
+                  return (
                   <TableRow key={salary.id}>
                     <TableCell className="font-medium">
                       {salary.employee?.first_name} {salary.employee?.last_name}
                     </TableCell>
-                    <TableCell>{salary.employee?.job_title || "-"}</TableCell>
+                    <TableCell>{teamInfo?.name || "-"}</TableCell>
+                    <TableCell>
+                      {teamInfo?.clients && teamInfo.clients.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {teamInfo.clients.slice(0, 2).map((client) => (
+                            <Badge key={client.id} variant="secondary" className="text-xs">
+                              {client.name}
+                            </Badge>
+                          ))}
+                          {teamInfo.clients.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{teamInfo.clients.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell>{formatDate(salary.start_date)}</TableCell>
                     <TableCell>{formatPercentage(salary.percentage_rate)}</TableCell>
                     <TableCell>{salary.minimum_salary ? formatCurrency(salary.minimum_salary) : "-"}</TableCell>
                     <TableCell>{formatCurrency(salary.monthly_salary)}</TableCell>
@@ -211,7 +294,8 @@ export function TeamLeaderSalary() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </>
