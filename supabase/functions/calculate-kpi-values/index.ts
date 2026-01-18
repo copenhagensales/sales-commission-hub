@@ -639,22 +639,31 @@ Deno.serve(async (req) => {
 
 // ============= LEADERBOARD CALCULATION FUNCTIONS =============
 
-// Paginated fetch for sales to avoid 1000-row limit
-async function fetchAllSales(
+// Type for sales with nested sale_items (JOIN approach)
+type SaleWithItems = {
+  id: string;
+  agent_email: string | null;
+  agent_name: string | null;
+  sale_items: { sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[];
+};
+
+// Paginated fetch for sales WITH nested sale_items using JOIN
+// This avoids the .in() query limits by fetching items together with sales
+async function fetchAllSalesWithItems(
   supabase: SupabaseClient,
   startStr: string,
   endStr: string,
   campaignFilter?: string[] // Optional: filter by client_campaign_id
-): Promise<{ id: string; agent_email: string | null; agent_name: string | null }[]> {
-  const PAGE_SIZE = 1000;
-  const allSales: { id: string; agent_email: string | null; agent_name: string | null }[] = [];
+): Promise<SaleWithItems[]> {
+  const PAGE_SIZE = 500; // Smaller batches since we're fetching nested data
+  const allSales: SaleWithItems[] = [];
   let page = 0;
   let hasMore = true;
   
   while (hasMore) {
     let query = supabase
       .from("sales")
-      .select("id, agent_email, agent_name")
+      .select("id, agent_email, agent_name, sale_items(sale_id, quantity, mapped_commission, product_id)")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -665,10 +674,17 @@ async function fetchAllSales(
       query = query.in("client_campaign_id", campaignFilter);
     }
     
-    const { data: sales } = await query;
+    const { data: sales, error } = await query;
+    
+    if (error) {
+      console.error(`[fetchAllSalesWithItems] Error on page ${page}:`, error);
+      hasMore = false;
+      continue;
+    }
     
     if (sales && sales.length > 0) {
-      allSales.push(...sales);
+      // Type assertion since Supabase types might not infer nested correctly
+      allSales.push(...(sales as SaleWithItems[]));
       hasMore = sales.length === PAGE_SIZE;
       page++;
     } else {
@@ -676,7 +692,13 @@ async function fetchAllSales(
     }
   }
   
-  console.log(`[fetchAllSales] Fetched ${allSales.length} total sales in ${page + 1} page(s)`);
+  // Count total items fetched via the JOIN
+  const totalItems = allSales.reduce((sum, s) => sum + (s.sale_items?.length || 0), 0);
+  const totalCommission = allSales.reduce((sum, s) => 
+    sum + (s.sale_items || []).reduce((isum, item) => isum + (item.mapped_commission || 0), 0), 0
+  );
+  
+  console.log(`[fetchAllSalesWithItems] Fetched ${allSales.length} sales with ${totalItems} items (total mapped_commission: ${totalCommission}) in ${page} page(s)`);
   return allSales;
 }
 
@@ -691,19 +713,17 @@ async function calculateGlobalLeaderboard(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Get all sales with agent_email using paginated fetch
-  const sales = await fetchAllSales(supabase, startStr, endStr);
+  // Get all sales WITH their sale_items using JOIN-based paginated fetch
+  const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr);
 
-  if (!sales || sales.length === 0) return [];
+  if (!salesWithItems || salesWithItems.length === 0) return [];
 
-  const saleIds = sales.map(s => s.id);
-  
-  // Get sale items with commission using batch fetch to avoid 1000-row limit
-  const saleItems = await fetchAllSaleItems(supabase, saleIds);
+  // Extract all sale_items from the nested data
+  const saleItems = salesWithItems.flatMap(s => s.sale_items || []);
   
   // Debug: Log totals
   const totalMappedCommission = saleItems.reduce((sum, item) => sum + (item.mapped_commission || 0), 0);
-  console.log(`[GlobalLeaderboard ${startStr.slice(0,10)} to ${endStr.slice(0,10)}] Sales: ${sales.length}, Items: ${saleItems.length}, Total mapped_commission: ${totalMappedCommission}`);
+  console.log(`[GlobalLeaderboard ${startStr.slice(0,10)} to ${endStr.slice(0,10)}] Sales: ${salesWithItems.length}, Items: ${saleItems.length}, Total mapped_commission: ${totalMappedCommission}`);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
@@ -724,7 +744,7 @@ async function calculateGlobalLeaderboard(
 
   // Collect unique agent emails for mapping lookup
   const agentEmails = new Set<string>();
-  for (const sale of sales) {
+  for (const sale of salesWithItems) {
     if (sale.agent_email) {
       agentEmails.add(sale.agent_email.toLowerCase());
     }
@@ -764,11 +784,12 @@ async function calculateGlobalLeaderboard(
   // Aggregate by agent email (use email as key for proper aggregation)
   const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
-  for (const sale of sales) {
+  for (const sale of salesWithItems) {
     const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
     if (!key) continue;
     
-    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    // Use nested sale_items directly from the sale object
+    const items = sale.sale_items || [];
     let saleSales = 0;
     let saleCommission = 0;
     
@@ -869,25 +890,23 @@ async function calculateTeamLeaderboard(
     }
   }
 
-  // Get all sales with agent_email using paginated fetch
-  const sales = await fetchAllSales(supabase, startStr, endStr);
+  // Get all sales WITH nested sale_items using JOIN-based paginated fetch
+  const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr);
 
-  if (!sales || sales.length === 0) return [];
+  if (!salesWithItems || salesWithItems.length === 0) return [];
 
   // Filter to team members by agent_email
-  const teamSales = sales.filter(s => 
+  const teamSales = salesWithItems.filter(s => 
     s.agent_email && teamAgentEmails.has(s.agent_email.toLowerCase())
   );
   
   if (teamSales.length === 0) return [];
 
-  const saleIds = teamSales.map(s => s.id);
-  
-  // Get sale items with commission using batch fetch to avoid 1000-row limit
-  const saleItems = await fetchAllSaleItems(supabase, saleIds);
+  // Extract all sale_items from the team sales
+  const saleItems = teamSales.flatMap(s => s.sale_items || []);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
-  const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
+  const productIds = [...new Set(saleItems.map(si => si.product_id).filter(Boolean))];
   let countingProductIds = new Set<string>();
   const productCommissionMap = new Map<string, number>();
   
@@ -910,7 +929,8 @@ async function calculateTeamLeaderboard(
     const key = sale.agent_email?.toLowerCase() || "";
     if (!key) continue;
     
-    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    // Use nested sale_items directly from the sale object
+    const items = sale.sale_items || [];
     let saleSales = 0;
     let saleCommission = 0;
     
@@ -986,18 +1006,16 @@ async function calculateClientLeaderboard(
   const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
   if (campaignIds.length === 0) return [];
 
-  // Get all sales for this client's campaigns using paginated fetch
-  const sales = await fetchAllSales(supabase, startStr, endStr, campaignIds);
+  // Get all sales for this client's campaigns WITH nested sale_items using JOIN-based paginated fetch
+  const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr, campaignIds);
 
-  if (!sales || sales.length === 0) return [];
+  if (!salesWithItems || salesWithItems.length === 0) return [];
 
-  const saleIds = sales.map(s => s.id);
-  
-  // Get sale items with commission using batch fetch to avoid 1000-row limit
-  const saleItems = await fetchAllSaleItems(supabase, saleIds);
+  // Extract all sale_items from the sales
+  const saleItems = salesWithItems.flatMap(s => s.sale_items || []);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
-  const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
+  const productIds = [...new Set(saleItems.map(si => si.product_id).filter(Boolean))];
   let countingProductIds = new Set<string>();
   const productCommissionMap = new Map<string, number>();
   
@@ -1015,7 +1033,7 @@ async function calculateClientLeaderboard(
 
   // Build email -> employee mapping for this function
   const agentEmails = new Set<string>();
-  for (const sale of sales) {
+  for (const sale of salesWithItems) {
     if (sale.agent_email) {
       agentEmails.add(sale.agent_email.toLowerCase());
     }
@@ -1052,11 +1070,12 @@ async function calculateClientLeaderboard(
   // Aggregate by agent email
   const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
-  for (const sale of sales) {
+  for (const sale of salesWithItems) {
     const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
     if (!key) continue;
     
-    const items = (saleItems || []).filter(si => si.sale_id === sale.id);
+    // Use nested sale_items directly from the sale object
+    const items = sale.sale_items || [];
     let saleSales = 0;
     let saleCommission = 0;
     
