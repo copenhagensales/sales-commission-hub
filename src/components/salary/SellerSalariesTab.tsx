@@ -37,6 +37,7 @@ export function SellerSalariesTab() {
 
   const totalSales = filteredData.reduce((sum, s) => sum + s.sales, 0);
   const totalCommission = filteredData.reduce((sum, s) => sum + s.commission, 0);
+  const totalVacationPay = filteredData.reduce((sum, s) => sum + s.vacationPay, 0);
 
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
@@ -97,18 +98,19 @@ export function SellerSalariesTab() {
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Salg</TableHead>
                 <TableHead className="text-right">Provision</TableHead>
+                <TableHead className="text-right">Feriepenge</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Indlæser...
                   </TableCell>
                 </TableRow>
               ) : filteredData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Ingen sælgere fundet
                   </TableCell>
                 </TableRow>
@@ -120,6 +122,7 @@ export function SellerSalariesTab() {
                       <TableCell>{seller.team}</TableCell>
                       <TableCell className="text-right">{seller.sales}</TableCell>
                       <TableCell className="text-right">{formatCurrency(seller.commission)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(seller.vacationPay)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-medium">
@@ -127,6 +130,7 @@ export function SellerSalariesTab() {
                     <TableCell></TableCell>
                     <TableCell className="text-right">{totalSales}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalVacationPay)}</TableCell>
                   </TableRow>
                 </>
               )}
