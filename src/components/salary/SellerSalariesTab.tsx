@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,18 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, Users } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { da } from "date-fns/locale";
+import { Search, Users } from "lucide-react";
+import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 
 export function SellerSalariesTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [periodStart, setPeriodStart] = useState<Date>(new Date());
+  const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  const handlePeriodChange = useCallback((start: Date, end: Date) => {
+    setPeriodStart(start);
+    setPeriodEnd(end);
+  }, []);
 
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-filter"],
@@ -25,7 +26,6 @@ export function SellerSalariesTab() {
       const { data, error } = await (supabase
         .from("teams") as any)
         .select("id, name")
-        .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data || [];
@@ -34,7 +34,7 @@ export function SellerSalariesTab() {
 
   // Fetch seller salaries (non-staff employees)
   const { data: sellerData, isLoading } = useQuery({
-    queryKey: ["seller-salaries", monthStart.toISOString(), monthEnd.toISOString(), selectedTeam],
+    queryKey: ["seller-salaries", periodStart.toISOString(), periodEnd.toISOString(), selectedTeam],
     queryFn: async () => {
       // Get non-staff employees with team memberships
       const { data: employees, error: empError } = await (supabase
@@ -82,8 +82,8 @@ export function SellerSalariesTab() {
             agent_external_id
           )
         `)
-        .gte("sales.sale_datetime", monthStart.toISOString())
-        .lte("sales.sale_datetime", monthEnd.toISOString());
+        .gte("sales.sale_datetime", periodStart.toISOString())
+        .lte("sales.sale_datetime", periodEnd.toISOString());
 
       // Calculate per employee
       const employeeStats = filteredEmployees.map(emp => {
@@ -143,17 +143,7 @@ export function SellerSalariesTab() {
       <CardContent className="space-y-4">
         {/* Period selector and filters */}
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="min-w-[120px] text-center font-medium capitalize">
-              {format(currentMonth, "MMMM yyyy", { locale: da })}
-            </span>
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <PayrollPeriodSelector onChange={handlePeriodChange} />
 
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger className="w-[180px]">
