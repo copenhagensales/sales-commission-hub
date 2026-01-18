@@ -1,12 +1,18 @@
 import { cn } from "@/lib/utils";
 import { KpiDefinition, KpiCategory } from "@/hooks/useKpiDefinitions";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Clock, Phone, Users, MoreHorizontal } from "lucide-react";
+import { TrendingUp, Clock, Phone, Users, MoreHorizontal, Database } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface KpiDefinitionListProps {
   definitions: KpiDefinition[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  cachedSlugs?: string[];
 }
 
 const categoryIcons: Record<KpiCategory, typeof TrendingUp> = {
@@ -33,7 +39,7 @@ const categoryColors: Record<KpiCategory, string> = {
   other: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
 };
 
-export function KpiDefinitionList({ definitions, selectedId, onSelect }: KpiDefinitionListProps) {
+export function KpiDefinitionList({ definitions, selectedId, onSelect, cachedSlugs = [] }: KpiDefinitionListProps) {
   // Group by category
   const grouped = definitions.reduce((acc, def) => {
     const cat = def.category as KpiCategory;
@@ -76,14 +82,26 @@ export function KpiDefinitionList({ definitions, selectedId, onSelect }: KpiDefi
                       : "text-foreground"
                   )}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm">{def.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-xs", categoryColors[category])}
-                    >
-                      {def.slug}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      {cachedSlugs.includes(def.slug) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Database className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <p className="text-xs">KPI caches automatisk til dashboards</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={cn("text-xs", categoryColors[category])}
+                      >
+                        {def.slug}
+                      </Badge>
+                    </div>
                   </div>
                 </button>
               ))}
