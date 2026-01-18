@@ -1152,15 +1152,16 @@ export default function EmployeeMasterData() {
                   <span className="text-xs">⌘</span>K
                 </kbd>
               </div>
-              <div className="flex items-center gap-2">
-                <EmployeeExcelImport />
-                <Dialog open={createDialogOpen} onOpenChange={(open) => {
-                  setCreateDialogOpen(open);
-                  if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
-                }}>
-                  <DialogTrigger asChild>
-                    <Button><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
-                  </DialogTrigger>
+              {canEditEmployees && (
+                <div className="flex items-center gap-2">
+                  <EmployeeExcelImport />
+                  <Dialog open={createDialogOpen} onOpenChange={(open) => {
+                    setCreateDialogOpen(open);
+                    if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
+                    </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>{t("employees.create.title")}</DialogTitle>
@@ -1260,7 +1261,8 @@ export default function EmployeeMasterData() {
                     </div>
                   </DialogContent>
                 </Dialog>
-              </div>
+                </div>
+              )}
             </div>
           </div>
           

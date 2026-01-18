@@ -42,7 +42,7 @@ export default function AbsenceManagement() {
   const { data: rejectedRequests } = useAbsenceRequests("rejected");
   const { data: departments } = useDepartments();
   const { data: currentEmployee } = useCurrentEmployee();
-  const { scopeAbsence } = usePermissions();
+  const { scopeAbsence, canEditAbsence } = usePermissions();
   const updateRequest = useUpdateAbsenceRequest();
 
   // Fetch team members for filtering
@@ -195,7 +195,7 @@ export default function AbsenceManagement() {
         <Badge variant={request.type === "vacation" ? "default" : "destructive"}>
           {request.type === "vacation" ? "Ferie" : "Sygdom"}
         </Badge>
-        {showActions && (
+        {showActions && canEditAbsence && (
           <>
             <Button
               size="sm"
@@ -251,10 +251,12 @@ export default function AbsenceManagement() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setMarkSickDialogOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Meld syg
-            </Button>
+            {canEditAbsence && (
+              <Button onClick={() => setMarkSickDialogOpen(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Meld syg
+              </Button>
+            )}
           </div>
         </div>
 
