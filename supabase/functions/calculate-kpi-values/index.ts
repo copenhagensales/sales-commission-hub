@@ -1537,37 +1537,58 @@ async function calculateClientKpiValue(
 
     case "total_hours":
     case "total_timer": {
-      // Find all agent emails with sales for this client
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("agent_email")
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
+      // Find teams associated with this client via team_clients
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("team_id")
+        .eq("client_id", clientId);
       
-      const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+      const teamIds = (teamClients || []).map((tc: { team_id: string }) => tc.team_id);
       
-      if (agentEmails.length === 0) return 0;
+      let employeeIds: string[] = [];
       
-      // Get agent IDs from emails
-      const { data: agents } = await supabase
-        .from("agents")
-        .select("id, email")
-        .in("email", agentEmails);
+      if (teamIds.length > 0) {
+        // Get all team members for these teams
+        const { data: teamMemberData } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .in("team_id", teamIds);
+        
+        employeeIds = [...new Set((teamMemberData || []).map((m: { employee_id: string }) => m.employee_id))];
+      }
       
-      const agentIds = (agents || []).map((a: any) => a.id);
-      if (agentIds.length === 0) return 0;
+      // Fallback: if no team_clients found, use agent emails from sales
+      if (employeeIds.length === 0) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("agent_email")
+          .in("client_campaign_id", campaignIds)
+          .gte("sale_datetime", startStr)
+          .lte("sale_datetime", endStr);
+        
+        const agentEmails = [...new Set((sales || []).map((s: any) => s.agent_email?.toLowerCase()).filter(Boolean))];
+        
+        if (agentEmails.length > 0) {
+          const { data: agents } = await supabase
+            .from("agents")
+            .select("id, email")
+            .in("email", agentEmails);
+          
+          const agentIds = (agents || []).map((a: any) => a.id);
+          if (agentIds.length > 0) {
+            const { data: agentMappings } = await supabase
+              .from("employee_agent_mapping")
+              .select("employee_id")
+              .in("agent_id", agentIds);
+            
+            employeeIds = [...new Set((agentMappings || []).map((m: any) => m.employee_id))];
+          }
+        }
+      }
       
-      // Map agent IDs to employee IDs
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id")
-        .in("agent_id", agentIds);
-      
-      const employeeIds = [...new Set((agentMappings || []).map((m: any) => m.employee_id))];
       if (employeeIds.length === 0) return 0;
       
-      // Calculate hours for these specific employees
+      // Calculate hours for these employees
       const shiftData = await fetchShiftData(supabase, startStr, endStr);
       if (!shiftData) return 0;
       

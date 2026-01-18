@@ -101,8 +101,8 @@ export default function EesyTmDashboard() {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const monthStart = startOfMonth(today);
 
-  // Get client ID for Eesy
-  const eesyClientId = getClientId("Eesy");
+  // Get client ID for Eesy TM
+  const eesyClientId = getClientId("Eesy TM");
 
   // Fetch cached KPIs for hero cards (fast, pre-computed) - now includes total_hours
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
