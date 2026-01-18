@@ -1074,8 +1074,8 @@ export default function MyProfile() {
 
   const getVacationTypeLabel = (type: string | null) => {
     switch (type) {
-      case "vacation_pay": return "Ferieløn";
-      case "vacation_bonus": return "Feriebonus";
+      case "vacation_pay": return "Feriepenge";
+      case "vacation_bonus": return "Ferie med løn";
       default: return null;
     }
   };
