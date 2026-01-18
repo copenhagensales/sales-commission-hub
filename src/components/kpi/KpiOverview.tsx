@@ -269,8 +269,17 @@ export function KpiOverview() {
               Ingen KPI'er matcher dine filtre
             </div>
           ) : (
-            <div className="divide-y divide-border">
-              {filteredKpis.map((kpi) => (
+          <div className="divide-y divide-border">
+            {/* Header row */}
+            <div className="flex items-center gap-4 px-4 py-2 bg-muted/30 border-b text-xs font-medium text-muted-foreground">
+              <div className="flex-shrink-0 w-5">Status</div>
+              <div className="flex-1 min-w-0">KPI Navn</div>
+              <div className="flex-shrink-0 w-14">Type</div>
+              <div className="w-24 flex-shrink-0">Kategori</div>
+              <div className="flex-shrink-0 w-9 text-right">Aktiv</div>
+            </div>
+            
+            {filteredKpis.map((kpi) => (
                 <div
                   key={kpi.id}
                   className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
