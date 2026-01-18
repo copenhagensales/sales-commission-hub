@@ -123,7 +123,7 @@ export function AddPersonnelDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personnel-salaries"] });
-      queryClient.invalidateQueries({ queryKey: ["existing-personnel-salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["existing-personnel-salaries-all"] });
       toast({ title: "Medarbejder tilføjet" });
       resetForm();
       onOpenChange(false);
