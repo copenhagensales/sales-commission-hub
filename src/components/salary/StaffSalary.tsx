@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AddPersonnelDialog } from "./AddPersonnelDialog";
 import { EditPersonnelDialog } from "./EditPersonnelDialog";
+import { format, parseISO } from "date-fns";
+import { da } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +27,7 @@ interface PersonnelSalary {
   monthly_salary: number;
   percentage_rate: number | null;
   minimum_salary: number | null;
+  start_date: string | null;
   is_active: boolean;
   notes: string | null;
   employee: {
@@ -54,6 +57,7 @@ export function StaffSalary() {
           monthly_salary,
           percentage_rate,
           minimum_salary,
+          start_date,
           is_active,
           notes,
           employee:employee_master_data(first_name, last_name, job_title)
@@ -119,6 +123,11 @@ export function StaffSalary() {
     return `${rate}%`;
   };
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    return format(parseISO(dateStr), "d. MMM yyyy", { locale: da });
+  };
+
   const handleEdit = (salary: PersonnelSalary) => {
     setSelectedSalary(salary);
     setEditDialogOpen(true);
@@ -163,6 +172,7 @@ export function StaffSalary() {
                 <TableRow>
                   <TableHead>Navn</TableHead>
                   <TableHead>Stilling</TableHead>
+                  <TableHead>Startdato</TableHead>
                   <TableHead>Procentsats</TableHead>
                   <TableHead>Minimumsløn</TableHead>
                   <TableHead>Månedsløn</TableHead>
@@ -177,6 +187,7 @@ export function StaffSalary() {
                       {salary.employee?.first_name} {salary.employee?.last_name}
                     </TableCell>
                     <TableCell>{salary.employee?.job_title || "-"}</TableCell>
+                    <TableCell>{formatDate(salary.start_date)}</TableCell>
                     <TableCell>{formatPercentage(salary.percentage_rate)}</TableCell>
                     <TableCell>{salary.minimum_salary ? formatCurrency(salary.minimum_salary) : "-"}</TableCell>
                     <TableCell>{formatCurrency(salary.monthly_salary)}</TableCell>

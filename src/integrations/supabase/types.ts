@@ -6118,6 +6118,7 @@ export type Database = {
           notes: string | null
           percentage_rate: number | null
           salary_type: string
+          start_date: string | null
           updated_at: string
         }
         Insert: {
@@ -6130,6 +6131,7 @@ export type Database = {
           notes?: string | null
           percentage_rate?: number | null
           salary_type: string
+          start_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -6142,6 +6144,7 @@ export type Database = {
           notes?: string | null
           percentage_rate?: number | null
           salary_type?: string
+          start_date?: string | null
           updated_at?: string
         }
         Relationships: [
