@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, Receipt } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,11 +19,46 @@ interface SalaryType {
   id: string;
   name: string;
   description: string | null;
-  code: string | null;
+  amount: number | null;
+  amount_type: "fixed" | "percentage";
+  calculation_basis: "sales" | "hours" | "commission" | "fixed" | "custom";
+  calculation_formula: string | null;
+  activation_condition: string | null;
+  group_restriction_type: "all" | "teams" | "positions" | "clients";
+  group_restriction_ids: string[] | null;
+  payout_frequency: "per_sale" | "daily" | "weekly" | "monthly" | "period";
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
+
+type AmountType = "fixed" | "percentage";
+type CalculationBasis = "sales" | "hours" | "commission" | "fixed" | "custom";
+type GroupRestrictionType = "all" | "teams" | "positions" | "clients";
+type PayoutFrequency = "per_sale" | "daily" | "weekly" | "monthly" | "period";
+
+const CALCULATION_BASIS_LABELS: Record<CalculationBasis, string> = {
+  sales: "Salg",
+  hours: "Timer",
+  commission: "Provision",
+  fixed: "Fast",
+  custom: "Tilpasset",
+};
+
+const GROUP_RESTRICTION_LABELS: Record<GroupRestrictionType, string> = {
+  all: "Alle",
+  teams: "Teams",
+  positions: "Stillinger",
+  clients: "Kunder",
+};
+
+const PAYOUT_FREQUENCY_LABELS: Record<PayoutFrequency, string> = {
+  per_sale: "Per salg",
+  daily: "Dagligt",
+  weekly: "Ugentligt",
+  monthly: "Månedligt",
+  period: "Per periode",
+};
 
 export default function SalaryTypes() {
   const queryClient = useQueryClient();
@@ -31,7 +68,13 @@ export default function SalaryTypes() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    code: "",
+    amount: "",
+    amount_type: "fixed" as AmountType,
+    calculation_basis: "fixed" as CalculationBasis,
+    calculation_formula: "",
+    activation_condition: "",
+    group_restriction_type: "all" as GroupRestrictionType,
+    payout_frequency: "monthly" as PayoutFrequency,
   });
 
   const { data: salaryTypes = [], isLoading } = useQuery({
@@ -47,11 +90,17 @@ export default function SalaryTypes() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; code: string }) => {
+    mutationFn: async (data: typeof formData) => {
       const { error } = await supabase.from("salary_types").insert({
         name: data.name,
         description: data.description || null,
-        code: data.code || null,
+        amount: data.amount ? parseFloat(data.amount) : null,
+        amount_type: data.amount_type,
+        calculation_basis: data.calculation_basis,
+        calculation_formula: data.calculation_formula || null,
+        activation_condition: data.activation_condition || null,
+        group_restriction_type: data.group_restriction_type,
+        payout_frequency: data.payout_frequency,
       });
       if (error) throw error;
     },
@@ -66,10 +115,20 @@ export default function SalaryTypes() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<SalaryType> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
       const { error } = await supabase
         .from("salary_types")
-        .update(data)
+        .update({
+          name: data.name,
+          description: data.description || null,
+          amount: data.amount ? parseFloat(data.amount) : null,
+          amount_type: data.amount_type,
+          calculation_basis: data.calculation_basis,
+          calculation_formula: data.calculation_formula || null,
+          activation_condition: data.activation_condition || null,
+          group_restriction_type: data.group_restriction_type,
+          payout_frequency: data.payout_frequency,
+        })
         .eq("id", id);
       if (error) throw error;
     },
@@ -101,7 +160,17 @@ export default function SalaryTypes() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", code: "" });
+    setFormData({
+      name: "",
+      description: "",
+      amount: "",
+      amount_type: "fixed",
+      calculation_basis: "fixed",
+      calculation_formula: "",
+      activation_condition: "",
+      group_restriction_type: "all",
+      payout_frequency: "monthly",
+    });
     setEditingType(null);
     setIsDialogOpen(false);
   };
@@ -111,7 +180,13 @@ export default function SalaryTypes() {
     setFormData({
       name: type.name,
       description: type.description || "",
-      code: type.code || "",
+      amount: type.amount?.toString() || "",
+      amount_type: type.amount_type || "fixed",
+      calculation_basis: type.calculation_basis || "fixed",
+      calculation_formula: type.calculation_formula || "",
+      activation_condition: type.activation_condition || "",
+      group_restriction_type: type.group_restriction_type || "all",
+      payout_frequency: type.payout_frequency || "monthly",
     });
     setIsDialogOpen(true);
   };
@@ -126,22 +201,38 @@ export default function SalaryTypes() {
     if (editingType) {
       updateMutation.mutate({
         id: editingType.id,
-        data: {
-          name: formData.name,
-          description: formData.description || null,
-          code: formData.code || null,
-        },
+        data: formData,
       });
     } else {
       createMutation.mutate(formData);
     }
   };
 
+  const formatAmount = (type: SalaryType) => {
+    if (type.amount === null) return "-";
+    const value = type.amount;
+    return type.amount_type === "percentage" ? `${value}%` : `${value} kr`;
+  };
+
+  const formatDefinition = (type: SalaryType) => {
+    const parts: string[] = [];
+    
+    // Calculation basis
+    parts.push(CALCULATION_BASIS_LABELS[type.calculation_basis] || "Fast");
+    
+    // Group restriction
+    parts.push(GROUP_RESTRICTION_LABELS[type.group_restriction_type] || "Alle");
+    
+    // Payout frequency
+    parts.push(PAYOUT_FREQUENCY_LABELS[type.payout_frequency] || "Månedligt");
+    
+    return parts.join(" · ");
+  };
+
   const filteredTypes = salaryTypes.filter(
     (type) =>
       type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      type.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      type.code?.toLowerCase().includes(searchTerm.toLowerCase())
+      type.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -164,39 +255,159 @@ export default function SalaryTypes() {
               Ny lønart
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingType ? "Rediger lønart" : "Opret ny lønart"}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Navn *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="F.eks. Grundløn, Overarbejde..."
-                />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Grundlæggende sektion */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Grundlæggende</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Navn *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="F.eks. Grundløn, Overarbejde..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Beskrivelse</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Hvad dækker denne lønart?"
+                    rows={2}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Beskrivelse</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Hvad dækker denne lønart?"
-                  rows={3}
-                />
+
+              <Separator />
+
+              {/* Beløb sektion */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Beløb</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Værdi</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      placeholder="F.eks. 300 eller 12.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount_type">Type</Label>
+                    <Select
+                      value={formData.amount_type}
+                      onValueChange={(value: AmountType) => setFormData({ ...formData, amount_type: value })}
+                    >
+                      <SelectTrigger id="amount_type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fixed">Fast beløb (kr)</SelectItem>
+                        <SelectItem value="percentage">Procent (%)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="code">Kode (valgfri)</Label>
-                <Input
-                  id="code"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="F.eks. 1000, OVR..."
-                />
+
+              <Separator />
+
+              {/* Definition sektion */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Definition</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="calculation_basis">Beregningsgrundlag</Label>
+                  <Select
+                    value={formData.calculation_basis}
+                    onValueChange={(value: CalculationBasis) => setFormData({ ...formData, calculation_basis: value })}
+                  >
+                    <SelectTrigger id="calculation_basis">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fast</SelectItem>
+                      <SelectItem value="sales">Salg</SelectItem>
+                      <SelectItem value="hours">Timer</SelectItem>
+                      <SelectItem value="commission">Provision</SelectItem>
+                      <SelectItem value="custom">Tilpasset</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.calculation_basis === "custom" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="calculation_formula">Beregningsformel</Label>
+                    <Textarea
+                      id="calculation_formula"
+                      value={formData.calculation_formula}
+                      onChange={(e) => setFormData({ ...formData, calculation_formula: e.target.value })}
+                      placeholder="Beskriv hvordan beløbet beregnes..."
+                      rows={2}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="activation_condition">Aktiveringsbetingelse</Label>
+                  <Textarea
+                    id="activation_condition"
+                    value={formData.activation_condition}
+                    onChange={(e) => setFormData({ ...formData, activation_condition: e.target.value })}
+                    placeholder="Hvornår aktiveres denne lønart? F.eks. 'Ved mindst 10 salg per dag'"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="group_restriction_type">Begrænsning til grupper</Label>
+                  <Select
+                    value={formData.group_restriction_type}
+                    onValueChange={(value: GroupRestrictionType) => setFormData({ ...formData, group_restriction_type: value })}
+                  >
+                    <SelectTrigger id="group_restriction_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Alle medarbejdere</SelectItem>
+                      <SelectItem value="teams">Bestemte teams</SelectItem>
+                      <SelectItem value="positions">Bestemte stillinger</SelectItem>
+                      <SelectItem value="clients">Bestemte kunder</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payout_frequency">Udbetalingsfrekvens</Label>
+                  <Select
+                    value={formData.payout_frequency}
+                    onValueChange={(value: PayoutFrequency) => setFormData({ ...formData, payout_frequency: value })}
+                  >
+                    <SelectTrigger id="payout_frequency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="per_sale">Per salg</SelectItem>
+                      <SelectItem value="daily">Dagligt</SelectItem>
+                      <SelectItem value="weekly">Ugentligt</SelectItem>
+                      <SelectItem value="monthly">Månedligt</SelectItem>
+                      <SelectItem value="period">Per lønperiode</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              <Separator />
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Annuller
@@ -238,7 +449,8 @@ export default function SalaryTypes() {
                 <TableRow>
                   <TableHead>Navn</TableHead>
                   <TableHead>Beskrivelse</TableHead>
-                  <TableHead>Kode</TableHead>
+                  <TableHead>Beløb</TableHead>
+                  <TableHead>Definition</TableHead>
                   <TableHead className="text-center">Aktiv</TableHead>
                   <TableHead className="text-right">Handlinger</TableHead>
                 </TableRow>
@@ -251,11 +463,12 @@ export default function SalaryTypes() {
                       {type.description || "-"}
                     </TableCell>
                     <TableCell>
-                      {type.code ? (
-                        <Badge variant="outline">{type.code}</Badge>
-                      ) : (
-                        "-"
-                      )}
+                      <Badge variant="outline">{formatAmount(type)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDefinition(type)}
+                      </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <Switch

@@ -6594,30 +6594,51 @@ export type Database = {
       }
       salary_types: {
         Row: {
-          code: string | null
+          activation_condition: string | null
+          amount: number | null
+          amount_type: string | null
+          calculation_basis: string | null
+          calculation_formula: string | null
           created_at: string
           description: string | null
+          group_restriction_ids: string[] | null
+          group_restriction_type: string | null
           id: string
           is_active: boolean
           name: string
+          payout_frequency: string | null
           updated_at: string
         }
         Insert: {
-          code?: string | null
+          activation_condition?: string | null
+          amount?: number | null
+          amount_type?: string | null
+          calculation_basis?: string | null
+          calculation_formula?: string | null
           created_at?: string
           description?: string | null
+          group_restriction_ids?: string[] | null
+          group_restriction_type?: string | null
           id?: string
           is_active?: boolean
           name: string
+          payout_frequency?: string | null
           updated_at?: string
         }
         Update: {
-          code?: string | null
+          activation_condition?: string | null
+          amount?: number | null
+          amount_type?: string | null
+          calculation_basis?: string | null
+          calculation_formula?: string | null
           created_at?: string
           description?: string | null
+          group_restriction_ids?: string[] | null
+          group_restriction_type?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          payout_frequency?: string | null
           updated_at?: string
         }
         Relationships: []
