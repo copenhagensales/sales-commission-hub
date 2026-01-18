@@ -37,8 +37,18 @@ interface PersonnelSalary {
     first_name: string;
     last_name: string;
     job_title: string | null;
+    salary_type: "provision" | "fixed" | "hourly" | null;
   } | null;
 }
+
+const getSalaryTypeLabel = (type: string | null) => {
+  switch (type) {
+    case "provision": return "Provision";
+    case "fixed": return "Fast løn";
+    case "hourly": return "Timeløn";
+    default: return "Ikke angivet";
+  }
+};
 
 interface EditPersonnelDialogProps {
   open: boolean;
@@ -149,6 +159,16 @@ export function EditPersonnelDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Medarbejderens løntype */}
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Løntype:</span>
+              <Badge variant="secondary">
+                {getSalaryTypeLabel(salary.employee?.salary_type ?? null)}
+              </Badge>
+            </div>
+          </div>
+
           {/* Team info for team leaders */}
           {isTeamLeader && (
             <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
