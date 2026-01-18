@@ -52,6 +52,15 @@ export function KpiDefinitionList({ definitions, selectedId, onSelect, cachedSlu
 
   return (
     <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b text-muted-foreground text-xs font-medium">
+        <span>KPI Navn</span>
+        <div className="flex items-center gap-6">
+          <span>Cache</span>
+          <span className="w-28 text-right">Slug</span>
+        </div>
+      </div>
+
       {orderedCategories.map((category) => {
         const items = grouped[category];
         if (!items?.length) return null;
