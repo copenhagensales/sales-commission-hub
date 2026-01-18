@@ -5,21 +5,13 @@ import {
   Dashboard,
   Agents,
   Sales,
-  Payroll,
   Settings,
   MgTest,
-  MgTestDashboard,
-  Codan,
-  TdcErhverv,
   TdcErhvervDashboard,
   RelatelDashboard,
   TrygDashboard,
   AseDashboard,
-  TeamOverview,
   NotFound,
-  AdversusData,
-  DialerData,
-  CallsData,
   Logikker,
   EmployeeMasterData,
   EmployeeDetail,
@@ -110,7 +102,6 @@ import {
   SecurityDashboard,
   UpcomingStarts,
   SalarySchemes,
-  MgTestPage,
   CommissionLeague,
   CommissionLeagueTest,
   LeagueAdminDashboard,
@@ -154,17 +145,9 @@ export const routes: RouteConfig[] = [
   { path: "/dashboard", component: Dashboard, access: "role", positionPermission: "menu_dashboard" },
   { path: "/agents", component: Agents, access: "role", positionPermission: "menu_employees" },
   { path: "/sales", component: Sales, access: "role", positionPermission: "menu_sales" },
-  { path: "/codan", component: Codan, access: "role", positionPermission: "menu_codan" },
-  { path: "/tdc-erhverv", component: TdcErhverv, access: "role", positionPermission: "menu_tdc_erhverv" },
-  { path: "/team-overview", component: TeamOverview, access: "role", positionPermission: "menu_mg_test" },
 
-  { path: "/payroll", component: Payroll, access: "role", positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", positionPermission: "menu_mg_test" },
-  { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", positionPermission: "menu_test_dashboard" },
-  
-  { path: "/adversus-data", component: AdversusData, access: "role", positionPermission: "menu_adversus_data" },
-  { path: "/dialer-data", component: DialerData, access: "role", positionPermission: "menu_dialer_data" },
-  { path: "/calls-data", component: CallsData, access: "role", positionPermission: "menu_calls_data" },
+
   { path: "/logikker", component: Logikker, access: "role", positionPermission: "menu_logics" },
   { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", positionPermission: "menu_employees" },
@@ -345,12 +328,6 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/tryg", component: TrygDashboard, access: "role", positionPermission: "menu_dashboard_tryg" },
   { path: "/dashboards/ase", component: AseDashboard, access: "role", positionPermission: "menu_dashboard_ase" },
   {
-    path: "/dashboards/mg-test",
-    component: MgTestDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_test",
-  },
-  {
     path: "/dashboards/eesy-tm",
     component: EesyTmDashboard,
     access: "role",
@@ -419,9 +396,6 @@ export const routes: RouteConfig[] = [
 
   // KPI Definitions (Owner only)
   { path: "/admin/kpi-definitions", component: KpiDefinitions, access: "role", positionPermission: "menu_kpi_definitions" },
-
-  // MG Test (Salary Schemes + Relatel Data)
-  { path: "/1234", component: MgTestPage, access: "role", positionPermission: "menu_mg_test" },
 
   // Salary
   { path: "/salary/types", component: SalaryTypes, access: "role", positionPermission: "menu_salary_types" },

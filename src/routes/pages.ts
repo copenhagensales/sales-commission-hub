@@ -7,25 +7,17 @@ export const Home = lazyPage(() => import("@/pages/Home"));
 export const Dashboard = lazyPage(() => import("@/pages/Dashboard"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
 export const Sales = lazyPage(() => import("@/pages/Sales"));
-export const Payroll = lazyPage(() => import("@/pages/Payroll"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
-export const MgTestDashboard = lazyPage(() => import("@/pages/MgTestDashboard"));
 
-export const Codan = lazyPage(() => import("@/pages/Codan"));
-export const TdcErhverv = lazyPage(() => import("@/pages/TdcErhverv"));
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
 export const TrygDashboard = lazyPage(() => import("@/pages/TrygDashboard"));
 export const AseDashboard = lazyPage(() => import("@/pages/AseDashboard"));
 export const UnitedDashboard = lazyPage(() => import("@/pages/UnitedDashboard"));
 export const CsTop20Dashboard = lazyPage(() => import("@/pages/CsTop20Dashboard"));
-export const TeamOverview = lazyPage(() => import("@/pages/TeamOverview"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
-export const AdversusData = lazyPage(() => import("@/pages/AdversusData"));
-export const DialerData = lazyPage(() => import("@/pages/DialerData"));
-export const CallsData = lazyPage(() => import("@/pages/CallsData"));
 export const Logikker = lazyPage(() => import("@/pages/Logikker"));
 export const EmployeeMasterData = lazyPage(() => import("@/pages/EmployeeMasterData"));
 export const EmployeeDetail = lazyPage(() => import("@/pages/EmployeeDetail"));
@@ -146,7 +138,6 @@ export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"
 
 // Salary Schemes
 export const SalarySchemes = lazyPage(() => import("@/pages/SalarySchemes"));
-export const MgTestPage = lazyPage(() => import("@/pages/MgTestPage"));
 
 // Commission League
 export const CommissionLeague = lazyPage(() => import("@/pages/CommissionLeague"));
@@ -166,4 +157,3 @@ export const KpiDefinitions = lazyPage(() => import("@/pages/admin/KpiDefinition
 
 // Salary
 export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
-
