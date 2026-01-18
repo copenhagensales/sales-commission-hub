@@ -34,6 +34,7 @@ interface PersonnelSalary {
     first_name: string;
     last_name: string;
     job_title: string | null;
+    salary_type: "provision" | "fixed" | "hourly" | null;
   } | null;
 }
 
@@ -66,7 +67,7 @@ export function TeamLeaderSalary() {
           start_date,
           is_active,
           notes,
-          employee:employee_master_data(first_name, last_name, job_title)
+          employee:employee_master_data(first_name, last_name, job_title, salary_type)
         `)
         .eq("salary_type", "team_leader")
         .order("created_at", { ascending: false });

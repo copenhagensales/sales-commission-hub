@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Search, Check } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +29,17 @@ interface Employee {
   last_name: string;
   job_title: string | null;
   is_staff_employee: boolean;
+  salary_type: "provision" | "fixed" | "hourly" | null;
 }
+
+const getSalaryTypeLabel = (type: string | null) => {
+  switch (type) {
+    case "provision": return "Provision";
+    case "fixed": return "Fast løn";
+    case "hourly": return "Timeløn";
+    default: return "Ikke angivet";
+  }
+};
 
 export function AddPersonnelDialog({
   open,
@@ -51,7 +62,7 @@ export function AddPersonnelDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, is_staff_employee")
+        .select("id, first_name, last_name, job_title, is_staff_employee, salary_type")
         .eq("is_active", true)
         .eq("is_staff_employee", true)
         .order("first_name");
@@ -196,6 +207,18 @@ export function AddPersonnelDialog({
               </div>
             </ScrollArea>
           </div>
+
+          {/* Vis valgt medarbejders løntype */}
+          {selectedEmployee && (
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Løntype:</span>
+                <Badge variant="secondary">
+                  {getSalaryTypeLabel(selectedEmployee.salary_type)}
+                </Badge>
+              </div>
+            </div>
+          )}
 
           {/* Percentage rate */}
           <div className="space-y-2">
