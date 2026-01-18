@@ -340,6 +340,16 @@ export default function DailyReports() {
             .eq("is_active", true);
           
           filteredEmployees = empData || [];
+          
+          // Apply team filter if a specific team is selected
+          if (selectedTeam !== "all") {
+            filteredEmployees = filteredEmployees.filter(emp => 
+              emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
+            );
+          }
+          
+          // Update employeeIds to match filtered list
+          employeeIds = filteredEmployees.map((e: any) => e.id);
         }
         
         console.log("[DailyReport] Employees found for client:", filteredEmployees.length);
