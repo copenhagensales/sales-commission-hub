@@ -103,9 +103,11 @@ function useCurrentUserRole() {
       if (employee?.job_title) {
         const titleLower = employee.job_title.toLowerCase();
         if (titleLower === 'ejer') return 'ejer';
+        if (titleLower === 'fieldmarketing leder') return 'fm_leder';
         if (titleLower.includes('teamleder')) return 'teamleder';
         if (titleLower === 'rekruttering') return 'rekruttering';
         if (titleLower === 'some') return 'some';
+        if (titleLower === 'fieldmarketing') return 'fm_medarbejder_';
       }
       
       return 'medarbejder' as SystemRole;
@@ -373,7 +375,7 @@ export const permissionKeyLabels: Record<string, string> = {
   tab_employees_teams: 'Fane: Teams',
   tab_employees_positions: 'Fane: Stillinger',
   tab_employees_permissions: 'Fane: Rettigheder',
-  tab_employees_dialer: 'Fane: Dialer-mapping',
+  tab_employees_dialer_mapping: 'Fane: Dialer-mapping',
   
   // OnboardingDashboard tabs
   tab_onboarding_overview: 'Fane: Onboarding oversigt',
