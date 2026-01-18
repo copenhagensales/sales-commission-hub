@@ -639,6 +639,47 @@ Deno.serve(async (req) => {
 
 // ============= LEADERBOARD CALCULATION FUNCTIONS =============
 
+// Paginated fetch for sales to avoid 1000-row limit
+async function fetchAllSales(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string,
+  campaignFilter?: string[] // Optional: filter by client_campaign_id
+): Promise<{ id: string; agent_email: string | null; agent_name: string | null }[]> {
+  const PAGE_SIZE = 1000;
+  const allSales: { id: string; agent_email: string | null; agent_name: string | null }[] = [];
+  let page = 0;
+  let hasMore = true;
+  
+  while (hasMore) {
+    let query = supabase
+      .from("sales")
+      .select("id, agent_email, agent_name")
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .order("sale_datetime", { ascending: true })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    
+    // Apply campaign filter if provided
+    if (campaignFilter && campaignFilter.length > 0) {
+      query = query.in("client_campaign_id", campaignFilter);
+    }
+    
+    const { data: sales } = await query;
+    
+    if (sales && sales.length > 0) {
+      allSales.push(...sales);
+      hasMore = sales.length === PAGE_SIZE;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+  
+  console.log(`[fetchAllSales] Fetched ${allSales.length} total sales in ${page + 1} page(s)`);
+  return allSales;
+}
+
 async function calculateGlobalLeaderboard(
   supabase: SupabaseClient,
   startDate: Date,
@@ -650,12 +691,8 @@ async function calculateGlobalLeaderboard(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Get all sales with agent_email for proper matching
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id, agent_email, agent_name")
-    .gte("sale_datetime", startStr)
-    .lte("sale_datetime", endStr);
+  // Get all sales with agent_email using paginated fetch
+  const sales = await fetchAllSales(supabase, startStr, endStr);
 
   if (!sales || sales.length === 0) return [];
 
@@ -832,12 +869,8 @@ async function calculateTeamLeaderboard(
     }
   }
 
-  // Get all sales with agent_email
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id, agent_email, agent_name")
-    .gte("sale_datetime", startStr)
-    .lte("sale_datetime", endStr);
+  // Get all sales with agent_email using paginated fetch
+  const sales = await fetchAllSales(supabase, startStr, endStr);
 
   if (!sales || sales.length === 0) return [];
 
@@ -953,13 +986,8 @@ async function calculateClientLeaderboard(
   const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
   if (campaignIds.length === 0) return [];
 
-  // Get all sales for this client's campaigns with agent_email
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id, agent_email, agent_name")
-    .in("client_campaign_id", campaignIds)
-    .gte("sale_datetime", startStr)
-    .lte("sale_datetime", endStr);
+  // Get all sales for this client's campaigns using paginated fetch
+  const sales = await fetchAllSales(supabase, startStr, endStr, campaignIds);
 
   if (!sales || sales.length === 0) return [];
 
