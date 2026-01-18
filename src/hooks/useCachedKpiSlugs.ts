@@ -5,14 +5,11 @@ export function useCachedKpiSlugs() {
   return useQuery({
     queryKey: ["cached-kpi-slugs"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("kpi_cached_values")
-        .select("kpi_slug");
+      const { data, error } = await supabase.rpc("get_distinct_cached_kpi_slugs");
 
       if (error) throw error;
 
-      // Return unique slugs
-      return [...new Set(data?.map((d) => d.kpi_slug) || [])];
+      return data?.map((d) => d.kpi_slug) || [];
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
