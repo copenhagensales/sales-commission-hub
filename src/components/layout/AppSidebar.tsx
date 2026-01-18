@@ -66,6 +66,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [reportsOpen, setReportsOpen] = useState(
     location.pathname.startsWith("/reports")
   );
+  const [salaryOpen, setSalaryOpen] = useState(
+    location.pathname.startsWith("/salary")
+  );
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
   );
@@ -394,6 +397,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = p.canView("menu_section_reports") && 
     (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
+  
+  // Check if Salary menu should be visible
+  const showSalaryMenu = p.canViewSalaryTypes;
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
@@ -1690,6 +1696,35 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               <ShoppingCart className="h-5 w-5" />
               {t("sidebar.sales")}
             </NavLink>
+          )}
+
+          {/* Løn menu */}
+          {showSalaryMenu && (
+            <Collapsible open={salaryOpen} onOpenChange={setSalaryOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/salary")
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5" />
+                  Løn
+                </div>
+                {salaryOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewSalaryTypes && (
+                  <NavLink to="/salary/types" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/salary/types" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Receipt className="h-4 w-4" />
+                    Lønarter
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {/* Logikker - near bottom */}
