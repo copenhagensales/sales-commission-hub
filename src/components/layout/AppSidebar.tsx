@@ -399,7 +399,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
   
   // Check if Salary menu should be visible
-  const showSalaryMenu = p.canViewSalaryTypes;
+  const showSalaryMenu = p.canView("menu_section_salary") && p.canViewSalaryTypes;
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
