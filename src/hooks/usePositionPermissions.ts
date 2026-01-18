@@ -36,11 +36,21 @@ function mapJobTitleToRoleKey(jobTitle: string | null | undefined): string {
   if (!jobTitle) return 'medarbejder';
   const lower = jobTitle.toLowerCase().trim();
   
+  // Owner - full access
   if (lower === 'ejer') return 'ejer';
+  
+  // Fieldmarketing roles (check before generic teamleder)
+  if (lower === 'fieldmarketing leder') return 'fm_leder';
+  if (lower === 'fieldmarketing' || lower === 'fm medarbejder') return 'fm_medarbejder_';
+  
+  // Team leader roles
   if (lower.includes('teamleder')) return 'teamleder';
+  
+  // Specialized roles
   if (lower === 'rekruttering') return 'rekruttering';
   if (lower === 'some') return 'some';
   
+  // Default
   return 'medarbejder';
 }
 
@@ -453,9 +463,12 @@ export function usePermissions() {
     canViewAdversusData: canView("menu_adversus_data"),
     // Shift planning menu
     canViewShiftOverview: canView("menu_shift_overview"),
+    canEditShiftOverview: canEdit("menu_shift_overview"),
     canViewMySchedule: hasPermission("menu_my_schedule"),
     canViewAbsence: canView("menu_absence"),
+    canEditAbsence: canEdit("menu_absence"),
     canViewTimeTracking: canView("menu_time_tracking"),
+    canEditTimeTracking: canEdit("menu_time_tracking"),
     canViewExtraWork: canView("menu_extra_work"),
     canViewExtraWorkAdmin: canView("menu_extra_work_admin"),
     // Fieldmarketing menu

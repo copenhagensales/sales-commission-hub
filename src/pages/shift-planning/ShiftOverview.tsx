@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 interface LatenessRecord {
   id: string;
@@ -68,6 +69,7 @@ export default function ShiftOverview() {
   const [showWeekend, setShowWeekend] = useState(false);
 
   const queryClient = useQueryClient();
+  const { canEditShiftOverview } = usePermissions();
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -1117,18 +1119,20 @@ export default function ShiftOverview() {
             
             {/* Actions */}
             <div className="flex items-center gap-3">
-              <Button
-                size="sm"
-                className="h-10 gap-2"
-                onClick={() => {
-                  setSelectedDate(null);
-                  setSelectedEmployeeId(null);
-                  setCreateDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Opret vagt
-              </Button>
+              {canEditShiftOverview && (
+                <Button
+                  size="sm"
+                  className="h-10 gap-2"
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setSelectedEmployeeId(null);
+                    setCreateDialogOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Opret vagt
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
