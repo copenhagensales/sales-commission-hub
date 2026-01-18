@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { useKpiDefinitions, KpiDefinition, useUpdateKpiDefinitionStatus } from "@/hooks/useKpiDefinitions";
 import { useKpiFormulas, KpiFormula, useUpdateKpiFormulaStatus } from "@/hooks/useKpiFormulas";
+import { useCachedKpiSlugs } from "@/hooks/useCachedKpiSlugs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, BookOpen, Calculator, Loader2, LayoutGrid, Check, CheckCircle2, Circle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Search, BookOpen, Calculator, Loader2, LayoutGrid, Check, CheckCircle2, Circle, Database } from "lucide-react";
 import { toast } from "sonner";
 
 // Unified KPI item type
@@ -18,6 +20,7 @@ interface UnifiedKpi {
   category: string | null;
   description: string | null;
   is_active: boolean;
+  slug?: string;
   source: KpiDefinition | KpiFormula;
 }
 
@@ -30,6 +33,7 @@ export function KpiOverview() {
 
   const { data: definitions, isLoading: loadingDefs } = useKpiDefinitions();
   const { data: formulas, isLoading: loadingFormulas } = useKpiFormulas();
+  const { data: cachedSlugs = [] } = useCachedKpiSlugs();
   
   const updateDefinitionStatus = useUpdateKpiDefinitionStatus();
   const updateFormulaStatus = useUpdateKpiFormulaStatus();
@@ -50,6 +54,7 @@ export function KpiOverview() {
         category: def.category,
         description: def.description,
         is_active: def.is_active ?? true,
+        slug: def.slug,
         source: def,
       });
     });
@@ -274,6 +279,7 @@ export function KpiOverview() {
             <div className="flex items-center gap-4 px-4 py-2 bg-muted/30 border-b text-xs font-medium text-muted-foreground">
               <div className="flex-shrink-0 w-5">Status</div>
               <div className="flex-1 min-w-0">KPI Navn</div>
+              <div className="flex-shrink-0 w-8 text-center">Cache</div>
               <div className="flex-shrink-0 w-14">Type</div>
               <div className="w-24 flex-shrink-0">Kategori</div>
               <div className="flex-shrink-0 w-9 text-right">Aktiv</div>
@@ -300,6 +306,20 @@ export function KpiOverview() {
                       <div className="text-sm text-muted-foreground truncate">
                         {kpi.description}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Cache indicator */}
+                  <div className="flex-shrink-0 w-8 flex justify-center">
+                    {kpi.slug && cachedSlugs.includes(kpi.slug) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Database className="h-4 w-4 text-emerald-500" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs">KPI caches automatisk til dashboards</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
 
