@@ -280,7 +280,20 @@ export default function DailyReports() {
             .filter(Boolean)
         )] as string[];
         
+        // ALSO fetch seller_ids from fieldmarketing_sales for this client
+        const { data: fmSellersForClient } = await supabase
+          .from("fieldmarketing_sales")
+          .select("seller_id")
+          .eq("client_id", selectedClient)
+          .gte("registered_at", `${startStr}T00:00:00`)
+          .lte("registered_at", `${endStr}T23:59:59`);
+        
+        const fmEmployeeIds = [...new Set(
+          (fmSellersForClient || []).map(s => s.seller_id).filter(Boolean)
+        )] as string[];
+        
         console.log("[DailyReport] Client sales agent emails:", agentEmails);
+        console.log("[DailyReport] FM seller IDs for client:", fmEmployeeIds.length);
         
         if (agentEmails.length > 0) {
           // Find agents matching these emails
@@ -313,17 +326,20 @@ export default function DailyReports() {
               };
             });
           }
+        }
+        
+        // Combine with FM employee IDs
+        employeeIds = [...new Set([...employeeIds, ...fmEmployeeIds])];
+        
+        // Fetch employee details for all IDs (from sales AND fieldmarketing)
+        if (employeeIds.length > 0) {
+          const { data: empData } = await supabase
+            .from("employee_master_data")
+            .select(`id, first_name, last_name, team_members(team:teams(id, name))`)
+            .in("id", employeeIds)
+            .eq("is_active", true);
           
-          // Fetch employee details for these IDs
-          if (employeeIds.length > 0) {
-            const { data: empData } = await supabase
-              .from("employee_master_data")
-              .select(`id, first_name, last_name, team_members(team:teams(id, name))`)
-              .in("id", employeeIds)
-              .eq("is_active", true);
-            
-            filteredEmployees = empData || [];
-          }
+          filteredEmployees = empData || [];
         }
         
         console.log("[DailyReport] Employees found for client:", filteredEmployees.length);
