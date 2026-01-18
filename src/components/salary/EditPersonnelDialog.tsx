@@ -50,6 +50,15 @@ const getSalaryTypeLabel = (type: string | null) => {
   }
 };
 
+const getMonthlySalaryLabel = (salaryType: string | null) => {
+  switch (salaryType) {
+    case "hourly": return "Timeløn (DKK/time)";
+    case "fixed": return "Månedsløn (DKK)";
+    case "provision": return "Basisløn (DKK)";
+    default: return "Månedsløn (DKK)";
+  }
+};
+
 interface EditPersonnelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -246,10 +255,13 @@ export function EditPersonnelDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="monthly-salary">Månedsløn (DKK)</Label>
+            <Label htmlFor="monthly-salary">
+              {getMonthlySalaryLabel(salary.employee?.salary_type ?? null)}
+            </Label>
             <Input
               id="monthly-salary"
               type="number"
+              step={salary.employee?.salary_type === "hourly" ? "0.01" : "1"}
               placeholder="0"
               value={monthlySalary}
               onChange={(e) => setMonthlySalary(e.target.value)}
