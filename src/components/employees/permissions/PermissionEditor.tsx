@@ -260,7 +260,7 @@ const PERMISSION_HIERARCHY: Record<string, string | null> = {
   tab_employees_teams: 'menu_employees',
   tab_employees_positions: 'menu_employees',
   tab_employees_permissions: 'menu_employees',
-  tab_employees_dialer: 'menu_employees',
+  tab_employees_dialer_mapping: 'menu_employees',
   
   // OnboardingDashboard tabs
   tab_onboarding_overview: 'menu_onboarding_overview',

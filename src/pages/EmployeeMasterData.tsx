@@ -156,7 +156,7 @@ export default function EmployeeMasterData() {
     { value: "teams", label: t("employees.tabs.teams"), permissionKey: "tab_employees_teams" },
     { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions" },
     { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions" },
-    { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer" },
+    { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer_mapping" },
   ];
 
   const visibleTabs = allTabs.filter(tab => canView(tab.permissionKey));
