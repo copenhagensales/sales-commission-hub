@@ -36,25 +36,28 @@ export function SellerSalariesTab() {
   const { data: sellerData, isLoading } = useQuery({
     queryKey: ["seller-salaries", monthStart.toISOString(), monthEnd.toISOString(), selectedTeam],
     queryFn: async () => {
-      // Get non-staff employees
-      const { data: employees, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, team_id")
+      // Get non-staff employees with team memberships
+      const { data: employees, error: empError } = await (supabase
+        .from("employee_master_data") as any)
+        .select(`
+          id, 
+          first_name, 
+          last_name,
+          team_members!left(
+            team_id,
+            teams!left(id, name)
+          )
+        `)
         .eq("is_active", true)
         .eq("is_staff_employee", false);
       if (empError) throw empError;
 
-      // Get team names separately
-      const teamIds = [...new Set(employees?.map(e => e.team_id).filter(Boolean) as string[])];
-      const { data: teamsData } = await supabase
-        .from("teams")
-        .select("id, name")
-        .in("id", teamIds);
-
       // Filter by selected team if needed
       let filteredEmployees = employees || [];
       if (selectedTeam !== "all") {
-        filteredEmployees = filteredEmployees.filter(e => e.team_id === selectedTeam);
+        filteredEmployees = filteredEmployees.filter((e: any) => 
+          e.team_members?.some((tm: any) => tm.team_id === selectedTeam)
+        );
       }
 
       // Get sales data for these employees via agent mapping
@@ -98,13 +101,15 @@ export function SellerSalariesTab() {
         const totalSales = empSales.reduce((sum, si) => sum + (si.quantity || 1), 0);
         const totalCommission = empSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0), 0);
 
-        const teamData = teamsData?.find(t => t.id === emp.team_id);
+        // Get team from team_members junction table
+        const teamMember = emp.team_members?.[0];
+        const teamData = teamMember?.teams;
 
         return {
           id: emp.id,
           name: `${emp.first_name} ${emp.last_name}`,
           team: teamData?.name || "Ikke tildelt",
-          teamId: emp.team_id,
+          teamId: teamMember?.team_id || null,
           sales: totalSales,
           commission: totalCommission,
         };
