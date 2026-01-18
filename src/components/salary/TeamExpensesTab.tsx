@@ -45,10 +45,9 @@ export function TeamExpensesTab() {
 
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-expense-filter"],
-    queryKey: ["teams-list"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
+      const { data, error } = await (supabase
+        .from("teams") as any)
         .select("id, name")
         .eq("is_active", true)
         .order("name");
@@ -59,10 +58,9 @@ export function TeamExpensesTab() {
 
   const { data: expenses, isLoading } = useQuery<TeamExpense[]>({
     queryKey: ["team-expenses", monthStart.toISOString(), monthEnd.toISOString(), selectedTeam],
-    queryKey: ["team-expenses", monthStart.toISOString(), monthEnd.toISOString(), selectedTeam],
     queryFn: async () => {
-      let query = supabase
-        .from("team_expenses")
+      let query = (supabase
+        .from("team_expenses") as any)
         .select("id, team_id, description, amount, expense_date, category, notes")
         .gte("expense_date", monthStart.toISOString().split("T")[0])
         .lte("expense_date", monthEnd.toISOString().split("T")[0])
@@ -76,15 +74,15 @@ export function TeamExpensesTab() {
       if (error) throw error;
 
       // Attach team names
-      const teamIds = [...new Set(data?.map(e => e.team_id) || [])];
-      const { data: teamsData } = await supabase
-        .from("teams")
+      const teamIds = [...new Set(data?.map((e: any) => e.team_id) || [])];
+      const { data: teamsData } = await (supabase
+        .from("teams") as any)
         .select("id, name")
         .in("id", teamIds);
 
-      return data?.map(e => ({
+      return data?.map((e: any) => ({
         ...e,
-        teams: teamsData?.find(t => t.id === e.team_id),
+        teams: teamsData?.find((t: any) => t.id === e.team_id),
       })) as TeamExpense[];
     },
   });

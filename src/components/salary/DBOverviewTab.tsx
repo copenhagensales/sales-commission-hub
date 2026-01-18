@@ -34,8 +34,8 @@ export function DBOverviewTab() {
     queryKey: ["teams-db", monthStart.toISOString(), monthEnd.toISOString()],
     queryFn: async (): Promise<TeamDB[]> => {
       // Get teams with leaders
-      const { data: teams, error: teamsError } = await supabase
-        .from("teams")
+      const { data: teams, error: teamsError } = await (supabase
+        .from("teams") as any)
         .select("id, name, team_leader_id")
         .eq("is_active", true);
       if (teamsError) throw teamsError;

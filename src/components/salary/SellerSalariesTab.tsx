@@ -22,8 +22,8 @@ export function SellerSalariesTab() {
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-filter"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
+      const { data, error } = await (supabase
+        .from("teams") as any)
         .select("id, name")
         .eq("is_active", true)
         .order("name");
