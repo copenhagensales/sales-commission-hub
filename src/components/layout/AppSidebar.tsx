@@ -50,9 +50,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
-  const [mgOpen, setMgOpen] = useState(
-    ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data", "/team-overview"].includes(location.pathname)
-  );
+  const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
   const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards"));
   const [testOpen, setTestOpen] = useState(
     ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
@@ -366,10 +364,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard);
   
   // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = p.canView("menu_section_mg") && 
-    (p.canViewPayroll || p.canViewMgTest || p.canViewTestDashboard || 
-     p.canViewDialerData || p.canViewCallsData || p.canViewAdversusData ||
-     p.canViewTdcErhverv || p.canViewCodan);
+  const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
   
   // Check if any Fieldmarketing items are visible (requires section permission)
   const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
@@ -1107,7 +1102,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/adversus-data", "/team-overview"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                location.pathname === "/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <Percent className="h-5 w-5" />
@@ -1116,76 +1111,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {mgOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewPayroll && (
-                  <NavLink to="/payroll" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/payroll" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Wallet className="h-4 w-4" />
-                    {t("sidebar.payroll")}
-                  </NavLink>
-                )}
-                {p.canViewMgTest && (
-                  <NavLink to="/team-overview" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/team-overview" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Users className="h-4 w-4" />
-                    {t("sidebar.teamOverview")}
-                  </NavLink>
-                )}
-                {p.canViewTdcErhverv && (
-                  <>
-                    <NavLink to="/tdc-erhverv" onClick={handleNavClick} className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/tdc-erhverv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <Building2 className="h-4 w-4" />
-                      {t("sidebar.tdcErhverv")}
-                    </NavLink>
-                    <NavLink to="/tdc-erhverv-dashboard" onClick={handleNavClick} className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/tdc-erhverv-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <BarChart3 className="h-4 w-4" />
-                      TDC Dagsoverblik
-                    </NavLink>
-                  </>
-                )}
-                {p.canViewMgTest && (
-                  <>
-                    <NavLink to="/relatel-dashboard" onClick={handleNavClick} className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/relatel-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <BarChart3 className="h-4 w-4" />
-                      Relatel Dagsoverblik
-                    </NavLink>
-                    <NavLink to="/tryg-dashboard" onClick={handleNavClick} className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/tryg-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <BarChart3 className="h-4 w-4" />
-                      Tryg Dagsoverblik
-                    </NavLink>
-                    <NavLink to="/ase-dashboard" onClick={handleNavClick} className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/ase-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <BarChart3 className="h-4 w-4" />
-                      ASE Dagsoverblik
-                    </NavLink>
-                  </>
-                )}
-                {p.canViewCodan && (
-                  <NavLink to="/codan" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/codan" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Shield className="h-4 w-4" />
-                    {t("sidebar.codan")}
-                  </NavLink>
-                )}
                 {p.canViewMgTest && (
                   <NavLink to="/mg-test" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1193,51 +1118,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Percent className="h-4 w-4" />
                     {t("sidebar.mgTest")}
-                  </NavLink>
-                )}
-                {p.canViewTestDashboard && (
-                  <NavLink to="/mg-test-dashboard" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/mg-test-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <FlaskConical className="h-4 w-4" />
-                    {t("sidebar.testDashboard")}
-                  </NavLink>
-                )}
-                {p.canViewDialerData && (
-                  <NavLink to="/dialer-data" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dialer-data" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Database className="h-4 w-4" />
-                    {t("sidebar.dialerData")}
-                  </NavLink>
-                )}
-                {p.canViewCallsData && (
-                  <NavLink to="/calls-data" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/calls-data" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Phone className="h-4 w-4" />
-                    {t("sidebar.callsData")}
-                  </NavLink>
-                )}
-                {p.canViewAdversusData && (
-                  <NavLink to="/adversus-data" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/adversus-data" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Database className="h-4 w-4" />
-                    {t("sidebar.dataSourcesInfo")}
-                  </NavLink>
-                )}
-                {p.canViewMgTest && (
-                  <NavLink to="/1234" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/1234" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    1234
                   </NavLink>
                 )}
               </CollapsibleContent>
