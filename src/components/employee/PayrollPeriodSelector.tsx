@@ -73,9 +73,9 @@ export function PayrollPeriodSelector({ onChange }: PayrollPeriodSelectorProps) 
         <ChevronLeft className="h-4 w-4" />
       </Button>
       
-      <h3 className="text-lg font-semibold min-w-[200px] text-center">
-        Lønperiode: {format(period.start, "d. MMM", { locale: da })} - {format(period.end, "d. MMM", { locale: da })}
-      </h3>
+      <span className="text-lg font-semibold min-w-[180px] text-center">
+        {format(period.start, "d. MMM", { locale: da })} - {format(period.end, "d. MMM", { locale: da })}
+      </span>
       
       <Button
         variant="outline"
