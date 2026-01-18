@@ -39,6 +39,8 @@ export function AddPersonnelDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [monthlySalary, setMonthlySalary] = useState("");
+  const [percentageRate, setPercentageRate] = useState("");
+  const [minimumSalary, setMinimumSalary] = useState("");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -92,6 +94,8 @@ export function AddPersonnelDialog({
         employee_id: selectedEmployee.id,
         salary_type: salaryType,
         monthly_salary: parseFloat(monthlySalary) || 0,
+        percentage_rate: parseFloat(percentageRate) || 0,
+        minimum_salary: parseFloat(minimumSalary) || 0,
         notes: notes || null,
         is_active: true,
       });
@@ -118,6 +122,8 @@ export function AddPersonnelDialog({
     setSearchQuery("");
     setSelectedEmployee(null);
     setMonthlySalary("");
+    setPercentageRate("");
+    setMinimumSalary("");
     setNotes("");
   };
 
@@ -189,6 +195,31 @@ export function AddPersonnelDialog({
                 )}
               </div>
             </ScrollArea>
+          </div>
+
+          {/* Percentage rate */}
+          <div className="space-y-2">
+            <Label htmlFor="percentage-rate">Procentsats (%)</Label>
+            <Input
+              id="percentage-rate"
+              type="number"
+              step="0.1"
+              placeholder="0"
+              value={percentageRate}
+              onChange={(e) => setPercentageRate(e.target.value)}
+            />
+          </div>
+
+          {/* Minimum salary */}
+          <div className="space-y-2">
+            <Label htmlFor="minimum-salary">Minimumsløn (DKK)</Label>
+            <Input
+              id="minimum-salary"
+              type="number"
+              placeholder="0"
+              value={minimumSalary}
+              onChange={(e) => setMinimumSalary(e.target.value)}
+            />
           </div>
 
           {/* Monthly salary */}
