@@ -107,35 +107,12 @@ export default function LocationsContent() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // First try to delete - this will work if there are no related records
       const { error } = await supabase.from("location").delete().eq("id", id);
-      
-      // If foreign key constraint error, do soft delete instead
-      if (error?.message?.includes("foreign key constraint")) {
-        const { error: updateError } = await supabase
-          .from("location")
-          .update({ status: "Sortlistet" })
-          .eq("id", id);
-        
-        if (updateError) throw updateError;
-        
-        // Indicate this was a soft delete
-        return { softDeleted: true };
-      }
-      
       if (error) throw error;
-      return { softDeleted: false };
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
-      if (result?.softDeleted) {
-        toast({ 
-          title: "Lokation sortlistet", 
-          description: "Lokationen har tilknyttede salg og blev sat til 'Sortlistet' i stedet for at blive slettet." 
-        });
-      } else {
-        toast({ title: "Lokation slettet" });
-      }
+      toast({ title: "Lokation slettet" });
       setLocationToDelete(null);
     },
     onError: (error: any) => {
