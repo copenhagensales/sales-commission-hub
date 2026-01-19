@@ -408,6 +408,7 @@ export type Database = {
           client_id: string | null
           comment: string | null
           created_at: string | null
+          daily_rate_override: number | null
           end_date: string
           expected_staff_count: number | null
           id: string
@@ -428,6 +429,7 @@ export type Database = {
           client_id?: string | null
           comment?: string | null
           created_at?: string | null
+          daily_rate_override?: number | null
           end_date: string
           expected_staff_count?: number | null
           id?: string
@@ -448,6 +450,7 @@ export type Database = {
           client_id?: string | null
           comment?: string | null
           created_at?: string | null
+          daily_rate_override?: number | null
           end_date?: string
           expected_staff_count?: number | null
           id?: string
