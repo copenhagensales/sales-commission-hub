@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
@@ -19,6 +20,9 @@ import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
+import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
+import { MyGoalsTabContent } from "@/components/profile/MyGoalsTabContent";
+import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 
 
 // Read-only display field
@@ -181,6 +185,8 @@ function EditableContactField({
 export default function MyProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "stamdata";
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { hasConsent, isLoading: consentLoading } = useHasDataProcessingConsent();
   const { isPreviewMode, previewEmployee } = useRolePreview();
@@ -1138,13 +1144,23 @@ export default function MyProfile() {
           </p>
         </div>
 
-        <Tabs defaultValue="stamdata" className="w-full">
-          <TabsList>
+        <Tabs defaultValue={defaultTab} className="w-full">
+          <TabsList className="flex-wrap">
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
+            <TabsTrigger value="kalender">
+              <Calendar className="h-4 w-4 mr-2" />
+              Kalender
+            </TabsTrigger>
             <TabsTrigger value="kontrakter">
               <FileText className="h-4 w-4 mr-2" />
               Kontrakter
             </TabsTrigger>
+            {employee?.salary_type === 'provision' && (
+              <TabsTrigger value="loen-maal">
+                <Target className="h-4 w-4 mr-2" />
+                Løn & Mål
+              </TabsTrigger>
+            )}
             <TabsTrigger value="vagthistorik">
               <History className="h-4 w-4 mr-2" />
               Vagthistorik
@@ -1152,6 +1168,10 @@ export default function MyProfile() {
             <TabsTrigger value="fravaer">
               <CalendarX className="h-4 w-4 mr-2" />
               Fravær
+            </TabsTrigger>
+            <TabsTrigger value="karriere">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Karriere
             </TabsTrigger>
             <TabsTrigger value="gdpr">
               <Shield className="h-4 w-4 mr-2" />
@@ -2150,6 +2170,34 @@ export default function MyProfile() {
 
           <TabsContent value="gdpr" className="mt-6">
             <GdprSettingsCard />
+          </TabsContent>
+
+          {/* Kalender Tab */}
+          <TabsContent value="kalender" className="mt-6">
+            <MyScheduleTabContent 
+              employeeId={employee.id} 
+              salaryType={employee.salary_type}
+              salaryAmount={employee.salary_amount}
+            />
+          </TabsContent>
+
+          {/* Løn & Mål Tab (kun for provision-ansatte) */}
+          {employee?.salary_type === 'provision' && (
+            <TabsContent value="loen-maal" className="mt-6">
+              <MyGoalsTabContent 
+                employeeId={employee.id} 
+                salaryType={employee.salary_type}
+              />
+            </TabsContent>
+          )}
+
+          {/* Karriere Tab */}
+          <TabsContent value="karriere" className="mt-6">
+            <CareerWishesTabContent 
+              employeeId={employee.id}
+              employeeName={`${employee.first_name} ${employee.last_name}`}
+              department={employee.department}
+            />
           </TabsContent>
         </Tabs>
       </div>
