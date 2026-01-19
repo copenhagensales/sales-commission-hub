@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users, Info, UserCheck, Briefcase, Crown } from "lucide-react";
+import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users, Info, UserCheck, Briefcase, Crown, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { TimeSelect } from "@/components/ui/time-select";
 
 const WEEKDAYS = [
   { day: 1, name: "Mandag" },
@@ -28,6 +29,7 @@ interface ClosingShift {
   email: string | null;
   phone: string | null;
   tasks: string | null;
+  send_time: string | null;
 }
 
 interface WeekendCleanupConfig {
@@ -56,6 +58,8 @@ export default function ClosingShifts() {
   const [editingShifts, setEditingShifts] = useState<Record<number, Partial<ClosingShift>>>({});
   const [editingTasks, setEditingTasks] = useState<string | null>(null);
   const [tasksChanged, setTasksChanged] = useState(false);
+  const [editingSendTime, setEditingSendTime] = useState<string | null>(null);
+  const [sendTimeChanged, setSendTimeChanged] = useState(false);
   
   // Weekend cleanup state
   const [editingWeekendTasks, setEditingWeekendTasks] = useState<string | null>(null);
@@ -179,6 +183,10 @@ export default function ClosingShifts() {
   const currentWeekendTasks = editingWeekendTasks ?? weekendConfig?.tasks ?? "";
   const currentWeekendRecipients = editingWeekendRecipients ?? weekendConfig?.recipients ?? "";
   
+  // Get send_time from first shift (shared across all days)
+  const dbSendTime = shifts?.find(s => s.weekday === 1)?.send_time;
+  const currentSendTime = editingSendTime ?? (dbSendTime ? dbSendTime.slice(0, 5) : "16:00");
+  
   // Get selected team's config
   const selectedTeamConfig = deactivationConfigs.find(c => c.team_id === selectedTeamId);
   const currentDeactivationRecipients = editingDeactivationRecipients ?? selectedTeamConfig?.recipients ?? "";
@@ -217,6 +225,26 @@ export default function ClosingShifts() {
     },
     onError: () => {
       toast.error("Kunne ikke opdatere tjekliste");
+    },
+  });
+
+  const updateSendTimeMutation = useMutation({
+    mutationFn: async (sendTime: string) => {
+      // Update send_time for all weekdays (shared setting)
+      const { error } = await supabase
+        .from("closing_shifts")
+        .update({ send_time: sendTime + ":00" })
+        .in("weekday", [1, 2, 3, 4, 5]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closing-shifts"] });
+      toast.success("Afsendelsestidspunkt opdateret");
+      setEditingSendTime(null);
+      setSendTimeChanged(false);
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere afsendelsestidspunkt");
     },
   });
 
@@ -398,10 +426,34 @@ export default function ClosingShifts() {
                   Tjekliste ved lukning
                 </CardTitle>
                 <CardDescription>
-                  Denne liste sendes med påmindelsen kl. 16:00 (én opgave per linje)
+                  Denne liste sendes med påmindelsen (én opgave per linje)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Afsendelsestidspunkt (dansk tid):</span>
+                  </div>
+                  <TimeSelect
+                    value={currentSendTime}
+                    onChange={(time) => {
+                      setEditingSendTime(time);
+                      setSendTimeChanged(true);
+                    }}
+                    placeholder="HH:MM"
+                    className="w-40"
+                  />
+                  {sendTimeChanged && (
+                    <Button
+                      size="sm"
+                      onClick={() => updateSendTimeMutation.mutate(currentSendTime)}
+                      disabled={updateSendTimeMutation.isPending}
+                    >
+                      Gem tidspunkt
+                    </Button>
+                  )}
+                </div>
                 <Textarea
                   value={currentTasks}
                   onChange={(e) => {
