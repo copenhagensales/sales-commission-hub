@@ -565,6 +565,72 @@ export type Database = {
           },
         ]
       }
+      booking_diet: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string | null
+          date: string
+          employee_id: string
+          id: string
+          salary_type_id: string
+        }
+        Insert: {
+          amount: number
+          booking_id: string
+          created_at?: string | null
+          date: string
+          employee_id: string
+          id?: string
+          salary_type_id: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          id?: string
+          salary_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_diet_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_diet_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_diet_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_diet_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_diet_salary_type_id_fkey"
+            columns: ["salary_type_id"]
+            isOneToOne: false
+            referencedRelation: "salary_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_vehicle: {
         Row: {
           booking_id: string
