@@ -132,9 +132,15 @@ export default function BookWeekContent() {
         applicationDeadline.setDate(applicationDeadline.getDate() - applicationDeadlineDays);
       }
 
+      // Get campaign_id from location's client_campaign_mapping
+      const location = locations?.find(l => l.id === locationId);
+      const campaignMapping = location?.client_campaign_mapping as Record<string, string> | null;
+      const campaignId = campaignMapping?.[clientId] || null;
+
       const { error } = await supabase.from("booking").insert({
         location_id: locationId,
         client_id: clientId,
+        campaign_id: campaignId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         week_number: selectedWeek,
