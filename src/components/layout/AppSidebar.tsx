@@ -288,6 +288,55 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     // NO refetchInterval - reduces DB load significantly
   });
 
+  // Fetch FM booking conflicts count (bookings where employee has approved absence)
+  const { data: fmBookingConflictsCount = 0 } = useQuery({
+    queryKey: ["fm-booking-conflicts-count"],
+    queryFn: async () => {
+      // Get booking assignments for next 4 weeks
+      const today = new Date();
+      const fourWeeksFromNow = new Date();
+      fourWeeksFromNow.setDate(today.getDate() + 28);
+      
+      const todayStr = today.toISOString().split('T')[0];
+      const futureStr = fourWeeksFromNow.toISOString().split('T')[0];
+      
+      const { data: assignments } = await supabase
+        .from("booking_assignment")
+        .select("employee_id, date")
+        .gte("date", todayStr)
+        .lte("date", futureStr);
+      
+      if (!assignments || assignments.length === 0) return 0;
+      
+      // Get all approved absences that overlap with our date range
+      const { data: absences } = await supabase
+        .from("absence_request_v2")
+        .select("employee_id, start_date, end_date")
+        .eq("status", "approved")
+        .lte("start_date", futureStr)
+        .gte("end_date", todayStr);
+      
+      if (!absences || absences.length === 0) return 0;
+      
+      // Count conflicts
+      let conflicts = 0;
+      assignments.forEach(assignment => {
+        const hasConflict = absences.some(absence => 
+          absence.employee_id === assignment.employee_id &&
+          assignment.date >= absence.start_date &&
+          assignment.date <= absence.end_date
+        );
+        if (hasConflict) conflicts++;
+      });
+      
+      return conflicts;
+    },
+    enabled: p.canViewFmBookings || p.canViewFmBookWeek,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -1012,7 +1061,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {/* Booking - single link to tabbed page */}
                 {(p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmLocations) && (
                   <NavLink to="/vagt-flow/booking" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname.startsWith("/vagt-flow/booking") || 
                     location.pathname === "/vagt-flow/book-week" || 
                     location.pathname === "/vagt-flow/bookings" || 
@@ -1020,8 +1069,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                       ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
-                    <CalendarDays className="h-4 w-4" />
-                    {t("sidebar.booking", "Booking")}
+                    <div className="flex items-center gap-3">
+                      <CalendarDays className="h-4 w-4" />
+                      {t("sidebar.booking", "Booking")}
+                    </div>
+                    {fmBookingConflictsCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                        {fmBookingConflictsCount > 99 ? "99+" : fmBookingConflictsCount}
+                      </Badge>
+                    )}
                   </NavLink>
                 )}
                 {p.canViewFmVehicles && (
