@@ -110,6 +110,7 @@ import {
   KpiDefinitions,
   TeamH2H,
   SalaryTypes,
+  TdcOpsummering,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -400,6 +401,9 @@ export const routes: RouteConfig[] = [
 
   // Salary
   { path: "/salary/types", component: SalaryTypes, access: "role", positionPermission: "menu_salary_types" },
+
+  // TDC Opsummering
+  { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

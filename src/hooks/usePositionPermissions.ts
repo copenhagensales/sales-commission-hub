@@ -457,6 +457,7 @@ export function usePermissions() {
     canViewSalaryTypes: canView("menu_salary_types"),
     canEditSalaryTypes: canEdit("menu_salary_types"),
     canViewTdcErhverv: canView("menu_tdc_erhverv"),
+    canViewTdcOpsummering: canView("menu_tdc_opsummering"),
     canViewCodan: canView("menu_codan"),
     canViewMgTest: canView("menu_mg_test"),
     canEditMgTest: canEdit("menu_mg_test"),
