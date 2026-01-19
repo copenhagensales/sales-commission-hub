@@ -1,7 +1,9 @@
-import { FileWarning } from "lucide-react";
+import { FileWarning, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ContractLockOverlayProps {
   contractId: string;
@@ -10,6 +12,23 @@ interface ContractLockOverlayProps {
 
 export function ContractLockOverlay({ contractId, contractTitle }: ContractLockOverlayProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const handleLogout = async () => {
+    queryClient.clear();
+    const keysToRemove = Object.keys(localStorage).filter(key => 
+      key.startsWith('sb-') || key.includes('supabase')
+    );
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    
+    navigate("/auth");
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
@@ -35,6 +54,15 @@ export function ContractLockOverlay({ contractId, contractTitle }: ContractLockO
             onClick={() => navigate(`/contract/sign/${contractId}`)}
           >
             Gå til underskrift
+          </Button>
+          <Button 
+            variant="outline"
+            className="w-full" 
+            size="lg"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Log ud
           </Button>
         </CardContent>
       </Card>
