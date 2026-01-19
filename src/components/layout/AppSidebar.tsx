@@ -41,7 +41,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/head-to-head", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+  );
+  const [spilOpen, setSpilOpen] = useState(
+    ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
@@ -398,6 +401,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
+  
+  // Check if Spil (Games) menu should be visible
+  const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
@@ -416,7 +422,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head", "/refer-a-friend", "/commission-league"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -425,9 +431,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {t("sidebar.myHome", "Mit Hjem")}
               </div>
               <div className="flex items-center gap-1">
-                {(unreadMessagesCount > 0 || pendingContractsCount > 0 || pendingH2hCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
+                {(unreadMessagesCount > 0 || pendingContractsCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
                   <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {(unreadMessagesCount + pendingContractsCount + pendingH2hCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount + pendingH2hCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
+                    {(unreadMessagesCount + pendingContractsCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
                   </Badge>
                 )}
                 {mitHjemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -449,114 +455,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 </NavLink>
               )}
 
-              {/* Head to Head */}
-              {p.canViewH2h && (
-                <NavLink
-                  to="/head-to-head"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Swords className="h-4 w-4" />
-                    Head to Head
-                  </div>
-                  {pendingH2hCount > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                      {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
-                    </Badge>
-                  )}
-                </NavLink>
-              )}
-
-              {/* Provisionsliga */}
-              {p.canViewCommissionLeague && (
-                <NavLink
-                  to="/commission-league"
-                  onClick={(e) => {
-                    handleNavClick(e);
-                    // Mark as seen to hide "NY" badge
-                    localStorage.setItem("league-sidebar-seen", "true");
-                  }}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-4 w-4" />
-                    Cph Sales Ligaen
-                  </div>
-                  {!localStorage.getItem("league-sidebar-seen") && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
-                      NY
-                    </span>
-                  )}
-                </NavLink>
-              )}
-              
-              {/* Liga Test Board - kun for ejere */}
-              {p.position?.name?.toLowerCase() === "ejer" && (
-                <NavLink
-                  to="/commission-league/test"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                    location.pathname === "/commission-league/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <FlaskConical className="h-4 w-4" />
-                  Liga Test Board
-                </NavLink>
-              )}
-
-              {/* Liga Admin - for ejere og teamledere */}
-              {p.canViewLeagueAdmin && (
-                <NavLink
-                  to="/admin/league"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                    location.pathname === "/admin/league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Shield className="h-4 w-4" />
-                  Liga Admin
-                </NavLink>
-              )}
-
-              {/* H2H Admin */}
-              {p.canViewLeagueAdmin && (
-                <NavLink
-                  to="/admin/h2h"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                    location.pathname === "/admin/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Swords className="h-4 w-4" />
-                  H2H Admin
-                </NavLink>
-              )}
-
-              {/* Team H2H - for teamledere */}
-              {p.canView('menu_team_h2h') && (
-                <NavLink
-                  to="/team/h2h"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                    location.pathname === "/team/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Users className="h-4 w-4" />
-                  Team H2H
-                </NavLink>
-              )}
-              
               {/* Beskeder */}
               {p.canViewMessages && (
                 <NavLink
@@ -692,6 +590,139 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Spil (Games) menu - H2H and Liga */}
+          {showSpilMenu && (
+            <Collapsible open={spilOpen} onOpenChange={setSpilOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-5 w-5" />
+                  Spil
+                </div>
+                <div className="flex items-center gap-1">
+                  {pendingH2hCount > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                      {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
+                    </Badge>
+                  )}
+                  {spilOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {/* Head to Head */}
+                {p.canViewH2h && (
+                  <NavLink
+                    to="/head-to-head"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Swords className="h-4 w-4" />
+                      Head to Head
+                    </div>
+                    {pendingH2hCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                        {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
+                      </Badge>
+                    )}
+                  </NavLink>
+                )}
+
+                {/* Cph Sales Ligaen */}
+                {p.canViewCommissionLeague && (
+                  <NavLink
+                    to="/commission-league"
+                    onClick={(e) => {
+                      handleNavClick(e);
+                      localStorage.setItem("league-sidebar-seen", "true");
+                    }}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-4 w-4" />
+                      Cph Sales Ligaen
+                    </div>
+                    {!localStorage.getItem("league-sidebar-seen") && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
+                        NY
+                      </span>
+                    )}
+                  </NavLink>
+                )}
+                
+                {/* Liga Test Board - kun for ejere */}
+                {p.position?.name?.toLowerCase() === "ejer" && (
+                  <NavLink
+                    to="/commission-league/test"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                      location.pathname === "/commission-league/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <FlaskConical className="h-4 w-4" />
+                    Liga Test Board
+                  </NavLink>
+                )}
+
+                {/* Liga Admin */}
+                {p.canViewLeagueAdmin && (
+                  <NavLink
+                    to="/admin/league"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                      location.pathname === "/admin/league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <Shield className="h-4 w-4" />
+                    Liga Admin
+                  </NavLink>
+                )}
+
+                {/* H2H Admin */}
+                {p.canViewLeagueAdmin && (
+                  <NavLink
+                    to="/admin/h2h"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                      location.pathname === "/admin/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <Swords className="h-4 w-4" />
+                    H2H Admin
+                  </NavLink>
+                )}
+
+                {/* Team H2H */}
+                {p.canView('menu_team_h2h') && (
+                  <NavLink
+                    to="/team/h2h"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
+                      location.pathname === "/team/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    Team H2H
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
           
           {/* Main navigation items */}
           {mainNavigation.map((item) => {

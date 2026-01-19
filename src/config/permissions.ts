@@ -38,6 +38,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_section_salary", label: "Løn sektion", description: "Adgang til Løn menuen", hasEditOption: false },
       { key: "menu_section_reports", label: "Rapporter sektion", description: "Adgang til Rapporter menuen", hasEditOption: false },
       { key: "menu_section_onboarding", label: "Onboarding sektion", description: "Adgang til Onboarding menuen", hasEditOption: false },
+      { key: "menu_section_spil", label: "Spil sektion", description: "Adgang til Spil menuen (H2H og Liga)", hasEditOption: false },
     ],
   },
 

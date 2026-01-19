@@ -228,6 +228,7 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_section_admin: 'Admin',
   menu_section_some: 'SOME',
   menu_section_sales_system: 'Salg & System',
+  menu_section_spil: 'Spil',
   
   // ===== MIT HJEM (under menu_section_personal) =====
   menu_home: 'Hjem',
