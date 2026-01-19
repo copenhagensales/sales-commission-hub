@@ -12,6 +12,7 @@ import { ScreenResolutionIndicator } from "./ScreenResolutionIndicator";
 import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useTvBoardContext } from "@/contexts/TvBoardContext";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
 interface DashboardHeaderProps {
@@ -28,11 +29,21 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   const isTvBoardMode = !!overrideSlug;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const { canView } = useUnifiedPermissions();
 
   const currentDashboardSlug = useMemo(() => {
     const dashboard = DASHBOARD_LIST.find(d => d.path === location.pathname);
     return dashboard?.slug || null;
   }, [location.pathname]);
+
+  // Filter dashboards based on user permissions
+  const accessibleDashboards = useMemo(() => {
+    return DASHBOARD_LIST.filter(dashboard => {
+      // If no permissionKey, show to all
+      if (!dashboard.permissionKey) return true;
+      return canView(dashboard.permissionKey);
+    });
+  }, [canView]);
 
   const handleFullscreenChange = useCallback(() => {
     const isCurrentlyFullscreen = !!document.fullscreenElement;
@@ -135,7 +146,7 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {DASHBOARD_LIST.map((dashboard) => (
+                {accessibleDashboards.map((dashboard) => (
                   <DropdownMenuItem
                     key={dashboard.slug}
                     onClick={() => navigate(dashboard.path)}
