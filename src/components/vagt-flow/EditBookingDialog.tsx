@@ -12,6 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -87,6 +88,8 @@ export function EditBookingDialog({
   const [clientId, setClientId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  const [dailyRateOverride, setDailyRateOverride] = useState<string>("");
+  const [useLocationRate, setUseLocationRate] = useState<boolean>(true);
 
   // Employee tab state
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
@@ -101,6 +104,15 @@ export function EditBookingDialog({
       setClientId(booking.client_id || "");
       setCampaignId(booking.campaign_id || "");
       setStatus(booking.status || "Bekræftet");
+      
+      // Daily rate override
+      const hasOverride = booking.daily_rate_override !== null && booking.daily_rate_override !== undefined;
+      setUseLocationRate(!hasOverride);
+      setDailyRateOverride(
+        hasOverride 
+          ? booking.daily_rate_override.toString() 
+          : (booking.location?.daily_rate || 1000).toString()
+      );
     }
   }, [booking]);
 
@@ -531,6 +543,7 @@ export function EditBookingDialog({
       client_id: string | null;
       campaign_id: string | null;
       status: "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst";
+      daily_rate_override: number | null;
     }) => {
       const { error } = await supabase
         .from("booking")
@@ -540,6 +553,7 @@ export function EditBookingDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
       toast.success("Booking opdateret");
       onOpenChange(false);
     },
@@ -603,10 +617,16 @@ export function EditBookingDialog({
       toast.error(`Kan ikke bekræfte: Mangler medarbejder på ${missingDayNames}`);
       return;
     }
+    
+    // Parse daily rate override
+    const parsedRate = parseFloat(dailyRateOverride);
+    const rateOverride = useLocationRate ? null : (isNaN(parsedRate) ? null : parsedRate);
+    
     updateBookingMutation.mutate({
       client_id: clientId,
       campaign_id: campaignId,
       status: status as "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst",
+      daily_rate_override: rateOverride,
     });
   };
 
@@ -770,6 +790,62 @@ export function EditBookingDialog({
                   <SelectItem value="Aflyst">Aflyst</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Daily Rate Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <Label className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Dagspris
+              </Label>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Lokationens standardpris:</span>
+                  <span className="font-medium text-foreground">
+                    {(booking.location?.daily_rate || 1000).toLocaleString('da-DK')} kr
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="useLocationRate"
+                    checked={useLocationRate}
+                    onCheckedChange={(checked) => {
+                      setUseLocationRate(!!checked);
+                      if (checked) {
+                        setDailyRateOverride(
+                          (booking.location?.daily_rate || 1000).toString()
+                        );
+                      }
+                    }}
+                  />
+                  <Label htmlFor="useLocationRate" className="text-sm cursor-pointer font-normal">
+                    Brug standardpris
+                  </Label>
+                </div>
+                
+                {!useLocationRate && (
+                  <div className="space-y-2">
+                    <Label htmlFor="dailyRate" className="text-sm font-normal">
+                      Tilpasset dagspris for denne booking (kr)
+                    </Label>
+                    <Input
+                      id="dailyRate"
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={dailyRateOverride}
+                      onChange={(e) => setDailyRateOverride(e.target.value)}
+                      placeholder="F.eks. 1500"
+                      className="max-w-[200px]"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Denne pris gælder kun for uge {weekNumber}, {year}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Warning for missing staff */}

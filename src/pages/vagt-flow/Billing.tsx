@@ -86,7 +86,8 @@ export default function VagtBilling() {
   // Group bookings by location
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    const dailyRate = booking.location?.daily_rate || 1000;
+    // Use daily_rate_override if set, otherwise fall back to location's daily_rate
+    const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
     
     if (!acc[locationId]) {
       acc[locationId] = {
