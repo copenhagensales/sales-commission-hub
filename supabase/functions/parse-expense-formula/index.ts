@@ -11,13 +11,211 @@ interface ParseRequest {
   team_id: string;
 }
 
+interface LocationDetail {
+  name: string;
+  location_id: string;
+  days: number;
+  daily_rate: number;
+  total: number;
+  sales: number;
+  revenue: number;
+}
+
+interface EmployeeDetail {
+  id: string;
+  name: string;
+  sales: number;
+  revenue: number;
+  booking_days: number;
+}
+
 interface FormulaResult {
   formula: string;
-  variables: Record<string, number>;
+  variables: Record<string, number | string | object>;
   calculated_amount: number;
   explanation: string;
   expense_name: string;
   category: string;
+  formula_readable?: string;
+}
+
+interface RichContext {
+  team_name: string;
+  team_member_count: number;
+  team_sales_count: number;
+  team_revenue: number;
+  booking_count: number;
+  booked_locations_count: number;
+  booking_days_count: number;
+  // New detailed data
+  location_costs_total: number;
+  location_details: LocationDetail[];
+  avg_location_daily_rate: number;
+  fm_sales_count: number;
+  avg_sales_per_employee: number;
+  employee_details: EmployeeDetail[];
+  working_days_in_month: number;
+}
+
+// Secure formula evaluator - only allows safe operations
+function evaluateFormula(formula: string, context: RichContext): number {
+  try {
+    // Replace variable names with actual values
+    let evalFormula = formula;
+    
+    // Simple variable replacements
+    evalFormula = evalFormula.replace(/\bteam_member_count\b/g, String(context.team_member_count));
+    evalFormula = evalFormula.replace(/\bteam_sales_count\b/g, String(context.team_sales_count));
+    evalFormula = evalFormula.replace(/\bteam_revenue\b/g, String(context.team_revenue));
+    evalFormula = evalFormula.replace(/\bbooking_count\b/g, String(context.booking_count));
+    evalFormula = evalFormula.replace(/\bbooked_locations_count\b/g, String(context.booked_locations_count));
+    evalFormula = evalFormula.replace(/\bbooking_days_count\b/g, String(context.booking_days_count));
+    evalFormula = evalFormula.replace(/\blocation_costs_total\b/g, String(context.location_costs_total));
+    evalFormula = evalFormula.replace(/\bavg_location_daily_rate\b/g, String(context.avg_location_daily_rate));
+    evalFormula = evalFormula.replace(/\bfm_sales_count\b/g, String(context.fm_sales_count));
+    evalFormula = evalFormula.replace(/\bavg_sales_per_employee\b/g, String(context.avg_sales_per_employee));
+    evalFormula = evalFormula.replace(/\bworking_days_in_month\b/g, String(context.working_days_in_month));
+    
+    // Handle SUM(locations.X) pattern
+    const sumLocationsMatch = evalFormula.match(/SUM\(locations\.(\w+)\)/gi);
+    if (sumLocationsMatch) {
+      for (const match of sumLocationsMatch) {
+        const field = match.match(/locations\.(\w+)/i)?.[1] as keyof LocationDetail;
+        if (field && context.location_details.length > 0) {
+          const sum = context.location_details.reduce((acc, loc) => {
+            const val = loc[field];
+            return acc + (typeof val === 'number' ? val : 0);
+          }, 0);
+          evalFormula = evalFormula.replace(match, String(sum));
+        } else {
+          evalFormula = evalFormula.replace(match, "0");
+        }
+      }
+    }
+    
+    // Handle SUM(employees.X) pattern
+    const sumEmployeesMatch = evalFormula.match(/SUM\(employees\.(\w+)\)/gi);
+    if (sumEmployeesMatch) {
+      for (const match of sumEmployeesMatch) {
+        const field = match.match(/employees\.(\w+)/i)?.[1] as keyof EmployeeDetail;
+        if (field && context.employee_details.length > 0) {
+          const sum = context.employee_details.reduce((acc, emp) => {
+            const val = emp[field];
+            return acc + (typeof val === 'number' ? val : 0);
+          }, 0);
+          evalFormula = evalFormula.replace(match, String(sum));
+        } else {
+          evalFormula = evalFormula.replace(match, "0");
+        }
+      }
+    }
+    
+    // Handle AVG(locations.X) pattern
+    const avgLocationsMatch = evalFormula.match(/AVG\(locations\.(\w+)\)/gi);
+    if (avgLocationsMatch) {
+      for (const match of avgLocationsMatch) {
+        const field = match.match(/locations\.(\w+)/i)?.[1] as keyof LocationDetail;
+        if (field && context.location_details.length > 0) {
+          const sum = context.location_details.reduce((acc, loc) => {
+            const val = loc[field];
+            return acc + (typeof val === 'number' ? val : 0);
+          }, 0);
+          const avg = sum / context.location_details.length;
+          evalFormula = evalFormula.replace(match, String(avg));
+        } else {
+          evalFormula = evalFormula.replace(match, "0");
+        }
+      }
+    }
+    
+    // Handle COUNT(locations) pattern
+    evalFormula = evalFormula.replace(/COUNT\(locations\)/gi, String(context.location_details.length));
+    evalFormula = evalFormula.replace(/COUNT\(employees\)/gi, String(context.employee_details.length));
+    
+    // Handle COUNT(locations WHERE sales > X) pattern
+    const countLocationsWhereMatch = evalFormula.match(/COUNT\(locations\s+WHERE\s+sales\s*>\s*(\d+)\)/gi);
+    if (countLocationsWhereMatch) {
+      for (const match of countLocationsWhereMatch) {
+        const threshold = parseInt(match.match(/>\s*(\d+)/)?.[1] || "0");
+        const count = context.location_details.filter(loc => loc.sales > threshold).length;
+        evalFormula = evalFormula.replace(match, String(count));
+      }
+    }
+    
+    // Handle MAX function
+    const maxMatch = evalFormula.match(/MAX\((\d+(?:\.\d+)?),\s*([^)]+)\)/gi);
+    if (maxMatch) {
+      for (const match of maxMatch) {
+        const parts = match.match(/MAX\((\d+(?:\.\d+)?),\s*([^)]+)\)/i);
+        if (parts) {
+          const val1 = parseFloat(parts[1]);
+          const val2 = parseFloat(parts[2]);
+          evalFormula = evalFormula.replace(match, String(Math.max(val1, isNaN(val2) ? 0 : val2)));
+        }
+      }
+    }
+    
+    // Handle max(...) lowercase
+    evalFormula = evalFormula.replace(/max\(([^,]+),\s*([^)]+)\)/gi, (_, a, b) => {
+      const valA = parseFloat(a);
+      const valB = parseFloat(b);
+      return String(Math.max(isNaN(valA) ? 0 : valA, isNaN(valB) ? 0 : valB));
+    });
+    
+    // Handle MIN function
+    evalFormula = evalFormula.replace(/min\(([^,]+),\s*([^)]+)\)/gi, (_, a, b) => {
+      const valA = parseFloat(a);
+      const valB = parseFloat(b);
+      return String(Math.min(isNaN(valA) ? 0 : valA, isNaN(valB) ? 0 : valB));
+    });
+    
+    // Handle IF(condition, then, else) - simplified version
+    const ifMatch = evalFormula.match(/IF\(([^,]+)\s*([><=!]+)\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/gi);
+    if (ifMatch) {
+      for (const match of ifMatch) {
+        const parts = match.match(/IF\(([^,]+)\s*([><=!]+)\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/i);
+        if (parts) {
+          const left = parseFloat(parts[1]);
+          const op = parts[2];
+          const right = parseFloat(parts[3]);
+          const thenVal = parseFloat(parts[4]);
+          const elseVal = parseFloat(parts[5]);
+          
+          let condition = false;
+          switch (op) {
+            case ">": condition = left > right; break;
+            case "<": condition = left < right; break;
+            case ">=": condition = left >= right; break;
+            case "<=": condition = left <= right; break;
+            case "==": condition = left === right; break;
+            case "!=": condition = left !== right; break;
+          }
+          
+          evalFormula = evalFormula.replace(match, String(condition ? thenVal : elseVal));
+        }
+      }
+    }
+    
+    // Security: Only allow numbers and basic math operators
+    const sanitized = evalFormula.replace(/[^0-9+\-*/().%\s]/g, "");
+    
+    // Evaluate the sanitized formula
+    if (!sanitized.trim() || sanitized.trim() === "") {
+      return 0;
+    }
+    
+    // Use Function constructor for safe evaluation (no access to global scope)
+    const result = new Function(`"use strict"; return (${sanitized})`)();
+    
+    if (typeof result !== "number" || isNaN(result) || !isFinite(result)) {
+      return 0;
+    }
+    
+    return Math.round(result * 100) / 100;
+  } catch (error) {
+    console.error("Formula evaluation error:", error, "Formula:", formula);
+    return 0;
+  }
 }
 
 serve(async (req) => {
@@ -53,10 +251,10 @@ serve(async (req) => {
       .eq("id", team_id)
       .single();
 
-    // Fetch team employees
+    // Fetch team employees with details
     const { data: teamEmployees } = await supabase
       .from("employee_master_data")
-      .select("id")
+      .select("id, first_name, last_name")
       .eq("team_id", team_id)
       .eq("is_active", true);
 
@@ -69,50 +267,137 @@ serve(async (req) => {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const startDateStr = startOfMonth.toISOString().split("T")[0];
     const endDateStr = endOfMonth.toISOString().split("T")[0];
+    
+    // Calculate working days in month (weekdays)
+    let workingDaysInMonth = 0;
+    const tempDate = new Date(startOfMonth);
+    while (tempDate <= endOfMonth) {
+      const dayOfWeek = tempDate.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) workingDaysInMonth++;
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
 
-    // Get team sales count for current month
+    // Get team sales for current month with employee breakdown
     const { data: salesData } = await supabase
       .from("sales")
-      .select("id, amount")
-      .in("employee_id", employeeIds)
+      .select("id, amount, employee_id")
+      .in("employee_id", employeeIds.length > 0 ? employeeIds : ["__none__"])
       .gte("sale_date", startDateStr)
       .lte("sale_date", endDateStr);
 
     const teamSalesCount = salesData?.length || 0;
     const teamRevenue = salesData?.reduce((sum, s) => sum + (s.amount || 0), 0) || 0;
 
-    // Fetch booking assignments for the team in current month
+    // Get fieldmarketing sales
+    const { data: fmSalesData } = await supabase
+      .from("fieldmarketing_sales")
+      .select("id, quantity, amount, location_id")
+      .gte("sale_date", startDateStr)
+      .lte("sale_date", endDateStr);
+
+    const fmSalesCount = fmSalesData?.reduce((sum, s) => sum + (s.quantity || 1), 0) || 0;
+
+    // Build employee details with sales
+    const employeeDetails: EmployeeDetail[] = (teamEmployees || []).map(emp => {
+      const empSales = salesData?.filter(s => s.employee_id === emp.id) || [];
+      return {
+        id: emp.id,
+        name: `${emp.first_name} ${emp.last_name}`,
+        sales: empSales.length,
+        revenue: empSales.reduce((sum, s) => sum + (s.amount || 0), 0),
+        booking_days: 0, // Will be filled below
+      };
+    });
+
+    // Fetch booking assignments and build location details
     let bookingCount = 0;
     let bookedLocationsCount = 0;
     let bookingDaysCount = 0;
+    let locationCostsTotal = 0;
+    const locationDetails: LocationDetail[] = [];
 
     if (employeeIds.length > 0) {
       const { data: assignments } = await supabase
         .from("booking_assignment")
-        .select("booking_id, date")
+        .select("booking_id, date, employee_id")
         .in("employee_id", employeeIds)
         .gte("date", startDateStr)
         .lte("date", endDateStr);
 
       bookingDaysCount = assignments?.length || 0;
 
+      // Update employee booking days
+      for (const emp of employeeDetails) {
+        emp.booking_days = assignments?.filter(a => a.employee_id === emp.id).length || 0;
+      }
+
       // Get unique booking IDs
       const bookingIds = [...new Set(assignments?.map(a => a.booking_id) || [])];
       bookingCount = bookingIds.length;
 
-      // Fetch bookings to get location info
       if (bookingIds.length > 0) {
+        // Fetch bookings with location details and daily rate override
         const { data: bookings } = await supabase
           .from("booking")
-          .select("id, location_id")
+          .select("id, location_id, daily_rate_override")
           .in("id", bookingIds);
 
-        const uniqueLocations = [...new Set(bookings?.map(b => b.location_id).filter(Boolean) || [])];
-        bookedLocationsCount = uniqueLocations.length;
+        const locationIds = [...new Set(bookings?.map(b => b.location_id).filter(Boolean) || [])];
+        bookedLocationsCount = locationIds.length;
+
+        if (locationIds.length > 0) {
+          // Fetch location details
+          const { data: locations } = await supabase
+            .from("location")
+            .select("id, name, daily_rate")
+            .in("id", locationIds);
+
+          // Build location details with calculations
+          for (const loc of locations || []) {
+            // Find bookings for this location
+            const locBookings = bookings?.filter(b => b.location_id === loc.id) || [];
+            
+            // Count days for this location
+            let locDays = 0;
+            for (const booking of locBookings) {
+              const bookingAssignments = assignments?.filter(a => a.booking_id === booking.id) || [];
+              locDays += bookingAssignments.length;
+            }
+
+            // Determine daily rate (use override if available)
+            const dailyRate = locBookings[0]?.daily_rate_override || loc.daily_rate || 0;
+            
+            // Calculate total for this location
+            const locTotal = dailyRate * locDays;
+
+            // Get FM sales for this location
+            const locFmSales = fmSalesData?.filter(s => s.location_id === loc.id) || [];
+            const locSalesCount = locFmSales.reduce((sum, s) => sum + (s.quantity || 1), 0);
+            const locRevenue = locFmSales.reduce((sum, s) => sum + (s.amount || 0), 0);
+
+            locationDetails.push({
+              name: loc.name,
+              location_id: loc.id,
+              days: locDays,
+              daily_rate: dailyRate,
+              total: locTotal,
+              sales: locSalesCount,
+              revenue: locRevenue,
+            });
+
+            locationCostsTotal += locTotal;
+          }
+        }
       }
     }
 
-    const contextData = {
+    const avgLocationDailyRate = locationDetails.length > 0
+      ? locationDetails.reduce((sum, loc) => sum + loc.daily_rate, 0) / locationDetails.length
+      : 0;
+
+    const avgSalesPerEmployee = teamMemberCount > 0 ? teamSalesCount / teamMemberCount : 0;
+
+    const contextData: RichContext = {
       team_name: teamData?.name || "Ukendt team",
       team_member_count: teamMemberCount,
       team_sales_count: teamSalesCount,
@@ -120,47 +405,102 @@ serve(async (req) => {
       booking_count: bookingCount,
       booked_locations_count: bookedLocationsCount,
       booking_days_count: bookingDaysCount,
+      location_costs_total: locationCostsTotal,
+      location_details: locationDetails,
+      avg_location_daily_rate: Math.round(avgLocationDailyRate),
+      fm_sales_count: fmSalesCount,
+      avg_sales_per_employee: Math.round(avgSalesPerEmployee * 10) / 10,
+      employee_details: employeeDetails,
+      working_days_in_month: workingDaysInMonth,
     };
 
-    console.log("Context data:", contextData);
+    console.log("Rich context data:", JSON.stringify(contextData, null, 2));
 
-    const systemPrompt = `Du er en assistent der hjælper med at parse udgiftsbeskrivelser til matematiske formler.
+    // Build location summary for AI
+    const locationSummary = locationDetails.length > 0
+      ? locationDetails.map(l => `- ${l.name}: ${l.days} dage × ${l.daily_rate} kr/dag = ${l.total} kr (${l.sales} salg)`).join("\n")
+      : "Ingen lokationer booket i perioden";
 
-Du modtager en beskrivelse af en teamudgift på dansk og skal returnere en struktureret formel.
+    const employeeSummary = employeeDetails.length > 0
+      ? employeeDetails.slice(0, 5).map(e => `- ${e.name}: ${e.sales} salg, ${e.booking_days} bookingdage`).join("\n")
+      : "Ingen sælgere";
 
-TILGÆNGELIGE VARIABLER:
-- team_member_count: Antal aktive sælgere i teamet (aktuelt: ${contextData.team_member_count})
-- team_sales_count: Antal salg i teamet denne måned (aktuelt: ${contextData.team_sales_count})
-- team_revenue: Teamets omsætning denne måned i DKK (aktuelt: ${contextData.team_revenue})
-- booking_count: Antal bookinger i perioden (aktuelt: ${contextData.booking_count})
-- booked_locations_count: Antal unikke bookede lokationer (aktuelt: ${contextData.booked_locations_count})
-- booking_days_count: Total antal bookingdage (aktuelt: ${contextData.booking_days_count})
+    const systemPrompt = `Du er en ekspert-assistent der hjælper med at parse komplekse udgiftsbeskrivelser til matematiske formler.
 
-EKSEMPLER:
-- "500 kr per sælger" → formula: "base_amount * team_member_count", variables: {"base_amount": 500}
-- "1% af omsætningen" → formula: "percentage * team_revenue", variables: {"percentage": 0.01}
-- "2000 kr flat" → formula: "fixed_amount", variables: {"fixed_amount": 2000}
-- "100 kr per salg over 50" → formula: "per_unit * max(0, team_sales_count - threshold)", variables: {"per_unit": 100, "threshold": 50}
-- "500 kr per lokation" → formula: "base_amount * booked_locations_count", variables: {"base_amount": 500}
-- "100 kr per bookingdag" → formula: "base_amount * booking_days_count", variables: {"base_amount": 100}
-- "Lokationsudgift baseret på bookinger" → formula: "base_amount * booked_locations_count", variables: {"base_amount": 500}
+Du modtager en beskrivelse af en teamudgift på dansk og skal returnere en struktureret formel der kan beregnes.
 
-VIGTIGE REGLER:
-- Når brugeren nævner "lokation" eller "lokationer", brug altid booked_locations_count
-- Når brugeren nævner "booking" eller "bookinger", brug booking_count
-- Når brugeren nævner "bookingdage" eller "dage", brug booking_days_count
+## TILGÆNGELIGE SIMPLE VARIABLER:
+| Variabel | Beskrivelse | Aktuel værdi |
+|----------|-------------|--------------|
+| team_member_count | Antal aktive sælgere | ${contextData.team_member_count} |
+| team_sales_count | Antal salg denne måned | ${contextData.team_sales_count} |
+| team_revenue | Omsætning i DKK | ${contextData.team_revenue} |
+| booking_count | Antal bookinger | ${contextData.booking_count} |
+| booked_locations_count | Antal unikke lokationer | ${contextData.booked_locations_count} |
+| booking_days_count | Total antal bookingdage | ${contextData.booking_days_count} |
+| location_costs_total | Sum af alle lokationsudgifter (dagspris × dage) | ${contextData.location_costs_total} |
+| avg_location_daily_rate | Gennemsnitlig dagspris | ${contextData.avg_location_daily_rate} |
+| fm_sales_count | Fieldmarketing salg | ${contextData.fm_sales_count} |
+| avg_sales_per_employee | Gennemsnitlige salg per sælger | ${contextData.avg_sales_per_employee} |
+| working_days_in_month | Arbejdsdage i måneden | ${contextData.working_days_in_month} |
 
-KATEGORIER (vælg den mest passende):
-- kantineordning, firmabil, parkering, telefon, internet, forsikring, uddannelse, udstyr, software, transport, repræsentation, lokation, andet
+## LOKATIONSDATA (detaljeret):
+${locationSummary}
 
+## SÆLGERDATA (top 5):
+${employeeSummary}
+
+## AGGREGERINGSFUNKTIONER:
+- SUM(locations.daily_rate) - Summer dagspris for alle lokationer
+- SUM(locations.days) - Summer dage for alle lokationer  
+- SUM(locations.total) - Summer dagspris × dage for alle lokationer = location_costs_total
+- SUM(locations.sales) - Summer salg for alle lokationer
+- SUM(locations.revenue) - Summer omsætning for alle lokationer
+- AVG(locations.daily_rate) - Gennemsnitlig dagspris
+- COUNT(locations) - Antal lokationer
+- COUNT(locations WHERE sales > X) - Antal lokationer med mere end X salg
+- SUM(employees.sales) - Summer salg for alle sælgere
+- SUM(employees.booking_days) - Summer bookingdage for alle sælgere
+- MAX(0, X - Y) - Maksimum af 0 og X-Y (for "over X" beregninger)
+- IF(X > Y, then, else) - Betinget beregning
+
+## EKSEMPLER PÅ FORMLER:
+
+| Beskrivelse | Formel | Forklaring |
+|-------------|--------|------------|
+| "500 kr per sælger" | base_amount * team_member_count | 500 × antal sælgere |
+| "1% af omsætningen" | percentage * team_revenue | 0.01 × omsætning |
+| "2000 kr flat" | fixed_amount | Fast beløb |
+| "100 kr per salg over 50" | per_unit * MAX(0, team_sales_count - threshold) | 100 × (salg - 50) hvis over 50 |
+| "500 kr per lokation" | base_amount * booked_locations_count | 500 × antal lokationer |
+| "100 kr per bookingdag" | base_amount * booking_days_count | 100 × antal bookingdage |
+| "Lokationsudgift baseret på dagspriser" | location_costs_total | Sum af dagspris × dage for hver lokation |
+| "Dagspris × dage for alle lokationer" | SUM(locations.total) | Summer alle lokationsudgifter |
+| "Gennemsnitlig dagspris gange antal lokationer" | avg_location_daily_rate * booked_locations_count | Gns. pris × antal |
+| "500 kr ekstra per lokation med over 5 salg" | base_amount * COUNT(locations WHERE sales > 5) | 500 × lokationer med >5 salg |
+| "10% rabat på lokationsudgifter" | location_costs_total * discount | Total × 0.9 |
+| "Bonus på 50 kr per salg over gennemsnittet" | per_sale * MAX(0, team_sales_count - avg_sales_per_employee * team_member_count) | Ekstra salg × 50 |
+
+## VIGTIGE REGLER:
+1. Brug ALTID location_costs_total eller SUM(locations.total) når brugeren nævner "lokationsudgift baseret på dagspriser" eller lignende
+2. Når brugeren nævner "per lokation" uden at nævne dagspriser, brug booked_locations_count
+3. Når brugeren nævner rabat/discount, gang med (1 - rabatprocent)
+4. Formlen skal være evaluerbar - brug kun de variabler og funktioner der er defineret ovenfor
+5. Beregn calculated_amount baseret på de aktuelle data
+
+## KATEGORIER (vælg den mest passende):
+kantineordning, firmabil, parkering, telefon, internet, forsikring, uddannelse, udstyr, software, transport, repræsentation, lokation, bonus, provision, andet
+
+## OUTPUT FORMAT:
 Returnér ALTID valid JSON med denne struktur:
 {
   "formula": "matematisk formel med variabelnavne",
   "variables": {"variabelnavn": numerisk_værdi},
   "calculated_amount": beregnet beløb baseret på aktuelle data,
   "explanation": "kort forklaring på dansk af hvad formlen gør",
-  "expense_name": "kort navn til udgiften",
-  "category": "kategori fra listen ovenfor"
+  "expense_name": "kort navn til udgiften (max 50 tegn)",
+  "category": "kategori fra listen ovenfor",
+  "formula_readable": "læsbar version af formlen på dansk"
 }`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -215,14 +555,21 @@ Returnér ALTID valid JSON med denne struktur:
       throw new Error("Failed to parse AI response as JSON");
     }
 
+    // Re-calculate amount using our secure evaluator for verification
+    const recalculatedAmount = evaluateFormula(result.formula, contextData);
+    
+    // Use AI's calculated amount if our evaluator returns 0 but AI has a value
+    const finalAmount = recalculatedAmount > 0 ? recalculatedAmount : (result.calculated_amount || 0);
+
     // Validate and ensure all fields exist
     const validatedResult: FormulaResult = {
       formula: result.formula || "fixed_amount",
       variables: result.variables || { fixed_amount: 0 },
-      calculated_amount: result.calculated_amount || 0,
+      calculated_amount: finalAmount,
       explanation: result.explanation || "Kunne ikke fortolke beskrivelsen",
       expense_name: result.expense_name || description.slice(0, 50),
       category: result.category || "andet",
+      formula_readable: result.formula_readable || result.explanation,
     };
 
     console.log("Validated result:", validatedResult);
