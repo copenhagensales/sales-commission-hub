@@ -2,18 +2,18 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { AddTeamExpenseDialog } from "./AddTeamExpenseDialog";
 import { EditTeamExpenseDialog } from "./EditTeamExpenseDialog";
+import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 
 interface TeamExpense {
   id: string;
@@ -36,12 +36,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 export function TeamExpensesTab() {
   const queryClient = useQueryClient();
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [periodStart, setPeriodStart] = useState<Date>(new Date());
+  const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<TeamExpense | null>(null);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  const handlePeriodChange = (start: Date, end: Date) => {
+    setPeriodStart(start);
+    setPeriodEnd(end);
+  };
 
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-expense-filter"],
@@ -56,13 +59,13 @@ export function TeamExpensesTab() {
   });
 
   const { data: expenses, isLoading } = useQuery<TeamExpense[]>({
-    queryKey: ["team-expenses", monthStart.toISOString(), monthEnd.toISOString(), selectedTeam],
+    queryKey: ["team-expenses", periodStart.toISOString(), periodEnd.toISOString(), selectedTeam],
     queryFn: async () => {
       let query = (supabase
         .from("team_expenses") as any)
         .select("id, team_id, description, amount, expense_date, category, notes")
-        .gte("expense_date", monthStart.toISOString().split("T")[0])
-        .lte("expense_date", monthEnd.toISOString().split("T")[0])
+        .gte("expense_date", periodStart.toISOString().split("T")[0])
+        .lte("expense_date", periodEnd.toISOString().split("T")[0])
         .order("expense_date", { ascending: false });
 
       if (selectedTeam !== "all") {
@@ -118,17 +121,7 @@ export function TeamExpensesTab() {
         <CardContent className="space-y-4">
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="min-w-[120px] text-center font-medium capitalize">
-                {format(currentMonth, "MMMM yyyy", { locale: da })}
-              </span>
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <PayrollPeriodSelector onChange={handlePeriodChange} />
 
             <Select value={selectedTeam} onValueChange={setSelectedTeam}>
               <SelectTrigger className="w-[180px]">
