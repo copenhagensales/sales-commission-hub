@@ -530,18 +530,6 @@ export default function BookingsContent() {
                                       >
                                         {hasAbsence && <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />}
                                         <span>{assignment.employee_name?.split(' ')[0]}</span>
-                                        {canEditFmBookings && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              deleteAssignmentMutation.mutate(assignment.id);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
-                                            title="Fjern medarbejder"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
-                                        )}
                                       </div>
                                     );
                                   })}
