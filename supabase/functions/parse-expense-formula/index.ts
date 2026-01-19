@@ -261,17 +261,34 @@ serve(async (req) => {
     const employeeIds = teamEmployees?.map(e => e.id) || [];
     const teamMemberCount = employeeIds.length;
 
-    // Get current month date range
+    // Get current payroll period (15th of previous month to 14th of current month, or 15th of current to 14th of next)
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const startDateStr = startOfMonth.toISOString().split("T")[0];
-    const endDateStr = endOfMonth.toISOString().split("T")[0];
+    const day = now.getDate();
+    const year = now.getFullYear();
+    const month = now.getMonth();
     
-    // Calculate working days in month (weekdays)
+    let periodStart: Date;
+    let periodEnd: Date;
+    
+    if (day >= 15) {
+      // Current period: 15th of this month to 14th of next month
+      periodStart = new Date(year, month, 15);
+      periodEnd = new Date(year, month + 1, 14);
+    } else {
+      // Current period: 15th of last month to 14th of this month
+      periodStart = new Date(year, month - 1, 15);
+      periodEnd = new Date(year, month, 14);
+    }
+    
+    const startDateStr = periodStart.toISOString().split("T")[0];
+    const endDateStr = periodEnd.toISOString().split("T")[0];
+    
+    console.log(`Payroll period: ${startDateStr} to ${endDateStr}`);
+    
+    // Calculate working days in payroll period (weekdays)
     let workingDaysInMonth = 0;
-    const tempDate = new Date(startOfMonth);
-    while (tempDate <= endOfMonth) {
+    const tempDate = new Date(periodStart);
+    while (tempDate <= periodEnd) {
       const dayOfWeek = tempDate.getDay();
       if (dayOfWeek !== 0 && dayOfWeek !== 6) workingDaysInMonth++;
       tempDate.setDate(tempDate.getDate() + 1);
