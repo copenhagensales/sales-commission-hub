@@ -57,7 +57,7 @@ export function RoleProtectedRoute({
   // User must have a position defined
   if (!position) {
     console.log("RoleProtectedRoute: DENIED - no position found for user");
-    return <Navigate to="/my-schedule" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   // If no specific permission required, grant access (authenticated route)
@@ -81,7 +81,7 @@ export function RoleProtectedRoute({
   }
 
   console.log("RoleProtectedRoute: DENIED - permission not granted");
-  return <Navigate to="/my-schedule" replace />;
+  return <Navigate to="/home" replace />;
 }
 
 // Simple protected route that just checks auth AND active employee status

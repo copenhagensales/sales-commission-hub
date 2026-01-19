@@ -295,6 +295,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         scopeKey: "scope_fieldmarketing",
       },
       { key: "menu_fm_my_week", label: "Min uge", description: "Adgang til min uge", hasEditOption: false },
+      { key: "menu_fm_booking", label: "Booking Management", description: "Adgang til booking management side", hasEditOption: true },
       { key: "menu_fm_book_week", label: "Book uge", description: "Adgang til book uge", hasEditOption: true },
       { key: "menu_fm_bookings", label: "Bookinger", description: "Adgang til bookinger", hasEditOption: true },
       { key: "menu_fm_locations", label: "Lokationer", description: "Adgang til lokationer", hasEditOption: true },
