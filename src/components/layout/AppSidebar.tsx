@@ -321,12 +321,20 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
         }
       }
       
+      console.log('Booking conflicts debug:', {
+        assignments: assignments?.length,
+        absences: absences?.length,
+        uniqueConflicts: employeesWithConflicts.size,
+        conflictingEmployees: Array.from(employeesWithConflicts)
+      });
+      
       return employeesWithConflicts.size;
     },
     enabled: p.canViewFmBookings || p.canViewFmBookWeek,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
