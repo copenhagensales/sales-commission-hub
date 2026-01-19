@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { format, addDays, getWeek, startOfWeek } from "date-fns";
+import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -218,9 +218,9 @@ export default function BookingsContent() {
         map.set(absence.employee_id, new Map());
       }
       
-      // Expand date range to individual dates
-      const start = new Date(absence.start_date);
-      const end = new Date(absence.end_date);
+      // Expand date range to individual dates (use parseISO to avoid timezone issues)
+      const start = parseISO(absence.start_date);
+      const end = parseISO(absence.end_date);
       const current = new Date(start);
       
       while (current <= end) {
