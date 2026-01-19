@@ -268,16 +268,15 @@ serve(async (req) => {
     const month = now.getMonth();
     
     let periodStart: Date;
-    let periodEnd: Date;
+    // Always use today as the end date (not the end of the payroll period)
+    const periodEnd: Date = new Date(year, month, day);
     
     if (day >= 15) {
-      // Current period: 15th of this month to 14th of next month
+      // Current period starts: 15th of this month
       periodStart = new Date(year, month, 15);
-      periodEnd = new Date(year, month + 1, 14);
     } else {
-      // Current period: 15th of last month to 14th of this month
+      // Current period starts: 15th of last month
       periodStart = new Date(year, month - 1, 15);
-      periodEnd = new Date(year, month, 14);
     }
     
     const startDateStr = periodStart.toISOString().split("T")[0];
@@ -387,12 +386,15 @@ serve(async (req) => {
         // Find bookings for this location
         const locBookings = allBookings.filter(b => b.location_id === loc.id);
         
-        // Count days for this location from assignments
-        let locDays = 0;
+        // Count unique dates for this location (not total assignments)
+        const uniqueDates = new Set<string>();
         for (const booking of locBookings) {
           const bookingAssignments = assignments?.filter(a => a.booking_id === booking.id) || [];
-          locDays += bookingAssignments.length;
+          for (const assignment of bookingAssignments) {
+            uniqueDates.add(assignment.date);
+          }
         }
+        let locDays = uniqueDates.size;
 
         // Also count from booked_days array if no assignments
         if (locDays === 0) {
