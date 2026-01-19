@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,8 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Loader2, CheckCircle2, AlertCircle, MapPin, Users, TrendingUp, Calendar, ChevronDown, ChevronUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Sparkles, Loader2, CheckCircle2, AlertCircle, MapPin, Users, TrendingUp, Calendar, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,23 +84,30 @@ interface ParseResponse {
   error?: string;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  kantineordning: "Kantineordning",
-  firmabil: "Firmabil",
-  parkering: "Parkering",
-  telefon: "Telefon",
-  internet: "Internet",
-  forsikring: "Forsikring",
-  uddannelse: "Uddannelse",
-  udstyr: "Udstyr",
-  software: "Software",
-  transport: "Transport",
-  repræsentation: "Repræsentation",
-  lokation: "Lokation",
-  bonus: "Bonus",
-  provision: "Provision",
-  andet: "Andet",
-};
+interface EditableResult {
+  expense_name: string;
+  category: string;
+  calculated_amount: number;
+  explanation: string;
+}
+
+const CATEGORY_OPTIONS = [
+  { value: "kantineordning", label: "Kantineordning" },
+  { value: "firmabil", label: "Firmabil" },
+  { value: "parkering", label: "Parkering" },
+  { value: "telefon", label: "Telefon" },
+  { value: "internet", label: "Internet" },
+  { value: "forsikring", label: "Forsikring" },
+  { value: "uddannelse", label: "Uddannelse" },
+  { value: "udstyr", label: "Udstyr" },
+  { value: "software", label: "Software" },
+  { value: "transport", label: "Transport" },
+  { value: "repræsentation", label: "Repræsentation" },
+  { value: "lokation", label: "Lokation" },
+  { value: "bonus", label: "Bonus" },
+  { value: "provision", label: "Provision" },
+  { value: "andet", label: "Andet" },
+];
 
 export function CreateAIExpenseDialog({
   open,
@@ -111,14 +118,35 @@ export function CreateAIExpenseDialog({
   const [teamId, setTeamId] = useState<string>("");
   const [description, setDescription] = useState("");
   const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
+  const [editableResult, setEditableResult] = useState<EditableResult | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+
+  // Sync editable result when parse result changes
+  useEffect(() => {
+    if (parseResult?.success && parseResult.result) {
+      setEditableResult({
+        expense_name: parseResult.result.expense_name,
+        category: parseResult.result.category,
+        calculated_amount: parseResult.result.calculated_amount,
+        explanation: parseResult.result.explanation,
+      });
+    } else {
+      setEditableResult(null);
+    }
+  }, [parseResult]);
 
   const resetForm = () => {
     setTeamId("");
     setDescription("");
     setParseResult(null);
+    setEditableResult(null);
     setShowDetails(false);
+  };
+
+  const resetParseResult = () => {
+    setParseResult(null);
+    setEditableResult(null);
   };
 
   const parseFormula = async () => {
@@ -129,6 +157,7 @@ export function CreateAIExpenseDialog({
 
     setIsParsing(true);
     setParseResult(null);
+    setEditableResult(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("parse-expense-formula", {
@@ -153,7 +182,7 @@ export function CreateAIExpenseDialog({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!parseResult?.result || !teamId) {
+      if (!editableResult || !parseResult?.result || !teamId) {
         throw new Error("Ingen gyldig formel at gemme");
       }
 
@@ -161,16 +190,16 @@ export function CreateAIExpenseDialog({
 
       const { error } = await supabase.from("team_expenses").insert({
         team_id: teamId,
-        description: result.expense_name,
-        amount: result.calculated_amount,
-        category: result.category,
+        description: editableResult.expense_name,
+        amount: editableResult.calculated_amount,
+        category: editableResult.category,
         expense_date: new Date().toISOString().split("T")[0],
-        notes: `AI-genereret: ${description}\n\nFormel: ${result.formula}\nForklaring: ${result.explanation}`,
+        notes: `AI-genereret: ${description}\n\nFormel: ${result.formula}\nForklaring: ${editableResult.explanation}`,
         is_recurring: true,
         is_dynamic: true,
         calculation_formula: result.formula,
         formula_variables: result.variables as Record<string, unknown>,
-        formula_description: result.explanation,
+        formula_description: editableResult.explanation,
       } as never);
 
       if (error) throw error;
@@ -196,7 +225,7 @@ export function CreateAIExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -207,7 +236,7 @@ export function CreateAIExpenseDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-4 max-h-[calc(95vh-200px)]">
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="team">Team</Label>
@@ -260,41 +289,81 @@ export function CreateAIExpenseDialog({
 
             {parseResult && (
               <Card className={`p-4 ${parseResult.success ? "border-green-500/50" : "border-destructive/50"}`}>
-                {parseResult.success && parseResult.result ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="font-medium">AI-fortolkning</span>
+                {parseResult.success && parseResult.result && editableResult ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="font-medium">AI-fortolkning</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetParseResult}
+                        className="h-7 text-xs"
+                      >
+                        <RefreshCw className="mr-1 h-3 w-3" />
+                        Fortolk igen
+                      </Button>
                     </div>
 
-                    <div className="grid gap-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Navn:</span>
-                        <span className="font-medium">{parseResult.result.expense_name}</span>
+                    {/* Editable fields */}
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="expense-name" className="text-xs">Navn</Label>
+                        <Input
+                          id="expense-name"
+                          value={editableResult.expense_name}
+                          onChange={(e) => setEditableResult(prev => prev ? { ...prev, expense_name: e.target.value } : null)}
+                          className="h-9"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Kategori:</span>
-                        <Badge variant="outline">
-                          {CATEGORY_LABELS[parseResult.result.category] || parseResult.result.category}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Beregnet beløb:</span>
-                        <span className="font-bold text-xl text-primary">
-                          {parseResult.result.calculated_amount.toLocaleString("da-DK")} kr
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        {parseResult.result.formula_readable || parseResult.result.explanation}
-                      </p>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="expense-category" className="text-xs">Kategori</Label>
+                        <Select
+                          value={editableResult.category}
+                          onValueChange={(value) => setEditableResult(prev => prev ? { ...prev, category: value } : null)}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CATEGORY_OPTIONS.map((cat) => (
+                              <SelectItem key={cat.value} value={cat.value}>
+                                {cat.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="expense-amount" className="text-xs">Beregnet beløb (kr)</Label>
+                        <Input
+                          id="expense-amount"
+                          type="number"
+                          value={editableResult.calculated_amount}
+                          onChange={(e) => setEditableResult(prev => prev ? { ...prev, calculated_amount: parseFloat(e.target.value) || 0 } : null)}
+                          className="h-9 font-bold text-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="expense-explanation" className="text-xs">Forklaring / Noter</Label>
+                        <Textarea
+                          id="expense-explanation"
+                          value={editableResult.explanation}
+                          onChange={(e) => setEditableResult(prev => prev ? { ...prev, explanation: e.target.value } : null)}
+                          rows={3}
+                          className="text-sm"
+                        />
+                      </div>
                     </div>
 
                     {/* Compact context summary */}
                     {context && (
-                      <div className="pt-2 border-t">
+                      <div className="pt-3 border-t">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <Users className="h-3 w-3" />
@@ -316,7 +385,7 @@ export function CreateAIExpenseDialog({
                       </div>
                     )}
 
-                    {/* Expandable details */}
+                    {/* Expandable location details - with better scroll */}
                     {context && context.location_details.length > 0 && (
                       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
                         <CollapsibleTrigger asChild>
@@ -326,20 +395,22 @@ export function CreateAIExpenseDialog({
                           </Button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="pt-2">
-                          <div className="space-y-1 max-h-32 overflow-y-auto">
-                            {context.location_details.map((loc, idx) => (
-                              <div key={idx} className="flex justify-between text-xs py-1 border-b border-border/50 last:border-0">
-                                <span className="text-muted-foreground truncate max-w-[150px]">{loc.name}</span>
-                                <span className="text-muted-foreground">
-                                  {loc.days}d × {loc.daily_rate.toLocaleString("da-DK")} kr = <span className="font-medium text-foreground">{loc.total.toLocaleString("da-DK")} kr</span>
-                                </span>
+                          <ScrollArea className="max-h-[200px]">
+                            <div className="space-y-1 pr-3">
+                              {context.location_details.map((loc, idx) => (
+                                <div key={idx} className="flex justify-between text-xs py-1.5 border-b border-border/50 last:border-0">
+                                  <span className="text-muted-foreground truncate max-w-[180px]" title={loc.name}>{loc.name}</span>
+                                  <span className="text-muted-foreground whitespace-nowrap ml-2">
+                                    {loc.days}d × {loc.daily_rate.toLocaleString("da-DK")} kr = <span className="font-medium text-foreground">{loc.total.toLocaleString("da-DK")} kr</span>
+                                  </span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between text-xs pt-2 font-medium border-t">
+                                <span>Total lokationsudgift:</span>
+                                <span>{context.location_costs_total.toLocaleString("da-DK")} kr</span>
                               </div>
-                            ))}
-                            <div className="flex justify-between text-xs pt-1 font-medium">
-                              <span>Total lokationsudgift:</span>
-                              <span>{context.location_costs_total.toLocaleString("da-DK")} kr</span>
                             </div>
-                          </div>
+                          </ScrollArea>
                         </CollapsibleContent>
                       </Collapsible>
                     )}
@@ -361,7 +432,7 @@ export function CreateAIExpenseDialog({
           </Button>
           <Button
             onClick={() => saveMutation.mutate()}
-            disabled={!parseResult?.success || saveMutation.isPending}
+            disabled={!editableResult || saveMutation.isPending}
           >
             {saveMutation.isPending ? (
               <>
