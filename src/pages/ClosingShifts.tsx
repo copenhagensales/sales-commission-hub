@@ -64,8 +64,10 @@ export default function ClosingShifts() {
   // Weekend cleanup state
   const [editingWeekendTasks, setEditingWeekendTasks] = useState<string | null>(null);
   const [editingWeekendRecipients, setEditingWeekendRecipients] = useState<string | null>(null);
+  const [editingWeekendSendTime, setEditingWeekendSendTime] = useState<string | null>(null);
   const [weekendTasksChanged, setWeekendTasksChanged] = useState(false);
   const [weekendRecipientsChanged, setWeekendRecipientsChanged] = useState(false);
+  const [weekendSendTimeChanged, setWeekendSendTimeChanged] = useState(false);
   
   // Deactivation reminder state
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
@@ -182,6 +184,8 @@ export default function ClosingShifts() {
   const currentTasks = editingTasks ?? shifts?.find(s => s.weekday === 1)?.tasks ?? "";
   const currentWeekendTasks = editingWeekendTasks ?? weekendConfig?.tasks ?? "";
   const currentWeekendRecipients = editingWeekendRecipients ?? weekendConfig?.recipients ?? "";
+  const dbWeekendSendTime = weekendConfig?.send_time;
+  const currentWeekendSendTime = editingWeekendSendTime ?? (dbWeekendSendTime ? dbWeekendSendTime.slice(0, 5) : "15:10");
   
   // Get send_time from first shift (shared across all days)
   const dbSendTime = shifts?.find(s => s.weekday === 1)?.send_time;
@@ -261,8 +265,10 @@ export default function ClosingShifts() {
       toast.success("Weekend oprydning opdateret");
       setEditingWeekendTasks(null);
       setEditingWeekendRecipients(null);
+      setEditingWeekendSendTime(null);
       setWeekendTasksChanged(false);
       setWeekendRecipientsChanged(false);
+      setWeekendSendTimeChanged(false);
     },
     onError: () => {
       toast.error("Kunne ikke opdatere weekend oprydning");
@@ -550,10 +556,26 @@ export default function ClosingShifts() {
                   Fredag: Oprydning før weekenden
                 </CardTitle>
                 <CardDescription>
-                  Sendes automatisk kl. 15:10 hver fredag til alle ledere og valgte modtagere
+                  Sendes automatisk hver fredag til alle ledere og valgte modtagere
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Afsendelsestidspunkt (dansk tid):</span>
+                  </div>
+                  <TimeSelect
+                    value={currentWeekendSendTime}
+                    onChange={(time) => {
+                      setEditingWeekendSendTime(time);
+                      setWeekendSendTimeChanged(true);
+                    }}
+                    placeholder="HH:MM"
+                    className="w-40"
+                  />
+                </div>
+                
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Modtagere (kommaseparerede emails)</label>
                   <Textarea
@@ -583,13 +605,14 @@ export default function ClosingShifts() {
                 </div>
 
                 <div className="flex gap-2">
-                  {(weekendTasksChanged || weekendRecipientsChanged) && (
+                  {(weekendTasksChanged || weekendRecipientsChanged || weekendSendTimeChanged) && (
                     <Button
                       size="sm"
                       onClick={() => {
                         const updates: Partial<WeekendCleanupConfig> = {};
                         if (weekendTasksChanged) updates.tasks = currentWeekendTasks;
                         if (weekendRecipientsChanged) updates.recipients = currentWeekendRecipients;
+                        if (weekendSendTimeChanged) updates.send_time = currentWeekendSendTime + ":00";
                         updateWeekendConfigMutation.mutate(updates);
                       }}
                       disabled={updateWeekendConfigMutation.isPending}
