@@ -318,18 +318,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       
       if (!absences || absences.length === 0) return 0;
       
-      // Count conflicts
-      let conflicts = 0;
-      assignments.forEach(assignment => {
+      // Count unique employees with conflicts
+      const employeesWithConflicts = new Set<string>();
+      
+      for (const assignment of assignments) {
         const hasConflict = absences.some(absence => 
           absence.employee_id === assignment.employee_id &&
           assignment.date >= absence.start_date &&
           assignment.date <= absence.end_date
         );
-        if (hasConflict) conflicts++;
-      });
+        if (hasConflict && assignment.employee_id) {
+          employeesWithConflicts.add(assignment.employee_id);
+        }
+      }
       
-      return conflicts;
+      return employeesWithConflicts.size;
     },
     enabled: p.canViewFmBookings || p.canViewFmBookWeek,
     staleTime: 5 * 60 * 1000,
