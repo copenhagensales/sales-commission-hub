@@ -309,86 +309,109 @@ serve(async (req) => {
       };
     });
 
-    // Fetch booking assignments and build location details
+    // Fetch ALL bookings in the current month directly (not via team employees)
     let bookingCount = 0;
     let bookedLocationsCount = 0;
     let bookingDaysCount = 0;
     let locationCostsTotal = 0;
     const locationDetails: LocationDetail[] = [];
 
-    if (employeeIds.length > 0) {
+    // Fetch bookings directly - they overlap with current month if start_date <= endDateStr AND end_date >= startDateStr
+    const { data: allBookings, error: bookingsError } = await supabase
+      .from("booking")
+      .select(`
+        id,
+        location_id,
+        daily_rate_override,
+        booked_days,
+        start_date,
+        end_date
+      `)
+      .lte("start_date", endDateStr)
+      .gte("end_date", startDateStr);
+
+    if (bookingsError) {
+      console.error("Error fetching bookings:", bookingsError);
+    }
+
+    console.log(`Found ${allBookings?.length || 0} bookings in period ${startDateStr} to ${endDateStr}`);
+
+    if (allBookings && allBookings.length > 0) {
+      bookingCount = allBookings.length;
+
+      // Get unique location IDs
+      const locationIds = [...new Set(allBookings.map(b => b.location_id).filter(Boolean))];
+      bookedLocationsCount = locationIds.length;
+
+      // Fetch all location details
+      const { data: locations } = await supabase
+        .from("location")
+        .select("id, name, daily_rate")
+        .in("id", locationIds);
+
+      // Get all booking assignments for day counting and employee data
+      const bookingIds = allBookings.map(b => b.id);
       const { data: assignments } = await supabase
         .from("booking_assignment")
         .select("booking_id, date, employee_id")
-        .in("employee_id", employeeIds)
+        .in("booking_id", bookingIds)
         .gte("date", startDateStr)
         .lte("date", endDateStr);
 
       bookingDaysCount = assignments?.length || 0;
 
-      // Update employee booking days
+      // Update employee booking days (for employees in the selected team)
       for (const emp of employeeDetails) {
         emp.booking_days = assignments?.filter(a => a.employee_id === emp.id).length || 0;
       }
 
-      // Get unique booking IDs
-      const bookingIds = [...new Set(assignments?.map(a => a.booking_id) || [])];
-      bookingCount = bookingIds.length;
+      // Build location details with calculations
+      for (const loc of locations || []) {
+        // Find bookings for this location
+        const locBookings = allBookings.filter(b => b.location_id === loc.id);
+        
+        // Count days for this location from assignments
+        let locDays = 0;
+        for (const booking of locBookings) {
+          const bookingAssignments = assignments?.filter(a => a.booking_id === booking.id) || [];
+          locDays += bookingAssignments.length;
+        }
 
-      if (bookingIds.length > 0) {
-        // Fetch bookings with location details and daily rate override
-        const { data: bookings } = await supabase
-          .from("booking")
-          .select("id, location_id, daily_rate_override")
-          .in("id", bookingIds);
-
-        const locationIds = [...new Set(bookings?.map(b => b.location_id).filter(Boolean) || [])];
-        bookedLocationsCount = locationIds.length;
-
-        if (locationIds.length > 0) {
-          // Fetch location details
-          const { data: locations } = await supabase
-            .from("location")
-            .select("id, name, daily_rate")
-            .in("id", locationIds);
-
-          // Build location details with calculations
-          for (const loc of locations || []) {
-            // Find bookings for this location
-            const locBookings = bookings?.filter(b => b.location_id === loc.id) || [];
-            
-            // Count days for this location
-            let locDays = 0;
-            for (const booking of locBookings) {
-              const bookingAssignments = assignments?.filter(a => a.booking_id === booking.id) || [];
-              locDays += bookingAssignments.length;
+        // Also count from booked_days array if no assignments
+        if (locDays === 0) {
+          for (const booking of locBookings) {
+            if (booking.booked_days && Array.isArray(booking.booked_days)) {
+              locDays += booking.booked_days.length;
             }
-
-            // Determine daily rate (use override if available)
-            const dailyRate = locBookings[0]?.daily_rate_override || loc.daily_rate || 0;
-            
-            // Calculate total for this location
-            const locTotal = dailyRate * locDays;
-
-            // Get FM sales for this location
-            const locFmSales = fmSalesData?.filter(s => s.location_id === loc.id) || [];
-            const locSalesCount = locFmSales.reduce((sum, s) => sum + (s.quantity || 1), 0);
-            const locRevenue = locFmSales.reduce((sum, s) => sum + (s.amount || 0), 0);
-
-            locationDetails.push({
-              name: loc.name,
-              location_id: loc.id,
-              days: locDays,
-              daily_rate: dailyRate,
-              total: locTotal,
-              sales: locSalesCount,
-              revenue: locRevenue,
-            });
-
-            locationCostsTotal += locTotal;
           }
         }
+
+        // Determine daily rate (use override if available, otherwise location rate)
+        const dailyRate = locBookings[0]?.daily_rate_override || loc.daily_rate || 0;
+        
+        // Calculate total for this location
+        const locTotal = dailyRate * locDays;
+
+        // Get FM sales for this location
+        const locFmSales = fmSalesData?.filter(s => s.location_id === loc.id) || [];
+        const locSalesCount = locFmSales.reduce((sum, s) => sum + (s.quantity || 1), 0);
+        const locRevenue = locFmSales.reduce((sum, s) => sum + (s.amount || 0), 0);
+
+        locationDetails.push({
+          name: loc.name,
+          location_id: loc.id,
+          days: locDays,
+          daily_rate: dailyRate,
+          total: locTotal,
+          sales: locSalesCount,
+          revenue: locRevenue,
+        });
+
+        locationCostsTotal += locTotal;
       }
+
+      console.log(`Calculated location_costs_total: ${locationCostsTotal}`);
+      console.log(`Location details:`, JSON.stringify(locationDetails, null, 2));
     }
 
     const avgLocationDailyRate = locationDetails.length > 0
