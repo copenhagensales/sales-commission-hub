@@ -76,11 +76,10 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
     setAiResult(null);
 
     try {
-      const selectedTeam = teams.find(t => t.id === teamId);
       const { data, error } = await supabase.functions.invoke("parse-expense-formula", {
         body: {
-          formula: description,
-          teamName: selectedTeam?.name || "Ukendt team",
+          description: description,
+          team_id: teamId,
         },
       });
 
