@@ -144,9 +144,9 @@ export function CreateAIExpenseDialog({
     setShowDetails(false);
   };
 
-  const resetParseResult = () => {
-    setParseResult(null);
-    setEditableResult(null);
+  const reParseFormula = () => {
+    // Clear result and re-run interpretation
+    parseFormula();
   };
 
   const parseFormula = async () => {
@@ -299,10 +299,15 @@ export function CreateAIExpenseDialog({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={resetParseResult}
+                        onClick={reParseFormula}
+                        disabled={isParsing}
                         className="h-7 text-xs"
                       >
-                        <RefreshCw className="mr-1 h-3 w-3" />
+                        {isParsing ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="mr-1 h-3 w-3" />
+                        )}
                         Fortolk igen
                       </Button>
                     </div>
