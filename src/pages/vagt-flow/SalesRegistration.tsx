@@ -643,9 +643,13 @@ const SalesRegistration = () => {
         {!isCallbackMode ? (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2 border-primary/50 bg-primary/5 hover:bg-primary/10 text-primary font-medium"
+              >
                 <Calendar className="h-4 w-4" />
-                Tast tidligere salg (Callbacks)
+                <span className="hidden sm:inline">Tast tidligere salg (Callbacks)</span>
+                <span className="sm:hidden">Callbacks</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
