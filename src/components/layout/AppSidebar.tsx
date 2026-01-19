@@ -471,21 +471,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 </NavLink>
               )}
               
-              {/* Min Kalender */}
-              {p.canViewMySchedule && (
-                <NavLink
-                  to="/my-schedule"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/my-schedule" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <UserCheck className="h-4 w-4" />
-                  {t("sidebar.myCalendar")}
-                </NavLink>
-              )}
-              
               {/* Min Profil */}
               {p.canViewMyProfile && (
                 <NavLink
@@ -498,58 +483,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 >
                   <User className="h-4 w-4" />
                   {t("sidebar.myProfile")}
-                </NavLink>
-              )}
-              
-              {/* Mine Mål */}
-              {p.canViewMyGoals && (
-                <NavLink
-                  to="/my-goals"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/my-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Target className="h-4 w-4" />
-                  {t("sidebar.myGoals", "Mine Mål")}
-                </NavLink>
-              )}
-              
-              {/* Mine Kontrakter */}
-              {p.canViewMyContracts && (
-                <NavLink
-                  to="/my-contracts"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/my-contracts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4" />
-                    {t("sidebar.myContracts")}
-                  </div>
-                  {pendingContractsCount > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                      {pendingContractsCount}
-                    </Badge>
-                  )}
-                </NavLink>
-              )}
-              
-              {/* Teamønsker og Karriere */}
-              {p.canViewCareerWishes && (
-                <NavLink
-                  to="/career-wishes"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/career-wishes" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {t("sidebar.teamWishesCareer")}
                 </NavLink>
               )}
               

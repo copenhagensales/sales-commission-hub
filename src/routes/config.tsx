@@ -1,4 +1,5 @@
 import type { RouteConfig } from "./types";
+import { MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesRedirect } from "./redirects";
 import {
   Auth,
   Home,
@@ -121,13 +122,13 @@ export const routes: RouteConfig[] = [
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
   { path: "/team/h2h", component: TeamH2H, access: "role", positionPermission: "menu_team_h2h" },
-  { path: "/my-schedule", component: MySchedule, access: "role", positionPermission: "menu_my_schedule" },
+  { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
-  { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
+  { path: "/my-goals", component: MyGoalsRedirect, access: "protected" },
   { path: "/my-goals/:employeeId", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
-  { path: "/my-contracts", component: MyContracts, access: "role", positionPermission: "menu_my_contracts" },
+  { path: "/my-contracts", component: MyContractsRedirect, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
-  { path: "/career-wishes", component: CareerWishes, access: "role", positionPermission: "menu_career_wishes" },
+  { path: "/career-wishes", component: CareerWishesRedirect, access: "protected" },
   { path: "/car-quiz", component: CarQuiz, access: "protected" },
   { path: "/code-of-conduct", component: CodeOfConduct, access: "protected" },
   { path: "/time-stamp", component: TimeStamp, access: "role", positionPermission: "menu_time_stamp" },
