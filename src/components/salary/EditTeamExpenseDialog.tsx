@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -50,6 +50,8 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [aiResult, setAiResult] = useState<{ amount: number; explanation: string } | null>(null);
 
   useEffect(() => {
     if (expense) {
@@ -60,8 +62,45 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
       setExpenseDate(new Date(expense.expense_date));
       setNotes(expense.notes || "");
       setIsRecurring(expense.is_recurring || false);
+      setAiResult(null);
     }
   }, [expense]);
+
+  const parseFormula = async () => {
+    if (!teamId || !description) {
+      toast.error("Vælg team og indtast beskrivelse først");
+      return;
+    }
+
+    setIsParsing(true);
+    setAiResult(null);
+
+    try {
+      const selectedTeam = teams.find(t => t.id === teamId);
+      const { data, error } = await supabase.functions.invoke("parse-expense-formula", {
+        body: {
+          formula: description,
+          teamName: selectedTeam?.name || "Ukendt team",
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.amount !== undefined) {
+        setAiResult({
+          amount: data.amount,
+          explanation: data.explanation || "AI beregning",
+        });
+      } else {
+        toast.error("Kunne ikke fortolke beskrivelsen");
+      }
+    } catch (error) {
+      console.error("Parse error:", error);
+      toast.error("Fejl ved AI-fortolkning");
+    } finally {
+      setIsParsing(false);
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -123,13 +162,59 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
 
           <div className="space-y-2">
             <Label htmlFor="description">Beskrivelse *</Label>
-            <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="F.eks. Konkurrence Q1"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="description"
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setAiResult(null);
+                }}
+                placeholder="F.eks. Konkurrence Q1"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={parseFormula}
+                disabled={isParsing || !teamId || !description}
+                title="Fortolk med AI"
+              >
+                {isParsing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
+
+          {aiResult && (
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2 border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI forslag
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setAmount(String(aiResult.amount));
+                    toast.success("Beløb anvendt");
+                  }}
+                >
+                  Anvend beløb
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">{aiResult.explanation}</p>
+              <p className="text-sm">
+                Beregnet beløb: <strong>{aiResult.amount.toLocaleString("da-DK")} kr.</strong>
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="amount">Beløb (kr.) *</Label>
