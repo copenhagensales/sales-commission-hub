@@ -15,13 +15,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircle } from "lucide-react";
+import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircle, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 interface ProductSelection {
   productId: string;
@@ -51,6 +53,8 @@ const SalesRegistration = () => {
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string>("");
+  const [isCallbackMode, setIsCallbackMode] = useState(false);
+  const [callbackDate, setCallbackDate] = useState<Date | undefined>();
   
   const createSalesMutation = useCreateFieldmarketingSale();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -167,8 +171,60 @@ const SalesRegistration = () => {
     enabled: !!selectedBookingId && isOwner,
   });
 
-  // Use either today's booking or owner-selected booking
-  const activeBooking = todayBooking || ownerSelectedBooking;
+  // Callback booking - fetch booking from selected date
+  const { data: callbackBooking, isLoading: callbackLoading } = useQuery({
+    queryKey: ["callback-booking", currentEmployee?.id, callbackDate],
+    queryFn: async () => {
+      if (!currentEmployee?.id || !callbackDate) return null;
+      
+      const dateStr = format(callbackDate, "yyyy-MM-dd");
+      
+      const { data: assignment, error } = await supabase
+        .from("booking_assignment")
+        .select(`
+          id,
+          start_time,
+          end_time,
+          booking:booking_id (
+            id,
+            location:location_id (id, name),
+            client:client_id (id, name),
+            brand:brand_id (id, name, color_hex),
+            campaign:campaign_id (id, name)
+          )
+        `)
+        .eq("employee_id", currentEmployee.id)
+        .eq("date", dateStr)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (!assignment) return null;
+
+      const booking = assignment.booking as any;
+      
+      return {
+        id: assignment.id,
+        location: booking?.location || null,
+        client: booking?.client || null,
+        brand: booking?.brand || null,
+        campaign: booking?.campaign || null,
+        startTime: assignment.start_time,
+        endTime: assignment.end_time,
+      } as TodayBooking;
+    },
+    enabled: isCallbackMode && !!currentEmployee?.id && !!callbackDate,
+  });
+
+  // Use callback booking when in callback mode, otherwise today's booking or owner-selected
+  const activeBooking = isCallbackMode ? callbackBooking : (todayBooking || ownerSelectedBooking);
+
+  // Exit callback mode handler
+  const exitCallbackMode = () => {
+    setIsCallbackMode(false);
+    setCallbackDate(undefined);
+    setProductSelections([]);
+    setComment("");
+  };
 
   // Auto-set location when today's booking is loaded
   useEffect(() => {
@@ -391,12 +447,18 @@ const SalesRegistration = () => {
           product_name: selection.productName,
           phone_number: phone.trim(),
           comment: comment || undefined,
+          registered_at: isCallbackMode && callbackDate 
+            ? format(callbackDate, "yyyy-MM-dd'T'12:00:00")
+            : undefined,
         }))
       );
 
       await createSalesMutation.mutateAsync(salesRecords);
       
-      toast.success(`${salesRecords.length} salg registreret!`);
+      const dateInfo = isCallbackMode && callbackDate 
+        ? ` for ${format(callbackDate, "d. MMMM", { locale: da })}`
+        : "";
+      toast.success(`${salesRecords.length} salg registreret${dateInfo}!`);
 
       // Reset form
       
@@ -560,30 +622,111 @@ const SalesRegistration = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {t("sidebar.salesRegistration")}
-          </h1>
-          {currentEmployee && (
-            <p className="text-muted-foreground mt-1">
-              {currentEmployee.first_name} {currentEmployee.last_name}
-            </p>
-          )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {t("sidebar.salesRegistration")}
+            </h1>
+            {currentEmployee && (
+              <p className="text-muted-foreground mt-1">
+                {currentEmployee.first_name} {currentEmployee.last_name}
+              </p>
+            )}
+          </div>
         </div>
+        
+        {/* Callback button */}
+        {!isCallbackMode ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                Tast tidligere salg (Callbacks)
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarComponent
+                mode="single"
+                selected={callbackDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setCallbackDate(date);
+                    setIsCallbackMode(true);
+                    setProductSelections([]);
+                    setComment("");
+                  }
+                }}
+                disabled={(date) => date > new Date() || date < new Date("2024-01-01")}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Button variant="outline" onClick={exitCallbackMode} className="gap-2">
+            <X className="h-4 w-4" />
+            Afslut callback-mode
+          </Button>
+        )}
       </div>
+
+      {/* Callback mode info banner */}
+      {isCallbackMode && callbackDate && (
+        <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  Callback-registrering for {format(callbackDate, "EEEE d. MMMM yyyy", { locale: da })}
+                </p>
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  Salg gemmes med den valgte dato
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Callback loading state */}
+      {isCallbackMode && callbackLoading && (
+        <Card className="border-muted">
+          <CardContent className="py-8">
+            <p className="text-center text-muted-foreground">
+              Søger efter din vagt den {callbackDate && format(callbackDate, "d. MMMM", { locale: da })}...
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No booking found for callback date */}
+      {isCallbackMode && callbackDate && !callbackLoading && !callbackBooking && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 justify-center">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <p className="text-sm text-destructive">
+                Du havde ingen vagt den {format(callbackDate, "d. MMMM yyyy", { locale: da })}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Today's booking info card */}
       {activeBooking && (
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className={isCallbackMode ? "border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/10" : "border-primary/30 bg-primary/5"}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="text-primary">{todayBooking ? "Dagens vagt" : "Valgt booking"}</span>
+              <span className={isCallbackMode ? "text-amber-700 dark:text-amber-300" : "text-primary"}>
+                {isCallbackMode ? "Callback-vagt" : (todayBooking ? "Dagens vagt" : "Valgt booking")}
+              </span>
               <span className="text-muted-foreground text-sm font-normal">
-                ({format(new Date(), "EEEE d. MMMM", { locale: da })})
+                ({format(isCallbackMode && callbackDate ? callbackDate : new Date(), "EEEE d. MMMM", { locale: da })})
               </span>
             </CardTitle>
           </CardHeader>

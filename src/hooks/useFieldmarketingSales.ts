@@ -115,6 +115,7 @@ interface CreateSaleParams {
   product_name: string;
   phone_number: string;
   comment?: string;
+  registered_at?: string;
 }
 
 export function useCreateFieldmarketingSale() {
