@@ -225,7 +225,7 @@ export function CreateAIExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[95vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -236,8 +236,8 @@ export function CreateAIExpenseDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4 max-h-[calc(95vh-200px)]">
-          <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
             <div className="space-y-2">
               <Label htmlFor="team">Team</Label>
               <Select value={teamId} onValueChange={setTeamId}>
@@ -429,7 +429,7 @@ export function CreateAIExpenseDialog({
               </Card>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={handleClose}>
