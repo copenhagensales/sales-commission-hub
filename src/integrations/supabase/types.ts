@@ -7405,6 +7405,7 @@ export type Database = {
           description: string
           expense_date: string
           id: string
+          is_recurring: boolean | null
           notes: string | null
           team_id: string
           updated_at: string | null
@@ -7416,6 +7417,7 @@ export type Database = {
           description: string
           expense_date: string
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           team_id: string
           updated_at?: string | null
@@ -7427,6 +7429,7 @@ export type Database = {
           description?: string
           expense_date?: string
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           team_id?: string
           updated_at?: string | null

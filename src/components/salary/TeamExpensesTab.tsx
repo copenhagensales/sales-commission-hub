@@ -23,6 +23,7 @@ interface TeamExpense {
   expense_date: string;
   category: string | null;
   notes: string | null;
+  is_recurring?: boolean;
   teams?: { name: string };
 }
 
@@ -61,28 +62,49 @@ export function TeamExpensesTab() {
   const { data: expenses, isLoading } = useQuery<TeamExpense[]>({
     queryKey: ["team-expenses", periodStart.toISOString(), periodEnd.toISOString(), selectedTeam],
     queryFn: async () => {
-      let query = (supabase
+      // Fetch one-time expenses within period
+      let oneTimeQuery = (supabase
         .from("team_expenses") as any)
-        .select("id, team_id, description, amount, expense_date, category, notes")
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring")
+        .eq("is_recurring", false)
         .gte("expense_date", periodStart.toISOString().split("T")[0])
-        .lte("expense_date", periodEnd.toISOString().split("T")[0])
-        .order("expense_date", { ascending: false });
+        .lte("expense_date", periodEnd.toISOString().split("T")[0]);
 
       if (selectedTeam !== "all") {
-        query = query.eq("team_id", selectedTeam);
+        oneTimeQuery = oneTimeQuery.eq("team_id", selectedTeam);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      // Fetch all recurring expenses (they appear in every period)
+      let recurringQuery = (supabase
+        .from("team_expenses") as any)
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring")
+        .eq("is_recurring", true);
+
+      if (selectedTeam !== "all") {
+        recurringQuery = recurringQuery.eq("team_id", selectedTeam);
+      }
+
+      const [oneTimeResult, recurringResult] = await Promise.all([
+        oneTimeQuery,
+        recurringQuery,
+      ]);
+
+      if (oneTimeResult.error) throw oneTimeResult.error;
+      if (recurringResult.error) throw recurringResult.error;
+
+      const allExpenses = [...(oneTimeResult.data || []), ...(recurringResult.data || [])];
+      
+      // Sort by expense_date descending
+      allExpenses.sort((a: any, b: any) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime());
 
       // Attach team names
-      const teamIds = [...new Set(data?.map((e: any) => e.team_id) || [])];
+      const teamIds = [...new Set(allExpenses.map((e: any) => e.team_id))];
       const { data: teamsData } = await (supabase
         .from("teams") as any)
         .select("id, name")
         .in("id", teamIds);
 
-      return data?.map((e: any) => ({
+      return allExpenses.map((e: any) => ({
         ...e,
         teams: teamsData?.find((t: any) => t.id === e.team_id),
       })) as TeamExpense[];
@@ -143,6 +165,7 @@ export function TeamExpensesTab() {
                 <TableRow>
                   <TableHead>Team</TableHead>
                   <TableHead>Beskrivelse</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Kategori</TableHead>
                   <TableHead>Dato</TableHead>
                   <TableHead className="text-right">Beløb</TableHead>
@@ -152,13 +175,13 @@ export function TeamExpensesTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : !expenses?.length ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Ingen udgifter fundet
                     </TableCell>
                   </TableRow>
@@ -168,6 +191,11 @@ export function TeamExpensesTab() {
                       <TableRow key={expense.id}>
                         <TableCell>{expense.teams?.name}</TableCell>
                         <TableCell className="font-medium">{expense.description}</TableCell>
+                        <TableCell>
+                          <Badge variant={expense.is_recurring ? "default" : "secondary"}>
+                            {expense.is_recurring ? "Fast" : "Engang"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           {expense.category && (
                             <Badge variant="outline">
@@ -202,7 +230,7 @@ export function TeamExpensesTab() {
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-medium">
-                      <TableCell colSpan={4}>Total</TableCell>
+                      <TableCell colSpan={5}>Total</TableCell>
                       <TableCell className="text-right">{formatCurrency(totalAmount)}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
