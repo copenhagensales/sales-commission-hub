@@ -161,7 +161,7 @@ export const routes: RouteConfig[] = [
     path: "/vagt-flow/booking",
     component: VagtBookingManagement,
     access: "role",
-    positionPermission: "menu_fm_book_week",
+    positionPermission: "menu_fm_booking",
   },
   { path: "/vagt-flow/book-week", component: VagtBookWeek, access: "role", positionPermission: "menu_fm_book_week" },
   { path: "/vagt-flow/locations", component: VagtLocations, access: "role", positionPermission: "menu_fm_locations" },
