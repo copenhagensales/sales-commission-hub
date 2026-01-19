@@ -50,14 +50,11 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
   const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards"));
-  const [testOpen, setTestOpen] = useState(
-    ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
-  );
   const [someOpen, setSomeOpen] = useState(
     ["/some", "/extra-work"].includes(location.pathname)
   );
@@ -364,7 +361,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Check if any Ledelse menu items are visible (requires section permission)
   const showLedelseMenu = p.canView("menu_section_ledelse") && 
-    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard);
+    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey);
   
   // Check if any MG menu items are visible (requires section permission)
   const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
@@ -379,9 +376,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
     (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts);
   
-  // Check if any Test menu items are visible (requires section permission)
-  const showTestMenu = p.canView("menu_section_test") && 
-    (p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey);
   
   // Check if any Recruitment items are visible (requires section permission)
   const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
@@ -855,7 +849,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path)) 
+                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].some(path => location.pathname.startsWith(path)) 
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -918,6 +912,33 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Lock className="h-4 w-4" />
                     {t("sidebar.security")}
+                  </NavLink>
+                )}
+                {p.canViewCarQuizAdmin && (
+                  <NavLink to="/car-quiz-admin" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/car-quiz-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Car className="h-4 w-4" />
+                    {t("sidebar.carQuizAdmin")}
+                  </NavLink>
+                )}
+                {p.canViewCocAdmin && (
+                  <NavLink to="/code-of-conduct-admin" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/code-of-conduct-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Shield className="h-4 w-4" />
+                    {t("sidebar.codeOfConductAdmin")}
+                  </NavLink>
+                )}
+                {p.canViewPulseSurvey && (
+                  <NavLink to="/pulse-survey-results" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/pulse-survey-results" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    {t("sidebar.pulseSurveyResults")}
                   </NavLink>
                 )}
               </CollapsibleContent>
@@ -1303,50 +1324,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
-          {/* Test menu */}
-          {showTestMenu && (
-            <Collapsible open={testOpen} onOpenChange={setTestOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <FlaskConical className="h-5 w-5" />
-                  {t("sidebar.testMenu")}
-                </div>
-                {testOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewCarQuizAdmin && (
-                  <NavLink to="/car-quiz-admin" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/car-quiz-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Car className="h-4 w-4" />
-                    {t("sidebar.carQuizAdmin")}
-                  </NavLink>
-                )}
-                {p.canViewCocAdmin && (
-                  <NavLink to="/code-of-conduct-admin" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/code-of-conduct-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Shield className="h-4 w-4" />
-                    {t("sidebar.codeOfConductAdmin")}
-                  </NavLink>
-                )}
-                {p.canViewPulseSurvey && (
-                  <NavLink to="/pulse-survey-results" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/pulse-survey-results" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    {t("sidebar.pulseSurveyResults")}
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
 
           {/* Rapporter menu */}
           {showReportsMenu && (
