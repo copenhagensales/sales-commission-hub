@@ -39,9 +39,7 @@ interface Product {
   counts_as_sale: boolean | null;
 }
 
-interface FieldmarketingSale {
-  revenue: number | null;
-}
+// Note: fieldmarketing_sales does not have a revenue column, uses sale_items for revenue
 
 interface TeamMemberShift {
   employee_id: string;
@@ -1221,8 +1219,8 @@ async function calculateSalesCount(
   const { count: fmCount } = await supabase
     .from("fieldmarketing_sales")
     .select("*", { count: "exact", head: true })
-    .gte("sale_date", startStr.split("T")[0])
-    .lte("sale_date", endStr.split("T")[0]);
+    .gte("registered_at", startStr)
+    .lte("registered_at", endStr);
 
   return count + (fmCount || 0);
 }
@@ -1272,14 +1270,8 @@ async function calculateTotalRevenue(
     return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
   }, 0);
 
-  const { data: fmData } = await supabase
-    .from("fieldmarketing_sales")
-    .select("revenue")
-    .gte("sale_date", startStr.split("T")[0])
-    .lte("sale_date", endStr.split("T")[0]);
-
-  const fmSales = (fmData || []) as FieldmarketingSale[];
-  total += fmSales.reduce((sum, s) => sum + (s.revenue || 0), 0);
+  // Note: fieldmarketing_sales does not have a revenue column
+  // Revenue is tracked through sale_items.mapped_revenue only
 
   return total;
 }
