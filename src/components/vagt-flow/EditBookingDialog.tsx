@@ -87,7 +87,6 @@ export function EditBookingDialog({
   // Booking tab state
   const [clientId, setClientId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
   const [dailyRateOverride, setDailyRateOverride] = useState<string>("");
   const [useLocationRate, setUseLocationRate] = useState<boolean>(true);
 
@@ -103,7 +102,6 @@ export function EditBookingDialog({
     if (booking) {
       setClientId(booking.client_id || "");
       setCampaignId(booking.campaign_id || "");
-      setStatus(booking.status || "Bekræftet");
       
       // Daily rate override
       const hasOverride = booking.daily_rate_override !== null && booking.daily_rate_override !== undefined;
@@ -542,7 +540,6 @@ export function EditBookingDialog({
     mutationFn: async (updates: {
       client_id: string | null;
       campaign_id: string | null;
-      status: "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst";
       daily_rate_override: number | null;
     }) => {
       const { error } = await supabase
@@ -611,12 +608,6 @@ export function EditBookingDialog({
       toast.error("Vælg venligst en kampagne");
       return;
     }
-    // Block Bekræftet status if missing staff
-    if (status === "Bekræftet" && daysWithoutStaff.length > 0) {
-      const missingDayNames = daysWithoutStaff.map(d => DAY_NAMES[d]).join(", ");
-      toast.error(`Kan ikke bekræfte: Mangler medarbejder på ${missingDayNames}`);
-      return;
-    }
     
     // Parse daily rate override
     const parsedRate = parseFloat(dailyRateOverride);
@@ -625,7 +616,6 @@ export function EditBookingDialog({
     updateBookingMutation.mutate({
       client_id: clientId,
       campaign_id: campaignId,
-      status: status as "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst",
       daily_rate_override: rateOverride,
     });
   };
@@ -777,20 +767,6 @@ export function EditBookingDialog({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Planlagt">Planlagt</SelectItem>
-                  <SelectItem value="Bekræftet">Bekræftet</SelectItem>
-                  <SelectItem value="Afsluttet">Afsluttet</SelectItem>
-                  <SelectItem value="Aflyst">Aflyst</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* Daily Rate Section */}
             <div className="space-y-3 pt-3 border-t">
@@ -859,9 +835,6 @@ export function EditBookingDialog({
                     </p>
                     <p className="mt-1 text-amber-700 dark:text-amber-300">
                       {daysWithoutStaff.map(d => `${DAY_NAMES[d]} (${format(addDays(weekStart, d), "d. MMM", { locale: da })})`).join(", ")}
-                    </p>
-                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                      Tilføj mindst 1 medarbejder per dag for at kunne sætte status til "Bekræftet"
                     </p>
                   </div>
                 </div>

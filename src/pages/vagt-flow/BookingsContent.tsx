@@ -60,7 +60,6 @@ export default function BookingsContent() {
     yearParam ? parseInt(yearParam) : getWeekYear(now)
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
@@ -248,8 +247,7 @@ export default function BookingsContent() {
 
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
-    const matchesStatus = statusFilter === "all" || b.status === statusFilter;
-    return matchesClient && matchesStatus;
+    return matchesClient;
   });
 
   const groupedByClient = filtered?.reduce((acc: any, booking: any) => {
@@ -292,12 +290,6 @@ export default function BookingsContent() {
     }
   };
 
-  const statusColors: Record<string, string> = {
-    Planlagt: "bg-blue-100 text-blue-700",
-    Bekræftet: "bg-green-100 text-green-700",
-    Afsluttet: "bg-gray-100 text-gray-700",
-    Aflyst: "bg-red-100 text-red-700",
-  };
 
   return (
     <div className="space-y-6">
@@ -359,17 +351,6 @@ export default function BookingsContent() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Alle statusser" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle statusser</SelectItem>
-                <SelectItem value="Bekræftet">Bekræftet</SelectItem>
-                <SelectItem value="Afsluttet">Afsluttet</SelectItem>
-                <SelectItem value="Aflyst">Aflyst</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -429,9 +410,6 @@ export default function BookingsContent() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={statusColors[booking.status] || "bg-gray-100 text-gray-700"}>
-                            {booking.status}
-                          </Badge>
                           {canEditFmBookings && (
                             <>
                               <Button

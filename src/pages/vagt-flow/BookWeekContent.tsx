@@ -146,7 +146,6 @@ export default function BookWeekContent() {
         week_number: selectedWeek,
         year: selectedYear,
         expected_staff_count: 2,
-        status: "Planlagt",
         booked_days: sortedDays,
         open_for_applications: openForApplications,
         visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,

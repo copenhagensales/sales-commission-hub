@@ -415,7 +415,6 @@ export type Database = {
           location_id: string
           open_for_applications: boolean | null
           start_date: string
-          status: Database["public"]["Enums"]["booking_status"] | null
           updated_at: string | null
           visible_from: string | null
           week_number: number
@@ -436,7 +435,6 @@ export type Database = {
           location_id: string
           open_for_applications?: boolean | null
           start_date: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
           updated_at?: string | null
           visible_from?: string | null
           week_number: number
@@ -457,7 +455,6 @@ export type Database = {
           location_id?: string
           open_for_applications?: boolean | null
           start_date?: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
           updated_at?: string | null
           visible_from?: string | null
           week_number?: number
@@ -8746,7 +8743,6 @@ export type Database = {
       absence_type: "sick" | "vacation" | "other"
       absence_type_v2: "vacation" | "sick" | "no_show" | "day_off"
       app_role: "admin" | "payroll" | "manager" | "agent"
-      booking_status: "Planlagt" | "Bekræftet" | "Aflyst" | "Afsluttet"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
       communication_channel: "Telefon" | "Mail" | "Andet"
@@ -8928,7 +8924,6 @@ export const Constants = {
       absence_type: ["sick", "vacation", "other"],
       absence_type_v2: ["vacation", "sick", "no_show", "day_off"],
       app_role: ["admin", "payroll", "manager", "agent"],
-      booking_status: ["Planlagt", "Bekræftet", "Aflyst", "Afsluttet"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
       communication_channel: ["Telefon", "Mail", "Andet"],
