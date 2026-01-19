@@ -85,12 +85,12 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Tilføj teamudgift</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 pr-4">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1 max-h-[calc(85vh-140px)] pr-4">
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label htmlFor="team">Team *</Label>
@@ -195,7 +195,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
             </div>
           </ScrollArea>
 
-          <DialogFooter className="pt-4 border-t mt-4">
+          <DialogFooter className="flex-shrink-0 pt-4 border-t mt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Annuller
             </Button>
