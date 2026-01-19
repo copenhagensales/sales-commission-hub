@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek } from "date-fns";
@@ -186,6 +186,68 @@ export default function BookingsContent() {
       return data || [];
     },
   });
+
+  // Fetch approved absences for employees in this week's bookings
+  const { data: employeeAbsences = [] } = useQuery({
+    queryKey: ["employee-absences-for-booking", selectedWeek, selectedYear],
+    queryFn: async () => {
+      const weekEnd = addDays(weekStart, 6);
+      const startStr = format(weekStart, "yyyy-MM-dd");
+      const endStr = format(weekEnd, "yyyy-MM-dd");
+
+      // Fetch approved absences that overlap with the selected week
+      const { data: absences, error } = await supabase
+        .from("absence_request_v2")
+        .select("employee_id, start_date, end_date, type")
+        .eq("status", "approved")
+        .lte("start_date", endStr)
+        .gte("end_date", startStr);
+
+      if (error) throw error;
+      return absences || [];
+    },
+    enabled: !!weekStart,
+  });
+
+  // Build a map of employee_id -> date -> absence_type for quick lookup
+  const absenceMap = useMemo(() => {
+    const map = new Map<string, Map<string, string>>();
+    
+    for (const absence of employeeAbsences) {
+      if (!map.has(absence.employee_id)) {
+        map.set(absence.employee_id, new Map());
+      }
+      
+      // Expand date range to individual dates
+      const start = new Date(absence.start_date);
+      const end = new Date(absence.end_date);
+      const current = new Date(start);
+      
+      while (current <= end) {
+        const dateStr = format(current, "yyyy-MM-dd");
+        map.get(absence.employee_id)!.set(dateStr, absence.type);
+        current.setDate(current.getDate() + 1);
+      }
+    }
+    
+    return map;
+  }, [employeeAbsences]);
+
+  // Helper to check if employee has absence on date
+  const getAbsenceType = (employeeId: string, date: Date): string | null => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return absenceMap.get(employeeId)?.get(dateStr) || null;
+  };
+
+  // Get Danish label for absence type
+  const getAbsenceLabel = (type: string): string => {
+    switch (type) {
+      case "sick": return "Syg";
+      case "vacation": return "Ferie";
+      case "day_off": return "Fridag";
+      default: return "Fravær";
+    }
+  };
 
   const bulkAssignMutation = useMutation({
     mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
@@ -453,23 +515,36 @@ export default function BookingsContent() {
                               <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                               {isBooked && dayAssignments?.length > 0 && (
                                 <div className="mt-1 space-y-0.5">
-                                  {dayAssignments.map((assignment: any) => (
-                                    <div key={assignment.id} className="text-[10px] text-primary font-medium truncate flex items-center justify-center gap-0.5 group">
-                                      <span>{assignment.employee_name?.split(' ')[0]}</span>
-                                      {canEditFmBookings && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteAssignmentMutation.mutate(assignment.id);
-                                          }}
-                                          className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
-                                          title="Fjern medarbejder"
-                                        >
-                                          <X className="h-3 w-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
+                                  {dayAssignments.map((assignment: any) => {
+                                    const absenceType = getAbsenceType(assignment.employee_id, dayDate);
+                                    const hasAbsence = !!absenceType;
+                                    
+                                    return (
+                                      <div 
+                                        key={assignment.id} 
+                                        className={cn(
+                                          "text-[10px] font-medium truncate flex items-center justify-center gap-0.5 group",
+                                          hasAbsence ? "text-destructive" : "text-primary"
+                                        )}
+                                        title={hasAbsence ? getAbsenceLabel(absenceType) : undefined}
+                                      >
+                                        {hasAbsence && <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />}
+                                        <span>{assignment.employee_name?.split(' ')[0]}</span>
+                                        {canEditFmBookings && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteAssignmentMutation.mutate(assignment.id);
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
+                                            title="Fjern medarbejder"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
