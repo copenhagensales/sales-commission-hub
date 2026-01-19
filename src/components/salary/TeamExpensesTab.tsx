@@ -49,7 +49,6 @@ export function TeamExpensesTab() {
       const { data, error } = await (supabase
         .from("teams") as any)
         .select("id, name")
-        .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data || [];
