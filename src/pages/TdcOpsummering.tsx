@@ -21,6 +21,7 @@ interface ProductLine {
 
 type MbbType = "mobile_voice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new" | null;
+type StartupChoice = "after_binding" | "wish_date" | null;
 
 export default function TdcOpsummering() {
   const { toast } = useToast();
@@ -38,15 +39,30 @@ export default function TdcOpsummering() {
   ]);
 
   // Conditional blocks
+  const [includeMbb, setIncludeMbb] = useState(false);
   const [mbbType, setMbbType] = useState<MbbType>(null);
   const [withoutRouter, setWithoutRouter] = useState(false);
+  
+  const [includeNumberChoice, setIncludeNumberChoice] = useState(false);
   const [numberChoice, setNumberChoice] = useState<NumberChoice>(null);
-  const [startAfterBinding, setStartAfterBinding] = useState(false);
-  const [hasWishDate, setHasWishDate] = useState(false);
+  const [existingNumbers, setExistingNumbers] = useState("");
+  const [newNumberCount, setNewNumberCount] = useState("");
+  
+  const [includeBinding, setIncludeBinding] = useState(false);
+  
+  const [includeStartup, setIncludeStartup] = useState(false);
+  const [startupChoice, setStartupChoice] = useState<StartupChoice>(null);
   const [wishDate, setWishDate] = useState("");
+  
+  const [includeOrderConfirmation, setIncludeOrderConfirmation] = useState(false);
+  const [includeCancellation, setIncludeCancellation] = useState(false);
+  const [includeAddRemove, setIncludeAddRemove] = useState(false);
+  
   const [hasSubsidy, setHasSubsidy] = useState(false);
   const [subsidyAmount, setSubsidyAmount] = useState("");
+  const [subsidyStartDate, setSubsidyStartDate] = useState("");
   const [subsidyProducts, setSubsidyProducts] = useState("");
+  
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
 
@@ -78,99 +94,120 @@ export default function TdcOpsummering() {
     lines.push("");
 
     // 2. Basic info (always)
-    if (companyName || cvr || contactName || contactPhone) {
-      lines.push(`Aftalen bliver oprettet i ${companyName || "[firmanavn]"} med CVR-nummer ${cvr || "[CVR-nummer]"}. Kontaktpersonen er ${contactName || "[navn]"}, og det telefonnummer vi benytter, er ${contactPhone || "[telefonnummer]"}.`);
-      lines.push("");
-    }
+    lines.push(`Aftalen bliver oprettet i ${companyName || "(firmanavn)"} med CVR-nummer ${cvr || "(CVR-nummer)"}. Kontaktpersonen er ${contactName || "(navn)"}, og det telefonnummer vi benytter, er ${contactPhone || "(telefonnummer)"}.`);
+    lines.push("");
 
     // 3. Product lines
-    const validProducts = productLines.filter(p => p.quantity && p.productName);
+    const validProducts = productLines.filter(p => p.quantity || p.productName || p.dataAmount || p.monthlyPrice);
     if (validProducts.length > 0) {
       validProducts.forEach(p => {
-        const dataInfo = p.dataAmount ? ` med ${p.dataAmount}` : "";
-        lines.push(`Du får ${p.quantity} stk. ${p.productName}${dataInfo} til en månedlig pris på ${p.monthlyPrice || "[beløb]"} kr. ekskl. moms.`);
+        lines.push(`Du får ${p.quantity || "(antal)"} ${p.productName || "(produktnavn)"} ${p.dataAmount || "(datamængde)"} til en månedlig pris på ${p.monthlyPrice || "(beløb)"} kr. ekskl. moms.`);
       });
       lines.push("");
     }
 
     // 4. MBB type
-    if (mbbType === "mobile_voice") {
-      lines.push("Der er tale om Mobile Voice-abonnementer, hvilket betyder at du kan ringe og sende SMS fra abonnementerne.");
+    if (includeMbb && mbbType === "mobile_voice") {
+      lines.push("Der oprettes et mobilt bredbånd gennem et mobilabonnement. Det får et fiktivt nummer, som vil fremgå i din ordrebekræftelse.");
       lines.push("");
-    } else if (mbbType === "datadelingskort") {
-      lines.push("Der er tale om datadelingskort, som bruges til mobile bredbånd eller tablets. Disse kan ikke bruges til at ringe eller sende SMS.");
+    } else if (includeMbb && mbbType === "datadelingskort") {
+      lines.push("Du får et datadelingskort, som deler data med dit hovedabonnement.");
       lines.push("");
-      
-      if (withoutRouter) {
-        lines.push("Abonnementerne leveres uden router, da du har oplyst at I allerede har router til formålet.");
+    }
+    
+    // Without router
+    if (withoutRouter) {
+      lines.push("Der medfølger ikke en router til abonnementet, så du skal selv sørge for en router.");
+      lines.push("");
+    }
+
+    // 5. Number choice
+    if (includeNumberChoice) {
+      if (numberChoice === "existing") {
+        lines.push(`Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: ${existingNumbers || "[X, Y, Z]"}.`);
+        lines.push("");
+      } else if (numberChoice === "mixed") {
+        lines.push(`Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er ${existingNumbers || "[X, Y, Z]"}, og at vi derudover opretter ${newNumberCount || "(antal)"} nye mobilnumre.`);
+        lines.push("");
+      } else if (numberChoice === "new") {
+        lines.push("Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre.");
         lines.push("");
       }
     }
 
-    // 5. Number choice
-    if (numberChoice === "existing") {
-      lines.push("I beholder jeres eksisterende telefonnumre, som portes over til TDC Erhverv.");
-      lines.push("");
-    } else if (numberChoice === "mixed") {
-      lines.push("I beholder nogle af jeres eksisterende numre og får derudover nye numre fra TDC Erhverv.");
-      lines.push("");
-    } else if (numberChoice === "new") {
-      lines.push("I får nye telefonnumre fra TDC Erhverv.");
+    // 6. Binding terms
+    if (includeBinding) {
+      lines.push("I er bundet på kontrakten i 36 måneder.");
       lines.push("");
     }
 
-    // 6. Binding terms (always)
-    lines.push("Abonnementerne har en bindingsperiode på 36 måneder, og bindingen starter fra den dag, aftalen træder i kraft.");
-    lines.push("");
+    // 7. Startup
+    if (includeStartup) {
+      if (startupChoice === "after_binding") {
+        lines.push("Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.");
+        lines.push("");
+      } else if (startupChoice === "wish_date") {
+        lines.push(`Vi har aftalt, at numrene flyttes den ${wishDate || "(dato)"}. Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.`);
+        lines.push("");
+      }
+    }
 
-    // 7. Start after binding
-    if (startAfterBinding) {
-      lines.push("Jeres eksisterende binding hos nuværende leverandør er stadig aktiv. Aftalen med TDC Erhverv træder først i kraft, når jeres nuværende binding udløber.");
+    // 8. Order confirmation
+    if (includeOrderConfirmation) {
+      lines.push("Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår.");
       lines.push("");
     }
 
-    // 8. Wish date
-    if (hasWishDate && wishDate) {
-      lines.push(`I har ønsket at aftalen skal træde i kraft den ${wishDate}.`);
+    // 9. Cancellation
+    if (includeCancellation) {
+      lines.push("Vi opsiger kun de numre, vi har aftalt, bliver overflyttet. Internet og produkter uden et nummer tilkoblet skal du derfor selv opsige.");
       lines.push("");
     }
 
-    // 9. Order confirmation (always)
-    lines.push("Du modtager en ordrebekræftelse på mail, som du bedes gennemgå. Hvis der er fejl eller mangler, bedes du kontakte os hurtigst muligt.");
-    lines.push("");
+    // 10. Add/remove subscriptions
+    if (includeAddRemove) {
+      lines.push("Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes.");
+      lines.push("");
+    }
 
-    // 10. Cancellation (always)
-    lines.push("Såfremt du ønsker at opsige jeres nuværende aftale hos en anden leverandør, skal du selv stå for dette.");
-    lines.push("");
-
-    // 11. Additional subscriptions (always)
-    lines.push("Når aftalen er aktiveret, kan du frit tilføje flere abonnementer på samme vilkår via Kundeservice.");
-    lines.push("");
-
-    // 12. Subsidy
+    // 11. Subsidy
     if (hasSubsidy && subsidyAmount) {
-      lines.push(`I modtager et tilskud på ${subsidyAmount} kr. ekskl. moms, som kan bruges til ${subsidyProducts || "hardware og tilbehør"}.`);
+      lines.push(`Du får et tilskud på ${subsidyAmount}, som kan bruges fra kontraktens startdato ${subsidyStartDate || "(dato)"}, hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers.`);
+      lines.push("");
+      
+      if (subsidyProducts) {
+        lines.push("Vi har talt om, at du skal bruge tilskuddet på disse produkter:");
+        lines.push("");
+        lines.push(subsidyProducts);
+        lines.push("");
+      }
+      
+      lines.push("Tilskuddet bruges som rabatkode i vores webshop, hvor vi altid bestræber os på at have lageret fyldt. Jeg kan ikke foretage bestillingen for dig, det gør du selv via shoppen.");
       lines.push("");
     }
 
-    // 13. Omstilling
+    // 12. Omstilling
     if (hasOmstilling) {
       if (isStandardOmstilling) {
-        lines.push("Der er inkluderet en standard omstillingsløsning i aftalen.");
+        lines.push("Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling.");
       } else {
-        lines.push("Der er inkluderet en avanceret omstillingsløsning i aftalen. Du vil blive kontaktet af en tekniker for opsætning.");
+        lines.push("Din omstilling inkluderer menuvalg og avanceret kaldsflow.");
       }
       lines.push("");
     }
 
-    // 14. Closing (always)
+    // 13. Closing (always)
     lines.push("Har du nogle spørgsmål til mig?");
 
     return lines.join("\n");
   }, [
     companyName, cvr, contactName, contactPhone, productLines,
-    mbbType, withoutRouter, numberChoice, startAfterBinding,
-    hasWishDate, wishDate, hasSubsidy, subsidyAmount, subsidyProducts,
+    includeMbb, mbbType, withoutRouter, 
+    includeNumberChoice, numberChoice, existingNumbers, newNumberCount,
+    includeBinding,
+    includeStartup, startupChoice, wishDate,
+    includeOrderConfirmation, includeCancellation, includeAddRemove,
+    hasSubsidy, subsidyAmount, subsidyStartDate, subsidyProducts,
     hasOmstilling, isStandardOmstilling
   ]);
 
@@ -286,7 +323,7 @@ export default function TdcOpsummering() {
                         <Input
                           value={product.quantity}
                           onChange={(e) => updateProductLine(product.id, "quantity", e.target.value)}
-                          placeholder="3"
+                          placeholder="3 stk."
                         />
                       </div>
                       <div className="space-y-2">
@@ -304,7 +341,7 @@ export default function TdcOpsummering() {
                         <Input
                           value={product.dataAmount}
                           onChange={(e) => updateProductLine(product.id, "dataAmount", e.target.value)}
-                          placeholder="50 GB data"
+                          placeholder="med 50 GB"
                         />
                       </div>
                       <div className="space-y-2">
@@ -324,34 +361,42 @@ export default function TdcOpsummering() {
             {/* Conditional blocks */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Aftalebetingelser</CardTitle>
+                <CardTitle className="text-lg">Valgfrie sektioner</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* MBB Type */}
                 <div className="space-y-3">
-                  <Label>Abonnementstype</Label>
-                  <RadioGroup 
-                    value={mbbType || ""} 
-                    onValueChange={(val) => setMbbType(val as MbbType || null)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="mobile_voice" id="mobile_voice" />
-                      <Label htmlFor="mobile_voice" className="font-normal cursor-pointer">Mobile Voice (tale + SMS)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="datadelingskort" id="datadelingskort" />
-                      <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort (MBB/tablet)</Label>
-                    </div>
-                  </RadioGroup>
-                  
-                  {mbbType === "datadelingskort" && (
-                    <div className="flex items-center space-x-2 ml-6 pt-2">
-                      <Checkbox 
-                        id="withoutRouter" 
-                        checked={withoutRouter}
-                        onCheckedChange={(checked) => setWithoutRouter(checked === true)}
-                      />
-                      <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">Uden router (kunden har egen)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="includeMbb" 
+                      checked={includeMbb}
+                      onCheckedChange={(checked) => setIncludeMbb(checked === true)}
+                    />
+                    <Label htmlFor="includeMbb" className="font-medium cursor-pointer">Mobilt Bredbånd (MBB)</Label>
+                  </div>
+                  {includeMbb && (
+                    <div className="ml-6 space-y-3">
+                      <RadioGroup 
+                        value={mbbType || ""} 
+                        onValueChange={(val) => setMbbType(val as MbbType || null)}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="mobile_voice" id="mobile_voice" />
+                          <Label htmlFor="mobile_voice" className="font-normal cursor-pointer">Mobile Voice (fiktivt nummer)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="datadelingskort" id="datadelingskort" />
+                          <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort</Label>
+                        </div>
+                      </RadioGroup>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="withoutRouter" 
+                          checked={withoutRouter}
+                          onCheckedChange={(checked) => setWithoutRouter(checked === true)}
+                        />
+                        <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">Uden router (kunden har egen)</Label>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -360,61 +405,140 @@ export default function TdcOpsummering() {
 
                 {/* Number choice */}
                 <div className="space-y-3">
-                  <Label>Nummervalg</Label>
-                  <RadioGroup 
-                    value={numberChoice || ""} 
-                    onValueChange={(val) => setNumberChoice(val as NumberChoice || null)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="existing" id="existing" />
-                      <Label htmlFor="existing" className="font-normal cursor-pointer">Kun eksisterende numre (portering)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="includeNumberChoice" 
+                      checked={includeNumberChoice}
+                      onCheckedChange={(checked) => setIncludeNumberChoice(checked === true)}
+                    />
+                    <Label htmlFor="includeNumberChoice" className="font-medium cursor-pointer">Nummervalg</Label>
+                  </div>
+                  {includeNumberChoice && (
+                    <div className="ml-6 space-y-3">
+                      <RadioGroup 
+                        value={numberChoice || ""} 
+                        onValueChange={(val) => setNumberChoice(val as NumberChoice || null)}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="existing" id="existing" />
+                          <Label htmlFor="existing" className="font-normal cursor-pointer">Eksisterende numre flyttes</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="mixed" id="mixed" />
+                          <Label htmlFor="mixed" className="font-normal cursor-pointer">Blanding af eksisterende og nye</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="new" id="new" />
+                          <Label htmlFor="new" className="font-normal cursor-pointer">Kun nye numre</Label>
+                        </div>
+                      </RadioGroup>
+                      {(numberChoice === "existing" || numberChoice === "mixed") && (
+                        <div className="space-y-2">
+                          <Label>Eksisterende numre</Label>
+                          <Input
+                            value={existingNumbers}
+                            onChange={(e) => setExistingNumbers(e.target.value)}
+                            placeholder="12345678, 87654321, 11223344"
+                          />
+                        </div>
+                      )}
+                      {numberChoice === "mixed" && (
+                        <div className="space-y-2">
+                          <Label>Antal nye numre</Label>
+                          <Input
+                            value={newNumberCount}
+                            onChange={(e) => setNewNumberCount(e.target.value)}
+                            placeholder="3"
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="mixed" id="mixed" />
-                      <Label htmlFor="mixed" className="font-normal cursor-pointer">Blanding af eksisterende og nye</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="new" id="new" />
-                      <Label htmlFor="new" className="font-normal cursor-pointer">Kun nye numre</Label>
-                    </div>
-                  </RadioGroup>
+                  )}
                 </div>
 
                 <Separator />
 
-                {/* Start after binding */}
+                {/* Binding */}
                 <div className="flex items-center space-x-2">
                   <Checkbox 
-                    id="startAfterBinding" 
-                    checked={startAfterBinding}
-                    onCheckedChange={(checked) => setStartAfterBinding(checked === true)}
+                    id="includeBinding" 
+                    checked={includeBinding}
+                    onCheckedChange={(checked) => setIncludeBinding(checked === true)}
                   />
-                  <Label htmlFor="startAfterBinding" className="font-normal cursor-pointer">
-                    Opstart efter eksisterende binding udløber
-                  </Label>
+                  <Label htmlFor="includeBinding" className="font-medium cursor-pointer">Binding (36 måneder)</Label>
                 </div>
 
-                {/* Wish date */}
+                <Separator />
+
+                {/* Startup */}
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <Checkbox 
-                      id="hasWishDate" 
-                      checked={hasWishDate}
-                      onCheckedChange={(checked) => setHasWishDate(checked === true)}
+                      id="includeStartup" 
+                      checked={includeStartup}
+                      onCheckedChange={(checked) => setIncludeStartup(checked === true)}
                     />
-                    <Label htmlFor="hasWishDate" className="font-normal cursor-pointer">
-                      Specifik ønskedato
-                    </Label>
+                    <Label htmlFor="includeStartup" className="font-medium cursor-pointer">Opstart</Label>
                   </div>
-                  {hasWishDate && (
-                    <div className="ml-6">
-                      <Input
-                        type="date"
-                        value={wishDate}
-                        onChange={(e) => setWishDate(e.target.value)}
-                      />
+                  {includeStartup && (
+                    <div className="ml-6 space-y-3">
+                      <RadioGroup 
+                        value={startupChoice || ""} 
+                        onValueChange={(val) => setStartupChoice(val as StartupChoice || null)}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="after_binding" id="after_binding" />
+                          <Label htmlFor="after_binding" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="wish_date" id="wish_date" />
+                          <Label htmlFor="wish_date" className="font-normal cursor-pointer">Med ønskedato</Label>
+                        </div>
+                      </RadioGroup>
+                      {startupChoice === "wish_date" && (
+                        <div className="space-y-2">
+                          <Label>Ønsket dato</Label>
+                          <Input
+                            type="date"
+                            value={wishDate}
+                            onChange={(e) => setWishDate(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
+                </div>
+
+                <Separator />
+
+                {/* Order confirmation */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="includeOrderConfirmation" 
+                    checked={includeOrderConfirmation}
+                    onCheckedChange={(checked) => setIncludeOrderConfirmation(checked === true)}
+                  />
+                  <Label htmlFor="includeOrderConfirmation" className="font-medium cursor-pointer">Ordrebekræftelse (14 dage)</Label>
+                </div>
+
+                {/* Cancellation */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="includeCancellation" 
+                    checked={includeCancellation}
+                    onCheckedChange={(checked) => setIncludeCancellation(checked === true)}
+                  />
+                  <Label htmlFor="includeCancellation" className="font-medium cursor-pointer">Opsigelse af numre</Label>
+                </div>
+
+                {/* Add/remove subscriptions */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="includeAddRemove" 
+                    checked={includeAddRemove}
+                    onCheckedChange={(checked) => setIncludeAddRemove(checked === true)}
+                  />
+                  <Label htmlFor="includeAddRemove" className="font-medium cursor-pointer">Tilføj/opsig abonnementer</Label>
                 </div>
 
                 <Separator />
@@ -427,26 +551,35 @@ export default function TdcOpsummering() {
                       checked={hasSubsidy}
                       onCheckedChange={(checked) => setHasSubsidy(checked === true)}
                     />
-                    <Label htmlFor="hasSubsidy" className="font-normal cursor-pointer">
-                      Tilskud inkluderet
-                    </Label>
+                    <Label htmlFor="hasSubsidy" className="font-medium cursor-pointer">Tilskud</Label>
                   </div>
                   {hasSubsidy && (
                     <div className="ml-6 space-y-3">
-                      <div className="space-y-2">
-                        <Label>Tilskudsbeløb (ekskl. moms)</Label>
-                        <Input
-                          value={subsidyAmount}
-                          onChange={(e) => setSubsidyAmount(e.target.value)}
-                          placeholder="5000"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Tilskudsbeløb</Label>
+                          <Input
+                            value={subsidyAmount}
+                            onChange={(e) => setSubsidyAmount(e.target.value)}
+                            placeholder="5.000 kr."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Startdato for tilskud</Label>
+                          <Input
+                            type="date"
+                            value={subsidyStartDate}
+                            onChange={(e) => setSubsidyStartDate(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        <Label>Kan bruges til</Label>
-                        <Input
+                        <Label>Produkter tilskuddet bruges på</Label>
+                        <Textarea
                           value={subsidyProducts}
                           onChange={(e) => setSubsidyProducts(e.target.value)}
-                          placeholder="hardware og tilbehør"
+                          placeholder="Router 5G til 1.500 kr., 2 stk. iPhone 15 til 2.000 kr. pr. stk..."
+                          rows={3}
                         />
                       </div>
                     </div>
@@ -463,9 +596,7 @@ export default function TdcOpsummering() {
                       checked={hasOmstilling}
                       onCheckedChange={(checked) => setHasOmstilling(checked === true)}
                     />
-                    <Label htmlFor="hasOmstilling" className="font-normal cursor-pointer">
-                      Omstillingsløsning inkluderet
-                    </Label>
+                    <Label htmlFor="hasOmstilling" className="font-medium cursor-pointer">Omstilling</Label>
                   </div>
                   {hasOmstilling && (
                     <RadioGroup 
@@ -475,11 +606,11 @@ export default function TdcOpsummering() {
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="standard" id="standard" />
-                        <Label htmlFor="standard" className="font-normal cursor-pointer">Standard omstilling</Label>
+                        <Label htmlFor="standard" className="font-normal cursor-pointer">Standard (kan opgraderes til menuvalg)</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="advanced" id="advanced" />
-                        <Label htmlFor="advanced" className="font-normal cursor-pointer">Avanceret omstilling (tekniker kontakter)</Label>
+                        <Label htmlFor="advanced" className="font-normal cursor-pointer">Avanceret (inkl. menuvalg)</Label>
                       </div>
                     </RadioGroup>
                   )}
@@ -488,12 +619,12 @@ export default function TdcOpsummering() {
             </Card>
           </div>
 
-          {/* Right column - Generated summary */}
+          {/* Right column - Generated text */}
           <div className="lg:sticky lg:top-6 h-fit">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-lg">Genereret opsummering</CardTitle>
-                <Button onClick={copyToClipboard} variant="outline" size="sm">
+                <Button onClick={copyToClipboard} size="sm" variant={copied ? "secondary" : "default"}>
                   {copied ? (
                     <>
                       <Check className="h-4 w-4 mr-1" />
@@ -502,7 +633,7 @@ export default function TdcOpsummering() {
                   ) : (
                     <>
                       <Copy className="h-4 w-4 mr-1" />
-                      Kopiér tekst
+                      Kopier tekst
                     </>
                   )}
                 </Button>
@@ -511,7 +642,7 @@ export default function TdcOpsummering() {
                 <Textarea
                   value={summaryText}
                   readOnly
-                  className="min-h-[600px] font-mono text-sm leading-relaxed resize-none"
+                  className="min-h-[600px] font-mono text-sm resize-none"
                 />
               </CardContent>
             </Card>
