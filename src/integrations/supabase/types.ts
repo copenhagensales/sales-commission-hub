@@ -7400,11 +7400,15 @@ export type Database = {
       team_expenses: {
         Row: {
           amount: number
+          calculation_formula: string | null
           category: string | null
           created_at: string | null
           description: string
           expense_date: string
+          formula_description: string | null
+          formula_variables: Json | null
           id: string
+          is_dynamic: boolean | null
           is_recurring: boolean | null
           notes: string | null
           team_id: string
@@ -7412,11 +7416,15 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          calculation_formula?: string | null
           category?: string | null
           created_at?: string | null
           description: string
           expense_date: string
+          formula_description?: string | null
+          formula_variables?: Json | null
           id?: string
+          is_dynamic?: boolean | null
           is_recurring?: boolean | null
           notes?: string | null
           team_id: string
@@ -7424,11 +7432,15 @@ export type Database = {
         }
         Update: {
           amount?: number
+          calculation_formula?: string | null
           category?: string | null
           created_at?: string | null
           description?: string
           expense_date?: string
+          formula_description?: string | null
+          formula_variables?: Json | null
           id?: string
+          is_dynamic?: boolean | null
           is_recurring?: boolean | null
           notes?: string | null
           team_id?: string
