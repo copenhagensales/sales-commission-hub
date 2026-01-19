@@ -81,7 +81,7 @@ export default function BookingsContent() {
         .from("booking")
         .select(`
           *,
-          location(name, address_city, type),
+          location(name, address_city, type, daily_rate),
           clients(id, name),
           client_campaigns:campaign_id(id, name),
           booking_assignment(id, date, employee_id)
