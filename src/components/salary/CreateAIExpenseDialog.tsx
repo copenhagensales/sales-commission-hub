@@ -344,14 +344,10 @@ export function CreateAIExpenseDialog({
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label htmlFor="expense-amount" className="text-xs">Beregnet beløb (kr)</Label>
-                        <Input
-                          id="expense-amount"
-                          type="number"
-                          value={editableResult.calculated_amount}
-                          onChange={(e) => setEditableResult(prev => prev ? { ...prev, calculated_amount: parseFloat(e.target.value) || 0 } : null)}
-                          className="h-9 font-bold text-primary"
-                        />
+                        <Label className="text-xs">Beregnet beløb (kr)</Label>
+                        <div className="h-9 px-3 py-2 rounded-md border bg-muted/50 font-bold text-primary flex items-center">
+                          {editableResult.calculated_amount.toLocaleString("da-DK")} kr
+                        </div>
                       </div>
 
                       <div className="space-y-1.5">
