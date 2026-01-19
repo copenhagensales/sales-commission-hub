@@ -29,8 +29,7 @@ export default function VagtFlowIndex() {
           client_campaigns:campaign_id(id, name)
         `)
         .eq("week_number", currentWeek)
-        .eq("year", currentYear)
-        .in("status", ["Planlagt", "Bekræftet"]);
+        .eq("year", currentYear);
       if (error) throw error;
       return data;
     },

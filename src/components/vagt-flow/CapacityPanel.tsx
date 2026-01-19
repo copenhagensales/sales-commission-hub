@@ -144,8 +144,7 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
         .from("booking")
         .select(`id, start_date, end_date, client_id, clients(name)`)
         .eq("week_number", weekNumber)
-        .eq("year", year)
-        .in("status", ["Planlagt", "Bekræftet"]);
+        .eq("year", year);
 
       if (error) throw error;
       return data;

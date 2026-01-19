@@ -58,7 +58,6 @@ export default function VagtBookings() {
     yearParam ? parseInt(yearParam) : getWeekYear(now)
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [absenceExpanded, setAbsenceExpanded] = useState(true);
@@ -337,7 +336,6 @@ export default function VagtBookings() {
 
   const filteredBookings = bookings?.filter((b: any) => {
     if (clientFilter !== "all" && b.client_id !== clientFilter) return false;
-    if (statusFilter !== "all" && b.status !== statusFilter) return false;
     return true;
   });
 
@@ -480,22 +478,7 @@ export default function VagtBookings() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Status</label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Alle status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle status</SelectItem>
-                    <SelectItem value="Planlagt">Planlagt</SelectItem>
-                    <SelectItem value="Bekræftet">Bekræftet</SelectItem>
-                    <SelectItem value="Aflyst">Aflyst</SelectItem>
-                    <SelectItem value="Afsluttet">Afsluttet</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
                 <Select value={clientFilter} onValueChange={setClientFilter}>
@@ -634,18 +617,7 @@ export default function VagtBookings() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge 
-                                variant="outline"
-                                className={
-                                  booking.status === "Planlagt" ? "border-yellow-500 text-yellow-600" :
-                                  booking.status === "Bekræftet" ? "border-green-500 text-green-600" :
-                                  booking.status === "Aflyst" ? "border-red-500 text-red-600" :
-                                  "border-gray-500 text-gray-600"
-                                }
-                              >
-                                {booking.status}
-                              </Badge>
-                              <Button 
+                              <Button
                                 variant="ghost" 
                                 size="sm" 
                                 className="text-primary"
