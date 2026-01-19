@@ -596,6 +596,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: false,
       },
       {
+        key: "menu_tdc_opsummering",
+        label: "TDC Opsummering",
+        description: "Adgang til TDC opsummeringsværktøj",
+        hasEditOption: false,
+      },
+      {
         key: "menu_dashboard_united",
         label: "United Dashboard",
         description: "Adgang til United dashboard",
