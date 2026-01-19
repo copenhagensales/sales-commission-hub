@@ -292,18 +292,20 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: fmBookingConflictsCount = 0 } = useQuery({
     queryKey: ["fm-booking-conflicts-count"],
     queryFn: async () => {
-      // Get booking assignments for next 4 weeks
+      // Get booking assignments: 2 weeks back + 4 weeks forward (covers past conflicts that may need attention)
       const today = new Date();
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(today.getDate() - 14);
       const fourWeeksFromNow = new Date();
       fourWeeksFromNow.setDate(today.getDate() + 28);
       
-      const todayStr = today.toISOString().split('T')[0];
+      const startStr = twoWeeksAgo.toISOString().split('T')[0];
       const futureStr = fourWeeksFromNow.toISOString().split('T')[0];
       
       const { data: assignments } = await supabase
         .from("booking_assignment")
         .select("employee_id, date")
-        .gte("date", todayStr)
+        .gte("date", startStr)
         .lte("date", futureStr);
       
       if (!assignments || assignments.length === 0) return 0;
@@ -314,7 +316,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
         .select("employee_id, start_date, end_date")
         .eq("status", "approved")
         .lte("start_date", futureStr)
-        .gte("end_date", todayStr);
+        .gte("end_date", startStr);
       
       if (!absences || absences.length === 0) return 0;
       
