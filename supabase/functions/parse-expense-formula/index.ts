@@ -53,42 +53,73 @@ serve(async (req) => {
       .eq("id", team_id)
       .single();
 
-    // Count active team members
-    const { count: memberCount } = await supabase
+    // Fetch team employees
+    const { data: teamEmployees } = await supabase
       .from("employee_master_data")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("team_id", team_id)
       .eq("is_active", true);
 
-    const teamMemberCount = memberCount || 0;
+    const employeeIds = teamEmployees?.map(e => e.id) || [];
+    const teamMemberCount = employeeIds.length;
+
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startDateStr = startOfMonth.toISOString().split("T")[0];
+    const endDateStr = endOfMonth.toISOString().split("T")[0];
 
     // Get team sales count for current month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    
-    const { count: salesCount } = await supabase
+    const { data: salesData } = await supabase
       .from("sales")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", team_id)
-      .gte("sale_date", startOfMonth.toISOString());
+      .select("id, amount")
+      .in("employee_id", employeeIds)
+      .gte("sale_date", startDateStr)
+      .lte("sale_date", endDateStr);
 
-    const teamSalesCount = salesCount || 0;
+    const teamSalesCount = salesData?.length || 0;
+    const teamRevenue = salesData?.reduce((sum, s) => sum + (s.amount || 0), 0) || 0;
 
-    // Get team revenue for current month
-    const { data: revenueData } = await supabase
-      .from("sales")
-      .select("revenue")
-      .eq("team_id", team_id)
-      .gte("sale_date", startOfMonth.toISOString());
+    // Fetch booking assignments for the team in current month
+    let bookingCount = 0;
+    let bookedLocationsCount = 0;
+    let bookingDaysCount = 0;
 
-    const teamRevenue = revenueData?.reduce((sum, s) => sum + (s.revenue || 0), 0) || 0;
+    if (employeeIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from("booking_assignment")
+        .select("booking_id, date")
+        .in("employee_id", employeeIds)
+        .gte("date", startDateStr)
+        .lte("date", endDateStr);
+
+      bookingDaysCount = assignments?.length || 0;
+
+      // Get unique booking IDs
+      const bookingIds = [...new Set(assignments?.map(a => a.booking_id) || [])];
+      bookingCount = bookingIds.length;
+
+      // Fetch bookings to get location info
+      if (bookingIds.length > 0) {
+        const { data: bookings } = await supabase
+          .from("booking")
+          .select("id, location_id")
+          .in("id", bookingIds);
+
+        const uniqueLocations = [...new Set(bookings?.map(b => b.location_id).filter(Boolean) || [])];
+        bookedLocationsCount = uniqueLocations.length;
+      }
+    }
 
     const contextData = {
       team_name: teamData?.name || "Ukendt team",
       team_member_count: teamMemberCount,
       team_sales_count: teamSalesCount,
       team_revenue: teamRevenue,
+      booking_count: bookingCount,
+      booked_locations_count: bookedLocationsCount,
+      booking_days_count: bookingDaysCount,
     };
 
     console.log("Context data:", contextData);
@@ -101,15 +132,26 @@ TILGÆNGELIGE VARIABLER:
 - team_member_count: Antal aktive sælgere i teamet (aktuelt: ${contextData.team_member_count})
 - team_sales_count: Antal salg i teamet denne måned (aktuelt: ${contextData.team_sales_count})
 - team_revenue: Teamets omsætning denne måned i DKK (aktuelt: ${contextData.team_revenue})
+- booking_count: Antal bookinger i perioden (aktuelt: ${contextData.booking_count})
+- booked_locations_count: Antal unikke bookede lokationer (aktuelt: ${contextData.booked_locations_count})
+- booking_days_count: Total antal bookingdage (aktuelt: ${contextData.booking_days_count})
 
 EKSEMPLER:
 - "500 kr per sælger" → formula: "base_amount * team_member_count", variables: {"base_amount": 500}
 - "1% af omsætningen" → formula: "percentage * team_revenue", variables: {"percentage": 0.01}
 - "2000 kr flat" → formula: "fixed_amount", variables: {"fixed_amount": 2000}
 - "100 kr per salg over 50" → formula: "per_unit * max(0, team_sales_count - threshold)", variables: {"per_unit": 100, "threshold": 50}
+- "500 kr per lokation" → formula: "base_amount * booked_locations_count", variables: {"base_amount": 500}
+- "100 kr per bookingdag" → formula: "base_amount * booking_days_count", variables: {"base_amount": 100}
+- "Lokationsudgift baseret på bookinger" → formula: "base_amount * booked_locations_count", variables: {"base_amount": 500}
+
+VIGTIGE REGLER:
+- Når brugeren nævner "lokation" eller "lokationer", brug altid booked_locations_count
+- Når brugeren nævner "booking" eller "bookinger", brug booking_count
+- Når brugeren nævner "bookingdage" eller "dage", brug booking_days_count
 
 KATEGORIER (vælg den mest passende):
-- kantineordning, firmabil, parkering, telefon, internet, forsikring, uddannelse, udstyr, software, transport, repræsentation, andet
+- kantineordning, firmabil, parkering, telefon, internet, forsikring, uddannelse, udstyr, software, transport, repræsentation, lokation, andet
 
 Returnér ALTID valid JSON med denne struktur:
 {

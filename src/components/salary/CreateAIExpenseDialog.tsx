@@ -47,6 +47,9 @@ interface ParseResponse {
     team_member_count: number;
     team_sales_count: number;
     team_revenue: number;
+    booking_count: number;
+    booked_locations_count: number;
+    booking_days_count: number;
   };
   error?: string;
 }
@@ -63,6 +66,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   software: "Software",
   transport: "Transport",
   repræsentation: "Repræsentation",
+  lokation: "Lokation",
   andet: "Andet",
 };
 
@@ -191,12 +195,12 @@ export function CreateAIExpenseDialog({
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="F.eks. '500 kr per sælger i teamet' eller '1% af omsætningen' eller '2000 kr fast bonus'"
+              placeholder="F.eks. '500 kr per lokation' eller '1% af omsætningen' eller '100 kr per bookingdag'"
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              Du kan bruge: antal sælgere, antal salg, omsætning, faste beløb,
-              procenter m.m.
+              Du kan bruge: antal sælgere, antal salg, omsætning, bookede lokationer,
+              bookingdage, faste beløb, procenter m.m.
             </p>
           </div>
 
@@ -258,7 +262,9 @@ export function CreateAIExpenseDialog({
                       <p>
                         Baseret på: {parseResult.context.team_member_count} sælgere,{" "}
                         {parseResult.context.team_sales_count} salg,{" "}
-                        {parseResult.context.team_revenue.toLocaleString("da-DK")} kr omsætning
+                        {parseResult.context.team_revenue.toLocaleString("da-DK")} kr omsætning,{" "}
+                        {parseResult.context.booked_locations_count} lokationer,{" "}
+                        {parseResult.context.booking_days_count} bookingdage
                       </p>
                     </div>
                   )}
