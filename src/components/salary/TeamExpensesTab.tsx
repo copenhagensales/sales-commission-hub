@@ -7,12 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { AddTeamExpenseDialog } from "./AddTeamExpenseDialog";
 import { EditTeamExpenseDialog } from "./EditTeamExpenseDialog";
+import { CreateAIExpenseDialog } from "./CreateAIExpenseDialog";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 
 interface TeamExpense {
@@ -24,6 +25,8 @@ interface TeamExpense {
   category: string | null;
   notes: string | null;
   is_recurring?: boolean;
+  is_dynamic?: boolean;
+  formula_description?: string | null;
   teams?: { name: string };
 }
 
@@ -32,6 +35,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   præmie: "Præmie",
   bonus: "Bonus",
   andet: "Andet",
+  kantineordning: "Kantineordning",
+  firmabil: "Firmabil",
+  parkering: "Parkering",
+  telefon: "Telefon",
+  internet: "Internet",
+  forsikring: "Forsikring",
+  uddannelse: "Uddannelse",
+  udstyr: "Udstyr",
+  software: "Software",
+  transport: "Transport",
+  repræsentation: "Repræsentation",
 };
 
 export function TeamExpensesTab() {
@@ -40,6 +54,7 @@ export function TeamExpensesTab() {
   const [periodStart, setPeriodStart] = useState<Date>(new Date());
   const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<TeamExpense | null>(null);
 
   const handlePeriodChange = (start: Date, end: Date) => {
@@ -65,7 +80,7 @@ export function TeamExpensesTab() {
       // Fetch one-time expenses within period
       let oneTimeQuery = (supabase
         .from("team_expenses") as any)
-        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring")
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, formula_description")
         .eq("is_recurring", false)
         .gte("expense_date", periodStart.toISOString().split("T")[0])
         .lte("expense_date", periodEnd.toISOString().split("T")[0]);
@@ -77,7 +92,7 @@ export function TeamExpensesTab() {
       // Fetch all recurring expenses (they appear in every period)
       let recurringQuery = (supabase
         .from("team_expenses") as any)
-        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring")
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, formula_description")
         .eq("is_recurring", true);
 
       if (selectedTeam !== "all") {
@@ -135,10 +150,16 @@ export function TeamExpensesTab() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Teamomkostninger</CardTitle>
-          <Button onClick={() => setAddDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Tilføj udgift
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setAiDialogOpen(true)} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Opret med AI
+            </Button>
+            <Button onClick={() => setAddDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Tilføj udgift
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
@@ -190,11 +211,27 @@ export function TeamExpensesTab() {
                     {expenses.map((expense) => (
                       <TableRow key={expense.id}>
                         <TableCell>{expense.teams?.name}</TableCell>
-                        <TableCell className="font-medium">{expense.description}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {expense.description}
+                            {expense.is_dynamic && (
+                              <span title={expense.formula_description || "AI-beregnet"}>
+                                <Sparkles className="h-3 w-3 text-primary" />
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={expense.is_recurring ? "default" : "secondary"}>
-                            {expense.is_recurring ? "Fast" : "Engang"}
-                          </Badge>
+                          <div className="flex gap-1">
+                            <Badge variant={expense.is_recurring ? "default" : "secondary"}>
+                              {expense.is_recurring ? "Fast" : "Engang"}
+                            </Badge>
+                            {expense.is_dynamic && (
+                              <Badge variant="outline" className="border-primary/50 text-primary">
+                                AI
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {expense.category && (
@@ -252,6 +289,12 @@ export function TeamExpensesTab() {
         open={!!editingExpense}
         onOpenChange={(open) => !open && setEditingExpense(null)}
         expense={editingExpense}
+        teams={teams || []}
+      />
+
+      <CreateAIExpenseDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
         teams={teams || []}
       />
     </>

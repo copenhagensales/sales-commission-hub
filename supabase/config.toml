@@ -1,5 +1,8 @@
 project_id = "jwlimmeijpfmaksvmuru"
 
+[functions.parse-expense-formula]
+verify_jwt = false
+
 [functions.sync-adversus]
 verify_jwt = false
 
