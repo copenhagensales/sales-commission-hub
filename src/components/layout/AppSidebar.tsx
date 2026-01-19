@@ -41,7 +41,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -416,7 +416,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
