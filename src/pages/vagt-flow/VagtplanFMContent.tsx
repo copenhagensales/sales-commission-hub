@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Users, Clock, Palmtree, Thermometer, CalendarDays, Coins, Eye, EyeOff, Umbrella, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Clock, Palmtree, Thermometer, CalendarDays, Coins, Eye, EyeOff, Umbrella, MapPin, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -694,8 +694,15 @@ export default function VagtplanFMContent() {
                           {booking && (
                             <Link 
                               to={`/vagt-flow/booking?tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
-                              className="flex items-center justify-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                              className={cn(
+                                "flex items-center justify-center gap-1 text-[10px] hover:underline",
+                                absence 
+                                  ? "text-red-600 font-semibold" 
+                                  : "text-blue-600 hover:text-blue-800"
+                              )}
+                              title={absence ? `⚠️ Booket men har ${getAbsenceLabel(absence.type).toLowerCase()}` : undefined}
                             >
+                              {absence && <AlertTriangle className="h-3 w-3" />}
                               <MapPin className="h-3 w-3" />
                               <span className="truncate max-w-[70px]">{(booking as any).booking?.location?.name}</span>
                             </Link>
