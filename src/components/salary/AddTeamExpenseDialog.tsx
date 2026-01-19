@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -36,6 +37,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
   const [category, setCategory] = useState<string>("");
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -46,7 +48,8 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
         category: category || null,
         expense_date: format(expenseDate, "yyyy-MM-dd"),
         notes: notes || null,
-      });
+        is_recurring: isRecurring,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -67,6 +70,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
     setCategory("");
     setExpenseDate(new Date());
     setNotes("");
+    setIsRecurring(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -118,6 +122,24 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Udgiftstype *</Label>
+            <RadioGroup
+              value={isRecurring ? "recurring" : "onetime"}
+              onValueChange={(value) => setIsRecurring(value === "recurring")}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="onetime" id="onetime" />
+                <Label htmlFor="onetime" className="font-normal cursor-pointer">Engangsudgift</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="recurring" id="recurring" />
+                <Label htmlFor="recurring" className="font-normal cursor-pointer">Fast udgift</Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div className="space-y-2">

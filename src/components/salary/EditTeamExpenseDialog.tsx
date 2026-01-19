@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -23,6 +24,7 @@ interface TeamExpense {
   expense_date: string;
   category: string | null;
   notes: string | null;
+  is_recurring?: boolean;
 }
 
 interface EditTeamExpenseDialogProps {
@@ -47,6 +49,7 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
   const [category, setCategory] = useState<string>("");
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
 
   useEffect(() => {
     if (expense) {
@@ -56,6 +59,7 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
       setCategory(expense.category || "");
       setExpenseDate(new Date(expense.expense_date));
       setNotes(expense.notes || "");
+      setIsRecurring(expense.is_recurring || false);
     }
   }, [expense]);
 
@@ -71,8 +75,9 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
           category: category || null,
           expense_date: format(expenseDate, "yyyy-MM-dd"),
           notes: notes || null,
+          is_recurring: isRecurring,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", expense.id);
       if (error) throw error;
     },
@@ -135,6 +140,24 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Udgiftstype *</Label>
+            <RadioGroup
+              value={isRecurring ? "recurring" : "onetime"}
+              onValueChange={(value) => setIsRecurring(value === "recurring")}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="onetime" id="edit-onetime" />
+                <Label htmlFor="edit-onetime" className="font-normal cursor-pointer">Engangsudgift</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="recurring" id="edit-recurring" />
+                <Label htmlFor="edit-recurring" className="font-normal cursor-pointer">Fast udgift</Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div className="space-y-2">
