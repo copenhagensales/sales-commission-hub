@@ -157,3 +157,6 @@ export const KpiDefinitions = lazyPage(() => import("@/pages/admin/KpiDefinition
 
 // Salary
 export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
+
+// TDC Opsummering
+export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));

@@ -273,6 +273,7 @@ export const permissionKeyLabels: Record<string, string> = {
   menu_team_overview: 'Team overblik',
   menu_tdc_erhverv: 'TDC Erhverv',
   menu_tdc_erhverv_dashboard: 'TDC Erhverv Dashboard',
+  menu_tdc_opsummering: 'TDC Opsummering',
   menu_relatel_dashboard: 'Relatel Dashboard',
   menu_tryg_dashboard: 'Tryg Dashboard',
   menu_ase_dashboard: 'ASE Dashboard',
