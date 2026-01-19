@@ -668,6 +668,19 @@ export default function VagtplanFMContent() {
                             {getAbsenceIcon(absence.type)}
                             {getAbsenceLabel(absence.type)}
                           </Badge>
+                          
+                          {/* Show booking with warning when employee has absence but is booked */}
+                          {booking && (
+                            <Link 
+                              to={`/vagt-flow/booking?tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
+                              className="flex items-center justify-center gap-1 text-[10px] text-red-600 font-semibold hover:underline"
+                              title={`⚠️ Booket men har ${getAbsenceLabel(absence.type).toLowerCase()}`}
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate max-w-[70px]">{(booking as any).booking?.location?.name}</span>
+                            </Link>
+                          )}
                         </div>
                       ) : hasShift ? (
                         <div className="flex flex-col items-center gap-1">
