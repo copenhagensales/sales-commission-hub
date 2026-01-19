@@ -28,7 +28,8 @@ import {
   Zap,
   Info,
   Flame,
-  ArrowUpRight
+  ArrowUpRight,
+  LogOut
 } from "lucide-react";
 import { LeaguePromoCard } from "@/components/league/LeaguePromoCard";
 import { Link } from "react-router-dom";
@@ -37,6 +38,8 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient as useQueryClientRQ } from "@tanstack/react-query";
 import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -44,6 +47,7 @@ import { usePrecomputedKpis, usePrecomputedKpi, getKpiValue } from "@/hooks/useP
 
 const Home = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { canEditHomeGoals: realCanEditHomeGoals } = usePermissions();
   const { isPreviewMode, previewPermissions, previewEmployee } = useRolePreview();
   
@@ -55,6 +59,22 @@ const Home = () => {
     : realCanEditHomeGoals;
   
   const queryClient = useQueryClient();
+
+  const handleLogout = async () => {
+    queryClient.clear();
+    const keysToRemove = Object.keys(localStorage).filter(key => 
+      key.startsWith('sb-') || key.includes('supabase')
+    );
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    
+    navigate("/auth");
+  };
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
   
@@ -850,13 +870,24 @@ const Home = () => {
         {/* Hero Welcome Section */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 p-8 md:p-10">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-              {getGreeting()}, {firstName}! <span className="inline-block animate-pulse">👋</span>
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Velkommen til en ny dag fuld af muligheder.
-            </p>
+          <div className="relative z-10 flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+                {getGreeting()}, {firstName}! <span className="inline-block animate-pulse">👋</span>
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Velkommen til en ny dag fuld af muligheder.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="gap-2 shrink-0"
+            >
+              <LogOut className="h-4 w-4" />
+              Log ud
+            </Button>
           </div>
         </section>
 
