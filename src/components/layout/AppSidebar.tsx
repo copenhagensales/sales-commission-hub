@@ -53,8 +53,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
-  const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test" || location.pathname === "/tdc-opsummering");
-  const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards"));
+  const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
+  const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards") || location.pathname === "/tdc-opsummering");
   const [someOpen, setSomeOpen] = useState(
     ["/some", "/extra-work"].includes(location.pathname)
   );
@@ -364,7 +364,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey);
   
   // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = p.canView("menu_section_mg") && (p.canViewMgTest || p.canViewTdcOpsummering);
+  const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
   
   // Check if any Fieldmarketing items are visible (requires section permission)
   const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
@@ -1087,7 +1087,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                (location.pathname === "/mg-test" || location.pathname === "/tdc-opsummering") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                location.pathname === "/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <Percent className="h-5 w-5" />
@@ -1105,15 +1105,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.mgTest")}
                   </NavLink>
                 )}
-                {p.canViewTdcOpsummering && (
-                  <NavLink to="/tdc-opsummering" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/tdc-opsummering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <FileText className="h-4 w-4" />
-                    TDC Opsummering
-                  </NavLink>
-                )}
               </CollapsibleContent>
             </Collapsible>
           )}
@@ -1123,11 +1114,11 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           {(p.canViewDashboardCphSales || p.canViewDashboardFieldmarketing || p.canViewDashboardEesyTm || 
             p.canViewDashboardTdcErhverv || p.canViewDashboardRelatel || p.canViewDashboardTryg || 
             p.canViewDashboardAse || p.canViewDashboardTest || p.canViewDashboardUnited || 
-            p.canViewDashboardDesign || p.canViewDashboardSettings) && (
+            p.canViewDashboardDesign || p.canViewDashboardSettings || p.canViewTdcOpsummering) && (
             <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                (location.pathname.startsWith("/dashboards") || location.pathname === "/tdc-opsummering") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <Monitor className="h-5 w-5" />
@@ -1260,6 +1251,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Settings className="h-4 w-4" />
                     Indstilling dashboard
+                  </NavLink>
+                )}
+                {p.canViewTdcOpsummering && (
+                  <NavLink to="/tdc-opsummering" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/tdc-opsummering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <FileText className="h-4 w-4" />
+                    TDC Opsummering
                   </NavLink>
                 )}
               </CollapsibleContent>
