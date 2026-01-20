@@ -355,6 +355,10 @@ export function usePermissions() {
   // Include isPending to properly catch initial query states
   const actuallyLoading = isLoading || isPending || (!isFetched && !data);
   
+  // isReady = true ONLY when permissions are fully fetched and available
+  // This prevents premature redirects during browser refresh
+  const isReady = isFetched && !isLoading && !isPending && !!data;
+  
   // isRetrying = actively fetching but no valid position data yet
   // This prevents false "deactivated" messages during database retry attempts
   const isRetrying = isFetching && !data?.position;
@@ -399,6 +403,7 @@ export function usePermissions() {
 
   return {
     isLoading: actuallyLoading,
+    isReady, // True ONLY when permissions are fully loaded - use for route guards
     isRetrying, // True during database retries - prevents false "deactivated" messages
     isError,
     error,
