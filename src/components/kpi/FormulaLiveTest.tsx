@@ -29,6 +29,7 @@ interface TestResult {
   queryTimeMs: number;
   breakdown: Record<string, number | string>;
   errors: string[];
+  formulaDisplay: string;
 }
 
 const periodLabels: Record<TestPeriod, string> = {
@@ -175,6 +176,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
         queryTimeMs,
         breakdown,
         errors,
+        formulaDisplay: formulaString.trim(),
       });
     } catch (error) {
       setResult({
@@ -182,6 +184,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
         queryTimeMs: 0,
         breakdown: {},
         errors: [error instanceof Error ? error.message : "Ukendt fejl"],
+        formulaDisplay: "",
       });
     } finally {
       setIsLoading(false);
@@ -279,6 +282,15 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
                     : result.value}
                 </span>
               </div>
+
+              {result.formulaDisplay && (
+                <div className="flex items-center justify-between text-xs bg-background px-2 py-1.5 rounded font-mono">
+                  <span className="text-muted-foreground">Beregning:</span>
+                  <span>
+                    {result.formulaDisplay} = {typeof result.value === "number" ? result.value.toLocaleString("da-DK") : result.value}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
