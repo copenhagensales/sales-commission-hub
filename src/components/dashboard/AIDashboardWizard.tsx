@@ -236,7 +236,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
         </div>
 
         {/* Step content */}
-        <ScrollArea className="flex-1 min-h-0 max-h-[50vh] pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-4">
           <div className="py-4">
             {/* Step 1: KPI Selection */}
             {currentStep === "kpis" && (
@@ -440,7 +440,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
           <div className="flex justify-between w-full">
