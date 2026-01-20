@@ -8740,6 +8740,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["system_role"]
       }
+      has_edit_permission: {
+        Args: { _permission_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
