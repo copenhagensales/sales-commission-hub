@@ -20,9 +20,11 @@ export function RoleProtectedRoute({
   positionPermission,
 }: RoleProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: permLoading, canView, permissions, position } = usePermissions();
+  const { isLoading: permLoading, isReady, canView, permissions, position } = usePermissions();
   
-  const isLoading = authLoading || permLoading;
+  // CRITICAL: Wait until BOTH auth is done AND permissions are READY (fully fetched)
+  // Using isReady prevents premature redirects during browser refresh
+  const isLoading = authLoading || !isReady;
   
   // Debug logging
   console.log("RoleProtectedRoute DEBUG:", {
@@ -31,6 +33,7 @@ export function RoleProtectedRoute({
     position: position?.name,
     permissions,
     isLoading,
+    isReady,
   });
 
   const handleLogout = async () => {
@@ -87,11 +90,12 @@ export function RoleProtectedRoute({
 // Simple protected route that just checks auth AND active employee status
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: permLoading, position, isError, isRetrying } = usePermissions();
+  const { isLoading: permLoading, isReady, position, isError, isRetrying } = usePermissions();
   const [retryCountdown, setRetryCountdown] = useState(15);
   
   // Include isRetrying in loading check - prevents false "deactivated" during DB retries
-  const isLoading = authLoading || permLoading || isRetrying;
+  // Also wait for isReady to prevent premature redirects on browser refresh
+  const isLoading = authLoading || permLoading || isRetrying || !isReady;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
