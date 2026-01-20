@@ -63,10 +63,14 @@ function matchPricingRule(
       }
     }
 
-    if (allConditionsMet && Object.keys(conditions).length > 0) {
+    if (allConditionsMet) {
+      // Rules match if all conditions are met (empty conditions = match)
+      // Campaign restriction is already checked above (lines 47-51)
+      const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
       log?.("INFO", `Matched pricing rule "${rule.name}" for product ${productId}`, {
         ruleId: rule.id,
         conditions,
+        hasCampaignRestriction,
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk
       });
