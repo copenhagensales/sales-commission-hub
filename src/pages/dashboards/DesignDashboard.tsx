@@ -1083,9 +1083,8 @@ export default function DesignDashboard() {
           setGlobalDesign(designId);
           setIsAIWizardOpen(false);
           
-          // Auto-open save dialog with suggested name
-          const today = new Date().toLocaleDateString('da-DK');
-          setDashboardName(`AI Dashboard - ${today}`);
+          // Use the name from wizard
+          setDashboardName(options.dashboardName);
           setCurrentDashboardId(null); // Ensure we create a new dashboard
           setIsSaveDialogOpen(true);
         }}
