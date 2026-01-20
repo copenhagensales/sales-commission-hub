@@ -637,10 +637,90 @@ const fetchMetricValueForFormula = async (
       }, 0) || 0;
     }
 
-    case "timer": {
-      // Return a default estimate - real implementation uses shift/timestamp data
-      // For now, return 0 if timer metric is used - formulas should use specific hour metrics
-      return 0;
+    case "timer":
+    case "total_hours":
+    case "live_sales_hours": {
+      // Sum actual worked hours from shift table
+      const dateStart = startISO.split("T")[0];
+      const dateEnd = endISO.split("T")[0];
+      
+      const { data: shifts } = await supabase
+        .from("shift")
+        .select("start_time, end_time, break_minutes")
+        .gte("date", dateStart)
+        .lte("date", dateEnd);
+      
+      let totalHours = 0;
+      (shifts || []).forEach((shift: any) => {
+        if (shift.start_time && shift.end_time) {
+          const start = new Date(`1970-01-01T${shift.start_time}`);
+          const end = new Date(`1970-01-01T${shift.end_time}`);
+          let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+          // Subtract breaks
+          if (shift.break_minutes) hours -= shift.break_minutes / 60;
+          if (hours > 0 && hours < 24) totalHours += hours;
+        }
+      });
+      
+      return totalHours;
+    }
+
+    case "sick_days": {
+      // Count from absence_request_v2
+      const { count } = await supabase
+        .from("absence_request_v2")
+        .select("id", { count: "exact", head: true })
+        .eq("type", "sick")
+        .eq("status", "approved")
+        .gte("start_date", startISO.split("T")[0])
+        .lte("start_date", endISO.split("T")[0]);
+      return count || 0;
+    }
+
+    case "vacation_days": {
+      const { count } = await supabase
+        .from("absence_request_v2")
+        .select("id", { count: "exact", head: true })
+        .eq("type", "vacation")
+        .eq("status", "approved")
+        .gte("start_date", startISO.split("T")[0])
+        .lte("start_date", endISO.split("T")[0]);
+      return count || 0;
+    }
+
+    case "day_off_days": {
+      const { count } = await supabase
+        .from("absence_request_v2")
+        .select("id", { count: "exact", head: true })
+        .eq("type", "day_off")
+        .eq("status", "approved")
+        .gte("start_date", startISO.split("T")[0])
+        .lte("start_date", endISO.split("T")[0]);
+      return count || 0;
+    }
+
+    case "all_shift_types": {
+      // Count all shifts (work days)
+      const { count } = await supabase
+        .from("shift")
+        .select("id", { count: "exact", head: true })
+        .gte("date", startISO.split("T")[0])
+        .lte("date", endISO.split("T")[0]);
+      return count || 0;
+    }
+
+    case "total_commission": {
+      // Reuse existing commission logic
+      return await fetchMetricValueForFormula("commission", startISO, endISO, clientId, teamId);
+    }
+
+    case "sales_count": {
+      // Reuse existing antal_salg logic  
+      return await fetchMetricValueForFormula("antal_salg", startISO, endISO, clientId, teamId);
+    }
+
+    case "total_revenue": {
+      return await fetchMetricValueForFormula("revenue", startISO, endISO, clientId, teamId);
     }
 
     case "calls_total": {
@@ -675,6 +755,32 @@ const fetchMetricValueForFormula = async (
       console.warn(`Unknown metric key for formula: ${metricKey}`);
       return 0;
   }
+};
+
+// Parse formula string like "{sales_count} / {live_sales_hours}" into tokens
+const parseFormulaString = (formula: string): Array<{type: string; value: string}> => {
+  const tokens: Array<{type: string; value: string}> = [];
+  // Match {metric}, operators, numbers, and parentheses
+  const regex = /\{([^}]+)\}|([+\-*/×÷−])|(\d+\.?\d*)|([()])/g;
+  let match;
+
+  while ((match = regex.exec(formula)) !== null) {
+    if (match[1]) {
+      // KPI/metric reference - extract the slug inside {}
+      tokens.push({ type: "metric", value: match[1] });
+    } else if (match[2]) {
+      // Operator
+      tokens.push({ type: "operator", value: match[2] });
+    } else if (match[3] && match[3] !== "") {
+      // Number (avoid empty matches)
+      tokens.push({ type: "number", value: match[3] });
+    } else if (match[4]) {
+      // Parenthesis
+      tokens.push({ type: "parenthesis", value: match[4] });
+    }
+  }
+
+  return tokens;
 };
 
 // Helper: Evaluate formula tokens with metric values
@@ -809,12 +915,11 @@ export const useWidgetKpiData = (widgets: Array<{
                 continue;
               }
               
-              // Parse formula tokens
-              let tokens: Array<{type: string; value: string}> = [];
-              try {
-                tokens = JSON.parse(formulaData.formula);
-              } catch {
-                console.error(`Invalid formula JSON: ${formulaData.formula}`);
+              // Parse formula string to tokens using regex parser
+              const tokens = parseFormulaString(formulaData.formula);
+              
+              if (tokens.length === 0) {
+                console.error(`Could not parse formula: ${formulaData.formula}`);
                 newValues.set(widget.id, "—");
                 continue;
               }
