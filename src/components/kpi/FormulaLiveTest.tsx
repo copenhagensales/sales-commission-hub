@@ -628,6 +628,73 @@ async function fetchKpiValue(
       return Math.round((completedHours + todayLiveHours) * 100) / 100;
     }
 
+    case "all_shift_types": {
+      // Tæl alle vagter uanset type (normal, special, etc.)
+      let url = `${supabaseUrl}/rest/v1/shift?select=id`;
+      url += `&date=gte.${startStr}&date=lte.${endStr}`;
+      if (employeeId) {
+        url += `&employee_id=eq.${employeeId}`;
+      }
+      
+      const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      return count;
+    }
+
+    case "day_off_days": {
+      // Tæl fridage fra absence_request_v2
+      let url = `${supabaseUrl}/rest/v1/absence_request_v2?select=id`;
+      url += `&type=eq.day_off&start_date=gte.${startStr}&start_date=lte.${endStr}&status=eq.approved`;
+      if (employeeId) {
+        url += `&employee_id=eq.${employeeId}`;
+      }
+      
+      const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      return count;
+    }
+
+    case "lateness_days": {
+      // Tæl unikke forsinkelsesdage
+      let url = `${supabaseUrl}/rest/v1/lateness_record?select=date`;
+      url += `&date=gte.${startStr}&date=lte.${endStr}`;
+      if (employeeId) {
+        url += `&employee_id=eq.${employeeId}`;
+      }
+      
+      const res = await fetch(url, { headers });
+      const data = res.ok ? await res.json() : [];
+      const uniqueDates = new Set(data.map((r: any) => r.date));
+      return uniqueDates.size;
+    }
+
+    case "calls_total": {
+      // Hent totale opkald fra dialer_calls tabellen
+      let url = `${supabaseUrl}/rest/v1/dialer_calls?select=id`;
+      url += `&call_start=gte.${startStr}T00:00:00&call_start=lte.${endStr}T23:59:59`;
+      if (employeeId) {
+        url += `&employee_id=eq.${employeeId}`;
+      }
+      
+      const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      return count;
+    }
+
+    case "calls_answered": {
+      // Hent besvarede opkald (connected > 0 eller is_answered)
+      let url = `${supabaseUrl}/rest/v1/dialer_calls?select=id`;
+      url += `&call_start=gte.${startStr}T00:00:00&call_start=lte.${endStr}T23:59:59`;
+      url += `&connected=gt.0`;
+      if (employeeId) {
+        url += `&employee_id=eq.${employeeId}`;
+      }
+      
+      const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      return count;
+    }
+
     default:
       return 0;
   }
