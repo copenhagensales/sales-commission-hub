@@ -7,8 +7,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, Type } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useKpiDefinitions, KpiCategory } from "@/hooks/useKpiDefinitions";
 import { useDesignTypes } from "@/hooks/useDesignTypes";
@@ -36,7 +36,7 @@ export interface AIDashboardWizardOptions {
   period: string;
   selectedKpis: string[];
   focusKpis: string[];
-  dashboardName: string;
+  aiPrompt?: string;
 }
 
 interface AIDashboardWizardProps {
@@ -73,7 +73,7 @@ const CATEGORY_ICONS: Record<KpiCategory, React.ReactNode> = {
   other: <BarChart3 className="h-4 w-4" />,
 };
 
-type WizardStep = "kpis" | "focus" | "scope" | "period" | "design" | "name";
+type WizardStep = "kpis" | "focus" | "scope" | "period" | "design" | "prompt";
 
 const STEPS: { id: WizardStep; title: string; icon: React.ReactNode }[] = [
   { id: "kpis", title: "KPI'er", icon: <BarChart3 className="h-4 w-4" /> },
@@ -81,7 +81,7 @@ const STEPS: { id: WizardStep; title: string; icon: React.ReactNode }[] = [
   { id: "scope", title: "Scope", icon: <Users className="h-4 w-4" /> },
   { id: "period", title: "Periode", icon: <Clock className="h-4 w-4" /> },
   { id: "design", title: "Design", icon: <Palette className="h-4 w-4" /> },
-  { id: "name", title: "Navn", icon: <Type className="h-4 w-4" /> },
+  { id: "prompt", title: "AI Forslag", icon: <MessageSquare className="h-4 w-4" /> },
 ];
 
 export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clients }: AIDashboardWizardProps) {
@@ -97,7 +97,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("this-month");
   const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
-  const [dashboardName, setDashboardName] = useState<string>("");
+  const [aiPrompt, setAiPrompt] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
@@ -137,7 +137,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
         (scopeType === "client" && selectedClientId);
       case "period": return !!selectedPeriod;
       case "design": return !!selectedDesign;
-      case "name": return dashboardName.trim().length > 0;
+      case "prompt": return true; // AI instruktioner er valgfrie
       default: return false;
     }
   };
@@ -177,6 +177,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
           clientId: scopeType === "client" ? selectedClientId : undefined,
           period: selectedPeriod,
           designId: selectedDesign,
+          aiPrompt: aiPrompt.trim() || undefined,
         },
       });
 
@@ -190,7 +191,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
           period: selectedPeriod,
           selectedKpis,
           focusKpis,
-          dashboardName: dashboardName.trim(),
+          aiPrompt: aiPrompt.trim() || undefined,
         });
         toast({ title: "Dashboard genereret!", description: "AI har oprettet dit dashboard baseret på dine valg." });
         resetWizard();
@@ -218,7 +219,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
     setSelectedClientId("");
     setSelectedPeriod("this-month");
     setSelectedDesign("minimal");
-    setDashboardName("");
+    setAiPrompt("");
     onOpenChange(false);
   };
 
@@ -463,19 +464,20 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
               </div>
             )}
 
-            {/* Step 6: Dashboard Name */}
-            {currentStep === "name" && (
+            {/* Step 6: AI Prompt */}
+            {currentStep === "prompt" && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Giv dit dashboard et navn så du nemt kan finde det igen.
+                  Giv AI'en ekstra instruktioner eller forslag til dit dashboard (valgfrit).
                 </p>
                 <div className="space-y-2">
-                  <Label htmlFor="dashboard-name">Dashboard navn</Label>
-                  <Input
-                    id="dashboard-name"
-                    placeholder="F.eks. Salgs-overblik eller Team Performance"
-                    value={dashboardName}
-                    onChange={(e) => setDashboardName(e.target.value)}
+                  <Label htmlFor="ai-prompt">Instruktioner til AI</Label>
+                  <Textarea
+                    id="ai-prompt"
+                    placeholder="F.eks. 'Fokuser på visualisering af månedlig vækst' eller 'Vis sammenligning mellem teams'"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="min-h-[120px] resize-none"
                     autoFocus
                   />
                 </div>
@@ -495,7 +497,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
               Tilbage
             </Button>
             
-            {currentStep === "name" ? (
+            {currentStep === "prompt" ? (
               <Button 
                 onClick={handleGenerate} 
                 disabled={!canProceed() || isGenerating}
