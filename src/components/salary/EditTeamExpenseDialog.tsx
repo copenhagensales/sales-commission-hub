@@ -26,7 +26,9 @@ interface TeamExpense {
   category: string | null;
   notes: string | null;
   is_recurring?: boolean;
+  is_dynamic?: boolean;
   all_days?: boolean;
+  formula_description?: string | null;
 }
 
 interface EditTeamExpenseDialogProps {
@@ -53,6 +55,7 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
   const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
   const [allDays, setAllDays] = useState<boolean>(false);
+  const [isDynamic, setIsDynamic] = useState<boolean>(false);
   const [isParsing, setIsParsing] = useState(false);
   const [aiResult, setAiResult] = useState<{ amount: number; explanation: string } | null>(null);
 
@@ -66,6 +69,7 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
       setNotes(expense.notes || "");
       setIsRecurring(expense.is_recurring || false);
       setAllDays(expense.all_days || false);
+      setIsDynamic(expense.is_dynamic || false);
       setAiResult(null);
     }
   }, [expense]);
@@ -177,20 +181,22 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
                 placeholder="F.eks. Konkurrence Q1"
                 className="flex-1"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={parseFormula}
-                disabled={isParsing || !teamId || !description}
-                title="Fortolk med AI"
-              >
-                {isParsing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-              </Button>
+              {!isDynamic && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={parseFormula}
+                  disabled={isParsing || !teamId || !description}
+                  title="Fortolk med AI"
+                >
+                  {isParsing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -221,14 +227,30 @@ export function EditTeamExpenseDialog({ open, onOpenChange, expense, teams }: Ed
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Beløb (kr.) *</Label>
+            <Label htmlFor="amount" className="flex items-center gap-2">
+              Beløb (kr.) *
+              {isDynamic && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Systemberegnet
+                </span>
+              )}
+            </Label>
             <Input
               id="amount"
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
+              readOnly={isDynamic}
+              disabled={isDynamic}
+              className={isDynamic ? "bg-muted cursor-not-allowed" : ""}
             />
+            {isDynamic && (
+              <p className="text-xs text-muted-foreground">
+                Beløbet beregnes automatisk af systemet og kan ikke redigeres manuelt.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
