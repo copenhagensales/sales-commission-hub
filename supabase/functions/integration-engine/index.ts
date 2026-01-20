@@ -27,7 +27,10 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to } = body;
+    const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to, maxRecords } = body;
+    
+    // Limit max records to prevent CPU timeout (default 500 for sync, unlimited for repair-history)
+    const effectiveMaxRecords = maxRecords ?? (action === "repair-history" ? undefined : 1000);
 
     const supabase = getSupabase();
 
@@ -160,7 +163,15 @@ serve(async (req) => {
             sales = sales.filter(s => s.campaignId === String(campaignId));
             console.log(`[Integration Engine] Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
           }
-          runResults["sales"] = await engine.processSales(sales);
+          
+          // Apply max records limit to prevent CPU timeout
+          if (effectiveMaxRecords && sales.length > effectiveMaxRecords) {
+            console.log(`[Integration Engine] Limiting sales from ${sales.length} to ${effectiveMaxRecords} to prevent timeout`);
+            sales = sales.slice(0, effectiveMaxRecords);
+          }
+          
+          // Use smaller batch size (200) to reduce CPU pressure per batch
+          runResults["sales"] = await engine.processSales(sales, 200);
 
           // Save debug log if adapter supports it
           const debugData = (adapter as any).getLastDebugData?.();
