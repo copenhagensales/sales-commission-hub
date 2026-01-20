@@ -58,7 +58,7 @@ import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
 import { useEmployeeDashboards, DashboardWidget } from "@/hooks/useEmployeeDashboards";
 import { useWidgetKpiData } from "@/hooks/useDashboardKpiData";
-import { AIDashboardWizard, AIDashboardWizardOptions } from "@/components/dashboard/AIDashboardWizard";
+import { AIDashboardWizard, AIDashboardWizardOptions, WizardState } from "@/components/dashboard/AIDashboardWizard";
 
 interface TimePeriod {
   id: string;
@@ -194,6 +194,16 @@ export default function DesignDashboard() {
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
   const [isAIWizardOpen, setIsAIWizardOpen] = useState(false);
+  const [wizardState, setWizardState] = useState<WizardState>({
+    selectedKpis: [],
+    focusKpis: [],
+    scopeType: "all",
+    selectedTeamId: "",
+    selectedClientId: "",
+    selectedPeriod: "this-month",
+    selectedDesign: "minimal",
+    aiPrompt: "",
+  });
   const [dashboardName, setDashboardName] = useState("Mit Dashboard");
   const [currentDashboardId, setCurrentDashboardId] = useState<string | null>(null);
   const [globalDesign, setGlobalDesign] = useState<string>(() => {
@@ -1090,6 +1100,8 @@ export default function DesignDashboard() {
         }}
         teams={teams}
         clients={clients}
+        initialState={wizardState}
+        onStateChange={setWizardState}
       />
     </div>
   );

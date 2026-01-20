@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -40,12 +40,25 @@ export interface AIDashboardWizardOptions {
   aiPrompt?: string;
 }
 
+export interface WizardState {
+  selectedKpis: string[];
+  focusKpis: string[];
+  scopeType: "all" | "team" | "client";
+  selectedTeamId: string;
+  selectedClientId: string;
+  selectedPeriod: string;
+  selectedDesign: string;
+  aiPrompt: string;
+}
+
 interface AIDashboardWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGenerate: (widgets: PlacedWidget[], designId: string, options: AIDashboardWizardOptions) => void;
   teams: { id: string; name: string }[];
   clients: { id: string; name: string }[];
+  initialState?: WizardState;
+  onStateChange?: (state: WizardState) => void;
 }
 
 const TIME_PERIODS = [
@@ -85,7 +98,7 @@ const STEPS: { id: WizardStep; title: string; icon: React.ReactNode }[] = [
   { id: "prompt", title: "AI Forslag", icon: <MessageSquare className="h-4 w-4" /> },
 ];
 
-export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clients }: AIDashboardWizardProps) {
+export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clients, initialState, onStateChange }: AIDashboardWizardProps) {
   const { toast } = useToast();
   const { data: kpiDefinitions = [], isLoading: kpisLoading } = useKpiDefinitions();
   const { data: kpiFormulas = [], isLoading: formulasLoading } = useKpiFormulas();
@@ -93,15 +106,29 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
   const isLoading = kpisLoading || formulasLoading;
   
   const [currentStep, setCurrentStep] = useState<WizardStep>("kpis");
-  const [selectedKpis, setSelectedKpis] = useState<string[]>([]);
-  const [focusKpis, setFocusKpis] = useState<string[]>([]);
-  const [scopeType, setScopeType] = useState<"all" | "team" | "client">("all");
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("this-month");
-  const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
-  const [aiPrompt, setAiPrompt] = useState<string>("");
+  const [selectedKpis, setSelectedKpis] = useState<string[]>(initialState?.selectedKpis ?? []);
+  const [focusKpis, setFocusKpis] = useState<string[]>(initialState?.focusKpis ?? []);
+  const [scopeType, setScopeType] = useState<"all" | "team" | "client">(initialState?.scopeType ?? "all");
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(initialState?.selectedTeamId ?? "");
+  const [selectedClientId, setSelectedClientId] = useState<string>(initialState?.selectedClientId ?? "");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(initialState?.selectedPeriod ?? "this-month");
+  const [selectedDesign, setSelectedDesign] = useState<string>(initialState?.selectedDesign ?? "minimal");
+  const [aiPrompt, setAiPrompt] = useState<string>(initialState?.aiPrompt ?? "");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Sync state changes back to parent
+  useEffect(() => {
+    onStateChange?.({
+      selectedKpis,
+      focusKpis,
+      scopeType,
+      selectedTeamId,
+      selectedClientId,
+      selectedPeriod,
+      selectedDesign,
+      aiPrompt,
+    });
+  }, [selectedKpis, focusKpis, scopeType, selectedTeamId, selectedClientId, selectedPeriod, selectedDesign, aiPrompt, onStateChange]);
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
@@ -218,7 +245,8 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
           aiPrompt: aiPrompt.trim() || undefined,
         });
         toast({ title: "Dashboard genereret!", description: "AI har oprettet dit dashboard baseret på dine valg." });
-        resetWizard();
+        setCurrentStep("kpis"); // Reset to first step
+        onOpenChange(false); // Close dialog but keep state
       } else {
         throw new Error("Ingen widgets modtaget fra AI");
       }
@@ -576,40 +604,51 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
         </div>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
-          <div className="flex justify-between w-full">
+          <div className="flex justify-between items-center w-full">
             <Button
-              variant="outline"
-              onClick={goPrev}
-              disabled={currentStepIndex === 0}
+              variant="ghost"
+              size="sm"
+              onClick={resetWizard}
+              className="text-muted-foreground"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Tilbage
+              Nulstil alt
             </Button>
             
-            {currentStep === "prompt" ? (
-              <Button 
-                onClick={handleGenerate} 
-                disabled={!canProceed() || isGenerating}
-                className="gap-2"
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={goPrev}
+                disabled={currentStepIndex === 0}
               >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Genererer...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Generer Dashboard
-                  </>
-                )}
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Tilbage
               </Button>
-            ) : (
-              <Button onClick={goNext} disabled={!canProceed()}>
-                Næste
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
+              
+              {currentStep === "prompt" ? (
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={!canProceed() || isGenerating}
+                  className="gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Genererer...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generer Dashboard
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={goNext} disabled={!canProceed()}>
+                  Næste
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>
