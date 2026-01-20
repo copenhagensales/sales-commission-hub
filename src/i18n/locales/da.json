@@ -121,6 +121,7 @@
     "tableHeaderLastSync": "Sidst synkroniseret",
     "tableHeaderActions": "Handlinger",
     "disabled": "Deaktiveret",
+    "every5min": "Hver 5 min",
     "every15min": "Hver 15 min",
     "every30min": "Hver 30 min",
     "everyHour": "Hver time",
