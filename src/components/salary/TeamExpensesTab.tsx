@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -140,6 +140,29 @@ export function TeamExpensesTab() {
     },
   });
 
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("recalculate-dynamic-expenses", {
+        body: selectedTeam !== "all" ? { team_id: selectedTeam } : {},
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["team-expenses"] });
+      const summary = data?.summary;
+      if (summary) {
+        toast.success(`Genberegnet: ${summary.updated} opdateret, ${summary.unchanged} uændret`);
+      } else {
+        toast.success("AI-udgifter genberegnet");
+      }
+    },
+    onError: (error) => {
+      console.error("Recalculation error:", error);
+      toast.error("Kunne ikke genberegne AI-udgifter");
+    },
+  });
+
   const totalAmount = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
   const formatCurrency = (amount: number) =>
@@ -151,6 +174,15 @@ export function TeamExpensesTab() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Teamomkostninger</CardTitle>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => recalculateMutation.mutate()} 
+              disabled={recalculateMutation.isPending}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+              {recalculateMutation.isPending ? 'Genberegner...' : 'Genberegn AI'}
+            </Button>
             <Button variant="outline" onClick={() => setAiDialogOpen(true)} className="gap-2">
               <Sparkles className="h-4 w-4" />
               Opret med AI

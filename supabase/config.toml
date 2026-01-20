@@ -209,3 +209,6 @@ verify_jwt = false
 
 [functions.league-calculate-standings]
 verify_jwt = false
+
+[functions.recalculate-dynamic-expenses]
+verify_jwt = false
