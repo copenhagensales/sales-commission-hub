@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, MessageSquare, Calculator } from "lucide-react";
+import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, MessageSquare, Calculator, Lightbulb } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useKpiDefinitions, KpiCategory } from "@/hooks/useKpiDefinitions";
@@ -115,6 +115,105 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
   const [selectedDesign, setSelectedDesign] = useState<string>(initialState?.selectedDesign ?? "minimal");
   const [aiPrompt, setAiPrompt] = useState<string>(initialState?.aiPrompt ?? "");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [scopeRecommendation, setScopeRecommendation] = useState<{
+    type: "all" | "team" | "client";
+    teamId?: string;
+    clientId?: string;
+    reason: string;
+  } | null>(null);
+
+  // Calculate scope recommendation based on selected KPIs
+  const calculateScopeRecommendation = useCallback(() => {
+    if (selectedKpis.length === 0) {
+      setScopeRecommendation(null);
+      return;
+    }
+
+    // Get categories of selected KPIs
+    const kpiCategories = selectedKpis.map(slug => {
+      if (slug.startsWith("formula:")) {
+        return "formula";
+      }
+      const def = kpiDefinitions.find(k => k.slug === slug);
+      return def?.category || "other";
+    });
+
+    // Count categories
+    const salesCount = kpiCategories.filter(c => c === "sales").length;
+    const hoursCount = kpiCategories.filter(c => c === "hours").length;
+    const callsCount = kpiCategories.filter(c => c === "calls").length;
+    const totalCount = kpiCategories.length;
+
+    // Check if KPI names mention specific clients
+    const selectedKpiNames = selectedKpis
+      .map(slug => {
+        if (slug.startsWith("formula:")) {
+          const formula = kpiFormulas.find(f => `formula:${f.id}` === slug);
+          return formula?.name?.toLowerCase() || "";
+        }
+        return kpiDefinitions.find(k => k.slug === slug)?.name?.toLowerCase() || "";
+      })
+      .join(" ");
+
+    // Try to match client names
+    const matchingClient = clients.find(client => 
+      selectedKpiNames.includes(client.name.toLowerCase())
+    );
+
+    if (matchingClient) {
+      setScopeRecommendation({
+        type: "client",
+        clientId: matchingClient.id,
+        reason: `Du har valgt KPI'er relateret til ${matchingClient.name}`
+      });
+      return;
+    }
+
+    // If primarily sales KPIs -> suggest client focus
+    if (salesCount > totalCount / 2 && clients.length > 0) {
+      setScopeRecommendation({
+        type: "client",
+        clientId: clients[0].id,
+        reason: `For salgs-KPI'er anbefaler vi at fokusere på en specifik kunde for mere målrettet indsigt`
+      });
+      return;
+    }
+
+    // If primarily hours/calls KPIs -> suggest team focus  
+    if ((hoursCount + callsCount) > totalCount / 2 && teams.length > 0) {
+      setScopeRecommendation({
+        type: "team",
+        teamId: teams[0].id,
+        reason: `For time- og opkalds-KPI'er anbefaler vi at vælge et specifikt team`
+      });
+      return;
+    }
+
+    // Default to "all" for mixed KPIs
+    if (totalCount >= 5) {
+      setScopeRecommendation({
+        type: "all",
+        reason: "Med flere forskellige KPI-typer giver et overblik over alle data mest mening"
+      });
+    } else {
+      setScopeRecommendation(null);
+    }
+  }, [selectedKpis, kpiDefinitions, kpiFormulas, clients, teams]);
+
+  // Recalculate recommendation when step changes to scope or when KPIs change
+  useEffect(() => {
+    if (currentStep === "scope") {
+      calculateScopeRecommendation();
+    }
+  }, [currentStep, calculateScopeRecommendation]);
+
+  const applyRecommendation = useCallback(() => {
+    if (!scopeRecommendation) return;
+    
+    setScopeType(scopeRecommendation.type);
+    if (scopeRecommendation.teamId) setSelectedTeamId(scopeRecommendation.teamId);
+    if (scopeRecommendation.clientId) setSelectedClientId(scopeRecommendation.clientId);
+  }, [scopeRecommendation]);
 
   // Sync state changes back to parent
   useEffect(() => {
@@ -474,6 +573,29 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                 <p className="text-sm text-muted-foreground">
                   Vælg om dashboardet skal vise data for alle, et specifikt team eller en kunde.
                 </p>
+                
+                {/* AI Recommendation */}
+                {scopeRecommendation && (
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <Lightbulb className="h-4 w-4" />
+                      AI Anbefaling
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {scopeRecommendation.reason}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 text-xs"
+                      onClick={applyRecommendation}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Anvend anbefaling
+                    </Button>
+                  </div>
+                )}
+                
                 <RadioGroup value={scopeType} onValueChange={(v) => setScopeType(v as typeof scopeType)}>
                   <div className="flex items-center space-x-2 p-3 rounded-md border">
                     <RadioGroupItem value="all" id="scope-all" />
