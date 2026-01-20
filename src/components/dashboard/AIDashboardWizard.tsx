@@ -76,8 +76,8 @@ const CATEGORY_ICONS: Record<KpiCategory, React.ReactNode> = {
 type WizardStep = "kpis" | "focus" | "scope" | "period" | "design" | "name";
 
 const STEPS: { id: WizardStep; title: string; icon: React.ReactNode }[] = [
-  { id: "kpis", title: "Vælg KPI'er", icon: <BarChart3 className="h-4 w-4" /> },
-  { id: "focus", title: "Fokuspunkt", icon: <Target className="h-4 w-4" /> },
+  { id: "kpis", title: "KPI'er", icon: <BarChart3 className="h-4 w-4" /> },
+  { id: "focus", title: "Fokus", icon: <Target className="h-4 w-4" /> },
   { id: "scope", title: "Scope", icon: <Users className="h-4 w-4" /> },
   { id: "period", title: "Periode", icon: <Clock className="h-4 w-4" /> },
   { id: "design", title: "Design", icon: <Palette className="h-4 w-4" /> },
@@ -224,7 +224,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -233,13 +233,13 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center justify-between px-2 py-3 border-b">
+        <div className="flex items-center gap-1 px-2 py-3 border-b overflow-x-auto">
           {STEPS.map((step, index) => (
-            <div key={step.id} className="flex items-center">
+            <div key={step.id} className="flex items-center flex-shrink-0">
               <button
                 onClick={() => index <= currentStepIndex && setCurrentStep(step.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded-md text-sm transition-colors",
+                  "flex items-center gap-1 px-1.5 py-1 rounded-md text-xs whitespace-nowrap transition-colors",
                   currentStep === step.id 
                     ? "bg-primary text-primary-foreground" 
                     : index < currentStepIndex 
@@ -249,10 +249,10 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                 disabled={index > currentStepIndex}
               >
                 {step.icon}
-                <span className="hidden sm:inline">{step.title}</span>
+                <span>{step.title}</span>
               </button>
               {index < STEPS.length - 1 && (
-                <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground" />
+                <ChevronRight className="h-3 w-3 mx-0.5 text-muted-foreground" />
               )}
             </div>
           ))}
