@@ -201,7 +201,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -236,7 +236,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
         </div>
 
         {/* Step content */}
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 max-h-[50vh] pr-4">
           <div className="py-4">
             {/* Step 1: KPI Selection */}
             {currentStep === "kpis" && (
