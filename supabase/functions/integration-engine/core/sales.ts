@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { StandardSale } from "../types.ts"
+import { StandardSale, PricingRule } from "../types.ts"
 import { chunk } from "../utils/batch.ts"
 
 /**
@@ -21,6 +21,65 @@ function isExcludedEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
   return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+}
+
+/**
+ * Match a pricing rule based on leadResultData conditions.
+ * Returns the matching rule with highest priority, or null if no match.
+ */
+function matchPricingRule(
+  productId: string,
+  pricingRulesMap: Map<string, PricingRule[]>,
+  leadResultData: Array<{ id?: number; label: string; value: string }>,
+  campaignMappingId?: string | null,
+  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
+): { commission: number; revenue: number; ruleId: string; ruleName: string } | null {
+  const rules = pricingRulesMap.get(productId);
+  if (!rules || rules.length === 0) return null;
+
+  // Sort by priority descending (highest first)
+  const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
+
+  for (const rule of sortedRules) {
+    if (!rule.is_active) continue;
+
+    // Check campaign restriction if rule has campaign_mapping_ids
+    if (rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0) {
+      if (!campaignMappingId || !rule.campaign_mapping_ids.includes(campaignMappingId)) {
+        continue;
+      }
+    }
+
+    // Check all conditions match
+    const conditions = rule.conditions || {};
+    let allConditionsMet = true;
+
+    for (const [condKey, condValue] of Object.entries(conditions)) {
+      // Find the matching field in leadResultData
+      const leadField = leadResultData.find(f => f.label === condKey);
+      if (!leadField || leadField.value !== condValue) {
+        allConditionsMet = false;
+        break;
+      }
+    }
+
+    if (allConditionsMet && Object.keys(conditions).length > 0) {
+      log?.("INFO", `Matched pricing rule "${rule.name}" for product ${productId}`, {
+        ruleId: rule.id,
+        conditions,
+        commission: rule.commission_dkk,
+        revenue: rule.revenue_dkk
+      });
+      return {
+        commission: rule.commission_dkk,
+        revenue: rule.revenue_dkk,
+        ruleId: rule.id,
+        ruleName: rule.name
+      };
+    }
+  }
+
+  return null;
 }
 
 async function ensureCampaignMappings(
@@ -73,8 +132,17 @@ function prepareSaleItems(
   productMapByExtId: Map<string, string>,
   productMapByName: Map<string, any>,
   dbProducts: any[] | null,
-  itemsArray: any[]
+  pricingRulesMap: Map<string, PricingRule[]>,
+  campaignMappingsMap: Map<string, string>,
+  itemsArray: any[],
+  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
+  // Extract leadResultData from rawPayload
+  const leadResultData = (sale.rawPayload?.leadResultData as Array<{ id?: number; label: string; value: string }>) || [];
+  
+  // Get campaign mapping ID for this sale
+  const campaignMappingId = sale.campaignId ? campaignMappingsMap.get(sale.campaignId) : null;
+
   for (const p of sale.products) {
     let productId = productMapByExtId.get(p.externalId)
     if (!productId && p.name) {
@@ -83,14 +151,33 @@ function prepareSaleItems(
     }
     let commission = 0
     let revenue = 0
+    let matchedRuleId: string | null = null
     const qty = p.quantity || 1
+
     if (productId) {
-      const fullProduct = dbProducts?.find((x) => x.id === productId)
-      if (fullProduct) {
-        commission = (fullProduct.commission_dkk || 0) * qty
-        revenue = (fullProduct.revenue_dkk || 0) * qty
+      // First: try to match a pricing rule based on leadResultData conditions
+      const matchedRule = matchPricingRule(
+        productId,
+        pricingRulesMap,
+        leadResultData,
+        campaignMappingId,
+        log
+      );
+
+      if (matchedRule) {
+        commission = matchedRule.commission * qty;
+        revenue = matchedRule.revenue * qty;
+        matchedRuleId = matchedRule.ruleId;
+      } else {
+        // Fallback to base product pricing
+        const fullProduct = dbProducts?.find((x) => x.id === productId)
+        if (fullProduct) {
+          commission = (fullProduct.commission_dkk || 0) * qty
+          revenue = (fullProduct.revenue_dkk || 0) * qty
+        }
       }
     }
+
     itemsArray.push({
       sale_id: saleId,
       product_id: productId || null,
@@ -101,6 +188,7 @@ function prepareSaleItems(
       mapped_commission: commission,
       mapped_revenue: revenue,
       needs_mapping: !productId,
+      matched_pricing_rule_id: matchedRuleId,
     })
   }
 }
@@ -111,6 +199,8 @@ async function processSalesBatch(
   productMapByName: Map<string, any>,
   productMapByExtId: Map<string, string>,
   dbProducts: any[] | null,
+  pricingRulesMap: Map<string, PricingRule[]>,
+  campaignMappingsMap: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
   let processed = 0
@@ -214,7 +304,17 @@ async function processSalesBatch(
       for (const sale of sales) {
         const saleId = saleIdMap.get(sale.externalId)
         if (saleId) {
-          prepareSaleItems(sale, saleId, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert)
+          prepareSaleItems(
+            sale,
+            saleId,
+            productMapByExtId,
+            productMapByName,
+            dbProducts,
+            pricingRulesMap,
+            campaignMappingsMap,
+            saleItemsToInsert,
+            log
+          )
         }
       }
     }
@@ -287,10 +387,44 @@ export async function processSales(
   }
 
   await ensureCampaignMappings(supabase, filteredSales, log)
-  const { data: dbProducts } = await supabase.from("products").select("id, name, commission_dkk, revenue_dkk")
-  const { data: dbMappings } = await supabase.from("adversus_product_mappings").select("*")
+  
+  // Fetch products, product mappings, pricing rules, and campaign mappings in parallel
+  const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult] = await Promise.all([
+    supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
+    supabase.from("adversus_product_mappings").select("*"),
+    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids").eq("is_active", true),
+    supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id")
+  ]);
+
+  const dbProducts = productsResult.data;
+  const dbMappings = mappingsResult.data;
+  const pricingRules = pricingRulesResult.data;
+  const campaignMappings = campaignMappingsResult.data;
+
   const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]))
   const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]))
+  
+  // Build pricing rules map: product_id -> array of rules
+  const pricingRulesMap = new Map<string, PricingRule[]>();
+  if (pricingRules) {
+    for (const rule of pricingRules) {
+      const existing = pricingRulesMap.get(rule.product_id) || [];
+      existing.push(rule as PricingRule);
+      pricingRulesMap.set(rule.product_id, existing);
+    }
+    if (pricingRulesMap.size > 0) {
+      log("INFO", `Loaded ${pricingRules.length} active pricing rules for ${pricingRulesMap.size} products`);
+    }
+  }
+
+  // Build campaign mappings map: adversus_campaign_id -> mapping id
+  const campaignMappingsMap = new Map<string, string>();
+  if (campaignMappings) {
+    for (const mapping of campaignMappings) {
+      campaignMappingsMap.set(mapping.adversus_campaign_id, mapping.id);
+    }
+  }
+
   let totalProcessed = 0
   let totalErrors = 0
   const batches = chunk(filteredSales, batchSize)
@@ -304,6 +438,8 @@ export async function processSales(
       productMapByName,
       productMapByExtId,
       dbProducts,
+      pricingRulesMap,
+      campaignMappingsMap,
       log
     )
     totalProcessed += processed

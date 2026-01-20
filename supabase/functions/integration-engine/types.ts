@@ -164,3 +164,16 @@ export interface FetchParams {
   range?: DateRange;
   campaignId?: string;
 }
+
+// Pricing rule for conditional commission/revenue calculation
+export interface PricingRule {
+  id: string;
+  product_id: string;
+  name: string;
+  conditions: Record<string, string>;
+  commission_dkk: number;
+  revenue_dkk: number;
+  priority: number;
+  is_active: boolean;
+  campaign_mapping_ids?: string[] | null;
+}
