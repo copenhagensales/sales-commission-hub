@@ -6784,6 +6784,7 @@ export type Database = {
           id: string
           mapped_commission: number | null
           mapped_revenue: number | null
+          matched_pricing_rule_id: string | null
           needs_mapping: boolean | null
           product_id: string | null
           quantity: number | null
@@ -6798,6 +6799,7 @@ export type Database = {
           id?: string
           mapped_commission?: number | null
           mapped_revenue?: number | null
+          matched_pricing_rule_id?: string | null
           needs_mapping?: boolean | null
           product_id?: string | null
           quantity?: number | null
@@ -6812,6 +6814,7 @@ export type Database = {
           id?: string
           mapped_commission?: number | null
           mapped_revenue?: number | null
+          matched_pricing_rule_id?: string | null
           needs_mapping?: boolean | null
           product_id?: string | null
           quantity?: number | null
@@ -6820,6 +6823,13 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_items_matched_pricing_rule_id_fkey"
+            columns: ["matched_pricing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "product_pricing_rules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_items_product_id_fkey"
             columns: ["product_id"]
