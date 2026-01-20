@@ -48,6 +48,7 @@ import {
   X,
   FolderOpen,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,7 @@ import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
 import { useEmployeeDashboards, DashboardWidget } from "@/hooks/useEmployeeDashboards";
 import { useWidgetKpiData } from "@/hooks/useDashboardKpiData";
+import { AIDashboardWizard } from "@/components/dashboard/AIDashboardWizard";
 
 interface TimePeriod {
   id: string;
@@ -191,6 +193,7 @@ export default function DesignDashboard() {
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+  const [isAIWizardOpen, setIsAIWizardOpen] = useState(false);
   const [dashboardName, setDashboardName] = useState("Mit Dashboard");
   const [currentDashboardId, setCurrentDashboardId] = useState<string | null>(null);
   const [globalDesign, setGlobalDesign] = useState<string>(() => {
@@ -605,42 +608,16 @@ export default function DesignDashboard() {
           )}
         </div>
 
-        {/* Floating action buttons - bottom right, always on top */}
-        <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50 opacity-40 hover:opacity-100 transition-opacity duration-300">
-          <Button onClick={openAddWidgetDialog} size="sm" className="shadow-lg">
-            <Plus className="h-4 w-4 mr-2" />
-            Tilføj widget
+        {/* Floating AI button - bottom right */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button 
+            onClick={() => setIsAIWizardOpen(true)} 
+            size="lg" 
+            className="shadow-lg gap-2"
+          >
+            <Sparkles className="h-5 w-5" />
+            Design med AI
           </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button size="sm" className="shadow-lg">
-                <Palette className="h-4 w-4 mr-2" />
-                Vælg Design
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64" align="end" side="top">
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Vælg Design</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {activeDesignTypes.map((design) => (
-                    <div
-                      key={design.id}
-                      onClick={() => setGlobalDesign(design.id)}
-                      className={cn(
-                        "p-2 rounded-lg border-2 cursor-pointer transition-all",
-                        globalDesign === design.id
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "border-border hover:border-primary/50",
-                      )}
-                    >
-                      <div className={cn("h-6 rounded-md mb-1", design.preview)} />
-                      <p className="text-xs font-medium text-center">{design.name}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
         </div>
       </div>
 
@@ -1086,6 +1063,19 @@ export default function DesignDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Dashboard Wizard */}
+      <AIDashboardWizard
+        open={isAIWizardOpen}
+        onOpenChange={setIsAIWizardOpen}
+        onGenerate={(widgets, designId) => {
+          setPlacedWidgets(widgets as PlacedWidget[]);
+          setGlobalDesign(designId);
+          setIsAIWizardOpen(false);
+        }}
+        teams={teams}
+        clients={clients}
+      />
     </div>
   );
 }

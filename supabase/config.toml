@@ -1,5 +1,8 @@
 project_id = "jwlimmeijpfmaksvmuru"
 
+[functions.generate-dashboard-layout]
+verify_jwt = false
+
 [functions.parse-expense-formula]
 verify_jwt = false
 
