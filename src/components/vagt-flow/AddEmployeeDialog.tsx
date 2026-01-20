@@ -208,12 +208,44 @@ export function AddEmployeeDialog({
     enabled: open && employeeIds.length > 0,
   });
 
-  // Helper to check if employee has shift on day
+  // Fetch individual shifts from the shift table (highest priority in hierarchy)
+  const { data: individualShifts = [] } = useQuery({
+    queryKey: ["individual-shifts-for-booking", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"), employeeIds],
+    queryFn: async () => {
+      if (employeeIds.length === 0) return [];
+      
+      const weekDates = Array.from({ length: 7 }, (_, i) => 
+        format(addDays(weekStart, i), "yyyy-MM-dd")
+      );
+      
+      const { data, error } = await supabase
+        .from("shift")
+        .select("employee_id, date")
+        .in("employee_id", employeeIds)
+        .in("date", weekDates);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && employeeIds.length > 0,
+  });
+
+  // Helper to check if employee has shift on day - following shift hierarchy:
+  // 1. Individual shift (shift table) - highest priority
+  // 2. Employee special shift (employee_standard_shifts)
+  // 3. Team primary shift (team_standard_shift_days) - lowest priority
   const hasShiftOnDay = useCallback((employeeId: string, dayIndex: number): boolean => {
     // dayIndex 0-6 where 0=Monday, convert to DB format 1=Monday, 7=Sunday
     const dbDayOfWeek = dayIndex + 1;
+    const dayDate = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
     
-    // 1. Check special shift first
+    // 1. Check individual shift first (highest priority)
+    const hasIndividualShift = individualShifts.some(
+      s => s.employee_id === employeeId && s.date === dayDate
+    );
+    if (hasIndividualShift) return true;
+    
+    // 2. Check special shift
     const specialShift = employeeSpecialShifts?.assignments?.find(
       s => s.employee_id === employeeId
     );
@@ -224,7 +256,7 @@ export function AddEmployeeDialog({
       return days.includes(dbDayOfWeek);
     }
     
-    // 2. Fallback to team primary shift
+    // 3. Fallback to team primary shift
     const primaryShift = primaryShiftsData?.shifts?.[0];
     if (!primaryShift) return false;
     
@@ -234,7 +266,7 @@ export function AddEmployeeDialog({
     
     // Default: weekdays have shift (Mon-Fri = 1-5)
     return dbDayOfWeek >= 1 && dbDayOfWeek <= 5;
-  }, [primaryShiftsData, employeeSpecialShifts]);
+  }, [weekStart, individualShifts, primaryShiftsData, employeeSpecialShifts]);
 
   // Check if employee has no shifts at all
   const hasNoShiftsAtAll = useCallback((employeeId: string): boolean => {
