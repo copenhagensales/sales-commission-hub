@@ -666,11 +666,19 @@ export class EnreachAdapter implements DialerAdapter {
         break;
       case "static_value":
         if (rule.staticProductName) {
-          // FIX: Use product name as externalId instead of conditionKey
+          // Parse quantity from the conditionKey value (e.g., "5GI salg": 2)
+          let qty = 1;
+          if (rule.conditionKey) {
+            const conditionValue = this.getValue(dataObj, [rule.conditionKey]);
+            const parsed = parseInt(String(conditionValue), 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              qty = parsed;
+            }
+          }
           products.push({
             name: rule.staticProductName,
             externalId: rule.staticProductName,
-            quantity: 1,
+            quantity: qty,
             unitPrice: rule.staticProductPrice || 0,
           });
         }
