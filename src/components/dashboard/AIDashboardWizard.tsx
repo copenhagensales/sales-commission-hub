@@ -233,30 +233,43 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
           </DialogTitle>
         </DialogHeader>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 px-2 py-3 border-b overflow-x-auto">
-          {STEPS.map((step, index) => (
-            <div key={step.id} className="flex items-center flex-shrink-0">
-              <button
-                onClick={() => index <= currentStepIndex && setCurrentStep(step.id)}
-                className={cn(
-                  "flex items-center gap-1 px-1.5 py-1 rounded-md text-xs whitespace-nowrap transition-colors",
-                  currentStep === step.id 
-                    ? "bg-primary text-primary-foreground" 
-                    : index < currentStepIndex 
-                      ? "text-primary hover:bg-muted cursor-pointer"
-                      : "text-muted-foreground"
+        {/* Step indicator - Progress bar design */}
+        <div className="px-6 py-4 border-b bg-muted/30">
+          <div className="flex items-center justify-between">
+            {STEPS.map((step, index) => (
+              <div key={step.id} className="flex items-center flex-1 last:flex-none">
+                {/* Step circle */}
+                <button
+                  onClick={() => index <= currentStepIndex && setCurrentStep(step.id)}
+                  disabled={index > currentStepIndex}
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all shrink-0",
+                    currentStep === step.id
+                      ? "bg-primary text-primary-foreground shadow-md ring-4 ring-primary/20"
+                      : index < currentStepIndex
+                        ? "bg-primary/80 text-primary-foreground hover:bg-primary cursor-pointer"
+                        : "bg-muted text-muted-foreground border border-border"
+                  )}
+                >
+                  {index + 1}
+                </button>
+                
+                {/* Connecting line */}
+                {index < STEPS.length - 1 && (
+                  <div className={cn(
+                    "flex-1 h-1 mx-2 rounded-full transition-colors",
+                    index < currentStepIndex ? "bg-primary/80" : "bg-muted"
+                  )} />
                 )}
-                disabled={index > currentStepIndex}
-              >
-                {step.icon}
-                <span>{step.title}</span>
-              </button>
-              {index < STEPS.length - 1 && (
-                <ChevronRight className="h-3 w-3 mx-0.5 text-muted-foreground" />
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
+          
+          {/* Current step title */}
+          <div className="flex items-center gap-2 mt-3 text-sm font-medium text-foreground">
+            {STEPS[currentStepIndex].icon}
+            <span>Step {currentStepIndex + 1}: {STEPS[currentStepIndex].title}</span>
+          </div>
         </div>
 
         {/* Step content */}
