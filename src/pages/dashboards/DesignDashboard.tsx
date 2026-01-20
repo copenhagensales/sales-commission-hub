@@ -58,7 +58,7 @@ import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
 import { useEmployeeDashboards, DashboardWidget } from "@/hooks/useEmployeeDashboards";
 import { useWidgetKpiData } from "@/hooks/useDashboardKpiData";
-import { AIDashboardWizard } from "@/components/dashboard/AIDashboardWizard";
+import { AIDashboardWizard, AIDashboardWizardOptions } from "@/components/dashboard/AIDashboardWizard";
 
 interface TimePeriod {
   id: string;
@@ -1068,10 +1068,26 @@ export default function DesignDashboard() {
       <AIDashboardWizard
         open={isAIWizardOpen}
         onOpenChange={setIsAIWizardOpen}
-        onGenerate={(widgets, designId) => {
-          setPlacedWidgets(widgets as PlacedWidget[]);
+        onGenerate={(widgets, designId, options: AIDashboardWizardOptions) => {
+          // Apply scope settings to all generated widgets
+          const widgetsWithScope = widgets.map(w => ({
+            ...w,
+            limitToTeam: options.scopeType === "team",
+            teamId: options.scopeType === "team" ? options.teamId : undefined,
+            limitToClient: options.scopeType === "client",
+            clientId: options.scopeType === "client" ? options.clientId : undefined,
+            timePeriodId: options.period,
+          }));
+          
+          setPlacedWidgets(widgetsWithScope as PlacedWidget[]);
           setGlobalDesign(designId);
           setIsAIWizardOpen(false);
+          
+          // Auto-open save dialog with suggested name
+          const today = new Date().toLocaleDateString('da-DK');
+          setDashboardName(`AI Dashboard - ${today}`);
+          setCurrentDashboardId(null); // Ensure we create a new dashboard
+          setIsSaveDialogOpen(true);
         }}
         teams={teams}
         clients={clients}
