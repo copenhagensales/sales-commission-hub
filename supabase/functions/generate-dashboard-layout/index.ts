@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,22 +49,41 @@ const categoryWidgetSuggestions: Record<string, string[]> = {
   other: ["kpi_card", "comparison_card", "bar_chart"]
 };
 
+// Map frontend period to database format
+function mapPeriodToDb(period: string): string {
+  const mapping: Record<string, string> = {
+    "today": "today",
+    "this-week": "this_week",
+    "this-month": "this_month",
+    "payroll-period": "payroll_period",
+  };
+  return mapping[period] || "this_month";
+}
+
 const DESIGN_PRINCIPLES = `
 DU ER EN PROFESSIONEL DASHBOARD DESIGNER med ekspertise i data visualisering.
 
 KRITISKE DESIGN PRINCIPPER:
 
-1. VISUEL HIERARKI
+1. DATADREVET DESIGN (VIGTIGT!)
+   - Brug de faktiske KPI-værdier til at beslutte widget-typer og størrelser
+   - Store tal (1000+) fortjener prominente charts (line_chart, bar_chart) med width 4-6
+   - Procent-værdier passer godt til goal_progress eller comparison_card
+   - Penge-værdier (kr) ser godt ud i store, fremtrædende widgets
+   - KPIs med "Ingen data" kan stadig vises som kpi_card
+   - Fremhæv de mest imponerende tal med store widgets
+
+2. VISUEL HIERARKI
    - Fokus KPI'er SKAL være store (width: 4-6, height: 2) og placeret øverst
    - Normale KPI'er er mindre (width: 2-3, height: 1)
    - Vigtigste information øverst til venstre
 
-2. VARIATION OG BALANCE
+3. VARIATION OG BALANCE
    - ALDRIG alle widgets samme størrelse - mix store, medium og små
    - Brug forskellige widget typer for visuel interesse
    - Balancer venstre og højre side af layoutet
 
-3. WIDGET TYPE VALG
+4. WIDGET TYPE VALG
    - "line_chart": Trends over tid - PERFEKT til fokus KPIs, salg, aktivitet (størrelse 4x2 eller 6x2)
    - "bar_chart": Sammenligning mellem kategorier - god til timer, distribution (størrelse 4x2 eller 3x2)
    - "kpi_card": Enkelt tal med trend pil - alle KPI typer (størrelse 2x1 eller 3x1)
@@ -73,12 +93,12 @@ KRITISKE DESIGN PRINCIPPER:
    - "leaderboard": Top performere liste - salg, aktivitet (størrelse 4x3 eller 6x3)
    - "multi_kpi_card": Flere relaterede KPIs samlet (størrelse 4x1 eller 6x1)
 
-4. GRID SYSTEM
+5. GRID SYSTEM
    - Griddet har 12 kolonner (x: 0-11)
    - Widgets må IKKE overlappe - beregn x + width <= 12
    - Start ny række når der ikke er plads
 
-5. LAYOUT STRUKTUR
+6. LAYOUT STRUKTUR
    Række 1 (y=0): Hero sektion
    - 1-2 store fokus charts (4x2 eller 6x2)
    - 2-4 små KPI cards i højre side (2x1 hver)
@@ -123,23 +143,72 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Initialize Supabase client to fetch real KPI values
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Fetch current KPI values from cache
+    const kpiSlugs = kpis.map(k => k.slug);
+    const dbPeriod = mapPeriodToDb(period);
+    
+    let kpiQuery = supabase
+      .from("kpi_cached_values")
+      .select("kpi_slug, value, formatted_value, period_type")
+      .in("kpi_slug", kpiSlugs)
+      .eq("period_type", dbPeriod);
+
+    // Apply scope filtering
+    if (scopeType === "team" && teamId) {
+      kpiQuery = kpiQuery.eq("scope_type", "team").eq("scope_id", teamId);
+    } else if (scopeType === "client" && clientId) {
+      kpiQuery = kpiQuery.eq("scope_type", "client").eq("scope_id", clientId);
+    } else {
+      kpiQuery = kpiQuery.eq("scope_type", "global");
+    }
+
+    const { data: kpiValues, error: kpiError } = await kpiQuery;
+    
+    if (kpiError) {
+      console.error("Error fetching KPI values:", kpiError);
+    }
+
+    // Build value map for quick lookup
+    const valueMap = new Map(kpiValues?.map(v => [v.kpi_slug, v]) || []);
+    
+    console.log(`Fetched ${kpiValues?.length || 0} KPI values for context`);
+
     const focusSlugs = new Set(focusKpis.map(k => k.slug));
     
-    // Build detailed KPI context for the AI
+    // Build detailed KPI context for the AI with real values
     const kpiContext = kpis.map(k => {
       const isFocus = focusSlugs.has(k.slug);
+      const cachedValue = valueMap.get(k.slug);
       const suggestedWidgets = categoryWidgetSuggestions[k.category] || categoryWidgetSuggestions.other;
-      return `- ${k.name} (slug: "${k.slug}", kategori: ${k.category})${isFocus ? ' [FOKUS - SKAL VÆRE STOR]' : ''} - Anbefalet: ${suggestedWidgets.join(', ')}`;
+      
+      // Format value info for AI
+      let valueInfo = "Ingen data endnu";
+      if (cachedValue) {
+        valueInfo = `Aktuel værdi: ${cachedValue.formatted_value} (rå værdi: ${cachedValue.value})`;
+      }
+      
+      return `- ${k.name} (slug: "${k.slug}", kategori: ${k.category})
+    ${valueInfo}
+    ${isFocus ? '[FOKUS - SKAL VÆRE STOR OG FREMTRÆDENDE]' : ''}
+    Anbefalet widget-typer: ${suggestedWidgets.join(', ')}`;
     }).join('\n');
 
     const prompt = `${DESIGN_PRINCIPLES}
 
-MINE VALGTE KPI'ER:
+MINE VALGTE KPI'ER MED AKTUELLE VÆRDIER:
 ${kpiContext}
 
 OPGAVE:
 Generer et professionelt, visuelt tiltalende dashboard layout.
 - Fokus KPI'er (markeret med [FOKUS]) SKAL have store widgets (width 4-6, height 2) med line_chart eller bar_chart
+- Brug de faktiske værdier til at beslutte hvilke KPIs der fortjener store widgets
+- Store/imponerende tal bør fremhæves med prominente charts
 - Normale KPI'er skal have varierede størrelser og typer
 - Sørg for at widgets IKKE overlapper (x + width <= 12)
 - Brug ALLE de valgte KPI'er
@@ -156,7 +225,7 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
         messages: [
           { 
             role: "system", 
-            content: "Du er en ekspert dashboard designer. Returner KUN valid JSON via tool call. Lav ALTID visuelt interessante layouts med variation i widget størrelser og typer." 
+            content: "Du er en ekspert dashboard designer. Returner KUN valid JSON via tool call. Lav ALTID visuelt interessante layouts med variation i widget størrelser og typer. Brug de faktiske KPI-værdier til at træffe designbeslutninger - store værdier fortjener store widgets!" 
           },
           { role: "user", content: prompt }
         ],
@@ -164,7 +233,7 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
           type: "function",
           function: {
             name: "generate_dashboard_widgets",
-            description: "Genererer et professionelt dashboard layout med varierede widget størrelser og typer",
+            description: "Genererer et professionelt dashboard layout med varierede widget størrelser og typer baseret på faktiske KPI-værdier",
             parameters: {
               type: "object",
               properties: {
@@ -185,7 +254,7 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
                           "leaderboard",
                           "multi_kpi_card"
                         ],
-                        description: "Widget type - vælg baseret på KPI kategori og om det er fokus" 
+                        description: "Widget type - vælg baseret på KPI kategori, værdi og om det er fokus" 
                       },
                       kpiSlug: { 
                         type: "string", 
