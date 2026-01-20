@@ -447,9 +447,9 @@ const SalesRegistration = () => {
           product_name: selection.productName,
           phone_number: phone.trim(),
           comment: comment || undefined,
-          registered_at: isCallbackMode && callbackDate 
-            ? format(callbackDate, "yyyy-MM-dd'T'12:00:00")
-            : undefined,
+              registered_at: isCallbackMode && callbackDate 
+                ? format(callbackDate, "yyyy-MM-dd'T'12:00:00")
+                : new Date().toISOString(),
         }))
       );
 
