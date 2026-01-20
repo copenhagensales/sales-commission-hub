@@ -2089,34 +2089,6 @@ export default function MgTest() {
                     Vis skjulte produkter
                   </Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => toggleAllProductsHidden.mutate(true)}
-                    disabled={toggleAllProductsHidden.isPending}
-                  >
-                    {toggleAllProductsHidden.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <EyeOff className="h-4 w-4 mr-2" />
-                    )}
-                    Skjul alle
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => toggleAllProductsHidden.mutate(false)}
-                    disabled={toggleAllProductsHidden.isPending}
-                  >
-                    {toggleAllProductsHidden.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Eye className="h-4 w-4 mr-2" />
-                    )}
-                    Vis alle
-                  </Button>
-                </div>
               </div>
               <Button onClick={() => setCreateProductDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
