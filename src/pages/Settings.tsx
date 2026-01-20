@@ -77,6 +77,7 @@ const availableDataSources: Record<string, { key: string; label: string; descrip
 };
 
 const frequencyOptions = [
+  { value: "5", label: "Hvert 5. minut" },
   { value: "15", label: "Hvert 15. minut" },
   { value: "30", label: "Hvert 30. minut" },
   { value: "60", label: "Hver time" },
