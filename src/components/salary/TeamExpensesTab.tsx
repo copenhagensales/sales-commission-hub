@@ -26,6 +26,7 @@ interface TeamExpense {
   notes: string | null;
   is_recurring?: boolean;
   is_dynamic?: boolean;
+  all_days?: boolean;
   formula_description?: string | null;
   teams?: { name: string };
 }
@@ -80,7 +81,7 @@ export function TeamExpensesTab() {
       // Fetch one-time expenses within period
       let oneTimeQuery = (supabase
         .from("team_expenses") as any)
-        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, formula_description")
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, all_days, formula_description")
         .eq("is_recurring", false)
         .gte("expense_date", periodStart.toISOString().split("T")[0])
         .lte("expense_date", periodEnd.toISOString().split("T")[0]);
@@ -92,7 +93,7 @@ export function TeamExpensesTab() {
       // Fetch all recurring expenses (they appear in every period)
       let recurringQuery = (supabase
         .from("team_expenses") as any)
-        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, formula_description")
+        .select("id, team_id, description, amount, expense_date, category, notes, is_recurring, is_dynamic, all_days, formula_description")
         .eq("is_recurring", true);
 
       if (selectedTeam !== "all") {
@@ -272,7 +273,11 @@ export function TeamExpensesTab() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>{format(new Date(expense.expense_date), "d. MMM yyyy", { locale: da })}</TableCell>
+                        <TableCell>
+                          {expense.all_days 
+                            ? "Alle dage" 
+                            : format(new Date(expense.expense_date), "d. MMM yyyy", { locale: da })}
+                        </TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(expense.amount))}</TableCell>
                         <TableCell>
                           <DropdownMenu>

@@ -1,0 +1,1 @@
+ALTER TABLE team_expenses ADD COLUMN all_days BOOLEAN DEFAULT false;

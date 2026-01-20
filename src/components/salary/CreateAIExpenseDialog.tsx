@@ -197,6 +197,7 @@ export function CreateAIExpenseDialog({
         notes: `AI-genereret: ${description}\n\nFormel: ${result.formula}\nForklaring: ${editableResult.explanation}`,
         is_recurring: true,
         is_dynamic: true,
+        all_days: true,
         calculation_formula: result.formula,
         formula_variables: result.variables as Record<string, unknown>,
         formula_description: editableResult.explanation,
