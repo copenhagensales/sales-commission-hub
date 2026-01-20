@@ -28,10 +28,19 @@ interface PlacedWidget {
   showTrend?: boolean;
 }
 
+export interface AIDashboardWizardOptions {
+  scopeType: "all" | "team" | "client";
+  teamId?: string;
+  clientId?: string;
+  period: string;
+  selectedKpis: string[];
+  focusKpis: string[];
+}
+
 interface AIDashboardWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onGenerate: (widgets: PlacedWidget[], designId: string) => void;
+  onGenerate: (widgets: PlacedWidget[], designId: string, options: AIDashboardWizardOptions) => void;
   teams: { id: string; name: string }[];
   clients: { id: string; name: string }[];
 }
@@ -169,7 +178,14 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
       if (error) throw error;
 
       if (data?.widgets) {
-        onGenerate(data.widgets, selectedDesign);
+        onGenerate(data.widgets, selectedDesign, {
+          scopeType,
+          teamId: selectedTeamId || undefined,
+          clientId: selectedClientId || undefined,
+          period: selectedPeriod,
+          selectedKpis,
+          focusKpis,
+        });
         toast({ title: "Dashboard genereret!", description: "AI har oprettet dit dashboard baseret på dine valg." });
         resetWizard();
       } else {
