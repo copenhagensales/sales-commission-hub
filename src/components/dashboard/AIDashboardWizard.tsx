@@ -7,10 +7,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, MessageSquare } from "lucide-react";
+import { Loader2, Sparkles, ChevronRight, ChevronLeft, BarChart3, Clock, Users, Palette, Target, MessageSquare, Calculator } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useKpiDefinitions, KpiCategory } from "@/hooks/useKpiDefinitions";
+import { useKpiFormulas } from "@/hooks/useKpiFormulas";
 import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -87,7 +88,9 @@ const STEPS: { id: WizardStep; title: string; icon: React.ReactNode }[] = [
 export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clients }: AIDashboardWizardProps) {
   const { toast } = useToast();
   const { data: kpiDefinitions = [], isLoading: kpisLoading } = useKpiDefinitions();
+  const { data: kpiFormulas = [], isLoading: formulasLoading } = useKpiFormulas();
   const { activeDesignTypes } = useDesignTypes();
+  const isLoading = kpisLoading || formulasLoading;
   
   const [currentStep, setCurrentStep] = useState<WizardStep>("kpis");
   const [selectedKpis, setSelectedKpis] = useState<string[]>([]);
@@ -160,13 +163,34 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
     setIsGenerating(true);
     
     try {
-      const selectedKpiDetails = kpiDefinitions
+      // KPI definitions
+      const definitionDetails = kpiDefinitions
         .filter(k => selectedKpis.includes(k.slug))
-        .map(k => ({ slug: k.slug, name: k.name, category: k.category }));
+        .map(k => ({ slug: k.slug, name: k.name, category: k.category, type: "definition" as const }));
       
-      const focusKpiDetails = kpiDefinitions
+      // KPI formulas (with formula: prefix)
+      const formulaDetails = kpiFormulas
+        .filter(f => selectedKpis.includes(`formula:${f.id}`))
+        .map(f => ({ 
+          slug: `formula:${f.id}`, 
+          name: f.name, 
+          category: "formula", 
+          type: "formula" as const,
+          formula: f.formula 
+        }));
+      
+      const selectedKpiDetails = [...definitionDetails, ...formulaDetails];
+      
+      // Focus KPIs (can be both definitions and formulas)
+      const focusDefinitions = kpiDefinitions
         .filter(k => focusKpis.includes(k.slug))
         .map(k => ({ slug: k.slug, name: k.name }));
+      
+      const focusFormulas = kpiFormulas
+        .filter(f => focusKpis.includes(`formula:${f.id}`))
+        .map(f => ({ slug: `formula:${f.id}`, name: f.name }));
+      
+      const focusKpiDetails = [...focusDefinitions, ...focusFormulas];
 
       const { data, error } = await supabase.functions.invoke("generate-dashboard-layout", {
         body: {
@@ -281,7 +305,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                 <p className="text-sm text-muted-foreground">
                   Vælg de KPI'er du vil have på dit dashboard. Du kan vælge flere.
                 </p>
-                {kpisLoading ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
@@ -315,6 +339,36 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Sammensatte formler sektion */}
+                    {kpiFormulas.filter(f => f.is_active).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Calculator className="h-4 w-4" />
+                          Sammensatte formler
+                          <Badge variant="secondary" className="text-xs">
+                            {kpiFormulas.filter(f => f.is_active).length}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 ml-6">
+                          {kpiFormulas.filter(f => f.is_active).map(formula => (
+                            <div
+                              key={`formula-${formula.id}`}
+                              onClick={() => toggleKpi(`formula:${formula.id}`)}
+                              className={cn(
+                                "flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors",
+                                selectedKpis.includes(`formula:${formula.id}`)
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:border-primary/50"
+                              )}
+                            >
+                              <Checkbox checked={selectedKpis.includes(`formula:${formula.id}`)} />
+                              <span className="text-sm truncate">{formula.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 {selectedKpis.length > 0 && (
@@ -334,6 +388,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                   Vælg op til 3 KPI'er der skal fremhæves på dashboardet (valgfrit).
                 </p>
                 <div className="grid grid-cols-2 gap-2">
+                  {/* KPI Definitions */}
                   {kpiDefinitions
                     .filter(k => selectedKpis.includes(k.slug))
                     .map(kpi => (
@@ -353,6 +408,27 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
                           focusKpis.includes(kpi.slug) ? "text-primary" : "text-muted-foreground"
                         )} />
                         <span className="text-sm">{kpi.name}</span>
+                      </div>
+                    ))}
+                  {/* KPI Formulas */}
+                  {kpiFormulas
+                    .filter(f => selectedKpis.includes(`formula:${f.id}`))
+                    .map(formula => (
+                      <div
+                        key={`formula-${formula.id}`}
+                        onClick={() => toggleFocusKpi(`formula:${formula.id}`)}
+                        className={cn(
+                          "flex items-center gap-2 p-3 rounded-md border cursor-pointer transition-colors",
+                          focusKpis.includes(`formula:${formula.id}`)
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                            : "border-border hover:border-primary/50"
+                        )}
+                      >
+                        <Calculator className={cn(
+                          "h-4 w-4",
+                          focusKpis.includes(`formula:${formula.id}`) ? "text-primary" : "text-muted-foreground"
+                        )} />
+                        <span className="text-sm">{formula.name}</span>
                       </div>
                     ))}
                 </div>

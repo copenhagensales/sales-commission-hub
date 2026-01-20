@@ -13,6 +13,7 @@ export interface KpiFormula {
   multiplier: number;
   symbol: string | null;
   symbol_position: 'before' | 'after';
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
