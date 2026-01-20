@@ -1655,6 +1655,7 @@ export function DialerIntegrations() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="0">{t("dialerIntegrations.disabled")}</SelectItem>
+                              <SelectItem value="5">{t("dialerIntegrations.every5min")}</SelectItem>
                               <SelectItem value="15">{t("dialerIntegrations.every15min")}</SelectItem>
                               <SelectItem value="30">{t("dialerIntegrations.every30min")}</SelectItem>
                               <SelectItem value="60">{t("dialerIntegrations.everyHour")}</SelectItem>

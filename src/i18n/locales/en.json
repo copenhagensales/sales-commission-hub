@@ -119,6 +119,7 @@
     "tableHeaderLastSync": "Last synced",
     "tableHeaderActions": "Actions",
     "disabled": "Disabled",
+    "every5min": "Every 5 min",
     "every15min": "Every 15 min",
     "every30min": "Every 30 min",
     "everyHour": "Every hour",
