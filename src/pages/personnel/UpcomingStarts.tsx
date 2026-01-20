@@ -288,7 +288,8 @@ export default function UpcomingStarts() {
               body: {
                 employeeId: employee.id,
                 email: candidate.email,
-                name: `${candidate.first_name} ${candidate.last_name}`,
+                firstName: candidate.first_name,
+                lastName: candidate.last_name,
               },
             }
           );
