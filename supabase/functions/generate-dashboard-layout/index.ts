@@ -20,6 +20,7 @@ interface RequestBody {
   clientId?: string;
   period: string;
   designId: string;
+  aiPrompt?: string;
 }
 
 interface GeneratedWidget {
@@ -59,6 +60,51 @@ function mapPeriodToDb(period: string): string {
   };
   return mapping[period] || "this_month";
 }
+
+// Design style prompts based on designId
+const DESIGN_STYLE_PROMPTS: Record<string, string> = {
+  minimal: `
+DESIGN STIL: MINIMAL
+- Brug færre, større widgets (max 5-6 widgets total)
+- Fokuser på whitespace og klarhed
+- Undgå pie_charts og leaderboards
+- Primært kpi_card og line_chart
+- Store widgets foretrækkes (width 4-6)
+- Simpel, elegant layout med få elementer`,
+
+  modern: `
+DESIGN STIL: MODERNE
+- Brug variation i widget-typer for visuel interesse
+- Inkluder goal_progress og comparison_card
+- Balanceret layout med 2-3 rækker
+- Mix af størrelser for dynamisk feel
+- 7-10 widgets er ideelt`,
+
+  executive: `
+DESIGN STIL: EXECUTIVE
+- Store, fremtrædende charts øverst (6x2 minimum for hero)
+- Fokus på line_chart og bar_chart for trends
+- Inkluder leaderboard i fuld bredde hvis relevant
+- Maksimer visuel impact med store tal
+- Professionelt, imponerende layout
+- Brug comparison_card til at vise vækst`,
+
+  compact: `
+DESIGN STIL: KOMPAKT
+- Mange små widgets (2x1 og 3x1)
+- Effektiv brug af plads - ingen spild
+- Grid-baseret layout med tæt spacing
+- Multi_kpi_card for relaterede KPIs
+- Maksimer information på skærmen
+- 10-12 widgets er fint`,
+
+  default: `
+DESIGN STIL: STANDARD
+- Balanceret mix af widget-størrelser
+- Hero sektion med 1-2 store charts
+- Resten som medium/små widgets
+- God variation i widget-typer`
+};
 
 const DESIGN_PRINCIPLES = `
 DU ER EN PROFESSIONEL DASHBOARD DESIGNER med ekspertise i data visualisering.
@@ -110,6 +156,28 @@ KRITISKE DESIGN PRINCIPPER:
    Række 4+ (y=4+): Detaljer
    - Leaderboard eller tabel i fuld bredde hvis relevant
 
+7. LAYOUT VARIATION (VIGTIGT!)
+   Vælg ET af disse layout-mønstre baseret på antal KPIs og design stil:
+
+   A) HERO LAYOUT (3-5 KPIs):
+      - 1 stort chart (8x2) + 2-3 små cards i siden
+   
+   B) BALANCED LAYOUT (5-8 KPIs):
+      - 2 medium charts (4x2 hver) + row af cards nedenunder
+   
+   C) DENSE LAYOUT (8+ KPIs):
+      - Multi_kpi_card øverst + grid af små widgets
+   
+   D) EXECUTIVE LAYOUT (med leaderboard):
+      - Hero chart + leaderboard i fuld bredde
+
+8. TILPAS TIL BRUGERENS ØNSKER
+   - Hvis brugeren nævner "sammenligning" → brug comparison_card
+   - Hvis brugeren nævner "mål" eller "target" → brug goal_progress
+   - Hvis brugeren nævner "top" eller "bedste" → brug leaderboard
+   - Hvis brugeren nævner "trend" eller "udvikling" → brug line_chart
+   - Hvis brugeren nævner "fordeling" → brug pie_chart
+
 EKSEMPEL PÅ PROFESSIONELT LAYOUT:
 [
   {"widgetTypeId": "line_chart", "kpiSlug": "total-sales", "x": 0, "y": 0, "width": 5, "height": 2},
@@ -129,13 +197,15 @@ serve(async (req) => {
 
   try {
     const body: RequestBody = await req.json();
-    const { kpis, focusKpis, scopeType, teamId, clientId, period } = body;
+    const { kpis, focusKpis, scopeType, teamId, clientId, period, designId, aiPrompt } = body;
 
     console.log("Generating dashboard layout for:", { 
       kpiCount: kpis.length, 
       focusCount: focusKpis.length,
       scopeType,
-      period 
+      period,
+      designId,
+      hasAiPrompt: !!aiPrompt
     });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -199,10 +269,27 @@ serve(async (req) => {
     Anbefalet widget-typer: ${suggestedWidgets.join(', ')}`;
     }).join('\n');
 
+    // Get design style prompt
+    const designStylePrompt = DESIGN_STYLE_PROMPTS[designId] || DESIGN_STYLE_PROMPTS.default;
+
+    // Build user instructions from aiPrompt
+    let userInstructions = "";
+    if (aiPrompt?.trim()) {
+      userInstructions = `
+
+BRUGERENS SPECIFIKKE ØNSKER (VIGTIGT - FØLG DISSE!):
+"${aiPrompt.trim()}"
+
+Sørg for at tage disse ønsker med i dit layout design! Tilpas widget-valg, størrelser og layout efter brugerens instruktioner.`;
+    }
+
     const prompt = `${DESIGN_PRINCIPLES}
+
+${designStylePrompt}
 
 MINE VALGTE KPI'ER MED AKTUELLE VÆRDIER:
 ${kpiContext}
+${userInstructions}
 
 OPGAVE:
 Generer et professionelt, visuelt tiltalende dashboard layout.
@@ -212,7 +299,9 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
 - Normale KPI'er skal have varierede størrelser og typer
 - Sørg for at widgets IKKE overlapper (x + width <= 12)
 - Brug ALLE de valgte KPI'er
-- Maksimalt 12 widgets total`;
+- Maksimalt 12 widgets total
+- FØLG design-stilen: ${designId}
+${aiPrompt ? '- FØLG brugerens specifikke ønsker!' : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -225,7 +314,10 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
         messages: [
           { 
             role: "system", 
-            content: "Du er en ekspert dashboard designer. Returner KUN valid JSON via tool call. Lav ALTID visuelt interessante layouts med variation i widget størrelser og typer. Brug de faktiske KPI-værdier til at træffe designbeslutninger - store værdier fortjener store widgets!" 
+            content: `Du er en ekspert dashboard designer. Returner KUN valid JSON via tool call. 
+Lav ALTID visuelt interessante layouts med variation i widget størrelser og typer. 
+Brug de faktiske KPI-værdier til at træffe designbeslutninger - store værdier fortjener store widgets!
+${aiPrompt ? 'VIGTIGT: Brugeren har givet specifikke instruktioner - følg dem nøje!' : ''}` 
           },
           { role: "user", content: prompt }
         ],
@@ -233,7 +325,7 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
           type: "function",
           function: {
             name: "generate_dashboard_widgets",
-            description: "Genererer et professionelt dashboard layout med varierede widget størrelser og typer baseret på faktiske KPI-værdier",
+            description: "Genererer et professionelt dashboard layout med varierede widget størrelser og typer baseret på faktiske KPI-værdier og brugerens ønsker",
             parameters: {
               type: "object",
               properties: {
@@ -254,7 +346,7 @@ Generer et professionelt, visuelt tiltalende dashboard layout.
                           "leaderboard",
                           "multi_kpi_card"
                         ],
-                        description: "Widget type - vælg baseret på KPI kategori, værdi og om det er fokus" 
+                        description: "Widget type - vælg baseret på KPI kategori, værdi, design-stil og brugerens ønsker" 
                       },
                       kpiSlug: { 
                         type: "string", 
