@@ -723,6 +723,7 @@ export function StaffEmployeesTab() {
                     <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                       <Switch 
                         checked={employee.is_active} 
+                        disabled={toggleActiveMutation.isPending}
                         onCheckedChange={(checked) => {
                           if (!checked) {
                             setDeactivatingEmployee(employee);

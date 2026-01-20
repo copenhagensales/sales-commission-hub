@@ -116,6 +116,25 @@ serve(async (req: Request) => {
       throw new Error("No recipients specified");
     }
 
+    // Check for duplicate within 5 minutes (only for initial reminders, not followups)
+    if (!is_followup) {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: existingReminder } = await supabase
+        .from("deactivation_reminders_sent")
+        .select("id")
+        .eq("employee_id", employee_id)
+        .gte("initial_sent_at", fiveMinutesAgo)
+        .maybeSingle();
+
+      if (existingReminder) {
+        console.log(`Skipping duplicate: reminder already sent for ${employee_name} within last 5 minutes`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "duplicate" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Get the email template - try team-specific first, fall back to default
     let config: { email_subject: string; email_body: string } | null = null;
     
