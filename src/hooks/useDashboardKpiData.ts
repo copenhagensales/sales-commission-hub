@@ -526,6 +526,226 @@ export const useDashboardKpiData = () => {
   };
 };
 
+// Helper: Fetch a metric value for formula evaluation
+const fetchMetricValueForFormula = async (
+  metricKey: string,
+  startISO: string,
+  endISO: string,
+  clientId?: string,
+  teamId?: string
+): Promise<number> => {
+  // Get target client IDs for filtering
+  let targetClientIds: string[] = [];
+  if (teamId) {
+    const { data: teamClients } = await supabase
+      .from("team_clients")
+      .select("client_id")
+      .eq("team_id", teamId);
+    targetClientIds = (teamClients || []).map(tc => tc.client_id);
+  } else if (clientId) {
+    targetClientIds = [clientId];
+  }
+
+  // Get campaign IDs for the target clients
+  let campaignIds: string[] = [];
+  if (targetClientIds.length > 0) {
+    const { data: campaigns } = await supabase
+      .from("client_campaigns")
+      .select("id")
+      .in("client_id", targetClientIds);
+    campaignIds = (campaigns || []).map(c => c.id);
+  }
+
+  switch (metricKey) {
+    case "antal_salg": {
+      // Count sales from sale_items where counts_as_sale !== false
+      let telesalesCount = 0;
+      let fieldmarketingCount = 0;
+      
+      if (campaignIds.length === 0 && targetClientIds.length === 0) {
+        // Get all campaigns
+        const { data: allCampaigns } = await supabase.from("client_campaigns").select("id");
+        campaignIds = (allCampaigns || []).map(c => c.id);
+      }
+      
+      if (campaignIds.length > 0) {
+        const { data: salesData } = await supabase
+          .from("sales")
+          .select(`id, sale_items (quantity, products (counts_as_sale))`)
+          .in("client_campaign_id", campaignIds)
+          .gte("sale_datetime", startISO)
+          .lte("sale_datetime", endISO);
+        
+        (salesData || []).forEach((sale: any) => {
+          (sale.sale_items || []).forEach((item: any) => {
+            if (item.products?.counts_as_sale !== false) {
+              telesalesCount += Number(item.quantity) || 1;
+            }
+          });
+        });
+      }
+      
+      // Fieldmarketing sales
+      let fmQuery = supabase
+        .from("fieldmarketing_sales")
+        .select("id", { count: "exact", head: true })
+        .gte("registered_at", startISO)
+        .lte("registered_at", endISO);
+      
+      if (targetClientIds.length > 0) {
+        fmQuery = fmQuery.in("client_id", targetClientIds);
+      }
+      const { count: fmCount } = await fmQuery;
+      fieldmarketingCount = fmCount || 0;
+      
+      return telesalesCount + fieldmarketingCount;
+    }
+
+    case "commission": {
+      // Sum mapped_commission from sale_items
+      let query = supabase
+        .from("sale_items")
+        .select(`mapped_commission, sales!inner(sale_datetime, client_campaign_id, validation_status)`)
+        .gte("sales.sale_datetime", startISO)
+        .lte("sales.sale_datetime", endISO)
+        .not("sales.validation_status", "eq", "cancelled")
+        .not("sales.validation_status", "eq", "rejected");
+
+      if (campaignIds.length > 0) {
+        query = query.in("sales.client_campaign_id", campaignIds);
+      }
+
+      const { data } = await query;
+      return data?.reduce((sum, item) => sum + (Number((item as any).mapped_commission) || 0), 0) || 0;
+    }
+
+    case "revenue": {
+      let query = supabase
+        .from("sale_items")
+        .select(`quantity, products(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`)
+        .gte("sales.sale_datetime", startISO)
+        .lte("sales.sale_datetime", endISO);
+
+      if (campaignIds.length > 0) {
+        query = query.in("sales.client_campaign_id", campaignIds);
+      }
+
+      const { data } = await query;
+      return data?.reduce((sum, item) => {
+        const revenue = (item.products as any)?.revenue_dkk || 0;
+        return sum + (revenue * (item.quantity || 1));
+      }, 0) || 0;
+    }
+
+    case "timer": {
+      // Return a default estimate - real implementation uses shift/timestamp data
+      // For now, return 0 if timer metric is used - formulas should use specific hour metrics
+      return 0;
+    }
+
+    case "calls_total": {
+      const { count } = await supabase
+        .from("dialer_calls")
+        .select("id", { count: "exact", head: true })
+        .gte("start_time", startISO)
+        .lte("start_time", endISO);
+      return count || 0;
+    }
+
+    case "calls_answered": {
+      const { count } = await supabase
+        .from("dialer_calls")
+        .select("id", { count: "exact", head: true })
+        .gte("start_time", startISO)
+        .lte("start_time", endISO)
+        .gt("duration_seconds", 0);
+      return count || 0;
+    }
+
+    case "talk_time_seconds": {
+      const { data } = await supabase
+        .from("dialer_calls")
+        .select("duration_seconds")
+        .gte("start_time", startISO)
+        .lte("start_time", endISO);
+      return data?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0;
+    }
+
+    default:
+      console.warn(`Unknown metric key for formula: ${metricKey}`);
+      return 0;
+  }
+};
+
+// Helper: Evaluate formula tokens with metric values
+const evaluateFormulaTokens = (
+  tokens: Array<{type: string; value: string}>,
+  values: Record<string, number>
+): number => {
+  // Build mathematical expression from tokens
+  let expression = "";
+  for (const token of tokens) {
+    if (token.type === "metric") {
+      expression += (values[token.value] || 0).toString();
+    } else if (token.type === "number") {
+      expression += token.value;
+    } else if (token.type === "operator") {
+      // Map operator symbols to JS operators
+      const opMap: Record<string, string> = {
+        "×": "*", "÷": "/", "+": "+", "−": "-", "*": "*", "/": "/", "-": "-"
+      };
+      expression += ` ${opMap[token.value] || token.value} `;
+    } else if (token.type === "parenthesis") {
+      expression += token.value;
+    }
+  }
+  
+  // Safely evaluate the expression
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function(`"use strict"; return (${expression})`)();
+    return isFinite(result) ? result : 0;
+  } catch (e) {
+    console.error("Formula evaluation error:", e, expression);
+    return 0;
+  }
+};
+
+// Helper: Format formula result with configured formatting
+const formatFormulaResult = (
+  value: number,
+  formula: { 
+    decimal_places?: number | null; 
+    symbol?: string | null; 
+    symbol_position?: string | null; 
+    kpi_type?: string | null;
+  }
+): string => {
+  const decimalPlaces = formula.decimal_places ?? 2;
+  
+  // Format number with Danish locale
+  const formatted = value.toLocaleString("da-DK", {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  });
+  
+  // Apply symbol
+  if (formula.symbol) {
+    return formula.symbol_position === "before"
+      ? `${formula.symbol} ${formatted}`
+      : `${formatted} ${formula.symbol}`;
+  }
+  
+  // Fallback to kpi_type for symbol
+  if (formula.kpi_type === "currency") {
+    return `${formatted} kr.`;
+  } else if (formula.kpi_type === "percentage") {
+    return `${formatted}%`;
+  }
+  
+  return formatted;
+};
+
 // Hook for batch fetching all widget data
 export const useWidgetKpiData = (widgets: Array<{
   id: string;
@@ -572,6 +792,56 @@ export const useWidgetKpiData = (widgets: Array<{
             const startISO = start.toISOString();
             const endISO = end.toISOString();
             
+            // === HANDLE FORMULAS ===
+            if (kpiTypeId.startsWith("formula:")) {
+              const formulaId = kpiTypeId.replace("formula:", "");
+              
+              // Fetch the formula from dashboard_kpis
+              const { data: formulaData, error: formulaError } = await supabase
+                .from("dashboard_kpis")
+                .select("formula, decimal_places, multiplier, symbol, symbol_position, kpi_type")
+                .eq("id", formulaId)
+                .single();
+              
+              if (formulaError || !formulaData?.formula) {
+                console.error(`Formula not found: ${formulaId}`, formulaError);
+                newValues.set(widget.id, "—");
+                continue;
+              }
+              
+              // Parse formula tokens
+              let tokens: Array<{type: string; value: string}> = [];
+              try {
+                tokens = JSON.parse(formulaData.formula);
+              } catch {
+                console.error(`Invalid formula JSON: ${formulaData.formula}`);
+                newValues.set(widget.id, "—");
+                continue;
+              }
+              
+              // Fetch values for each metric in the formula
+              const metricValues: Record<string, number> = {};
+              for (const token of tokens) {
+                if (token.type === "metric" && !metricValues.hasOwnProperty(token.value)) {
+                  metricValues[token.value] = await fetchMetricValueForFormula(
+                    token.value, startISO, endISO, widget.clientId, widget.teamId
+                  );
+                }
+              }
+              
+              // Evaluate the formula
+              let result = evaluateFormulaTokens(tokens, metricValues);
+              
+              // Apply multiplier (e.g. ×100 for percentages)
+              result = result * (formulaData.multiplier || 1);
+              
+              // Format the result
+              const formatted = formatFormulaResult(result, formulaData);
+              newValues.set(widget.id, formatted);
+              continue;
+            }
+            
+            // === HANDLE STANDARD KPIs ===
             let value = 0;
             
             switch (kpiTypeId) {
