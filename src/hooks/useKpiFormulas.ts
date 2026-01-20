@@ -9,6 +9,10 @@ export interface KpiFormula {
   formula: string;
   base_metric: string | null;
   kpi_type: string;
+  decimal_places: number;
+  multiplier: number;
+  symbol: string | null;
+  symbol_position: 'before' | 'after';
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +23,10 @@ export interface CreateKpiFormulaInput {
   formula: string;
   base_metric?: string;
   kpi_type: string;
+  decimal_places?: number;
+  multiplier?: number;
+  symbol?: string;
+  symbol_position?: 'before' | 'after';
 }
 
 export function useKpiFormulas() {
@@ -68,6 +76,10 @@ export function useCreateKpiFormula() {
           formula: input.formula,
           base_metric: input.base_metric || null,
           kpi_type: input.kpi_type,
+          decimal_places: input.decimal_places ?? 2,
+          multiplier: input.multiplier ?? 1,
+          symbol: input.symbol || null,
+          symbol_position: input.symbol_position || 'after',
         })
         .select()
         .single();
@@ -98,6 +110,10 @@ export function useUpdateKpiFormula() {
           formula: input.formula,
           base_metric: input.base_metric || null,
           kpi_type: input.kpi_type,
+          decimal_places: input.decimal_places ?? 2,
+          multiplier: input.multiplier ?? 1,
+          symbol: input.symbol || null,
+          symbol_position: input.symbol_position || 'after',
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -181,4 +197,23 @@ export const KPI_TYPES = [
   { key: "percentage", label: "Procent" },
   { key: "currency", label: "Valuta (DKK)" },
   { key: "decimal", label: "Decimal" },
+] as const;
+
+export const DECIMAL_OPTIONS = [
+  { key: 0, label: "0 decimaler" },
+  { key: 1, label: "1 decimal" },
+  { key: 2, label: "2 decimaler" },
+  { key: 3, label: "3 decimaler" },
+  { key: 4, label: "4 decimaler" },
+] as const;
+
+export const MULTIPLIER_OPTIONS = [
+  { key: 0.01, label: "÷ 100" },
+  { key: 1, label: "Ingen" },
+  { key: 100, label: "× 100" },
+] as const;
+
+export const SYMBOL_POSITION_OPTIONS = [
+  { key: "before", label: "Foran" },
+  { key: "after", label: "Bagved" },
 ] as const;

@@ -2722,13 +2722,17 @@ export type Database = {
           critical_threshold: number | null
           dashboard_slugs: string[] | null
           data_source: string | null
+          decimal_places: number | null
           description: string | null
           display_order: number | null
           formula: string | null
           id: string
           is_active: boolean | null
           kpi_type: string
+          multiplier: number | null
           name: string
+          symbol: string | null
+          symbol_position: string | null
           target_value: number | null
           unit: string | null
           updated_at: string
@@ -2741,13 +2745,17 @@ export type Database = {
           critical_threshold?: number | null
           dashboard_slugs?: string[] | null
           data_source?: string | null
+          decimal_places?: number | null
           description?: string | null
           display_order?: number | null
           formula?: string | null
           id?: string
           is_active?: boolean | null
           kpi_type?: string
+          multiplier?: number | null
           name: string
+          symbol?: string | null
+          symbol_position?: string | null
           target_value?: number | null
           unit?: string | null
           updated_at?: string
@@ -2760,13 +2768,17 @@ export type Database = {
           critical_threshold?: number | null
           dashboard_slugs?: string[] | null
           data_source?: string | null
+          decimal_places?: number | null
           description?: string | null
           display_order?: number | null
           formula?: string | null
           id?: string
           is_active?: boolean | null
           kpi_type?: string
+          multiplier?: number | null
           name?: string
+          symbol?: string | null
+          symbol_position?: string | null
           target_value?: number | null
           unit?: string | null
           updated_at?: string

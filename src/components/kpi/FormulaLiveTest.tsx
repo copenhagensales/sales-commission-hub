@@ -22,6 +22,10 @@ interface FormulaToken {
 interface FormulaLiveTestProps {
   tokens: FormulaToken[];
   formulaName?: string;
+  decimalPlaces?: number;
+  multiplier?: number;
+  symbol?: string;
+  symbolPosition?: 'before' | 'after';
 }
 
 interface TestResult {
@@ -59,13 +63,36 @@ const getDateRange = (period: TestPeriod) => {
   }
 };
 
-export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
+export function FormulaLiveTest({ 
+  tokens, 
+  formulaName,
+  decimalPlaces = 2,
+  multiplier = 1,
+  symbol = "",
+  symbolPosition = "after"
+}: FormulaLiveTestProps) {
   const [period, setPeriod] = useState<TestPeriod>("this_month");
   const [employeeId, setEmployeeId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
 
   const { data: kpiDefinitions } = useKpiDefinitions();
+
+  // Format value with multiplier, decimals and symbol
+  const formatValue = (value: number): string => {
+    const multiplied = value * multiplier;
+    const formatted = multiplied.toLocaleString("da-DK", {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    });
+    
+    if (symbol) {
+      return symbolPosition === "before" 
+        ? `${symbol} ${formatted}` 
+        : `${formatted} ${symbol}`;
+    }
+    return formatted;
+  };
 
   // Fetch employees for filtering
   const { data: employees } = useQuery({
@@ -278,7 +305,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
                 <span className="text-xs text-muted-foreground">Resultat</span>
                 <span className="text-lg font-bold text-primary">
                   {typeof result.value === "number"
-                    ? result.value.toLocaleString("da-DK")
+                    ? formatValue(result.value)
                     : result.value}
                 </span>
               </div>
@@ -287,7 +314,7 @@ export function FormulaLiveTest({ tokens, formulaName }: FormulaLiveTestProps) {
                 <div className="flex items-center justify-between text-xs bg-background px-2 py-1.5 rounded font-mono">
                   <span className="text-muted-foreground">Beregning:</span>
                   <span>
-                    {result.formulaDisplay} = {typeof result.value === "number" ? result.value.toLocaleString("da-DK") : result.value}
+                    {result.formulaDisplay} = {typeof result.value === "number" ? formatValue(result.value) : result.value}
                   </span>
                 </div>
               )}

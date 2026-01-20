@@ -44,6 +44,9 @@ import {
   useDeleteKpiFormula,
   OPERATORS,
   KPI_TYPES,
+  DECIMAL_OPTIONS,
+  MULTIPLIER_OPTIONS,
+  SYMBOL_POSITION_OPTIONS,
   KpiFormula,
 } from "@/hooks/useKpiFormulas";
 import { useKpiDefinitions, KpiDefinition } from "@/hooks/useKpiDefinitions";
@@ -63,6 +66,10 @@ interface FormulaFormData {
   description: string;
   tokens: FormulaToken[];
   kpiType: string;
+  decimalPlaces: number;
+  multiplier: number;
+  symbol: string;
+  symbolPosition: 'before' | 'after';
 }
 
 const initialFormData: FormulaFormData = {
@@ -70,6 +77,10 @@ const initialFormData: FormulaFormData = {
   description: "",
   tokens: [],
   kpiType: "number",
+  decimalPlaces: 2,
+  multiplier: 1,
+  symbol: "",
+  symbolPosition: "after",
 };
 
 // Generate unique ID for tokens
@@ -101,6 +112,10 @@ export function KpiFormulaBuilder() {
       description: formula.description || "",
       tokens,
       kpiType: formula.kpi_type,
+      decimalPlaces: formula.decimal_places ?? 2,
+      multiplier: Number(formula.multiplier) ?? 1,
+      symbol: formula.symbol || "",
+      symbolPosition: formula.symbol_position || "after",
     });
     setIsDialogOpen(true);
   };
@@ -276,6 +291,10 @@ export function KpiFormulaBuilder() {
           formula,
           base_metric: firstKpi?.value,
           kpi_type: formData.kpiType,
+          decimal_places: formData.decimalPlaces,
+          multiplier: formData.multiplier,
+          symbol: formData.symbol || undefined,
+          symbol_position: formData.symbolPosition,
         },
         {
           onSuccess: () => {
@@ -292,6 +311,10 @@ export function KpiFormulaBuilder() {
           formula,
           base_metric: firstKpi?.value,
           kpi_type: formData.kpiType,
+          decimal_places: formData.decimalPlaces,
+          multiplier: formData.multiplier,
+          symbol: formData.symbol || undefined,
+          symbol_position: formData.symbolPosition,
         },
         {
           onSuccess: () => {
@@ -501,6 +524,102 @@ export function KpiFormulaBuilder() {
               />
             </div>
 
+            {/* Formatting options section */}
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+              <Label className="text-sm font-medium">Formatering af resultat</Label>
+              
+              <div className="grid grid-cols-3 gap-3">
+                {/* Decimal places */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Decimaler</Label>
+                  <Select 
+                    value={String(formData.decimalPlaces)} 
+                    onValueChange={(v) => setFormData({ ...formData, decimalPlaces: parseInt(v) })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DECIMAL_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.key} value={String(opt.key)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Multiplier */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Multiplikator</Label>
+                  <Select 
+                    value={String(formData.multiplier)} 
+                    onValueChange={(v) => setFormData({ ...formData, multiplier: parseFloat(v) })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MULTIPLIER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.key} value={String(opt.key)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Symbol position */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Symbol placering</Label>
+                  <Select 
+                    value={formData.symbolPosition} 
+                    onValueChange={(v) => setFormData({ ...formData, symbolPosition: v as 'before' | 'after' })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SYMBOL_POSITION_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.key} value={opt.key}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Symbol input */}
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Symbol:</Label>
+                <Input 
+                  value={formData.symbol} 
+                  onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
+                  placeholder="f.eks. %, DKK, kr, stk"
+                  className="w-32 h-8"
+                />
+              </div>
+              
+              {/* Live preview of formatting */}
+              <div className="text-xs text-muted-foreground bg-background p-2 rounded">
+                Eksempel: {(() => {
+                  const sampleValue = 0.3456;
+                  const multiplied = sampleValue * formData.multiplier;
+                  const formatted = multiplied.toLocaleString("da-DK", {
+                    minimumFractionDigits: formData.decimalPlaces,
+                    maximumFractionDigits: formData.decimalPlaces,
+                  });
+                  if (formData.symbol) {
+                    return formData.symbolPosition === "before" 
+                      ? `${formData.symbol} ${formatted}` 
+                      : `${formatted} ${formData.symbol}`;
+                  }
+                  return formatted;
+                })()}
+              </div>
+            </div>
+
             {/* Formula builder area */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -689,7 +808,11 @@ export function KpiFormulaBuilder() {
                 {/* Live Test */}
                 <FormulaLiveTest 
                   tokens={formData.tokens} 
-                  formulaName={formData.name || undefined} 
+                  formulaName={formData.name || undefined}
+                  decimalPlaces={formData.decimalPlaces}
+                  multiplier={formData.multiplier}
+                  symbol={formData.symbol}
+                  symbolPosition={formData.symbolPosition}
                 />
               </div>
             </div>
