@@ -7,6 +7,7 @@ const corsHeaders = {
 
 // Map sync_frequency_minutes to cron expressions
 const frequencyToCron: Record<number, string> = {
+  5: "*/5 * * * *",        // Every 5 minutes
   15: "*/15 * * * *",      // Every 15 minutes
   30: "*/30 * * * *",      // Every 30 minutes
   60: "0 * * * *",         // Every hour
