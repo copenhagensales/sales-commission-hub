@@ -266,7 +266,13 @@ async function processSalesBatch(
       if (!customerPhone && sale.leadId && webhookPhoneMap.has(sale.leadId)) {
         customerPhone = webhookPhoneMap.get(sale.leadId)!
       }
-      const saleData = {
+      
+      // Detect cancelled sales from raw_payload state (Adversus/Relatel)
+      const rawPayload = sale.rawPayload as Record<string, unknown> | null | undefined
+      const adversusState = rawPayload?.state as string | undefined
+      const isCancelledSale = adversusState === 'cancelled'
+      
+      const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
         sale_datetime: sale.saleDate,
         agent_name: sale.agentName || sale.agentEmail,
@@ -281,6 +287,13 @@ async function processSalesBatch(
         raw_payload: sale.rawPayload || null,
         updated_at: new Date().toISOString(),
       }
+      
+      // Set validation_status to cancelled if dialer reports cancelled state
+      if (isCancelledSale) {
+        saleData.validation_status = 'cancelled'
+        log("INFO", `Sale ${sale.externalId} marked as cancelled from dialer state`)
+      }
+      
       allSalesData.push(saleData)
       if (existingSale) existingSaleIds.push(existingSale.id)
       processed++
