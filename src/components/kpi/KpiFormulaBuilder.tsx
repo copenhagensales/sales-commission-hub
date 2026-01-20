@@ -35,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Calculator, Pencil, Trash2, Loader2, X, Parentheses, BookOpen } from "lucide-react";
+import { Plus, Calculator, Pencil, Trash2, Loader2, X, Parentheses, BookOpen, Percent } from "lucide-react";
 import { FormulaLiveTest } from "./FormulaLiveTest";
 import {
   useKpiFormulas,
@@ -91,6 +91,7 @@ export function KpiFormulaBuilder() {
   const [editingFormula, setEditingFormula] = useState<KpiFormula | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormulaFormData>(initialFormData);
+  const [inlineInput, setInlineInput] = useState("");
 
   const { data: formulas, isLoading } = useKpiFormulas();
   const { data: kpiDefinitions } = useKpiDefinitions();
@@ -526,7 +527,23 @@ export function KpiFormulaBuilder() {
 
             {/* Formatting options section */}
             <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
-              <Label className="text-sm font-medium">Formatering af resultat</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Formatering af resultat</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setFormData({
+                    ...formData,
+                    multiplier: 100,
+                    symbol: "%",
+                    symbolPosition: "after"
+                  })}
+                >
+                  <Percent className="h-3 w-3 mr-1" />
+                  Procent
+                </Button>
+              </div>
               
               <div className="grid grid-cols-3 gap-3">
                 {/* Decimal places */}
@@ -684,11 +701,50 @@ export function KpiFormulaBuilder() {
                       )}
                     </div>
                   ))}
-                  {formData.tokens.length === 0 && (
-                    <span className="text-muted-foreground text-sm italic">
-                      Klik på elementer nedenfor for at bygge din formel...
-                    </span>
-                  )}
+                  {/* Inline input for typing numbers and operators directly */}
+                  <input
+                    type="text"
+                    value={inlineInput}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const lastChar = value.slice(-1);
+                      
+                      // Check if user typed an operator or parenthesis
+                      if (["+", "-", "*", "/", "(", ")"].includes(lastChar)) {
+                        // First, add any number that was typed before the operator
+                        const numPart = value.slice(0, -1).trim();
+                        if (numPart && !isNaN(Number(numPart))) {
+                          addToken({ type: "number", value: numPart, label: numPart });
+                        }
+                        
+                        // Then add the operator or parenthesis
+                        if (lastChar === "(" || lastChar === ")") {
+                          addToken({ type: "parenthesis", value: lastChar, label: lastChar });
+                        } else {
+                          const opDef = OPERATORS.find(o => o.key === lastChar);
+                          addToken({ type: "operator", value: lastChar, label: opDef?.label || lastChar });
+                        }
+                        setInlineInput("");
+                      } else {
+                        setInlineInput(value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && inlineInput.trim()) {
+                        const trimmed = inlineInput.trim();
+                        if (!isNaN(Number(trimmed))) {
+                          addToken({ type: "number", value: trimmed, label: trimmed });
+                          setInlineInput("");
+                        }
+                      } else if (e.key === "Backspace" && inlineInput === "" && formData.tokens.length > 0) {
+                        // Remove last token when backspace on empty input
+                        const lastToken = formData.tokens[formData.tokens.length - 1];
+                        removeToken(lastToken.id);
+                      }
+                    }}
+                    placeholder={formData.tokens.length === 0 ? "Skriv tal/operatorer eller vælg nedenfor..." : ""}
+                    className="flex-1 min-w-[80px] bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
+                  />
                 </div>
               </div>
 
@@ -735,27 +791,6 @@ export function KpiFormulaBuilder() {
                   </div>
                 </div>
 
-                {/* Number input */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20">Tal:</span>
-                  <div className="flex gap-1 items-center">
-                    <Input
-                      type="number"
-                      placeholder="100"
-                      className="w-24 h-8"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const value = (e.target as HTMLInputElement).value;
-                          if (value) {
-                            addToken({ type: "number", value, label: value });
-                            (e.target as HTMLInputElement).value = "";
-                          }
-                        }
-                      }}
-                    />
-                    <span className="text-xs text-muted-foreground">Tryk Enter for at tilføje</span>
-                  </div>
-                </div>
 
                 {/* KPI Definitions */}
                 <div className="space-y-2">
