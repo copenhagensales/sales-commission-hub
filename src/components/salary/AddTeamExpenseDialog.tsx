@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -39,6 +40,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [allDays, setAllDays] = useState<boolean>(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -50,6 +52,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
         expense_date: format(expenseDate, "yyyy-MM-dd"),
         notes: notes || null,
         is_recurring: isRecurring,
+        all_days: allDays,
       } as any);
       if (error) throw error;
     },
@@ -72,6 +75,7 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
     setExpenseDate(new Date());
     setNotes("");
     setIsRecurring(false);
+    setAllDays(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -159,27 +163,42 @@ export function AddTeamExpenseDialog({ open, onOpenChange, teams }: AddTeamExpen
             </div>
 
             <div className="space-y-2">
-              <Label>Dato *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(expenseDate, "d. MMMM yyyy", { locale: da })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={expenseDate}
-                    onSelect={(date) => date && setExpenseDate(date)}
-                    locale={da}
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="allDays" 
+                  checked={allDays} 
+                  onCheckedChange={(checked) => setAllDays(checked === true)} 
+                />
+                <Label htmlFor="allDays" className="font-normal cursor-pointer">
+                  Alle dage i perioden
+                </Label>
+              </div>
             </div>
+
+            {!allDays && (
+              <div className="space-y-2">
+                <Label>Dato *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(expenseDate, "d. MMMM yyyy", { locale: da })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={expenseDate}
+                      onSelect={(date) => date && setExpenseDate(date)}
+                      locale={da}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Noter</Label>

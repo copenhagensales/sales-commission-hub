@@ -7465,6 +7465,7 @@ export type Database = {
       }
       team_expenses: {
         Row: {
+          all_days: boolean | null
           amount: number
           calculation_formula: string | null
           category: string | null
@@ -7481,6 +7482,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          all_days?: boolean | null
           amount?: number
           calculation_formula?: string | null
           category?: string | null
@@ -7497,6 +7499,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          all_days?: boolean | null
           amount?: number
           calculation_formula?: string | null
           category?: string | null
