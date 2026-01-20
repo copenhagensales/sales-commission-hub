@@ -10,6 +10,8 @@ interface KpiInfo {
   slug: string;
   name: string;
   category: string;
+  type?: "definition" | "formula";
+  formula?: string;
 }
 
 interface RequestBody {
@@ -254,6 +256,7 @@ serve(async (req) => {
     // Build detailed KPI context for the AI with real values
     const kpiContext = kpis.map(k => {
       const isFocus = focusSlugs.has(k.slug);
+      const isFormula = k.type === "formula";
       const cachedValue = valueMap.get(k.slug);
       const suggestedWidgets = categoryWidgetSuggestions[k.category] || categoryWidgetSuggestions.other;
       
@@ -263,7 +266,12 @@ serve(async (req) => {
         valueInfo = `Aktuel værdi: ${cachedValue.formatted_value} (rå værdi: ${cachedValue.value})`;
       }
       
+      const typeInfo = isFormula 
+        ? `[SAMMENSAT FORMEL: ${k.formula}]` 
+        : "";
+      
       return `- ${k.name} (slug: "${k.slug}", kategori: ${k.category})
+    ${typeInfo}
     ${valueInfo}
     ${isFocus ? '[FOKUS - SKAL VÆRE STOR OG FREMTRÆDENDE]' : ''}
     Anbefalet widget-typer: ${suggestedWidgets.join(', ')}`;
