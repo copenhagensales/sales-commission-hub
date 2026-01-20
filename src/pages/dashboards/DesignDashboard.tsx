@@ -1083,8 +1083,8 @@ export default function DesignDashboard() {
           setGlobalDesign(designId);
           setIsAIWizardOpen(false);
           
-          // Use the name from wizard
-          setDashboardName(options.dashboardName);
+          // Auto-generate dashboard name
+          setDashboardName(`Dashboard - ${new Date().toLocaleDateString('da-DK')}`);
           setCurrentDashboardId(null); // Ensure we create a new dashboard
           setIsSaveDialogOpen(true);
         }}
