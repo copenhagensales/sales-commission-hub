@@ -11,8 +11,8 @@ const corsHeaders = {
 const MAINTENANCE_MODE = false;
 
 // ============= IN-MEMORY CACHE =============
-// Cache results for 30 seconds to reduce database load
-const CACHE_TTL_MS = 30000;
+// Cache results for 15 seconds to reduce database load while keeping TV in sync
+const CACHE_TTL_MS = 15000;
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 function getCached<T>(key: string): T | null {
@@ -244,6 +244,36 @@ Deno.serve(async (req) => {
     const sales = salesWithItems || [];
     console.log(`Found ${sales.length} sales with items`);
 
+    // Fetch fieldmarketing_sales for today (Yousee, Eesy FM, etc.)
+    const { data: fmSalesData, error: fmError } = await supabase
+      .from("fieldmarketing_sales")
+      .select(`
+        id,
+        client_id,
+        seller_name,
+        registered_at,
+        sale_items (
+          id,
+          quantity,
+          product_id,
+          products (
+            id,
+            name,
+            counts_as_sale,
+            commission_dkk
+          )
+        )
+      `)
+      .gte("registered_at", startOfDay)
+      .lte("registered_at", endOfDay);
+
+    if (fmError) {
+      console.error("Fieldmarketing sales error:", fmError);
+    }
+
+    const fmSales = fmSalesData || [];
+    console.log(`Found ${fmSales.length} fieldmarketing sales`);
+
     // Fetch all clients with logo_url
     const { data: allClients } = await supabase
       .from("clients")
@@ -352,8 +382,56 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Sales by client:`, salesByClient);
-    console.log(`Total counted sales: ${totalCountedSales}`);
+    // Process fieldmarketing sales and add to salesByClient
+    for (const fmSale of fmSales) {
+      const clientId = fmSale.client_id;
+      let clientName = "Ukendt FM";
+      
+      if (clientId) {
+        clientName = clientMap[clientId] || "Ukendt FM";
+      }
+
+      const fmItems = (fmSale as any).sale_items || [];
+      let fmItemCount = 0;
+      let fmCommission = 0;
+
+      for (const item of fmItems) {
+        const product = item.products;
+        // Count items where product is mapped and counts_as_sale is true
+        if (product && product.id && product.counts_as_sale === true) {
+          const qty = item.quantity || 1;
+          fmItemCount += qty;
+          fmCommission += (product.commission_dkk || 0) * qty;
+        }
+      }
+
+      // If no items, count the sale itself as 1
+      if (fmItemCount === 0 && fmItems.length === 0) {
+        fmItemCount = 1;
+      }
+
+      if (fmItemCount > 0) {
+        if (!salesByClient[clientName]) {
+          salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
+        }
+        salesByClient[clientName].count += fmItemCount;
+        totalCountedSales += fmItemCount;
+
+        // Track FM seller
+        if (fmSale.seller_name) {
+          const lowerName = fmSale.seller_name.toLowerCase();
+          sellersWithSales.add(lowerName);
+          
+          if (!sellerCommission[lowerName]) {
+            sellerCommission[lowerName] = { commission: 0, name: fmSale.seller_name };
+          }
+          sellerCommission[lowerName].commission += fmCommission;
+        }
+      }
+    }
+
+    console.log(`Sales by client (incl. FM):`, salesByClient);
+    console.log(`Total counted sales (incl. FM): ${totalCountedSales}`);
     console.log(`Sellers on board: ${sellersWithSales.size}`);
 
     // Resolve agent names to employee names for top sellers

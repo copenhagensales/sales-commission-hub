@@ -97,7 +97,7 @@ export default function CphSalesDashboard() {
       return response.data;
     },
     enabled: tvMode,
-    refetchInterval: 120000, // 2 minutes
+    refetchInterval: 60000, // 1 minute - synced with normal dashboard
     staleTime: 60000,
   });
 
