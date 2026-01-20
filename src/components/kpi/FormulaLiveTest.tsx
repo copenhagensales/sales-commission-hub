@@ -629,16 +629,122 @@ async function fetchKpiValue(
     }
 
     case "all_shift_types": {
-      // Tæl alle vagter uanset type (normal, special, etc.)
-      let url = `${supabaseUrl}/rest/v1/shift?select=id`;
-      url += `&date=gte.${startStr}&date=lte.${endStr}`;
-      if (employeeId) {
-        url += `&employee_id=eq.${employeeId}`;
+      // Generer alle datoer i perioden
+      const dates: string[] = [];
+      const currentDate = new Date(startStr);
+      const endDate = new Date(endStr);
+      while (currentDate <= endDate) {
+        dates.push(format(currentDate, "yyyy-MM-dd"));
+        currentDate.setDate(currentDate.getDate() + 1);
       }
-      
-      const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
-      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
-      return count;
+
+      // Hent medarbejdere
+      let employeesToCheck: { id: string; team_id: string | null }[] = [];
+      if (employeeId) {
+        const empRes = await fetch(`${supabaseUrl}/rest/v1/employee_master_data?select=id,team_id&id=eq.${employeeId}`, { headers });
+        const empData = empRes.ok ? await empRes.json() : [];
+        employeesToCheck = empData;
+      } else {
+        const empsRes = await fetch(`${supabaseUrl}/rest/v1/employee_master_data?select=id,team_id&is_active=eq.true`, { headers });
+        employeesToCheck = empsRes.ok ? await empsRes.json() : [];
+      }
+
+      if (employeesToCheck.length === 0) return 0;
+
+      const employeeIds = employeesToCheck.map(e => e.id);
+
+      // Hent alle vagtkilder parallelt
+      const [individualRes, empStandardRes, teamMembersRes, teamShiftsRes, shiftDaysRes, absencesRes] = await Promise.all([
+        // 1. Individuelle vagter
+        fetch(`${supabaseUrl}/rest/v1/shift?select=employee_id,date&employee_id=in.(${employeeIds.join(",")})&date=gte.${startStr}&date=lte.${endStr}`, { headers }),
+        // 2. Medarbejder-standardvagter
+        fetch(`${supabaseUrl}/rest/v1/employee_standard_shifts?select=employee_id,shift_id&employee_id=in.(${employeeIds.join(",")})`, { headers }),
+        // 3. Team-medlemskaber
+        fetch(`${supabaseUrl}/rest/v1/team_members?select=employee_id,team_id&employee_id=in.(${employeeIds.join(",")})`, { headers }),
+        // 4. Team-standardvagter
+        fetch(`${supabaseUrl}/rest/v1/team_standard_shifts?select=id,team_id,is_active`, { headers }),
+        // 5. Vagtdage per shift
+        fetch(`${supabaseUrl}/rest/v1/team_standard_shift_days?select=shift_id,day_of_week`, { headers }),
+        // 6. Godkendte fraværsdage (syg/ferie ekskluderes)
+        fetch(`${supabaseUrl}/rest/v1/absence_request_v2?select=employee_id,start_date,end_date&employee_id=in.(${employeeIds.join(",")})&status=eq.approved&type=in.(sick,vacation)&start_date=lte.${endStr}&end_date=gte.${startStr}`, { headers }),
+      ]);
+
+      const individualShifts = individualRes.ok ? await individualRes.json() : [];
+      const empStandardShifts = empStandardRes.ok ? await empStandardRes.json() : [];
+      const teamMembers = teamMembersRes.ok ? await teamMembersRes.json() : [];
+      const teamShifts = teamShiftsRes.ok ? await teamShiftsRes.json() : [];
+      const shiftDays = shiftDaysRes.ok ? await shiftDaysRes.json() : [];
+      const absences = absencesRes.ok ? await absencesRes.json() : [];
+
+      // Byg lookup maps
+      const shiftDaysMap = new Map<string, number[]>();
+      shiftDays.forEach((sd: any) => {
+        if (!shiftDaysMap.has(sd.shift_id)) shiftDaysMap.set(sd.shift_id, []);
+        shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
+      });
+
+      const teamActiveShiftMap = new Map<string, string>();
+      teamShifts.forEach((s: any) => {
+        if (s.is_active) teamActiveShiftMap.set(s.team_id, s.id);
+      });
+
+      const individualShiftMap = new Map<string, Set<string>>();
+      individualShifts.forEach((s: any) => {
+        if (!individualShiftMap.has(s.employee_id)) individualShiftMap.set(s.employee_id, new Set());
+        individualShiftMap.get(s.employee_id)!.add(s.date);
+      });
+
+      const empShiftIdMap = new Map<string, string>();
+      empStandardShifts.forEach((s: any) => empShiftIdMap.set(s.employee_id, s.shift_id));
+
+      const employeeTeamMap = new Map<string, string>();
+      teamMembers.forEach((m: any) => {
+        if (m.team_id) employeeTeamMap.set(m.employee_id, m.team_id);
+      });
+
+      // Byg fraværsdatoer per medarbejder
+      const absenceDateMap = new Map<string, Set<string>>();
+      absences.forEach((a: any) => {
+        if (!absenceDateMap.has(a.employee_id)) absenceDateMap.set(a.employee_id, new Set());
+        const absStart = new Date(a.start_date);
+        const absEnd = new Date(a.end_date);
+        const curr = new Date(absStart);
+        while (curr <= absEnd) {
+          absenceDateMap.get(a.employee_id)!.add(format(curr, "yyyy-MM-dd"));
+          curr.setDate(curr.getDate() + 1);
+        }
+      });
+
+      // Tæl vagter efter hierarki
+      let totalShifts = 0;
+      for (const employee of employeesToCheck) {
+        const empId = employee.id;
+        const teamId = employeeTeamMap.get(empId) || employee.team_id;
+        const absenceDates = absenceDateMap.get(empId) || new Set();
+        const individualDates = individualShiftMap.get(empId) || new Set();
+        
+        const empShiftId = empShiftIdMap.get(empId);
+        const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+        const teamActiveShiftId = teamId ? teamActiveShiftMap.get(teamId) : undefined;
+        const teamDays = teamActiveShiftId ? shiftDaysMap.get(teamActiveShiftId) : undefined;
+
+        for (const dateStr of dates) {
+          if (absenceDates.has(dateStr)) continue;
+
+          const dayOfWeek = new Date(dateStr).getDay();
+          const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+          if (individualDates.has(dateStr)) {
+            totalShifts++;
+          } else if (empStandardDays?.includes(dayNumber)) {
+            totalShifts++;
+          } else if (teamDays?.includes(dayNumber)) {
+            totalShifts++;
+          }
+        }
+      }
+
+      return totalShifts;
     }
 
     case "day_off_days": {
