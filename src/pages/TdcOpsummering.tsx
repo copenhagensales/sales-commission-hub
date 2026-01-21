@@ -49,7 +49,7 @@ export default function TdcOpsummering() {
   // newNumberStartOption removed - text is now static in summary
   
   // Binding
-  const [includeBinding, setIncludeBinding] = useState(false);
+  // includeBinding removed - text now always included
   
   // Startup (7, 8 - one MUST be selected)
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
@@ -158,11 +158,9 @@ export default function TdcOpsummering() {
       lines.push("");
     }
 
-    // Binding terms
-    if (includeBinding) {
-      lines.push("I er bundet på kontrakten i 36 måneder.");
-      lines.push("");
-    }
+    // Binding terms (always included)
+    lines.push("I er bundet på kontrakten i 36 måneder.");
+    lines.push("");
 
     // 7 or 8 - Startup (KUN hvis eksisterende/mixed numre - aldrig sammen med punkt 9)
     if (numberChoice === "existing" || numberChoice === "mixed") {
@@ -227,7 +225,6 @@ export default function TdcOpsummering() {
     companyName, cvr, contactName, contactPhone, productLines,
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
-    includeBinding,
     startupChoice,
     includeOrderConfirmation, includeAddRemove,
     hasSubsidy, subsidyAmount, subsidyStartDate, subsidyProducts,
@@ -478,14 +475,6 @@ export default function TdcOpsummering() {
                 <Separator />
 
                 {/* Binding */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="includeBinding" 
-                    checked={includeBinding}
-                    onCheckedChange={(checked) => setIncludeBinding(checked === true)}
-                  />
-                  <Label htmlFor="includeBinding" className="font-medium cursor-pointer">Binding (36 måneder)</Label>
-                </div>
 
                 <Separator />
 
