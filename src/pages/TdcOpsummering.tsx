@@ -380,10 +380,14 @@ export default function TdcOpsummering() {
                   <Label className="font-medium">Mobilt Bredbånd (MBB)</Label>
                   <RadioGroup 
                     value={mbbType || ""} 
-                    onValueChange={(val) => {
-                      setMbbType(val as MbbType || null);
-                      if (!val) setIncludeWithoutRouter(false);
-                    }}
+                onValueChange={(val) => {
+                  setMbbType(val as MbbType || null);
+                  if (val) {
+                    setIncludeWithoutRouter(true);
+                  } else {
+                    setIncludeWithoutRouter(false);
+                  }
+                }}
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="mobilevoice" id="mobilevoice" />
