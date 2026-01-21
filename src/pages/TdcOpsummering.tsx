@@ -46,7 +46,7 @@ export default function TdcOpsummering() {
   const [numberChoice, setNumberChoice] = useState<NumberChoice | null>(null);
   const [existingNumbers, setExistingNumbers] = useState("");
   const [newNumberCount, setNewNumberCount] = useState("");
-  const [newNumberStartOption, setNewNumberStartOption] = useState(""); // For option 9
+  // newNumberStartOption removed - text is now static in summary
   
   // Binding
   const [includeBinding, setIncludeBinding] = useState(false);
@@ -142,7 +142,7 @@ export default function TdcOpsummering() {
 
     // 9 - Kun hvis "Kun nye numre" (option 6) er valgt
     if (numberChoice === "new") {
-      lines.push(`Dine nye numre starter ${newNumberStartOption || "(hurtigst muligt eller på bestemt dato)"}.`);
+      lines.push("Dine nye numre starter (hurtigst muligt eller på bestemt dato).");
       lines.push("");
     }
     
@@ -164,13 +164,15 @@ export default function TdcOpsummering() {
       lines.push("");
     }
 
-    // 7 or 8 - Startup
-    if (startupChoice === "asap") {
-      lines.push("Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.");
-      lines.push("");
-    } else if (startupChoice === "specific" && wishDate) {
-      lines.push(`Vi har aftalt, at numrene flyttes den ${wishDate}. Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.`);
-      lines.push("");
+    // 7 or 8 - Startup (KUN hvis eksisterende/mixed numre - aldrig sammen med punkt 9)
+    if (numberChoice === "existing" || numberChoice === "mixed") {
+      if (startupChoice === "asap") {
+        lines.push("Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.");
+        lines.push("");
+      } else if (startupChoice === "specific" && wishDate) {
+        lines.push(`Vi har aftalt, at numrene flyttes den ${wishDate}. Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.`);
+        lines.push("");
+      }
     }
 
     // Order confirmation
@@ -224,7 +226,7 @@ export default function TdcOpsummering() {
   }, [
     companyName, cvr, contactName, contactPhone, productLines,
     mbbType, includeWithoutRouter, 
-    numberChoice, existingNumbers, newNumberCount, newNumberStartOption,
+    numberChoice, existingNumbers, newNumberCount,
     includeBinding,
     startupChoice, wishDate,
     includeOrderConfirmation, includeAddRemove,
@@ -425,7 +427,14 @@ export default function TdcOpsummering() {
                   <Label className="font-medium">Nummervalg *</Label>
                   <RadioGroup 
                     value={numberChoice || ""} 
-                    onValueChange={(val) => setNumberChoice(val as NumberChoice)}
+                    onValueChange={(val) => {
+                      setNumberChoice(val as NumberChoice);
+                      // Nulstil startup valg hvis "kun nye numre" vælges
+                      if (val === "new") {
+                        setStartupChoice(null);
+                        setWishDate("");
+                      }
+                    }}
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="existing" id="existing" />
@@ -465,17 +474,6 @@ export default function TdcOpsummering() {
                     </div>
                   )}
                   
-                  {/* Input for new number start date - only if "new" is selected (option 9) */}
-                  {numberChoice === "new" && (
-                    <div className="ml-6 space-y-2">
-                      <Label>Hvornår starter de nye numre?</Label>
-                      <Input
-                        value={newNumberStartOption}
-                        onChange={(e) => setNewNumberStartOption(e.target.value)}
-                        placeholder="hurtigst muligt / [dato]"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <Separator />
@@ -492,33 +490,35 @@ export default function TdcOpsummering() {
 
                 <Separator />
 
-                {/* Startup (7, 8) - MANDATORY */}
-                <div className="space-y-3">
-                  <Label className="font-medium">Opstart *</Label>
-                  <RadioGroup 
-                    value={startupChoice || ""} 
-                    onValueChange={(val) => setStartupChoice(val as StartupChoice)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="asap" id="asap" />
-                      <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode (7)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="specific" id="specific" />
-                      <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
-                    </div>
-                  </RadioGroup>
-                  {startupChoice === "specific" && (
-                    <div className="ml-6 space-y-2">
-                      <Label>Ønsket dato</Label>
-                      <Input
-                        type="date"
-                        value={wishDate}
-                        onChange={(e) => setWishDate(e.target.value)}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* Startup (7, 8) - Kun relevant når der flyttes numre (4 eller 5) */}
+                {(numberChoice === "existing" || numberChoice === "mixed") && (
+                  <div className="space-y-3">
+                    <Label className="font-medium">Opstart *</Label>
+                    <RadioGroup 
+                      value={startupChoice || ""} 
+                      onValueChange={(val) => setStartupChoice(val as StartupChoice)}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="asap" id="asap" />
+                        <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode (7)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="specific" id="specific" />
+                        <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
+                      </div>
+                    </RadioGroup>
+                    {startupChoice === "specific" && (
+                      <div className="ml-6 space-y-2">
+                        <Label>Ønsket dato</Label>
+                        <Input
+                          type="date"
+                          value={wishDate}
+                          onChange={(e) => setWishDate(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <Separator />
 
