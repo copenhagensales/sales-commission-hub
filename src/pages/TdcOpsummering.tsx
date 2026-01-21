@@ -185,6 +185,10 @@ export default function TdcOpsummering() {
     if (hasSubsidy) {
       lines.push({ text: "Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers." });
       lines.push({ text: "" });
+      lines.push({ text: "Vi har talt om, at du skal bruge tilskuddet på disse produkter:" });
+      lines.push({ text: "" });
+      lines.push({ text: "(Nævn produkt og gigabyte, samt deres pris og eventuel resterende egenbetaling - Hvis router nævn også forbindelsestype 4G/5G)", isRed: true });
+      lines.push({ text: "" });
       lines.push({ text: "Tilskuddet bruges som rabatkode i vores webshop, hvor vi altid bestræber os på at have lageret fyldt. Jeg kan ikke foretage bestillingen for dig, det gør du selv via shoppen." });
       lines.push({ text: "" });
     }
