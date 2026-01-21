@@ -9,6 +9,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { MainLayout } from "@/components/layout/MainLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SummaryLine {
   text: string;
@@ -35,6 +44,9 @@ export default function TdcOpsummering() {
   
   // Startup (7, 8 - one MUST be selected)
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
+  
+  // Router warning dialog
+  const [showRouterWarning, setShowRouterWarning] = useState(false);
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
@@ -284,7 +296,13 @@ export default function TdcOpsummering() {
                       <Checkbox
                         id="withoutRouter"
                         checked={includeWithoutRouter}
-                        onCheckedChange={(checked) => setIncludeWithoutRouter(checked === true)}
+                        onCheckedChange={(checked) => {
+                          if (checked === true) {
+                            setIncludeWithoutRouter(true);
+                          } else {
+                            setShowRouterWarning(true);
+                          }
+                        }}
                       />
                       <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">uden router (3)</Label>
                     </div>
@@ -480,6 +498,27 @@ export default function TdcOpsummering() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showRouterWarning} onOpenChange={setShowRouterWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vigtigt: Router skal inkluderes</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              Når du fjerner "uden router", skal du huske at inkludere en 4G eller 5G router under Tilskud-sektionen i de produkter, du har aftalt med kunden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                setIncludeWithoutRouter(false);
+                setShowRouterWarning(false);
+              }}
+            >
+              Jeg har forstået
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
