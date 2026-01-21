@@ -55,8 +55,8 @@ export default function TdcOpsummering() {
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
   // wishDate removed - text now uses static "(dato)" placeholder
   
-  const [includeOrderConfirmation, setIncludeOrderConfirmation] = useState(false);
-  const [includeAddRemove, setIncludeAddRemove] = useState(false);
+  // includeOrderConfirmation removed - text now always included
+  // includeAddRemove removed - text now always included
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
@@ -173,17 +173,13 @@ export default function TdcOpsummering() {
       }
     }
 
-    // Order confirmation
-    if (includeOrderConfirmation) {
-      lines.push("Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår.");
-      lines.push("");
-    }
+    // Order confirmation (always included)
+    lines.push("Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår.");
+    lines.push("");
 
-    // Add/remove subscriptions
-    if (includeAddRemove) {
-      lines.push("Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes.");
-      lines.push("");
-    }
+    // Add/remove subscriptions (always included)
+    lines.push("Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes.");
+    lines.push("");
 
     // Subsidy
     if (hasSubsidy && subsidyAmount) {
@@ -226,7 +222,6 @@ export default function TdcOpsummering() {
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
     startupChoice,
-    includeOrderConfirmation, includeAddRemove,
     hasSubsidy, subsidyAmount, subsidyStartDate, subsidyProducts,
     hasOmstilling, kaldsflow, hardware, isStandardOmstilling
   ]);
@@ -499,26 +494,6 @@ export default function TdcOpsummering() {
                 )}
 
                 <Separator />
-
-                {/* Order confirmation */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="includeOrderConfirmation" 
-                    checked={includeOrderConfirmation}
-                    onCheckedChange={(checked) => setIncludeOrderConfirmation(checked === true)}
-                  />
-                  <Label htmlFor="includeOrderConfirmation" className="font-medium cursor-pointer">Ordrebekræftelse (14 dage)</Label>
-                </div>
-
-                {/* Add/remove subscriptions */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="includeAddRemove" 
-                    checked={includeAddRemove}
-                    onCheckedChange={(checked) => setIncludeAddRemove(checked === true)}
-                  />
-                  <Label htmlFor="includeAddRemove" className="font-medium cursor-pointer">Tilføj/opsig abonnementer</Label>
-                </div>
 
                 <Separator />
 
