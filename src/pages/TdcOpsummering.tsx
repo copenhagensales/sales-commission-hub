@@ -63,8 +63,6 @@ export default function TdcOpsummering() {
   
   // Omstilling (13, 14)
   const [hasOmstilling, setHasOmstilling] = useState(false);
-  const [kaldsflow, setKaldsflow] = useState("");
-  const [hardware, setHardware] = useState("");
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
 
   const addProductLine = () => {
@@ -188,14 +186,9 @@ export default function TdcOpsummering() {
 
     // 13, 14 - Omstilling
     if (hasOmstilling) {
-      if (kaldsflow) {
-        lines.push(`Kaldsflow: ${kaldsflow}`);
-        lines.push("");
-      }
-      if (hardware) {
-        lines.push(`Hardware: ${hardware}`);
-        lines.push("");
-      }
+      lines.push("Vi har aftalt at sætte omstilling op, så indkommende opkald kan fordeles mellem flere modtagere. Jeg sender dig en mail med et link til et planlægningsark, som du udfylder med de relevante oplysninger. Når du har udfyldt arket, kontakter vi dig for at aftale en dato for opsætning og opstart.");
+      lines.push("");
+      
       if (isStandardOmstilling) {
         lines.push("Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling.");
         lines.push("");
@@ -212,7 +205,7 @@ export default function TdcOpsummering() {
     numberChoice, existingNumbers, newNumberCount,
     startupChoice,
     hasSubsidy,
-    hasOmstilling, kaldsflow, hardware, isStandardOmstilling
+    hasOmstilling, isStandardOmstilling
   ]);
 
   const copyToClipboard = async () => {
@@ -508,26 +501,8 @@ export default function TdcOpsummering() {
                     />
                     <Label htmlFor="hasOmstilling" className="font-medium cursor-pointer">Omstilling</Label>
                   </div>
-                  {hasOmstilling && (
-                    <div className="ml-6 space-y-3">
-                      <div className="space-y-2">
-                        <Label>Kaldsflow (hvad sker der når man ringer?)</Label>
-                        <Textarea
-                          value={kaldsflow}
-                          onChange={(e) => setKaldsflow(e.target.value)}
-                          placeholder="Beskriv kaldsflowet..."
-                          rows={3}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Hardware (hvad udstyr skal bruges?)</Label>
-                        <Textarea
-                          value={hardware}
-                          onChange={(e) => setHardware(e.target.value)}
-                          placeholder="Beskriv hardwaren..."
-                          rows={3}
-                        />
-                      </div>
+                {hasOmstilling && (
+                    <div className="ml-6">
                       <div className="flex items-center space-x-2">
                         <Checkbox 
                           id="standardOmstilling" 
