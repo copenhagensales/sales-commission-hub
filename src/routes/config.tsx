@@ -111,6 +111,7 @@ import {
   TeamH2H,
   SalaryTypes,
   TdcOpsummering,
+  TdcOpsummeringPublic,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -141,6 +142,7 @@ export const routes: RouteConfig[] = [
   { path: "/commission-league/test", component: CommissionLeagueTest, access: "role", positionPermission: "menu_commission_league" },
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
+  { path: "/tdc-public", component: TdcOpsummeringPublic, access: "public" },
   { path: "/contract/:id", component: ContractSign, access: "public" },
   { path: "/contract/sign/:id", component: ContractSign, access: "public" },
 

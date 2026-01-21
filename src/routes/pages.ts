@@ -1,5 +1,7 @@
 import { lazy } from "react";
 
+export const TdcOpsummeringPublic = lazy(() => import("@/pages/TdcOpsummeringPublic"));
+
 const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
