@@ -42,6 +42,12 @@ export default function TdcOpsummering() {
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
 
+  // Validation for required fields
+  const isNummervalgMissing = !numberChoice;
+  const isOpstartRequired = numberChoice === "existing" || numberChoice === "mixed";
+  const isOpstartMissing = isOpstartRequired && !startupChoice;
+  const showWarningBanner = isNummervalgMissing || isOpstartMissing;
+
   // Generate summary lines with formatting info
   const summaryLines = useMemo(() => {
     const lines: SummaryLine[] = [];
@@ -207,6 +213,15 @@ export default function TdcOpsummering() {
                 <CardTitle className="text-lg">Valgfrie sektioner</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Warning banner for missing required selections */}
+                {showWarningBanner && (
+                  <div className="bg-destructive text-destructive-foreground p-4 rounded-md text-center font-bold text-lg">
+                    ⚠️ Udfyld venligst: 
+                    {isNummervalgMissing && " Nummervalg"}
+                    {isNummervalgMissing && isOpstartMissing && " og"}
+                    {isOpstartMissing && " Opstart"}
+                  </div>
+                )}
                 {/* MBB Type (1 and 2) */}
                 <div className="space-y-3">
                   <Label className="font-medium">Mobilt Bredbånd (MBB)</Label>
