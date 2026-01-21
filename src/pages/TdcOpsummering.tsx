@@ -47,6 +47,7 @@ export default function TdcOpsummering() {
   
   // Router warning dialog
   const [showRouterWarning, setShowRouterWarning] = useState(false);
+  const [subsidyLockedForRouter, setSubsidyLockedForRouter] = useState(false);
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
@@ -299,6 +300,7 @@ export default function TdcOpsummering() {
                         onCheckedChange={(checked) => {
                           if (checked === true) {
                             setIncludeWithoutRouter(true);
+                            setSubsidyLockedForRouter(false);
                           } else {
                             setShowRouterWarning(true);
                           }
@@ -373,28 +375,35 @@ export default function TdcOpsummering() {
 
                 {/* Subsidy */}
                 <div className="space-y-2">
-                  <Label className="font-medium">Tilskud</Label>
+                  <Label className="font-medium">
+                    Tilskud
+                    {subsidyLockedForRouter && (
+                      <span className="text-amber-600 text-sm ml-2">(låst - router kræver tilskud)</span>
+                    )}
+                  </Label>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="hasSubsidy" 
                       checked={hasSubsidy}
+                      disabled={subsidyLockedForRouter}
                       onCheckedChange={(checked) => {
                         setHasSubsidy(checked === true);
                         if (checked) setNoSubsidy(false);
                       }}
                     />
-                    <Label htmlFor="hasSubsidy" className="font-normal cursor-pointer">Tilskud inkluderet</Label>
+                    <Label htmlFor="hasSubsidy" className={`font-normal cursor-pointer ${subsidyLockedForRouter ? "text-muted-foreground" : ""}`}>Tilskud inkluderet</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="noSubsidy" 
                       checked={noSubsidy}
+                      disabled={subsidyLockedForRouter}
                       onCheckedChange={(checked) => {
                         setNoSubsidy(checked === true);
                         if (checked) setHasSubsidy(false);
                       }}
                     />
-                    <Label htmlFor="noSubsidy" className="font-normal cursor-pointer">Intet Tilskud</Label>
+                    <Label htmlFor="noSubsidy" className={`font-normal cursor-pointer ${subsidyLockedForRouter ? "text-muted-foreground" : ""}`}>Intet Tilskud</Label>
                   </div>
                 </div>
 
@@ -512,6 +521,9 @@ export default function TdcOpsummering() {
               onClick={() => {
                 setIncludeWithoutRouter(false);
                 setShowRouterWarning(false);
+                setHasSubsidy(true);
+                setNoSubsidy(false);
+                setSubsidyLockedForRouter(true);
               }}
             >
               Jeg har forstået
