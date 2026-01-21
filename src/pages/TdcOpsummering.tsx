@@ -24,7 +24,7 @@ interface SummaryLine {
   isRed?: boolean;
 }
 
-type MbbType = "router" | "hotspot" | null;
+type MbbType = "mobilevoice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
 
@@ -110,19 +110,19 @@ export default function TdcOpsummering() {
       lines.push({ text: "" });
     }
 
-    // 1 - MBB via router (tilsluttet strøm)
-    if (mbbType === "router") {
+    // 1 - Mobilevoice som MBB
+    if (mbbType === "mobilevoice") {
       lines.push({ text: "Det mobile bredbånd kører via en router, der er tilsluttet strøm." });
       lines.push({ text: "" });
     }
     
-    // 2 - MBB via mobil router/hotspot (USB)
-    if (mbbType === "hotspot") {
+    // 2 - Datadelingskort som MBB
+    if (mbbType === "datadelingskort") {
       lines.push({ text: "Det mobile bredbånd kører via en mobil router, der oplades via USB." });
       lines.push({ text: "" });
     }
     
-    // 3 - Datadelingskort (corrected text from Word document - only if MBB is selected)
+    // 3 - uden router (kun hvis et af ovenstående er valgt)
     if (mbbType && includeWithoutRouter) {
       lines.push({ text: "Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer." });
       lines.push({ text: "" });
@@ -386,12 +386,12 @@ export default function TdcOpsummering() {
                     }}
                   >
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="router" id="router" />
-                      <Label htmlFor="router" className="font-normal cursor-pointer">Router (tilsluttet strøm) (1)</Label>
+                      <RadioGroupItem value="mobilevoice" id="mobilevoice" />
+                      <Label htmlFor="mobilevoice" className="font-normal cursor-pointer">Mobilevoice som MBB (1)</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="hotspot" id="hotspot" />
-                      <Label htmlFor="hotspot" className="font-normal cursor-pointer">Mobil router / Hotspot (USB) (2)</Label>
+                      <RadioGroupItem value="datadelingskort" id="datadelingskort" />
+                      <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB (2)</Label>
                     </div>
                   </RadioGroup>
                   
@@ -403,7 +403,7 @@ export default function TdcOpsummering() {
                         checked={includeWithoutRouter}
                         onCheckedChange={(checked) => setIncludeWithoutRouter(checked === true)}
                       />
-                      <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">Datadelingskort (3)</Label>
+                      <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">uden router (3)</Label>
                     </div>
                   )}
                 </div>
