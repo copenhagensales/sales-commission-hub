@@ -31,8 +31,6 @@ export default function TdcOpsummering() {
   
   // Number choice (4, 5, 6 - one MUST be selected)
   const [numberChoice, setNumberChoice] = useState<NumberChoice | null>(null);
-  const [existingNumbers, setExistingNumbers] = useState("");
-  const [newNumberCount, setNewNumberCount] = useState("");
   
   // Startup (7, 8 - one MUST be selected)
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
@@ -80,10 +78,10 @@ export default function TdcOpsummering() {
 
     // 4, 5, 6 - Number choice
     if (numberChoice === "existing") {
-      lines.push({ text: `Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: ${existingNumbers || "[X, Y, Z]"}.` });
+      lines.push({ text: "Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: [X, Y, Z]." });
       lines.push({ text: "" });
     } else if (numberChoice === "mixed") {
-      lines.push({ text: `Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er ${existingNumbers || "[X, Y, Z]"}, og at vi derudover opretter ${newNumberCount || "(antal)"} nye mobilnumre.` });
+      lines.push({ text: "Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er [X, Y, Z], og at vi derudover opretter (antal) nye mobilnumre." });
       lines.push({ text: "" });
     } else if (numberChoice === "new") {
       lines.push({ text: "Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre." });
@@ -160,7 +158,7 @@ export default function TdcOpsummering() {
     return lines;
   }, [
     mbbType, includeWithoutRouter, 
-    numberChoice, existingNumbers, newNumberCount,
+    numberChoice,
     startupChoice,
     hasSubsidy,
     hasOmstilling, isStandardOmstilling
@@ -289,30 +287,7 @@ export default function TdcOpsummering() {
                     </div>
                   </RadioGroup>
                   
-                  {/* Input fields for existing/mixed */}
-                  {(numberChoice === "existing" || numberChoice === "mixed") && (
-                    <div className="ml-6 space-y-3">
-                      <div className="space-y-2">
-                        <Label>Eksisterende numre</Label>
-                        <Input
-                          value={existingNumbers}
-                          onChange={(e) => setExistingNumbers(e.target.value)}
-                          placeholder="12345678, 87654321, 11223344"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {numberChoice === "mixed" && (
-                    <div className="ml-6 space-y-2">
-                      <Label>Antal nye numre</Label>
-                      <Input
-                        value={newNumberCount}
-                        onChange={(e) => setNewNumberCount(e.target.value)}
-                        placeholder="3"
-                      />
-                    </div>
-                  )}
-                  
+                
                 </div>
 
                 <Separator />
