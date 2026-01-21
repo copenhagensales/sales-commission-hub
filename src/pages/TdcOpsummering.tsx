@@ -53,7 +53,7 @@ export default function TdcOpsummering() {
   
   // Startup (7, 8 - one MUST be selected)
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
-  const [wishDate, setWishDate] = useState("");
+  // wishDate removed - text now uses static "(dato)" placeholder
   
   const [includeOrderConfirmation, setIncludeOrderConfirmation] = useState(false);
   const [includeAddRemove, setIncludeAddRemove] = useState(false);
@@ -169,8 +169,8 @@ export default function TdcOpsummering() {
       if (startupChoice === "asap") {
         lines.push("Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.");
         lines.push("");
-      } else if (startupChoice === "specific" && wishDate) {
-        lines.push(`Vi har aftalt, at numrene flyttes den ${wishDate}. Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.`);
+      } else if (startupChoice === "specific") {
+        lines.push("Vi har aftalt, at numrene flyttes den (dato). Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.");
         lines.push("");
       }
     }
@@ -228,7 +228,7 @@ export default function TdcOpsummering() {
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
     includeBinding,
-    startupChoice, wishDate,
+    startupChoice,
     includeOrderConfirmation, includeAddRemove,
     hasSubsidy, subsidyAmount, subsidyStartDate, subsidyProducts,
     hasOmstilling, kaldsflow, hardware, isStandardOmstilling
@@ -432,7 +432,6 @@ export default function TdcOpsummering() {
                       // Nulstil startup valg hvis "kun nye numre" vælges
                       if (val === "new") {
                         setStartupChoice(null);
-                        setWishDate("");
                       }
                     }}
                   >
@@ -507,16 +506,6 @@ export default function TdcOpsummering() {
                         <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
                       </div>
                     </RadioGroup>
-                    {startupChoice === "specific" && (
-                      <div className="ml-6 space-y-2">
-                        <Label>Ønsket dato</Label>
-                        <Input
-                          type="date"
-                          value={wishDate}
-                          onChange={(e) => setWishDate(e.target.value)}
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
 
