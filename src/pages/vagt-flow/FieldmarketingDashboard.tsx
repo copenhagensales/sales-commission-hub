@@ -43,7 +43,7 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
   const dayStart = startOfDay(selectedDate).toISOString();
   const dayEnd = endOfDay(selectedDate).toISOString();
 
-  // Fetch product commissions - prioritize campaign overrides, fallback to base commission
+  // Fetch product commissions - use product_pricing_rules (same as DailyReports)
   const { data: productCommissions } = useQuery({
     queryKey: ["fieldmarketing-product-commissions", clientId],
     queryFn: async () => {
@@ -57,43 +57,45 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       
       // Create base commission map from products
       const commissionMap: Record<string, number> = {};
+      const productIdToName: Record<string, string> = {};
+      
       (products || []).forEach((p: any) => {
         if (p.client_campaign?.client_id === clientId) {
           commissionMap[p.name] = p.commission_dkk || 0;
+          productIdToName[p.id] = p.name;
         }
       });
       
-      // 2. Get the campaign mapping for this client's fieldmarketing (e.g. "Eesy gaden")
-      const { data: campaignMappings, error: mappingError } = await supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_name, client_campaign:client_campaign_id(client_id)")
-        .ilike("adversus_campaign_name", "%gaden%");
+      // 2. Get product_pricing_rules - these OVERRIDE base commissions (same as DailyReports)
+      const { data: pricingRules, error: rulesError } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, commission_dkk, priority")
+        .eq("is_active", true);
       
-      if (mappingError) throw mappingError;
+      if (rulesError) throw rulesError;
       
-      // Find the campaign mapping for this client
-      const clientCampaignMapping = campaignMappings?.find(
-        (m: any) => m.client_campaign?.client_id === clientId
-      );
+      // Group rules by product_id and keep highest priority rule for each
+      const bestRuleByProduct: Record<string, { commission: number; priority: number }> = {};
       
-      if (!clientCampaignMapping) {
-        // No campaign mapping found - return base commissions only
-        return commissionMap;
-      }
+      (pricingRules || []).forEach((rule: any) => {
+        if (!rule.product_id) return;
+        
+        const existing = bestRuleByProduct[rule.product_id];
+        const rulePriority = rule.priority || 0;
+        
+        if (!existing || rulePriority > existing.priority) {
+          bestRuleByProduct[rule.product_id] = {
+            commission: rule.commission_dkk || 0,
+            priority: rulePriority,
+          };
+        }
+      });
       
-      // 3. Get campaign-specific overrides - these OVERRIDE base commissions
-      const { data: overrides, error: overrideError } = await supabase
-        .from("product_campaign_overrides")
-        .select("commission_dkk, product:product_id(name)")
-        .eq("campaign_mapping_id", clientCampaignMapping.id);
-      
-      if (overrideError) throw overrideError;
-      
-      // Override base commission with campaign-specific commission when set
-      (overrides || []).forEach((o: any) => {
-        if (o.product?.name) {
-          // Campaign override ALWAYS takes priority
-          commissionMap[o.product.name] = o.commission_dkk || 0;
+      // Apply pricing rules to override base commissions
+      Object.entries(bestRuleByProduct).forEach(([productId, { commission }]) => {
+        const productName = productIdToName[productId];
+        if (productName) {
+          commissionMap[productName] = commission;
         }
       });
       
