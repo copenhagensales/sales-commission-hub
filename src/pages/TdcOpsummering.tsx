@@ -49,7 +49,13 @@ export default function TdcOpsummering() {
   const isNummervalgMissing = !numberChoice;
   const isOpstartRequired = numberChoice === "existing" || numberChoice === "mixed";
   const isOpstartMissing = isOpstartRequired && !startupChoice;
-  const showWarningBanner = isNummervalgMissing || isOpstartMissing;
+  
+  // Nye valideringer - brugeren skal aktivt vælge enten tjenesten ELLER "ingen"
+  const isMbbMissing = !noMbb && mbbType === null;
+  const isTilskudMissing = !noSubsidy && !hasSubsidy;
+  const isOmstillingMissing = !noOmstilling && !hasOmstilling;
+
+  const showWarningBanner = isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing;
 
   // Generate summary lines with formatting info
   const summaryLines = useMemo(() => {
@@ -447,9 +453,13 @@ export default function TdcOpsummering() {
                     <div className="absolute inset-0 z-10 bg-destructive/95 backdrop-blur-sm rounded-md flex items-center justify-center">
                       <div className="text-destructive-foreground text-center font-bold text-xl p-6">
                         ⚠️ Udfyld venligst: 
-                        {isNummervalgMissing && " Nummervalg"}
-                        {isNummervalgMissing && isOpstartMissing && " og"}
-                        {isOpstartMissing && " Opstart"}
+                        {[
+                          isNummervalgMissing && "Nummervalg",
+                          isOpstartMissing && "Opstart",
+                          isMbbMissing && "Mobilt Bredbånd",
+                          isTilskudMissing && "Tilskud",
+                          isOmstillingMissing && "Omstilling"
+                        ].filter(Boolean).join(", ")}
                       </div>
                     </div>
                   )}
