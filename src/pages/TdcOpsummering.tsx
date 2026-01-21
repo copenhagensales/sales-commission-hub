@@ -60,9 +60,6 @@ export default function TdcOpsummering() {
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
-  const [subsidyAmount, setSubsidyAmount] = useState("");
-  const [subsidyStartDate, setSubsidyStartDate] = useState("");
-  const [subsidyProducts, setSubsidyProducts] = useState("");
   
   // Omstilling (13, 14)
   const [hasOmstilling, setHasOmstilling] = useState(false);
@@ -182,17 +179,9 @@ export default function TdcOpsummering() {
     lines.push("");
 
     // Subsidy
-    if (hasSubsidy && subsidyAmount) {
-      lines.push(`Du får et tilskud på ${subsidyAmount}, som kan bruges fra kontraktens startdato ${subsidyStartDate || "(dato)"}, hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers.`);
+    if (hasSubsidy) {
+      lines.push("Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers.");
       lines.push("");
-      
-      if (subsidyProducts) {
-        lines.push("Vi har talt om, at du skal bruge tilskuddet på disse produkter:");
-        lines.push("");
-        lines.push(subsidyProducts);
-        lines.push("");
-      }
-      
       lines.push("Tilskuddet bruges som rabatkode i vores webshop, hvor vi altid bestræber os på at have lageret fyldt. Jeg kan ikke foretage bestillingen for dig, det gør du selv via shoppen.");
       lines.push("");
     }
@@ -222,7 +211,7 @@ export default function TdcOpsummering() {
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
     startupChoice,
-    hasSubsidy, subsidyAmount, subsidyStartDate, subsidyProducts,
+    hasSubsidy,
     hasOmstilling, kaldsflow, hardware, isStandardOmstilling
   ]);
 
@@ -498,46 +487,13 @@ export default function TdcOpsummering() {
                 <Separator />
 
                 {/* Subsidy */}
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="hasSubsidy" 
-                      checked={hasSubsidy}
-                      onCheckedChange={(checked) => setHasSubsidy(checked === true)}
-                    />
-                    <Label htmlFor="hasSubsidy" className="font-medium cursor-pointer">Tilskud</Label>
-                  </div>
-                  {hasSubsidy && (
-                    <div className="ml-6 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Tilskudsbeløb</Label>
-                          <Input
-                            value={subsidyAmount}
-                            onChange={(e) => setSubsidyAmount(e.target.value)}
-                            placeholder="5.000 kr."
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Startdato for tilskud</Label>
-                          <Input
-                            type="date"
-                            value={subsidyStartDate}
-                            onChange={(e) => setSubsidyStartDate(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Produkter tilskuddet bruges på</Label>
-                        <Textarea
-                          value={subsidyProducts}
-                          onChange={(e) => setSubsidyProducts(e.target.value)}
-                          placeholder="Router 5G til 1.500 kr., 2 stk. iPhone 15 til 2.000 kr. pr. stk..."
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="hasSubsidy" 
+                    checked={hasSubsidy}
+                    onCheckedChange={(checked) => setHasSubsidy(checked === true)}
+                  />
+                  <Label htmlFor="hasSubsidy" className="font-medium cursor-pointer">Tilskud</Label>
                 </div>
 
                 <Separator />
