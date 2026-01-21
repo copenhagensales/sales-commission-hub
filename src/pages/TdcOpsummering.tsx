@@ -32,11 +32,7 @@ export default function TdcOpsummering() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  // Customer data
-  const [companyName, setCompanyName] = useState("");
-  const [cvr, setCvr] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  // Customer data removed - using static placeholders in summary
 
   // Product lines
   const [productLines, setProductLines] = useState<ProductLine[]>([
@@ -98,7 +94,7 @@ export default function TdcOpsummering() {
     lines.push({ text: "" });
 
     // 2. Basic info (always)
-    lines.push({ text: `Aftalen bliver oprettet i ${companyName || "(firmanavn)"} med CVR-nummer ${cvr || "(CVR-nummer)"}. Kontaktpersonen er ${contactName || "(navn)"}, og det telefonnummer vi benytter, er ${contactPhone || "(telefonnummer)"}.` });
+    lines.push({ text: "Aftalen bliver oprettet i (firmanavn) med CVR-nummer (CVR-nummer). Kontaktpersonen er (navn), og det telefonnummer vi benytter, er (telefonnummer)." });
     lines.push({ text: "" });
 
     // 3. Product lines
@@ -209,7 +205,7 @@ export default function TdcOpsummering() {
 
     return lines;
   }, [
-    companyName, cvr, contactName, contactPhone, productLines,
+    productLines,
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
     startupChoice,
@@ -254,55 +250,6 @@ export default function TdcOpsummering() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Input form */}
           <div className="space-y-6">
-            {/* Customer data */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Kundeoplysninger</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Firmanavn</Label>
-                    <Input
-                      id="companyName"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="CPH Sales ApS"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cvr">CVR-nummer</Label>
-                    <Input
-                      id="cvr"
-                      value={cvr}
-                      onChange={(e) => setCvr(e.target.value)}
-                      placeholder="12345678"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contactName">Kontaktperson</Label>
-                    <Input
-                      id="contactName"
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
-                      placeholder="John Doe"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactPhone">Telefonnummer</Label>
-                    <Input
-                      id="contactPhone"
-                      value={contactPhone}
-                      onChange={(e) => setContactPhone(e.target.value)}
-                      placeholder="12 34 56 78"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Product lines */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
