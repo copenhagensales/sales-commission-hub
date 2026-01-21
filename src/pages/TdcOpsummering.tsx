@@ -212,26 +212,40 @@ export default function TdcOpsummering() {
                 {/* MBB Type (1 and 2) */}
                 <div className="space-y-3">
                   <Label className="font-medium">Mobilt Bredbånd (MBB)</Label>
-                  <RadioGroup 
-                    value={mbbType || ""} 
-                onValueChange={(val) => {
-                  setMbbType(val as MbbType || null);
-                  if (val) {
-                    setIncludeWithoutRouter(true);
-                  } else {
-                    setIncludeWithoutRouter(false);
-                  }
-                }}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="mobilevoice" id="mobilevoice" />
-                      <Label htmlFor="mobilevoice" className="font-normal cursor-pointer">Mobilevoice som MBB (1)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="datadelingskort" id="datadelingskort" />
-                      <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB (2)</Label>
-                    </div>
-                  </RadioGroup>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mobilevoice"
+                      checked={mbbType === "mobilevoice"}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setMbbType("mobilevoice");
+                          setIncludeWithoutRouter(true);
+                        } else {
+                          setMbbType(null);
+                          setIncludeWithoutRouter(false);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="mobilevoice" className="font-normal cursor-pointer">Mobilevoice som MBB (1)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="datadelingskort"
+                      checked={mbbType === "datadelingskort"}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setMbbType("datadelingskort");
+                          setIncludeWithoutRouter(true);
+                        } else {
+                          setMbbType(null);
+                          setIncludeWithoutRouter(false);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB (2)</Label>
+                  </div>
+                </div>
                   
                   {/* Option 3 - Datadelingskort (only available if 1 or 2 is selected) */}
                   {mbbType && (
