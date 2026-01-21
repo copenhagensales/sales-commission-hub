@@ -224,7 +224,7 @@ export default function TdcOpsummering() {
               <CardContent className="space-y-6">
                 {/* MBB Type (1 and 2) */}
                 <div className="space-y-3">
-                  <Label className="font-medium">Mobilt Bredbånd (MBB)</Label>
+                  <Label className="font-medium">MV/Datadelingskort som MBB</Label>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
