@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2, CheckSquare } from "lucide-react";
+import { Plus, Search, BookOpen, TrendingUp, Clock, Phone, Users, Calculator, Loader2, CheckSquare, ExternalLink } from "lucide-react";
+import { PublicLinksOverview } from "@/components/kpi/PublicLinksOverview";
 
 export default function KpiDefinitions() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -69,6 +70,10 @@ export default function KpiDefinitions() {
             <TabsTrigger value="formulas" className="gap-2">
               <Calculator className="h-4 w-4" />
               Formelbygger
+            </TabsTrigger>
+            <TabsTrigger value="public-links" className="gap-2">
+              <ExternalLink className="h-4 w-4" />
+              Offentlige links
             </TabsTrigger>
           </TabsList>
 
@@ -219,6 +224,11 @@ export default function KpiDefinitions() {
           {/* Formulas Tab */}
           <TabsContent value="formulas">
             <KpiFormulaBuilder />
+          </TabsContent>
+
+          {/* Public Links Tab */}
+          <TabsContent value="public-links">
+            <PublicLinksOverview />
           </TabsContent>
         </Tabs>
 
