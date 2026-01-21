@@ -19,6 +19,11 @@ interface ProductLine {
   monthlyPrice: string;
 }
 
+interface SummaryLine {
+  text: string;
+  isRed?: boolean;
+}
+
 type MbbType = "router" | "hotspot" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
@@ -84,121 +89,121 @@ export default function TdcOpsummering() {
     ));
   };
 
-  // Generate summary text based on Word document structure
-  const summaryText = useMemo(() => {
-    const lines: string[] = [];
+  // Generate summary lines with formatting info
+  const summaryLines = useMemo(() => {
+    const lines: SummaryLine[] = [];
 
     // 1. Introduction (always)
-    lines.push("For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages.");
-    lines.push("");
+    lines.push({ text: "For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages." });
+    lines.push({ text: "" });
 
     // 2. Basic info (always)
-    lines.push(`Aftalen bliver oprettet i ${companyName || "(firmanavn)"} med CVR-nummer ${cvr || "(CVR-nummer)"}. Kontaktpersonen er ${contactName || "(navn)"}, og det telefonnummer vi benytter, er ${contactPhone || "(telefonnummer)"}.`);
-    lines.push("");
+    lines.push({ text: `Aftalen bliver oprettet i ${companyName || "(firmanavn)"} med CVR-nummer ${cvr || "(CVR-nummer)"}. Kontaktpersonen er ${contactName || "(navn)"}, og det telefonnummer vi benytter, er ${contactPhone || "(telefonnummer)"}.` });
+    lines.push({ text: "" });
 
     // 3. Product lines
     const validProducts = productLines.filter(p => p.quantity || p.productName || p.dataAmount || p.monthlyPrice);
     if (validProducts.length > 0) {
       validProducts.forEach(p => {
-        lines.push(`Du får ${p.quantity || "(antal)"} ${p.productName || "(produktnavn)"} ${p.dataAmount || "(datamængde)"} til en månedlig pris på ${p.monthlyPrice || "(beløb)"} kr. ekskl. moms.`);
+        lines.push({ text: `Du får ${p.quantity || "(antal)"} ${p.productName || "(produktnavn)"} ${p.dataAmount || "(datamængde)"} til en månedlig pris på ${p.monthlyPrice || "(beløb)"} kr. ekskl. moms.` });
       });
-      lines.push("");
+      lines.push({ text: "" });
     }
 
     // 1 - MBB via router (tilsluttet strøm)
     if (mbbType === "router") {
-      lines.push("Det mobile bredbånd kører via en router, der er tilsluttet strøm.");
-      lines.push("");
+      lines.push({ text: "Det mobile bredbånd kører via en router, der er tilsluttet strøm." });
+      lines.push({ text: "" });
     }
     
     // 2 - MBB via mobil router/hotspot (USB)
     if (mbbType === "hotspot") {
-      lines.push("Det mobile bredbånd kører via en mobil router, der oplades via USB.");
-      lines.push("");
+      lines.push({ text: "Det mobile bredbånd kører via en mobil router, der oplades via USB." });
+      lines.push({ text: "" });
     }
     
     // 3 - Datadelingskort (corrected text from Word document - only if MBB is selected)
     if (mbbType && includeWithoutRouter) {
-      lines.push("Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer.");
-      lines.push("");
+      lines.push({ text: "Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer." });
+      lines.push({ text: "" });
     }
 
     // 4, 5, 6 - Number choice
     if (numberChoice === "existing") {
-      lines.push(`Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: ${existingNumbers || "[X, Y, Z]"}.`);
-      lines.push("");
+      lines.push({ text: `Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: ${existingNumbers || "[X, Y, Z]"}.` });
+      lines.push({ text: "" });
     } else if (numberChoice === "mixed") {
-      lines.push(`Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er ${existingNumbers || "[X, Y, Z]"}, og at vi derudover opretter ${newNumberCount || "(antal)"} nye mobilnumre.`);
-      lines.push("");
+      lines.push({ text: `Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er ${existingNumbers || "[X, Y, Z]"}, og at vi derudover opretter ${newNumberCount || "(antal)"} nye mobilnumre.` });
+      lines.push({ text: "" });
     } else if (numberChoice === "new") {
-      lines.push("Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre.");
-      lines.push("");
+      lines.push({ text: "Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre." });
+      lines.push({ text: "" });
     }
 
     // 9 - Kun hvis "Kun nye numre" (option 6) er valgt
     if (numberChoice === "new") {
-      lines.push("Dine nye numre starter (hurtigst muligt eller på bestemt dato).");
-      lines.push("");
+      lines.push({ text: "Dine nye numre starter (hurtigst muligt eller på bestemt dato)." });
+      lines.push({ text: "" });
     }
     
     // 10 - Opsigelse af eksisterende (kun hvis 4 eller 5 er valgt)
     if (numberChoice === "existing" || numberChoice === "mixed") {
-      lines.push("Vi opsiger kun de numre, vi har aftalt, bliver overflyttet. Internet og produkter uden et nummer tilkoblet skal du derfor selv opsige.");
-      lines.push("");
+      lines.push({ text: "Vi opsiger kun de numre, vi har aftalt, bliver overflyttet. Internet og produkter uden et nummer tilkoblet skal du derfor selv opsige." });
+      lines.push({ text: "" });
     }
     
     // 11 - Opsigelse ved nyoprettelser (kun hvis 6 er valgt)
     if (numberChoice === "new") {
-      lines.push("Da vi opretter nye abonnementer opsiger vi derfor intet du måtte have ved andre udbydere.");
-      lines.push("");
+      lines.push({ text: "Da vi opretter nye abonnementer opsiger vi derfor intet du måtte have ved andre udbydere." });
+      lines.push({ text: "" });
     }
 
     // Binding terms (always included)
-    lines.push("I er bundet på kontrakten i 36 måneder.");
-    lines.push("");
+    lines.push({ text: "I er bundet på kontrakten i 36 måneder." });
+    lines.push({ text: "" });
 
     // 7 or 8 - Startup (KUN hvis eksisterende/mixed numre - aldrig sammen med punkt 9)
     if (numberChoice === "existing" || numberChoice === "mixed") {
       if (startupChoice === "asap") {
-        lines.push("Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.");
-        lines.push("");
+        lines.push({ text: "Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder." });
+        lines.push({ text: "" });
       } else if (startupChoice === "specific") {
-        lines.push("Vi har aftalt, at numrene flyttes den (dato). Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.");
-        lines.push("");
+        lines.push({ text: "Vi har aftalt, at numrene flyttes den (dato). Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse." });
+        lines.push({ text: "" });
       }
     }
 
     // Order confirmation (always included)
-    lines.push("Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår.");
-    lines.push("");
+    lines.push({ text: "Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår." });
+    lines.push({ text: "" });
 
     // Add/remove subscriptions (always included)
-    lines.push("Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes.");
-    lines.push("");
+    lines.push({ text: "Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes." });
+    lines.push({ text: "" });
 
     // Subsidy
     if (hasSubsidy) {
-      lines.push("Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers.");
-      lines.push("");
-      lines.push("Tilskuddet bruges som rabatkode i vores webshop, hvor vi altid bestræber os på at have lageret fyldt. Jeg kan ikke foretage bestillingen for dig, det gør du selv via shoppen.");
-      lines.push("");
+      lines.push({ text: "Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers." });
+      lines.push({ text: "" });
+      lines.push({ text: "Tilskuddet bruges som rabatkode i vores webshop, hvor vi altid bestræber os på at have lageret fyldt. Jeg kan ikke foretage bestillingen for dig, det gør du selv via shoppen." });
+      lines.push({ text: "" });
     }
 
     // 13, 14 - Omstilling
     if (hasOmstilling) {
-      lines.push("Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)");
-      lines.push("");
+      lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
+      lines.push({ text: "" });
       
       if (isStandardOmstilling) {
-        lines.push("Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling.");
-        lines.push("");
+        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
+        lines.push({ text: "" });
       }
     }
 
     // Closing (always)
-    lines.push("Har du nogle spørgsmål til mig?");
+    lines.push({ text: "Har du nogle spørgsmål til mig?" });
 
-    return lines.join("\n");
+    return lines;
   }, [
     companyName, cvr, contactName, contactPhone, productLines,
     mbbType, includeWithoutRouter, 
@@ -207,6 +212,11 @@ export default function TdcOpsummering() {
     hasSubsidy,
     hasOmstilling, isStandardOmstilling
   ]);
+
+  // Plain text version for copying
+  const summaryText = useMemo(() => {
+    return summaryLines.map(line => line.text).join("\n");
+  }, [summaryLines]);
 
   const copyToClipboard = async () => {
     try {
@@ -538,11 +548,17 @@ export default function TdcOpsummering() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <Textarea
-                  value={summaryText}
-                  readOnly
-                  className="min-h-[600px] font-mono text-sm resize-none"
-                />
+                <div className="min-h-[600px] font-mono text-sm p-3 border rounded-md bg-background overflow-auto whitespace-pre-wrap">
+                  {summaryLines.map((line, index) => (
+                    <span 
+                      key={index} 
+                      className={line.isRed ? "text-red-600 font-semibold" : ""}
+                    >
+                      {line.text}
+                      {index < summaryLines.length - 1 && "\n"}
+                    </span>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
