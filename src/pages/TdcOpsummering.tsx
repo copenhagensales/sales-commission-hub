@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { FileText, Plus, Trash2, Copy, Check } from "lucide-react";
+import { FileText, Copy, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,17 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { MainLayout } from "@/components/layout/MainLayout";
-
-interface ProductLine {
-  id: string;
-  quantity: string;
-  productName: string;
-  dataAmount: string;
-  monthlyPrice: string;
-}
 
 interface SummaryLine {
   text: string;
@@ -32,12 +23,7 @@ export default function TdcOpsummering() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  // Customer data removed - using static placeholders in summary
-
-  // Product lines
-  const [productLines, setProductLines] = useState<ProductLine[]>([
-    { id: crypto.randomUUID(), quantity: "", productName: "", dataAmount: "", monthlyPrice: "" }
-  ]);
+  // Customer data and product lines removed - using static placeholders in summary
 
   // MBB options (1 and 2 - only one can be selected)
   const [mbbType, setMbbType] = useState<MbbType>(null);
@@ -47,17 +33,9 @@ export default function TdcOpsummering() {
   const [numberChoice, setNumberChoice] = useState<NumberChoice | null>(null);
   const [existingNumbers, setExistingNumbers] = useState("");
   const [newNumberCount, setNewNumberCount] = useState("");
-  // newNumberStartOption removed - text is now static in summary
-  
-  // Binding
-  // includeBinding removed - text now always included
   
   // Startup (7, 8 - one MUST be selected)
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
-  // wishDate removed - text now uses static "(dato)" placeholder
-  
-  // includeOrderConfirmation removed - text now always included
-  // includeAddRemove removed - text now always included
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
@@ -65,25 +43,6 @@ export default function TdcOpsummering() {
   // Omstilling (13, 14)
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
-
-  const addProductLine = () => {
-    setProductLines([
-      ...productLines,
-      { id: crypto.randomUUID(), quantity: "", productName: "", dataAmount: "", monthlyPrice: "" }
-    ]);
-  };
-
-  const removeProductLine = (id: string) => {
-    if (productLines.length > 1) {
-      setProductLines(productLines.filter(p => p.id !== id));
-    }
-  };
-
-  const updateProductLine = (id: string, field: keyof ProductLine, value: string) => {
-    setProductLines(productLines.map(p => 
-      p.id === id ? { ...p, [field]: value } : p
-    ));
-  };
 
   // Generate summary lines with formatting info
   const summaryLines = useMemo(() => {
@@ -97,14 +56,9 @@ export default function TdcOpsummering() {
     lines.push({ text: "Aftalen bliver oprettet i (firmanavn) med CVR-nummer (CVR-nummer). Kontaktpersonen er (navn), og det telefonnummer vi benytter, er (telefonnummer)." });
     lines.push({ text: "" });
 
-    // 3. Product lines
-    const validProducts = productLines.filter(p => p.quantity || p.productName || p.dataAmount || p.monthlyPrice);
-    if (validProducts.length > 0) {
-      validProducts.forEach(p => {
-        lines.push({ text: `Du får ${p.quantity || "(antal)"} ${p.productName || "(produktnavn)"} ${p.dataAmount || "(datamængde)"} til en månedlig pris på ${p.monthlyPrice || "(beløb)"} kr. ekskl. moms.` });
-      });
-      lines.push({ text: "" });
-    }
+    // 3. Product lines - static placeholder
+    lines.push({ text: "Du får (antal + fulde produktnavn + datamængde) til en månedlig pris på (beløb) kr. ekskl. moms." });
+    lines.push({ text: "" });
 
     // 1 - Mobilevoice som MBB
     if (mbbType === "mobilevoice") {
@@ -205,7 +159,6 @@ export default function TdcOpsummering() {
 
     return lines;
   }, [
-    productLines,
     mbbType, includeWithoutRouter, 
     numberChoice, existingNumbers, newNumberCount,
     startupChoice,
@@ -250,72 +203,6 @@ export default function TdcOpsummering() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Input form */}
           <div className="space-y-6">
-            {/* Product lines */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-lg">Produkter</CardTitle>
-                <Button variant="outline" size="sm" onClick={addProductLine}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Tilføj produkt
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {productLines.map((product, index) => (
-                  <div key={product.id} className="space-y-3 p-4 rounded-lg border bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Produkt {index + 1}</span>
-                      {productLines.length > 1 && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => removeProductLine(product.id)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label>Antal</Label>
-                        <Input
-                          value={product.quantity}
-                          onChange={(e) => updateProductLine(product.id, "quantity", e.target.value)}
-                          placeholder="3 stk."
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Produktnavn</Label>
-                        <Input
-                          value={product.productName}
-                          onChange={(e) => updateProductLine(product.id, "productName", e.target.value)}
-                          placeholder="TDC Erhverv Mobil L"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label>Datamængde</Label>
-                        <Input
-                          value={product.dataAmount}
-                          onChange={(e) => updateProductLine(product.id, "dataAmount", e.target.value)}
-                          placeholder="med 50 GB"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Månedspris (ekskl. moms)</Label>
-                        <Input
-                          value={product.monthlyPrice}
-                          onChange={(e) => updateProductLine(product.id, "monthlyPrice", e.target.value)}
-                          placeholder="199"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
             {/* Conditional blocks */}
             <Card>
               <CardHeader>
