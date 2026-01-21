@@ -28,6 +28,7 @@ export default function TdcOpsummering() {
   // MBB options (1 and 2 - only one can be selected)
   const [mbbType, setMbbType] = useState<MbbType>(null);
   const [includeWithoutRouter, setIncludeWithoutRouter] = useState(false); // Option 3 - datadelingskort
+  const [noMbb, setNoMbb] = useState(false);
   
   // Number choice (4, 5, 6 - one MUST be selected)
   const [numberChoice, setNumberChoice] = useState<NumberChoice | null>(null);
@@ -37,10 +38,12 @@ export default function TdcOpsummering() {
   
   // Subsidy
   const [hasSubsidy, setHasSubsidy] = useState(false);
+  const [noSubsidy, setNoSubsidy] = useState(false);
   
   // Omstilling (13, 14)
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
+  const [noOmstilling, setNoOmstilling] = useState(false);
 
   // Validation for required fields
   const isNummervalgMissing = !numberChoice;
@@ -225,6 +228,7 @@ export default function TdcOpsummering() {
                         if (checked) {
                           setMbbType("mobilevoice");
                           setIncludeWithoutRouter(true);
+                          setNoMbb(false);
                         } else {
                           setMbbType(null);
                           setIncludeWithoutRouter(false);
@@ -241,6 +245,7 @@ export default function TdcOpsummering() {
                         if (checked) {
                           setMbbType("datadelingskort");
                           setIncludeWithoutRouter(true);
+                          setNoMbb(false);
                         } else {
                           setMbbType(null);
                           setIncludeWithoutRouter(false);
@@ -248,6 +253,22 @@ export default function TdcOpsummering() {
                       }}
                     />
                     <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB (2)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="noMbb"
+                      checked={noMbb}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setNoMbb(true);
+                          setMbbType(null);
+                          setIncludeWithoutRouter(false);
+                        } else {
+                          setNoMbb(false);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="noMbb" className="font-normal cursor-pointer">Ingen Mobilt Bredbånd</Label>
                   </div>
                 </div>
                   
@@ -327,28 +348,49 @@ export default function TdcOpsummering() {
                 <Separator />
 
                 {/* Subsidy */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="hasSubsidy" 
-                    checked={hasSubsidy}
-                    onCheckedChange={(checked) => setHasSubsidy(checked === true)}
-                  />
-                  <Label htmlFor="hasSubsidy" className="font-medium cursor-pointer">Tilskud</Label>
+                <div className="space-y-2">
+                  <Label className="font-medium">Tilskud</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="hasSubsidy" 
+                      checked={hasSubsidy}
+                      onCheckedChange={(checked) => {
+                        setHasSubsidy(checked === true);
+                        if (checked) setNoSubsidy(false);
+                      }}
+                    />
+                    <Label htmlFor="hasSubsidy" className="font-normal cursor-pointer">Tilskud inkluderet</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="noSubsidy" 
+                      checked={noSubsidy}
+                      onCheckedChange={(checked) => {
+                        setNoSubsidy(checked === true);
+                        if (checked) setHasSubsidy(false);
+                      }}
+                    />
+                    <Label htmlFor="noSubsidy" className="font-normal cursor-pointer">Intet Tilskud</Label>
+                  </div>
                 </div>
 
                 <Separator />
 
                 {/* Omstilling (13, 14) */}
-                <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="font-medium">Omstilling</Label>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="hasOmstilling" 
                       checked={hasOmstilling}
-                      onCheckedChange={(checked) => setHasOmstilling(checked === true)}
+                      onCheckedChange={(checked) => {
+                        setHasOmstilling(checked === true);
+                        if (checked) setNoOmstilling(false);
+                      }}
                     />
-                    <Label htmlFor="hasOmstilling" className="font-medium cursor-pointer">Omstilling</Label>
+                    <Label htmlFor="hasOmstilling" className="font-normal cursor-pointer">Omstilling inkluderet</Label>
                   </div>
-                {hasOmstilling && (
+                  {hasOmstilling && (
                     <div className="ml-6">
                       <div className="flex items-center space-x-2">
                         <Checkbox 
@@ -360,6 +402,20 @@ export default function TdcOpsummering() {
                       </div>
                     </div>
                   )}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="noOmstilling" 
+                      checked={noOmstilling}
+                      onCheckedChange={(checked) => {
+                        setNoOmstilling(checked === true);
+                        if (checked) {
+                          setHasOmstilling(false);
+                          setIsStandardOmstilling(true);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="noOmstilling" className="font-normal cursor-pointer">Ingen Omstilling</Label>
+                  </div>
                 </div>
               </CardContent>
             </Card>
