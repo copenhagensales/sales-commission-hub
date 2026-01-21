@@ -124,7 +124,7 @@ export default function TdcOpsummering() {
     
     // 3 - uden router (kun hvis et af ovenstående er valgt)
     if (mbbType && includeWithoutRouter) {
-      lines.push({ text: "Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer." });
+      lines.push({ text: "Der medfølger ikke en router til abonnementet, så du skal selv sørge for en router." });
       lines.push({ text: "" });
     }
 
