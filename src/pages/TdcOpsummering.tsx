@@ -385,25 +385,29 @@ export default function TdcOpsummering() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {/* Warning banner for missing required selections */}
-                {showWarningBanner && (
-                  <div className="bg-destructive text-destructive-foreground p-4 rounded-md text-center font-bold text-lg mb-4">
-                    ⚠️ Udfyld venligst: 
-                    {isNummervalgMissing && " Nummervalg"}
-                    {isNummervalgMissing && isOpstartMissing && " og"}
-                    {isOpstartMissing && " Opstart"}
+                <div className="relative">
+                  {/* Warning overlay - covers the summary text */}
+                  {showWarningBanner && (
+                    <div className="absolute inset-0 z-10 bg-destructive/95 backdrop-blur-sm rounded-md flex items-center justify-center">
+                      <div className="text-destructive-foreground text-center font-bold text-xl p-6">
+                        ⚠️ Udfyld venligst: 
+                        {isNummervalgMissing && " Nummervalg"}
+                        {isNummervalgMissing && isOpstartMissing && " og"}
+                        {isOpstartMissing && " Opstart"}
+                      </div>
+                    </div>
+                  )}
+                  <div className="min-h-[600px] font-mono text-sm p-3 border rounded-md bg-background overflow-auto whitespace-pre-wrap">
+                    {summaryLines.map((line, index) => (
+                      <span 
+                        key={index} 
+                        className={line.isRed ? "text-red-600 font-semibold" : ""}
+                      >
+                        {line.text}
+                        {index < summaryLines.length - 1 && "\n"}
+                      </span>
+                    ))}
                   </div>
-                )}
-                <div className="min-h-[600px] font-mono text-sm p-3 border rounded-md bg-background overflow-auto whitespace-pre-wrap">
-                  {summaryLines.map((line, index) => (
-                    <span 
-                      key={index} 
-                      className={line.isRed ? "text-red-600 font-semibold" : ""}
-                    >
-                      {line.text}
-                      {index < summaryLines.length - 1 && "\n"}
-                    </span>
-                  ))}
                 </div>
               </CardContent>
             </Card>
