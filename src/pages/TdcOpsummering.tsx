@@ -112,13 +112,13 @@ export default function TdcOpsummering() {
 
     // 1 - Mobilevoice som MBB
     if (mbbType === "mobilevoice") {
-      lines.push({ text: "Det mobile bredbånd kører via en router, der er tilsluttet strøm." });
+      lines.push({ text: "Der oprettes et mobilt bredbånd gennem et mobilabonnement. Det får et fiktivt nummer, som vil fremgå i din ordrebekræftelse." });
       lines.push({ text: "" });
     }
     
     // 2 - Datadelingskort som MBB
     if (mbbType === "datadelingskort") {
-      lines.push({ text: "Det mobile bredbånd kører via en mobil router, der oplades via USB." });
+      lines.push({ text: "Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer." });
       lines.push({ text: "" });
     }
     
