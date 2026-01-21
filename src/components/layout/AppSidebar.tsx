@@ -439,8 +439,12 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showReportsMenu = p.canView("menu_section_reports") && 
     (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
   
-  // Check if Salary menu should be visible
-  const showSalaryMenu = p.canView("menu_section_salary") && p.canViewSalaryTypes;
+  // HARDCODED: Only Kasper Mikkelsen and Mathias Grubak can see salary menu
+  const SALARY_ALLOWED_USER_IDS = [
+    'f0fb7ec3-5f00-4fcd-a6ca-2a53669147b9', // Kasper Mikkelsen
+    '71267f4e-fd9e-4c16-8fe9-da0f48ce2598', // Mathias Grubak
+  ];
+  const showSalaryMenu = user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false;
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
