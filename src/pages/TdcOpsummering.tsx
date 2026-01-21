@@ -186,7 +186,7 @@ export default function TdcOpsummering() {
 
     // 13, 14 - Omstilling
     if (hasOmstilling) {
-      lines.push("Vi har aftalt at sætte omstilling op, så indkommende opkald kan fordeles mellem flere modtagere. Jeg sender dig en mail med et link til et planlægningsark, som du udfylder med de relevante oplysninger. Når du har udfyldt arket, kontakter vi dig for at aftale en dato for opsætning og opstart.");
+      lines.push("Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)");
       lines.push("");
       
       if (isStandardOmstilling) {
