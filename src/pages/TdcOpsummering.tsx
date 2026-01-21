@@ -213,15 +213,6 @@ export default function TdcOpsummering() {
                 <CardTitle className="text-lg">Valgfrie sektioner</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Warning banner for missing required selections */}
-                {showWarningBanner && (
-                  <div className="bg-destructive text-destructive-foreground p-4 rounded-md text-center font-bold text-lg">
-                    ⚠️ Udfyld venligst: 
-                    {isNummervalgMissing && " Nummervalg"}
-                    {isNummervalgMissing && isOpstartMissing && " og"}
-                    {isOpstartMissing && " Opstart"}
-                  </div>
-                )}
                 {/* MBB Type (1 and 2) */}
                 <div className="space-y-3">
                   <Label className="font-medium">Mobilt Bredbånd (MBB)</Label>
@@ -394,6 +385,15 @@ export default function TdcOpsummering() {
                 </Button>
               </CardHeader>
               <CardContent>
+                {/* Warning banner for missing required selections */}
+                {showWarningBanner && (
+                  <div className="bg-destructive text-destructive-foreground p-4 rounded-md text-center font-bold text-lg mb-4">
+                    ⚠️ Udfyld venligst: 
+                    {isNummervalgMissing && " Nummervalg"}
+                    {isNummervalgMissing && isOpstartMissing && " og"}
+                    {isOpstartMissing && " Opstart"}
+                  </div>
+                )}
                 <div className="min-h-[600px] font-mono text-sm p-3 border rounded-md bg-background overflow-auto whitespace-pre-wrap">
                   {summaryLines.map((line, index) => (
                     <span 
