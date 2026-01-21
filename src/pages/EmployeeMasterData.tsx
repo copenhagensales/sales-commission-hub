@@ -550,9 +550,11 @@ export default function EmployeeMasterData() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      setDeactivatingEmployee(null);
       toast({ title: t("employees.toast.statusUpdated") });
     },
     onError: (error) => {
+      setDeactivatingEmployee(null);
       toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
     },
   });
@@ -1575,12 +1577,12 @@ export default function EmployeeMasterData() {
                 onClick={() => {
                   if (deactivatingEmployee) {
                     toggleActiveMutation.mutate({ id: deactivatingEmployee.id, is_active: false, employee: deactivatingEmployee });
-                    setDeactivatingEmployee(null);
                   }
                 }}
+                disabled={toggleActiveMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Deaktiver
+                {toggleActiveMutation.isPending ? "Deaktiverer..." : "Deaktiver"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
