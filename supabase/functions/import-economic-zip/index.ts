@@ -163,10 +163,17 @@ Deno.serve(async (req) => {
 
       console.log(`Parsed ${filename}: ${rows.length} rows`);
 
-      if (lowerName.includes("konto")) {
+      // Extract base filename (handle nested paths like "folder/Konto.csv")
+      const baseName = filename.split('/').pop()?.toLowerCase() || '';
+      
+      // Use exact filename matching to avoid conflicts
+      // (e.g., SystemKonto.csv, AfgiftsKonto.csv should NOT match)
+      if (baseName === "konto.csv") {
         kontoPlanData = rows;
-      } else if (lowerName.includes("postering")) {
+        console.log(`→ Matched as Kontoplan: ${rows.length} rows`);
+      } else if (baseName === "postering.csv") {
         posteringData = rows;
+        console.log(`→ Matched as Posteringer: ${rows.length} rows`);
       }
     }
 
