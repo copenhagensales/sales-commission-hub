@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Pagination,
   PaginationContent,
@@ -35,10 +35,28 @@ import {
   X,
   User,
   Phone,
-  Package
+  Package,
+  ChevronDown,
+  ChevronUp,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+// Type for leadResultData field
+interface LeadResultField {
+  label: string;
+  value: string;
+}
+
+// Type for raw_payload
+interface RawPayload {
+  leadId?: number;
+  id?: number; // Opportunity/Sales ID
+  campaignId?: number;
+  leadResultData?: LeadResultField[];
+  [key: string]: unknown;
+}
 
 interface Sale {
   id: string;
@@ -48,6 +66,7 @@ interface Sale {
   customer_phone: string | null;
   customer_company: string | null;
   validation_status: string | null;
+  raw_payload: RawPayload | null;
   client_campaigns: {
     id: string;
     name: string;
@@ -95,6 +114,37 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
   }
 }
 
+// Helper: Get specific field from leadResultData
+function getLeadField(payload: RawPayload | null, label: string): string | null {
+  if (!payload?.leadResultData) return null;
+  const field = payload.leadResultData.find(f => f.label === label);
+  return field?.value || null;
+}
+
+// Helper: Get phone with fallback to lead data
+function getEffectivePhone(sale: Sale): string | null {
+  if (sale.customer_phone) return sale.customer_phone;
+  
+  // Fallback: Check "Kontakt nummer" from lead data
+  const kontaktNummer = getLeadField(sale.raw_payload, 'Kontakt nummer');
+  if (kontaktNummer) return kontaktNummer;
+  
+  // Fallback: Check "Fastgjorte noter" for phone number pattern
+  const noter = getLeadField(sale.raw_payload, 'Fastgjorte noter');
+  if (noter) {
+    const phoneMatch = noter.match(/\d{2}\s?\d{2}\s?\d{2}\s?\d{2}/);
+    if (phoneMatch) return phoneMatch[0].replace(/\s/g, '');
+  }
+  
+  return null;
+}
+
+// Helper: Get Sales ID from leadResultData
+function getSalesId(payload: RawPayload | null): string | null {
+  const salesId = getLeadField(payload, 'Sales ID');
+  return salesId || null;
+}
+
 interface SalesFeedProps {
   selectedClientId?: string;
 }
@@ -112,7 +162,21 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [newSaleIds, setNewSaleIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+
+  // Toggle expanded state for a sale
+  const toggleExpanded = useCallback((saleId: string) => {
+    setExpandedSaleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(saleId)) {
+        next.delete(saleId);
+      } else {
+        next.add(saleId);
+      }
+      return next;
+    });
+  }, []);
 
   // Fetch available API sources dynamically
   const { data: availableSources = [] } = useQuery({
@@ -179,6 +243,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           customer_phone,
           customer_company,
           validation_status,
+          raw_payload,
           client_campaign_id,
           ${clientCampaignsJoin} (
             id,
@@ -268,6 +333,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
               customer_phone,
               customer_company,
               validation_status,
+              raw_payload,
               client_campaigns (
                 id,
                 name,
@@ -387,6 +453,89 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
       range.push(totalPages);
     }
     return range;
+  };
+
+  // Render lead tags badges
+  const renderLeadTags = (payload: RawPayload | null) => {
+    if (!payload) return null;
+    
+    const tilskud = getLeadField(payload, 'Tilskud');
+    const binding = getLeadField(payload, 'Bindingsperiode') || getLeadField(payload, 'Binding');
+    
+    if (!tilskud && !binding) return null;
+    
+    return (
+      <div className="flex gap-1 flex-wrap">
+        {tilskud && (
+          <Badge variant="outline" className="text-xs font-normal">
+            {tilskud}%
+          </Badge>
+        )}
+        {binding && (
+          <Badge variant="outline" className="text-xs font-normal">
+            {binding} mdr
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
+  // Render lead info (Lead ID + Sales ID)
+  const renderLeadInfo = (payload: RawPayload | null) => {
+    if (!payload) return <span className="text-muted-foreground text-sm">-</span>;
+    
+    const leadId = payload.leadId;
+    const salesId = getSalesId(payload);
+    
+    if (!leadId && !salesId) return <span className="text-muted-foreground text-sm">-</span>;
+    
+    return (
+      <div className="space-y-0.5">
+        {leadId && (
+          <p className="text-xs font-mono text-muted-foreground">
+            Lead: {leadId}
+          </p>
+        )}
+        {salesId && (
+          <p className="text-xs font-mono text-muted-foreground">
+            Sales: {salesId}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  // Render expandable lead data section
+  const renderLeadDataSection = (sale: Sale) => {
+    const payload = sale.raw_payload;
+    if (!payload?.leadResultData || payload.leadResultData.length === 0) return null;
+    
+    const isExpanded = expandedSaleIds.has(sale.id);
+    const fieldCount = payload.leadResultData.length;
+    
+    return (
+      <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(sale.id)}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
+            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            <FileText className="h-3 w-3" />
+            {isExpanded ? "Skjul" : "Vis"} lead data ({fieldCount})
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-3 pt-3 border-t text-sm">
+            {payload.leadResultData.map((field, idx) => (
+              <div key={idx} className="space-y-0.5 min-w-0">
+                <p className="text-xs text-muted-foreground truncate">{field.label}</p>
+                <p className="font-medium truncate text-sm" title={field.value || "-"}>
+                  {field.value || "-"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
   };
 
   if (isLoading) {
@@ -615,115 +764,26 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         ) : (
           <>
             <div className="grid gap-3 sm:gap-4">
-              {sales.map((sale) => (
-                <Card 
-                  key={sale.id}
-                  className={cn(
-                    "transition-all duration-500 overflow-hidden",
-                    newSaleIds.has(sale.id) && "ring-2 ring-primary/50 animate-in slide-in-from-top-2"
-                  )}
-                >
-                  <CardContent className="p-4">
-                    {/* Mobile Layout (stacked) */}
-                    <div className="lg:hidden">
-                      {/* Header: Agent + Date + Status */}
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex-1 min-w-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <p className="font-semibold truncate cursor-default">
-                                {sale.agent_name || "Ukendt agent"}
-                              </p>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <p className="text-xs text-muted-foreground cursor-default">
-                                {format(parseISO(sale.sale_datetime), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
-                              </p>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Badge
-                          variant={
-                            sale.validation_status === "cancelled" || sale.validation_status === "rejected"
-                              ? "destructive"
-                              : sale.validation_status === "pending"
-                              ? "secondary"
-                              : "default"
-                          }
-                          className="shrink-0"
-                        >
-                          {sale.validation_status || "ny"}
-                        </Badge>
-                      </div>
-
-                      {/* Customer Info */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <span className="truncate block">
-                              {sale.customer_company || "Ingen virksomhed"}
-                            </span>
-                            {sale.client_campaigns?.clients?.name && (
-                              <span className="text-xs text-muted-foreground truncate block">
-                                {sale.client_campaigns.clients.name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {sale.customer_phone && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <div className="flex items-center gap-1 min-w-0">
-                              <span className="font-mono truncate">{formatPhone(sale.customer_phone)}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 shrink-0"
-                                onClick={() => copyPhone(sale.customer_phone!, sale.id)}
-                              >
-                                {copiedId === sale.id ? (
-                                  <Check className="h-3 w-3 text-green-500" />
-                                ) : (
-                                  <Copy className="h-3 w-3 text-muted-foreground" />
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-start gap-2 text-sm">
-                          <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <span className="text-muted-foreground">
-                            {getProductsDisplay(sale.sale_items)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout (horizontal grid) */}
-                    <div className="hidden lg:grid lg:grid-cols-12 lg:gap-4 lg:items-center">
-                      {/* Agent + Date - 3 cols */}
-                      <div className="col-span-3 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 shrink-0">
-                            <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                              {getInitials(sale.agent_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
+              {sales.map((sale) => {
+                const effectivePhone = getEffectivePhone(sale);
+                
+                return (
+                  <Card 
+                    key={sale.id}
+                    className={cn(
+                      "transition-all duration-500 overflow-hidden",
+                      newSaleIds.has(sale.id) && "ring-2 ring-primary/50 animate-in slide-in-from-top-2"
+                    )}
+                  >
+                    <CardContent className="p-4">
+                      {/* Mobile Layout (stacked) */}
+                      <div className="lg:hidden">
+                        {/* Header: Agent + Date + Status */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex-1 min-w-0">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p className="font-medium truncate text-sm cursor-default">
+                                <p className="font-semibold truncate cursor-default">
                                   {sale.agent_name || "Ukendt agent"}
                                 </p>
                               </TooltipTrigger>
@@ -734,75 +794,184 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <p className="text-xs text-muted-foreground cursor-default">
-                                  {format(parseISO(sale.sale_datetime), "d. MMM 'kl.' HH:mm", { locale: da })}
+                                  {format(parseISO(sale.sale_datetime), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
                                 </p>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm:ss", { locale: da })}
+                                {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
                               </TooltipContent>
                             </Tooltip>
                           </div>
+                          <Badge
+                            variant={
+                              sale.validation_status === "cancelled" || sale.validation_status === "rejected"
+                                ? "destructive"
+                                : sale.validation_status === "pending"
+                                ? "secondary"
+                                : "default"
+                            }
+                            className="shrink-0"
+                          >
+                            {sale.validation_status || "ny"}
+                          </Badge>
                         </div>
-                      </div>
 
-                      {/* Customer + Client - 3 cols */}
-                      <div className="col-span-3 min-w-0">
-                        <p className="font-medium truncate text-sm">
-                          {sale.customer_company || "Ingen virksomhed"}
-                        </p>
-                        {sale.client_campaigns?.clients?.name && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {sale.client_campaigns.clients.name}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Phone - 2 cols */}
-                      <div className="col-span-2 min-w-0">
-                        {sale.customer_phone ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-sm truncate">{formatPhone(sale.customer_phone)}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              onClick={() => copyPhone(sale.customer_phone!, sale.id)}
-                            >
-                              {copiedId === sale.id ? (
-                                <Check className="h-3 w-3 text-green-500" />
-                              ) : (
-                                <Copy className="h-3 w-3 text-muted-foreground" />
+                        {/* Customer Info */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate block">
+                                {sale.customer_company || "Ingen virksomhed"}
+                              </span>
+                              {sale.client_campaigns?.clients?.name && (
+                                <span className="text-xs text-muted-foreground truncate block">
+                                  {sale.client_campaigns.clients.name}
+                                </span>
                               )}
-                            </Button>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
+
+                          {effectivePhone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="font-mono truncate">{formatPhone(effectivePhone)}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  onClick={() => copyPhone(effectivePhone, sale.id)}
+                                >
+                                  {copiedId === sale.id ? (
+                                    <Check className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <Copy className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-start gap-2 text-sm">
+                            <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            <span className="text-muted-foreground">
+                              {getProductsDisplay(sale.sale_items)}
+                            </span>
+                          </div>
+
+                          {/* Lead Tags for mobile */}
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {renderLeadTags(sale.raw_payload)}
+                            {sale.raw_payload?.leadId && (
+                              <Badge variant="secondary" className="text-xs font-mono">
+                                Lead: {sale.raw_payload.leadId}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expandable Lead Data */}
+                        {renderLeadDataSection(sale)}
                       </div>
 
-                      {/* Products - 3 cols */}
-                      <div className="col-span-3 min-w-0">
-                        {getProductsDisplay(sale.sale_items)}
-                      </div>
+                      {/* Desktop Layout (horizontal grid) */}
+                      <div className="hidden lg:block">
+                        <div className="grid grid-cols-12 gap-4 items-center">
+                          {/* Agent + Date - 3 cols */}
+                          <div className="col-span-3 min-w-0">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 shrink-0">
+                                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                                  {getInitials(sale.agent_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="font-medium truncate text-sm cursor-default">
+                                      {sale.agent_name || "Ukendt agent"}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-xs text-muted-foreground cursor-default">
+                                      {format(parseISO(sale.sale_datetime), "d. MMM 'kl.' HH:mm", { locale: da })}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm:ss", { locale: da })}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
 
-                      {/* Status - 1 col */}
-                      <div className="col-span-1 flex justify-end">
-                        <Badge
-                          variant={
-                            sale.validation_status === "cancelled" || sale.validation_status === "rejected"
-                              ? "destructive"
-                              : sale.validation_status === "pending"
-                              ? "secondary"
-                              : "default"
-                          }
-                        >
-                          {sale.validation_status || "ny"}
-                        </Badge>
+                          {/* Lead Info - 2 cols */}
+                          <div className="col-span-2 min-w-0">
+                            {renderLeadInfo(sale.raw_payload)}
+                          </div>
+
+                          {/* Phone - 2 cols */}
+                          <div className="col-span-2 min-w-0">
+                            {effectivePhone ? (
+                              <div className="flex items-center gap-1">
+                                <span className="font-mono text-sm truncate">{formatPhone(effectivePhone)}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  onClick={() => copyPhone(effectivePhone, sale.id)}
+                                >
+                                  {copiedId === sale.id ? (
+                                    <Check className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <Copy className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </div>
+
+                          {/* Products - 3 cols */}
+                          <div className="col-span-3 min-w-0">
+                            {getProductsDisplay(sale.sale_items)}
+                          </div>
+
+                          {/* Lead Tags - 1 col */}
+                          <div className="col-span-1 min-w-0">
+                            {renderLeadTags(sale.raw_payload)}
+                          </div>
+
+                          {/* Status - 1 col */}
+                          <div className="col-span-1 flex justify-end">
+                            <Badge
+                              variant={
+                                sale.validation_status === "cancelled" || sale.validation_status === "rejected"
+                                  ? "destructive"
+                                  : sale.validation_status === "pending"
+                                  ? "secondary"
+                                  : "default"
+                              }
+                            >
+                              {sale.validation_status || "ny"}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Expandable Lead Data */}
+                        {renderLeadDataSection(sale)}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Pagination */}
