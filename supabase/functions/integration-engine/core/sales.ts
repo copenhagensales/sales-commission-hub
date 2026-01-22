@@ -45,17 +45,18 @@ function matchPricingRule(
   const hasEmptyLeadData = !leadResultData || leadResultData.length === 0;
   
   if (hasConditionalRules && hasEmptyLeadData) {
-    log?.("WARN", `Product ${productId} has conditional pricing rules but leadResultData is empty - rules may not match correctly`);
+    log?.("WARN", `Product ${productId} has conditional pricing rules but leadResultData is empty - checking for campaign fallback`);
   }
 
   for (const rule of sortedRules) {
     if (!rule.is_active) continue;
 
+    const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
+    const campaignMatches = hasCampaignRestriction && campaignMappingId && rule.campaign_mapping_ids!.includes(campaignMappingId);
+
     // Check campaign restriction if rule has campaign_mapping_ids
-    if (rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0) {
-      if (!campaignMappingId || !rule.campaign_mapping_ids.includes(campaignMappingId)) {
-        continue;
-      }
+    if (hasCampaignRestriction && !campaignMatches) {
+      continue;
     }
 
     // Check all conditions match
@@ -74,10 +75,26 @@ function matchPricingRule(
       }
     }
 
+    // NEW: Campaign fallback logic - if campaign matches AND leadResultData is empty,
+    // use the rule anyway as a fallback (for campaigns that don't provide lead data)
+    if (!allConditionsMet && conditionKeys.length > 0 && hasEmptyLeadData && campaignMatches) {
+      log?.("INFO", `Using campaign fallback for rule "${rule.name}" - campaign matches but leadResultData is empty`, {
+        ruleId: rule.id,
+        productId,
+        campaignMappingId,
+        commission: rule.commission_dkk,
+        revenue: rule.revenue_dkk
+      });
+      return {
+        commission: rule.commission_dkk,
+        revenue: rule.revenue_dkk,
+        ruleId: rule.id,
+        ruleName: rule.name
+      };
+    }
+
     if (allConditionsMet) {
       // Rules match if all conditions are met (empty conditions = match)
-      // Campaign restriction is already checked above (lines 47-51)
-      const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
       log?.("INFO", `Matched pricing rule "${rule.name}" for product ${productId}`, {
         ruleId: rule.id,
         conditions,
@@ -91,9 +108,9 @@ function matchPricingRule(
         ruleId: rule.id,
         ruleName: rule.name
       };
-    } else if (conditionKeys.length > 0 && hasEmptyLeadData) {
-      // Log when a conditional rule fails specifically due to empty lead data
-      log?.("WARN", `Rule "${rule.name}" not matched - condition "${failedCondition}" could not be evaluated (empty leadResultData)`, {
+    } else if (conditionKeys.length > 0 && hasEmptyLeadData && !campaignMatches) {
+      // Log when a conditional rule fails specifically due to empty lead data (and no campaign fallback)
+      log?.("WARN", `Rule "${rule.name}" not matched - condition "${failedCondition}" could not be evaluated (empty leadResultData, no campaign fallback)`, {
         ruleId: rule.id,
         productId
       });
