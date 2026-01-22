@@ -215,3 +215,6 @@ verify_jwt = false
 
 [functions.recalculate-dynamic-expenses]
 verify_jwt = false
+
+[functions.import-economic-zip]
+verify_jwt = false
