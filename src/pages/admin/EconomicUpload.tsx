@@ -5,9 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileArchive, CheckCircle2, XCircle, Loader2, Clock, Calendar, FileText } from "lucide-react";
+import { Upload, FileArchive, CheckCircle2, XCircle, Loader2, Clock, Calendar, FileText, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -65,6 +67,47 @@ export default function EconomicUpload() {
     },
     onError: (error: Error) => {
       queryClient.invalidateQueries({ queryKey: ["economic-imports"] });
+      toast({
+        title: "Import fejlede",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete import mutation
+  const deleteImport = useMutation({
+    mutationFn: async (importId: string) => {
+      // First get the storage path
+      const { data: importData } = await supabase
+        .from("economic_imports")
+        .select("storage_path")
+        .eq("id", importId)
+        .single();
+
+      // Delete from storage if path exists
+      if (importData?.storage_path) {
+        await supabase.storage
+          .from("economic-imports")
+          .remove([importData.storage_path]);
+      }
+
+      // Delete the import record
+      const { error } = await supabase
+        .from("economic_imports")
+        .delete()
+        .eq("id", importId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["economic-imports"] });
+      toast({
+        title: "Import slettet",
+        description: "Importen er blevet fjernet.",
+      });
+    },
+    onError: (error: Error) => {
       toast({
         title: "Import fejlede",
         description: error.message,
@@ -269,6 +312,8 @@ export default function EconomicUpload() {
                       <TableHead>Status</TableHead>
                       <TableHead>Periode</TableHead>
                       <TableHead className="text-right">Rækker</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead className="text-right">Rækker</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -309,6 +354,36 @@ export default function EconomicUpload() {
                             <span>{imp.rows_postering.toLocaleString("da-DK")} posteringer</span>
                             <span className="text-muted-foreground">{imp.rows_konto.toLocaleString("da-DK")} konti</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Slet import?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Er du sikker på at du vil slette denne import? Dette fjerner kun import-posten, ikke de importerede data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteImport.mutate(imp.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Slet
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))}
