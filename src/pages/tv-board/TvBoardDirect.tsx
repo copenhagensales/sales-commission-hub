@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ChevronLeft, ChevronRight, Maximize, Minimize, Monitor } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { TvBoardProvider } from "@/contexts/TvBoardContext";
@@ -10,6 +9,8 @@ import { replaceCelebrationVariables } from "@/hooks/useCelebrationData";
 import { useTvCelebrationData } from "@/hooks/useTvCelebrationData";
 import { Button } from "@/components/ui/button";
 import { useTvScreenAdapter, getTvScaleStyles, getTvCenteringStyles } from "@/hooks/useTvScreenAdapter";
+import { useTvBoardConfig, type CelebrationSettings } from "@/hooks/tv-board/useTvBoardConfig";
+import { TvBoardStatusOverlay } from "@/components/tv-board/TvBoardStatusOverlay";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -38,42 +39,13 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "cs-top-20": CsTop20Dashboard,
 };
 
-interface CelebrationSettings {
-  enabled: boolean;
-  effect: "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles";
-  duration: number;
-  triggerCondition: string;
-  text: string;
-  metric: string;
-  sourceDashboard: string | null;
-}
-
-interface TvBoardData {
-  id: string;
-  dashboard_slug: string;
-  dashboard_slugs: string[] | null;
-  is_active: boolean;
-  access_count: number | null;
-  auto_rotate: boolean | null;
-  rotate_interval_seconds: number | null;
-  rotate_intervals_per_dashboard: Record<string, number> | null;
-  celebration_enabled: boolean | null;
-  celebration_effect: string | null;
-  celebration_duration: number | null;
-  celebration_trigger_condition: string | null;
-  celebration_text: string | null;
-  celebration_metric: string | null;
-  celebration_source_dashboard: string | null;
-  start_fullscreen: boolean | null;
-}
-
 export default function TvBoardDirect() {
   const { code } = useParams<{ code: string }>();
   const queryClient = useQueryClient();
+
+  const { loading, hardError, transientError, tvData } = useTvBoardConfig(code);
   const [dashboardSlugs, setDashboardSlugs] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   
   // Auto-rotation state
   const [autoRotate, setAutoRotate] = useState(false);
@@ -103,45 +75,9 @@ export default function TvBoardDirect() {
     enabled: !!celebrationSettings?.enabled && dashboardSlugs.length > 0,
   });
 
-  // Function to fetch TV board configuration
-  const fetchTvBoardConfig = useCallback(async () => {
-    if (!code) {
-      setError("Ingen adgangskode angivet");
-      setLoading(false);
-      return;
-    }
-
-    const { data, error: queryError } = await supabase
-      .from("tv_board_access")
-      .select(`
-        id, 
-        dashboard_slug, 
-        dashboard_slugs, 
-        is_active, 
-        access_count,
-        auto_rotate,
-        rotate_interval_seconds,
-        rotate_intervals_per_dashboard,
-        celebration_enabled,
-        celebration_effect,
-        celebration_duration,
-        celebration_trigger_condition,
-        celebration_text,
-        celebration_metric,
-        celebration_source_dashboard,
-        start_fullscreen
-      `)
-      .eq("access_code", code.toUpperCase())
-      .eq("is_active", true)
-      .single();
-
-    if (queryError || !data) {
-      setError("Ugyldig eller inaktiv adgangskode");
-      setLoading(false);
-      return;
-    }
-
-    const tvData = data as TvBoardData;
+  // Apply tvData -> UI state (keeps TV running even if refresh has transient errors)
+  useEffect(() => {
+    if (!tvData || !code) return;
 
     // Use dashboard_slugs array if available, otherwise fall back to single slug
     const slugs = tvData.dashboard_slugs && tvData.dashboard_slugs.length > 0
@@ -150,28 +86,23 @@ export default function TvBoardDirect() {
         ? [tvData.dashboard_slug]
         : [];
 
-    if (slugs.length === 0) {
-      setError("Ingen dashboards konfigureret for dette link");
-      setLoading(false);
-      return;
-    }
+    if (slugs.length === 0) return;
 
     // Store in sessionStorage
     sessionStorage.setItem("tv_board_code", code.toUpperCase());
     sessionStorage.setItem("tv_board_slugs", JSON.stringify(slugs));
 
     // Only update state if config actually changed
-    setDashboardSlugs(prevSlugs => {
+    setDashboardSlugs((prevSlugs) => {
       const prevJson = JSON.stringify(prevSlugs);
       const newJson = JSON.stringify(slugs);
       if (prevJson !== newJson) {
-        // Reset to first dashboard if slugs changed
         setCurrentIndex(0);
         return slugs;
       }
       return prevSlugs;
     });
-    
+
     // Set auto-rotation settings
     if (tvData.auto_rotate && slugs.length > 1) {
       setAutoRotate(true);
@@ -184,12 +115,12 @@ export default function TvBoardDirect() {
     } else {
       setAutoRotate(false);
     }
-    
+
     // Set celebration settings
     if (tvData.celebration_enabled) {
       setCelebrationSettings({
         enabled: true,
-        effect: (tvData.celebration_effect as CelebrationSettings["effect"]) || "fireworks",
+        effect: (tvData.celebration_effect as any) || "fireworks",
         duration: tvData.celebration_duration || 5000,
         triggerCondition: tvData.celebration_trigger_condition || "new_sale",
         text: tvData.celebration_text || "🎉 Nyt salg!",
@@ -199,7 +130,7 @@ export default function TvBoardDirect() {
     } else {
       setCelebrationSettings(null);
     }
-    
+
     // Auto-fullscreen on first load if setting is enabled
     if (tvData.start_fullscreen && !hasAutoFullscreened.current && !document.fullscreenElement) {
       hasAutoFullscreened.current = true;
@@ -209,36 +140,7 @@ export default function TvBoardDirect() {
         });
       }, 500);
     }
-
-    setLoading(false);
-    
-    return tvData;
-  }, [code]);
-
-  // Initial load and periodic config refresh
-  useEffect(() => {
-    // Initial fetch
-    fetchTvBoardConfig().then((tvData) => {
-      if (tvData) {
-        // Update access count only on initial load (fire-and-forget, don't block on RLS)
-        supabase
-          .from("tv_board_access")
-          .update({
-            last_accessed_at: new Date().toISOString(),
-            access_count: (tvData.access_count || 0) + 1,
-          })
-          .eq("id", tvData.id)
-          .then(() => {}); // Ignore errors - this is non-critical
-      }
-    });
-
-    // Refresh config every 30 seconds to pick up admin changes
-    const configInterval = setInterval(() => {
-      fetchTvBoardConfig();
-    }, 30000);
-
-    return () => clearInterval(configInterval);
-  }, [fetchTvBoardConfig]);
+  }, [tvData, code]);
 
   // Handle auto-rotation
   useEffect(() => {
@@ -384,12 +286,12 @@ export default function TvBoardDirect() {
     );
   }
 
-  if (error) {
+  if (hardError) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Adgang nægtet</h1>
-          <p className="text-slate-400">{error}</p>
+          <p className="text-slate-400">{hardError.message}</p>
         </div>
       </div>
     );
@@ -475,6 +377,9 @@ export default function TvBoardDirect() {
           text={replaceCelebrationVariables(celebrationSettings.text, celebrationData)}
         />
       )}
+
+      {/* Transient connectivity overlay (does not kick user out) */}
+      <TvBoardStatusOverlay message={transientError} />
       
       {/* Fullscreen button - always visible on hover */}
       <Button
