@@ -112,6 +112,7 @@ import {
   SalaryTypes,
   TdcOpsummering,
   TdcOpsummeringPublic,
+  EconomicUpload,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -406,6 +407,9 @@ export const routes: RouteConfig[] = [
 
   // TDC Opsummering
   { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
+
+  // Economic Upload (Owner only)
+  { path: "/admin/economic-upload", component: EconomicUpload, access: "role", positionPermission: "menu_economic_upload" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

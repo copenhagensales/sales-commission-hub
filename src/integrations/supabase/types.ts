@@ -3026,6 +3026,66 @@ export type Database = {
         }
         Relationships: []
       }
+      economic_imports: {
+        Row: {
+          checksum: string | null
+          created_at: string | null
+          created_by: string | null
+          detected_end_date: string | null
+          detected_start_date: string | null
+          error_message: string | null
+          file_name: string | null
+          file_size_bytes: number | null
+          files_found: string[] | null
+          id: string
+          processing_time_ms: number | null
+          rows_faktura: number | null
+          rows_fakturalinjer: number | null
+          rows_konto: number | null
+          rows_postering: number | null
+          status: string | null
+          storage_path: string
+        }
+        Insert: {
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          detected_end_date?: string | null
+          detected_start_date?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          files_found?: string[] | null
+          id?: string
+          processing_time_ms?: number | null
+          rows_faktura?: number | null
+          rows_fakturalinjer?: number | null
+          rows_konto?: number | null
+          rows_postering?: number | null
+          status?: string | null
+          storage_path: string
+        }
+        Update: {
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          detected_end_date?: string | null
+          detected_start_date?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          files_found?: string[] | null
+          id?: string
+          processing_time_ms?: number | null
+          rows_faktura?: number | null
+          rows_fakturalinjer?: number | null
+          rows_konto?: number | null
+          rows_postering?: number | null
+          status?: string | null
+          storage_path?: string
+        }
+        Relationships: []
+      }
       economic_invoices: {
         Row: {
           created_at: string
@@ -3082,6 +3142,161 @@ export type Database = {
           vat_amount?: number | null
         }
         Relationships: []
+      }
+      economic_kontoplan: {
+        Row: {
+          adgang: number | null
+          debet_kredit: string | null
+          import_id: string | null
+          konto_nr: number
+          modkonto: number | null
+          momskode: string | null
+          navn: string
+          noegletalskode: string | null
+          note: string | null
+          overfoer_primo_til: number | null
+          raw_json: Json | null
+          sum_fra: number | null
+          type: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          adgang?: number | null
+          debet_kredit?: string | null
+          import_id?: string | null
+          konto_nr: number
+          modkonto?: number | null
+          momskode?: string | null
+          navn: string
+          noegletalskode?: string | null
+          note?: string | null
+          overfoer_primo_til?: number | null
+          raw_json?: Json | null
+          sum_fra?: number | null
+          type?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          adgang?: number | null
+          debet_kredit?: string | null
+          import_id?: string | null
+          konto_nr?: number
+          modkonto?: number | null
+          momskode?: string | null
+          navn?: string
+          noegletalskode?: string | null
+          note?: string | null
+          overfoer_primo_til?: number | null
+          raw_json?: Json | null
+          sum_fra?: number | null
+          type?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_kontoplan_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "economic_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      economic_posteringer: {
+        Row: {
+          aktivitets_nr: number | null
+          antal: number | null
+          antal2: number | null
+          beloeb: number | null
+          beloeb_dkk: number | null
+          bilags_nr: number | null
+          dato: string
+          enhed1_nr: number | null
+          enhed2_nr: number | null
+          faktura_nr: number | null
+          forfalds_dato: string | null
+          import_id: string | null
+          konto_nr: number | null
+          kunde_nr: number | null
+          leverandoer_faktura_nr: string | null
+          leverandoer_nr: number | null
+          loebe_nr: number
+          momskode: string | null
+          posterings_type: string | null
+          projekt_nr: number | null
+          raw_json: Json | null
+          tekst: string | null
+          updated_at: string | null
+          valuta: string | null
+        }
+        Insert: {
+          aktivitets_nr?: number | null
+          antal?: number | null
+          antal2?: number | null
+          beloeb?: number | null
+          beloeb_dkk?: number | null
+          bilags_nr?: number | null
+          dato: string
+          enhed1_nr?: number | null
+          enhed2_nr?: number | null
+          faktura_nr?: number | null
+          forfalds_dato?: string | null
+          import_id?: string | null
+          konto_nr?: number | null
+          kunde_nr?: number | null
+          leverandoer_faktura_nr?: string | null
+          leverandoer_nr?: number | null
+          loebe_nr: number
+          momskode?: string | null
+          posterings_type?: string | null
+          projekt_nr?: number | null
+          raw_json?: Json | null
+          tekst?: string | null
+          updated_at?: string | null
+          valuta?: string | null
+        }
+        Update: {
+          aktivitets_nr?: number | null
+          antal?: number | null
+          antal2?: number | null
+          beloeb?: number | null
+          beloeb_dkk?: number | null
+          bilags_nr?: number | null
+          dato?: string
+          enhed1_nr?: number | null
+          enhed2_nr?: number | null
+          faktura_nr?: number | null
+          forfalds_dato?: string | null
+          import_id?: string | null
+          konto_nr?: number | null
+          kunde_nr?: number | null
+          leverandoer_faktura_nr?: string | null
+          leverandoer_nr?: number | null
+          loebe_nr?: number
+          momskode?: string | null
+          posterings_type?: string | null
+          projekt_nr?: number | null
+          raw_json?: Json | null
+          tekst?: string | null
+          updated_at?: string | null
+          valuta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_posteringer_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "economic_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "economic_posteringer_konto_nr_fkey"
+            columns: ["konto_nr"]
+            isOneToOne: false
+            referencedRelation: "economic_kontoplan"
+            referencedColumns: ["konto_nr"]
+          },
+        ]
       }
       email_templates: {
         Row: {
