@@ -40,6 +40,14 @@ function matchPricingRule(
   // Sort by priority descending (highest first)
   const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
 
+  // Track if we have conditional rules but empty lead data
+  const hasConditionalRules = sortedRules.some(r => r.is_active && Object.keys(r.conditions || {}).length > 0);
+  const hasEmptyLeadData = !leadResultData || leadResultData.length === 0;
+  
+  if (hasConditionalRules && hasEmptyLeadData) {
+    log?.("WARN", `Product ${productId} has conditional pricing rules but leadResultData is empty - rules may not match correctly`);
+  }
+
   for (const rule of sortedRules) {
     if (!rule.is_active) continue;
 
@@ -52,13 +60,16 @@ function matchPricingRule(
 
     // Check all conditions match
     const conditions = rule.conditions || {};
+    const conditionKeys = Object.keys(conditions);
     let allConditionsMet = true;
+    let failedCondition: string | null = null;
 
     for (const [condKey, condValue] of Object.entries(conditions)) {
       // Find the matching field in leadResultData
       const leadField = leadResultData.find(f => f.label === condKey);
       if (!leadField || leadField.value !== condValue) {
         allConditionsMet = false;
+        failedCondition = condKey;
         break;
       }
     }
@@ -80,6 +91,12 @@ function matchPricingRule(
         ruleId: rule.id,
         ruleName: rule.name
       };
+    } else if (conditionKeys.length > 0 && hasEmptyLeadData) {
+      // Log when a conditional rule fails specifically due to empty lead data
+      log?.("WARN", `Rule "${rule.name}" not matched - condition "${failedCondition}" could not be evaluated (empty leadResultData)`, {
+        ruleId: rule.id,
+        productId
+      });
     }
   }
 

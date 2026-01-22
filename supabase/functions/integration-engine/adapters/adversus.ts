@@ -427,7 +427,115 @@ export class AdversusAdapter implements DialerAdapter {
     }
 
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
+
+    // 4. FALLBACK: For missing leads, fetch directly by lead ID
+    const allLeadIds = sales.map(s => s.leadId).filter(Boolean).map(String);
+    const missingLeadIds = allLeadIds.filter(lid => !leadIdToData.has(lid));
+    
+    if (missingLeadIds.length > 0) {
+      console.log(`[Adversus] FALLBACK: ${missingLeadIds.length} leads missing from bulk fetch, fetching individually...`);
+      
+      let fallbackSuccess = 0;
+      let fallbackFailed = 0;
+      const oppPattern = /OPP-\d{4,6}/;
+      
+      // Process in small batches to avoid rate limiting
+      const batchSize = 10;
+      for (let i = 0; i < missingLeadIds.length; i += batchSize) {
+        const batch = missingLeadIds.slice(i, i + batchSize);
+        
+        for (const leadId of batch) {
+          try {
+            const leadData = await this.fetchLeadById(leadId);
+            
+            if (leadData) {
+              const resultData: Array<{ id: number; name: string; type: string; value: any }> = leadData.resultData || [];
+              const resultFields: Record<string, any> = {};
+              let opp: string | null = null;
+              
+              if (Array.isArray(resultData)) {
+                for (const field of resultData) {
+                  if (field && field.name !== undefined) {
+                    resultFields[field.name] = field.value;
+                    
+                    if (field.value) {
+                      const value = String(field.value);
+                      const match = value.match(oppPattern);
+                      if (match && !opp) {
+                        opp = match[0];
+                      }
+                    }
+                  }
+                }
+              }
+              
+              leadIdToData.set(leadId, { opp, resultData, resultFields });
+              fallbackSuccess++;
+              
+              // Log successful fallback with field info for debugging
+              if (resultData.length > 0) {
+                const fieldNames = resultData.map(f => f.name).filter(Boolean).join(', ');
+                console.log(`[Adversus] Fallback lead ${leadId}: Found ${resultData.length} fields (${fieldNames.substring(0, 100)})`);
+              }
+            } else {
+              fallbackFailed++;
+            }
+          } catch (e) {
+            console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+            fallbackFailed++;
+          }
+        }
+        
+        // Delay between batches to avoid rate limiting
+        if (i + batchSize < missingLeadIds.length) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+      
+      console.log(`[Adversus] Fallback complete: ${fallbackSuccess} leads fetched, ${fallbackFailed} failed`);
+    }
+
     return leadIdToData;
+  }
+
+  /**
+   * Fetch a single lead by ID - used as fallback when bulk fetch misses leads
+   */
+  private async fetchLeadById(leadId: string): Promise<any | null> {
+    try {
+      const url = `${this.baseUrl}/v1/leads/${leadId}`;
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
+      });
+      
+      if (res.status === 429) {
+        // Rate limited - wait and retry once
+        console.log(`[Adversus] Rate limited on lead ${leadId}, waiting...`);
+        await new Promise(r => setTimeout(r, 1000));
+        
+        const retryRes = await fetch(url, {
+          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
+        });
+        
+        if (!retryRes.ok) {
+          console.log(`[Adversus] Retry failed for lead ${leadId}: ${retryRes.status}`);
+          return null;
+        }
+        
+        return await retryRes.json();
+      }
+      
+      if (!res.ok) {
+        console.log(`[Adversus] Failed to fetch lead ${leadId}: ${res.status}`);
+        return null;
+      }
+      
+      return await res.json();
+    } catch (e) {
+      console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+      return null;
+    }
   }
 
   // Validar que el OPP tenga formato correcto
