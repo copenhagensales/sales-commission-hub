@@ -105,6 +105,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
   const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
@@ -112,6 +113,39 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
+
+  // Fetch available API sources dynamically
+  const { data: availableSources = [] } = useQuery({
+    queryKey: ["sales-sources"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("source")
+        .not("source", "is", null);
+      
+      if (error) throw error;
+      
+      // Get unique sources
+      const uniqueSources = [...new Set(data?.map(s => s.source))]
+        .filter(Boolean) as string[];
+      
+      return uniqueSources.sort();
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  });
+
+  // Format source names for display
+  const formatSourceName = (source: string): string => {
+    const sourceNames: Record<string, string> = {
+      "Eesy": "Eesy",
+      "tryg": "Tryg",
+      "Lovablecph": "CPH Sales",
+      "Relatel_CPHSALES": "Relatel",
+      "ase": "ASE",
+      "Unknown Dialer": "Ukendt",
+    };
+    return sourceNames[source] || source;
+  };
 
   // Get effective date range based on preset or custom range
   const getEffectiveDateRange = useCallback(() => {
@@ -127,7 +161,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
+    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -183,6 +217,11 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         } else {
           query = query.eq('status', salesStatusFilter);
         }
+      }
+
+      // API source filter
+      if (sourceFilter !== "all") {
+        query = query.eq("source", sourceFilter);
       }
 
       // Client filter - with inner join, just filter on client_id
@@ -272,7 +311,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange, selectedClientId]);
+  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange, selectedClientId]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -503,6 +542,21 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
               <SelectItem value="approved">Godkendt</SelectItem>
               <SelectItem value="cancelled">Annulleret</SelectItem>
               <SelectItem value="rejected">Afvist</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* API Source Filter */}
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="API kilde" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle kilder</SelectItem>
+              {availableSources.map((source) => (
+                <SelectItem key={source} value={source}>
+                  {formatSourceName(source)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
