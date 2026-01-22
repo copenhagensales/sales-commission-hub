@@ -785,19 +785,10 @@ export default function DailyReports() {
                 salesCount += Number(item.quantity) || 1;
               }
               
-              // Check for campaign override - use it if exists, otherwise fallback to mapped values
-              const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-              const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
-              
-              if (override) {
-                // Use campaign-specific commission/revenue
-                revenue += override.revenue;
-                commission += override.commission;
-              } else {
-                // Fallback to mapped values from sale_items
-                revenue += Number(item.mapped_revenue) || 0;
-                commission += Number(item.mapped_commission) || 0;
-              }
+              // Use pre-calculated mapped values from sale_items
+              // These are already correctly calculated with quantity in the integration-engine
+              revenue += Number(item.mapped_revenue) || 0;
+              commission += Number(item.mapped_commission) || 0;
             });
           });
 
