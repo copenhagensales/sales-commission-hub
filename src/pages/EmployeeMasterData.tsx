@@ -457,6 +457,27 @@ export default function EmployeeMasterData() {
       const updateData = is_active
         ? { is_active, employment_start_date: today, employment_end_date: null }
         : { is_active, employment_end_date: today };
+
+      // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
+      // A DB trigger removes team_members as soon as is_active flips to false.
+      let teamId: string | null | undefined;
+      let team:
+        | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
+        | null
+        | undefined;
+      if (!is_active) {
+        const { data: teamMembership } = await supabase
+          .from("team_members")
+          .select("team_id, teams(id, name, team_leader_id, assistant_team_leader_id)")
+          .eq("employee_id", id)
+          .maybeSingle();
+
+        teamId = teamMembership?.team_id;
+        team = teamMembership?.teams as
+          | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
+          | null
+          | undefined;
+      }
       
       const { error } = await supabase
         .from("employee_master_data")
@@ -466,16 +487,6 @@ export default function EmployeeMasterData() {
 
       // If deactivating, send deactivation reminder
       if (!is_active) {
-        // Get team membership from team_members (authoritative source)
-        const { data: teamMembership } = await supabase
-          .from("team_members")
-          .select("team_id, teams(id, name, team_leader_id, assistant_team_leader_id)")
-          .eq("employee_id", id)
-          .maybeSingle();
-
-        const teamId = teamMembership?.team_id;
-        const team = teamMembership?.teams as { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null } | null;
-
         let manualRecipients: string[] = [];
         const autoRecipientEmails: string[] = [];
 
