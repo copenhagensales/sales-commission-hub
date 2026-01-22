@@ -78,10 +78,13 @@ export default function EconomicUpload() {
       const file = acceptedFiles[0];
       if (!file) return;
 
-      if (!file.name.toLowerCase().endsWith(".zip")) {
+      const lowerName = file.name.toLowerCase();
+      const isValidFile = lowerName.endsWith(".zip") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
+      
+      if (!isValidFile) {
         toast({
           title: "Forkert filtype",
-          description: "Upload venligst en ZIP-fil fra e-conomic.",
+          description: "Upload venligst en ZIP- eller Excel-fil fra e-conomic.",
           variant: "destructive",
         });
         return;
@@ -143,6 +146,8 @@ export default function EconomicUpload() {
     accept: {
       "application/zip": [".zip"],
       "application/x-zip-compressed": [".zip"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
     },
     maxFiles: 1,
     disabled: isUploading,
@@ -205,9 +210,9 @@ export default function EconomicUpload() {
                 <Upload className="h-5 w-5" />
                 Upload ZIP-fil
               </CardTitle>
-              <CardDescription>
-                Træk og slip en ZIP-fil fra e-conomic, eller klik for at vælge
-              </CardDescription>
+            <CardDescription>
+              Træk og slip en ZIP- eller Excel-fil fra e-conomic, eller klik for at vælge
+            </CardDescription>
             </CardHeader>
             <CardContent>
               <div
@@ -228,10 +233,10 @@ export default function EconomicUpload() {
                   <div className="flex flex-col items-center gap-3">
                     <FileArchive className="h-12 w-12 text-muted-foreground" />
                     <p className="text-lg font-medium">
-                      {isDragActive ? "Slip filen her" : "Træk ZIP-fil hertil"}
+                      {isDragActive ? "Slip filen her" : "Træk ZIP- eller Excel-fil hertil"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Eller klik for at vælge fil
+                      Understøtter .zip, .xlsx og .xls filer
                     </p>
                   </div>
                 )}
