@@ -100,6 +100,14 @@ const SALARY_ITEMS = {
   menu_salary_types: { name: "Lønarter", href: "/salary/types", icon: Receipt },
 };
 
+const ECONOMIC_ITEMS = {
+  menu_economic_dashboard: { name: "Overblik", href: "/economic", icon: LayoutDashboard },
+  menu_economic_expenses: { name: "Udgifter", href: "/economic/expenses", icon: Receipt },
+  menu_economic_budget: { name: "Budget 2026", href: "/economic/budget", icon: Wallet },
+  menu_economic_mapping: { name: "Mapping", href: "/economic/mapping", icon: Database },
+  menu_economic_upload: { name: "Import", href: "/admin/economic-upload", icon: Database },
+};
+
 export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,6 +123,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   const [recruitmentOpen, setRecruitmentOpen] = useState(false);
   const [boardsOpen, setBoardsOpen] = useState(false);
   const [salaryOpen, setSalaryOpen] = useState(false);
+  const [economicOpen, setEconomicOpen] = useState(false);
 
   // Helper to check if permission is enabled
   const hasPermission = (key: string): boolean => {
@@ -189,6 +198,11 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
   // Salary section - check parent first
   const salaryItems = hasSectionPermission('menu_section_salary')
     ? (isOwner ? Object.values(SALARY_ITEMS) : getEnabledItems(SALARY_ITEMS))
+    : [];
+    
+  // Economic section - check parent first
+  const economicItems = hasSectionPermission('menu_section_economic')
+    ? (isOwner ? Object.values(ECONOMIC_ITEMS) : getEnabledItems(ECONOMIC_ITEMS))
     : [];
 
   const handleNavClick = () => {
@@ -328,6 +342,9 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
           
           {/* Salary submenu */}
           {renderCollapsibleMenu("Løn", Wallet, salaryItems, salaryOpen, setSalaryOpen, ["/salary"])}
+          
+          {/* Economic submenu */}
+          {renderCollapsibleMenu("Økonomi", Receipt, economicItems, economicOpen, setEconomicOpen, ["/economic", "/admin/economic-upload"])}
           
           {/* Settings */}
           {hasPermission("menu_settings") && (

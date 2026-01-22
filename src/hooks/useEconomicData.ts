@@ -248,10 +248,13 @@ export function useUpdateKontoMapping() {
 export function useUpdateBudgetLine() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (line: Omit<BudgetLine, "id">) => {
+    mutationFn: async (line: { year: number; month: number; kategori_id: string; amount: number; team_id: string | null; note?: string | null }) => {
       const { data, error } = await supabase
         .from("economic_budget_lines")
-        .upsert(line, { onConflict: "year,month,team_id,kategori_id" })
+        .upsert({
+          ...line,
+          note: line.note ?? null,
+        }, { onConflict: "year,month,team_id,kategori_id" })
         .select()
         .single();
       if (error) throw error;

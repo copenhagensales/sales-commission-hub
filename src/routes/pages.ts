@@ -165,3 +165,8 @@ export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
 
 // Economic
 export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUpload"));
+export const EconomicLayout = lazyPage(() => import("@/pages/economic/EconomicLayout"));
+export const EconomicDashboard = lazyPage(() => import("@/pages/economic/EconomicDashboard"));
+export const EconomicExpenses = lazyPage(() => import("@/pages/economic/EconomicExpenses"));
+export const EconomicBudget = lazyPage(() => import("@/pages/economic/EconomicBudget"));
+export const EconomicMapping = lazyPage(() => import("@/pages/economic/EconomicMapping"));

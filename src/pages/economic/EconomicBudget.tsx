@@ -87,7 +87,6 @@ export default function EconomicBudget() {
           kategori_id: kat.id,
           amount: Math.round(monthlyAmount),
           team_id: selectedTeam === "all" ? null : selectedTeam,
-          note: null,
         });
       }
     });
@@ -120,7 +119,6 @@ export default function EconomicBudget() {
           kategori_id: kat.id,
           amount: Math.round(monthlyAmount),
           team_id: selectedTeam === "all" ? null : selectedTeam,
-          note: null,
         });
       }
     });

@@ -39,6 +39,21 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_section_reports", label: "Rapporter sektion", description: "Adgang til Rapporter menuen", hasEditOption: false },
       { key: "menu_section_onboarding", label: "Onboarding sektion", description: "Adgang til Onboarding menuen", hasEditOption: false },
       { key: "menu_section_spil", label: "Spil sektion", description: "Adgang til Spil menuen (H2H og Liga)", hasEditOption: false },
+      { key: "menu_section_economic", label: "Økonomi sektion", description: "Adgang til Økonomi menuen", hasEditOption: false },
+    ],
+  },
+
+  // ==================== ØKONOMI ====================
+  {
+    key: "menu_economic",
+    label: "Økonomi menu",
+    icon: "💰",
+    permissions: [
+      { key: "menu_economic_dashboard", label: "Økonomi Dashboard", description: "Adgang til økonomi overblik", hasEditOption: false },
+      { key: "menu_economic_expenses", label: "Udgifter", description: "Adgang til udgiftsoversigt", hasEditOption: false },
+      { key: "menu_economic_budget", label: "Budget 2026", description: "Adgang til budget planlægning", hasEditOption: true },
+      { key: "menu_economic_mapping", label: "Økonomi Mapping", description: "Adgang til konto/kategori mapping", hasEditOption: true },
+      { key: "menu_economic_upload", label: "E-conomic Import", description: "Adgang til at importere e-conomic data", hasEditOption: false },
     ],
   },
 
