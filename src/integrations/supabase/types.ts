@@ -3026,6 +3026,63 @@ export type Database = {
         }
         Relationships: []
       }
+      economic_invoices: {
+        Row: {
+          created_at: string
+          currency: string | null
+          customer_name: string | null
+          customer_number: string | null
+          date: string
+          due_date: string | null
+          economic_invoice_id: string
+          gross_amount: number | null
+          id: string
+          invoice_number: string | null
+          net_amount: number | null
+          pdf_url: string | null
+          raw: Json | null
+          status: string
+          updated_at: string
+          vat_amount: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          customer_name?: string | null
+          customer_number?: string | null
+          date: string
+          due_date?: string | null
+          economic_invoice_id: string
+          gross_amount?: number | null
+          id?: string
+          invoice_number?: string | null
+          net_amount?: number | null
+          pdf_url?: string | null
+          raw?: Json | null
+          status?: string
+          updated_at?: string
+          vat_amount?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          customer_name?: string | null
+          customer_number?: string | null
+          date?: string
+          due_date?: string | null
+          economic_invoice_id?: string
+          gross_amount?: number | null
+          id?: string
+          invoice_number?: string | null
+          net_amount?: number | null
+          pdf_url?: string | null
+          raw?: Json | null
+          status?: string
+          updated_at?: string
+          vat_amount?: number | null
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           content: string
