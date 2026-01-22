@@ -3002,6 +3002,89 @@ export type Database = {
         }
         Relationships: []
       }
+      economic_baseline_exclusions: {
+        Row: {
+          created_at: string | null
+          id: string
+          kategori_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          kategori_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          kategori_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_baseline_exclusions_kategori_id_fkey"
+            columns: ["kategori_id"]
+            isOneToOne: false
+            referencedRelation: "economic_kategorier"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      economic_budget_lines: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          kategori_id: string
+          month: number
+          note: string | null
+          team_id: string | null
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          kategori_id: string
+          month: number
+          note?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          kategori_id?: string
+          month?: number
+          note?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_budget_lines_kategori_id_fkey"
+            columns: ["kategori_id"]
+            isOneToOne: false
+            referencedRelation: "economic_kategorier"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "economic_budget_lines_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       economic_events: {
         Row: {
           created_at: string
@@ -3025,6 +3108,75 @@ export type Database = {
           processed?: boolean | null
         }
         Relationships: []
+      }
+      economic_fordelingsregler: {
+        Row: {
+          active_from: string | null
+          active_to: string | null
+          affected_count: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          kategori_id: string
+          match_field: string
+          match_operator: string
+          match_value: string
+          note: string | null
+          priority: number
+          team_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active_from?: string | null
+          active_to?: string | null
+          affected_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          kategori_id: string
+          match_field: string
+          match_operator: string
+          match_value: string
+          note?: string | null
+          priority?: number
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active_from?: string | null
+          active_to?: string | null
+          affected_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          kategori_id?: string
+          match_field?: string
+          match_operator?: string
+          match_value?: string
+          note?: string | null
+          priority?: number
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_fordelingsregler_kategori_id_fkey"
+            columns: ["kategori_id"]
+            isOneToOne: false
+            referencedRelation: "economic_kategorier"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "economic_fordelingsregler_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       economic_imports: {
         Row: {
@@ -3142,6 +3294,117 @@ export type Database = {
           vat_amount?: number | null
         }
         Relationships: []
+      }
+      economic_kategorier: {
+        Row: {
+          beskrivelse: string | null
+          created_at: string | null
+          default_team_id: string | null
+          id: string
+          is_active: boolean | null
+          is_expense: boolean | null
+          navn: string
+          sort_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          beskrivelse?: string | null
+          created_at?: string | null
+          default_team_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_expense?: boolean | null
+          navn: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Update: {
+          beskrivelse?: string | null
+          created_at?: string | null
+          default_team_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_expense?: boolean | null
+          navn?: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_kategorier_default_team_id_fkey"
+            columns: ["default_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      economic_konto_mapping: {
+        Row: {
+          active_from: string | null
+          active_to: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_auto_suggested: boolean | null
+          kategori_id: string
+          konto_nr: number
+          needs_review: boolean | null
+          note: string | null
+          team_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active_from?: string | null
+          active_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_auto_suggested?: boolean | null
+          kategori_id: string
+          konto_nr: number
+          needs_review?: boolean | null
+          note?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active_from?: string | null
+          active_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_auto_suggested?: boolean | null
+          kategori_id?: string
+          konto_nr?: number
+          needs_review?: boolean | null
+          note?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_konto_mapping_kategori_id_fkey"
+            columns: ["kategori_id"]
+            isOneToOne: false
+            referencedRelation: "economic_kategorier"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "economic_konto_mapping_konto_nr_fkey"
+            columns: ["konto_nr"]
+            isOneToOne: false
+            referencedRelation: "economic_kontoplan"
+            referencedColumns: ["konto_nr"]
+          },
+          {
+            foreignKeyName: "economic_konto_mapping_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       economic_kontoplan: {
         Row: {
@@ -8782,6 +9045,43 @@ export type Database = {
         }
         Relationships: []
       }
+      posteringer_enriched: {
+        Row: {
+          beloeb_dkk: number | null
+          bilags_nr: number | null
+          dato: string | null
+          import_id: string | null
+          kategori: string | null
+          kategori_id: string | null
+          klassificering_kilde: string | null
+          konto_nr: number | null
+          kontonavn: string | null
+          kunde_nr: number | null
+          leverandoer_nr: number | null
+          loebe_nr: number | null
+          maaned: string | null
+          needs_review: boolean | null
+          team: string | null
+          team_id: string | null
+          tekst: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_posteringer_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "economic_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "economic_posteringer_konto_nr_fkey"
+            columns: ["konto_nr"]
+            isOneToOne: false
+            referencedRelation: "economic_kontoplan"
+            referencedColumns: ["konto_nr"]
+          },
+        ]
+      }
     }
     Functions: {
       assign_role_by_email: {
@@ -8791,6 +9091,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_suggest_konto_mapping: { Args: never; Returns: number }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }
@@ -9110,6 +9411,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_fordelingsregel_counts: { Args: never; Returns: undefined }
       update_overdue_coaching_tasks: { Args: never; Returns: number }
       validate_password_reset_token: {
         Args: { _token_hash: string }

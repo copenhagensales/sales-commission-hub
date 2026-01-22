@@ -113,6 +113,11 @@ import {
   TdcOpsummering,
   TdcOpsummeringPublic,
   EconomicUpload,
+  EconomicLayout,
+  EconomicDashboard,
+  EconomicExpenses,
+  EconomicBudget,
+  EconomicMapping,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -410,6 +415,12 @@ export const routes: RouteConfig[] = [
 
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: EconomicUpload, access: "role", positionPermission: "menu_economic_upload" },
+
+  // Economic Dashboard (with nested routes)
+  { path: "/economic", component: EconomicDashboard, access: "role", positionPermission: "menu_economic" },
+  { path: "/economic/expenses", component: EconomicExpenses, access: "role", positionPermission: "menu_economic" },
+  { path: "/economic/budget", component: EconomicBudget, access: "role", positionPermission: "menu_economic" },
+  { path: "/economic/mapping", component: EconomicMapping, access: "role", positionPermission: "menu_economic" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
