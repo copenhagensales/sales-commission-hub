@@ -9051,6 +9051,7 @@ export type Database = {
           bilags_nr: number | null
           dato: string | null
           import_id: string | null
+          is_balance_account: boolean | null
           kategori: string | null
           kategori_id: string | null
           klassificering_kilde: string | null

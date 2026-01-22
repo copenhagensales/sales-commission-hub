@@ -38,11 +38,11 @@ export default function EconomicExpenses() {
   const { data: teams } = useTeams();
   const createRegel = useCreateFordelingsregel();
   
-  // Filter posteringer
+  // Filter posteringer (exclude balance accounts from expense view)
   const filteredPosteringer = useMemo(() => {
     if (!posteringer) return [];
     
-    let filtered = posteringer.filter(p => p.beloeb_dkk < 0); // Only expenses
+    let filtered = posteringer.filter(p => p.beloeb_dkk < 0 && !p.is_balance_account); // Only P&L expenses
     
     if (teamFilter !== "all") {
       filtered = filtered.filter(p => p.team_id === teamFilter);
