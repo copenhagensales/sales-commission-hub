@@ -2,14 +2,14 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, DollarSign, Target, Wallet } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Target, Wallet, HelpCircle } from "lucide-react";
 import { useEconomicSummary, useEconomicKategorier, useBaselineExclusions, usePosteringerEnriched } from "@/hooks/useEconomicData";
 import { EconomicResultChart } from "@/components/economic/EconomicResultChart";
 import { EconomicCategoryChart } from "@/components/economic/EconomicCategoryChart";
 import { EconomicTopLists } from "@/components/economic/EconomicTopLists";
 import { BaselineFilter } from "@/components/economic/BaselineFilter";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 const formatDKK = (value: number) => {
   return new Intl.NumberFormat("da-DK", {
@@ -66,8 +66,9 @@ export default function EconomicDashboard() {
   }
   
   return (
-    <TooltipProvider>
-      <div className="space-y-6 p-6">
+    <MainLayout>
+      <TooltipProvider>
+        <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -199,11 +200,12 @@ export default function EconomicDashboard() {
         </div>
         
         {/* Top Lists */}
-        <EconomicTopLists 
-          byKategori={summary?.byKategori} 
-          posteringer={posteringer}
-        />
-      </div>
-    </TooltipProvider>
+          <EconomicTopLists 
+            byKategori={summary?.byKategori} 
+            posteringer={posteringer}
+          />
+        </div>
+      </TooltipProvider>
+    </MainLayout>
   );
 }
