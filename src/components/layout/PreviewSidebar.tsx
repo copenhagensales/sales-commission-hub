@@ -145,8 +145,9 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
 
   const mainItems = getEnabledItems(MAIN_MENU_ITEMS);
   
-  // Section visibility based on parent permission
+  // Section visibility based on parent permission (owners always have access)
   const hasSectionPermission = (sectionKey: string): boolean => {
+    if (isOwner) return true;
     return hasPermission(sectionKey);
   };
   
