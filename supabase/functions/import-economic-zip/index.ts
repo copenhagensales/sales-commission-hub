@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,6 +103,76 @@ function decodeContent(buffer: Uint8Array): string {
   }
 }
 
+// Parse Excel file and extract sheets as record arrays
+function parseExcel(buffer: ArrayBuffer): { kontoPlanData: Record<string, string>[]; posteringData: Record<string, string>[]; sheetsFound: string[] } {
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheetsFound = workbook.SheetNames;
+  
+  let kontoPlanData: Record<string, string>[] = [];
+  let posteringData: Record<string, string>[] = [];
+
+  console.log(`Excel sheets found: ${sheetsFound.join(", ")}`);
+
+  for (const sheetName of sheetsFound) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { 
+      raw: false, 
+      defval: "" 
+    });
+
+    console.log(`Sheet "${sheetName}": ${rows.length} rows`);
+
+    const lowerName = sheetName.toLowerCase();
+    
+    // Match sheet names to data types
+    if (lowerName === "konto" || lowerName === "kontoplan" || lowerName.includes("konto")) {
+      if (kontoPlanData.length === 0) {
+        kontoPlanData = rows;
+        console.log(`→ Matched "${sheetName}" as Kontoplan: ${rows.length} rows`);
+      }
+    } else if (lowerName === "postering" || lowerName === "posteringer" || lowerName.includes("postering")) {
+      if (posteringData.length === 0) {
+        posteringData = rows;
+        console.log(`→ Matched "${sheetName}" as Posteringer: ${rows.length} rows`);
+      }
+    }
+  }
+
+  // If no specific matches, try first sheet for posteringer (common single-sheet export)
+  if (posteringData.length === 0 && kontoPlanData.length === 0 && sheetsFound.length > 0) {
+    const firstSheet = workbook.Sheets[sheetsFound[0]];
+    const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(firstSheet, { 
+      raw: false, 
+      defval: "" 
+    });
+    
+    // Check if it looks like posteringer based on columns
+    if (rows.length > 0) {
+      const firstRow = rows[0];
+      const columns = Object.keys(firstRow);
+      const hasPostColumns = columns.some(c => 
+        c.toLowerCase().includes("dato") || 
+        c.toLowerCase().includes("beløb") ||
+        c.toLowerCase().includes("beloeb") ||
+        c.toLowerCase().includes("konto")
+      );
+      
+      if (hasPostColumns) {
+        posteringData = rows;
+        console.log(`→ Using first sheet "${sheetsFound[0]}" as Posteringer (detected by columns): ${rows.length} rows`);
+      }
+    }
+  }
+
+  return { kontoPlanData, posteringData, sheetsFound };
+}
+
+// Detect file type from path
+function isExcelFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith(".xlsx") || lower.endsWith(".xls");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -131,68 +202,78 @@ Deno.serve(async (req) => {
       .update({ status: "processing" })
       .eq("id", importId);
 
-    // Download ZIP from storage
+    // Download file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("economic-imports")
       .download(storagePath);
 
     if (downloadError || !fileData) {
-      throw new Error(`Failed to download ZIP: ${downloadError?.message}`);
+      throw new Error(`Failed to download file: ${downloadError?.message}`);
     }
-
-    // Unzip in memory
-    const zip = new JSZip();
-    const zipContent = await zip.loadAsync(await fileData.arrayBuffer());
 
     const filesFound: string[] = [];
     let kontoPlanData: Record<string, string>[] = [];
     let posteringData: Record<string, string>[] = [];
 
-    // Find and parse CSV files
-    for (const [filename, file] of Object.entries(zipContent.files)) {
-      if (file.dir) continue;
-      
-      const lowerName = filename.toLowerCase();
-      if (!lowerName.endsWith(".csv")) continue;
-      
-      filesFound.push(filename);
-      
-      const content = await file.async("uint8array");
-      const text = decodeContent(content);
-      const rows = parseCSV(text);
+    // Check if Excel or ZIP
+    if (isExcelFile(storagePath)) {
+      console.log("Detected Excel file, parsing directly...");
+      const buffer = await fileData.arrayBuffer();
+      const result = parseExcel(buffer);
+      kontoPlanData = result.kontoPlanData;
+      posteringData = result.posteringData;
+      filesFound.push(...result.sheetsFound.map(s => `${s} (sheet)`));
+    } else {
+      // ZIP file processing
+      console.log("Detected ZIP file, extracting...");
+      const zip = new JSZip();
+      const zipContent = await zip.loadAsync(await fileData.arrayBuffer());
 
-      console.log(`Parsed ${filename}: ${rows.length} rows`);
+      // Find and parse CSV files
+      for (const [filename, file] of Object.entries(zipContent.files)) {
+        if (file.dir) continue;
+        
+        const lowerName = filename.toLowerCase();
+        if (!lowerName.endsWith(".csv")) continue;
+        
+        filesFound.push(filename);
+        
+        const content = await file.async("uint8array");
+        const text = decodeContent(content);
+        const rows = parseCSV(text);
 
-      // Extract base filename (handle nested paths like "folder/Konto.csv")
-      const baseName = filename.split('/').pop()?.toLowerCase() || '';
-      
-      // Use exact filename matching to avoid conflicts
-      // (e.g., SystemKonto.csv, AfgiftsKonto.csv should NOT match)
-      if (baseName === "konto.csv") {
-        kontoPlanData = rows;
-        console.log(`→ Matched as Kontoplan: ${rows.length} rows`);
-      } else if (baseName === "postering.csv") {
-        posteringData = rows;
-        console.log(`→ Matched as Posteringer: ${rows.length} rows`);
+        console.log(`Parsed ${filename}: ${rows.length} rows`);
+
+        // Extract base filename (handle nested paths like "folder/Konto.csv")
+        const baseName = filename.split('/').pop()?.toLowerCase() || '';
+        
+        // Use exact filename matching to avoid conflicts
+        if (baseName === "konto.csv") {
+          kontoPlanData = rows;
+          console.log(`→ Matched as Kontoplan: ${rows.length} rows`);
+        } else if (baseName === "postering.csv") {
+          posteringData = rows;
+          console.log(`→ Matched as Posteringer: ${rows.length} rows`);
+        }
       }
     }
 
-    console.log(`Found files: ${filesFound.join(", ")}`);
+    console.log(`Found files/sheets: ${filesFound.join(", ")}`);
     console.log(`Konto rows: ${kontoPlanData.length}, Postering rows: ${posteringData.length}`);
 
     // Import Kontoplan first (due to foreign key)
     let kontoPlanCount = 0;
     if (kontoPlanData.length > 0) {
       const kontoBatch = kontoPlanData.map((row) => ({
-        konto_nr: parseIntSafe(row["KontoNr"]),
-        navn: row["Navn"] || "Ukendt",
+        konto_nr: parseIntSafe(row["KontoNr"]) || parseIntSafe(row["Konto Nr"]) || parseIntSafe(row["Kontonr"]),
+        navn: row["Navn"] || row["Kontonavn"] || "Ukendt",
         type: parseIntSafe(row["Type"]),
-        sum_fra: parseIntSafe(row["SumFra"]),
-        momskode: row["MomsKode"] || null,
-        debet_kredit: row["DebetKredit"] || null,
+        sum_fra: parseIntSafe(row["SumFra"]) || parseIntSafe(row["Sum Fra"]),
+        momskode: row["MomsKode"] || row["Momskode"] || null,
+        debet_kredit: row["DebetKredit"] || row["Debet/Kredit"] || null,
         modkonto: parseIntSafe(row["Modkonto"]),
-        overfoer_primo_til: parseIntSafe(row["OverfoerPrimoTil"]),
-        noegletalskode: row["NoegletalsKode"] || null,
+        overfoer_primo_til: parseIntSafe(row["OverfoerPrimoTil"]) || parseIntSafe(row["Overfør Primo Til"]),
+        noegletalskode: row["NoegletalsKode"] || row["Nøgletalskode"] || null,
         note: row["Note"] || null,
         adgang: parseIntSafe(row["Adgang"]),
         raw_json: row,
@@ -223,7 +304,7 @@ Deno.serve(async (req) => {
 
     if (posteringData.length > 0) {
       const posteringBatch = posteringData.map((row) => {
-        const dato = parseDanishDate(row["Dato"]);
+        const dato = parseDanishDate(row["Dato"]) || parseDanishDate(row["Bogføringsdato"]);
         
         // Track date range
         if (dato) {
@@ -232,27 +313,27 @@ Deno.serve(async (req) => {
         }
 
         return {
-          loebe_nr: parseIntSafe(row["LoebeNr"]),
-          posterings_type: row["PosteringsType"] || null,
+          loebe_nr: parseIntSafe(row["LoebeNr"]) || parseIntSafe(row["Løbenr"]) || parseIntSafe(row["Løbe Nr"]),
+          posterings_type: row["PosteringsType"] || row["Posteringstype"] || null,
           dato: dato,
-          konto_nr: parseIntSafe(row["KontoNr"]),
-          bilags_nr: parseIntSafe(row["BilagsNr"]),
+          konto_nr: parseIntSafe(row["KontoNr"]) || parseIntSafe(row["Konto Nr"]) || parseIntSafe(row["Kontonr"]),
+          bilags_nr: parseIntSafe(row["BilagsNr"]) || parseIntSafe(row["Bilag Nr"]) || parseIntSafe(row["Bilagsnr"]),
           tekst: row["Tekst"] || null,
-          beloeb_dkk: parseDanishNumber(row["BeloebDKK"]),
+          beloeb_dkk: parseDanishNumber(row["BeloebDKK"]) || parseDanishNumber(row["Beløb DKK"]) || parseDanishNumber(row["Beløb"]),
           valuta: row["Valuta"] || "DKK",
-          beloeb: parseDanishNumber(row["Beloeb"]),
-          projekt_nr: parseIntSafe(row["ProjektNr"]),
-          aktivitets_nr: parseIntSafe(row["AktivitetsNr"]),
-          kunde_nr: parseIntSafe(row["KundeNr"]),
-          leverandoer_nr: parseIntSafe(row["LeverandoerNr"]),
-          faktura_nr: parseIntSafe(row["FakturaNr"]),
-          leverandoer_faktura_nr: row["LeverandoerFakturaNr"] || null,
-          forfalds_dato: parseDanishDate(row["ForfaldsDato"]),
-          momskode: row["MomsKode"] || null,
-          enhed1_nr: parseIntSafe(row["Enhed1Nr"]),
-          enhed2_nr: parseIntSafe(row["Enhed2Nr"]),
+          beloeb: parseDanishNumber(row["Beloeb"]) || parseDanishNumber(row["Beløb"]),
+          projekt_nr: parseIntSafe(row["ProjektNr"]) || parseIntSafe(row["Projekt Nr"]),
+          aktivitets_nr: parseIntSafe(row["AktivitetsNr"]) || parseIntSafe(row["Aktivitets Nr"]),
+          kunde_nr: parseIntSafe(row["KundeNr"]) || parseIntSafe(row["Kunde Nr"]),
+          leverandoer_nr: parseIntSafe(row["LeverandoerNr"]) || parseIntSafe(row["Leverandør Nr"]),
+          faktura_nr: parseIntSafe(row["FakturaNr"]) || parseIntSafe(row["Faktura Nr"]),
+          leverandoer_faktura_nr: row["LeverandoerFakturaNr"] || row["Leverandør Faktura Nr"] || null,
+          forfalds_dato: parseDanishDate(row["ForfaldsDato"]) || parseDanishDate(row["Forfaldsdato"]),
+          momskode: row["MomsKode"] || row["Momskode"] || null,
+          enhed1_nr: parseIntSafe(row["Enhed1Nr"]) || parseIntSafe(row["Enhed 1 Nr"]),
+          enhed2_nr: parseIntSafe(row["Enhed2Nr"]) || parseIntSafe(row["Enhed 2 Nr"]),
           antal: parseDanishNumber(row["Antal"]),
-          antal2: parseDanishNumber(row["Antal2"]),
+          antal2: parseDanishNumber(row["Antal2"]) || parseDanishNumber(row["Antal 2"]),
           raw_json: row,
           import_id: importId,
           updated_at: new Date().toISOString(),
