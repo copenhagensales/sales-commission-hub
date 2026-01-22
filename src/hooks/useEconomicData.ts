@@ -56,6 +56,7 @@ export interface PosteringEnriched {
   team_id: string;
   klassificering_kilde: "regel" | "mapping" | "fallback";
   needs_review: boolean;
+  is_balance_account: boolean;
 }
 
 export interface BudgetLine {
@@ -294,7 +295,7 @@ export function useEconomicSummary(year: number) {
     .reduce((sum, p) => sum + Math.abs(p.beloeb_dkk), 0);
   
   const udgifter = posteringer
-    .filter(p => p.kategori !== "Omsætning" && p.beloeb_dkk < 0)
+    .filter(p => p.kategori !== "Omsætning" && p.beloeb_dkk < 0 && !p.is_balance_account)
     .reduce((sum, p) => sum + Math.abs(p.beloeb_dkk), 0);
   
   const resultat = omsaetning - udgifter;
@@ -307,7 +308,7 @@ export function useEconomicSummary(year: number) {
     }
     if (p.kategori === "Omsætning") {
       byMonth[p.maaned].omsaetning += Math.abs(p.beloeb_dkk);
-    } else if (p.beloeb_dkk < 0) {
+    } else if (p.beloeb_dkk < 0 && !p.is_balance_account) {
       byMonth[p.maaned].udgifter += Math.abs(p.beloeb_dkk);
     }
   });
@@ -316,18 +317,18 @@ export function useEconomicSummary(year: number) {
     byMonth[m].resultat = byMonth[m].omsaetning - byMonth[m].udgifter;
   });
   
-  // Group by kategori
+  // Group by kategori (exclude balance accounts)
   const byKategori: Record<string, number> = {};
-  posteringer.filter(p => p.beloeb_dkk < 0).forEach(p => {
+  posteringer.filter(p => p.beloeb_dkk < 0 && !p.is_balance_account).forEach(p => {
     if (!byKategori[p.kategori]) {
       byKategori[p.kategori] = 0;
     }
     byKategori[p.kategori] += Math.abs(p.beloeb_dkk);
   });
   
-  // Group by team
+  // Group by team (exclude balance accounts)
   const byTeam: Record<string, number> = {};
-  posteringer.filter(p => p.beloeb_dkk < 0).forEach(p => {
+  posteringer.filter(p => p.beloeb_dkk < 0 && !p.is_balance_account).forEach(p => {
     if (!byTeam[p.team]) {
       byTeam[p.team] = 0;
     }

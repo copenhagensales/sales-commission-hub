@@ -35,7 +35,7 @@ export default function EconomicDashboard() {
     
     const excludedKategorier = new Set(exclusions);
     const filteredPosteringer = posteringer.filter(
-      p => !excludedKategorier.has(p.kategori_id) && p.beloeb_dkk < 0
+      p => !excludedKategorier.has(p.kategori_id) && p.beloeb_dkk < 0 && !p.is_balance_account
     );
     
     const total = filteredPosteringer.reduce((sum, p) => sum + Math.abs(p.beloeb_dkk), 0);
