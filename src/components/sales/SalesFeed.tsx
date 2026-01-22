@@ -224,6 +224,9 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         query = query.eq("source", sourceFilter);
       }
 
+      // Exclude unknown agents
+      query = query.neq("agent_name", "Ukendt");
+
       // Client filter - with inner join, just filter on client_id
       if (selectedClientId) {
         query = query.eq('client_campaigns.client_id', selectedClientId);
@@ -280,7 +283,10 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
             .eq("id", payload.new.id)
             .single();
 
-          if (newSale) {
+           if (newSale) {
+             // Ignore sales from unknown agent
+             if (newSale.agent_name === "Ukendt") return;
+
             // Mark as new for animation
             setNewSaleIds(prev => new Set([...prev, newSale.id]));
             
