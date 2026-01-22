@@ -21,6 +21,7 @@ import {
   useCreateFordelingsregel,
   EconomicKategori,
 } from "@/hooks/useEconomicData";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -93,7 +94,8 @@ export default function EconomicMapping() {
   };
   
   return (
-    <div className="space-y-6 p-6">
+    <MainLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -350,6 +352,7 @@ export default function EconomicMapping() {
         </TabsContent>
       </Tabs>
     </div>
+    </MainLayout>
   );
 }
 

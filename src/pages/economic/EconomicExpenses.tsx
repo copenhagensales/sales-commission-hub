@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronRight, Plus, Filter } from "lucide-react";
 import { usePosteringerEnriched, useEconomicKategorier, useTeams, useCreateFordelingsregel, PosteringEnriched } from "@/hooks/useEconomicData";
 import { BaselineFilter } from "@/components/economic/BaselineFilter";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "sonner";
 
 const formatDKK = (value: number) => {
@@ -151,7 +152,8 @@ export default function EconomicExpenses() {
   }
   
   return (
-    <div className="space-y-6 p-6">
+    <MainLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -332,6 +334,7 @@ export default function EconomicExpenses() {
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }
 

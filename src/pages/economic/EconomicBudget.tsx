@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Percent, TrendingUp, Calculator } from "lucide-react";
 import { useEconomicBudget, useEconomicKategorier, useTeams, useUpdateBudgetLine, usePosteringerEnriched } from "@/hooks/useEconomicData";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "sonner";
 
 const formatDKK = (value: number) => {
@@ -160,7 +161,8 @@ export default function EconomicBudget() {
   }
   
   return (
-    <div className="space-y-6 p-6">
+    <MainLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -312,5 +314,6 @@ export default function EconomicBudget() {
         </TabsContent>
       </Tabs>
     </div>
+    </MainLayout>
   );
 }
