@@ -61,6 +61,12 @@ export default function BookingsContent() {
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
+  const [deleteAssignmentData, setDeleteAssignmentData] = useState<{
+    id: string;
+    employeeName: string;
+    dayName: string;
+    date: string;
+  } | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
 
@@ -523,13 +529,34 @@ export default function BookingsContent() {
                                       <div 
                                         key={assignment.id} 
                                         className={cn(
-                                          "text-[10px] font-medium truncate flex items-center justify-center gap-0.5 group",
+                                          "text-[10px] font-medium truncate flex items-center justify-center gap-0.5 group relative",
                                           hasAbsence ? "text-destructive" : "text-primary"
                                         )}
                                         title={hasAbsence ? getAbsenceLabel(absenceType) : undefined}
                                       >
                                         {hasAbsence && <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />}
                                         <span>{assignment.employee_name?.split(' ')[0]}</span>
+                                        
+                                        {/* Delete button - only visible for editors on hover */}
+                                        {canEditFmBookings && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteAssignmentData({
+                                                id: assignment.id,
+                                                employeeName: assignment.employee_name,
+                                                dayName: day,
+                                                date: format(dayDate, "d. MMM", { locale: da })
+                                              });
+                                            }}
+                                            className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 
+                                                       bg-destructive text-destructive-foreground rounded-full p-0.5 
+                                                       hover:bg-destructive/90 transition-opacity z-10"
+                                            title="Fjern medarbejder fra denne dag"
+                                          >
+                                            <X className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -550,7 +577,7 @@ export default function BookingsContent() {
         ))
       )}
 
-      {/* Delete confirmation */}
+      {/* Delete booking confirmation */}
       <AlertDialog open={!!deleteBookingId} onOpenChange={() => setDeleteBookingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -566,6 +593,37 @@ export default function BookingsContent() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Slet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete single assignment confirmation */}
+      <AlertDialog 
+        open={!!deleteAssignmentData} 
+        onOpenChange={() => setDeleteAssignmentData(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern medarbejder fra vagt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil fjerne <strong>{deleteAssignmentData?.employeeName}</strong> fra {deleteAssignmentData?.dayName} d. {deleteAssignmentData?.date}?
+              <br /><br />
+              Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteAssignmentData) {
+                  deleteAssignmentMutation.mutate(deleteAssignmentData.id);
+                  setDeleteAssignmentData(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
