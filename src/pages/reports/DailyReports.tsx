@@ -109,6 +109,7 @@ export default function DailyReports() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
   const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "clients", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -198,13 +199,22 @@ export default function DailyReports() {
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ["daily-report-employees"],
+    queryKey: ["daily-report-employees", employeeStatusFilter],
     queryFn: async () => {
       // Use secure view that only exposes non-sensitive columns
-      const { data } = await supabase
+      let query = supabase
         .from("employee_basic_info")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, is_active")
         .order("first_name");
+      
+      if (employeeStatusFilter === "active") {
+        query = query.eq("is_active", true);
+      } else if (employeeStatusFilter === "inactive") {
+        query = query.eq("is_active", false);
+      }
+      // "all" = no filter
+      
+      const { data } = await query;
       return data || [];
     },
   });
@@ -249,7 +259,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
@@ -333,11 +343,18 @@ export default function DailyReports() {
         
         // Fetch employee details for all IDs (from sales AND fieldmarketing)
         if (employeeIds.length > 0) {
-          const { data: empData } = await supabase
+          let empQuery = supabase
             .from("employee_master_data")
             .select(`id, first_name, last_name, team_members(team:teams(id, name))`)
-            .in("id", employeeIds)
-            .eq("is_active", true);
+            .in("id", employeeIds);
+          
+          if (employeeStatusFilter === "active") {
+            empQuery = empQuery.eq("is_active", true);
+          } else if (employeeStatusFilter === "inactive") {
+            empQuery = empQuery.eq("is_active", false);
+          }
+          
+          const { data: empData } = await empQuery;
           
           filteredEmployees = empData || [];
           
@@ -363,7 +380,13 @@ export default function DailyReports() {
             last_name,
             team_members(team:teams(id, name))
           `)
-          .eq("is_active", true);
+        
+        if (employeeStatusFilter === "active") {
+          employeeQuery = employeeQuery.eq("is_active", true);
+        } else if (employeeStatusFilter === "inactive") {
+          employeeQuery = employeeQuery.eq("is_active", false);
+        }
+        // "all" = no filter
 
         if (selectedEmployee !== "all") {
           employeeQuery = employeeQuery.eq("id", selectedEmployee);
@@ -864,6 +887,7 @@ export default function DailyReports() {
     if (selectedEmployee !== "all") count++;
     if (selectedClient !== "all") count++;
     if (selectedCampaign !== "all") count++;
+    if (employeeStatusFilter !== "active") count++;
     return count;
   };
 
@@ -1059,6 +1083,24 @@ export default function DailyReports() {
                         {teams.map((team) => (
                           <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Medarbejder status */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Medarbejder status</label>
+                    <Select value={employeeStatusFilter} onValueChange={(v) => setEmployeeStatusFilter(v as "active" | "inactive" | "all")}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <div className="flex items-center justify-between w-full">
+                          <SelectValue />
+                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Aktive</SelectItem>
+                        <SelectItem value="inactive">Inaktive</SelectItem>
+                        <SelectItem value="all">Alle</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
