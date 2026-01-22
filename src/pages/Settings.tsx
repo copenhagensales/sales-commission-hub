@@ -454,6 +454,24 @@ export default function Settings() {
     }
   };
 
+  const syncEconomicInvoices = async () => {
+    setLoading("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-economic-invoices", {
+        body: { days: syncDays },
+      });
+      if (error) throw error;
+
+      setResults({ type: "economic-invoices", data });
+      toast.success(`Faktura-sync færdig: ${data?.upserted ?? 0} opdateret (hentede ${data?.totalFetched ?? 0})`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Faktura-sync fejlede");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const backfillOpp = async () => {
     setLoading("backfill-opp");
     try {
@@ -726,6 +744,12 @@ export default function Settings() {
                                   onClick={() => {
                                     if (integration.type === 'adversus') {
                                       syncSalesToDb();
+                                    } else if (integration.type === 'economic') {
+                                      if (!integration.enabled_sources.includes('invoices')) {
+                                        toast.info("Aktivér først datakilden 'Fakturaer' før du henter data");
+                                        return;
+                                      }
+                                      syncEconomicInvoices();
                                     } else {
                                       toast.info(`Sync for ${integration.name} er ikke implementeret endnu`);
                                     }
