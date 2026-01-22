@@ -508,10 +508,16 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Render expandable lead data section
   const renderLeadDataSection = (sale: Sale) => {
     const payload = sale.raw_payload;
-    if (!payload?.leadResultData || payload.leadResultData.length === 0) return null;
+    if (!payload) return null;
     
+    const hasLeadResultData = payload.leadResultData && payload.leadResultData.length > 0;
     const isExpanded = expandedSaleIds.has(sale.id);
-    const fieldCount = payload.leadResultData.length;
+    const fieldCount = hasLeadResultData ? payload.leadResultData!.length : 0;
+    
+    // Determine button label based on available data
+    const buttonLabel = hasLeadResultData 
+      ? `${isExpanded ? "Skjul" : "Vis"} lead data (${fieldCount})`
+      : `${isExpanded ? "Skjul" : "Vis"} salgsinfo`;
     
     return (
       <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(sale.id)}>
@@ -519,20 +525,56 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           <Button variant="ghost" size="sm" className="gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
             <FileText className="h-3 w-3" />
-            {isExpanded ? "Skjul" : "Vis"} lead data ({fieldCount})
+            {buttonLabel}
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-3 pt-3 border-t text-sm">
-            {payload.leadResultData.map((field, idx) => (
-              <div key={idx} className="space-y-0.5 min-w-0">
-                <p className="text-xs text-muted-foreground truncate">{field.label}</p>
-                <p className="font-medium truncate text-sm" title={field.value || "-"}>
-                  {field.value || "-"}
-                </p>
+          {hasLeadResultData ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-3 pt-3 border-t text-sm">
+              {payload.leadResultData!.map((field, idx) => (
+                <div key={idx} className="space-y-0.5 min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{field.label}</p>
+                  <p className="font-medium truncate text-sm" title={field.value || "-"}>
+                    {field.value || "-"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground mb-3">Lead data ikke modtaget fra kildesystemet</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
+                {payload.leadId && (
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs text-muted-foreground">Lead ID</p>
+                    <p className="font-mono text-sm">{payload.leadId}</p>
+                  </div>
+                )}
+                {payload.id && (
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs text-muted-foreground">Opportunity ID</p>
+                    <p className="font-mono text-sm">{payload.id}</p>
+                  </div>
+                )}
+                {payload.campaignId && (
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs text-muted-foreground">Kampagne ID</p>
+                    <p className="font-mono text-sm">{payload.campaignId}</p>
+                  </div>
+                )}
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-xs text-muted-foreground">Registreret</p>
+                  <p className="text-sm">{format(parseISO(sale.sale_datetime), "d. MMM yyyy HH:mm", { locale: da })}</p>
+                </div>
+                {sale.sale_items && sale.sale_items.length > 0 && (
+                  <div className="space-y-0.5 min-w-0 col-span-2">
+                    <p className="text-xs text-muted-foreground">Produkter</p>
+                    {getProductsDisplay(sale.sale_items)}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
     );
