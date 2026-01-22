@@ -70,6 +70,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
   );
+  const [economicOpen, setEconomicOpen] = useState(
+    location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload"
+  );
 
   // Fetch employee name and pending contracts count
   // OPTIMIZED: Removed refetchInterval to reduce DB load - only refetch on window focus
@@ -451,6 +454,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Check if Spil (Games) menu should be visible
   const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
+  
+  // Check if Economic menu should be visible (owner always has access)
+  const isOwner = p.position?.name?.toLowerCase() === "ejer";
+  const showEconomicMenu = isOwner || p.canView("menu_section_economic");
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
@@ -1613,6 +1620,61 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     Lønarter
                   </NavLink>
                 )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Økonomi menu */}
+          {showEconomicMenu && (
+            <Collapsible open={economicOpen} onOpenChange={setEconomicOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                (location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload")
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Receipt className="h-5 w-5" />
+                  Økonomi
+                </div>
+                {economicOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                <NavLink to="/economic" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/economic" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <LayoutDashboard className="h-4 w-4" />
+                  Overblik
+                </NavLink>
+                <NavLink to="/economic/expenses" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/economic/expenses" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Receipt className="h-4 w-4" />
+                  Udgifter
+                </NavLink>
+                <NavLink to="/economic/budget" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/economic/budget" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Target className="h-4 w-4" />
+                  Budget 2026
+                </NavLink>
+                <NavLink to="/economic/mapping" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/economic/mapping" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Database className="h-4 w-4" />
+                  Mapping
+                </NavLink>
+                <NavLink to="/admin/economic-upload" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/admin/economic-upload" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Database className="h-4 w-4" />
+                  Import
+                </NavLink>
               </CollapsibleContent>
             </Collapsible>
           )}
