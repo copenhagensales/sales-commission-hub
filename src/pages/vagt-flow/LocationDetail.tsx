@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, MapPin, Phone, Mail, User, Building } from "lucide-react";
+import { PhoneButton } from "@/components/ui/phone-link";
 import { useState, useEffect } from "react";
 import {
   Select,
@@ -351,7 +352,7 @@ export default function LocationDetail() {
                 />
               </div>
               <div>
-                <Label className="flex items-center gap-2">
+              <Label className="flex items-center gap-2">
                   <Phone className="h-4 w-4" /> Telefon
                 </Label>
                 <div className="flex gap-2">
@@ -361,14 +362,7 @@ export default function LocationDetail() {
                     className="flex-1"
                     disabled={!canEditLocation}
                   />
-                  {formData.contact_phone && (
-                    <a
-                      href={`tel:${formData.contact_phone}`}
-                      className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  )}
+                  <PhoneButton phoneNumber={formData.contact_phone} />
                 </div>
               </div>
               <div>

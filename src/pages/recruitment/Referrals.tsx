@@ -39,7 +39,7 @@ import {
   Users, 
   Search, 
   MoreHorizontal, 
-  Phone, 
+  Phone,
   Mail, 
   DollarSign,
   Calendar,
@@ -53,6 +53,7 @@ import {
   UserPlus,
   ExternalLink
 } from "lucide-react";
+import { PhoneLink } from "@/components/ui/phone-link";
 import { CreateReferralDialog } from "@/components/recruitment/CreateReferralDialog";
 import { 
   useAllReferrals, 
@@ -355,12 +356,7 @@ export default function Referrals() {
                                 <Mail className="h-3 w-3" />
                                 {referral.candidate_email}
                               </a>
-                              {referral.candidate_phone && (
-                                <a href={`tel:${referral.candidate_phone}`} className="flex items-center gap-1 hover:text-primary">
-                                  <Phone className="h-3 w-3" />
-                                  {referral.candidate_phone}
-                                </a>
-                              )}
+                              <PhoneLink phoneNumber={referral.candidate_phone} />
                             </div>
                           </div>
                         </TableCell>

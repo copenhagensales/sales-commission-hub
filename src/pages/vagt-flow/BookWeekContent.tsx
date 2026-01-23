@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Calendar, ChevronLeft, ChevronRight, Star, Search, Phone } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Star, Search } from "lucide-react";
+import { PhoneLink } from "@/components/ui/phone-link";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -488,16 +489,11 @@ export default function BookWeekContent() {
                 <p className="font-medium">{selectedLocation?.name}</p>
                 <p className="text-sm text-muted-foreground">Uge {selectedWeek}, {selectedYear}</p>
               </div>
-              {selectedLocation?.contact_phone ? (
-                <a
-                  href={`tel:${selectedLocation.contact_phone}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  <Phone className="h-3.5 w-3.5" />
-                  {selectedLocation.contact_phone}
-                </a>
-              ) : null}
+              <PhoneLink 
+                phoneNumber={selectedLocation?.contact_phone} 
+                className="text-sm hover:underline"
+                iconClassName="h-3.5 w-3.5"
+              />
             </div>
 
             <div className="grid grid-cols-7 gap-2">
