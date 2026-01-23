@@ -8,11 +8,14 @@ interface TeamDB {
   teamName: string;
   leaderId: string | null;
   leaderName: string;
+  assistantId: string | null;
+  assistantName: string;
   revenue: number;
-  salaryCosts: number;
+  sellerSalaryCosts: number;
+  leaderSalary: number;
+  assistantSalary: number;
   expenses: number;
   db: number;
-  leaderSalary: number;
   percentageRate: number;
   minimumSalary: number;
 }
@@ -26,8 +29,10 @@ export function DBTeamDetailCard({ team, onClose }: DBTeamDetailCardProps) {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
 
-  const calculatedSalary = team.db * (team.percentageRate / 100);
-  const usesMinimum = team.leaderSalary === team.minimumSalary && calculatedSalary < team.minimumSalary;
+  // Calculate if leader uses minimum salary
+  const dbBeforeLeader = team.revenue - team.sellerSalaryCosts - team.expenses;
+  const calculatedLeaderSalary = dbBeforeLeader * (team.percentageRate / 100);
+  const usesMinimum = team.leaderSalary === team.minimumSalary && calculatedLeaderSalary < team.minimumSalary;
 
   return (
     <Card>
@@ -38,50 +43,85 @@ export function DBTeamDetailCard({ team, onClose }: DBTeamDetailCardProps) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Teamleder:</span> {team.leaderName}
-          </p>
+        {/* Team info */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Teamleder</p>
+            <p className="font-medium">{team.leaderName}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Assistent</p>
+            <p className="font-medium">{team.assistantName}</p>
+          </div>
         </div>
 
         <Separator />
 
+        {/* Revenue and costs breakdown */}
         <div className="space-y-2">
+          <h4 className="font-medium text-sm text-muted-foreground">Omsætning & Omkostninger</h4>
           <div className="flex justify-between">
             <span>Omsætning (salg fra kunder)</span>
             <span className="font-medium">{formatCurrency(team.revenue)}</span>
           </div>
           <div className="flex justify-between text-destructive">
-            <span>Lønomkostninger (team-provision)</span>
-            <span>-{formatCurrency(team.salaryCosts)}</span>
+            <span>Sælgerløn (provision)</span>
+            <span>-{formatCurrency(team.sellerSalaryCosts)}</span>
           </div>
           <div className="flex justify-between text-destructive">
             <span>Team-udgifter</span>
             <span>-{formatCurrency(team.expenses)}</span>
           </div>
-          <Separator />
-          <div className="flex justify-between font-medium">
-            <span>Dækningsbidrag (DB)</span>
-            <span>{formatCurrency(team.db)}</span>
-          </div>
         </div>
 
         <Separator />
 
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span>Beregnet løn: {formatCurrency(team.db)} × {team.percentageRate}%</span>
-            <span>{formatCurrency(calculatedSalary)}</span>
+        {/* Salary breakdown */}
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm text-muted-foreground">Lønninger</h4>
+          
+          {/* Leader salary */}
+          <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Teamleder: {team.leaderName}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Beregnet løn: {formatCurrency(dbBeforeLeader)} × {team.percentageRate}%</span>
+              <span>{formatCurrency(calculatedLeaderSalary)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Minimumsløn</span>
+              <span>{formatCurrency(team.minimumSalary)}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between font-medium">
+              <span>Lederløn {usesMinimum && "(minimum)"}</span>
+              <span className="text-destructive">-{formatCurrency(team.leaderSalary)}</span>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span>Minimumsløn</span>
-            <span>{formatCurrency(team.minimumSalary)}</span>
+
+          {/* Assistant salary */}
+          {team.assistantId && (
+            <div className="bg-muted/50 rounded-lg p-3">
+              <div className="flex justify-between">
+                <span>Assistentløn: {team.assistantName}</span>
+                <span className="text-destructive font-medium">-{formatCurrency(team.assistantSalary)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Final DB */}
+        <div className="bg-primary/10 rounded-lg p-4">
+          <div className="flex justify-between items-center">
+            <span className="font-medium text-lg">Dækningsbidrag (DB)</span>
+            <span className="font-bold text-xl text-primary">{formatCurrency(team.db)}</span>
           </div>
-          <Separator />
-          <div className="flex justify-between font-medium text-base">
-            <span>UDBETALING {usesMinimum && "(minimum)"}</span>
-            <span className="text-primary">{formatCurrency(team.leaderSalary)}</span>
-          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Omsætning − Sælgerløn − Lederløn − Assistentløn − Udgifter
+          </p>
         </div>
       </CardContent>
     </Card>
