@@ -2913,30 +2913,6 @@ export type Database = {
           },
         ]
       }
-      economic_events: {
-        Row: {
-          created_at: string
-          event_type: string
-          id: string
-          payload: Json
-          processed: boolean | null
-        }
-        Insert: {
-          created_at?: string
-          event_type: string
-          id?: string
-          payload: Json
-          processed?: boolean | null
-        }
-        Update: {
-          created_at?: string
-          event_type?: string
-          id?: string
-          payload?: Json
-          processed?: boolean | null
-        }
-        Relationships: []
-      }
       economic_fordelingsregler: {
         Row: {
           active_from: string | null
@@ -3063,63 +3039,6 @@ export type Database = {
           rows_postering?: number | null
           status?: string | null
           storage_path?: string
-        }
-        Relationships: []
-      }
-      economic_invoices: {
-        Row: {
-          created_at: string
-          currency: string | null
-          customer_name: string | null
-          customer_number: string | null
-          date: string
-          due_date: string | null
-          economic_invoice_id: string
-          gross_amount: number | null
-          id: string
-          invoice_number: string | null
-          net_amount: number | null
-          pdf_url: string | null
-          raw: Json | null
-          status: string
-          updated_at: string
-          vat_amount: number | null
-        }
-        Insert: {
-          created_at?: string
-          currency?: string | null
-          customer_name?: string | null
-          customer_number?: string | null
-          date: string
-          due_date?: string | null
-          economic_invoice_id: string
-          gross_amount?: number | null
-          id?: string
-          invoice_number?: string | null
-          net_amount?: number | null
-          pdf_url?: string | null
-          raw?: Json | null
-          status?: string
-          updated_at?: string
-          vat_amount?: number | null
-        }
-        Update: {
-          created_at?: string
-          currency?: string | null
-          customer_name?: string | null
-          customer_number?: string | null
-          date?: string
-          due_date?: string | null
-          economic_invoice_id?: string
-          gross_amount?: number | null
-          id?: string
-          invoice_number?: string | null
-          net_amount?: number | null
-          pdf_url?: string | null
-          raw?: Json | null
-          status?: string
-          updated_at?: string
-          vat_amount?: number | null
         }
         Relationships: []
       }

@@ -711,12 +711,6 @@ export default function Settings() {
                                   onClick={() => {
                                     if (integration.type === 'adversus') {
                                       syncSalesToDb();
-                                    } else if (integration.type === 'economic') {
-                                      if (!integration.enabled_sources.includes('invoices')) {
-                                        toast.info("Aktivér først datakilden 'Fakturaer' før du henter data");
-                                        return;
-                                      }
-                                      syncEconomicInvoices();
                                     } else {
                                       toast.info(`Sync for ${integration.name} er ikke implementeret endnu`);
                                     }
