@@ -1,0 +1,221 @@
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown } from "lucide-react";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { da } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+
+type PeriodMode = "payroll" | "month" | "custom";
+
+interface DBPeriodSelectorProps {
+  periodStart: Date;
+  periodEnd: Date;
+  onChange: (start: Date, end: Date) => void;
+  mode: PeriodMode;
+  onModeChange: (mode: PeriodMode) => void;
+}
+
+// Get payroll period (15th to 14th)
+function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
+  const day = baseDate.getDate();
+  const month = baseDate.getMonth();
+  const year = baseDate.getFullYear();
+
+  if (day >= 15) {
+    // Current period: 15th of this month to 14th of next month
+    const start = new Date(year, month, 15);
+    const nextMonth = addMonths(new Date(year, month, 1), 1);
+    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 14, 23, 59, 59);
+    return { start, end };
+  } else {
+    // Current period: 15th of previous month to 14th of this month
+    const prevMonth = subMonths(new Date(year, month, 1), 1);
+    const start = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 15);
+    const end = new Date(year, month, 14, 23, 59, 59);
+    return { start, end };
+  }
+}
+
+export function DBPeriodSelector({
+  periodStart,
+  periodEnd,
+  onChange,
+  mode,
+  onModeChange,
+}: DBPeriodSelectorProps) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: periodStart,
+    to: periodEnd,
+  });
+
+  const presets = useMemo(() => {
+    const now = new Date();
+    const currentPayroll = getPayrollPeriod(now);
+    const prevPayroll = getPayrollPeriod(subMonths(now, 1));
+    const thisMonth = { start: startOfMonth(now), end: endOfMonth(now) };
+    const lastMonth = {
+      start: startOfMonth(subMonths(now, 1)),
+      end: endOfMonth(subMonths(now, 1)),
+    };
+
+    return [
+      { label: "Denne lønperiode", mode: "payroll" as PeriodMode, ...currentPayroll },
+      { label: "Forrige lønperiode", mode: "payroll" as PeriodMode, ...prevPayroll },
+      { label: "Denne måned", mode: "month" as PeriodMode, ...thisMonth },
+      { label: "Forrige måned", mode: "month" as PeriodMode, ...lastMonth },
+    ];
+  }, []);
+
+  const handlePrevious = () => {
+    if (mode === "payroll") {
+      const prevPeriod = getPayrollPeriod(subMonths(periodStart, 1));
+      onChange(prevPeriod.start, prevPeriod.end);
+    } else if (mode === "month") {
+      const prevMonth = subMonths(periodStart, 1);
+      onChange(startOfMonth(prevMonth), endOfMonth(prevMonth));
+    }
+  };
+
+  const handleNext = () => {
+    if (mode === "payroll") {
+      const nextPeriod = getPayrollPeriod(addMonths(periodStart, 1));
+      onChange(nextPeriod.start, nextPeriod.end);
+    } else if (mode === "month") {
+      const nextMonth = addMonths(periodStart, 1);
+      onChange(startOfMonth(nextMonth), endOfMonth(nextMonth));
+    }
+  };
+
+  const handlePresetSelect = (preset: (typeof presets)[0]) => {
+    onModeChange(preset.mode);
+    onChange(preset.start, preset.end);
+  };
+
+  const handleCustomSelect = () => {
+    onModeChange("custom");
+    setCalendarOpen(true);
+  };
+
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    setDateRange(range);
+    if (range?.from && range?.to) {
+      onChange(range.from, range.to);
+    }
+  };
+
+  const formatPeriodDisplay = () => {
+    if (mode === "payroll") {
+      return `${format(periodStart, "d. MMM", { locale: da })} - ${format(periodEnd, "d. MMM yyyy", { locale: da })}`;
+    } else if (mode === "month") {
+      return format(periodStart, "MMMM yyyy", { locale: da });
+    } else {
+      return `${format(periodStart, "d. MMM", { locale: da })} - ${format(periodEnd, "d. MMM yyyy", { locale: da })}`;
+    }
+  };
+
+  const getModeLabel = () => {
+    switch (mode) {
+      case "payroll":
+        return "Lønperiode";
+      case "month":
+        return "Måned";
+      case "custom":
+        return "Brugerdefineret";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Arrow navigation - disabled for custom mode */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handlePrevious}
+        disabled={mode === "custom"}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      {/* Period display */}
+      <div className="min-w-[200px] text-center">
+        <span className="font-medium capitalize">{formatPeriodDisplay()}</span>
+        <span className="ml-2 text-xs text-muted-foreground">({getModeLabel()})</span>
+      </div>
+
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleNext}
+        disabled={mode === "custom"}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+
+      {/* Preset dropdown + custom picker */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1">
+            <CalendarIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Vælg periode</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {presets.map((preset) => (
+            <DropdownMenuItem
+              key={preset.label}
+              onClick={() => handlePresetSelect(preset)}
+            >
+              {preset.label}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  handleCustomSelect();
+                }}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Brugerdefineret...
+              </DropdownMenuItem>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end" side="left">
+              <Calendar
+                mode="range"
+                defaultMonth={periodStart}
+                selected={dateRange}
+                onSelect={handleDateRangeSelect}
+                numberOfMonths={2}
+                locale={da}
+                className={cn("p-3 pointer-events-auto")}
+              />
+              <div className="border-t p-3 flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={() => setCalendarOpen(false)}
+                  disabled={!dateRange?.from || !dateRange?.to}
+                >
+                  Anvend
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
