@@ -108,23 +108,6 @@ export default function UnitedDashboard() {
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
 
-  // Fetch TV data from edge function (bypasses RLS for TV mode)
-  const { data: tvData } = useQuery<TvUnitedData>({
-    queryKey: ["tv-united-data"],
-    queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=united-data&dashboard=united`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch TV data");
-      }
-      return response.json();
-    },
-    enabled: tvMode,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 30s for at mindske database load
-  });
-
   // Fetch United team's clients
   const { data: teamClients } = useQuery({
     queryKey: ["united-team-clients"],
@@ -147,7 +130,7 @@ export default function UnitedDashboard() {
 
       return (clients || []).map((tc: any) => tc.clients).filter(Boolean);
     },
-    enabled: !tvMode
+    enabled: true
   });
 
   // Get team ID for United
@@ -371,21 +354,18 @@ export default function UnitedDashboard() {
     avatarUrl: entry.avatarUrl || undefined,
   });
 
-  // Sort employees by commission for each period
+  // Sort employees by commission for each period (use cached data - same source for all modes)
   const sortedDailySellers: SellerData[] = useMemo(() => {
-    if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
     return cachedSellersToday.map(mapLeaderboardToSeller);
-  }, [cachedSellersToday, tvMode, tvData]);
+  }, [cachedSellersToday]);
 
   const sortedWeeklySellers: SellerData[] = useMemo(() => {
-    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
     return cachedSellersWeek.map(mapLeaderboardToSeller);
-  }, [cachedSellersWeek, tvMode, tvData]);
+  }, [cachedSellersWeek]);
 
   const sortedPayrollSellers: SellerData[] = useMemo(() => {
-    if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
     return cachedSellersPayroll.map(mapLeaderboardToSeller);
-  }, [cachedSellersPayroll, tvMode, tvData]);
+  }, [cachedSellersPayroll]);
 
   const getAvatarUrl = (name: string) => {
     if (!employeeAvatars) return undefined;
@@ -394,15 +374,15 @@ export default function UnitedDashboard() {
 
   const isLoading = leaderboardsLoading;
 
-  // Calculate total sales from cached leaderboards
+  // Calculate total sales from cached leaderboards (same source for all modes)
   const totalSalesToday = cachedSellersToday.reduce((sum, s) => sum + s.salesCount, 0);
   const totalSalesWeek = cachedSellersWeek.reduce((sum, s) => sum + s.salesCount, 0);
   const totalSalesPayroll = cachedSellersPayroll.reduce((sum, s) => sum + s.salesCount, 0);
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Use effective client sales (TV mode or direct query)
-  const effectiveClientSales = tvMode && tvData?.clientSales ? tvData.clientSales : (clientSalesData || []);
+  // Use client sales from direct query (works for all modes now)
+  const effectiveClientSales = clientSalesData || [];
 
   return (
     <div className={tvMode 
@@ -424,7 +404,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesToday ?? 0) : totalSalesToday}
+                {totalSalesToday}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -437,7 +417,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesWeek ?? 0) : totalSalesWeek}
+                {totalSalesWeek}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -450,7 +430,7 @@ export default function UnitedDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {tvMode ? (tvData?.salesMonth ?? 0) : totalSalesPayroll}
+                {totalSalesPayroll}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>

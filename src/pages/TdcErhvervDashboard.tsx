@@ -32,17 +32,14 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
   }, [enabled, intervalMs]);
 };
 
-interface TvTdcData {
-  salesToday: number;
-  salesWeek: number;
-  salesMonth: number;
-  hoursToday: number;
-  hoursWeek: number;
-  hoursPayroll: number;
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  employeeGoals?: Record<string, number>;
+// Unified seller data type (from cached leaderboard)
+interface SellerData {
+  name: string;
+  sales: number;
+  commission: number;
+  avatarUrl: string | null;
+  employeeId: string;
+  goalTarget: number | null;
 }
 
 // Calculate payroll period (15th to 14th)
@@ -124,25 +121,8 @@ export default function TdcErhvervDashboard() {
     ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
-  // Fetch TV data from edge function (bypasses RLS for TV mode)
-  const { data: tvData } = useQuery<TvTdcData>({
-    queryKey: ["tv-tdc-erhverv-data"],
-    queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=tdc-erhverv-data&dashboard=tdc-erhverv`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch TV data");
-      }
-      return response.json();
-    },
-    enabled: tvMode,
-    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
-    staleTime: 60000,
-  });
-
   // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
+  // Now uses public RLS policy - works for both normal and TV mode
   const { 
     sellersToday: cachedSellersToday, 
     sellersWeek: cachedSellersWeek, 
@@ -220,17 +200,18 @@ export default function TdcErhvervDashboard() {
   }, [payrollPeriod.start]);
 
   // Get goal info for an employee with period-relative expected progress
-  // In TV mode, use goalTarget from seller data; otherwise use employeeGoals map
+  // Now uses goalTarget from cached leaderboard data (same source for all modes)
   const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
     let payrollTarget: number | undefined;
     
-    if (tvMode) {
-      // In TV mode, use the goalTarget passed from seller data
-      payrollTarget = sellerGoalTarget ?? undefined;
+    // First try goalTarget from seller data, then fall back to employeeGoals map
+    if (sellerGoalTarget != null) {
+      payrollTarget = sellerGoalTarget;
     } else {
       const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-      if (!employeeId) return null;
-      payrollTarget = employeeGoals?.get(employeeId);
+      if (employeeId) {
+        payrollTarget = employeeGoals?.get(employeeId);
+      }
     }
     
     if (!payrollTarget) return null;
@@ -260,21 +241,18 @@ export default function TdcErhvervDashboard() {
     goalTarget: entry.goalTarget,
   });
 
-  // Sort employees by commission for each period (use cached data)
+  // Sort employees by commission for each period (use cached data - same source for all modes)
   const sortedDailySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
     return cachedSellersToday.map(mapCachedToSeller);
-  }, [cachedSellersToday, tvMode, tvData]);
+  }, [cachedSellersToday]);
 
   const sortedWeeklySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
     return cachedSellersWeek.map(mapCachedToSeller);
-  }, [cachedSellersWeek, tvMode, tvData]);
+  }, [cachedSellersWeek]);
 
   const sortedPayrollSellers = useMemo(() => {
-    if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
     return cachedSellersPayroll.map(mapCachedToSeller);
-  }, [cachedSellersPayroll, tvMode, tvData]);
+  }, [cachedSellersPayroll]);
 
   const getAvatarUrl = (name: string) => {
     if (!employeeData?.avatarMap) return undefined;
@@ -285,20 +263,14 @@ export default function TdcErhvervDashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Get sales counts from cached KPIs (or TV data in TV mode)
-  const todaySales = tvMode 
-    ? (tvData?.salesToday ?? 0) 
-    : getKpiValue(cachedKpis?.today?.sales_count, 0);
-  const weekSales = tvMode 
-    ? (tvData?.salesWeek ?? 0) 
-    : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
+  // Get sales counts from cached KPIs (same source for all modes)
+  const todaySales = getKpiValue(cachedKpis?.today?.sales_count, 0);
+  const weekSales = getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const payrollSales = tvMode 
-    ? (tvData?.salesMonth ?? 0) 
-    : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
+  const payrollSales = getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
 
-  // Hours now come from cached KPIs instead of useDashboardSalesData
-  const payrollHours = tvMode ? (tvData?.hoursPayroll ?? 0) : getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
+  // Hours now come from cached KPIs
+  const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
 
   // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;

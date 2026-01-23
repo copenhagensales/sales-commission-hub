@@ -1,5 +1,4 @@
 import { useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays, getDay, getHours } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
@@ -12,6 +11,7 @@ import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/Goa
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
+import { useQuery } from "@tanstack/react-query";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -31,16 +31,6 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
     return () => clearInterval(timer);
   }, [enabled, intervalMs]);
 };
-
-interface TvEesyData {
-  salesToday: number;
-  salesWeek: number;
-  salesMonth: number;
-  sellersToday: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersWeek: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  sellersMonth: Array<{ name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; goalTarget?: number | null }>;
-  employeeGoals?: Record<string, number>;
-}
 
 // Calculate payroll period (15th to 14th)
 function calculatePayrollPeriod(): { start: Date; end: Date } {
@@ -110,25 +100,8 @@ export default function EesyTmDashboard() {
     ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
-  // Fetch TV data from edge function (bypasses RLS for TV mode)
-  const { data: tvData } = useQuery<TvEesyData>({
-    queryKey: ["tv-eesy-tm-data"],
-    queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=eesy-tm-data&dashboard=eesy-tm`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch TV data");
-      }
-      return response.json();
-    },
-    enabled: tvMode,
-    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
-    staleTime: 60000, // 1 minute stale time
-  });
-
   // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
+  // Now uses public RLS policy - works for both normal and TV mode
   const { 
     sellersToday: cachedSellersToday, 
     sellersWeek: cachedSellersWeek, 
@@ -136,10 +109,8 @@ export default function EesyTmDashboard() {
     isLoading: leaderboardsLoading 
   } = useCachedLeaderboards(
     { type: "client", id: eesyClientId || null },
-    { enabled: !tvMode, limit: 30 }
+    { enabled: true, limit: 30 }
   );
-
-  // No more useDashboardSalesData - hours now come from cached KPIs!
 
   // Fetch employee avatars and IDs
   const { data: employeeData } = useQuery({
@@ -154,31 +125,35 @@ export default function EesyTmDashboard() {
       const nameToIdMap = new Map<string, string>();
       (data || []).forEach(emp => {
         const fullName = `${emp.first_name} ${emp.last_name}`;
-        nameToIdMap.set(fullName.toLowerCase(), emp.id);
         if (emp.avatar_url) {
           avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
         }
+        nameToIdMap.set(fullName.toLowerCase(), emp.id);
       });
       return { avatarMap, nameToIdMap };
     },
-    enabled: !tvMode
+    staleTime: 300000,
   });
 
   // Fetch employee sales goals for payroll period
   const { data: employeeGoals } = useQuery({
-    queryKey: ["employee-goals-eesy", payrollPeriod.start.toISOString(), payrollPeriod.end.toISOString()],
+    queryKey: ["employee-goals-eesy", payrollPeriod.start.toISOString()],
     queryFn: async () => {
       const { data } = await supabase
         .from("employee_sales_goals")
-        .select("employee_id, target_amount")
-        .gte("period_start", format(payrollPeriod.start, "yyyy-MM-dd"))
-        .lte("period_end", format(payrollPeriod.end, "yyyy-MM-dd"));
+        .select("employee_id, commission_target")
+        .gte("period_start", payrollPeriod.start.toISOString())
+        .lte("period_start", payrollPeriod.end.toISOString());
       
-      const goalMap = new Map<string, number>();
-      (data || []).forEach(g => goalMap.set(g.employee_id, g.target_amount));
-      return goalMap;
+      const goalsMap = new Map<string, number>();
+      (data || []).forEach(goal => {
+        if (goal.commission_target) {
+          goalsMap.set(goal.employee_id, goal.commission_target);
+        }
+      });
+      return goalsMap;
     },
-    enabled: !tvMode
+    staleTime: 300000,
   });
 
   // Calculate time-based progress for relative goal tracking
@@ -202,28 +177,25 @@ export default function EesyTmDashboard() {
     return { payrollExpectedPercent, weekExpectedPercent, dayExpectedPercent: dayProgressPercent };
   }, [payrollPeriod.start]);
 
-  // Get goal info for an employee with period-relative expected progress
-  // In TV mode, use goalTarget from seller data; otherwise use employeeGoals map
+  // Get goal info for an employee
   const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
     let payrollTarget: number | undefined;
     
-    if (tvMode) {
-      // In TV mode, use the goalTarget passed from seller data
-      payrollTarget = sellerGoalTarget ?? undefined;
+    if (sellerGoalTarget != null) {
+      payrollTarget = sellerGoalTarget;
     } else {
       const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-      if (!employeeId) return null;
-      payrollTarget = employeeGoals?.get(employeeId);
+      if (employeeId) {
+        payrollTarget = employeeGoals?.get(employeeId);
+      }
     }
     
     if (!payrollTarget) return null;
 
-    // Calculate target for the specific period
     const target = period === 'payroll' ? payrollTarget 
                  : period === 'week' ? Math.round((payrollTarget / 21) * 5)
                  : Math.round(payrollTarget / 21);
     
-    // Get expected progress for this period
     const expectedPercent = period === 'payroll' ? timeProgress.payrollExpectedPercent
                           : period === 'week' ? timeProgress.weekExpectedPercent
                           : timeProgress.dayExpectedPercent;
@@ -233,48 +205,22 @@ export default function EesyTmDashboard() {
     return { target, progress, expectedPercent, expectedAmount };
   };
 
-  // Convert cached leaderboard entries to component-expected format
-  const mapCachedToSeller = (entry: LeaderboardEntry) => ({
-    name: entry.employeeName,
-    totalSales: entry.salesCount,
-    totalCommission: entry.commission,
-    avatarUrl: entry.avatarUrl,
-    employeeId: entry.employeeId,
-    goalTarget: entry.goalTarget,
-  });
+  // Map cached leaderboard entries to display format
+  const sortedPayrollSellers = cachedSellersPayroll;
+  const sortedWeeklySellers = cachedSellersWeek;
+  const sortedDailySellers = cachedSellersToday;
 
-  // Sort employees by commission for each period (use cached data)
-  const sortedDailySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
-    return cachedSellersToday.map(mapCachedToSeller);
-  }, [cachedSellersToday, tvMode, tvData]);
-
-  const sortedWeeklySellers = useMemo(() => {
-    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
-    return cachedSellersWeek.map(mapCachedToSeller);
-  }, [cachedSellersWeek, tvMode, tvData]);
-
-  const sortedPayrollSellers = useMemo(() => {
-    if (tvMode && tvData?.sellersMonth) return tvData.sellersMonth;
-    return cachedSellersPayroll.map(mapCachedToSeller);
-  }, [cachedSellersPayroll, tvMode, tvData]);
-
-  const getAvatarUrl = (name: string) => {
-    if (!employeeData?.avatarMap) return undefined;
-    return employeeData.avatarMap.get(name.toLowerCase());
-  };
-
-  const isLoading = (!tvMode && kpisLoading) || leaderboardsLoading;
+  const isLoading = kpisLoading || leaderboardsLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Get sales counts from cached KPIs (or TV data in TV mode)
-  const salesToday = tvMode ? (tvData?.salesToday ?? 0) : getKpiValue(cachedKpis?.today?.sales_count, 0);
-  const salesWeek = tvMode ? (tvData?.salesWeek ?? 0) : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
-  const salesMonth = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const salesPayroll = tvMode ? (tvData?.salesMonth ?? 0) : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
+  // Get sales counts from cached KPIs
+  const salesToday = getKpiValue(cachedKpis?.today?.sales_count, 0);
+  const salesWeek = getKpiValue(cachedKpis?.this_week?.sales_count, 0);
+  const salesMonth = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
+  const salesPayroll = getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
 
-  // Hours now come from cached KPIs instead of useDashboardSalesData
+  // Hours now come from cached KPIs
   const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
 
   // Calculate sales per hour for payroll period
@@ -289,19 +235,16 @@ export default function EesyTmDashboard() {
         title="Eesy TM – Overblik" 
         subtitle={`Dag, uge og lønperiode (${periodLabel})`}
       />
-      <div className={tvMode ? 'space-y-4 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
-
-        {/* KPI Cards - Row 1: Time-based sales */}
-        <div className="grid grid-cols-4 gap-4">
+      <div className={tvMode ? 'space-y-3 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
+        {/* KPI Cards */}
+        <div className={tvMode ? 'grid grid-cols-5 gap-3' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {salesToday}
-              </div>
+              <div className="text-3xl font-bold text-primary">{salesToday}</div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
           </Card>
@@ -312,9 +255,7 @@ export default function EesyTmDashboard() {
               <CalendarRange className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {salesWeek}
-              </div>
+              <div className="text-3xl font-bold text-primary">{salesWeek}</div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
           </Card>
@@ -325,10 +266,8 @@ export default function EesyTmDashboard() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {salesMonth}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
+              <div className="text-3xl font-bold text-primary">{salesMonth}</div>
+              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM", { locale: da })}</p>
             </CardContent>
           </Card>
 
@@ -338,54 +277,43 @@ export default function EesyTmDashboard() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {salesPayroll}
-              </div>
+              <div className="text-3xl font-bold text-primary">{salesPayroll}</div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>
           </Card>
-        </div>
 
-        {/* KPI Card - Sales per hour (payroll period only) */}
-        <div className="grid grid-cols-1 gap-4">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium">Salg/time (løn)</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {payrollSalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {salesPayroll} salg / {payrollHours.toFixed(1)} timer
-              </p>
+              <div className="text-3xl font-bold text-primary">{payrollSalesPerHour.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{payrollHours.toFixed(1)} timer</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Three leaderboard columns */}
-        <div className={tvMode 
-          ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' 
-          : 'grid grid-cols-1 gap-4 lg:grid-cols-3'
-        }>
-          
-          {/* Top Løn Periode */}
+        {/* Leaderboard Tables */}
+        <div className={tvMode ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' : 'grid grid-cols-1 gap-6 lg:grid-cols-3'}>
+          {/* Payroll Period */}
           <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Løn Periode
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold">Top Løn Periode</CardTitle>
             </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
+            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
               {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Indlæser...</span>
+                </div>
               ) : sortedPayrollSellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Ingen salg endnu</span>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-border/50">
+                    <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
@@ -395,28 +323,23 @@ export default function EesyTmDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedPayrollSellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'payroll', sellerGoalTarget);
+                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'payroll', seller.goalTarget);
                       
                       return (
-                        <TableRow key={name} className="border-b border-border/30">
+                        <TableRow key={seller.employeeId} className="border-b border-border/30">
                           <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(name)}</AvatarFallback>
+                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{seller.displayName}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">{sales}</TableCell>
+                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>{formatCurrency(commission)}</span>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'payroll')}`}>{formatCurrency(seller.commission)}</span>
                           </TableCell>
                           <TableCell className="py-2">
                             <div className="flex justify-end">
@@ -424,12 +347,13 @@ export default function EesyTmDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={seller.commission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
+                                  size={32}
                                 />
                               ) : (
-                                <GoalProgressRingEmpty />
+                                <GoalProgressRingEmpty size={32} />
                               )}
                             </div>
                           </TableCell>
@@ -442,22 +366,24 @@ export default function EesyTmDashboard() {
             </CardContent>
           </Card>
 
-          {/* Top Uge */}
+          {/* Weekly */}
           <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Uge
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold">Top Uge</CardTitle>
             </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
+            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
               {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Indlæser...</span>
+                </div>
               ) : sortedWeeklySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Ingen salg endnu</span>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-border/50">
+                    <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
@@ -467,36 +393,23 @@ export default function EesyTmDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedWeeklySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'week', sellerGoalTarget);
+                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'week', seller.goalTarget);
                       
                       return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
+                        <TableRow key={seller.employeeId} className="border-b border-border/30">
+                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
+                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{seller.displayName}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
+                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'week')}`}>
-                              {formatCurrency(commission)}
-                            </span>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'week')}`}>{formatCurrency(seller.commission)}</span>
                           </TableCell>
                           <TableCell className="py-2">
                             <div className="flex justify-end">
@@ -504,12 +417,13 @@ export default function EesyTmDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={seller.commission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
+                                  size={32}
                                 />
                               ) : (
-                                <GoalProgressRingEmpty />
+                                <GoalProgressRingEmpty size={32} />
                               )}
                             </div>
                           </TableCell>
@@ -522,22 +436,24 @@ export default function EesyTmDashboard() {
             </CardContent>
           </Card>
 
-          {/* Top Dag */}
+          {/* Daily */}
           <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Dag
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold">Top Dag</CardTitle>
             </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
+            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
               {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Indlæser...</span>
+                </div>
               ) : sortedDailySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
+                <div className="flex items-center justify-center py-8">
+                  <span className="text-muted-foreground">Ingen salg endnu</span>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-border/50">
+                    <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
@@ -547,36 +463,23 @@ export default function EesyTmDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedDailySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'day', sellerGoalTarget);
+                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'day', seller.goalTarget);
                       
                       return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
+                        <TableRow key={seller.employeeId} className="border-b border-border/30">
+                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
+                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-sm">{name}</span>
+                              <span className="font-medium text-sm">{seller.displayName}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
-                          </TableCell>
+                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'day')}`}>
-                              {formatCurrency(commission)}
-                            </span>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(seller.commission, 'day')}`}>{formatCurrency(seller.commission)}</span>
                           </TableCell>
                           <TableCell className="py-2">
                             <div className="flex justify-end">
@@ -584,12 +487,13 @@ export default function EesyTmDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={seller.commission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
+                                  size={32}
                                 />
                               ) : (
-                                <GoalProgressRingEmpty />
+                                <GoalProgressRingEmpty size={32} />
                               )}
                             </div>
                           </TableCell>
@@ -601,7 +505,6 @@ export default function EesyTmDashboard() {
               )}
             </CardContent>
           </Card>
-
         </div>
       </div>
     </div>
