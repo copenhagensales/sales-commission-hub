@@ -9102,6 +9102,7 @@ export type Database = {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
       }
+      cleanup_kpi_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
       consume_password_reset_token: {
         Args: { _token_hash: string }
