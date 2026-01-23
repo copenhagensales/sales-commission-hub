@@ -32,6 +32,7 @@ import { EmployeeFormDialog } from "@/components/employees/EmployeeFormDialog";
 import { EmployeeKpiCards } from "@/components/employees/EmployeeKpiCards";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 
 
 interface EmployeeMasterDataRecord {
@@ -215,31 +216,17 @@ export default function EmployeeMasterData() {
     },
   });
 
-  // Fetch staff employee count
-  const { data: staffCount = 0 } = useQuery({
-    queryKey: ["staff-employee-count"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("employee_master_data")
-        .select("*", { count: "exact", head: true })
-        .eq("is_staff_employee", true)
-        .eq("is_active", true);
-      if (error) throw error;
-      return count ?? 0;
-    },
-  });
-
-  // Fetch team count
-  const { data: teamCount = 0 } = useQuery({
-    queryKey: ["team-count"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("teams")
-        .select("*", { count: "exact", head: true });
-      if (error) throw error;
-      return count ?? 0;
-    },
-  });
+  // Fetch KPI values from centralized cache
+  const { data: kpiData = {} } = usePrecomputedKpis(
+    ["active_employees", "staff_employees", "team_count", "position_count"],
+    "today",
+    "global"
+  );
+  
+  const cachedActiveCount = getKpiValue(kpiData.active_employees);
+  const cachedStaffCount = getKpiValue(kpiData.staff_employees);
+  const cachedTeamCount = getKpiValue(kpiData.team_count);
+  const cachedPositionCount = getKpiValue(kpiData.position_count);
 
   // Fetch job positions from database
   const { data: jobPositions = [] } = useQuery({
@@ -759,7 +746,12 @@ export default function EmployeeMasterData() {
       return sortDirection === "asc" ? comparison : -comparison;
     });
 
-  const activeCount = employees.filter((e) => e.is_active).length;
+  // Use cached KPI values (fallback to local count if cache not yet populated)
+  const localActiveCount = employees.filter((e) => e.is_active).length;
+  const activeCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
+  const staffCount = cachedStaffCount;
+  const teamCount = cachedTeamCount;
+  const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
 
   // Section configuration - must be after activeCount/staffCount are defined
   const visibleSections = useMemo(() => {
@@ -789,7 +781,7 @@ export default function EmployeeMasterData() {
           activeCount={activeCount}
           staffCount={staffCount}
           teamCount={teamCount}
-          positionCount={jobPositions.length}
+          positionCount={positionCount}
         />
 
         {/* Employee Form Dialog */}

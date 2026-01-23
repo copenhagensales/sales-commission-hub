@@ -1160,6 +1160,15 @@ async function calculateKpiValue(
     case "aktive_medarbejdere":
       return calculateActiveEmployees(supabase);
     
+    case "staff_employees":
+      return calculateStaffEmployees(supabase);
+    
+    case "team_count":
+      return calculateTeamCount(supabase);
+    
+    case "position_count":
+      return calculatePositionCount(supabase);
+    
     case "sales_per_hour":
     case "salg_per_time":
       const sales = await calculateSalesCount(supabase, startStr, endStr);
@@ -1425,6 +1434,40 @@ async function calculateActiveEmployees(
 ): Promise<number> {
   const { count } = await supabase
     .from("employee_master_data")
+    .select("*", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("is_staff_employee", false);
+
+  return count || 0;
+}
+
+async function calculateStaffEmployees(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { count } = await supabase
+    .from("employee_master_data")
+    .select("*", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("is_staff_employee", true);
+
+  return count || 0;
+}
+
+async function calculateTeamCount(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { count } = await supabase
+    .from("teams")
+    .select("*", { count: "exact", head: true });
+
+  return count || 0;
+}
+
+async function calculatePositionCount(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { count } = await supabase
+    .from("job_positions")
     .select("*", { count: "exact", head: true })
     .eq("is_active", true);
 
