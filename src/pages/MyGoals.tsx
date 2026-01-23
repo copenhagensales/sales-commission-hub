@@ -295,9 +295,9 @@ export default function MyGoals() {
       <div className="space-y-6">
         {isViewingOther && (
           <Button variant="ghost" size="sm" asChild className="gap-2">
-            <Link to="/dashboards/tdc-erhverv-goals">
+            <Link to="/employees">
               <ArrowLeft className="h-4 w-4" />
-              Tilbage til team oversigt
+              Tilbage til medarbejdere
             </Link>
           </Button>
         )}
