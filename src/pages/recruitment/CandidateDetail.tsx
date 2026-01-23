@@ -28,6 +28,7 @@ import { CandidateChatHistory } from "@/components/recruitment/CandidateChatHist
 import { CandidateCallLogs } from "@/components/recruitment/CandidateCallLogs";
 import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog";
 import { AddToWinbackDialog } from "@/components/recruitment/AddToWinbackDialog";
+import { CandidateDetailDialog } from "@/components/recruitment/CandidateDetailDialog";
 import { combineDateAndDanishTime } from "@/lib/danish-time-utils";
 
 const statusLabels: Record<string, string> = {
@@ -96,6 +97,7 @@ export default function CandidateDetail() {
   const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [showWinbackDialog, setShowWinbackDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const {
     data: candidate,
     isLoading
@@ -485,7 +487,7 @@ export default function CandidateDetail() {
                   <Mail className="h-4 w-4 mr-1.5" />
                   Email
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate(`/recruitment/candidates/${id}/edit`)} className="bg-background/80">
+                <Button size="sm" variant="outline" onClick={() => setShowEditDialog(true)} className="bg-background/80">
                   <Edit2 className="h-4 w-4 mr-1.5" />
                   Rediger
                 </Button>
@@ -984,5 +986,28 @@ export default function CandidateDetail() {
         onSave={(category, contactDate) => addToWinbackMutation.mutate({ category, contactDate })}
         isLoading={addToWinbackMutation.isPending}
       />
+
+      {candidate && (
+        <CandidateDetailDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          candidate={{
+            id: candidate.id,
+            first_name: candidate.first_name,
+            last_name: candidate.last_name,
+            email: candidate.email,
+            phone: candidate.phone,
+            status: candidate.status,
+            rating: candidate.rating,
+            interview_date: candidate.interview_date,
+            created_at: candidate.created_at,
+            source: candidate.source,
+            notes: candidate.notes,
+            applied_position: candidate.applied_position,
+          }}
+          statusLabels={statusLabels}
+          statusColors={statusColors}
+        />
+      )}
     </MainLayout>;
 }
