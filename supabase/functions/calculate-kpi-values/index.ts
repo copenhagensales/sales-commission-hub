@@ -39,7 +39,19 @@ interface Product {
   counts_as_sale: boolean | null;
 }
 
-// Note: fieldmarketing_sales does not have a revenue column, uses sale_items for revenue
+interface FmSale {
+  id: string;
+  product_name: string | null;
+  client_id: string | null;
+  seller_email: string | null;
+  seller_name: string | null;
+}
+
+interface FmPricingRule {
+  product_name: string;
+  commission_dkk: number | null;
+  price_dkk: number | null;
+}
 
 interface TeamMemberShift {
   employee_id: string;
@@ -112,6 +124,30 @@ async function fetchAllSaleItems(
   
   console.log(`[fetchAllSaleItems] Fetched ${allItems.length} items from ${saleIds.length} sales in ${Math.ceil(saleIds.length / BATCH_SIZE)} batches`);
   return allItems;
+}
+
+// ============= FM COMMISSION MAP HELPER =============
+// Fetches product pricing rules and creates a case-insensitive map of product_name -> commission_dkk
+// Prioritizes highest commission for each product
+async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; price: number }>> {
+  const { data: rules } = await supabase
+    .from("product_pricing_rules")
+    .select("product_name, commission_dkk, price_dkk")
+    .order("commission_dkk", { ascending: false, nullsFirst: false });
+  
+  const map = new Map<string, { commission: number; price: number }>();
+  for (const rule of (rules || []) as FmPricingRule[]) {
+    const key = rule.product_name?.toLowerCase();
+    if (key && !map.has(key)) {
+      // First occurrence has highest commission due to ordering
+      map.set(key, {
+        commission: rule.commission_dkk || 0,
+        price: rule.price_dkk || 0,
+      });
+    }
+  }
+  console.log(`[fetchFmCommissionMap] Loaded ${map.size} FM product pricing rules`);
+  return map;
 }
 
 // Date helpers
@@ -218,11 +254,14 @@ Deno.serve(async (req) => {
     
     const clientList = (clients || []) as { id: string; name: string }[];
 
+    // Pre-fetch FM commission map once for all calculations
+    const fmCommissionMap = await fetchFmCommissionMap(supabase);
+
     // Calculate each KPI for each period (global scope)
     for (const kpi of (kpiDefinitions as KpiDefinition[]) || []) {
       for (const period of periods) {
         try {
-          const value = await calculateKpiValue(supabase, kpi, period.start, period.end);
+          const value = await calculateKpiValue(supabase, kpi, period.start, period.end, fmCommissionMap);
           
           cachedValues.push({
             kpi_slug: kpi.slug,
@@ -246,7 +285,7 @@ Deno.serve(async (req) => {
       for (const period of periods) {
         for (const kpiSlug of clientScopedKpis) {
           try {
-            const value = await calculateClientKpiValue(supabase, kpiSlug, client.id, period.start, period.end);
+            const value = await calculateClientKpiValue(supabase, kpiSlug, client.id, period.start, period.end, fmCommissionMap);
             
             cachedValues.push({
               kpi_slug: kpiSlug,
@@ -295,7 +334,6 @@ Deno.serve(async (req) => {
   
   // Only calculate for payroll_period and today (most used)
   const employeePeriods = periods.filter(p => p.type === "payroll_period" || p.type === "today");
-  const employeeScopedKpis = ["sales_count", "total_commission"];
   
   // Fetch all sales data once for efficiency
   const payrollPeriodDates = getPayrollPeriod(now);
@@ -304,6 +342,15 @@ Deno.serve(async (req) => {
     .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
     .gte("sale_datetime", payrollPeriodDates.start.toISOString())
     .lte("sale_datetime", payrollPeriodDates.end.toISOString());
+  
+  // Fetch FM sales for employee-scoped calculations
+  const { data: allPeriodFmSales } = await supabase
+    .from("fieldmarketing_sales")
+    .select("id, product_name, seller_email, seller_name, client_id")
+    .gte("registered_at", payrollPeriodDates.start.toISOString())
+    .lte("registered_at", payrollPeriodDates.end.toISOString());
+  
+  console.log(`[Employee-scoped] Loaded ${(allPeriodSales || []).length} telesales, ${(allPeriodFmSales || []).length} FM sales for payroll period`);
   
   // Fetch products for counts_as_sale check
   const allProductIds = [...new Set((allPeriodSales || []).flatMap((s: any) => 
@@ -330,7 +377,7 @@ Deno.serve(async (req) => {
     }
     
     for (const period of employeePeriods) {
-      // Filter sales for this employee in this period
+      // Filter telesales for this employee in this period
       const empSales = (allPeriodSales || []).filter((sale: any) => {
         const saleDate = new Date(sale.sale_datetime);
         if (saleDate < period.start || saleDate > period.end) return false;
@@ -342,7 +389,16 @@ Deno.serve(async (req) => {
                (saleExternalId && agentData.externalIds.includes(saleExternalId));
       });
       
-      // Calculate sales count
+      // Filter FM sales for this employee in this period
+      const empFmSales = (allPeriodFmSales || []).filter((sale: any) => {
+        const saleDate = new Date(sale.registered_at);
+        if (saleDate < period.start || saleDate > period.end) return false;
+        
+        const sellerEmail = sale.seller_email?.toLowerCase();
+        return sellerEmail && agentData.emails.includes(sellerEmail);
+      });
+      
+      // Calculate sales count (telesales)
       let salesCount = 0;
       let totalCommission = 0;
       
@@ -358,6 +414,13 @@ Deno.serve(async (req) => {
         if (!sale.sale_items || sale.sale_items.length === 0) {
           salesCount += 1;
         }
+      }
+      
+      // Add FM sales count and commission
+      for (const fmSale of empFmSales) {
+        salesCount += 1;
+        const fmPricing = fmCommissionMap.get((fmSale as any).product_name?.toLowerCase());
+        totalCommission += fmPricing?.commission || 0;
       }
       
       // Add sales_count
@@ -399,7 +462,7 @@ Deno.serve(async (req) => {
     .eq("period_start", payrollStart)
     .eq("period_end", payrollEnd);
   
-  // For each team with a goal, calculate commission
+  // For each team with a goal, calculate commission including FM
   for (const goal of (teamGoals || [])) {
     const teamId = goal.team_id;
     
@@ -426,7 +489,7 @@ Deno.serve(async (req) => {
     
     if (teamAgentEmails.length === 0 && teamExternalIds.length === 0) continue;
     
-    // Calculate team commission from already-fetched sales data
+    // Calculate team commission from already-fetched telesales data
     let teamCommission = 0;
     
     for (const sale of (allPeriodSales || [])) {
@@ -440,6 +503,15 @@ Deno.serve(async (req) => {
         for (const item of ((sale as any).sale_items || [])) {
           teamCommission += (item.mapped_commission || 0) * (item.quantity || 1);
         }
+      }
+    }
+    
+    // Add FM commission for team members
+    for (const fmSale of (allPeriodFmSales || [])) {
+      const sellerEmail = (fmSale as any).seller_email?.toLowerCase();
+      if (sellerEmail && teamAgentEmails.includes(sellerEmail)) {
+        const fmPricing = fmCommissionMap.get((fmSale as any).product_name?.toLowerCase());
+        teamCommission += fmPricing?.commission || 0;
       }
     }
     
@@ -499,6 +571,7 @@ Deno.serve(async (req) => {
           period.end,
           employeeMap,
           employeeTeamMap,
+          fmCommissionMap,
           30 // Top 30
         );
         
@@ -532,6 +605,7 @@ Deno.serve(async (req) => {
             period.end,
             employeeMap,
             team.name,
+            fmCommissionMap,
             20 // Top 20 per team
           );
           
@@ -561,6 +635,7 @@ Deno.serve(async (req) => {
             period.end,
             employeeMap,
             employeeTeamMap,
+            fmCommissionMap,
             30 // Top 30 per client
           );
           
@@ -700,28 +775,59 @@ async function fetchAllSalesWithItems(
   return allSales;
 }
 
+// Fetch FM sales for a date range
+async function fetchFmSalesForPeriod(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string,
+  clientId?: string
+): Promise<FmSale[]> {
+  let query = supabase
+    .from("fieldmarketing_sales")
+    .select("id, product_name, seller_email, seller_name, client_id")
+    .gte("registered_at", startStr)
+    .lte("registered_at", endStr);
+  
+  if (clientId) {
+    query = query.eq("client_id", clientId);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error("[fetchFmSalesForPeriod] Error:", error);
+    return [];
+  }
+  
+  return (data || []) as FmSale[];
+}
+
 async function calculateGlobalLeaderboard(
   supabase: SupabaseClient,
   startDate: Date,
   endDate: Date,
   employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
   employeeTeamMap: Map<string, string>,
+  fmCommissionMap: Map<string, { commission: number; price: number }>,
   limit: number = 30
 ): Promise<LeaderboardEntry[]> {
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Get all sales WITH their sale_items using JOIN-based paginated fetch
+  // Get all telesales WITH their sale_items using JOIN-based paginated fetch
   const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr);
 
-  if (!salesWithItems || salesWithItems.length === 0) return [];
+  // Get all FM sales for this period
+  const fmSales = await fetchFmSalesForPeriod(supabase, startStr, endStr);
+
+  if ((!salesWithItems || salesWithItems.length === 0) && fmSales.length === 0) return [];
 
   // Extract all sale_items from the nested data
   const saleItems = salesWithItems.flatMap(s => s.sale_items || []);
   
   // Debug: Log totals
   const totalMappedCommission = saleItems.reduce((sum, item) => sum + (item.mapped_commission || 0), 0);
-  console.log(`[GlobalLeaderboard ${startStr.slice(0,10)} to ${endStr.slice(0,10)}] Sales: ${salesWithItems.length}, Items: ${saleItems.length}, Total mapped_commission: ${totalMappedCommission}`);
+  console.log(`[GlobalLeaderboard ${startStr.slice(0,10)} to ${endStr.slice(0,10)}] Telesales: ${salesWithItems.length}, FM: ${fmSales.length}, Items: ${saleItems.length}, Total mapped_commission: ${totalMappedCommission}`);
 
   // Get products to check counts_as_sale AND get commission_dkk for fallback
   const productIds = [...new Set((saleItems || []).map(si => si.product_id).filter(Boolean))];
@@ -745,6 +851,11 @@ async function calculateGlobalLeaderboard(
   for (const sale of salesWithItems) {
     if (sale.agent_email) {
       agentEmails.add(sale.agent_email.toLowerCase());
+    }
+  }
+  for (const fmSale of fmSales) {
+    if (fmSale.seller_email) {
+      agentEmails.add(fmSale.seller_email.toLowerCase());
     }
   }
 
@@ -782,6 +893,7 @@ async function calculateGlobalLeaderboard(
   // Aggregate by agent email (use email as key for proper aggregation)
   const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
+  // Process telesales
   for (const sale of salesWithItems) {
     const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
     if (!key) continue;
@@ -812,6 +924,22 @@ async function calculateGlobalLeaderboard(
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
       agentName: existing.agentName,
+    });
+  }
+
+  // Process FM sales
+  for (const fmSale of fmSales) {
+    const key = fmSale.seller_email?.toLowerCase() || fmSale.seller_name || "";
+    if (!key) continue;
+    
+    const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
+    const fmCommission = fmPricing?.commission || 0;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    agentStats.set(key, {
+      sales: existing.sales + 1,
+      commission: existing.commission + fmCommission,
+      agentName: existing.agentName || fmSale.seller_name || key,
     });
   }
 
@@ -854,6 +982,7 @@ async function calculateTeamLeaderboard(
   endDate: Date,
   employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
   teamName: string,
+  fmCommissionMap: Map<string, { commission: number; price: number }>,
   limit: number = 20
 ): Promise<LeaderboardEntry[]> {
   const startStr = startDate.toISOString();
@@ -888,17 +1017,23 @@ async function calculateTeamLeaderboard(
     }
   }
 
-  // Get all sales WITH nested sale_items using JOIN-based paginated fetch
+  // Get all telesales WITH nested sale_items using JOIN-based paginated fetch
   const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr);
 
-  if (!salesWithItems || salesWithItems.length === 0) return [];
+  // Get all FM sales for this period
+  const fmSales = await fetchFmSalesForPeriod(supabase, startStr, endStr);
 
-  // Filter to team members by agent_email
+  // Filter telesales to team members by agent_email
   const teamSales = salesWithItems.filter(s => 
     s.agent_email && teamAgentEmails.has(s.agent_email.toLowerCase())
   );
+
+  // Filter FM sales to team members by seller_email
+  const teamFmSales = fmSales.filter(s => 
+    s.seller_email && teamAgentEmails.has(s.seller_email.toLowerCase())
+  );
   
-  if (teamSales.length === 0) return [];
+  if (teamSales.length === 0 && teamFmSales.length === 0) return [];
 
   // Extract all sale_items from the team sales
   const saleItems = teamSales.flatMap(s => s.sale_items || []);
@@ -923,6 +1058,7 @@ async function calculateTeamLeaderboard(
   // Aggregate by agent email
   const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
+  // Process telesales
   for (const sale of teamSales) {
     const key = sale.agent_email?.toLowerCase() || "";
     if (!key) continue;
@@ -952,6 +1088,22 @@ async function calculateTeamLeaderboard(
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
       agentName: existing.agentName,
+    });
+  }
+
+  // Process FM sales
+  for (const fmSale of teamFmSales) {
+    const key = fmSale.seller_email?.toLowerCase() || "";
+    if (!key) continue;
+    
+    const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
+    const fmCommission = fmPricing?.commission || 0;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    agentStats.set(key, {
+      sales: existing.sales + 1,
+      commission: existing.commission + fmCommission,
+      agentName: existing.agentName || fmSale.seller_name || key,
     });
   }
 
@@ -990,6 +1142,7 @@ async function calculateClientLeaderboard(
   endDate: Date,
   employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
   employeeTeamMap: Map<string, string>,
+  fmCommissionMap: Map<string, { commission: number; price: number }>,
   limit: number = 30
 ): Promise<LeaderboardEntry[]> {
   const startStr = startDate.toISOString();
@@ -1002,12 +1155,16 @@ async function calculateClientLeaderboard(
     .eq("client_id", clientId);
   
   const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
-  if (campaignIds.length === 0) return [];
 
-  // Get all sales for this client's campaigns WITH nested sale_items using JOIN-based paginated fetch
-  const salesWithItems = await fetchAllSalesWithItems(supabase, startStr, endStr, campaignIds);
+  // Get all telesales for this client's campaigns WITH nested sale_items
+  const salesWithItems = campaignIds.length > 0 
+    ? await fetchAllSalesWithItems(supabase, startStr, endStr, campaignIds)
+    : [];
 
-  if (!salesWithItems || salesWithItems.length === 0) return [];
+  // Get FM sales for this client
+  const fmSales = await fetchFmSalesForPeriod(supabase, startStr, endStr, clientId);
+
+  if ((salesWithItems.length === 0) && (fmSales.length === 0)) return [];
 
   // Extract all sale_items from the sales
   const saleItems = salesWithItems.flatMap(s => s.sale_items || []);
@@ -1034,6 +1191,11 @@ async function calculateClientLeaderboard(
   for (const sale of salesWithItems) {
     if (sale.agent_email) {
       agentEmails.add(sale.agent_email.toLowerCase());
+    }
+  }
+  for (const fmSale of fmSales) {
+    if (fmSale.seller_email) {
+      agentEmails.add(fmSale.seller_email.toLowerCase());
     }
   }
 
@@ -1068,6 +1230,7 @@ async function calculateClientLeaderboard(
   // Aggregate by agent email
   const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
   
+  // Process telesales
   for (const sale of salesWithItems) {
     const key = sale.agent_email?.toLowerCase() || sale.agent_name || "";
     if (!key) continue;
@@ -1097,6 +1260,22 @@ async function calculateClientLeaderboard(
       sales: existing.sales + saleSales,
       commission: existing.commission + saleCommission,
       agentName: existing.agentName,
+    });
+  }
+
+  // Process FM sales
+  for (const fmSale of fmSales) {
+    const key = fmSale.seller_email?.toLowerCase() || fmSale.seller_name || "";
+    if (!key) continue;
+    
+    const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
+    const fmCommission = fmPricing?.commission || 0;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    agentStats.set(key, {
+      sales: existing.sales + 1,
+      commission: existing.commission + fmCommission,
+      agentName: existing.agentName || fmSale.seller_name || key,
     });
   }
 
@@ -1134,7 +1313,8 @@ async function calculateKpiValue(
   supabase: SupabaseClient,
   kpi: KpiDefinition,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  fmCommissionMap: Map<string, { commission: number; price: number }>
 ): Promise<number> {
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
@@ -1146,11 +1326,11 @@ async function calculateKpiValue(
     
     case "total_commission":
     case "total_provision":
-      return calculateTotalCommission(supabase, startStr, endStr);
+      return calculateTotalCommission(supabase, startStr, endStr, fmCommissionMap);
     
     case "total_revenue":
     case "total_omsætning":
-      return calculateTotalRevenue(supabase, startStr, endStr);
+      return calculateTotalRevenue(supabase, startStr, endStr, fmCommissionMap);
     
     case "total_hours":
     case "total_timer":
@@ -1237,8 +1417,10 @@ async function calculateSalesCount(
 async function calculateTotalCommission(
   supabase: SupabaseClient,
   startStr: string,
-  endStr: string
+  endStr: string,
+  fmCommissionMap: Map<string, { commission: number; price: number }>
 ): Promise<number> {
+  // Telesales commission from sale_items
   const { data, error } = await supabase
     .from("sale_items")
     .select("mapped_commission, quantity")
@@ -1252,16 +1434,34 @@ async function calculateTotalCommission(
 
   const saleItems = (data || []) as SaleItem[];
 
-  return saleItems.reduce((sum, item) => {
+  let telesalesCommission = saleItems.reduce((sum, item) => {
     return sum + (item.mapped_commission || 0) * (item.quantity || 1);
   }, 0);
+
+  // FM commission from fieldmarketing_sales
+  const { data: fmSales } = await supabase
+    .from("fieldmarketing_sales")
+    .select("product_name")
+    .gte("registered_at", startStr)
+    .lte("registered_at", endStr);
+
+  let fmCommission = 0;
+  for (const sale of (fmSales || [])) {
+    const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+    fmCommission += pricing?.commission || 0;
+  }
+
+  console.log(`[TotalCommission] Telesales: ${telesalesCommission}, FM: ${fmCommission}`);
+  return telesalesCommission + fmCommission;
 }
 
 async function calculateTotalRevenue(
   supabase: SupabaseClient,
   startStr: string,
-  endStr: string
+  endStr: string,
+  fmCommissionMap: Map<string, { commission: number; price: number }>
 ): Promise<number> {
+  // Telesales revenue from sale_items
   const { data, error } = await supabase
     .from("sale_items")
     .select("mapped_revenue, quantity")
@@ -1275,14 +1475,25 @@ async function calculateTotalRevenue(
 
   const saleItems = (data || []) as SaleItem[];
 
-  let total = saleItems.reduce((sum, item) => {
+  let telesalesRevenue = saleItems.reduce((sum, item) => {
     return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
   }, 0);
 
-  // Note: fieldmarketing_sales does not have a revenue column
-  // Revenue is tracked through sale_items.mapped_revenue only
+  // FM revenue from fieldmarketing_sales using price_dkk
+  const { data: fmSales } = await supabase
+    .from("fieldmarketing_sales")
+    .select("product_name")
+    .gte("registered_at", startStr)
+    .lte("registered_at", endStr);
 
-  return total;
+  let fmRevenue = 0;
+  for (const sale of (fmSales || [])) {
+    const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+    fmRevenue += pricing?.price || 0;
+  }
+
+  console.log(`[TotalRevenue] Telesales: ${telesalesRevenue}, FM: ${fmRevenue}`);
+  return telesalesRevenue + fmRevenue;
 }
 
 // Shared shift data cache for performance (fetched once per execution)
@@ -1515,7 +1726,8 @@ async function calculateClientKpiValue(
   kpiSlug: string,
   clientId: string,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  fmCommissionMap: Map<string, { commission: number; price: number }>
 ): Promise<number> {
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
@@ -1526,95 +1738,143 @@ async function calculateClientKpiValue(
     .eq("client_id", clientId);
   
   const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
-  
-  if (campaignIds.length === 0) {
-    return 0;
-  }
 
   switch (kpiSlug) {
     case "sales_count":
     case "antal_salg": {
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("id")
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
-      
-      const saleIds = (sales || []).map((s: { id: string }) => s.id);
-      if (saleIds.length === 0) return 0;
-
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select("quantity, product_id")
-        .in("sale_id", saleIds);
-
-      const productIds = [...new Set((saleItems || []).map((si: any) => si.product_id).filter(Boolean))] as string[];
-      
-      let countingProductIds = new Set<string>();
-      if (productIds.length > 0) {
-        const { data: productsData } = await supabase
-          .from("products")
-          .select("id, counts_as_sale")
-          .in("id", productIds);
+      // Telesales count
+      let telesalesCount = 0;
+      if (campaignIds.length > 0) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id")
+          .in("client_campaign_id", campaignIds)
+          .gte("sale_datetime", startStr)
+          .lte("sale_datetime", endStr);
         
-        const products = (productsData || []) as Product[];
-        countingProductIds = new Set(
-          products.filter(p => p.counts_as_sale !== false).map(p => p.id)
-        );
-      }
+        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        if (saleIds.length > 0) {
+          const { data: saleItems } = await supabase
+            .from("sale_items")
+            .select("quantity, product_id")
+            .in("sale_id", saleIds);
 
-      let count = 0;
-      for (const item of (saleItems || []) as SaleItem[]) {
-        if (!item.product_id || countingProductIds.has(item.product_id)) {
-          count += item.quantity || 1;
+          const productIds = [...new Set((saleItems || []).map((si: any) => si.product_id).filter(Boolean))] as string[];
+          
+          let countingProductIds = new Set<string>();
+          if (productIds.length > 0) {
+            const { data: productsData } = await supabase
+              .from("products")
+              .select("id, counts_as_sale")
+              .in("id", productIds);
+            
+            const products = (productsData || []) as Product[];
+            countingProductIds = new Set(
+              products.filter(p => p.counts_as_sale !== false).map(p => p.id)
+            );
+          }
+
+          for (const item of (saleItems || []) as SaleItem[]) {
+            if (!item.product_id || countingProductIds.has(item.product_id)) {
+              telesalesCount += item.quantity || 1;
+            }
+          }
         }
       }
-      return count;
+      
+      // FM sales count for this client
+      const { count: fmCount } = await supabase
+        .from("fieldmarketing_sales")
+        .select("*", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .gte("registered_at", startStr)
+        .lte("registered_at", endStr);
+      
+      return telesalesCount + (fmCount || 0);
     }
 
     case "total_commission":
     case "total_provision": {
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("id")
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
+      // Telesales commission
+      let telesalesCommission = 0;
+      if (campaignIds.length > 0) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id")
+          .in("client_campaign_id", campaignIds)
+          .gte("sale_datetime", startStr)
+          .lte("sale_datetime", endStr);
+        
+        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        if (saleIds.length > 0) {
+          const { data: saleItems } = await supabase
+            .from("sale_items")
+            .select("mapped_commission, quantity")
+            .in("sale_id", saleIds);
+
+          telesalesCommission = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+            return sum + (item.mapped_commission || 0) * (item.quantity || 1);
+          }, 0);
+        }
+      }
       
-      const saleIds = (sales || []).map((s: { id: string }) => s.id);
-      if (saleIds.length === 0) return 0;
-
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select("mapped_commission, quantity")
-        .in("sale_id", saleIds);
-
-      return ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
-        return sum + (item.mapped_commission || 0) * (item.quantity || 1);
-      }, 0);
+      // FM commission for this client
+      const { data: fmSales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("product_name")
+        .eq("client_id", clientId)
+        .gte("registered_at", startStr)
+        .lte("registered_at", endStr);
+      
+      let fmCommission = 0;
+      for (const sale of (fmSales || [])) {
+        const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+        fmCommission += pricing?.commission || 0;
+      }
+      
+      return telesalesCommission + fmCommission;
     }
 
     case "total_revenue":
     case "total_omsætning": {
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("id")
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
+      // Telesales revenue
+      let telesalesRevenue = 0;
+      if (campaignIds.length > 0) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id")
+          .in("client_campaign_id", campaignIds)
+          .gte("sale_datetime", startStr)
+          .lte("sale_datetime", endStr);
+        
+        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        if (saleIds.length > 0) {
+          const { data: saleItems } = await supabase
+            .from("sale_items")
+            .select("mapped_revenue, quantity")
+            .in("sale_id", saleIds);
+
+          telesalesRevenue = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+            return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
+          }, 0);
+        }
+      }
       
-      const saleIds = (sales || []).map((s: { id: string }) => s.id);
-      if (saleIds.length === 0) return 0;
-
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select("mapped_revenue, quantity")
-        .in("sale_id", saleIds);
-
-      return ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
-        return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
-      }, 0);
+      // FM revenue for this client
+      const { data: fmSales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("product_name")
+        .eq("client_id", clientId)
+        .gte("registered_at", startStr)
+        .lte("registered_at", endStr);
+      
+      let fmRevenue = 0;
+      for (const sale of (fmSales || [])) {
+        const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+        fmRevenue += pricing?.price || 0;
+      }
+      
+      return telesalesRevenue + fmRevenue;
     }
 
     case "total_hours":
@@ -1640,7 +1900,7 @@ async function calculateClientKpiValue(
       }
       
       // Fallback: if no team_clients found, use agent emails from sales
-      if (employeeIds.length === 0) {
+      if (employeeIds.length === 0 && campaignIds.length > 0) {
         const { data: sales } = await supabase
           .from("sales")
           .select("agent_email")
