@@ -58,6 +58,9 @@ export default function TdcOpsummering() {
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
   const [noOmstilling, setNoOmstilling] = useState(false);
 
+  // Specialsalg - Kun 5G Fri
+  const [kun5gFriSalg, setKun5gFriSalg] = useState(false);
+
   // Validation for required fields
   const isNummervalgMissing = !numberChoice;
   const isOpstartRequired = numberChoice === "existing" || numberChoice === "mixed";
@@ -68,11 +71,25 @@ export default function TdcOpsummering() {
   const isTilskudMissing = !noSubsidy && !hasSubsidy;
   const isOmstillingMissing = !noOmstilling && !hasOmstilling;
 
-  const showWarningBanner = isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing;
+  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing);
 
   // Generate summary lines with formatting info
   const summaryLines = useMemo(() => {
     const lines: SummaryLine[] = [];
+
+    // Hvis "Kun 5g Fri Salg" er valgt, brug den forenklede tekst
+    if (kun5gFriSalg) {
+      lines.push({ text: "For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages." });
+      lines.push({ text: "" });
+      lines.push({ text: "Aftalen bliver oprettet i (firmanavn) med CVR-nummer (CVR-nummer). Kontaktpersonen er (navn), og det telefonnummer vi benytter, er (telefonnummer)." });
+      lines.push({ text: "" });
+      lines.push({ text: "Du får (antal + fulde produktnavn + hastighedsbegrænsning) til en månedlig pris på (beløb) kr. ekskl. moms." });
+      lines.push({ text: "" });
+      lines.push({ text: "Abonnementet har 12 måneders binding og derefter 3 måneders opsigelse. Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår. Vi kan ikke opsige dit nuværende internet for dig, vi anbefaler derfor at du matcher opsigelsen med vores oprettelsesdato der fremgår i ordrebekræftelsen." });
+      lines.push({ text: "" });
+      lines.push({ text: "Har du nogle spørgsmål til mig?" });
+      return lines;
+    }
 
     // 1. Introduction (always)
     lines.push({ text: "For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages." });
@@ -185,6 +202,7 @@ export default function TdcOpsummering() {
 
     return lines;
   }, [
+    kun5gFriSalg,
     mbbType, includeWithoutRouter, 
     numberChoice,
     startupChoice,
@@ -449,6 +467,26 @@ export default function TdcOpsummering() {
                     />
                     <Label htmlFor="noOmstilling" className="font-normal cursor-pointer">Ingen Omstilling</Label>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* Specialsalg - Kun 5G Fri */}
+                <div className="space-y-2">
+                  <Label className="font-medium">Specialsalg</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="kun5gFriSalg" 
+                      checked={kun5gFriSalg}
+                      onCheckedChange={(checked) => setKun5gFriSalg(checked === true)}
+                    />
+                    <Label htmlFor="kun5gFriSalg" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                  </div>
+                  {kun5gFriSalg && (
+                    <p className="text-sm text-muted-foreground ml-6">
+                      Ved aktivering bruges en forenklet opsummering kun til 5G Fri produkter.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
