@@ -413,6 +413,11 @@ export const permissionKeyLabels: Record<string, string> = {
   tab_fm_bookings: 'Fane: Kommende bookinger',
   tab_fm_locations: 'Fane: Lokationer',
   tab_fm_vagtplan: 'Fane: Vagtplan FM',
+  
+  // ===== SOFTPHONE & KOMMUNIKATION =====
+  softphone_outbound: 'Softphone: Udgående opkald',
+  softphone_inbound: 'Softphone: Indgående opkald',
+  employee_sms: 'SMS til medarbejdere',
 };
 
 export const visibilityLabels: Record<Visibility, string> = {
