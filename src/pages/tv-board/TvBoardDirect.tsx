@@ -15,9 +15,6 @@ import { TvBoardStatusOverlay } from "@/components/tv-board/TvBoardStatusOverlay
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
 import FieldmarketingDashboardFull from "@/pages/dashboards/FieldmarketingDashboardFull";
-import TeamDashboard from "@/pages/dashboards/TeamDashboard";
-import TdcErhvervGoalsDashboard from "@/pages/dashboards/TdcErhvervGoalsDashboard";
-import FieldmarketingGoalsDashboard from "@/pages/dashboards/FieldmarketingGoalsDashboard";
 import EesyTmDashboard from "@/pages/EesyTmDashboard";
 import TdcErhvervDashboard from "@/pages/TdcErhvervDashboard";
 import RelatelDashboard from "@/pages/RelatelDashboard";
@@ -27,15 +24,10 @@ import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
   "fieldmarketing": FieldmarketingDashboardFull,
-  "team": TeamDashboard,
   "eesy-tm": EesyTmDashboard,
   "tdc-erhverv": TdcErhvervDashboard,
   "relatel": RelatelDashboard,
-  "tryg": TeamDashboard,
-  "ase": TeamDashboard,
-  "united": TeamDashboard,
-  "tdc-erhverv-goals": TdcErhvervGoalsDashboard,
-  "fieldmarketing-goals": FieldmarketingGoalsDashboard,
+  "united": TdcErhvervDashboard,
   "cs-top-20": CsTop20Dashboard,
 };
 
