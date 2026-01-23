@@ -14,11 +14,14 @@ interface TeamDB {
   teamName: string;
   leaderId: string | null;
   leaderName: string;
+  assistantId: string | null;
+  assistantName: string;
   revenue: number;
-  salaryCosts: number;
+  sellerSalaryCosts: number;
+  leaderSalary: number;
+  assistantSalary: number;
   expenses: number;
   db: number;
-  leaderSalary: number;
   percentageRate: number;
   minimumSalary: number;
 }
@@ -33,19 +36,21 @@ export function DBOverviewTab() {
   const { data: teamsDB, isLoading } = useQuery<TeamDB[]>({
     queryKey: ["teams-db", monthStart.toISOString(), monthEnd.toISOString()],
     queryFn: async (): Promise<TeamDB[]> => {
-      // Get teams with leaders
+      // Get all teams with leaders and assistants
       const { data: teams, error: teamsError } = await (supabase
         .from("teams") as any)
-        .select("id, name, team_leader_id")
-        .eq("is_active", true);
+        .select("id, name, team_leader_id, assistant_team_leader_id");
       if (teamsError) throw teamsError;
 
-      // Get leader names
-      const leaderIds = teams?.map(t => t.team_leader_id).filter(Boolean) as string[];
-      const { data: leaders } = await supabase
+      // Get leader and assistant names
+      const leaderIds = teams?.map((t: any) => t.team_leader_id).filter(Boolean) as string[];
+      const assistantIds = teams?.map((t: any) => t.assistant_team_leader_id).filter(Boolean) as string[];
+      const allEmployeeIds = [...new Set([...leaderIds, ...assistantIds])];
+
+      const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
-        .in("id", leaderIds);
+        .in("id", allEmployeeIds);
 
       // Get team expenses for the period
       const { data: expenses } = await supabase
@@ -55,12 +60,20 @@ export function DBOverviewTab() {
         .lte("expense_date", monthEnd.toISOString().split("T")[0]);
 
       // Get personnel salaries for team leaders
-      const { data: personnelSalaries } = await supabase
+      const { data: leaderSalaries } = await supabase
         .from("personnel_salaries")
-        .select("employee_id, percentage_rate, minimum_salary")
+        .select("employee_id, percentage_rate, minimum_salary, monthly_salary")
         .eq("salary_type", "team_leader")
         .eq("is_active", true)
         .in("employee_id", leaderIds);
+
+      // Get personnel salaries for assistants
+      const { data: assistantSalaries } = await supabase
+        .from("personnel_salaries")
+        .select("employee_id, monthly_salary")
+        .eq("salary_type", "assistant")
+        .eq("is_active", true)
+        .in("employee_id", assistantIds);
 
       // Get team members for each team
       const { data: teamMembers } = await supabase
@@ -91,7 +104,7 @@ export function DBOverviewTab() {
         .lte("sales.sale_datetime", monthEnd.toISOString());
 
       // Calculate DB for each team
-      const teamsWithDB: TeamDB[] = (teams || []).map(team => {
+      const teamsWithDB: TeamDB[] = (teams || []).map((team: any) => {
         // Team expenses
         const teamExpenses = expenses?.filter(e => e.team_id === team.id) || [];
         const totalExpenses = teamExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -102,39 +115,52 @@ export function DBOverviewTab() {
 
         // Agent info for team members
         const memberAgents = agentMappings?.filter(am => memberIds.includes(am.employee_id)) || [];
-        const agentEmails = memberAgents.map(a => a.agents?.email?.toLowerCase()).filter(Boolean);
-        const agentExtIds = memberAgents.map(a => a.agents?.external_dialer_id).filter(Boolean);
+        const agentEmails = memberAgents.map(a => (a.agents as any)?.email?.toLowerCase()).filter(Boolean);
+        const agentExtIds = memberAgents.map(a => (a.agents as any)?.external_dialer_id).filter(Boolean);
 
         // Sales for team
         const teamSales = saleItems?.filter(si => {
-          const email = si.sales?.agent_email?.toLowerCase();
-          const extId = si.sales?.agent_external_id;
+          const email = (si.sales as any)?.agent_email?.toLowerCase();
+          const extId = (si.sales as any)?.agent_external_id;
           return agentEmails.includes(email) || agentExtIds.includes(extId);
         }) || [];
 
         const revenue = teamSales.reduce((sum, si) => sum + (Number(si.mapped_revenue) || 0) * (si.quantity || 1), 0);
-        const salaryCosts = teamSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0) * (si.quantity || 1), 0);
-        const db = revenue - salaryCosts - totalExpenses;
+        const sellerSalaryCosts = teamSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0) * (si.quantity || 1), 0);
 
         // Leader salary calculation
-        const leaderSalary = personnelSalaries?.find(ps => ps.employee_id === team.team_leader_id);
+        const leaderSalary = leaderSalaries?.find(ps => ps.employee_id === team.team_leader_id);
         const percentageRate = Number(leaderSalary?.percentage_rate) || 0;
         const minimumSalary = Number(leaderSalary?.minimum_salary) || 0;
-        const calculatedSalary = db * (percentageRate / 100);
-        const finalLeaderSalary = Math.max(calculatedSalary, minimumSalary);
+        
+        // Calculate DB before leader salary for percentage calc
+        const dbBeforeLeader = revenue - sellerSalaryCosts - totalExpenses;
+        const calculatedLeaderSalary = dbBeforeLeader * (percentageRate / 100);
+        const finalLeaderSalary = Math.max(calculatedLeaderSalary, minimumSalary);
 
-        const leader = leaders?.find(l => l.id === team.team_leader_id);
+        // Assistant salary
+        const assistantSalary = assistantSalaries?.find(ps => ps.employee_id === team.assistant_team_leader_id);
+        const finalAssistantSalary = Number(assistantSalary?.monthly_salary) || 0;
+
+        // Final DB
+        const db = revenue - sellerSalaryCosts - finalLeaderSalary - finalAssistantSalary - totalExpenses;
+
+        const leader = employees?.find(e => e.id === team.team_leader_id);
+        const assistant = employees?.find(e => e.id === team.assistant_team_leader_id);
 
         return {
           teamId: team.id,
           teamName: team.name,
           leaderId: team.team_leader_id,
           leaderName: leader ? `${leader.first_name} ${leader.last_name}` : "Ikke tildelt",
+          assistantId: team.assistant_team_leader_id,
+          assistantName: assistant ? `${assistant.first_name} ${assistant.last_name}` : "-",
           revenue,
-          salaryCosts,
+          sellerSalaryCosts,
+          leaderSalary: finalLeaderSalary,
+          assistantSalary: finalAssistantSalary,
           expenses: totalExpenses,
           db,
-          leaderSalary: finalLeaderSalary,
           percentageRate,
           minimumSalary,
         };
@@ -150,13 +176,14 @@ export function DBOverviewTab() {
   const totals = teamsDB?.reduce(
     (acc, t) => ({
       revenue: acc.revenue + t.revenue,
-      salaryCosts: acc.salaryCosts + t.salaryCosts,
+      sellerSalaryCosts: acc.sellerSalaryCosts + t.sellerSalaryCosts,
+      leaderSalary: acc.leaderSalary + t.leaderSalary,
+      assistantSalary: acc.assistantSalary + t.assistantSalary,
       expenses: acc.expenses + t.expenses,
       db: acc.db + t.db,
-      leaderSalary: acc.leaderSalary + t.leaderSalary,
     }),
-    { revenue: 0, salaryCosts: 0, expenses: 0, db: 0, leaderSalary: 0 }
-  ) || { revenue: 0, salaryCosts: 0, expenses: 0, db: 0, leaderSalary: 0 };
+    { revenue: 0, sellerSalaryCosts: 0, leaderSalary: 0, assistantSalary: 0, expenses: 0, db: 0 }
+  ) || { revenue: 0, sellerSalaryCosts: 0, leaderSalary: 0, assistantSalary: 0, expenses: 0, db: 0 };
 
   return (
     <div className="space-y-4">
@@ -188,22 +215,23 @@ export function DBOverviewTab() {
                 <TableRow>
                   <TableHead>Team</TableHead>
                   <TableHead className="text-right">Omsætning</TableHead>
-                  <TableHead className="text-right">Lønomk.</TableHead>
+                  <TableHead className="text-right">Sælgerløn</TableHead>
+                  <TableHead className="text-right">Lederløn</TableHead>
+                  <TableHead className="text-right">Assist.løn</TableHead>
                   <TableHead className="text-right">Udgifter</TableHead>
                   <TableHead className="text-right">DB</TableHead>
-                  <TableHead className="text-right">TL Løn</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : !teamsDB?.length ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Ingen teams fundet
                     </TableCell>
                   </TableRow>
@@ -217,19 +245,21 @@ export function DBOverviewTab() {
                       >
                         <TableCell className="font-medium">{team.teamName}</TableCell>
                         <TableCell className="text-right">{formatCurrency(team.revenue)}</TableCell>
-                        <TableCell className="text-right text-destructive">-{formatCurrency(team.salaryCosts)}</TableCell>
+                        <TableCell className="text-right text-destructive">-{formatCurrency(team.sellerSalaryCosts)}</TableCell>
+                        <TableCell className="text-right text-destructive">-{formatCurrency(team.leaderSalary)}</TableCell>
+                        <TableCell className="text-right text-destructive">-{formatCurrency(team.assistantSalary)}</TableCell>
                         <TableCell className="text-right text-destructive">-{formatCurrency(team.expenses)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(team.db)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(team.leaderSalary)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-medium">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
-                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.salaryCosts)}</TableCell>
+                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.sellerSalaryCosts)}</TableCell>
+                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.leaderSalary)}</TableCell>
+                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.assistantSalary)}</TableCell>
                       <TableCell className="text-right text-destructive">-{formatCurrency(totals.expenses)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(totals.db)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totals.leaderSalary)}</TableCell>
                     </TableRow>
                   </>
                 )}
