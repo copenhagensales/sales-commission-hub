@@ -443,6 +443,11 @@ export default function ContractSign() {
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
                         </p>
+                        {sig.ip_address && (
+                          <p className="text-xs text-muted-foreground/70 mt-0.5">
+                            IP: {sig.ip_address}
+                          </p>
+                        )}
                       </div>
                       <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
                         <Check className="h-5 w-5 text-primary-foreground" />
