@@ -155,15 +155,16 @@ export function SoftphoneWidget() {
   const isIncomingRinging = callState === 'incoming';
   useRingingSound(isIncomingRinging);
 
-  // Auto-connect softphone on mount only if user has inbound access
+  // Auto-connect softphone on mount for any user with softphone access
   useEffect(() => {
-    if (!hasInboundAccess) return; // Only auto-connect if user can receive calls
+    if (!hasAnyAccess) return; // Auto-connect if user has any softphone access
     if (!autoConnectAttempted && deviceState === 'disconnected') {
       setAutoConnectAttempted(true);
-      console.log('[SoftphoneWidget] Auto-connecting softphone for incoming calls...');
-      initializeDevice();
+      console.log('[SoftphoneWidget] Auto-connecting softphone...');
+      // Pass hasInboundAccess to determine if device should register for incoming calls
+      initializeDevice(hasInboundAccess);
     }
-  }, [deviceState, autoConnectAttempted, initializeDevice, hasInboundAccess]);
+  }, [deviceState, autoConnectAttempted, initializeDevice, hasAnyAccess, hasInboundAccess]);
 
   // Handle input change - only allow numbers, +, *, #
   const handleDialNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
