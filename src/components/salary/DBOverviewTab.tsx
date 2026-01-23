@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, Calendar } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DBTeamDetailCard } from "./DBTeamDetailCard";
 import { DBPeriodSelector } from "./DBPeriodSelector";
+import { DBDailyBreakdown } from "./DBDailyBreakdown";
 
 type PeriodMode = "payroll" | "month" | "custom";
 interface TeamDB {
@@ -31,6 +33,7 @@ export function DBOverviewTab() {
   const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [selectedTeam, setSelectedTeam] = useState<TeamDB | null>(null);
+  const [dailyViewTeam, setDailyViewTeam] = useState<TeamDB | null>(null);
 
   const handlePeriodChange = (start: Date, end: Date) => {
     setPeriodStart(start);
@@ -220,18 +223,19 @@ export function DBOverviewTab() {
                   <TableHead className="text-right">Assist.løn</TableHead>
                   <TableHead className="text-right">Udgifter</TableHead>
                   <TableHead className="text-right">DB</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : !teamsDB?.length ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Ingen teams fundet
                     </TableCell>
                   </TableRow>
@@ -250,6 +254,18 @@ export function DBOverviewTab() {
                         <TableCell className="text-right text-destructive">-{formatCurrency(team.assistantSalary)}</TableCell>
                         <TableCell className="text-right text-destructive">-{formatCurrency(team.expenses)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(team.db)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDailyViewTeam(team);
+                            }}
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-medium">
@@ -260,6 +276,7 @@ export function DBOverviewTab() {
                       <TableCell className="text-right text-destructive">-{formatCurrency(totals.assistantSalary)}</TableCell>
                       <TableCell className="text-right text-destructive">-{formatCurrency(totals.expenses)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(totals.db)}</TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   </>
                 )}
@@ -272,6 +289,16 @@ export function DBOverviewTab() {
 
       {selectedTeam && (
         <DBTeamDetailCard team={selectedTeam} onClose={() => setSelectedTeam(null)} />
+      )}
+
+      {dailyViewTeam && (
+        <DBDailyBreakdown
+          teamId={dailyViewTeam.teamId}
+          teamName={dailyViewTeam.teamName}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          onClose={() => setDailyViewTeam(null)}
+        />
       )}
     </div>
   );
