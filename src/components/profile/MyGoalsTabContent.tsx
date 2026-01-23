@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SalesGoalTracker } from "@/components/my-profile/SalesGoalTracker";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
+import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
 interface MyGoalsTabContentProps {
   employeeId: string;
@@ -29,130 +30,21 @@ export function MyGoalsTabContent({ employeeId, salaryType }: MyGoalsTabContentP
     return { start, end };
   }, []);
 
-  // Get commission stats for the payroll period
-  const { data: commissionStats } = useQuery({
-    queryKey: ["my-goals-commission-stats", employeeId, payrollPeriod.start.toISOString()],
-    queryFn: async () => {
-      const now = new Date();
-      const periodStart = payrollPeriod.start.toISOString();
-      const periodEnd = payrollPeriod.end.toISOString();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  // Fetch KPIs from cache for payroll period
+  const { data: payrollKpis } = usePrecomputedKpis(
+    ["sales_count", "total_commission"],
+    "payroll_period" as KpiPeriod,
+    "employee",
+    employeeId
+  );
 
-      let periodCommission = 0;
-      let todayCommission = 0;
-      let periodSalesCount = 0;
-      let todaySalesCount = 0;
-
-      // Check for agent mappings
-      const { data: mappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(name)")
-        .eq("employee_id", employeeId);
-
-      if (mappings && mappings.length > 0) {
-        const agentNames = mappings.map(m => {
-          const agent = m.agents as { name: string } | null;
-          return agent?.name;
-        }).filter(Boolean) as string[];
-
-        if (agentNames.length > 0) {
-          const { data: periodSales } = await supabase
-            .from("sales")
-            .select(`
-              id,
-              sale_datetime,
-              sale_items (
-                id,
-                mapped_commission,
-                quantity
-              )
-            `)
-            .in("agent_name", agentNames)
-            .gte("sale_datetime", periodStart)
-            .lte("sale_datetime", periodEnd);
-
-          const { data: todaySales } = await supabase
-            .from("sales")
-            .select(`
-              id,
-              sale_items (
-                id,
-                mapped_commission,
-                quantity
-              )
-            `)
-            .in("agent_name", agentNames)
-            .gte("sale_datetime", todayStart)
-            .lte("sale_datetime", todayEnd);
-
-          periodCommission += (periodSales || []).reduce((total, sale) => {
-            const items = sale.sale_items as Array<{ mapped_commission?: number }> | null;
-            return total + ((items || []).reduce((sum, item) => sum + (item.mapped_commission || 0), 0));
-          }, 0);
-
-          todayCommission += (todaySales || []).reduce((total, sale) => {
-            const items = sale.sale_items as Array<{ mapped_commission?: number }> | null;
-            return total + ((items || []).reduce((sum, item) => sum + (item.mapped_commission || 0), 0));
-          }, 0);
-
-          periodSalesCount += periodSales?.length || 0;
-          todaySalesCount += todaySales?.length || 0;
-        }
-      }
-
-      // Also check fieldmarketing_sales
-      const { data: fmPeriodSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, product_name, registered_at")
-        .eq("seller_id", employeeId)
-        .gte("registered_at", periodStart)
-        .lte("registered_at", periodEnd);
-
-      const { data: fmTodaySales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, product_name")
-        .eq("seller_id", employeeId)
-        .gte("registered_at", todayStart)
-        .lte("registered_at", todayEnd);
-
-      const allFmSales = [...(fmPeriodSales || []), ...(fmTodaySales || [])];
-      if (allFmSales.length > 0) {
-        const allProductNames = allFmSales.map(s => s.product_name).filter(Boolean) as string[];
-        const uniqueProductNames = [...new Set(allProductNames)];
-
-        if (uniqueProductNames.length > 0) {
-          const { data: products } = await supabase
-            .from("products")
-            .select("name, commission_dkk")
-            .in("name", uniqueProductNames);
-
-          const productCommissionMap = new Map(
-            (products || []).map(p => [p.name, p.commission_dkk || 0])
-          );
-
-          periodCommission += (fmPeriodSales || []).reduce((total, sale) => {
-            return total + (productCommissionMap.get(sale.product_name) || 0);
-          }, 0);
-
-          todayCommission += (fmTodaySales || []).reduce((total, sale) => {
-            return total + (productCommissionMap.get(sale.product_name) || 0);
-          }, 0);
-        }
-      }
-
-      periodSalesCount += fmPeriodSales?.length || 0;
-      todaySalesCount += fmTodaySales?.length || 0;
-
-      return {
-        periodCommission,
-        periodSalesCount,
-        todayCommission,
-        todaySalesCount,
-      };
-    },
-    enabled: salaryType === 'provision',
-  });
+  // Fetch KPIs from cache for today
+  const { data: todayKpis } = usePrecomputedKpis(
+    ["sales_count", "total_commission"],
+    "today" as KpiPeriod,
+    "employee",
+    employeeId
+  );
 
   // Get absences
   const { data: absences = [] } = useQuery({
@@ -203,6 +95,12 @@ export function MyGoalsTabContent({ employeeId, salaryType }: MyGoalsTabContentP
     );
   }
 
+  // Extract values from cached KPIs
+  const periodCommission = getKpiValue(payrollKpis?.total_commission);
+  const periodSalesCount = getKpiValue(payrollKpis?.sales_count);
+  const todayCommission = getKpiValue(todayKpis?.total_commission);
+  const todaySalesCount = getKpiValue(todayKpis?.sales_count);
+
   return (
     <div className="space-y-6">
       <div>
@@ -214,12 +112,12 @@ export function MyGoalsTabContent({ employeeId, salaryType }: MyGoalsTabContentP
         employeeId={employeeId}
         payrollPeriod={payrollPeriod}
         commissionStats={{
-          periodTotal: commissionStats?.periodCommission || 0,
-          periodSales: commissionStats?.periodSalesCount || 0,
-          monthTotal: commissionStats?.periodCommission || 0,
-          monthSales: commissionStats?.periodSalesCount || 0,
-          todayTotal: commissionStats?.todayCommission || 0,
-          todaySales: commissionStats?.todaySalesCount || 0,
+          periodTotal: periodCommission,
+          periodSales: periodSalesCount,
+          monthTotal: periodCommission,
+          monthSales: periodSalesCount,
+          todayTotal: todayCommission,
+          todaySales: todaySalesCount,
         }}
         absences={absences}
         danishHolidays={danishHolidays}
