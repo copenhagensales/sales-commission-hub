@@ -125,6 +125,54 @@ async function fetchAllSaleItems(
   return allItems;
 }
 
+// Type for employee KPI sales (simpler than leaderboard)
+type EmployeeKpiSale = {
+  id: string;
+  agent_email: string | null;
+  agent_external_id: string | null;
+  sale_datetime: string;
+  sale_items: { mapped_commission: number; quantity: number; product_id: string | null }[];
+};
+
+// Paginated fetch for employee KPI calculations - avoids 1000-row limit
+async function fetchAllSalesWithItemsForEmployeeKpi(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string
+): Promise<EmployeeKpiSale[]> {
+  const PAGE_SIZE = 500;
+  const allSales: EmployeeKpiSale[] = [];
+  let page = 0;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const { data: sales, error } = await supabase
+      .from("sales")
+      .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .order("sale_datetime", { ascending: true })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    
+    if (error) {
+      console.error(`[fetchAllSalesWithItemsForEmployeeKpi] Error on page ${page}:`, error);
+      hasMore = false;
+      continue;
+    }
+    
+    if (sales && sales.length > 0) {
+      allSales.push(...(sales as EmployeeKpiSale[]));
+      hasMore = sales.length === PAGE_SIZE;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+  
+  console.log(`[fetchAllSalesWithItemsForEmployeeKpi] Fetched ${allSales.length} sales in ${page || 1} page(s) for period ${startStr} to ${endStr}`);
+  return allSales;
+}
+
 // ============= FM COMMISSION MAP HELPER =============
 // Fetches product pricing rules and creates a case-insensitive map of product_name -> commission_dkk
 // Prioritizes highest commission for each product
@@ -334,13 +382,13 @@ Deno.serve(async (req) => {
   // Only calculate for payroll_period and today (most used)
   const employeePeriods = periods.filter(p => p.type === "payroll_period" || p.type === "today");
   
-  // Fetch all sales data once for efficiency
+  // Fetch all sales data once for efficiency - using paginated fetch to avoid 1000-row limit
   const payrollPeriodDates = getPayrollPeriod(now);
-  const { data: allPeriodSales } = await supabase
-    .from("sales")
-    .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
-    .gte("sale_datetime", payrollPeriodDates.start.toISOString())
-    .lte("sale_datetime", payrollPeriodDates.end.toISOString());
+  const allPeriodSales = await fetchAllSalesWithItemsForEmployeeKpi(
+    supabase,
+    payrollPeriodDates.start.toISOString(),
+    payrollPeriodDates.end.toISOString()
+  );
   
   // Fetch FM sales for employee-scoped calculations
   // Use seller_id (not seller_email) to match FM sales to employees
@@ -448,6 +496,22 @@ Deno.serve(async (req) => {
   }
   
   console.log(`Calculated employee-scoped KPIs for ${(activeEmployees || []).length} employees`);
+  
+  // === PARTIAL SAVE: Upsert employee-scoped KPIs immediately to avoid losing data on timeout ===
+  if (cachedValues.length > 0) {
+    console.log(`[Partial Save] Upserting ${cachedValues.length} employee-scoped KPIs...`);
+    const { error: partialUpsertError } = await supabase
+      .from("kpi_cached_values")
+      .upsert(cachedValues, {
+        onConflict: "kpi_slug,period_type,scope_type,scope_id",
+      });
+    
+    if (partialUpsertError) {
+      console.error("[Partial Save] Error upserting employee KPIs:", partialUpsertError);
+    } else {
+      console.log(`[Partial Save] Successfully saved ${cachedValues.length} employee-scoped KPIs`);
+    }
+  }
 
   // ============= TEAM-SCOPED COMMISSION =============
   console.log("Calculating team-scoped commission for goals...");
@@ -716,7 +780,9 @@ Deno.serve(async (req) => {
 type SaleWithItems = {
   id: string;
   agent_email: string | null;
+  agent_external_id: string | null;
   agent_name: string | null;
+  sale_datetime: string;
   sale_items: { sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[];
 };
 
@@ -736,7 +802,7 @@ async function fetchAllSalesWithItems(
   while (hasMore) {
     let query = supabase
       .from("sales")
-      .select("id, agent_email, agent_name, sale_items(sale_id, quantity, mapped_commission, product_id)")
+      .select("id, agent_email, agent_external_id, agent_name, sale_datetime, sale_items(sale_id, quantity, mapped_commission, product_id)")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
