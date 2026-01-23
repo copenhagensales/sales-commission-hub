@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { da } from "date-fns/locale";
+import { TrendingUp } from "lucide-react";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { DBTeamDetailCard } from "./DBTeamDetailCard";
+import { DBPeriodSelector } from "./DBPeriodSelector";
 
+type PeriodMode = "payroll" | "month" | "custom";
 interface TeamDB {
   teamId: string;
   teamName: string;
@@ -27,14 +27,18 @@ interface TeamDB {
 }
 
 export function DBOverviewTab() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
+  const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [selectedTeam, setSelectedTeam] = useState<TeamDB | null>(null);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  const handlePeriodChange = (start: Date, end: Date) => {
+    setPeriodStart(start);
+    setPeriodEnd(end);
+  };
 
   const { data: teamsDB, isLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db", monthStart.toISOString(), monthEnd.toISOString()],
+    queryKey: ["teams-db", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async (): Promise<TeamDB[]> => {
       // Get all teams with leaders and assistants
       const { data: teams, error: teamsError } = await (supabase
@@ -56,8 +60,8 @@ export function DBOverviewTab() {
       const { data: expenses } = await supabase
         .from("team_expenses")
         .select("team_id, amount")
-        .gte("expense_date", monthStart.toISOString().split("T")[0])
-        .lte("expense_date", monthEnd.toISOString().split("T")[0]);
+        .gte("expense_date", periodStart.toISOString().split("T")[0])
+        .lte("expense_date", periodEnd.toISOString().split("T")[0]);
 
       // Get personnel salaries for team leaders
       const { data: leaderSalaries } = await supabase
@@ -100,8 +104,8 @@ export function DBOverviewTab() {
             agent_external_id
           )
         `)
-        .gte("sales.sale_datetime", monthStart.toISOString())
-        .lte("sales.sale_datetime", monthEnd.toISOString());
+        .gte("sales.sale_datetime", periodStart.toISOString())
+        .lte("sales.sale_datetime", periodEnd.toISOString());
 
       // Calculate DB for each team
       const teamsWithDB: TeamDB[] = (teams || []).map((team: any) => {
@@ -196,17 +200,13 @@ export function DBOverviewTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Period selector */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="min-w-[120px] text-center font-medium capitalize">
-              {format(currentMonth, "MMMM yyyy", { locale: da })}
-            </span>
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <DBPeriodSelector
+            periodStart={periodStart}
+            periodEnd={periodEnd}
+            onChange={handlePeriodChange}
+            mode={periodMode}
+            onModeChange={setPeriodMode}
+          />
 
           {/* Table */}
           <div className="rounded-md border">
