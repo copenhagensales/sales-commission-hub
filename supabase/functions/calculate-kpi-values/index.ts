@@ -344,9 +344,10 @@ Deno.serve(async (req) => {
     .lte("sale_datetime", payrollPeriodDates.end.toISOString());
   
   // Fetch FM sales for employee-scoped calculations
+  // Use seller_id (not seller_email) to match FM sales to employees
   const { data: allPeriodFmSales } = await supabase
     .from("fieldmarketing_sales")
-    .select("id, product_name, seller_email, seller_name, client_id")
+    .select("id, product_name, seller_id, client_id, registered_at")
     .gte("registered_at", payrollPeriodDates.start.toISOString())
     .lte("registered_at", payrollPeriodDates.end.toISOString());
   
@@ -369,33 +370,33 @@ Deno.serve(async (req) => {
     );
   }
   
-  // Calculate for each active employee with mappings
+  // Calculate for each active employee
+  // Don't skip employees without agent mappings - they might have FM sales
   for (const emp of (activeEmployees || [])) {
     const agentData = employeeAgentMap.get(emp.id);
-    if (!agentData || (agentData.emails.length === 0 && agentData.externalIds.length === 0)) {
-      continue; // Skip employees without agent mappings
-    }
+    const hasAgentMappings = agentData && 
+      (agentData.emails.length > 0 || agentData.externalIds.length > 0);
     
     for (const period of employeePeriods) {
-      // Filter telesales for this employee in this period
-      const empSales = (allPeriodSales || []).filter((sale: any) => {
+      // Filter telesales for this employee in this period (only if they have agent mappings)
+      const empSales = hasAgentMappings ? (allPeriodSales || []).filter((sale: any) => {
         const saleDate = new Date(sale.sale_datetime);
         if (saleDate < period.start || saleDate > period.end) return false;
         
         const saleEmail = sale.agent_email?.toLowerCase();
         const saleExternalId = sale.agent_external_id;
         
-        return (saleEmail && agentData.emails.includes(saleEmail)) ||
-               (saleExternalId && agentData.externalIds.includes(saleExternalId));
-      });
+        return (saleEmail && agentData!.emails.includes(saleEmail)) ||
+               (saleExternalId && agentData!.externalIds.includes(saleExternalId));
+      }) : [];
       
       // Filter FM sales for this employee in this period
+      // Match directly on seller_id = employee.id (same logic as DailyReports)
       const empFmSales = (allPeriodFmSales || []).filter((sale: any) => {
         const saleDate = new Date(sale.registered_at);
         if (saleDate < period.start || saleDate > period.end) return false;
         
-        const sellerEmail = sale.seller_email?.toLowerCase();
-        return sellerEmail && agentData.emails.includes(sellerEmail);
+        return sale.seller_id === emp.id;
       });
       
       // Calculate sales count (telesales)
