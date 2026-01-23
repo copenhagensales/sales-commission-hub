@@ -528,7 +528,7 @@ export default function TdcOpsummering() {
                       </div>
                     </div>
                   )}
-                  <div className="min-h-[600px] font-mono text-sm p-3 border rounded-md bg-background overflow-auto whitespace-pre-wrap">
+                  <div className="min-h-[600px] font-mono text-base p-3 border rounded-md bg-white text-black overflow-auto whitespace-pre-wrap">
                     {summaryLines.map((line, index) => (
                       <span 
                         key={index} 
