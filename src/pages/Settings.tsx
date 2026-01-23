@@ -44,8 +44,6 @@ interface WebhookEndpoint {
 const secretLabels: Record<string, string> = {
   "ADVERSUS_API_USERNAME": "Brugernavn",
   "ADVERSUS_API_PASSWORD": "Adgangskode",
-  "ECONOMIC_APP_SECRET_TOKEN": "App Secret Token",
-  "ECONOMIC_AGREEMENT_GRANT_TOKEN": "Agreement Grant Token",
   "M365_TENANT_ID": "Tenant ID",
   "M365_CLIENT_ID": "Client ID",
   "M365_CLIENT_SECRET": "Client Secret",
@@ -60,12 +58,6 @@ const availableDataSources: Record<string, { key: string; label: string; descrip
     { key: "users", label: "Brugere", description: "Hent agenter og medarbejdere" },
     { key: "leads", label: "Leads", description: "Synkroniser lead-data" },
     { key: "products", label: "Produkter", description: "Hent produktkatalog" },
-  ],
-  economic: [
-    { key: "journal_entries", label: "Bogføringsposter", description: "Synkroniser bogføringsposter" },
-    { key: "accounts", label: "Konti", description: "Hent kontoplan" },
-    { key: "invoices", label: "Fakturaer", description: "Synkroniser fakturaer" },
-    { key: "customers", label: "Kunder", description: "Hent kundedata" },
   ],
   m365: [
     { key: "send_emails", label: "Send emails", description: "Aktiver email-afsendelse" },
@@ -248,14 +240,8 @@ export default function Settings() {
         if (error) throw error;
         setWebhookEvents(prev => ({ ...prev, [webhookType]: data || [] }));
       } else if (webhookType === 'economic') {
-        const { data, error } = await supabase
-          .from("economic_events")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(25);
-        
-        if (error) throw error;
-        setWebhookEvents(prev => ({ ...prev, [webhookType]: data || [] }));
+        // economic_events table removed - no longer used
+        setWebhookEvents(prev => ({ ...prev, [webhookType]: [] }));
       } else {
         setWebhookEvents(prev => ({ ...prev, [webhookType]: [] }));
       }
@@ -452,23 +438,6 @@ export default function Settings() {
     }
   };
 
-  const syncEconomicInvoices = async () => {
-    setLoading("sync");
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-economic-invoices", {
-        body: { days: syncDays },
-      });
-      if (error) throw error;
-
-      setResults({ type: "economic-invoices", data });
-      toast.success(`Faktura-sync færdig: ${data?.upserted ?? 0} opdateret (hentede ${data?.totalFetched ?? 0})`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Faktura-sync fejlede");
-    } finally {
-      setLoading(null);
-    }
-  };
 
   const backfillOpp = async () => {
     setLoading("backfill-opp");
