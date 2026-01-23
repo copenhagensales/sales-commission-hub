@@ -15,8 +15,6 @@ export const MgTest = lazyPage(() => import("@/pages/MgTest"));
 
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
-export const TrygDashboard = lazyPage(() => import("@/pages/TrygDashboard"));
-export const AseDashboard = lazyPage(() => import("@/pages/AseDashboard"));
 export const UnitedDashboard = lazyPage(() => import("@/pages/UnitedDashboard"));
 export const CsTop20Dashboard = lazyPage(() => import("@/pages/CsTop20Dashboard"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
@@ -87,14 +85,11 @@ export const RolePreview = lazyPage(() => import("@/pages/RolePreview"));
 export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));
 
 // Team Dashboards
-export const TeamDashboard = lazyPage(() => import("@/pages/dashboards/TeamDashboard"));
 export const EesyTmDashboard = lazyPage(() => import("@/pages/EesyTmDashboard"));
 export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashboards/FieldmarketingDashboardFull"));
 export const CphSalesDashboard = lazyPage(() => import("@/pages/dashboards/CphSalesDashboard"));
 export const DashboardSettings = lazyPage(() => import("@/pages/dashboards/DashboardSettings"));
 export const DesignDashboard = lazyPage(() => import("@/pages/dashboards/DesignDashboard"));
-export const TdcErhvervGoalsDashboard = lazyPage(() => import("@/pages/dashboards/TdcErhvervGoalsDashboard"));
-export const FieldmarketingGoalsDashboard = lazyPage(() => import("@/pages/dashboards/FieldmarketingGoalsDashboard"));
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
 
