@@ -77,37 +77,44 @@ export function usePrecomputedKpis(
     queryFn: async (): Promise<Record<string, CachedKpiValue>> => {
       if (kpiSlugs.length === 0) return {};
 
-      let query = supabase
-        .from("kpi_cached_values")
-        .select("kpi_slug, value, formatted_value, calculated_at")
-        .in("kpi_slug", kpiSlugs)
-        .eq("period_type", period)
-        .eq("scope_type", scopeType);
+      // Fetch the latest value per slug via separate queries to avoid hitting row limits
+      const results: Record<string, CachedKpiValue> = {};
 
-      if (scopeId) {
-        query = query.eq("scope_id", scopeId);
-      } else {
-        query = query.is("scope_id", null);
-      }
+      await Promise.all(
+        kpiSlugs.map(async (slug) => {
+          let query = supabase
+            .from("kpi_cached_values")
+            .select("kpi_slug, value, formatted_value, calculated_at")
+            .eq("kpi_slug", slug)
+            .eq("period_type", period)
+            .eq("scope_type", scopeType)
+            .order("calculated_at", { ascending: false })
+            .limit(1);
 
-      const { data, error } = await query;
+          if (scopeId) {
+            query = query.eq("scope_id", scopeId);
+          } else {
+            query = query.is("scope_id", null);
+          }
 
-      if (error) {
-        console.error("Error fetching precomputed KPIs:", error);
-        throw error;
-      }
+          const { data, error } = await query.maybeSingle();
 
-      // Convert array to record keyed by slug
-      const result: Record<string, CachedKpiValue> = {};
-      for (const item of data || []) {
-        result[item.kpi_slug] = {
-          value: item.value,
-          formatted_value: item.formatted_value,
-          calculated_at: item.calculated_at,
-        };
-      }
+          if (error) {
+            console.error(`Error fetching KPI ${slug}:`, error);
+            return;
+          }
 
-      return result;
+          if (data) {
+            results[data.kpi_slug] = {
+              value: data.value,
+              formatted_value: data.formatted_value,
+              calculated_at: data.calculated_at,
+            };
+          }
+        })
+      );
+
+      return results;
     },
     enabled: kpiSlugs.length > 0,
     staleTime: 30000,
