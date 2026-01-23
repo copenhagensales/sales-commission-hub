@@ -150,7 +150,7 @@ export default function EmployeeMasterData() {
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const { canView } = useUnifiedPermissions();
 
-  const [openSections, setOpenSections] = useState<string[]>(["all-employees"]);
+  const [openSections, setOpenSections] = useState<string[]>([]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
