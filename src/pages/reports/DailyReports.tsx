@@ -460,7 +460,11 @@ export default function DailyReports() {
             .in("employee_id", employeesWithTimestampTeams)
             .gte("clock_in", startStr)
             .lte("clock_in", endStr + "T23:59:59");
-          timeStampsData = stamps || [];
+          // Map timestamps with computed date field for matching
+          timeStampsData = (stamps || []).map(ts => ({
+            ...ts,
+            date: ts.clock_in ? format(parseISO(ts.clock_in), 'yyyy-MM-dd') : null
+          }));
         }
       }
 
@@ -670,8 +674,10 @@ export default function DailyReports() {
         const teamName = emp.team_members?.[0]?.team?.name || null;
         
         const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
+        // Prioritize shift with hours_source='shift' over 'timestamp' for consistent behavior
         const empPrimaryShift = empTeamMembership 
-          ? primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id)
+          ? (primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id && ps.hours_source === 'shift')
+             || primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id))
           : null;
         const empShiftDays = empPrimaryShift 
           ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
