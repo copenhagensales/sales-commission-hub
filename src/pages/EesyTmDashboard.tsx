@@ -141,14 +141,14 @@ export default function EesyTmDashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("employee_sales_goals")
-        .select("employee_id, commission_target")
+        .select("employee_id, target_amount")
         .gte("period_start", payrollPeriod.start.toISOString())
         .lte("period_start", payrollPeriod.end.toISOString());
       
       const goalsMap = new Map<string, number>();
       (data || []).forEach(goal => {
-        if (goal.commission_target) {
-          goalsMap.set(goal.employee_id, goal.commission_target);
+        if (goal.target_amount) {
+          goalsMap.set(goal.employee_id, goal.target_amount);
         }
       });
       return goalsMap;
