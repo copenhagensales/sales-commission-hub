@@ -391,7 +391,14 @@ const FieldmarketingDashboardFull = () => {
   const activeClientId = TAB_TO_CLIENT_ID[activeTab];
   const activeClient = clients?.find(c => c.id === activeClientId);
 
-  const gridColsClass = `grid-cols-${visibleTabs.length}`;
+  // Use static class names so Tailwind can find them at build-time
+  const gridColsMap: Record<number, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+  };
+  const gridColsClass = gridColsMap[visibleTabs.length] || "grid-cols-2";
 
   return (
     <DashboardLayout>
