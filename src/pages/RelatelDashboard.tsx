@@ -33,10 +33,10 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
 };
 
 // Unified seller data type (from cached leaderboard)
-interface SellerData {
+interface MappedSellerData {
   name: string;
-  sales: number;
-  commission: number;
+  totalSales: number;
+  totalCommission: number;
   avatarUrl: string | null;
   employeeId: string;
   goalTarget: number | null;
@@ -217,7 +217,7 @@ export default function RelatelDashboard() {
   };
 
   // Convert cached leaderboard entries to component-expected format
-  const mapCachedToSeller = (entry: LeaderboardEntry) => ({
+  const mapCachedToSeller = (entry: LeaderboardEntry): MappedSellerData => ({
     name: entry.employeeName,
     totalSales: entry.salesCount,
     totalCommission: entry.commission,
@@ -227,15 +227,15 @@ export default function RelatelDashboard() {
   });
 
   // Sort employees by commission for each period (use cached data - same source for all modes)
-  const sortedDailySellers = useMemo(() => {
+  const sortedDailySellers: MappedSellerData[] = useMemo(() => {
     return cachedSellersToday.map(mapCachedToSeller);
   }, [cachedSellersToday]);
 
-  const sortedWeeklySellers = useMemo(() => {
+  const sortedWeeklySellers: MappedSellerData[] = useMemo(() => {
     return cachedSellersWeek.map(mapCachedToSeller);
   }, [cachedSellersWeek]);
 
-  const sortedPayrollSellers = useMemo(() => {
+  const sortedPayrollSellers: MappedSellerData[] = useMemo(() => {
     return cachedSellersPayroll.map(mapCachedToSeller);
   }, [cachedSellersPayroll]);
 
@@ -375,12 +375,8 @@ export default function RelatelDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedPayrollSellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'payroll', sellerGoalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
+                      const goalInfo = getGoalInfo(name, totalCommission, 'payroll', goalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -390,7 +386,7 @@ export default function RelatelDashboard() {
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
+                                <AvatarImage src={avatarUrl || undefined} alt={name} />
                                 <AvatarFallback className="text-xs bg-primary/20">
                                   {getInitials(name)}
                                 </AvatarFallback>
@@ -399,11 +395,11 @@ export default function RelatelDashboard() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
+                            {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'payroll')}`}>
-                              {formatCurrency(commission)}
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'payroll')}`}>
+                              {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
                           <TableCell className="py-2">
@@ -412,7 +408,7 @@ export default function RelatelDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={totalCommission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
                                 />
@@ -455,12 +451,8 @@ export default function RelatelDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedWeeklySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'week', sellerGoalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
+                      const goalInfo = getGoalInfo(name, totalCommission, 'week', goalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -470,7 +462,7 @@ export default function RelatelDashboard() {
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
+                                <AvatarImage src={avatarUrl || undefined} alt={name} />
                                 <AvatarFallback className="text-xs bg-primary/20">
                                   {getInitials(name)}
                                 </AvatarFallback>
@@ -479,11 +471,11 @@ export default function RelatelDashboard() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
+                            {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'week')}`}>
-                              {formatCurrency(commission)}
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'week')}`}>
+                              {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
                           <TableCell className="py-2">
@@ -492,7 +484,7 @@ export default function RelatelDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={totalCommission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
                                 />
@@ -535,12 +527,8 @@ export default function RelatelDashboard() {
                   </TableHeader>
                   <TableBody>
                     {sortedDailySellers.map((seller, index) => {
-                      const name = 'employeeName' in seller ? seller.employeeName : seller.name;
-                      const sales = 'totalSales' in seller ? seller.totalSales : seller.sales;
-                      const commission = 'totalCommission' in seller ? seller.totalCommission : seller.commission;
-                      const avatarUrl = 'avatarUrl' in seller ? seller.avatarUrl : getAvatarUrl(name);
-                      const sellerGoalTarget = 'goalTarget' in seller ? seller.goalTarget : undefined;
-                      const goalInfo = getGoalInfo(name, commission, 'day', sellerGoalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
+                      const goalInfo = getGoalInfo(name, totalCommission, 'day', goalTarget);
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -550,7 +538,7 @@ export default function RelatelDashboard() {
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
+                                <AvatarImage src={avatarUrl || undefined} alt={name} />
                                 <AvatarFallback className="text-xs bg-primary/20">
                                   {getInitials(name)}
                                 </AvatarFallback>
@@ -559,11 +547,11 @@ export default function RelatelDashboard() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
-                            {sales}
+                            {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(commission, 'day')}`}>
-                              {formatCurrency(commission)}
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'day')}`}>
+                              {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
                           <TableCell className="py-2">
@@ -572,7 +560,7 @@ export default function RelatelDashboard() {
                                 <GoalProgressRing
                                   progress={goalInfo.progress}
                                   expectedPercent={goalInfo.expectedPercent}
-                                  current={commission}
+                                  current={totalCommission}
                                   target={goalInfo.target}
                                   expectedAmount={goalInfo.expectedAmount}
                                 />
