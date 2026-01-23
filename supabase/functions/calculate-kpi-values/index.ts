@@ -43,8 +43,7 @@ interface FmSale {
   id: string;
   product_name: string | null;
   client_id: string | null;
-  seller_email: string | null;
-  seller_name: string | null;
+  seller_id: string | null;
 }
 
 interface FmPricingRule {
@@ -785,7 +784,7 @@ async function fetchFmSalesForPeriod(
 ): Promise<FmSale[]> {
   let query = supabase
     .from("fieldmarketing_sales")
-    .select("id, product_name, seller_email, seller_name, client_id")
+    .select("id, product_name, seller_id, client_id")
     .gte("registered_at", startStr)
     .lte("registered_at", endStr);
   
@@ -854,11 +853,8 @@ async function calculateGlobalLeaderboard(
       agentEmails.add(sale.agent_email.toLowerCase());
     }
   }
-  for (const fmSale of fmSales) {
-    if (fmSale.seller_email) {
-      agentEmails.add(fmSale.seller_email.toLowerCase());
-    }
-  }
+  // FM sales use seller_id directly - no need to add to agentEmails lookup
+  // We'll handle FM sales by direct employee ID matching below
 
   // Get agents by email
   const { data: agents } = await supabase
@@ -928,20 +924,28 @@ async function calculateGlobalLeaderboard(
     });
   }
 
-  // Process FM sales
+  // Process FM sales - use seller_id directly to match employees
   for (const fmSale of fmSales) {
-    const key = fmSale.seller_email?.toLowerCase() || fmSale.seller_name || "";
-    if (!key) continue;
+    if (!fmSale.seller_id) continue;
     
     const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
     const fmCommission = fmPricing?.commission || 0;
     
-    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    // Use seller_id as key for FM sales since we match directly by employee ID
+    const empInfo = employeeMap.get(fmSale.seller_id);
+    const key = empInfo?.name?.toLowerCase() || fmSale.seller_id;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: empInfo?.name || fmSale.seller_id };
     agentStats.set(key, {
       sales: existing.sales + 1,
       commission: existing.commission + fmCommission,
-      agentName: existing.agentName || fmSale.seller_name || key,
+      agentName: existing.agentName,
     });
+    
+    // Also add to emailToEmployeeId so the lookup works correctly later
+    if (!emailToEmployeeId.has(key)) {
+      emailToEmployeeId.set(key, fmSale.seller_id);
+    }
   }
 
   // Convert to leaderboard entries using proper employee mapping
@@ -1029,9 +1033,9 @@ async function calculateTeamLeaderboard(
     s.agent_email && teamAgentEmails.has(s.agent_email.toLowerCase())
   );
 
-  // Filter FM sales to team members by seller_email
+  // Filter FM sales to team members by seller_id (direct employee ID match)
   const teamFmSales = fmSales.filter(s => 
-    s.seller_email && teamAgentEmails.has(s.seller_email.toLowerCase())
+    s.seller_id && teamEmployeeIds.has(s.seller_id)
   );
   
   if (teamSales.length === 0 && teamFmSales.length === 0) return [];
@@ -1092,20 +1096,28 @@ async function calculateTeamLeaderboard(
     });
   }
 
-  // Process FM sales
+  // Process FM sales - use seller_id directly
   for (const fmSale of teamFmSales) {
-    const key = fmSale.seller_email?.toLowerCase() || "";
-    if (!key) continue;
+    if (!fmSale.seller_id) continue;
     
     const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
     const fmCommission = fmPricing?.commission || 0;
     
-    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    // Find employee info via seller_id
+    const empInfo = employeeMap.get(fmSale.seller_id);
+    const key = empInfo?.name?.toLowerCase() || fmSale.seller_id;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: empInfo?.name || fmSale.seller_id };
     agentStats.set(key, {
       sales: existing.sales + 1,
       commission: existing.commission + fmCommission,
-      agentName: existing.agentName || fmSale.seller_name || key,
+      agentName: existing.agentName,
     });
+    
+    // Map this key to employee for lookup later
+    if (!emailToEmployeeId.has(key)) {
+      emailToEmployeeId.set(key, fmSale.seller_id);
+    }
   }
 
   // Convert to leaderboard entries
@@ -1194,11 +1206,8 @@ async function calculateClientLeaderboard(
       agentEmails.add(sale.agent_email.toLowerCase());
     }
   }
-  for (const fmSale of fmSales) {
-    if (fmSale.seller_email) {
-      agentEmails.add(fmSale.seller_email.toLowerCase());
-    }
-  }
+  // FM sales use seller_id directly - no need to add to agentEmails lookup
+  // We'll handle FM sales by direct employee ID matching below
 
   const { data: agents } = await supabase
     .from("agents")
@@ -1264,20 +1273,28 @@ async function calculateClientLeaderboard(
     });
   }
 
-  // Process FM sales
+  // Process FM sales - use seller_id directly
   for (const fmSale of fmSales) {
-    const key = fmSale.seller_email?.toLowerCase() || fmSale.seller_name || "";
-    if (!key) continue;
+    if (!fmSale.seller_id) continue;
     
     const fmPricing = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "");
     const fmCommission = fmPricing?.commission || 0;
     
-    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: fmSale.seller_name || key };
+    // Find employee info via seller_id
+    const empInfo = employeeMap.get(fmSale.seller_id);
+    const key = empInfo?.name?.toLowerCase() || fmSale.seller_id;
+    
+    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: empInfo?.name || fmSale.seller_id };
     agentStats.set(key, {
       sales: existing.sales + 1,
       commission: existing.commission + fmCommission,
-      agentName: existing.agentName || fmSale.seller_name || key,
+      agentName: existing.agentName,
     });
+    
+    // Map this key to employee for lookup later
+    if (!emailToEmployeeId.has(key)) {
+      emailToEmployeeId.set(key, fmSale.seller_id);
+    }
   }
 
   // Convert to leaderboard entries
