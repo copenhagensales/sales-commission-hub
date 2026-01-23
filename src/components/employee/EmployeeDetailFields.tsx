@@ -8,6 +8,7 @@ import { Check, X, Pencil, Phone, Mail, CalendarIcon } from "lucide-react";
 import { format, parse, isValid } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PhoneLink } from "@/components/ui/phone-link";
 
 interface EditableRowProps {
   label: string;
@@ -211,9 +212,37 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
     );
   }
 
-  const href = type === "phone" ? `tel:${value}` : `mailto:${value}`;
-  const Icon = type === "phone" ? Phone : Mail;
+  // For phone, use PhoneLink which integrates with softphone
+  if (type === "phone") {
+    return (
+      <tr className="border-b border-border/50 last:border-0 group">
+        <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
+        <td className="py-2.5 text-sm font-medium">
+          <div className="flex items-center justify-between">
+            {value ? (
+              <PhoneLink 
+                phoneNumber={value} 
+                className="text-primary hover:underline"
+                iconClassName="h-3.5 w-3.5"
+              />
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
 
+  // For email, use standard mailto link
   return (
     <tr className="border-b border-border/50 last:border-0 group">
       <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
@@ -221,11 +250,11 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
         <div className="flex items-center justify-between">
           {value ? (
             <a 
-              href={href} 
+              href={`mailto:${value}`} 
               className="text-primary hover:underline flex items-center gap-1.5"
               onClick={(e) => e.stopPropagation()}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Mail className="h-3.5 w-3.5" />
               {value}
             </a>
           ) : (

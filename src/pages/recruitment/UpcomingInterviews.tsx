@@ -6,7 +6,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Phone, Mail, Trash2, ChevronDown, History } from "lucide-react";
+import { Calendar, Mail, Trash2, ChevronDown, History } from "lucide-react";
+import { PhoneLink } from "@/components/ui/phone-link";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -247,18 +248,7 @@ export default function UpcomingInterviews() {
                             {interview.candidate.first_name} {interview.candidate.last_name}
                           </p>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                            {interview.candidate.phone && (
-                              <span 
-                                className="flex items-center gap-1 hover:text-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `tel:${interview.candidate.phone}`;
-                                }}
-                              >
-                                <Phone className="h-3 w-3" />
-                                {interview.candidate.phone}
-                              </span>
-                            )}
+                            <PhoneLink phoneNumber={interview.candidate.phone} />
                             {interview.candidate.email && (
                               <span 
                                 className="flex items-center gap-1 hover:text-foreground"
