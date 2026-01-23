@@ -214,13 +214,9 @@ function getDashboardConfig(slug: string | null): { clientId?: string; teamId?: 
   // Map dashboard slugs to their actual client IDs from database
   const clientIdMap: Record<string, string> = {
     "tdc-erhverv": "20744525-7466-4b2c-afa7-6ee09a9112b0",
-    "tdc-erhverv-goals": "20744525-7466-4b2c-afa7-6ee09a9112b0",
-    "tryg": "516a3f67-ea6d-4ef0-929d-e3224cc16e22",
     "relatel": "0ff8476d-16d8-4150-aee9-48ac90ec962d",
-    "ase": "53eb9c4a-91b0-44a9-9ee7-a87d87cc3e0f",
     "codan": "789f7e51-d3c8-42c6-b461-b45ea20d1e1f",
-    "fieldmarketing": "9a92ea4c-6404-4b58-be08-065e7552d552", // Eesy FM
-    "fieldmarketing-goals": "9a92ea4c-6404-4b58-be08-065e7552d552",
+    "fieldmarketing": "9a92ea4c-6404-4b58-be08-065e7552d552",
     "eesy-tm": "81993a7b-ff24-46b8-8ffb-37a83138ddba",
   };
 

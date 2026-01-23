@@ -105,9 +105,6 @@ const CELEBRATION_METRICS = [
   { value: "total_sales", label: "Samlet antal salg", dashboards: ["all"] },
   { value: "commission_today", label: "Provision i dag", dashboards: ["all"] },
   { value: "commission_month", label: "Provision denne måned", dashboards: ["all"] },
-  { value: "goal_progress", label: "Mål-fremskridt (%)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
-  { value: "goal_target", label: "Mål (DKK)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
-  { value: "goal_remaining", label: "Mangler (DKK)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
 ];
 
 export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialogProps) {

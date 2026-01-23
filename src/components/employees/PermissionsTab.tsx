@@ -146,14 +146,9 @@ const permissionIconMap: Record<string, React.ReactNode> = {
   menu_dashboard_cph_sales: <BarChart3 className="h-4 w-4" />,
   menu_dashboard_cs_top_20: <Trophy className="h-4 w-4" />,
   menu_dashboard_fieldmarketing: <Car className="h-4 w-4" />,
-  menu_dashboard_fm_goals: <Target className="h-4 w-4" />,
   menu_dashboard_eesy_tm: <BarChart3 className="h-4 w-4" />,
   menu_dashboard_tdc_erhverv: <Phone className="h-4 w-4" />,
-  menu_dashboard_tdc_goals: <Target className="h-4 w-4" />,
   menu_dashboard_relatel: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_tryg: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_ase: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_mg_test: <FlaskConical className="h-4 w-4" />,
   menu_dashboard_united: <Building2 className="h-4 w-4" />,
   menu_dashboard_design: <Settings className="h-4 w-4" />,
   menu_dashboard_settings: <Settings className="h-4 w-4" />,
@@ -264,10 +259,8 @@ const sectionChildren: Record<string, string[]> = {
   menu_section_salary: ['menu_payroll', 'menu_salary_types'],
   menu_section_dashboards: [
     'menu_dashboard_cph_sales', 'menu_dashboard_cs_top_20', 'menu_dashboard_fieldmarketing',
-    'menu_dashboard_fm_goals', 'menu_dashboard_eesy_tm', 'menu_dashboard_tdc_erhverv',
-    'menu_dashboard_tdc_goals', 'menu_dashboard_relatel', 'menu_dashboard_tryg',
-    'menu_dashboard_ase', 'menu_dashboard_mg_test', 'menu_dashboard_united',
-    'menu_dashboard_design', 'menu_dashboard_settings'
+    'menu_dashboard_eesy_tm', 'menu_dashboard_tdc_erhverv', 'menu_dashboard_relatel',
+    'menu_dashboard_united', 'menu_dashboard_design', 'menu_dashboard_settings'
   ],
   menu_section_test: ['menu_car_quiz_admin', 'menu_coc_admin', 'menu_pulse_survey'],
   menu_section_rekruttering: [
