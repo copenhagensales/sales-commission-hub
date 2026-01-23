@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period";
+export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "last_24h" | "last_7d" | "last_30d";
 export type KpiScopeType = "global" | "client" | "team" | "employee";
 
 interface CachedKpiValue {
@@ -151,11 +151,14 @@ export function useClientDashboardKpis(
       }
 
       // Organize by period, then by slug
-      const result: Record<KpiPeriod, Record<string, CachedKpiValue>> = {
+      const result: Partial<Record<KpiPeriod, Record<string, CachedKpiValue>>> = {
         today: {},
         this_week: {},
         this_month: {},
         payroll_period: {},
+        last_24h: {},
+        last_7d: {},
+        last_30d: {},
       };
 
       for (const item of data || []) {
