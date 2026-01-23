@@ -33,7 +33,6 @@ verify_jwt = false
 [functions.economic-webhook]
 verify_jwt = false
 
-
 [functions.cleanup-inactive-employees]
 verify_jwt = false
 
