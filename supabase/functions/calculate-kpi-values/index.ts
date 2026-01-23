@@ -408,7 +408,7 @@ Deno.serve(async (req) => {
           if (!productId || allCountingProductIds.has(productId)) {
             salesCount += (item as any).quantity || 1;
           }
-          totalCommission += ((item as any).mapped_commission || 0) * ((item as any).quantity || 1);
+          totalCommission += (item as any).mapped_commission || 0;
         }
         // If no items, count as 1 sale
         if (!sale.sale_items || sale.sale_items.length === 0) {
