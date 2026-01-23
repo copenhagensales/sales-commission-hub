@@ -91,17 +91,8 @@ verify_jwt = false
 [functions.delete-auth-user]
 verify_jwt = false
 
-[functions.scheduler-manager]
-verify_jwt = true
-
 [functions.integration-engine]
 verify_jwt = false
-
-[functions.customer-crm-syncer]
-verify_jwt = true
-
-[functions.validate-excel-import]
-verify_jwt = true
 
 [functions.adversus-diagnostics]
 verify_jwt = false
