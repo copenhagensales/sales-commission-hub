@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -28,6 +28,7 @@ import { PositionsTab } from "@/components/employees/PositionsTab";
 import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
 import { PermissionsTab } from "@/components/employees/PermissionsTab";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
+import { EmployeeFormDialog } from "@/components/employees/EmployeeFormDialog";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 
@@ -149,18 +150,7 @@ export default function EmployeeMasterData() {
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const { canView } = useUnifiedPermissions();
 
-  // Tab configuration with permission keys
-  const allTabs = [
-    { value: "all-employees", label: t("employees.tabs.all"), permissionKey: "tab_employees_all" },
-    { value: "staff-employees", label: t("employees.tabs.staff"), permissionKey: "tab_employees_staff" },
-    { value: "teams", label: t("employees.tabs.teams"), permissionKey: "tab_employees_teams" },
-    { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions" },
-    { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions" },
-    { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer_mapping" },
-  ];
-
-  const visibleTabs = allTabs.filter(tab => canView(tab.permissionKey));
-  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.value || "all-employees");
+  const [openSections, setOpenSections] = useState<string[]>(["all-employees"]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -757,6 +747,19 @@ export default function EmployeeMasterData() {
 
   const activeCount = employees.filter((e) => e.is_active).length;
 
+  // Section configuration - must be after activeCount/staffCount are defined
+  const visibleSections = useMemo(() => {
+    const allSections = [
+      { value: "all-employees", label: t("employees.tabs.all"), permissionKey: "tab_employees_all", icon: Users, count: activeCount },
+      { value: "staff-employees", label: t("employees.tabs.staff"), permissionKey: "tab_employees_staff", icon: Briefcase, count: staffCount },
+      { value: "teams", label: t("employees.tabs.teams"), permissionKey: "tab_employees_teams", icon: Network },
+      { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions", icon: Briefcase },
+      { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions", icon: Shield },
+      { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer_mapping", icon: Link2 },
+    ];
+    return allSections.filter(section => canView(section.permissionKey));
+  }, [t, activeCount, staffCount, canView]);
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -766,765 +769,272 @@ export default function EmployeeMasterData() {
         </div>
 
 
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) {
-                setEditingEmployee(null);
-                setFormData(defaultEmployee);
-                setCurrentStep(0);
-                setLastSaved(null);
-              }
-            }}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingEmployee ? t("employees.dialog.editEmployee") : t("employees.dialog.newEmployee")}</DialogTitle>
-              </DialogHeader>
-              
-              {/* Progress indicator */}
-              <div className="flex items-center justify-center mb-4 gap-1">
-                {dialogSteps.map((step, index) => (
-                  <div key={index} className="flex items-center">
-                    <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                        index < currentStep
-                          ? "bg-green-500 text-white"
-                          : index === currentStep
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {index < currentStep ? <Check className="h-3 w-3" /> : index + 1}
-                    </div>
-                    {index < dialogSteps.length - 1 && (
-                      <div className={`w-6 h-0.5 ${index < currentStep ? "bg-green-500" : "bg-muted"}`} />
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <p className="text-center text-sm font-medium mb-4">{dialogSteps[currentStep]?.title}</p>
+        {/* Employee Form Dialog - using new accordion-based component */}
+        <EmployeeFormDialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) {
+              setEditingEmployee(null);
+            }
+          }}
+          editingEmployee={editingEmployee}
+          jobPositions={jobPositions}
+          onSuccess={() => {
+            setEditingEmployee(null);
+          }}
+        />
 
-              {/* Auto-save indicator */}
-              <div className="text-center mb-4 h-4">
-                {autoSaving ? (
-                  <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> {t("employees.dialog.saving")}
-                  </span>
-                ) : lastSaved ? (
-                  <span className="text-xs text-green-600 flex items-center justify-center gap-1">
-                    <Check className="h-3 w-3" /> {t("employees.dialog.savedAutomatically")}
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Step 0: Identity */}
-              {currentStep === 0 && (
-                <div className="space-y-4">
-                  {/* Avatar Upload - Only show when editing existing employee */}
-                  {editingEmployee && (
-                    <div className="flex flex-col items-center gap-3">
-                      <Label className="text-sm text-muted-foreground">Profilbillede</Label>
-                      <div className="relative group">
-                        <Avatar className="h-24 w-24 border-2 border-border">
-                          <AvatarImage src={formData.avatar_url || undefined} alt="Profilbillede" />
-                          <AvatarFallback className="bg-muted text-muted-foreground text-lg">
-                            {formData.first_name?.[0]?.toUpperCase() || ""}
-                            {formData.last_name?.[0]?.toUpperCase() || ""}
-                          </AvatarFallback>
-                        </Avatar>
-                        <label 
-                          htmlFor="avatar-upload" 
-                          className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          {uploadingAvatar ? (
-                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Camera className="h-6 w-6 text-muted-foreground" />
-                          )}
-                        </label>
-                        <input
-                          id="avatar-upload"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarUpload}
-                          disabled={uploadingAvatar}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.firstName")} *</Label>
-                      <Input value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.lastName")} *</Label>
-                      <Input value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} />
-                    </div>
-                    <div className="space-y-2 col-span-2">
-                      <Label>{t("employees.fields.cprNumber")}</Label>
-                      <Input type="password" value={formData.cpr_number || ""} onChange={(e) => setFormData({ ...formData, cpr_number: e.target.value || null })} placeholder={t("employees.fields.cprPlaceholder")} />
-                    </div>
-                  </div>
+        <Accordion type="multiple" value={openSections} onValueChange={setOpenSections} className="space-y-3">
+          {/* All Employees Section */}
+          {visibleSections.find(s => s.value === "all-employees") && (
+            <AccordionItem value="all-employees" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.all")}</span>
+                  <Badge variant="secondary" className="ml-2">{activeCount}</Badge>
                 </div>
-              )}
-
-              {/* Step 1: Contact */}
-              {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-2">
-                      <Label>{t("employees.fields.address")}</Label>
-                      <Input value={formData.address_street || ""} onChange={(e) => setFormData({ ...formData, address_street: e.target.value || null })} placeholder={t("employees.fields.addressPlaceholder")} />
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                {/* Sticky filter header */}
+                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 mb-4 -mx-4 px-4 border-b">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px] max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        ref={searchInputRef}
+                        placeholder={t("employees.filters.searchPlaceholder")} 
+                        value={searchTerm} 
+                        onChange={(e) => setSearchTerm(e.target.value)} 
+                        className="pl-9 h-9" 
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.postalCode")}</Label>
-                      <Input value={formData.address_postal_code || ""} onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.city")}</Label>
-                      <Input value={formData.address_city || ""} onChange={(e) => setFormData({ ...formData, address_city: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.country")}</Label>
-                      <Input value={formData.address_country || ""} onChange={(e) => setFormData({ ...formData, address_country: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.phone")}</Label>
-                      <Input value={formData.private_phone || ""} onChange={(e) => setFormData({ ...formData, private_phone: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2 col-span-2">
-                      <Label>{t("employees.fields.email")}</Label>
-                      <Input type="email" value={formData.private_email || ""} onChange={(e) => setFormData({ ...formData, private_email: e.target.value || null })} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Employment */}
-              {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.employmentDate")}</Label>
-                      <Input type="date" value={formData.employment_start_date || ""} onChange={(e) => setFormData({ ...formData, employment_start_date: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.endDate")}</Label>
-                      <Input type="date" value={formData.employment_end_date || ""} onChange={(e) => setFormData({ ...formData, employment_end_date: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.jobTitle")}</Label>
-                      <Select value={formData.job_title || ""} onValueChange={(v) => setFormData({ ...formData, job_title: v || null })}>
-                        <SelectTrigger><SelectValue placeholder={t("employees.fields.selectPosition")} /></SelectTrigger>
-                        <SelectContent>
-                          {jobPositions.map((position) => (
-                            <SelectItem key={position.id} value={position.name}>
-                              {position.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.department")}</Label>
-                      <Input value={formData.department || ""} onChange={(e) => setFormData({ ...formData, department: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.workLocation")}</Label>
-                      <Select value={formData.work_location || "København V"} onValueChange={(v) => setFormData({ ...formData, work_location: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="København V">København V</SelectItem>
-                          <SelectItem value="Århus">Århus</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.contractId")}</Label>
-                      <Input value={formData.contract_id || ""} onChange={(e) => setFormData({ ...formData, contract_id: e.target.value || null })} />
-                    </div>
-                    <div className="flex items-center space-x-2 col-span-2">
-                      <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
-                      <Label>{t("employees.fields.activeEmployee")}</Label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Salary */}
-              {currentStep === 3 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.salaryType")}</Label>
-                      <Select value={formData.salary_type || "provision"} onValueChange={(v) => setFormData({ ...formData, salary_type: v as "provision" | "fixed" | "hourly" })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="provision">{t("employees.salaryTypes.provision")}</SelectItem>
-                          <SelectItem value="fixed">{t("employees.salaryTypes.fixed")}</SelectItem>
-                          <SelectItem value="hourly">{t("employees.salaryTypes.hourly")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {(formData.salary_type === "fixed" || formData.salary_type === "hourly") && (
-                      <div className="space-y-2">
-                        <Label>{t("employees.fields.salaryAmount")}</Label>
-                        <Input type="number" value={formData.salary_amount || ""} onChange={(e) => setFormData({ ...formData, salary_amount: e.target.value ? parseFloat(e.target.value) : null })} />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.regNumber")}</Label>
-                      <Input type="password" value={formData.bank_reg_number || ""} onChange={(e) => setFormData({ ...formData, bank_reg_number: e.target.value || null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.accountNumber")}</Label>
-                      <Input type="password" value={formData.bank_account_number || ""} onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value || null })} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Vacation */}
-              {currentStep === 4 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.vacationType")}</Label>
-                      <Select value={formData.vacation_type || "vacation_pay"} onValueChange={(v) => setFormData({ ...formData, vacation_type: v as "vacation_pay" | "vacation_bonus" })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="vacation_pay">{t("employees.fields.vacationPay")}</SelectItem>
-                          <SelectItem value="vacation_bonus">{t("employees.fields.vacationBonus")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {formData.vacation_type === "vacation_bonus" && (
-                      <div className="space-y-2">
-                        <Label>{t("employees.fields.vacationBonusPercent")}</Label>
-                        <Input type="number" value={formData.vacation_bonus_percent || 1} onChange={(e) => setFormData({ ...formData, vacation_bonus_percent: parseFloat(e.target.value) })} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Other */}
-              {currentStep === 5 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch checked={formData.has_parking} onCheckedChange={(checked) => setFormData({ ...formData, has_parking: checked })} />
-                      <Label>{t("employees.fields.parkingSpot")}</Label>
-                    </div>
-                    {formData.has_parking && (
-                      <>
-                        <div className="space-y-2">
-                          <Label>{t("employees.fields.spotId")}</Label>
-                          <Input value={formData.parking_spot_id || ""} onChange={(e) => setFormData({ ...formData, parking_spot_id: e.target.value || null })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>{t("employees.fields.monthlyPrice")}</Label>
-                          <Input type="number" value={formData.parking_monthly_cost || ""} onChange={(e) => setFormData({ ...formData, parking_monthly_cost: e.target.value ? parseFloat(e.target.value) : null })} />
-                        </div>
-                      </>
-                    )}
-                    <div className="space-y-2 col-span-2">
-                      <Label>{t("employees.fields.workingHoursModel")}</Label>
-                      <Input value={formData.working_hours_model || ""} onChange={(e) => setFormData({ ...formData, working_hours_model: e.target.value || null })} placeholder={t("employees.fields.workingHoursPlaceholder")} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.hoursPerWeek")}</Label>
-                      <Input type="number" value={formData.weekly_hours || ""} onChange={(e) => setFormData({ ...formData, weekly_hours: e.target.value ? parseFloat(e.target.value) : null })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("employees.fields.standardStartTime")}</Label>
-                      <Input type="time" value={formData.standard_start_time || ""} onChange={(e) => setFormData({ ...formData, standard_start_time: e.target.value || null })} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Navigation buttons */}
-              <div className="flex gap-4 mt-6">
-                {currentStep > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(currentStep - 1)}
-                  >
-                    {t("employees.dialog.back")}
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  className="flex-1"
-                  onClick={handleStepNext}
-                  disabled={saveMutation.isPending || autoSaving}
-                >
-                  {saveMutation.isPending || autoSaving ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("employees.dialog.saving")}</>
-                  ) : currentStep === dialogSteps.length - 1 ? (
-                    <>{t("employees.dialog.finish")} <Check className="ml-2 h-4 w-4" /></>
-                  ) : (
-                    <>{t("employees.dialog.next")} <ArrowRight className="ml-2 h-4 w-4" /></>
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full grid-cols-${visibleTabs.length} mb-6`}>
-            {visibleTabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="all-employees" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl bg-card/50 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">{t("employees.stats.activeEmployees")}</span>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="text-2xl font-bold">{activeCount}</div>
-          </div>
-          <div className="rounded-xl bg-card/50 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Backoffice</span>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="text-2xl font-bold">{staffCount}</div>
-          </div>
-          <div className="rounded-xl bg-card/50 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">{t("employees.stats.total")}</span>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="text-2xl font-bold">{activeCount + staffCount}</div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <h2 className="text-xl font-semibold">{t("employees.overview")}</h2>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center rounded-lg bg-muted/50 p-1">
-                <Button
-                  variant={statusFilter === "active" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("active")}
-                  className="h-7 px-3 text-xs"
-                >
-                  {t("employees.filters.active")} ({activeCount})
-                </Button>
-                <Button
-                  variant={statusFilter === "inactive" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("inactive")}
-                  className="h-7 px-3 text-xs"
-                >
-                  {t("employees.filters.inactive")}
-                </Button>
-                <Button
-                  variant={statusFilter === "all" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("all")}
-                  className="h-7 px-3 text-xs"
-                >
-                  {t("employees.filters.all")} ({employees.length})
-                </Button>
-              </div>
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger className="w-36 h-9 bg-muted/50 border-0">
-                  <SelectValue placeholder="Alle teams" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="all">Alle teams</SelectItem>
-                  {uniqueTeams.map((team) => (
-                    <SelectItem key={team} value={team}>{team}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  ref={searchInputRef}
-                  placeholder={t("employees.filters.searchPlaceholder")} 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="pl-9 pr-12 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
-                />
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                  <span className="text-xs">⌘</span>K
-                </kbd>
-              </div>
-              {canEditEmployees && (
-                <div className="flex items-center gap-2">
-                  <EmployeeExcelImport />
-                  <Dialog open={createDialogOpen} onOpenChange={(open) => {
-                    setCreateDialogOpen(open);
-                    if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
-                    </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("employees.create.title")}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <p className="text-sm text-muted-foreground">
-                        {t("employees.create.description")}
-                      </p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Fornavn *</Label>
-                          <Input 
-                            value={createData.first_name} 
-                            onChange={(e) => setCreateData({ ...createData, first_name: e.target.value })} 
-                            placeholder="Fornavn"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Efternavn</Label>
-                          <Input 
-                            value={createData.last_name} 
-                            onChange={(e) => setCreateData({ ...createData, last_name: e.target.value })} 
-                            placeholder="Efternavn"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Email *</Label>
-                        <Input 
-                          type="email"
-                          value={createData.email} 
-                          onChange={(e) => setCreateData({ ...createData, email: e.target.value })} 
-                          placeholder="medarbejder@email.dk"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Kodeord *</Label>
-                        <div className="relative">
-                          <Input 
-                            type={showPassword ? "text" : "password"}
-                            value={createData.password} 
-                            onChange={(e) => setCreateData({ ...createData, password: e.target.value })} 
-                            placeholder="Mindst 6 tegn"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0 h-full px-3"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Medarbejderen kan ændre koden efter første login.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Stilling *</Label>
-                        <Select 
-                          value={createData.job_title} 
-                          onValueChange={(value) => setCreateData({ ...createData, job_title: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Vælg stilling" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {jobPositions
-                              .filter((position) => {
-                                // Hide "Ejer" position unless current user is also "Ejer"
-                                if (position.name === "Ejer") {
-                                  return currentUserPosition === "Ejer";
-                                }
-                                return true;
-                              })
-                              .map((position) => (
-                              <SelectItem key={position.id} value={position.name}>
-                                {position.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Rettigheder tildeles automatisk baseret på stilling.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button onClick={handleCreateEmployee} disabled={creatingEmployee}>
-                        {creatingEmployee ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opretter...</>
-                        ) : (
-                          <><Plus className="mr-2 h-4 w-4" /> Opret medarbejder</>
-                        )}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="rounded-xl bg-card/50 overflow-hidden">
-            {isLoading ? (
-              <p className="text-muted-foreground p-6">{t("employees.loading")}</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b border-border/50">
-                    <TableHead 
-                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t("employees.table.name")}
-                        {sortColumn === "name" ? (
-                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        ) : (
-                          <ArrowUpDown className="h-3 w-3 opacity-40" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => handleSort("position")}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t("employees.table.position")}
-                        {sortColumn === "position" ? (
-                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        ) : (
-                          <ArrowUpDown className="h-3 w-3 opacity-40" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => handleSort("team")}
-                    >
-                      <div className="flex items-center gap-1">
-                        Team
-                        {sortColumn === "team" ? (
-                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        ) : (
-                          <ArrowUpDown className="h-3 w-3 opacity-40" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEmployees.map((employee) => (
-                    <TableRow 
-                      key={employee.id} 
-                      className="cursor-pointer hover:bg-muted/30 border-b border-border/30"
-                      onClick={() => navigate(`/employees/${employee.id}`)}
-                    >
-                      <TableCell className="font-medium py-3">
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="relative">
-                                {getContractStatus(employee.id) === 'signed' ? (
-                                  <div className="flex items-center">
-                                    <FileText className="h-3.5 w-3.5 text-green-500" />
-                                    <Check className="h-2.5 w-2.5 text-green-500 absolute -right-1 -bottom-0.5" />
-                                  </div>
-                                ) : getContractStatus(employee.id) === 'pending' ? (
-                                  <div className="flex items-center">
-                                    <FileText className="h-3.5 w-3.5 text-amber-500" />
-                                    <Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" />
-                                  </div>
-                                ) : getContractStatus(employee.id) === 'rejected' ? (
-                                  <div className="flex items-center">
-                                    <FileText className="h-3.5 w-3.5 text-red-500" />
-                                    <X className="h-2.5 w-2.5 text-red-500 absolute -right-1 -bottom-0.5" />
-                                  </div>
-                                ) : (
-                                  <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />
-                                )}
+                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "active" | "inactive" | "all")}>
+                      <SelectTrigger className="w-32 h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">{t("employees.filters.active")}</SelectItem>
+                        <SelectItem value="inactive">{t("employees.filters.inactive")}</SelectItem>
+                        <SelectItem value="all">{t("employees.filters.all")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={teamFilter} onValueChange={setTeamFilter}>
+                      <SelectTrigger className="w-36 h-9">
+                        <SelectValue placeholder="Alle teams" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle teams</SelectItem>
+                        {uniqueTeams.map((team) => (
+                          <SelectItem key={team} value={team}>{team}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {canEditEmployees && (
+                      <div className="flex items-center gap-2 ml-auto">
+                        <EmployeeExcelImport />
+                        <Dialog open={createDialogOpen} onOpenChange={(open) => {
+                          setCreateDialogOpen(open);
+                          if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm"><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{t("employees.create.title")}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Fornavn *</Label>
+                                  <Input value={createData.first_name} onChange={(e) => setCreateData({ ...createData, first_name: e.target.value })} placeholder="Fornavn" />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Efternavn</Label>
+                                  <Input value={createData.last_name} onChange={(e) => setCreateData({ ...createData, last_name: e.target.value })} placeholder="Efternavn" />
+                                </div>
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {getContractStatus(employee.id) === 'signed' 
-                                ? t("employees.table.contractSigned")
-                                : getContractStatus(employee.id) === 'pending'
-                                ? "Afventer underskrift"
-                                : getContractStatus(employee.id) === 'rejected'
-                                ? "Kontrakt afvist"
-                                : t("employees.table.noContractSigned")}
-                            </TooltipContent>
-                          </Tooltip>
-                          <span>{employee.first_name} {employee.last_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
-                      <TableCell className="py-3">
-                        {getEmployeeTeams(employee.id) ? (
-                          <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge>
-                        ) : <span className="text-muted-foreground/50">-</span>}
-                      </TableCell>
-                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                        <Switch 
-                          checked={employee.is_active} 
-                          disabled={toggleActiveMutation.isPending}
-                          onCheckedChange={(checked) => {
-                            if (!checked) {
-                              setDeactivatingEmployee(employee);
-                            } else {
-                              toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee });
-                            }
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-0.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  handleSendInvitation(employee);
-                                }}
-                                disabled={!employee.private_email || sendingResetTo === employee.id || employee.invitation_status === "completed"}
-                              >
-                                {sendingResetTo === employee.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : employee.invitation_status === "completed" ? (
-                                  <UserCheck className="h-3.5 w-3.5 text-green-500" />
-                                ) : employee.invitation_status === "pending" ? (
-                                  <Send className="h-3.5 w-3.5 text-amber-500" />
-                                ) : (
-                                  <Mail className="h-3.5 w-3.5" />
-                                )}
+                              <div className="space-y-2">
+                                <Label>Email *</Label>
+                                <Input type="email" value={createData.email} onChange={(e) => setCreateData({ ...createData, email: e.target.value })} placeholder="medarbejder@email.dk" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Kodeord *</Label>
+                                <div className="relative">
+                                  <Input type={showPassword ? "text" : "password"} value={createData.password} onChange={(e) => setCreateData({ ...createData, password: e.target.value })} placeholder="Mindst 6 tegn" />
+                                  <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)}>
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Stilling *</Label>
+                                <Select value={createData.job_title} onValueChange={(value) => setCreateData({ ...createData, job_title: value })}>
+                                  <SelectTrigger><SelectValue placeholder="Vælg stilling" /></SelectTrigger>
+                                  <SelectContent>
+                                    {jobPositions.filter((p) => p.name !== "Ejer" || currentUserPosition === "Ejer").map((position) => (
+                                      <SelectItem key={position.id} value={position.name}>{position.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <Button onClick={handleCreateEmployee} disabled={creatingEmployee}>
+                                {creatingEmployee ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opretter...</> : <><Plus className="mr-2 h-4 w-4" /> Opret medarbejder</>}
                               </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {employee.invitation_status === "completed" 
-                                ? t("employees.actions.registered") 
-                                : employee.invitation_status === "pending"
-                                ? t("employees.actions.resendInvitation")
-                                : t("employees.actions.sendInvitation")}
-                            </TooltipContent>
-                          </Tooltip>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-popover w-48">
-                              <DropdownMenuItem
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  if (employee.private_phone) {
-                                    if (hasOutboundSoftphone && isDeviceReady) {
-                                      makeCall(employee.private_phone);
-                                    } else {
-                                      window.location.href = `tel:${employee.private_phone}`;
-                                    }
-                                  }
-                                }}
-                                disabled={!employee.private_phone}
-                              >
-                                <Phone className="h-4 w-4 mr-2" />
-                                Ring op
-                              </DropdownMenuItem>
-                              {canSendEmployeeSms && (
-                                <DropdownMenuItem
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    setSmsEmployee(employee);
-                                    setSmsDialogOpen(true);
-                                  }}
-                                  disabled={!employee.private_phone}
-                                >
-                                  <MessageSquare className="h-4 w-4 mr-2" />
-                                  Send SMS
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}
-                              >
-                                <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                Flyt til stab
-                              </DropdownMenuItem>
-                              {canEditEmployees && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Slet medarbejder
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredEmployees.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        {t("employees.table.noEmployeesFound")}
-                      </TableCell>
-                    </TableRow>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Employee table */}
+                <div className="rounded-xl bg-card/50 overflow-hidden">
+                  {isLoading ? (
+                    <p className="text-muted-foreground p-6">{t("employees.loading")}</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b border-border/50">
+                          <TableHead className="text-xs font-medium text-muted-foreground cursor-pointer" onClick={() => handleSort("name")}>
+                            <div className="flex items-center gap-1">{t("employees.table.name")} {sortColumn === "name" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}</div>
+                          </TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground cursor-pointer" onClick={() => handleSort("position")}>
+                            <div className="flex items-center gap-1">{t("employees.table.position")} {sortColumn === "position" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}</div>
+                          </TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground cursor-pointer" onClick={() => handleSort("team")}>
+                            <div className="flex items-center gap-1">Team {sortColumn === "team" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}</div>
+                          </TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredEmployees.map((employee) => (
+                          <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/30 border-b border-border/30" onClick={() => navigate(`/employees/${employee.id}`)}>
+                            <TableCell className="font-medium py-3">
+                              <div className="flex items-center gap-2">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="relative">
+                                      {getContractStatus(employee.id) === 'signed' ? <div className="flex items-center"><FileText className="h-3.5 w-3.5 text-emerald-500" /><Check className="h-2.5 w-2.5 text-emerald-500 absolute -right-1 -bottom-0.5" /></div>
+                                      : getContractStatus(employee.id) === 'pending' ? <div className="flex items-center"><FileText className="h-3.5 w-3.5 text-amber-500" /><Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" /></div>
+                                      : getContractStatus(employee.id) === 'rejected' ? <div className="flex items-center"><FileText className="h-3.5 w-3.5 text-destructive" /><X className="h-2.5 w-2.5 text-destructive absolute -right-1 -bottom-0.5" /></div>
+                                      : <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{getContractStatus(employee.id) === 'signed' ? t("employees.table.contractSigned") : getContractStatus(employee.id) === 'pending' ? "Afventer underskrift" : getContractStatus(employee.id) === 'rejected' ? "Kontrakt afvist" : t("employees.table.noContractSigned")}</TooltipContent>
+                                </Tooltip>
+                                <span>{employee.first_name} {employee.last_name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                            <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
+                            <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee }); }}} />
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="flex items-center gap-0.5">
+                                <Tooltip><TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleSendInvitation(employee); }} disabled={!employee.private_email || sendingResetTo === employee.id || employee.invitation_status === "completed"}>
+                                    {sendingResetTo === employee.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : employee.invitation_status === "completed" ? <UserCheck className="h-3.5 w-3.5 text-emerald-500" /> : employee.invitation_status === "pending" ? <Send className="h-3.5 w-3.5 text-amber-500" /> : <Mail className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </TooltipTrigger><TooltipContent>{employee.invitation_status === "completed" ? t("employees.actions.registered") : employee.invitation_status === "pending" ? t("employees.actions.resendInvitation") : t("employees.actions.sendInvitation")}</TooltipContent></Tooltip>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-popover w-48">
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (employee.private_phone) { if (hasOutboundSoftphone && isDeviceReady) { makeCall(employee.private_phone); } else { window.location.href = `tel:${employee.private_phone}`; }}}} disabled={!employee.private_phone}><Phone className="h-4 w-4 mr-2" />Ring op</DropdownMenuItem>
+                                    {canSendEmployeeSms && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSmsEmployee(employee); setSmsDialogOpen(true); }} disabled={!employee.private_phone}><MessageSquare className="h-4 w-4 mr-2" />Send SMS</DropdownMenuItem>}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}><ArrowRightLeft className="h-4 w-4 mr-2" />Flyt til stab</DropdownMenuItem>
+                                    {canEditEmployees && (<><DropdownMenuSeparator /><DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2" />Slet medarbejder</DropdownMenuItem></>)}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">{t("employees.table.noEmployeesFound")}</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
                   )}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-        </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
 
-          </TabsContent>
+          {/* Staff Employees Section */}
+          {visibleSections.find(s => s.value === "staff-employees") && (
+            <AccordionItem value="staff-employees" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.staff")}</span>
+                  <Badge variant="secondary" className="ml-2">{staffCount}</Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4"><StaffEmployeesTab /></AccordionContent>
+            </AccordionItem>
+          )}
 
-          <TabsContent value="staff-employees" className="space-y-6">
-            <StaffEmployeesTab />
-          </TabsContent>
+          {/* Teams Section */}
+          {visibleSections.find(s => s.value === "teams") && (
+            <AccordionItem value="teams" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Network className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.teams")}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4"><TeamsTab /></AccordionContent>
+            </AccordionItem>
+          )}
 
-          <TabsContent value="teams" className="space-y-6">
-            <TeamsTab />
-          </TabsContent>
+          {/* Positions Section */}
+          {visibleSections.find(s => s.value === "positions") && (
+            <AccordionItem value="positions" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.positions")}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4"><PositionsTab /></AccordionContent>
+            </AccordionItem>
+          )}
 
-          <TabsContent value="positions" className="space-y-6">
-            <PositionsTab />
-          </TabsContent>
+          {/* Permissions Section */}
+          {visibleSections.find(s => s.value === "permissions") && (
+            <AccordionItem value="permissions" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.permissions")}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4"><PermissionsTab /></AccordionContent>
+            </AccordionItem>
+          )}
 
-          <TabsContent value="permissions" className="space-y-6">
-            <PermissionsTab />
-          </TabsContent>
-
-          <TabsContent value="dialer-mapping" className="space-y-6">
-            <DialerMappingTab />
-          </TabsContent>
-        </Tabs>
+          {/* Dialer Mapping Section */}
+          {visibleSections.find(s => s.value === "dialer-mapping") && (
+            <AccordionItem value="dialer-mapping" className="border rounded-lg bg-card/30">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t("employees.tabs.dialerMapping")}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4"><DialerMappingTab /></AccordionContent>
+            </AccordionItem>
+          )}
+        </Accordion>
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
