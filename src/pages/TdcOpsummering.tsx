@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
-import { FileText, Copy, Check } from "lucide-react";
+import { FileText, Copy, Check, Sun, Moon, Type } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +34,8 @@ type StartupChoice = "asap" | "specific";
 export default function TdcOpsummering() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
+  const [fontSize, setFontSize] = useState(16);
 
   // Customer data and product lines removed - using static placeholders in summary
 
@@ -528,11 +533,40 @@ export default function TdcOpsummering() {
                       </div>
                     </div>
                   )}
-                  <div className="min-h-[600px] font-mono text-base p-3 border rounded-md bg-white text-black overflow-auto whitespace-pre-wrap">
+                  
+                  {/* Kontrolpanel for tema og tekststørrelse */}
+                  <div className="flex items-center justify-between mb-3 p-2 bg-muted/50 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                      <Switch checked={isDarkTheme} onCheckedChange={setIsDarkTheme} />
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Type className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[fontSize]} 
+                        onValueChange={(val) => setFontSize(val[0])}
+                        min={12}
+                        max={24}
+                        step={1}
+                        className="w-32"
+                      />
+                      <span className="text-sm text-muted-foreground w-12">{fontSize}px</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    className={cn(
+                      "min-h-[600px] font-mono p-3 border rounded-md overflow-auto whitespace-pre-wrap",
+                      isDarkTheme ? "bg-slate-900 text-white" : "bg-white text-black"
+                    )}
+                    style={{ fontSize: `${fontSize}px` }}
+                  >
                     {summaryLines.map((line, index) => (
                       <span 
                         key={index} 
-                        className={line.isRed ? "text-red-600 font-semibold" : ""}
+                        className={line.isRed ? "text-red-500 font-semibold" : ""}
                       >
                         {line.text}
                         {index < summaryLines.length - 1 && "\n"}
