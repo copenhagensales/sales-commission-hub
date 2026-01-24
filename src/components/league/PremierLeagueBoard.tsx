@@ -160,7 +160,7 @@ export function PremierLeagueBoard({
                 {isTopDivision ? (
                   <>
                     <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
-                    <span className="truncate">Superligaen</span>
+                    <span className="truncate">Salgsligaen</span>
                   </>
                 ) : (
                   <>
