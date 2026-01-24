@@ -44,6 +44,7 @@ import { SalesProgressComparison } from "./SalesProgressComparison";
 import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
+import { usePreviousPeriodComparison } from "@/hooks/usePreviousPeriodComparison";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
@@ -183,6 +184,25 @@ export function SalesGoalTracker({
     employeeId,
     payrollPeriod.start,
     payrollPeriod.end
+  );
+
+  // We need workingDaysData first, but since it's calculated later, 
+  // we calculate passed days early for the comparison hook
+  const today = startOfDay(new Date());
+  const allDaysForComparison = eachDayOfInterval({
+    start: payrollPeriod.start,
+    end: payrollPeriod.end,
+  });
+  const passedDaysForComparison = allDaysForComparison.filter(
+    (day) => !isWeekend(day) && (isBefore(day, today) || isSameDay(day, today))
+  ).length;
+
+  // Fetch previous period comparison data
+  const previousPeriodData = usePreviousPeriodComparison(
+    employeeId,
+    payrollPeriod.start,
+    payrollPeriod.end,
+    passedDaysForComparison
   );
 
   // Fetch current goal for this period
@@ -784,14 +804,18 @@ export function SalesGoalTracker({
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <SalesProgressComparison
-                  currentPeriodTotal={commissionStats.periodTotal}
-                  daysPassedInPeriod={workingDaysData.passed}
-                />
-              </CardContent>
-            </Card>
+            {previousPeriodData.hasData && (
+              <Card>
+                <CardContent className="p-4">
+                  <SalesProgressComparison
+                    currentPeriodTotal={commissionStats.periodTotal}
+                    daysPassedInPeriod={workingDaysData.passed}
+                    previousPeriodTotal={previousPeriodData.previousPeriodTotal}
+                    previousPeriodAtSameDay={previousPeriodData.previousPeriodAtSameDay}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardContent className="p-4">
