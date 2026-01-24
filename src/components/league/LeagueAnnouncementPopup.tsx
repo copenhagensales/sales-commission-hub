@@ -67,7 +67,7 @@ export function LeagueAnnouncementPopup() {
             <Trophy className="w-8 h-8 text-white" />
           </div>
           <DialogTitle className="text-2xl font-bold">
-            Cph Sales Ligaen er åben! 🏆
+            Salgsligaen er åben! 🏆
           </DialogTitle>
           <DialogDescription className="text-base">
             Konkurrér mod dine kolleger og kæmp dig op gennem divisionerne!
