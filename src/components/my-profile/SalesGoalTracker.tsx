@@ -890,8 +890,8 @@ export function SalesGoalTracker({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Gamification Section - Records, NextUnlock, Comparison, Achievements */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Gamification Section - Records, Comparison, Achievements */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="p-4">
                 <SalesRecords
@@ -918,7 +918,7 @@ export function SalesGoalTracker({
               </Card>
             )}
 
-            <Card>
+            <Card className="md:col-span-2">
               <CardContent className="p-4">
                 <SalesAchievements
                   unlockedAchievementIds={gamification.unlockedAchievementIds}
