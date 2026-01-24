@@ -750,6 +750,8 @@ export function SalesGoalTracker({
               <CardContent className="p-4">
                 <SalesAchievements
                   unlockedAchievementIds={gamification.unlockedAchievementIds}
+                  achievements={gamification.achievements}
+                  achievementData={gamification.achievementData}
                 />
               </CardContent>
             </Card>

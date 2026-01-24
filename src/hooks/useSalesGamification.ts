@@ -271,21 +271,23 @@ export function useSalesGamification({
     return getRandomQuote(performanceStatus);
   }, [performanceStatus]);
 
+  // Compute achievement check data for UI display
+  const achievementData: AchievementCheckData = useMemo(() => ({
+    hasSetGoal: targetAmount > 0,
+    progressPercent,
+    isAhead,
+    currentStreak,
+    longestStreak,
+    daysPassedInPeriod,
+    totalDaysInPeriod,
+    currentPeriodTotal,
+    exceededGoalBy10Percent: progressPercent >= 110,
+  }), [targetAmount, progressPercent, isAhead, currentStreak, longestStreak, daysPassedInPeriod, totalDaysInPeriod, currentPeriodTotal]);
+
   // Check for new achievements - only compute once when achievements data is stable
   const potentialAchievements = useMemo(() => {
-    const checkData: AchievementCheckData = {
-      hasSetGoal: targetAmount > 0,
-      progressPercent,
-      isAhead,
-      currentStreak,
-      longestStreak,
-      daysPassedInPeriod,
-      totalDaysInPeriod,
-      currentPeriodTotal,
-      exceededGoalBy10Percent: progressPercent >= 110,
-    };
-    return checkAchievements(checkData);
-  }, [targetAmount, progressPercent, isAhead, currentStreak, longestStreak, daysPassedInPeriod, totalDaysInPeriod, currentPeriodTotal]);
+    return checkAchievements(achievementData);
+  }, [achievementData]);
 
   // Calculate new achievements - use stable references
   const newAchievements = useMemo(() => {
@@ -365,6 +367,8 @@ export function useSalesGamification({
 
     // Achievements
     unlockedAchievementIds,
+    achievements: achievements || [],
+    achievementData,
     newAchievements,
     unlockAchievement: unlockAchievementMutation.mutate,
 
