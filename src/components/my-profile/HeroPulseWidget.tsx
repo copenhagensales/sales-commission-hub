@@ -1,8 +1,14 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Zap, TrendingUp, TrendingDown, Minus, Flame, Rocket, Target } from "lucide-react";
+import { Zap, TrendingUp, TrendingDown, Minus, Flame, Rocket, Target, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PulseThresholds, getPulseStatus } from "@/hooks/useGamificationConfig";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface HeroPulseWidgetProps {
   pulsePercent: number;
@@ -93,7 +99,18 @@ export function HeroPulseWidget({
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Din Puls
           </span>
-          <Zap className={cn("h-4 w-4", config.colorClass)} />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px] text-center">
+                <p className="text-xs">
+                  Viser din præstation i dag sammenlignet med dit daglige gennemsnit. 100% = du matcher dit snit.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {/* Main Pulse Circle */}
