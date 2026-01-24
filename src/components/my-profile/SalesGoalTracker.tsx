@@ -133,35 +133,107 @@ function MilestoneProgressBar({ progress, targetAmount, currentAmount }: {
   );
 }
 
-// Scenario Chip Component
-function ScenarioChip({ 
+// Motivational Chip Component
+function MotivationalChip({ 
   label, 
-  value, 
-  isHighlighted = false,
+  value,
+  subLabel,
+  compareValue,
+  progress,
+  isPositive,
   icon: Icon 
 }: { 
   label: string; 
-  value: number; 
-  isHighlighted?: boolean;
+  value: number | string;
+  subLabel?: string;
+  compareValue?: number;
+  progress?: number;
+  isPositive?: boolean;
   icon?: React.ElementType;
 }) {
+  const hasComparison = compareValue !== undefined;
+  const showProgress = progress !== undefined;
+  
+  // Determine color based on isPositive or comparison
+  const colorClass = isPositive === true 
+    ? 'text-green-500' 
+    : isPositive === false 
+      ? 'text-amber-500' 
+      : 'text-primary';
+  
+  const bgClass = isPositive === true 
+    ? 'bg-green-500/10 border-green-500/30' 
+    : isPositive === false 
+      ? 'bg-amber-500/10 border-amber-500/30' 
+      : 'bg-primary/10 border-primary/30';
+
   return (
-    <div className={`flex flex-col items-center p-3 rounded-lg border transition-all ${
-      isHighlighted 
-        ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20' 
-        : 'bg-muted/30 border-border/50'
-    }`}>
+    <div className={`flex flex-col items-center p-3 rounded-lg border transition-all ${bgClass}`}>
       <div className="flex items-center gap-1.5 mb-1">
-        {Icon && <Icon className={`h-3 w-3 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />}
-        <span className={`text-xs ${isHighlighted ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+        {Icon && <Icon className={`h-3 w-3 ${colorClass}`} />}
+        <span className={`text-xs font-medium ${colorClass}`}>
           {label}
         </span>
       </div>
-      <span className={`text-sm font-bold ${isHighlighted ? 'text-primary' : ''}`}>
-        {value.toLocaleString("da-DK")} kr
-      </span>
+      
+      {hasComparison ? (
+        <div className="flex items-center gap-1.5">
+          <span className={`text-sm font-bold ${colorClass}`}>
+            {typeof value === 'number' ? value.toLocaleString("da-DK") : value} kr
+          </span>
+          <span className="text-xs text-muted-foreground">vs.</span>
+          <span className="text-xs text-muted-foreground">
+            {compareValue.toLocaleString("da-DK")} kr
+          </span>
+        </div>
+      ) : (
+        <span className={`text-sm font-bold ${colorClass}`}>
+          {typeof value === 'number' ? value.toLocaleString("da-DK") : value} kr
+        </span>
+      )}
+      
+      {subLabel && (
+        <span className="text-xs text-muted-foreground mt-0.5">{subLabel}</span>
+      )}
+      
+      {showProgress && (
+        <div className="w-full h-1.5 bg-background/50 rounded-full mt-2 overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all ${isPositive !== false ? 'bg-primary' : 'bg-amber-500'}`}
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+// Helper to get next milestone
+function getNextMilestone(current: number, target: number): { amount: number; label: string; progress: number } {
+  if (target <= 0) return { amount: 0, label: "Sæt et mål", progress: 0 };
+  
+  const milestones = [
+    { percent: 25, label: "25%" },
+    { percent: 50, label: "Halvvejs!" },
+    { percent: 75, label: "Sidste sprint" },
+    { percent: 100, label: "Mål nået!" },
+  ];
+  
+  const currentPercent = (current / target) * 100;
+  const next = milestones.find(m => m.percent > currentPercent);
+  
+  if (!next) {
+    return { amount: target, label: "🎉 Mål nået!", progress: 100 };
+  }
+  
+  const milestoneAmount = (target * next.percent) / 100;
+  const progressToMilestone = (current / milestoneAmount) * 100;
+  
+  return {
+    amount: milestoneAmount,
+    label: next.label,
+    progress: progressToMilestone
+  };
 }
 
 export function SalesGoalTracker({
@@ -665,24 +737,41 @@ export function SalesGoalTracker({
                 </div>
               </div>
 
-              {/* Scenario Chips */}
+              {/* Motivational Chips */}
               <div className="grid grid-cols-3 gap-3 mt-6">
-                <ScenarioChip 
-                  label="Nuværende tempo" 
-                  value={Math.round(kpis.projectedFinal)} 
+                {/* Chip 1: Today's progress */}
+                <MotivationalChip 
+                  label="I dag" 
+                  value={Math.round(commissionStats.todayTotal)}
+                  subLabel={`af ${Math.round(kpis.todayTarget).toLocaleString("da-DK")} kr`}
+                  progress={(commissionStats.todayTotal / kpis.todayTarget) * 100}
+                  isPositive={commissionStats.todayTotal >= kpis.todayTarget}
+                  icon={Zap}
+                />
+                
+                {/* Chip 2: Your average vs. needed */}
+                <MotivationalChip 
+                  label="Dit snit" 
+                  value={Math.round(kpis.actualDailyAvg)}
+                  compareValue={Math.round(kpis.dailyNeeded)}
+                  isPositive={kpis.actualDailyAvg >= kpis.dailyNeeded}
                   icon={TrendingUp}
                 />
-                <ScenarioChip 
-                  label="På sporet" 
-                  value={kpis.targetAmount} 
-                  isHighlighted={true}
-                  icon={Target}
-                />
-                <ScenarioChip 
-                  label="Sprint (+10%)" 
-                  value={Math.round(kpis.sprintTarget)} 
-                  icon={Rocket}
-                />
+                
+                {/* Chip 3: Next milestone */}
+                {(() => {
+                  const milestone = getNextMilestone(commissionStats.periodTotal, kpis.targetAmount);
+                  return (
+                    <MotivationalChip 
+                      label="Næste delmål" 
+                      value={Math.round(milestone.amount)}
+                      subLabel={milestone.label}
+                      progress={milestone.progress}
+                      isPositive={true}
+                      icon={Target}
+                    />
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
