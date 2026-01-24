@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Target,
   TrendingUp,
@@ -17,6 +18,8 @@ import {
   MapPin,
   Rocket,
   Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -36,6 +39,7 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
 import { usePerformanceThresholds, DEFAULT_THRESHOLDS, type PerformanceThresholds } from "@/hooks/usePerformanceThresholds";
+import { useGamificationConfig, getPulseStatus } from "@/hooks/useGamificationConfig";
 import { SalesStreakBadge } from "./SalesStreakBadge";
 import { SalesAchievements } from "./SalesAchievements";
 import { SalesRecords } from "./SalesRecords";
@@ -43,9 +47,13 @@ import { SalesAvatar } from "./SalesAvatar";
 import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
 import { SalesProgressComparison } from "./SalesProgressComparison";
 import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
+import { HeroPulseWidget } from "./HeroPulseWidget";
+import { NextUnlockCard } from "./NextUnlockCard";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
 import { usePreviousPeriodComparison } from "@/hooks/usePreviousPeriodComparison";
+import { createAchievementConfigs } from "@/lib/gamification-achievements";
+import { useAchievementTargets } from "@/hooks/useAchievementTargets";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
@@ -240,10 +248,18 @@ export function SalesGoalTracker({
   const queryClient = useQueryClient();
   const [goalInput, setGoalInput] = useState("");
   const [showCelebration, setShowCelebration] = useState(false);
+  const [kpiCardsOpen, setKpiCardsOpen] = useState(true);
   const [celebrationConfig, setCelebrationConfig] = useState<{
     effect: "fireworks" | "confetti" | "stars" | "flames";
     text: string;
   }>({ effect: "confetti", text: "" });
+
+  // Fetch gamification config from KPI definitions
+  const { config: gamificationConfig } = useGamificationConfig();
+  
+  // Fetch achievement targets
+  const achievementTargetsQuery = useAchievementTargets();
+  const achievementTargets = achievementTargetsQuery.data;
 
   // Fetch effective hourly rate based on KPI definitions
   const hourlyRateData = useEffectiveHourlyRate(
@@ -550,7 +566,7 @@ export function SalesGoalTracker({
   const getStatusBadge = () => {
     if (kpis.progressPercent >= 100) {
       return (
-        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
+        <Badge className="bg-success/20 text-success border-success/30 gap-1">
           <Trophy className="h-3 w-3" />
           Mål nået!
         </Badge>
@@ -558,7 +574,7 @@ export function SalesGoalTracker({
     }
     if (kpis.willHitGoal && kpis.isAhead) {
       return (
-        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
+        <Badge className="bg-success/20 text-success border-success/30 gap-1">
           <Flame className="h-3 w-3" />
           Foran planen
         </Badge>
@@ -566,7 +582,7 @@ export function SalesGoalTracker({
     }
     if (kpis.isOnTrack) {
       return (
-        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 gap-1">
+        <Badge className="bg-warning/20 text-warning border-warning/30 gap-1">
           <Zap className="h-3 w-3" />
           På sporet
         </Badge>
@@ -574,7 +590,7 @@ export function SalesGoalTracker({
     }
     // Reframed from "Bag planen" to "Gap til plan"
     return (
-      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+      <Badge className="bg-warning/20 text-warning border-warning/30 gap-1">
         <Target className="h-3 w-3" />
         Gap til plan
       </Badge>
@@ -706,11 +722,11 @@ export function SalesGoalTracker({
               
               {/* Supportive microcopy for gap */}
               {!kpis.isAhead && !kpis.isOnTrack && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-amber-300">
+                <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-warning">
                     <span className="font-medium">Gap til plan:</span> +{Math.round(kpis.gapToTrack).toLocaleString("da-DK")} kr/dag for at være på sporet
                   </p>
-                  <p className="text-xs text-amber-300/70 mt-1">
+                  <p className="text-xs text-warning/70 mt-1">
                     Rammer du dagens mål, er du tilbage på planen.
                   </p>
                 </div>
@@ -728,159 +744,151 @@ export function SalesGoalTracker({
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground mb-1">Projiceret slutprovision</p>
-                  <p className={`text-2xl font-bold ${kpis.willHitGoal ? 'text-green-400' : 'text-amber-400'}`}>
+                  <p className={`text-2xl font-bold ${kpis.willHitGoal ? 'text-success' : 'text-warning'}`}>
                     {Math.round(kpis.projectedFinal).toLocaleString("da-DK")} kr
                   </p>
                 </div>
               </div>
 
-              {/* Motivational Chips */}
-              <div className="grid grid-cols-3 gap-3 mt-6">
-                {/* Chip 1: Today's progress */}
-                <MotivationalChip 
-                  label="I dag" 
-                  value={Math.round(commissionStats.todayTotal)}
-                  subLabel={`af ${Math.round(kpis.todayTarget).toLocaleString("da-DK")} kr`}
-                  progress={(commissionStats.todayTotal / kpis.todayTarget) * 100}
-                  isPositive={commissionStats.todayTotal >= kpis.todayTarget}
-                  icon={Zap}
-                />
+              {/* Hero Pulse Widget - Replaces the 3 Motivational Chips */}
+              {(() => {
+                const pulsePercent = kpis.expectedByNow > 0 
+                  ? Math.round((kpis.currentAmount / kpis.expectedByNow) * 100)
+                  : 100;
                 
-                {/* Chip 2: Your average vs. needed */}
-                <MotivationalChip 
-                  label="Dit snit" 
-                  value={Math.round(kpis.actualDailyAvg)}
-                  compareValue={Math.round(kpis.dailyNeeded)}
-                  isPositive={kpis.actualDailyAvg >= kpis.dailyNeeded}
-                  icon={TrendingUp}
-                />
-                
-                {/* Chip 3: Relative performance (Din puls) */}
-                {(() => {
-                  const perf = getRelativePerformance(
-                    kpis.currentAmount, 
-                    kpis.expectedByNow,
-                    thresholds
-                  );
-                  return (
-                    <MotivationalChip 
-                      label="Din puls" 
-                      value={`${perf.percent}%`}
-                      subLabel={perf.label}
-                      progress={Math.min(100, perf.percent)}
-                      isPositive={perf.isPositive}
-                      icon={perf.icon}
-                    />
-                  );
-                })()}
-              </div>
+                return (
+                  <HeroPulseWidget
+                    pulsePercent={pulsePercent}
+                    todayTotal={commissionStats.todayTotal}
+                    actualDailyAvg={kpis.actualDailyAvg}
+                    thresholds={gamificationConfig.pulseThresholds}
+                    className="mt-6"
+                  />
+                );
+              })()}
             </CardContent>
           </Card>
 
-          {/* KPI Cards */}
+          {/* Collapsible KPI Cards */}
+          <Collapsible open={kpiCardsOpen} onOpenChange={setKpiCardsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full flex items-center justify-between p-2 mb-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {kpiCardsOpen ? "Skjul" : "Vis"} KPI detaljer
+                </span>
+                {kpiCardsOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Dagligt snit behøvet</p>
+                        <p className="text-xl font-bold">
+                          {Math.round(kpis.dailyNeededFromNow).toLocaleString("da-DK")} kr
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {workingDaysData.remaining} arbejdsdage tilbage
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-success/10" : "bg-warning/10"}`}>
+                        {kpis.isAhead ? (
+                          <TrendingUp className="h-5 w-5 text-success" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-warning" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Trend</p>
+                        <p className={`text-xl font-bold ${kpis.isAhead ? "text-success" : "text-warning"}`}>
+                          {kpis.trendPercent > 0 ? "+" : ""}{Math.round(kpis.trendPercent)}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {kpis.isAhead ? "foran" : "ift."} forventet tempo
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Target className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Resterende</p>
+                        <p className="text-xl font-bold">
+                          {Math.round(kpis.amountRemaining).toLocaleString("da-DK")} kr
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Aktuelt snit: {Math.round(kpis.actualDailyAvg).toLocaleString("da-DK")} kr/dag
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Effective Hourly Rate Card */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        hourlyRateData.hourlyRate >= 200 
+                          ? "bg-success/10" 
+                          : hourlyRateData.hourlyRate >= 150 
+                            ? "bg-warning/10" 
+                            : "bg-muted/50"
+                      }`}>
+                        <Clock className={`h-5 w-5 ${
+                          hourlyRateData.hourlyRate >= 200 
+                            ? "text-success" 
+                            : hourlyRateData.hourlyRate >= 150 
+                              ? "text-warning" 
+                              : "text-muted-foreground"
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Din timeløn så langt</p>
+                        <p className={`text-xl font-bold ${
+                          hourlyRateData.hourlyRate >= 200 
+                            ? "text-success" 
+                            : hourlyRateData.hourlyRate >= 150 
+                              ? "text-warning" 
+                              : ""
+                        }`}>
+                          {hourlyRateData.isLoading 
+                            ? "..." 
+                            : `${Math.round(hourlyRateData.hourlyRate).toLocaleString("da-DK")} kr/t`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Gamification Section - Records, NextUnlock, Comparison, Achievements */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Calendar className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Dagligt snit behøvet</p>
-                    <p className="text-xl font-bold">
-                      {Math.round(kpis.dailyNeededFromNow).toLocaleString("da-DK")} kr
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {workingDaysData.remaining} arbejdsdage tilbage
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-green-500/10" : "bg-amber-500/10"}`}>
-                    {kpis.isAhead ? (
-                      <TrendingUp className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <TrendingDown className="h-5 w-5 text-amber-500" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Trend</p>
-                    <p className={`text-xl font-bold ${kpis.isAhead ? "text-green-500" : "text-amber-500"}`}>
-                      {kpis.trendPercent > 0 ? "+" : ""}{Math.round(kpis.trendPercent)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {kpis.isAhead ? "foran" : "ift."} forventet tempo
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Target className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Resterende</p>
-                    <p className="text-xl font-bold">
-                      {Math.round(kpis.amountRemaining).toLocaleString("da-DK")} kr
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Aktuelt snit: {Math.round(kpis.actualDailyAvg).toLocaleString("da-DK")} kr/dag
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Effective Hourly Rate Card */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    hourlyRateData.hourlyRate >= 200 
-                      ? "bg-green-500/10" 
-                      : hourlyRateData.hourlyRate >= 150 
-                        ? "bg-amber-500/10" 
-                        : "bg-muted/50"
-                  }`}>
-                    <Clock className={`h-5 w-5 ${
-                      hourlyRateData.hourlyRate >= 200 
-                        ? "text-green-500" 
-                        : hourlyRateData.hourlyRate >= 150 
-                          ? "text-amber-500" 
-                          : "text-muted-foreground"
-                    }`} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Din timeløn så langt</p>
-                    <p className={`text-xl font-bold ${
-                      hourlyRateData.hourlyRate >= 200 
-                        ? "text-green-500" 
-                        : hourlyRateData.hourlyRate >= 150 
-                          ? "text-amber-500" 
-                          : ""
-                    }`}>
-                      {hourlyRateData.isLoading 
-                        ? "..." 
-                        : `${Math.round(hourlyRateData.hourlyRate).toLocaleString("da-DK")} kr/t`
-                      }
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Gamification Section - Records, Comparison, Achievements */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4">
                 <SalesRecords
@@ -893,6 +901,35 @@ export function SalesGoalTracker({
                 />
               </CardContent>
             </Card>
+
+            {/* Next Unlock Card */}
+            {(() => {
+              // Find next achievement with progress
+              const achievementConfigs = createAchievementConfigs(achievementTargets);
+              const nextAchievementConfig = achievementConfigs.find(config => {
+                if (gamification.unlockedAchievementIds.includes(config.id)) return false;
+                if (!gamification.achievementData) return false;
+                const progress = config.getProgress(gamification.achievementData);
+                return progress && progress.current < progress.target;
+              });
+              
+              const nextAchievement = nextAchievementConfig && gamification.achievementData ? {
+                name: nextAchievementConfig.name,
+                icon: nextAchievementConfig.icon,
+                progress: nextAchievementConfig.getProgress(gamification.achievementData) || { current: 0, target: 1 },
+              } : undefined;
+
+              return (
+                <NextUnlockCard
+                  currentStreak={gamification.currentStreak}
+                  streakThresholds={gamificationConfig.streakThresholds}
+                  todayTotal={commissionStats.todayTotal}
+                  bestDayRecord={gamification.bestDayRecord?.record_value}
+                  nextAchievement={nextAchievement}
+                  priorityOrder={gamificationConfig.nextUnlockPriority}
+                />
+              );
+            })()}
 
             {previousPeriodData.hasData && (
               <Card>
