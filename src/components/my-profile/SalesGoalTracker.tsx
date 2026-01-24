@@ -16,6 +16,7 @@ import {
   Flame,
   MapPin,
   Rocket,
+  Clock,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -42,6 +43,7 @@ import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
 import { SalesProgressComparison } from "./SalesProgressComparison";
 import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
+import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
@@ -175,6 +177,13 @@ export function SalesGoalTracker({
     effect: "fireworks" | "confetti" | "stars" | "flames";
     text: string;
   }>({ effect: "confetti", text: "" });
+
+  // Fetch effective hourly rate based on KPI definitions
+  const hourlyRateData = useEffectiveHourlyRate(
+    employeeId,
+    payrollPeriod.start,
+    payrollPeriod.end
+  );
 
   // Fetch current goal for this period
   const { data: currentGoal, isLoading } = useQuery({
@@ -659,7 +668,7 @@ export function SalesGoalTracker({
           </Card>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -715,6 +724,50 @@ export function SalesGoalTracker({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Aktuelt snit: {Math.round(kpis.actualDailyAvg).toLocaleString("da-DK")} kr/dag
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Effective Hourly Rate Card */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    hourlyRateData.hourlyRate >= 200 
+                      ? "bg-green-500/10" 
+                      : hourlyRateData.hourlyRate >= 150 
+                        ? "bg-amber-500/10" 
+                        : "bg-muted/50"
+                  }`}>
+                    <Clock className={`h-5 w-5 ${
+                      hourlyRateData.hourlyRate >= 200 
+                        ? "text-green-500" 
+                        : hourlyRateData.hourlyRate >= 150 
+                          ? "text-amber-500" 
+                          : "text-muted-foreground"
+                    }`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Din timeløn så langt</p>
+                    <p className={`text-xl font-bold ${
+                      hourlyRateData.hourlyRate >= 200 
+                        ? "text-green-500" 
+                        : hourlyRateData.hourlyRate >= 150 
+                          ? "text-amber-500" 
+                          : ""
+                    }`}>
+                      {hourlyRateData.isLoading 
+                        ? "..." 
+                        : `${Math.round(hourlyRateData.hourlyRate).toLocaleString("da-DK")} kr/t`
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {hourlyRateData.isLoading 
+                        ? "Beregner..."
+                        : `${hourlyRateData.effectiveHours.toFixed(1)}t (${hourlyRateData.workDays}d × ${hourlyRateData.breakDeductionPerDay}t pause)`
+                      }
                     </p>
                   </div>
                 </div>
