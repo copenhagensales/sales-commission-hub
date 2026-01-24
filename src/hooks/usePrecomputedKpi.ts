@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "last_24h" | "last_7d" | "last_30d";
+export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "current" | "last_24h" | "last_7d" | "last_30d";
 export type KpiScopeType = "global" | "client" | "team" | "employee";
 
 interface CachedKpiValue {
