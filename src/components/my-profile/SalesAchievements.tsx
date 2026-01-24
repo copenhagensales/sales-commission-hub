@@ -1,4 +1,5 @@
-import { ACHIEVEMENT_CONFIGS, ACHIEVEMENT_CATEGORIES, type AchievementCheckData } from "@/lib/gamification-achievements";
+import { createAchievementConfigs, ACHIEVEMENT_CATEGORIES, type AchievementCheckData } from "@/lib/gamification-achievements";
+import { useAchievementTargets } from "@/hooks/useAchievementTargets";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { Lock, ChevronDown, ChevronUp, Check } from "lucide-react";
@@ -23,22 +24,26 @@ export function SalesAchievements({
   achievementData
 }: SalesAchievementsProps) {
   const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const { data: targets } = useAchievementTargets();
+  
+  // Create achievement configs with dynamic targets
+  const achievementConfigs = useMemo(() => createAchievementConfigs(targets), [targets]);
 
   // Get unlocked achievements with dates
   const unlockedAchievements = useMemo(() => {
-    return ACHIEVEMENT_CONFIGS
+    return achievementConfigs
       .filter(config => unlockedAchievementIds.includes(config.id))
       .map(config => ({
         ...config,
         unlockedAt: achievements.find(a => a.achievement_type === config.id)?.unlocked_at
       }));
-  }, [unlockedAchievementIds, achievements]);
+  }, [unlockedAchievementIds, achievements, achievementConfigs]);
 
   // Get next achievement (closest to unlocking)
   const nextAchievement = useMemo(() => {
     if (!achievementData) return null;
 
-    const lockedWithProgress = ACHIEVEMENT_CONFIGS
+    const lockedWithProgress = achievementConfigs
       .filter(config => !unlockedAchievementIds.includes(config.id))
       .map(config => {
         const progress = config.getProgress(achievementData);
@@ -50,7 +55,7 @@ export function SalesAchievements({
       .sort((a, b) => b.percent - a.percent);
 
     return lockedWithProgress[0] || null;
-  }, [achievementData, unlockedAchievementIds]);
+  }, [achievementData, unlockedAchievementIds, achievementConfigs]);
 
   // Get achievements by category for full view
   const achievementsByCategory = useMemo(() => {
@@ -58,12 +63,12 @@ export function SalesAchievements({
     return categories.map(category => ({
       key: category,
       ...ACHIEVEMENT_CATEGORIES[category],
-      achievements: ACHIEVEMENT_CONFIGS.filter(a => a.category === category)
+      achievements: achievementConfigs.filter(a => a.category === category)
     }));
-  }, []);
+  }, [achievementConfigs]);
 
   const unlockedCount = unlockedAchievementIds.length;
-  const totalCount = ACHIEVEMENT_CONFIGS.length;
+  const totalCount = achievementConfigs.length;
 
   return (
     <div className="space-y-4">
