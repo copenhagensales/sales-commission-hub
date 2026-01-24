@@ -35,6 +35,7 @@ import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, sta
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
+import { usePerformanceThresholds, DEFAULT_THRESHOLDS, type PerformanceThresholds } from "@/hooks/usePerformanceThresholds";
 import { SalesStreakBadge } from "./SalesStreakBadge";
 import { SalesAchievements } from "./SalesAchievements";
 import { SalesRecords } from "./SalesRecords";
@@ -188,7 +189,7 @@ function MotivationalChip({
         </div>
       ) : (
         <span className={`text-sm font-bold ${colorClass}`}>
-          {typeof value === 'number' ? value.toLocaleString("da-DK") : value} kr
+          {typeof value === 'number' ? `${value.toLocaleString("da-DK")} kr` : value}
         </span>
       )}
       
@@ -208,32 +209,25 @@ function MotivationalChip({
   );
 }
 
-// Helper to get next milestone
-function getNextMilestone(current: number, target: number): { amount: number; label: string; progress: number } {
-  if (target <= 0) return { amount: 0, label: "Sæt et mål", progress: 0 };
+// Helper to get relative performance (Din puls)
+function getRelativePerformance(
+  current: number, 
+  expected: number, 
+  thresholds: PerformanceThresholds
+): {
+  percent: number;
+  label: string;
+  isPositive: boolean | undefined;
+  icon: React.ElementType;
+} {
+  if (expected <= 0) return { percent: 100, label: "Start!", isPositive: true, icon: Rocket };
   
-  const milestones = [
-    { percent: 25, label: "25%" },
-    { percent: 50, label: "Halvvejs!" },
-    { percent: 75, label: "Sidste sprint" },
-    { percent: 100, label: "Mål nået!" },
-  ];
+  const percent = Math.round((current / expected) * 100);
   
-  const currentPercent = (current / target) * 100;
-  const next = milestones.find(m => m.percent > currentPercent);
-  
-  if (!next) {
-    return { amount: target, label: "🎉 Mål nået!", progress: 100 };
-  }
-  
-  const milestoneAmount = (target * next.percent) / 100;
-  const progressToMilestone = (current / milestoneAmount) * 100;
-  
-  return {
-    amount: milestoneAmount,
-    label: next.label,
-    progress: progressToMilestone
-  };
+  if (percent >= thresholds.flying) return { percent, label: "Flyver!", isPositive: true, icon: Rocket };
+  if (percent >= thresholds.ahead) return { percent, label: "Foran plan", isPositive: true, icon: TrendingUp };
+  if (percent >= thresholds.close) return { percent, label: "Tæt på", isPositive: undefined, icon: Target };
+  return { percent, label: "Hent ind!", isPositive: false, icon: TrendingDown };
 }
 
 export function SalesGoalTracker({
@@ -497,6 +491,9 @@ export function SalesGoalTracker({
     });
   }, [workingDaysData, currentGoal, commissionStats]);
 
+  // Fetch performance thresholds from KPI definitions
+  const { data: thresholds = DEFAULT_THRESHOLDS } = usePerformanceThresholds();
+
   // Initialize gamification hook
   const gamification = useSalesGamification({
     employeeId,
@@ -758,17 +755,21 @@ export function SalesGoalTracker({
                   icon={TrendingUp}
                 />
                 
-                {/* Chip 3: Next milestone */}
+                {/* Chip 3: Relative performance (Din puls) */}
                 {(() => {
-                  const milestone = getNextMilestone(commissionStats.periodTotal, kpis.targetAmount);
+                  const perf = getRelativePerformance(
+                    kpis.currentAmount, 
+                    kpis.expectedByNow,
+                    thresholds
+                  );
                   return (
                     <MotivationalChip 
-                      label="Næste delmål" 
-                      value={Math.round(milestone.amount)}
-                      subLabel={milestone.label}
-                      progress={milestone.progress}
-                      isPositive={true}
-                      icon={Target}
+                      label="Din puls" 
+                      value={`${perf.percent}%`}
+                      subLabel={perf.label}
+                      progress={Math.min(100, perf.percent)}
+                      isPositive={perf.isPositive}
+                      icon={perf.icon}
                     />
                   );
                 })()}
