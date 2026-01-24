@@ -593,6 +593,78 @@ Deno.serve(async (req) => {
   
   console.log(`Calculated team-scoped commission for ${(teamGoals || []).length} teams with goals`);
 
+  // ============= LIGA POSITION KPIs =============
+  console.log("Calculating liga position KPIs...");
+
+  // Hent aktiv sæson (qualification eller active)
+  const { data: activeSeason } = await supabase
+    .from("league_seasons")
+    .select("id, status")
+    .in("status", ["qualification", "active"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeSeason) {
+    // Hent alle aktive standings
+    const { data: standings } = await supabase
+      .from("league_qualification_standings")
+      .select("employee_id, overall_rank, projected_division, projected_rank, current_provision, deals_count")
+      .eq("season_id", activeSeason.id);
+
+    for (const standing of (standings || [])) {
+      // Liga position (overall rank)
+      cachedValues.push({
+        kpi_slug: "liga_position",
+        period_type: "current",
+        scope_type: "employee",
+        scope_id: standing.employee_id,
+        value: standing.overall_rank,
+        formatted_value: `#${standing.overall_rank}`,
+        calculated_at: calculatedAt,
+      });
+
+      // Liga division
+      cachedValues.push({
+        kpi_slug: "liga_division",
+        period_type: "current",
+        scope_type: "employee",
+        scope_id: standing.employee_id,
+        value: standing.projected_division,
+        formatted_value: standing.projected_division === 1 
+          ? "Salgsligaen" 
+          : `${standing.projected_division}. division`,
+        calculated_at: calculatedAt,
+      });
+
+      // Rank inden for division
+      cachedValues.push({
+        kpi_slug: "liga_division_rank",
+        period_type: "current",
+        scope_type: "employee",
+        scope_id: standing.employee_id,
+        value: standing.projected_rank,
+        formatted_value: `#${standing.projected_rank}`,
+        calculated_at: calculatedAt,
+      });
+
+      // Liga provision
+      cachedValues.push({
+        kpi_slug: "liga_provision",
+        period_type: "current",
+        scope_type: "employee",
+        scope_id: standing.employee_id,
+        value: standing.current_provision || 0,
+        formatted_value: formatValue(standing.current_provision || 0, "commission"),
+        calculated_at: calculatedAt,
+      });
+    }
+
+    console.log(`Cached liga KPIs for ${(standings || []).length} enrolled employees`);
+  } else {
+    console.log("No active league season found - skipping liga KPIs");
+  }
+
     // ============= LEADERBOARD CACHE CALCULATION =============
     console.log("Calculating global leaderboards...");
     
