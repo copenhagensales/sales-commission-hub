@@ -86,21 +86,21 @@ export function HeroPulseWidget({
         )}
       />
 
-      <CardContent className="relative p-6">
+      <CardContent className="relative p-4">
         {/* Header */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Zap className={cn("h-5 w-5", config.colorClass)} />
-          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="flex items-center justify-center gap-1.5 mb-3">
+          <Zap className={cn("h-4 w-4", config.colorClass)} />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Din Puls
           </span>
-          <Zap className={cn("h-5 w-5", config.colorClass)} />
+          <Zap className={cn("h-4 w-4", config.colorClass)} />
         </div>
 
         {/* Main Pulse Circle */}
-        <div className="flex justify-center mb-4">
+        <div className="flex justify-center mb-3">
           <div
             className={cn(
-              "relative flex items-center justify-center w-36 h-36 rounded-full border-4",
+              "relative flex items-center justify-center w-24 h-24 rounded-full border-[3px]",
               config.borderClass,
               config.bgClass,
               config.pulseClass
@@ -109,7 +109,7 @@ export function HeroPulseWidget({
             {/* Inner glow effect */}
             <div
               className={cn(
-                "absolute inset-2 rounded-full opacity-30",
+                "absolute inset-1.5 rounded-full opacity-30",
                 config.bgClass
               )}
             />
@@ -118,7 +118,7 @@ export function HeroPulseWidget({
             <div className="relative z-10 text-center">
               <span
                 className={cn(
-                  "text-4xl font-bold tabular-nums",
+                  "text-2xl font-bold tabular-nums",
                   config.colorClass
                 )}
               >
@@ -129,24 +129,24 @@ export function HeroPulseWidget({
         </div>
 
         {/* Status label */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <StatusIcon className={cn("h-5 w-5", config.colorClass)} />
-          <span className={cn("text-lg font-semibold", config.colorClass)}>
+        <div className="flex items-center justify-center gap-1.5 mb-4">
+          <StatusIcon className={cn("h-4 w-4", config.colorClass)} />
+          <span className={cn("text-sm font-semibold", config.colorClass)}>
             {config.label}
           </span>
         </div>
 
         {/* Supporting chips */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col items-center p-3 rounded-lg bg-card/50 border border-border/50">
-            <span className="text-xs text-muted-foreground mb-1">I dag</span>
-            <span className="text-lg font-bold text-foreground">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col items-center p-2 rounded-lg bg-card/50 border border-border/50">
+            <span className="text-[10px] text-muted-foreground mb-0.5">I dag</span>
+            <span className="text-sm font-bold text-foreground">
               {formatCurrency(todayTotal)}
             </span>
           </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-card/50 border border-border/50">
-            <span className="text-xs text-muted-foreground mb-1">Dit snit</span>
-            <span className="text-lg font-bold text-foreground">
+          <div className="flex flex-col items-center p-2 rounded-lg bg-card/50 border border-border/50">
+            <span className="text-[10px] text-muted-foreground mb-0.5">Dit snit</span>
+            <span className="text-sm font-bold text-foreground">
               {formatCurrency(actualDailyAvg)}
             </span>
           </div>
