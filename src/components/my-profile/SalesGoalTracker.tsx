@@ -48,7 +48,7 @@ import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
 import { SalesProgressComparison } from "./SalesProgressComparison";
 import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
 import { HeroPulseWidget } from "./HeroPulseWidget";
-import { NextUnlockCard } from "./NextUnlockCard";
+
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
 import { usePreviousPeriodComparison } from "@/hooks/usePreviousPeriodComparison";
@@ -901,35 +901,6 @@ export function SalesGoalTracker({
                 />
               </CardContent>
             </Card>
-
-            {/* Next Unlock Card */}
-            {(() => {
-              // Find next achievement with progress
-              const achievementConfigs = createAchievementConfigs(achievementTargets);
-              const nextAchievementConfig = achievementConfigs.find(config => {
-                if (gamification.unlockedAchievementIds.includes(config.id)) return false;
-                if (!gamification.achievementData) return false;
-                const progress = config.getProgress(gamification.achievementData);
-                return progress && progress.current < progress.target;
-              });
-              
-              const nextAchievement = nextAchievementConfig && gamification.achievementData ? {
-                name: nextAchievementConfig.name,
-                icon: nextAchievementConfig.icon,
-                progress: nextAchievementConfig.getProgress(gamification.achievementData) || { current: 0, target: 1 },
-              } : undefined;
-
-              return (
-                <NextUnlockCard
-                  currentStreak={gamification.currentStreak}
-                  streakThresholds={gamificationConfig.streakThresholds}
-                  todayTotal={commissionStats.todayTotal}
-                  bestDayRecord={gamification.bestDayRecord?.record_value}
-                  nextAchievement={nextAchievement}
-                  priorityOrder={gamificationConfig.nextUnlockPriority}
-                />
-              );
-            })()}
 
             {previousPeriodData.hasData && (
               <Card>
