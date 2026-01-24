@@ -747,6 +747,9 @@ export function SalesGoalTracker({
                   <p className={`text-2xl font-bold ${kpis.willHitGoal ? 'text-success' : 'text-warning'}`}>
                     {Math.round(kpis.projectedFinal).toLocaleString("da-DK")} kr
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    + {Math.round(kpis.projectedFinal * 0.125).toLocaleString("da-DK")} kr feriepenge
+                  </p>
                 </div>
               </div>
 
