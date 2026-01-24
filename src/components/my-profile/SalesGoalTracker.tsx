@@ -763,12 +763,6 @@ export function SalesGoalTracker({
                         : `${Math.round(hourlyRateData.hourlyRate).toLocaleString("da-DK")} kr/t`
                       }
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {hourlyRateData.isLoading 
-                        ? "Beregner..."
-                        : `${hourlyRateData.effectiveHours.toFixed(1)}t (${hourlyRateData.workDays}d × ${hourlyRateData.breakDeductionPerDay}t pause)`
-                      }
-                    </p>
                   </div>
                 </div>
               </CardContent>
