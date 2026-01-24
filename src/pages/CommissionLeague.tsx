@@ -83,7 +83,7 @@ export default function CommissionLeague() {
     if (!season?.id) return;
     try {
       await enrollMutation.mutateAsync(season.id);
-      toast.success("Du er nu tilmeldt Cph Sales Ligaen! 🎉");
+      toast.success("Du er nu tilmeldt Salgsligaen! 🎉");
       // Trigger standings calculation
       handleCalculateStandings();
     } catch (error: any) {
@@ -140,7 +140,7 @@ export default function CommissionLeague() {
             <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
               <CardContent className="py-16 text-center">
                 <Trophy className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
-                <h1 className="text-2xl font-bold mb-2">Cph Sales Ligaen</h1>
+                <h1 className="text-2xl font-bold mb-2">Salgsligaen</h1>
                 <p className="text-muted-foreground mb-6">
                   Der er ingen aktiv sæson lige nu. Kom tilbage senere!
                 </p>
@@ -164,7 +164,7 @@ export default function CommissionLeague() {
             <div>
               <div className="flex items-center gap-3">
                 <Trophy className="h-8 w-8 text-yellow-500" />
-                <h1 className="text-2xl md:text-3xl font-bold">Cph Sales Ligaen</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">Salgsligaen</h1>
                 <Badge variant="secondary">Sæson {season.season_number}</Badge>
               </div>
               <p className="text-muted-foreground mt-1">
@@ -198,7 +198,7 @@ export default function CommissionLeague() {
                 <div className="grid md:grid-cols-2 gap-8 items-center">
                   <div>
                     <h2 className="text-2xl font-bold mb-4">
-                      🏆 Deltag i Cph Sales Ligaen!
+                      🏆 Deltag i Salgsligaen!
                     </h2>
                     <p className="text-muted-foreground mb-6">
                       Kæmp mod dine kolleger i et spændende liga-system baseret på din provision.

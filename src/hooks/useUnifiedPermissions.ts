@@ -233,7 +233,7 @@ export const permissionKeyLabels: Record<string, string> = {
   // ===== MIT HJEM (under menu_section_personal) =====
   menu_home: 'Hjem',
   menu_h2h: 'Head-to-Head',
-  menu_commission_league: 'Cph Sales Ligaen',
+  menu_commission_league: 'Salgsligaen',
   menu_league_admin: 'Liga Administration',
   menu_liga_test_board: 'Liga Test Board',
   menu_h2h_admin: 'H2H Admin',

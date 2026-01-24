@@ -111,7 +111,7 @@ export function LeaguePromoCard() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Trophy className="w-5 h-5 text-yellow-500" />
-            Cph Sales Ligaen
+            Salgsligaen
             <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30 text-[10px] font-bold animate-pulse">
               NY
             </Badge>
