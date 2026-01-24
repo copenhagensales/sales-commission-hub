@@ -33,12 +33,13 @@ export function useEffectiveHourlyRate(
         .from("kpi_definitions")
         .select("example_value")
         .eq("slug", "break_deduction_per_day")
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.warn("Could not fetch break_deduction_per_day KPI, using default 1:", error.message);
         return 1;
       }
+      // Default to 1 hour break deduction if no KPI definition exists
       return parseFloat(data?.example_value || "1");
     },
     staleTime: 1000 * 60 * 60, // Cache for 1 hour
