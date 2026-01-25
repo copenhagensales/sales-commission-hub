@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Zap, TrendingUp, Flame, Rocket, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,11 +23,12 @@ const STATUS_CONFIG = {
   flying: {
     label: "High Score! 🚀",
     icon: Rocket,
-    colorClass: "text-[hsl(160_84%_39%)]", // Electric teal
+    colorClass: "text-[hsl(160_84%_39%)]",
     bgClass: "bg-[hsl(160_84%_39%/0.15)]",
     borderClass: "border-[hsl(160_84%_39%/0.4)]",
     pulseClass: "hero-pulse-flying",
     gradient: "from-[hsl(160_84%_39%/0.25)] to-[hsl(160_84%_39%/0.05)]",
+    ringColor: "hsl(160 84% 39%)",
   },
   ahead: {
     label: "Kører godt! 💪",
@@ -37,6 +38,7 @@ const STATUS_CONFIG = {
     borderClass: "border-success/40",
     pulseClass: "hero-pulse-ahead",
     gradient: "from-success/20 to-success/5",
+    ringColor: "hsl(142 71% 45%)",
   },
   close: {
     label: "Tænd op! 🔥",
@@ -46,6 +48,7 @@ const STATUS_CONFIG = {
     borderClass: "border-amber-500/30",
     pulseClass: "hero-pulse-warmup",
     gradient: "from-amber-500/15 to-amber-500/5",
+    ringColor: "hsl(38 92% 50%)",
   },
   behind: {
     label: "Tid til boost!",
@@ -55,6 +58,7 @@ const STATUS_CONFIG = {
     borderClass: "border-primary/30",
     pulseClass: "hero-pulse-slow",
     gradient: "from-primary/15 to-primary/5",
+    ringColor: "hsl(161 93% 40%)",
   },
 };
 
@@ -65,9 +69,24 @@ export function HeroPulseWidget({
   thresholds,
   className,
 }: HeroPulseWidgetProps) {
+  const [isAnimating, setIsAnimating] = useState(true);
   const status = getPulseStatus(pulsePercent, thresholds);
   const config = STATUS_CONFIG[status];
   const StatusIcon = config.icon;
+
+  // Circle math: circumference = 2 * PI * radius
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  // Cap at 100% for the ring visual, but show actual % in number
+  const displayPercent = Math.min(pulsePercent, 100);
+  const offset = circumference - (displayPercent / 100) * circumference;
+
+  useEffect(() => {
+    // Reset animation when pulsePercent changes significantly
+    setIsAnimating(true);
+    const timer = setTimeout(() => setIsAnimating(false), 1500);
+    return () => clearTimeout(timer);
+  }, [Math.round(pulsePercent / 10)]); // Re-trigger on significant changes
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("da-DK", {
@@ -114,26 +133,64 @@ export function HeroPulseWidget({
           </TooltipProvider>
         </div>
 
-        {/* Main Pulse Circle */}
+        {/* Main Pulse Circle with SVG Ring */}
         <div className="flex justify-center mb-3">
           <div
             className={cn(
-              "relative flex items-center justify-center w-24 h-24 rounded-full border-[3px]",
-              config.borderClass,
-              config.bgClass,
+              "relative flex items-center justify-center w-28 h-28",
               config.pulseClass
             )}
           >
-            {/* Inner glow effect */}
+            {/* SVG Ring */}
+            <svg
+              className="absolute inset-0 w-full h-full -rotate-90"
+              viewBox="0 0 100 100"
+            >
+              {/* Background ring */}
+              <circle
+                cx="50"
+                cy="50"
+                r={radius}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
+                className="text-muted/30"
+              />
+              {/* Animated progress ring */}
+              <circle
+                cx="50"
+                cy="50"
+                r={radius}
+                fill="none"
+                stroke={config.ringColor}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={isAnimating ? circumference : offset}
+                className={cn(
+                  "transition-all duration-1000 ease-out",
+                  isAnimating && "pulse-ring-animated"
+                )}
+                style={{ 
+                  "--pulse-offset": offset,
+                  filter: `drop-shadow(0 0 8px ${config.ringColor})`
+                } as React.CSSProperties}
+              />
+            </svg>
+
+            {/* Inner circle with glow */}
             <div
               className={cn(
-                "absolute inset-1.5 rounded-full opacity-30",
+                "absolute inset-3 rounded-full",
                 config.bgClass
               )}
             />
 
             {/* Percentage display */}
-            <div className="relative z-10 text-center">
+            <div className={cn(
+              "relative z-10 text-center",
+              isAnimating && "pulse-number-animated"
+            )}>
               <span
                 className={cn(
                   "text-2xl font-bold tabular-nums",
