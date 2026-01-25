@@ -915,36 +915,21 @@ export function SalesGoalTracker({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Gamification Section - Records & Streaks + Comparison */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className={!previousPeriodData.hasData ? "md:col-span-2" : ""}>
-              <CardContent className="p-4">
-                <SalesRecords
-                  bestDayRecord={gamification.bestDayRecord}
-                  bestWeekRecord={gamification.bestWeekRecord}
-                  longestStreak={gamification.longestStreak}
-                  currentStreak={gamification.currentStreak}
-                  todayTotal={commissionStats.todayTotal}
-                  currentPeriodTotal={commissionStats.periodTotal}
-                  dailyTarget={kpis.todayTarget}
-                  hitDailyGoal={commissionStats.todayTotal >= kpis.todayTarget}
-                />
-              </CardContent>
-            </Card>
-
-            {previousPeriodData.hasData && (
-              <Card>
-                <CardContent className="p-4">
-                  <SalesProgressComparison
-                    currentPeriodTotal={commissionStats.periodTotal}
-                    daysPassedInPeriod={workingDaysData.passed}
-                    previousPeriodTotal={previousPeriodData.previousPeriodTotal}
-                    previousPeriodAtSameDay={previousPeriodData.previousPeriodAtSameDay}
-                  />
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          {/* Gamification Section - Records & Streaks */}
+          <Card>
+            <CardContent className="p-4">
+              <SalesRecords
+                bestDayRecord={gamification.bestDayRecord}
+                bestWeekRecord={gamification.bestWeekRecord}
+                longestStreak={gamification.longestStreak}
+                currentStreak={gamification.currentStreak}
+                todayTotal={commissionStats.todayTotal}
+                currentPeriodTotal={commissionStats.periodTotal}
+                dailyTarget={kpis.todayTarget}
+                hitDailyGoal={commissionStats.todayTotal >= kpis.todayTarget}
+              />
+            </CardContent>
+          </Card>
 
           {/* Progression Chart with Race Track Zones */}
           <Card>
