@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Zap, TrendingUp, TrendingDown, Minus, Flame, Rocket, Target, HelpCircle } from "lucide-react";
+import { Zap, TrendingUp, Flame, Rocket, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PulseThresholds, getPulseStatus } from "@/hooks/useGamificationConfig";
 import {
@@ -18,42 +18,43 @@ interface HeroPulseWidgetProps {
   className?: string;
 }
 
+// Flipped narrative: Focus on achievements, not gaps
 const STATUS_CONFIG = {
   flying: {
-    label: "Flyver! 🚀",
+    label: "High Score! 🚀",
     icon: Rocket,
-    colorClass: "text-success",
-    bgClass: "bg-success/10",
-    borderClass: "border-success/30",
+    colorClass: "text-[hsl(160_84%_39%)]", // Electric teal
+    bgClass: "bg-[hsl(160_84%_39%/0.15)]",
+    borderClass: "border-[hsl(160_84%_39%/0.4)]",
     pulseClass: "hero-pulse-flying",
-    gradient: "from-success/20 to-success/5",
+    gradient: "from-[hsl(160_84%_39%/0.25)] to-[hsl(160_84%_39%/0.05)]",
   },
   ahead: {
-    label: "Foran plan",
+    label: "Kører godt! 💪",
     icon: TrendingUp,
     colorClass: "text-success",
-    bgClass: "bg-success/10",
-    borderClass: "border-success/30",
+    bgClass: "bg-success/15",
+    borderClass: "border-success/40",
     pulseClass: "hero-pulse-ahead",
-    gradient: "from-success/15 to-success/5",
+    gradient: "from-success/20 to-success/5",
   },
   close: {
-    label: "Tæt på mål",
-    icon: Target,
-    colorClass: "text-warning",
-    bgClass: "bg-warning/10",
-    borderClass: "border-warning/30",
-    pulseClass: "hero-pulse-close",
-    gradient: "from-warning/15 to-warning/5",
+    label: "Tænd op! 🔥",
+    icon: Flame,
+    colorClass: "text-amber-400",
+    bgClass: "bg-amber-500/10",
+    borderClass: "border-amber-500/30",
+    pulseClass: "hero-pulse-warmup",
+    gradient: "from-amber-500/15 to-amber-500/5",
   },
   behind: {
-    label: "Gap til plan",
-    icon: TrendingDown,
-    colorClass: "text-destructive",
-    bgClass: "bg-destructive/10",
-    borderClass: "border-destructive/30",
-    pulseClass: "hero-pulse-behind",
-    gradient: "from-destructive/15 to-destructive/5",
+    label: "Tid til boost!",
+    icon: Zap,
+    colorClass: "text-primary",
+    bgClass: "bg-primary/10",
+    borderClass: "border-primary/30",
+    pulseClass: "hero-pulse-slow",
+    gradient: "from-primary/15 to-primary/5",
   },
 };
 
