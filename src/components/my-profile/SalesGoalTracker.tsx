@@ -373,6 +373,18 @@ export function SalesGoalTracker({
     }
   }, [gamification.hitDailyGoal, currentGoal]);
 
+  // Celebrate new records
+  useEffect(() => {
+    if (gamification.newRecordType) {
+      const recordText = gamification.newRecordType === "best_day" 
+        ? "Ny dagsrekord! 🏆" 
+        : "Ny ugerekord! 🏆";
+      setCelebrationConfig({ effect: "fireworks", text: recordText });
+      setShowCelebration(true);
+      gamification.clearNewRecord();
+    }
+  }, [gamification.newRecordType]);
+
   const handleSaveGoal = () => {
     const amount = parseInt(goalInput);
     if (isNaN(amount) || amount <= 0) {
