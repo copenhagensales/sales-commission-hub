@@ -757,6 +757,7 @@ export function SalesGoalTracker({
               
               {/* Power Moves - Financial Milestones */}
               <PowerMovesMilestones 
+                currentAmount={Math.round(kpis.currentAmount)}
                 projectedAmount={Math.round(kpis.projectedFinal)} 
                 className="mt-4 pt-4 border-t border-border/50"
               />
