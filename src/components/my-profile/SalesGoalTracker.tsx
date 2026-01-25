@@ -696,13 +696,6 @@ export function SalesGoalTracker({
         )}
       </Card>
 
-      {/* Motivational Quote */}
-      {currentGoal && (
-        <SalesMotivationalQuote 
-          quote={gamification.motivationalQuote} 
-          status={gamification.performanceStatus} 
-        />
-      )}
 
       {currentGoal && (
         <>
