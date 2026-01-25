@@ -696,18 +696,6 @@ export function SalesGoalTracker({
         )}
       </Card>
 
-      {/* Extra Effort Suggestions */}
-      {currentGoal && kpis.hourlyRate > 0 && (
-        <SalesExtraEffortSuggestions
-          hourlyRate={kpis.hourlyRate}
-          amountRemaining={kpis.amountRemaining}
-          currentAmount={kpis.currentAmount}
-          targetAmount={kpis.targetAmount}
-          status={kpis.performanceStatus}
-          bestDayRecord={gamification.bestDayRecord?.record_value}
-        />
-      )}
-
       {/* Motivational Quote */}
       {currentGoal && (
         <SalesMotivationalQuote 
@@ -930,6 +918,18 @@ export function SalesGoalTracker({
               />
             </CardContent>
           </Card>
+
+          {/* Extra Effort Suggestions - Below Records */}
+          {kpis.hourlyRate > 0 && (
+            <SalesExtraEffortSuggestions
+              hourlyRate={kpis.hourlyRate}
+              amountRemaining={kpis.amountRemaining}
+              currentAmount={kpis.currentAmount}
+              targetAmount={kpis.targetAmount}
+              status={kpis.performanceStatus}
+              bestDayRecord={gamification.bestDayRecord?.record_value}
+            />
+          )}
 
           {/* Progression Chart with Race Track Zones */}
           <Card>
