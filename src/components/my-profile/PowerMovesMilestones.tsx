@@ -19,19 +19,12 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
   return (
     <div className={cn("space-y-3", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Din Power Move-rejse</span>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{currentAmount.toLocaleString("da-DK")} kr</span>
-          <span className="mx-1">→</span>
-          <span className="font-semibold text-primary">{projectedAmount.toLocaleString("da-DK")} kr</span>
-        </div>
+      <div className="flex items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Din Power Move-rejse</span>
       </div>
 
-      {/* Thick progress bar with crown at the end */}
+      {/* Thick progress bar */}
       <div className="flex items-center gap-3">
         <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">0 kr</span>
         <div className="flex-1 relative h-5 bg-muted rounded-full overflow-hidden">
@@ -46,7 +39,7 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
             style={{ width: `${currentProgress}%` }}
           />
         </div>
-        <span className="text-2xl" title="50.000 kr - Boss Mode">👑</span>
+        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">50k</span>
       </div>
 
       {/* Simple legend */}
