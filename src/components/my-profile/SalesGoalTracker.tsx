@@ -20,6 +20,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Pencil,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -250,6 +251,7 @@ export function SalesGoalTracker({
   const [goalInput, setGoalInput] = useState("");
   const [showCelebration, setShowCelebration] = useState(false);
   const [kpiCardsOpen, setKpiCardsOpen] = useState(true);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [celebrationConfig, setCelebrationConfig] = useState<{
     effect: "fireworks" | "confetti" | "stars" | "flames";
     text: string;
@@ -336,6 +338,7 @@ export function SalesGoalTracker({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-goal", employeeId] });
       toast.success("Salgsmål gemt");
+      setIsEditingGoal(false);
     },
     onError: () => {
       toast.error("Kunne ikke gemme salgsmål");
@@ -627,42 +630,70 @@ export function SalesGoalTracker({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <SalesAvatar totalEarned={gamification.totalEarned} showProgress={false} />
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Sæt dit salgsmål for lønperioden
-              </CardTitle>
+              {currentGoal && !isEditingGoal ? (
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Dit mål: {currentGoal.target_amount.toLocaleString("da-DK")} kr
+                </CardTitle>
+              ) : (
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  {currentGoal ? "Rediger dit mål" : "Sæt dit salgsmål for lønperioden"}
+                </CardTitle>
+              )}
             </div>
-            <SalesStreakBadge 
-              currentStreak={gamification.currentStreak} 
-              streakAtRisk={gamification.streakAtRisk}
-            />
+            <div className="flex items-center gap-2">
+              <SalesStreakBadge 
+                currentStreak={gamification.currentStreak} 
+                streakAtRisk={gamification.streakAtRisk}
+              />
+              {currentGoal && !isEditingGoal && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditingGoal(true)}
+                  className="h-8 w-8"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="text-sm text-muted-foreground mb-1.5 block">
-                Mål i provision (DKK)
-              </label>
-              <Input
-                type="number"
-                placeholder="F.eks. 50000"
-                value={goalInput}
-                onChange={(e) => setGoalInput(e.target.value)}
-                className="text-lg font-medium"
-              />
+        {(!currentGoal || isEditingGoal) && (
+          <CardContent>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="text-sm text-muted-foreground mb-1.5 block">
+                  Mål i provision (DKK)
+                </label>
+                <Input
+                  type="number"
+                  placeholder="F.eks. 50000"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  className="text-lg font-medium"
+                />
+              </div>
+              <Button 
+                onClick={handleSaveGoal} 
+                disabled={saveGoalMutation.isPending}
+                className="gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                {currentGoal ? "Gem" : "Sæt mål"}
+              </Button>
+              {currentGoal && (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditingGoal(false)}
+                >
+                  Annuller
+                </Button>
+              )}
             </div>
-            <Button 
-              onClick={handleSaveGoal} 
-              disabled={saveGoalMutation.isPending}
-              className="gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              {currentGoal ? "Opdater mål" : "Sæt mål"}
-            </Button>
-          </div>
-          
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
       {/* Extra Effort Suggestions */}
