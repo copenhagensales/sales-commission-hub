@@ -30,12 +30,12 @@ export function CompactKpiChips({
       bgClass: "bg-primary/10 border-primary/20",
     },
     {
-      label: "Dit tempo",
-      value: `${Math.abs(Math.round(trendPercent))}%`,
-      subLabel: isAhead ? "foran 🚀" : "boost-mulighed",
-      icon: isAhead ? TrendingUp : Zap,
-      colorClass: isAhead ? "text-success" : "text-primary",
-      bgClass: isAhead ? "bg-success/10 border-success/20" : "bg-primary/10 border-primary/20",
+      label: "Dagligt mål",
+      value: `${Math.round(dailyNeededFromNow).toLocaleString("da-DK")} kr`,
+      subLabel: "for at nå målet",
+      icon: TrendingUp,
+      colorClass: "text-primary",
+      bgClass: "bg-primary/10 border-primary/20",
     },
     {
       label: "Din timeløn",
