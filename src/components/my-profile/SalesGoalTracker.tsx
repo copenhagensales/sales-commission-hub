@@ -749,17 +749,18 @@ export function SalesGoalTracker({
                   <p className={`text-2xl font-bold ${kpis.willHitGoal ? 'text-success' : 'text-warning'}`}>
                     {Math.round(kpis.projectedFinal).toLocaleString("da-DK")} kr
                   </p>
-              <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     + {Math.round(kpis.projectedFinal * 0.125).toLocaleString("da-DK")} kr feriepenge
                   </p>
-                  {/* Power Moves - Compact inline milestone info */}
-                  <PowerMovesMilestones 
-                    currentAmount={Math.round(kpis.currentAmount)}
-                    projectedAmount={Math.round(kpis.projectedFinal)} 
-                    className="mt-2"
-                  />
                 </div>
               </div>
+              
+              {/* Power Moves - Financial Milestones */}
+              <PowerMovesMilestones 
+                currentAmount={Math.round(kpis.currentAmount)}
+                projectedAmount={Math.round(kpis.projectedFinal)} 
+                className="mt-4 pt-4 border-t border-border/50"
+              />
 
               {/* Hero Pulse Widget - Replaces the 3 Motivational Chips */}
               {(() => {
