@@ -1,65 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Target } from "lucide-react";
-
-const POWER_MOVES = [
-  { 
-    amount: 10000, 
-    name: "The Shield", 
-    emoji: "🛡️",
-    vibe: "Stress-fri zone",
-    description: "Første buffer. Du kan sige nej til overarbejde."
-  },
-  { 
-    amount: 15000, 
-    name: "The Starter", 
-    emoji: "🌱",
-    vibe: "Momentum",
-    description: "Råd til oplevelser. Spontane planer unlocked."
-  },
-  { 
-    amount: 20000, 
-    name: "The Player", 
-    emoji: "🎯",
-    vibe: "I spil",
-    description: "Weekend-trips unlocked. Du lever, ikke bare overlever."
-  },
-  { 
-    amount: 25000, 
-    name: "The Seed", 
-    emoji: "💰",
-    vibe: "Bliv banken",
-    description: "Investeringskapital. Passiv indkomst starter her."
-  },
-  { 
-    amount: 30000, 
-    name: "The Builder", 
-    emoji: "🏗️",
-    vibe: "Fundament",
-    description: "Fundamentet er sat. Alt herfra er ren bonus."
-  },
-  { 
-    amount: 35000, 
-    name: "The Accelerator", 
-    emoji: "⚡",
-    vibe: "Fuld fart",
-    description: "Fuld fart fremad. Ingen bremser. Kun grønt lys."
-  },
-  { 
-    amount: 40000, 
-    name: "The Veteran", 
-    emoji: "🎖️",
-    vibe: "Erfaring",
-    description: "Du ved hvad du laver. Det her er skills, ikke held."
-  },
-  { 
-    amount: 50000, 
-    name: "The Multiplier", 
-    emoji: "👑",
-    vibe: "Boss Mode",
-    description: "Du bygger imperium. Kapital til de store træk."
-  },
-];
+import { TrendingUp } from "lucide-react";
 
 interface PowerMovesMilestonesProps {
   currentAmount: number;
@@ -67,31 +7,18 @@ interface PowerMovesMilestonesProps {
   className?: string;
 }
 
+const MAX_AMOUNT = 50000;
+
 export function PowerMovesMilestones({ currentAmount, projectedAmount, className }: PowerMovesMilestonesProps) {
-  const maxAmount = POWER_MOVES[POWER_MOVES.length - 1].amount;
-  
   // Current position (what you have NOW)
-  const currentProgress = Math.min(100, (currentAmount / maxAmount) * 100);
-  const currentNextMilestone = POWER_MOVES.find(m => currentAmount < m.amount) || null;
-  const currentDistanceToNext = currentNextMilestone 
-    ? currentNextMilestone.amount - currentAmount 
-    : 0;
-  const currentProgressToNext = currentNextMilestone 
-    ? Math.min(100, Math.round((currentAmount / currentNextMilestone.amount) * 100))
-    : 100;
+  const currentProgress = Math.min(100, (currentAmount / MAX_AMOUNT) * 100);
   
   // Projected position (where you'll END UP)
-  const projectedProgress = Math.min(100, (projectedAmount / maxAmount) * 100);
-  const projectedAchievedMilestones = POWER_MOVES.filter(m => projectedAmount >= m.amount);
-  const projectedLastAchieved = projectedAchievedMilestones[projectedAchievedMilestones.length - 1] || null;
-  const projectedNextMilestone = POWER_MOVES.find(m => projectedAmount < m.amount) || null;
-  const projectedDistanceToNext = projectedNextMilestone 
-    ? projectedNextMilestone.amount - projectedAmount 
-    : 0;
+  const projectedProgress = Math.min(100, (projectedAmount / MAX_AMOUNT) * 100);
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Header with context */}
+    <div className={cn("space-y-3", className)}>
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" />
@@ -104,129 +31,34 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
         </div>
       </div>
 
-      {/* Compact Emoji Timeline */}
-      <div className="relative py-3">
-        {/* Emoji markers on single line */}
-        <div className="flex justify-between items-center px-1 mb-2">
-          {POWER_MOVES.map((milestone) => {
-            const isCurrentlyAchieved = currentAmount >= milestone.amount;
-            const isProjectedAchieved = projectedAmount >= milestone.amount;
-            return (
-              <div
-                key={milestone.amount}
-                className={cn(
-                  "text-base transition-all duration-300 cursor-default",
-                  isCurrentlyAchieved 
-                    ? "opacity-100 scale-110" 
-                    : isProjectedAchieved 
-                      ? "opacity-60" 
-                      : "opacity-25 grayscale"
-                )}
-                title={`${milestone.name} - ${milestone.amount.toLocaleString("da-DK")} kr: ${milestone.description}`}
-              >
-                {milestone.emoji}
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* Simplified dual progress bar */}
-        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-          {/* Projected progress (striped) */}
+      {/* Thick progress bar with crown at the end */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">0 kr</span>
+        <div className="flex-1 relative h-5 bg-muted rounded-full overflow-hidden">
+          {/* Projected progress (lighter) */}
           <div 
-            className="absolute inset-y-0 left-0 bg-primary/25 rounded-full transition-all duration-700 ease-out"
+            className="absolute inset-y-0 left-0 bg-primary/30 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${projectedProgress}%` }}
           />
-          {/* Current progress (solid) */}
+          {/* Current progress (solid green) */}
           <div 
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-success to-success/80 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${currentProgress}%` }}
           />
         </div>
-        
-        {/* Minimal legend */}
-        <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
-          <span>● Du er her</span>
-          <span>○ Målpunkt</span>
-        </div>
+        <span className="text-2xl" title="50.000 kr - Boss Mode">👑</span>
       </div>
 
-      {/* Milestone Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Current: Next Unlock */}
-        {currentNextMilestone && (
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-              <Target className="h-3 w-3" />
-              <span>Næste unlock</span>
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{currentNextMilestone.emoji}</span>
-                <div>
-                  <p className="font-semibold">{currentNextMilestone.name}</p>
-                  <p className="text-xs text-muted-foreground">{currentNextMilestone.amount.toLocaleString("da-DK")} kr</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-foreground">
-                  {currentDistanceToNext.toLocaleString("da-DK")} kr
-                </p>
-                <p className="text-xs text-muted-foreground">mangler</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground italic mb-2">"{currentNextMilestone.description}"</p>
-            <div className="flex items-center gap-2">
-              <Progress value={currentProgressToNext} className="h-1.5 flex-1" />
-              <span className="text-xs font-medium">{currentProgressToNext}%</span>
-            </div>
-          </div>
-        )}
-
-        {/* Projected: End of month */}
-        <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
-          <div className="flex items-center gap-1.5 text-xs text-primary mb-2">
-            <TrendingUp className="h-3 w-3" />
-            <span>Ved månedens udgang</span>
-          </div>
-          
-          {projectedLastAchieved && (
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{projectedLastAchieved.emoji}</span>
-              <div>
-                <p className="font-semibold text-primary">{projectedLastAchieved.name}</p>
-                <p className="text-xs text-muted-foreground">{projectedLastAchieved.amount.toLocaleString("da-DK")} kr</p>
-              </div>
-            </div>
-          )}
-          
-          {projectedNextMilestone ? (
-            <p className="text-xs text-muted-foreground">
-              + <span className="font-semibold text-primary">{projectedNextMilestone.name}</span> kun{" "}
-              <span className="font-bold">{projectedDistanceToNext.toLocaleString("da-DK")} kr</span> væk!
-            </p>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-lg">👑</span>
-              <p className="text-xs font-semibold text-primary">Boss Mode Unlocked!</p>
-            </div>
-          )}
-          
-          <p className="text-xs text-muted-foreground mt-2 italic">Hvis du holder dit tempo</p>
-        </div>
-
-        {/* All current milestones achieved */}
-        {!currentNextMilestone && (
-          <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">👑</span>
-              <div>
-                <p className="font-bold text-warning">Boss Mode Aktiv!</p>
-                <p className="text-xs text-muted-foreground">Du har nået alle milestones. Legend.</p>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Simple legend */}
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>
+          <span className="inline-block w-2 h-2 rounded-full bg-success mr-1.5" />
+          Du er her
+        </span>
+        <span>
+          <span className="inline-block w-2 h-2 rounded-full bg-primary/30 mr-1.5" />
+          Målpunkt
+        </span>
       </div>
     </div>
   );
