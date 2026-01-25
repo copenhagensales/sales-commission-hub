@@ -28,7 +28,7 @@ interface HeroStatusCardProps {
 
 const STATUS_CONFIG = {
   flying: {
-    label: "High Score! 🚀",
+    label: "Over dit snit! 🚀",
     icon: Rocket,
     colorClass: "text-[hsl(160_84%_39%)]",
     bgClass: "bg-[hsl(160_84%_39%/0.15)]",
@@ -36,7 +36,7 @@ const STATUS_CONFIG = {
     ringColor: "hsl(160 84% 39%)",
   },
   ahead: {
-    label: "Kører godt! 💪",
+    label: "Foran dit snit 💪",
     icon: TrendingUp,
     colorClass: "text-success",
     bgClass: "bg-success/15",
@@ -44,7 +44,7 @@ const STATUS_CONFIG = {
     ringColor: "hsl(142 71% 45%)",
   },
   close: {
-    label: "Tænd op! 🔥",
+    label: "Tæt på dit snit 🔥",
     icon: Flame,
     colorClass: "text-amber-400",
     bgClass: "bg-amber-500/10",
@@ -52,7 +52,7 @@ const STATUS_CONFIG = {
     ringColor: "hsl(38 92% 50%)",
   },
   behind: {
-    label: "Tid til boost!",
+    label: "Under dit snit ⚡",
     icon: Zap,
     colorClass: "text-primary",
     bgClass: "bg-primary/10",
