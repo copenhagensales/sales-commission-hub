@@ -127,7 +127,7 @@ export function SalesExtraEffortSuggestions({
                 <Lightbulb className="h-4 w-4 text-amber-400" />
               </div>
               <p className="text-sm font-medium">
-                {isBehind ? "Sådan indhenter du målet" : "Push dit mål endnu højere!"}
+                Sådan tjener du ekstra 💰
               </p>
             </div>
             <div className="flex items-center gap-2">
