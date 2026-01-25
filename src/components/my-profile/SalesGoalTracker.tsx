@@ -718,18 +718,6 @@ export function SalesGoalTracker({
                 </div>
               </div>
               
-              {/* Supportive microcopy for gap */}
-              {/* Positive framing: What they CAN achieve */}
-              {!kpis.isAhead && !kpis.isOnTrack && (
-                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-primary">
-                    <span className="font-medium">🎯 Dagens boost-mål:</span> {Math.round(kpis.gapToTrack).toLocaleString("da-DK")} kr ekstra = tilbage på sporet!
-                  </p>
-                  <p className="text-xs text-primary/70 mt-1">
-                    Du har allerede {kpis.currentAmount.toLocaleString("da-DK")} kr i perioden 🔥
-                  </p>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
