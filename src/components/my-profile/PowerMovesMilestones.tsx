@@ -104,31 +104,25 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
         </div>
       </div>
 
-      {/* Dual Progress Timeline */}
-      <div className="relative pt-6 pb-2">
-        {/* Emoji markers */}
-        <div className="absolute top-0 left-0 right-0 flex justify-between px-1">
+      {/* Compact Emoji Timeline */}
+      <div className="relative py-3">
+        {/* Emoji markers on single line */}
+        <div className="flex justify-between items-center px-1 mb-2">
           {POWER_MOVES.map((milestone) => {
             const isCurrentlyAchieved = currentAmount >= milestone.amount;
             const isProjectedAchieved = projectedAmount >= milestone.amount;
-            const position = (milestone.amount / maxAmount) * 100;
             return (
               <div
                 key={milestone.amount}
                 className={cn(
-                  "text-sm transition-all duration-300",
+                  "text-base transition-all duration-300 cursor-default",
                   isCurrentlyAchieved 
                     ? "opacity-100 scale-110" 
                     : isProjectedAchieved 
-                      ? "opacity-70" 
-                      : "opacity-30 grayscale"
+                      ? "opacity-60" 
+                      : "opacity-25 grayscale"
                 )}
-                style={{ 
-                  position: 'absolute', 
-                  left: `${position}%`, 
-                  transform: 'translateX(-50%)' 
-                }}
-                title={`${milestone.name} - ${milestone.amount.toLocaleString("da-DK")} kr`}
+                title={`${milestone.name} - ${milestone.amount.toLocaleString("da-DK")} kr: ${milestone.description}`}
               >
                 {milestone.emoji}
               </div>
@@ -136,47 +130,24 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
           })}
         </div>
         
-        {/* Dual progress bar */}
-        <div className="relative h-3 bg-muted rounded-full overflow-hidden">
-          {/* Projected progress (striped/lighter) */}
+        {/* Simplified dual progress bar */}
+        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+          {/* Projected progress (striped) */}
           <div 
-            className="absolute inset-y-0 left-0 bg-primary/30 rounded-full transition-all duration-700 ease-out"
-            style={{ 
-              width: `${projectedProgress}%`,
-              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.1) 4px, rgba(255,255,255,0.1) 8px)'
-            }}
+            className="absolute inset-y-0 left-0 bg-primary/25 rounded-full transition-all duration-700 ease-out"
+            style={{ width: `${projectedProgress}%` }}
           />
           {/* Current progress (solid) */}
           <div 
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-success to-primary rounded-full transition-all duration-700 ease-out"
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-success to-success/80 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${currentProgress}%` }}
           />
-          {/* Current position marker */}
-          <div 
-            className="absolute top-1/2 w-4 h-4 bg-success rounded-full border-2 border-background shadow-lg transition-all duration-500 z-10"
-            style={{ left: `${currentProgress}%`, transform: 'translate(-50%, -50%)' }}
-            title="Du er her nu"
-          />
-          {/* Projected position marker */}
-          {projectedProgress > currentProgress && (
-            <div 
-              className="absolute top-1/2 w-3 h-3 bg-primary rounded-full border-2 border-background shadow-md transition-all duration-500"
-              style={{ left: `${projectedProgress}%`, transform: 'translate(-50%, -50%)' }}
-              title="Målpunkt ved månedens udgang"
-            />
-          )}
         </div>
         
-        {/* Legend */}
-        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-success" />
-            <span>Du er her</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            <span>Målpunkt</span>
-          </div>
+        {/* Minimal legend */}
+        <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
+          <span>● Du er her</span>
+          <span>○ Målpunkt</span>
         </div>
       </div>
 
