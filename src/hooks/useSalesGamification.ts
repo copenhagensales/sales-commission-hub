@@ -4,6 +4,7 @@ import { useMemo, useEffect, useRef } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
+import { format, startOfWeek } from "date-fns";
 
 interface UseSalesGamificationProps {
   employeeId: string;
@@ -16,6 +17,7 @@ interface UseSalesGamificationProps {
   totalDaysInPeriod: number;
   dailyTarget: number;
   todayTotal: number;
+  currentWeekTotal: number;
 }
 
 export function useSalesGamification({
@@ -29,6 +31,7 @@ export function useSalesGamification({
   totalDaysInPeriod,
   dailyTarget,
   todayTotal,
+  currentWeekTotal,
 }: UseSalesGamificationProps) {
   const queryClient = useQueryClient();
 
@@ -309,6 +312,7 @@ export function useSalesGamification({
   // Auto-initialize records if they don't exist and we have data
   const hasInitializedRecordsRef = useRef(false);
   const hasInitializedLevelRef = useRef(false);
+  const hasInitializedWeekRecordRef = useRef(false);
   
   useEffect(() => {
     if (hasInitializedRecordsRef.current) return;
@@ -355,6 +359,37 @@ export function useSalesGamification({
       });
     }
   }, [todayTotal, bestDayRecord?.record_value, employeeId, records]);
+
+  // Initialize best week record if it doesn't exist
+  useEffect(() => {
+    if (hasInitializedWeekRecordRef.current) return;
+    if (!employeeId || records === undefined) return;
+    if (currentWeekTotal <= 0) return;
+    
+    if (!bestWeekRecord) {
+      hasInitializedWeekRecordRef.current = true;
+      updateRecordMutation.mutate({
+        recordType: "best_week",
+        recordValue: Math.round(currentWeekTotal),
+        periodReference: format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"),
+      });
+    }
+  }, [employeeId, records, currentWeekTotal, bestWeekRecord]);
+
+  // Update best week record if current week exceeds it
+  useEffect(() => {
+    if (!employeeId || records === undefined) return;
+    if (currentWeekTotal <= 0) return;
+    
+    const currentBestWeek = bestWeekRecord?.record_value || 0;
+    if (currentWeekTotal > currentBestWeek && bestWeekRecord) {
+      updateRecordMutation.mutate({
+        recordType: "best_week",
+        recordValue: Math.round(currentWeekTotal),
+        periodReference: format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"),
+      });
+    }
+  }, [currentWeekTotal, bestWeekRecord?.record_value, employeeId, records]);
 
   return {
     // Streak

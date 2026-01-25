@@ -24,7 +24,7 @@ import {
   ReferenceLine,
   Scatter,
 } from "recharts";
-import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
+import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay, startOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
@@ -132,6 +132,31 @@ export function SalesGoalTracker({
       return data;
     },
   });
+
+  // Fetch current week commission
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+
+  const { data: weekSalesData } = useQuery({
+    queryKey: ["week-commission", employeeId, weekStartStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("mapped_commission, sales!inner(employee_id, sale_date)")
+        .eq("sales.employee_id", employeeId)
+        .gte("sales.sale_date", weekStartStr);
+      
+      if (error) throw error;
+      
+      const total = (data || []).reduce((sum, item) => 
+        sum + (item.mapped_commission || 0), 0
+      );
+      return total;
+    },
+    enabled: !!employeeId,
+  });
+
+  const currentWeekTotal = weekSalesData || 0;
 
   // Initialize input when goal loads
   useEffect(() => {
@@ -319,6 +344,7 @@ export function SalesGoalTracker({
     totalDaysInPeriod: workingDaysData.total,
     dailyTarget: kpis.todayTarget,
     todayTotal: commissionStats.todayTotal,
+    currentWeekTotal,
   });
 
   const processedAchievementsRef = useRef<Set<string>>(new Set());
@@ -495,6 +521,7 @@ export function SalesGoalTracker({
                 longestStreak={gamification.longestStreak}
                 currentStreak={gamification.currentStreak}
                 todayTotal={commissionStats.todayTotal}
+                currentWeekTotal={currentWeekTotal}
                 hitDailyGoal={commissionStats.todayTotal >= kpis.todayTarget}
               />
             </CardContent>
