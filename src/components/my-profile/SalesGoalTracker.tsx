@@ -662,21 +662,6 @@ export function SalesGoalTracker({
             </Button>
           </div>
           
-          {currentGoal && (
-            <div className="mt-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Fremdrift mod mål</span>
-                <span className="font-medium">
-                  {kpis.currentAmount.toLocaleString("da-DK")} / {kpis.targetAmount.toLocaleString("da-DK")} kr
-                </span>
-              </div>
-              <MilestoneProgressBar 
-                progress={kpis.progressPercent} 
-                targetAmount={kpis.targetAmount}
-                currentAmount={kpis.currentAmount}
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
 
