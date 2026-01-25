@@ -140,11 +140,22 @@ export function SalesGoalTracker({
   const { data: weekSalesData } = useQuery({
     queryKey: ["week-commission", employeeId, weekStartStr],
     queryFn: async () => {
+      // First get the employee's agent mapping
+      const { data: mapping } = await supabase
+        .from("employee_agent_mapping")
+        .select("agent_id, agents(name)")
+        .eq("employee_id", employeeId)
+        .maybeSingle();
+
+      const agentName = mapping?.agents?.name;
+      if (!agentName) return 0;
+
+      // Get sale items for the current week using agent_name
       const { data, error } = await supabase
         .from("sale_items")
-        .select("mapped_commission, sales!inner(employee_id, sale_date)")
-        .eq("sales.employee_id", employeeId)
-        .gte("sales.sale_date", weekStartStr);
+        .select("mapped_commission, sales!inner(agent_name, sale_datetime)")
+        .eq("sales.agent_name", agentName)
+        .gte("sales.sale_datetime", `${weekStartStr}T00:00:00`);
       
       if (error) throw error;
       
