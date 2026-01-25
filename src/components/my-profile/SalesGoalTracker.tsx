@@ -41,7 +41,7 @@ import { useSalesGamification } from "@/hooks/useSalesGamification";
 import { usePerformanceThresholds, DEFAULT_THRESHOLDS, type PerformanceThresholds } from "@/hooks/usePerformanceThresholds";
 import { useGamificationConfig, getPulseStatus } from "@/hooks/useGamificationConfig";
 import { SalesStreakBadge } from "./SalesStreakBadge";
-import { SalesAchievements } from "./SalesAchievements";
+// SalesAchievements removed - functionality merged into SalesRecords
 import { SalesRecords } from "./SalesRecords";
 import { SalesAvatar } from "./SalesAvatar";
 import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
@@ -890,9 +890,9 @@ export function SalesGoalTracker({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Gamification Section - Records, Comparison, Achievements */}
+          {/* Gamification Section - Records & Streaks + Comparison */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
+            <Card className={!previousPeriodData.hasData ? "md:col-span-2" : ""}>
               <CardContent className="p-4">
                 <SalesRecords
                   bestDayRecord={gamification.bestDayRecord}
@@ -901,6 +901,8 @@ export function SalesGoalTracker({
                   currentStreak={gamification.currentStreak}
                   todayTotal={commissionStats.todayTotal}
                   currentPeriodTotal={commissionStats.periodTotal}
+                  dailyTarget={kpis.todayTarget}
+                  hitDailyGoal={commissionStats.todayTotal >= kpis.todayTarget}
                 />
               </CardContent>
             </Card>
@@ -917,16 +919,6 @@ export function SalesGoalTracker({
                 </CardContent>
               </Card>
             )}
-
-            <Card className="md:col-span-2">
-              <CardContent className="p-4">
-                <SalesAchievements
-                  unlockedAchievementIds={gamification.unlockedAchievementIds}
-                  achievements={gamification.achievements}
-                  achievementData={gamification.achievementData}
-                />
-              </CardContent>
-            </Card>
           </div>
 
           {/* Progression Chart with Race Track Zones */}
