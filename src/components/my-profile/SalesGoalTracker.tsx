@@ -48,6 +48,7 @@ import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
 import { SalesProgressComparison } from "./SalesProgressComparison";
 import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
 import { HeroPulseWidget } from "./HeroPulseWidget";
+import { PowerMovesMilestones } from "./PowerMovesMilestones";
 
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
@@ -753,6 +754,12 @@ export function SalesGoalTracker({
                   </p>
                 </div>
               </div>
+              
+              {/* Power Moves - Financial Milestones */}
+              <PowerMovesMilestones 
+                projectedAmount={Math.round(kpis.projectedFinal)} 
+                className="mt-4 pt-4 border-t border-border/50"
+              />
 
               {/* Hero Pulse Widget - Replaces the 3 Motivational Chips */}
               {(() => {
