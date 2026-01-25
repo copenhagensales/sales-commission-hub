@@ -21,7 +21,7 @@ export function PowerMovesMilestones({ currentAmount, projectedAmount, className
       {/* Header */}
       <div className="flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Din Power Move-rejse</span>
+        <span className="text-sm font-medium">Provision i perioden</span>
       </div>
 
       {/* Thick progress bar */}
