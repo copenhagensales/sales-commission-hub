@@ -761,9 +761,9 @@ export function SalesGoalTracker({
 
               {/* Hero Pulse Widget - Replaces the 3 Motivational Chips */}
               {(() => {
-                const pulsePercent = kpis.expectedByNow > 0 
-                  ? Math.round((kpis.currentAmount / kpis.expectedByNow) * 100)
-                  : 100;
+                const pulsePercent = kpis.actualDailyAvg > 0 
+                  ? Math.round((commissionStats.todayTotal / kpis.actualDailyAvg) * 100)
+                  : 0;
                 
                 return (
                   <HeroPulseWidget
