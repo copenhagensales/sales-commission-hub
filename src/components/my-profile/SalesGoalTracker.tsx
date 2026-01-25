@@ -628,20 +628,17 @@ export function SalesGoalTracker({
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <SalesAvatar totalEarned={gamification.totalEarned} showProgress={false} />
-              {currentGoal && !isEditingGoal ? (
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Dit mål: {currentGoal.target_amount.toLocaleString("da-DK")} kr
-                </CardTitle>
-              ) : (
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  {currentGoal ? "Rediger dit mål" : "Sæt dit salgsmål for lønperioden"}
-                </CardTitle>
-              )}
-            </div>
+            {currentGoal && !isEditingGoal ? (
+              <CardTitle className="text-base flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Dit mål: {currentGoal.target_amount.toLocaleString("da-DK")} kr
+              </CardTitle>
+            ) : (
+              <CardTitle className="text-base flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                {currentGoal ? "Rediger dit mål" : "Sæt dit salgsmål for lønperioden"}
+              </CardTitle>
+            )}
             <div className="flex items-center gap-2">
               <SalesStreakBadge 
                 currentStreak={gamification.currentStreak} 
