@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
 import { format, startOfWeek } from "date-fns";
+
+export type RecordType = "best_day" | "best_week" | null;
 
 interface UseSalesGamificationProps {
   employeeId: string;
@@ -34,6 +36,10 @@ export function useSalesGamification({
   currentWeekTotal,
 }: UseSalesGamificationProps) {
   const queryClient = useQueryClient();
+  
+  // Track new records for celebration
+  const [newRecordType, setNewRecordType] = useState<RecordType>(null);
+  const clearNewRecord = () => setNewRecordType(null);
 
   // Fetch streak data
   const { data: streakData } = useQuery({
@@ -345,13 +351,19 @@ export function useSalesGamification({
     }
   }, [employeeId, currentPeriodTotal, levelData]);
 
+  // Track if we've already celebrated a record this session
+  const hasCelebratedDayRecordRef = useRef(false);
+  const hasCelebratedWeekRecordRef = useRef(false);
+
   // Update best day record if today exceeds it
   useEffect(() => {
     if (!employeeId || records === undefined) return;
     if (todayTotal <= 0) return;
     
     const currentBestDay = bestDayRecord?.record_value || 0;
-    if (todayTotal > currentBestDay) {
+    if (todayTotal > currentBestDay && bestDayRecord && !hasCelebratedDayRecordRef.current) {
+      hasCelebratedDayRecordRef.current = true;
+      setNewRecordType("best_day");
       updateRecordMutation.mutate({
         recordType: "best_day",
         recordValue: todayTotal,
@@ -382,7 +394,9 @@ export function useSalesGamification({
     if (currentWeekTotal <= 0) return;
     
     const currentBestWeek = bestWeekRecord?.record_value || 0;
-    if (currentWeekTotal > currentBestWeek && bestWeekRecord) {
+    if (currentWeekTotal > currentBestWeek && bestWeekRecord && !hasCelebratedWeekRecordRef.current) {
+      hasCelebratedWeekRecordRef.current = true;
+      setNewRecordType("best_week");
       updateRecordMutation.mutate({
         recordType: "best_week",
         recordValue: Math.round(currentWeekTotal),
@@ -412,6 +426,8 @@ export function useSalesGamification({
     bestWeekRecord,
     bestMonthRecord,
     updateRecord: updateRecordMutation.mutate,
+    newRecordType,
+    clearNewRecord,
 
     // Level
     levelProgress,
