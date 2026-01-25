@@ -215,9 +215,9 @@ export function HeroStatusCard({
             </div>
           </div>
 
-          {/* Right: Projected */}
+          {/* Right: Expected */}
           <div className="flex-1 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Projiceret</p>
+            <p className="text-xs text-muted-foreground mb-1">Forventet</p>
             <p className={cn("text-xl font-bold", willHitGoal ? "text-success" : "text-warning")}>
               {Math.round(projectedFinal).toLocaleString("da-DK")} <span className="text-sm font-normal text-muted-foreground">kr</span>
             </p>
