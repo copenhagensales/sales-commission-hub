@@ -222,7 +222,7 @@ export function HeroStatusCard({
               {Math.round(projectedFinal).toLocaleString("da-DK")} <span className="text-sm font-normal text-muted-foreground">kr</span>
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              + {Math.round(projectedFinal * 0.125).toLocaleString("da-DK")} feriepenge
+              + {Math.round(projectedFinal * 0.125).toLocaleString("da-DK")} kr. i feriepenge
             </p>
           </div>
         </div>
