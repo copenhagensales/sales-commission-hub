@@ -1,4 +1,4 @@
-import { Flame, AlertTriangle } from "lucide-react";
+import { Flame, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -24,21 +24,21 @@ export function SalesStreakBadge({
       className={cn(
         "gap-1.5 text-sm font-semibold px-3 py-1.5 transition-all",
         streakAtRisk 
-          ? "bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse"
+          ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
           : isLegendaryStreak
             ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
             : isBurningStreak
               ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
               : isHotStreak
-                ? "bg-red-500/20 text-red-400 border-red-500/30"
+                ? "bg-orange-500/15 text-orange-400 border-orange-500/25"
                 : "bg-primary/20 text-primary border-primary/30",
         className
       )}
     >
       {streakAtRisk ? (
         <>
-          <AlertTriangle className="h-4 w-4" />
-          <span>Streak i fare!</span>
+          <Zap className="h-4 w-4 animate-pulse" />
+          <span>Hold momentum! 💪</span>
         </>
       ) : (
         <>

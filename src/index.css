@@ -270,21 +270,22 @@
     @apply bg-danger/15 text-danger border-danger/30;
   }
 
-  /* Hero Pulse animations */
+  /* Hero Pulse animations - Psychology-optimized */
   .hero-pulse-flying {
-    animation: pulse-glow-green 1s ease-in-out infinite;
+    animation: pulse-glow-electric 0.8s ease-in-out infinite;
   }
 
   .hero-pulse-ahead {
-    animation: pulse-glow-green 1.5s ease-in-out infinite;
+    animation: pulse-glow-green 1.2s ease-in-out infinite;
   }
 
-  .hero-pulse-close {
-    animation: pulse-glow-amber 2s ease-in-out infinite;
+  .hero-pulse-warmup {
+    animation: pulse-glow-warmup 1.8s ease-in-out infinite;
   }
 
-  .hero-pulse-behind {
-    animation: pulse-glow-red 2.5s ease-in-out infinite;
+  /* Slow, rhythmic pulse for "below 50%" - indicates "warming up" */
+  .hero-pulse-slow {
+    animation: pulse-glow-slow 3s ease-in-out infinite;
   }
 
   .number-animate {
@@ -313,37 +314,53 @@
   }
 }
 
-/* Hero Pulse glow animations */
+/* Hero Pulse glow animations - Psychology-optimized */
+@keyframes pulse-glow-electric {
+  0%, 100% {
+    box-shadow: 0 0 25px hsl(160 84% 39% / 0.5), 0 0 50px hsl(160 84% 39% / 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(160 84% 39% / 0.8), 0 0 80px hsl(160 84% 39% / 0.3);
+    transform: scale(1.03);
+  }
+}
+
 @keyframes pulse-glow-green {
   0%, 100% {
     box-shadow: 0 0 20px hsl(var(--success) / 0.4);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 40px hsl(var(--success) / 0.8);
+    box-shadow: 0 0 40px hsl(var(--success) / 0.7);
     transform: scale(1.02);
   }
 }
 
-@keyframes pulse-glow-amber {
+@keyframes pulse-glow-warmup {
   0%, 100% {
-    box-shadow: 0 0 15px hsl(var(--warning) / 0.3);
+    box-shadow: 0 0 15px hsl(38 92% 50% / 0.3);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 30px hsl(var(--warning) / 0.6);
+    box-shadow: 0 0 30px hsl(38 92% 50% / 0.5);
     transform: scale(1.01);
   }
 }
 
-@keyframes pulse-glow-red {
+/* Slow heartbeat pulse - motivational, not alarming */
+@keyframes pulse-glow-slow {
   0%, 100% {
-    box-shadow: 0 0 15px hsl(var(--destructive) / 0.3);
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.2);
     transform: scale(1);
   }
-  50% {
-    box-shadow: 0 0 25px hsl(var(--destructive) / 0.5);
-    transform: scale(1.01);
+  30% {
+    box-shadow: 0 0 25px hsl(var(--primary) / 0.5);
+    transform: scale(1.015);
+  }
+  60% {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.3);
+    transform: scale(1.005);
   }
 }
 

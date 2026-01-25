@@ -721,13 +721,14 @@ export function SalesGoalTracker({
               </div>
               
               {/* Supportive microcopy for gap */}
+              {/* Positive framing: What they CAN achieve */}
               {!kpis.isAhead && !kpis.isOnTrack && (
-                <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-warning">
-                    <span className="font-medium">Gap til plan:</span> +{Math.round(kpis.gapToTrack).toLocaleString("da-DK")} kr/dag for at være på sporet
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-primary">
+                    <span className="font-medium">🎯 Dagens boost-mål:</span> {Math.round(kpis.gapToTrack).toLocaleString("da-DK")} kr ekstra = tilbage på sporet!
                   </p>
-                  <p className="text-xs text-warning/70 mt-1">
-                    Rammer du dagens mål, er du tilbage på planen.
+                  <p className="text-xs text-primary/70 mt-1">
+                    Du har allerede {kpis.currentAmount.toLocaleString("da-DK")} kr i perioden 🔥
                   </p>
                 </div>
               )}
@@ -810,20 +811,20 @@ export function SalesGoalTracker({
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-success/10" : "bg-warning/10"}`}>
+                      <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-success/10" : "bg-primary/10"}`}>
                         {kpis.isAhead ? (
                           <TrendingUp className="h-5 w-5 text-success" />
                         ) : (
-                          <TrendingDown className="h-5 w-5 text-warning" />
+                          <Zap className="h-5 w-5 text-primary" />
                         )}
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Trend</p>
-                        <p className={`text-xl font-bold ${kpis.isAhead ? "text-success" : "text-warning"}`}>
-                          {kpis.trendPercent > 0 ? "+" : ""}{Math.round(kpis.trendPercent)}%
+                        <p className="text-sm text-muted-foreground">Tempo</p>
+                        <p className={`text-xl font-bold ${kpis.isAhead ? "text-success" : "text-primary"}`}>
+                          {Math.abs(Math.round(kpis.trendPercent))}%
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {kpis.isAhead ? "foran" : "ift."} forventet tempo
+                          {kpis.isAhead ? "foran plan! 🚀" : "boost-mulighed"}
                         </p>
                       </div>
                     </div>
@@ -1016,13 +1017,13 @@ export function SalesGoalTracker({
                       }}
                     />
                     
-                    {/* Expected progression line */}
+                    {/* Expected progression line - simplified, less prominent */}
                     <Line
                       type="monotone"
                       dataKey="targetCumulative"
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeDasharray="4 4"
-                      strokeWidth={2}
+                      stroke="hsl(var(--muted-foreground) / 0.4)"
+                      strokeDasharray="8 8"
+                      strokeWidth={1.5}
                       dot={false}
                       name="Forventet tempo"
                     />
@@ -1039,15 +1040,25 @@ export function SalesGoalTracker({
                       connectNulls={false}
                     />
                     
-                    {/* Actual progression area */}
+                    {/* Actual progression area - Hero line with glow effect */}
+                    <defs>
+                      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
                     <Area
                       type="monotone"
                       dataKey="actualCumulative"
-                      fill="hsl(var(--primary) / 0.2)"
+                      fill="hsl(var(--primary) / 0.25)"
                       stroke="hsl(var(--primary))"
-                      strokeWidth={3}
+                      strokeWidth={4}
                       name="Faktisk provision"
                       connectNulls={false}
+                      style={{ filter: "url(#glow)" }}
                     />
                     
                     {/* Today marker */}

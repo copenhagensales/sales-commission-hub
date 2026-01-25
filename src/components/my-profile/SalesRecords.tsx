@@ -1,4 +1,4 @@
-import { Flame, AlertTriangle } from "lucide-react";
+import { Flame, Zap } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useGamificationConfig, getStreakBadge } from "@/hooks/useGamificationConfig";
@@ -69,12 +69,12 @@ export function SalesRecords({
           <div className="flex items-center gap-3">
             <Flame className={cn(
               "h-5 w-5",
-              currentStreak > 0 ? "text-orange-500" : "text-muted-foreground/40"
+              currentStreak > 0 ? "text-warning" : "text-muted-foreground/40"
             )} />
             <div className="flex items-baseline gap-2">
               <span className={cn(
                 "text-2xl font-bold tabular-nums",
-                currentStreak > 0 ? "text-orange-500" : "text-muted-foreground"
+                currentStreak > 0 ? "text-warning" : "text-muted-foreground"
               )}>
                 {currentStreak}
               </span>
@@ -88,9 +88,9 @@ export function SalesRecords({
           {streakBadge.badge && (
             <span className={cn(
               "text-xs font-medium px-2 py-1 rounded-full",
-              streakBadge.badge === "legendary" && "bg-purple-500/15 text-purple-400",
-              streakBadge.badge === "fire" && "bg-orange-500/15 text-orange-400",
-              streakBadge.badge === "hot" && "bg-amber-500/15 text-amber-400"
+              streakBadge.badge === "legendary" && "bg-primary/15 text-primary",
+              streakBadge.badge === "fire" && "bg-warning/15 text-warning",
+              streakBadge.badge === "hot" && "bg-warning/10 text-warning/80"
             )}>
               {streakBadge.badge === "legendary" && "👑 Legendarisk"}
               {streakBadge.badge === "fire" && "🔥 Fire"}
@@ -103,7 +103,7 @@ export function SalesRecords({
         {currentStreak > 0 && (
           <p className="text-xs text-muted-foreground mb-3">
             {isOnLongestStreak && currentStreak > 1 ? (
-              <span className="text-green-400">🎉 Du er på din længste streak!</span>
+              <span className="text-success">🎉 Du er på din længste streak!</span>
             ) : streakToRecord > 0 ? (
               <span>{streakToRecord} {streakToRecord === 1 ? "dag" : "dage"} til ny rekord ({longestStreak})</span>
             ) : null}
@@ -116,11 +116,11 @@ export function SalesRecords({
           </p>
         )}
         
-        {/* Streak at Risk Alert */}
+        {/* Streak motivation - positive framing */}
         {streakAtRisk && (
-          <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2 mt-2">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            <span>Streak i fare – nå dit dagsmål for at beholde den</span>
+          <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-md px-3 py-2 mt-2 border border-warning/20">
+            <Zap className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+            <span>Hold momentum! Luk dagens mål og forlæng din streak 💪</span>
           </div>
         )}
       </div>
@@ -131,7 +131,7 @@ export function SalesRecords({
         <div className={cn(
           "rounded-lg border p-4 transition-colors",
           brokeNewDayRecord 
-            ? "bg-green-500/10 border-green-500/30"
+            ? "bg-success/10 border-success/30"
             : "bg-card border-border"
         )}>
           <p className="text-xs text-muted-foreground mb-1">Bedste dag</p>
@@ -149,11 +149,11 @@ export function SalesRecords({
                 value={Math.min(100, todayVsBestDay)} 
                 className={cn(
                   "h-1.5",
-                  brokeNewDayRecord && "[&>div]:bg-green-500"
+                  brokeNewDayRecord && "[&>div]:bg-success"
                 )}
               />
               {brokeNewDayRecord ? (
-                <p className="text-xs text-green-400 font-medium">NY REKORD! 🎉</p>
+                <p className="text-xs text-success font-medium">NY REKORD! 🎉</p>
               ) : nearDayRecord ? (
                 <p className="text-xs text-muted-foreground">
                   {(bestDayValue - todayTotal).toLocaleString("da-DK")} kr til rekord
@@ -167,7 +167,7 @@ export function SalesRecords({
         <div className={cn(
           "rounded-lg border p-4 transition-colors",
           brokeNewWeekRecord 
-            ? "bg-green-500/10 border-green-500/30"
+            ? "bg-success/10 border-success/30"
             : "bg-card border-border"
         )}>
           <p className="text-xs text-muted-foreground mb-1">Bedste uge</p>
@@ -185,11 +185,11 @@ export function SalesRecords({
                 value={Math.min(100, weekVsBestWeek)} 
                 className={cn(
                   "h-1.5",
-                  brokeNewWeekRecord && "[&>div]:bg-green-500"
+                  brokeNewWeekRecord && "[&>div]:bg-success"
                 )}
               />
               {brokeNewWeekRecord ? (
-                <p className="text-xs text-green-400 font-medium">NY REKORD! 🎉</p>
+                <p className="text-xs text-success font-medium">NY REKORD! 🎉</p>
               ) : nearWeekRecord ? (
                 <p className="text-xs text-muted-foreground">
                   {(bestWeekValue - currentWeekTotal).toLocaleString("da-DK")} kr til rekord
