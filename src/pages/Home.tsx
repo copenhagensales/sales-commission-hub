@@ -490,6 +490,18 @@ const Home = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Compact League View */}
           <CompactLeagueView />
+
+          {/* Tabbed Recognitions */}
+          <TabbedRecognitions
+            currentWeek={{
+              topWeekly: weeklyRecognition?.currentWeek?.topWeekly || null,
+              bestDay: weeklyRecognition?.currentWeek?.bestDay || null,
+            }}
+            lastWeek={{
+              topWeekly: weeklyRecognition?.lastWeek?.topWeekly || null,
+              bestDay: weeklyRecognition?.lastWeek?.bestDay || null,
+            }}
+          />
         </div>
 
         {/* Today's Celebrations - Only if there are any */}
@@ -524,18 +536,6 @@ const Home = () => {
           </Card>
         )}
 
-          {/* Tabbed Recognitions - closes ZONE 2 grid */}
-          <TabbedRecognitions
-            currentWeek={{
-              topWeekly: weeklyRecognition?.currentWeek?.topWeekly || null,
-              bestDay: weeklyRecognition?.currentWeek?.bestDay || null,
-            }}
-            lastWeek={{
-              topWeekly: weeklyRecognition?.lastWeek?.topWeekly || null,
-              bestDay: weeklyRecognition?.lastWeek?.bestDay || null,
-            }}
-          />
-        </div>
 
         {/* ZONE 3: Team & Community - Full Width */}
         <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
