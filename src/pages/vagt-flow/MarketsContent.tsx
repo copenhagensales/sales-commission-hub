@@ -55,12 +55,12 @@ export default function MarketsContent() {
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
-  // Fetch market bookings (next 6 months)
+  // Fetch market bookings (next 12 months)
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["vagt-market-bookings"],
     queryFn: async () => {
       const today = new Date();
-      const sixMonthsFromNow = addMonths(today, 6);
+      const twelveMonthsFromNow = addMonths(today, 12);
 
       const { data: bookingData, error } = await supabase
         .from("booking")
@@ -73,7 +73,7 @@ export default function MarketsContent() {
         `)
         .in("location.type", MARKET_TYPES)
         .gte("start_date", format(today, "yyyy-MM-dd"))
-        .lte("start_date", format(sixMonthsFromNow, "yyyy-MM-dd"))
+        .lte("start_date", format(twelveMonthsFromNow, "yyyy-MM-dd"))
         .order("start_date");
 
       if (error) throw error;
