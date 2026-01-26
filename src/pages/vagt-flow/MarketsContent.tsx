@@ -219,13 +219,6 @@ export default function MarketsContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Tent className="h-6 w-6 text-primary" />
-            Kommende markeder & messer
-          </h2>
-          <p className="text-muted-foreground">Overblik over planlagte markeder og messer de næste 6 måneder</p>
-        </div>
         <Badge variant="outline" className="text-lg px-4 py-2">
           {filtered.length} events
         </Badge>
