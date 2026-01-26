@@ -30,8 +30,7 @@ import { format, parseISO, differenceInYears, startOfMonth, startOfWeek, endOfWe
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
-import { useActiveSeason, useMyEnrollment, useQualificationStandings } from "@/hooks/useLeagueData";
-import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
+import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
 
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
@@ -93,19 +92,10 @@ const Home = () => {
     staleTime: 60000,
   });
 
-  // League data for sticky bar
+  // League data
   const { data: season } = useActiveSeason();
   const { data: enrollment } = useMyEnrollment(season?.id);
   const isEnrolledInLeague = !!enrollment;
-  const { data: currentEmployeeId } = useCurrentEmployeeId();
-  const { data: allStandings = [] } = useQualificationStandings(season?.id);
-  
-  const leagueRank = useMemo(() => {
-    if (!currentEmployeeId || allStandings.length === 0) return null;
-    const myIndex = allStandings.findIndex(s => s.employee_id === currentEmployeeId);
-    if (myIndex === -1) return null;
-    return allStandings[myIndex].overall_rank || (myIndex + 1);
-  }, [currentEmployeeId, allStandings]);
 
   // Calculate payroll period (15th-14th)
   const payrollPeriod = useMemo(() => {
@@ -483,7 +473,6 @@ const Home = () => {
         progressPercent={progressPercent}
         hasGoal={hasGoal}
         periodCommission={personalStats?.periodCommission || 0}
-        leagueRank={leagueRank}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4 md:p-8 space-y-6">
@@ -525,7 +514,7 @@ const Home = () => {
                     {celebration.type === 'birthday' ? (
                       <span className="text-2xl">🎂</span>
                     ) : (
-                      <Award className="w-5 h-5 text-amber-500" />
+                      <Award className="w-5 h-5 text-yellow-500" />
                     )}
                     <div>
                       <p className="font-medium">{celebration.name}</p>
@@ -722,7 +711,7 @@ const Home = () => {
                         {celebration.type === 'birthday' ? (
                           <Cake className="w-4 h-4 text-primary" />
                         ) : (
-                          <Award className="w-4 h-4 text-amber-500" />
+                          <Award className="w-4 h-4 text-yellow-500" />
                         )}
                         <span className="font-medium">{celebration.name}</span>
                         <span className="text-muted-foreground">•</span>
