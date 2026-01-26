@@ -1,127 +1,174 @@
 
+# Implementering: Klikbar Marked-booking med EditBookingDialog
 
-# Plan: Markeds-booking med Samlet Pris
+## Oversigt
+Gør marked-kortene i MarketsContent klikbare så de åbner EditBookingDialog direkte - samme dialog som bruges i BookingsContent.
 
-## Nuværende Situation
+## Ændringer i `src/pages/vagt-flow/MarketsContent.tsx`
 
-Dit system fungerer allerede godt:
-
-1. **Lokationer** - Alle typer (Butik, Storcenter, Markeder, Messer) oprettes under "Lokationer" fanen
-2. **Booking** - Markeder bookes via "Book uge" fanen med dato-range picker (allerede implementeret!)
-3. **Markeder-oversigt** - "Markeder" fanen viser bookinger filtreret på `location.type = "Markeder"` eller `"Messer"`
-
-**Det eneste der mangler:**
-- Et felt til **samlet pris** (i stedet for dagspris) når man booker markeder
-- Visning af samlet pris i Markeder-oversigten og Billing
-
-## Hvad vi skal tilføje
-
-### 1. Database: Nyt `total_price` felt
-
-Tilføj en kolonne til `booking` tabellen:
-
-```sql
-ALTER TABLE public.booking ADD COLUMN total_price numeric DEFAULT NULL;
-```
-
-**Logik:**
-- Hvis `total_price` er sat → brug denne direkte
-- Hvis `total_price` er NULL → beregn fra dagspris × dage (som nu)
-
-### 2. Book-dialogen: Tilføj "Samlet pris" input
-
-Når du booker et marked via "Book uge" fanen, tilføjes et nyt felt:
-
-```text
-+------------------------------------------+
-| Book marked/messe                        |
-+------------------------------------------+
-| Kræmmermarked Fyn                        |
-| [Markeder badge]                         |
-+------------------------------------------+
-| PERIODE                                  |
-| Fra: [01-02-2026] Til: [02-02-2026]      |
-| (2 dage valgt)                           |
-+------------------------------------------+
-| PRIS                                     |
-| Samlet pris: [15.000] kr                 |  ← NY
-| (for hele perioden)                      |
-+------------------------------------------+
-| Forventet antal medarbejdere: [4]        |
-+------------------------------------------+
-```
-
-### 3. Markeder-oversigt: Vis samlet pris
-
-I "Markeder" fanen vises samlet pris under hver booking:
-
-```text
-+------------------------------------------+
-| Kræmmermarked Fyn                        |
-| 1-2. feb 2026 | Odense | Uge 5           |
-| [Eesy FM] [Fuldt bemandat]               |
-| Samlet pris: 15.000 kr                   |  ← NY
-+------------------------------------------+
-```
-
-### 4. Billing: Opdater prisberegning
-
-Ændr logikken så `total_price` bruges hvis sat:
-
+### 1. Nye imports (linje 1-47)
+Tilføj:
 ```typescript
-// Nuværende logik:
-const total = dailyRate × days;
-
-// Ny logik:
-const total = booking.total_price ?? (dailyRate × days);
+import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
+import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 ```
 
-### 5. EditBookingDialog: Mulighed for at redigere samlet pris
-
-Tilføj "Samlet pris" felt i redigerings-dialogen for markeder.
-
-## Filer der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| Database migration | Tilføj `total_price` kolonne |
-| `src/pages/vagt-flow/BookWeekContent.tsx` | Tilføj "Samlet pris" input i booking-dialogen |
-| `src/pages/vagt-flow/MarketsContent.tsx` | Vis samlet pris i oversigten |
-| `src/pages/vagt-flow/Billing.tsx` | Brug `total_price` hvis sat |
-| `src/components/vagt-flow/EditBookingDialog.tsx` | Tilføj redigering af samlet pris |
-
-## Lokationer forbliver som de er
-
-- Markeder oprettes stadig under "Lokationer" (ingen ændring)
-- Dagspris-feltet forbliver (bruges som fallback hvis samlet pris ikke sættes)
-- "Markeder" fanen er bare en filtreret visning af bookinger
-
-## Tekniske detaljer
-
-**Ny state i BookWeekContent:**
+### 2. Ny state til dialog (efter linje 56)
 ```typescript
-const [marketTotalPrice, setMarketTotalPrice] = useState<string>("");
+const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
 ```
 
-**Opdateret insert i mutation:**
+### 3. Query til Fieldmarketing medarbejdere (efter fieldmarketingClients query)
 ```typescript
-const { error } = await supabase.from("booking").insert({
-  // ... eksisterende felter
-  total_price: isMarket && marketTotalPrice 
-    ? parseFloat(marketTotalPrice) 
-    : null,
+const { data: employees = [] } = useQuery({
+  queryKey: ["vagt-employees-for-markets-fieldmarketing"],
+  queryFn: async () => {
+    const { data: teamData } = await supabase
+      .from("teams")
+      .select("id, name")
+      .ilike("name", "Fieldmarketing")
+      .maybeSingle();
+
+    if (!teamData) return [];
+
+    const { data } = await supabase
+      .from("team_members")
+      .select(`employee_id, employee:employee_id(id, first_name, last_name, is_active)`)
+      .eq("team_id", teamData.id);
+
+    return (data || [])
+      .filter((tm: any) => tm.employee?.is_active)
+      .map((tm: any) => ({
+        id: tm.employee.id,
+        full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+        team: teamData.name,
+      }));
+  },
 });
 ```
 
-**Prislogik i Billing:**
+### 4. Query til køretøjer
 ```typescript
-const getBookingTotal = (booking: any) => {
-  if (booking.total_price != null) {
-    return booking.total_price;
-  }
-  const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-  const days = booking.booked_days?.length || 1;
-  return dailyRate * days;
-};
+const { data: vehicles = [] } = useQuery({
+  queryKey: ["vagt-vehicles-for-markets"],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("vehicle")
+      .select("id, name, license_plate")
+      .eq("is_active", true)
+      .order("name");
+    return data || [];
+  },
+});
 ```
 
+### 5. Bulk assign mutation (til tilføjelse af medarbejdere)
+```typescript
+const bulkAssignMutation = useMutation({
+  mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+    const inserts = assignments.flatMap(a => 
+      a.dates.map(date => ({
+        booking_id: a.bookingId,
+        employee_id: a.employeeId,
+        date,
+        start_time: "09:00",
+        end_time: "17:00",
+      }))
+    );
+    const { data, error } = await supabase.from("booking_assignment").insert(inserts).select();
+    if (error) throw error;
+    return data;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+    toast({ title: "Medarbejdere tilføjet" });
+  },
+});
+```
+
+### 6. Ændr onClick på booking-kortet (linje 315)
+Fra:
+```typescript
+onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${booking.week_number}&year=${booking.year}`)}
+```
+
+Til:
+```typescript
+onClick={() => setEditBookingDialogBooking(booking)}
+```
+
+### 7. Opdater MarketCalendarWidget onClick (linje 253-257)
+Fra:
+```typescript
+onBookingClick={(booking) => {
+  if (booking.location?.id) {
+    navigate(`/vagt-flow/locations/${booking.location.id}`);
+  }
+}}
+```
+
+Til:
+```typescript
+onBookingClick={(booking) => setEditBookingDialogBooking(booking)}
+```
+
+### 8. Tilføj EditBookingDialog komponenten (før lukkende `</div>`)
+```typescript
+{editBookingDialogBooking && (
+  <EditBookingDialog
+    open={!!editBookingDialogBooking}
+    onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
+    booking={editBookingDialogBooking}
+    weekNumber={editBookingDialogBooking.week_number}
+    year={editBookingDialogBooking.year}
+    weekStart={getWeekStartDate(editBookingDialogBooking.year, editBookingDialogBooking.week_number)}
+    employees={employees}
+    vehicles={vehicles}
+    onAddEmployeeAssignments={(assignments) => {
+      bulkAssignMutation.mutate(
+        assignments.map(a => ({
+          bookingId: editBookingDialogBooking.id,
+          employeeId: a.employeeId,
+          dates: a.dates,
+        }))
+      );
+    }}
+    onAddVehicleAssignment={async (assignment) => {
+      const inserts = assignment.dates.map(date => ({
+        booking_id: editBookingDialogBooking.id,
+        vehicle_id: assignment.vehicleId,
+        date,
+      }));
+      const { error } = await supabase.from("booking_vehicle").insert(inserts);
+      if (error) {
+        toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+        toast({ title: "Bil tilføjet" });
+      }
+    }}
+  />
+)}
+```
+
+## Brugerflow efter implementering
+
+1. Bruger klikker på et marked-kort i "Markeder" fanen
+2. EditBookingDialog åbnes med bookingens data
+3. Bruger kan redigere:
+   - Kunde og kampagne
+   - Dagspris/samlet pris
+   - Tilføje/fjerne medarbejdere
+   - Tilføje/fjerne køretøjer
+   - Tilføje diæt
+4. Slet-knappen virker stadig separat (e.stopPropagation())
+5. Kalender-widget klik åbner også dialogen
+
+## Påvirkning
+
+| Element | Påvirkning |
+|---------|------------|
+| Vagtplan (BookingsContent) | Ingen - separate queries |
+| Billing | Ingen - læser samme data |
+| Database | Ingen nye tabeller |
+| Eksisterende funktionalitet | Bevares 100% |
