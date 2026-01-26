@@ -48,19 +48,6 @@ const formatCurrency = (value: number) =>
 
 const getInitials = (name: string) => getInitialsFromHook(name);
 
-// Commission color thresholds based on period type
-const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payroll') => {
-  const thresholds = {
-    day: { green: 1250, yellow: 1000 },
-    week: { green: 6250, yellow: 5000 },
-    payroll: { green: 26250, yellow: 21000 }
-  };
-  const { green, yellow } = thresholds[period];
-  if (commission >= green) return "bg-green-500";
-  if (commission >= yellow) return "bg-yellow-500";
-  return "bg-red-500";
-};
-
 // Get rank badge for top 3
 const getRankBadge = (index: number) => {
   if (index === 0) return "🥇";
@@ -137,39 +124,49 @@ export default function CsTop20Dashboard() {
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Leaderboard card component - TV optimized
+  // Leaderboard card component - Clean, modern design
   const LeaderboardCard = ({ 
     title, 
     icon: Icon, 
     sellers, 
-    period,
-    accentColor
+    accentClass
   }: { 
     title: string; 
     icon: React.ElementType; 
     sellers: LeaderboardEntry[]; 
-    period: 'day' | 'week' | 'payroll';
-    accentColor: string;
+    accentClass: string;
   }) => (
-    <Card className={`overflow-hidden border-0 shadow-2xl flex flex-col ${tvMode ? 'bg-slate-800/90 h-full' : 'bg-gradient-to-b from-card to-card/95'}`}>
-      <CardHeader className={`pb-2 flex-shrink-0 bg-gradient-to-r ${accentColor} text-white`}>
-        <CardTitle className={`flex items-center justify-center gap-2 font-bold uppercase tracking-wider ${tvMode ? 'text-lg' : 'text-lg'}`}>
-          <Icon className={tvMode ? "h-5 w-5" : "h-5 w-5"} />
+    <Card className={`overflow-hidden border shadow-lg flex flex-col ${
+      tvMode 
+        ? 'bg-slate-800/95 border-slate-700/50 h-full' 
+        : 'bg-card border-border/50'
+    }`}>
+      <CardHeader className={`pb-3 flex-shrink-0 border-b ${
+        tvMode ? 'border-slate-700/50 bg-slate-800' : 'border-border/30 bg-muted/30'
+      }`}>
+        <CardTitle className={`flex items-center justify-center gap-2.5 font-semibold tracking-wide ${
+          tvMode ? 'text-lg text-white' : 'text-base text-foreground'
+        }`}>
+          <div className={`p-1.5 rounded-lg ${accentClass}`}>
+            <Icon className="h-4 w-4 text-white" />
+          </div>
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent className={`p-0 ${tvMode ? 'flex-1 overflow-y-auto' : ''}`}>
         {(tvMode ? false : isLoading) ? (
           <div className="flex items-center justify-center py-16">
-            <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+            <div className="animate-pulse text-muted-foreground text-sm">Indlæser...</div>
           </div>
         ) : sellers.length === 0 ? (
-          <div className={`flex flex-col items-center justify-center py-16 ${tvMode ? 'text-slate-400' : 'text-muted-foreground'}`}>
-            <Trophy className="h-8 w-8 mb-2 opacity-50" />
-            <span>Ingen salg endnu</span>
+          <div className={`flex flex-col items-center justify-center py-16 ${
+            tvMode ? 'text-slate-400' : 'text-muted-foreground'
+          }`}>
+            <Trophy className="h-8 w-8 mb-2 opacity-40" />
+            <span className="text-sm">Ingen salg endnu</span>
           </div>
         ) : (
-          <div className={`divide-y ${tvMode ? 'divide-slate-700/50' : 'divide-border/50'}`}>
+          <div className={`divide-y ${tvMode ? 'divide-slate-700/30' : 'divide-border/40'}`}>
             {sellers.map((seller, index) => {
               const name = seller.employeeName;
               const sales = seller.salesCount;
@@ -178,28 +175,49 @@ export default function CsTop20Dashboard() {
               const rankBadge = getRankBadge(index);
               const displayName = seller.displayName;
               
+              // Top 3 get subtle highlight
+              const isTopThree = index < 3;
+              
               return (
                 <div 
                   key={seller.employeeId || name} 
-                  className={`flex items-center gap-2 transition-colors ${
-                    tvMode ? 'px-3 py-2' : 'px-4 py-3 hover:bg-muted/50'
+                  className={`flex items-center gap-3 transition-all duration-150 ${
+                    tvMode ? 'px-3 py-2.5' : 'px-4 py-3 hover:bg-muted/40'
                   } ${
-                    index < 3 ? (tvMode ? 'bg-slate-700/40' : 'bg-muted/30') : ''
+                    isTopThree 
+                      ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
+                      : ''
                   }`}
                 >
                   {/* Rank */}
-                  <div className={`flex-shrink-0 text-center ${tvMode ? 'w-8' : 'w-8'}`}>
+                  <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-7' : 'w-8'}`}>
                     {rankBadge ? (
                       <span className={tvMode ? "text-lg" : "text-xl"}>{rankBadge}</span>
                     ) : (
-                      <span className={`font-semibold ${tvMode ? 'text-sm text-slate-400' : 'text-sm text-muted-foreground'}`}>{index + 1}</span>
+                      <span className={`tabular-nums ${
+                        tvMode 
+                          ? 'text-sm text-slate-500' 
+                          : 'text-sm text-muted-foreground/70'
+                      }`}>
+                        {index + 1}
+                      </span>
                     )}
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ring-2 ${tvMode ? 'h-9 w-9' : 'h-10 w-10'} ${index === 0 ? 'ring-yellow-400' : index < 3 ? 'ring-primary/30' : 'ring-transparent'}`}>
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-9 w-9' : 'h-10 w-10'} ${
+                    index === 0 
+                      ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
+                      : index < 3 
+                        ? 'ring-1 ring-border/50' 
+                        : ''
+                  }`}>
                     <AvatarImage src={avatarUrl || undefined} alt={name} />
-                    <AvatarFallback className={`font-semibold bg-primary/20 text-primary ${tvMode ? 'text-xs' : 'text-xs'}`}>
+                    <AvatarFallback className={`font-medium text-xs ${
+                      tvMode 
+                        ? 'bg-slate-700 text-slate-300' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
                       {getInitials(name)}
                     </AvatarFallback>
                   </Avatar>
@@ -207,26 +225,38 @@ export default function CsTop20Dashboard() {
                   {/* Name & Sales & Team */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className={`font-semibold truncate ${tvMode ? 'text-sm text-white' : 'text-sm'}`}>{displayName}</span>
+                      <span className={`font-medium truncate ${
+                        tvMode ? 'text-sm text-white' : 'text-sm text-foreground'
+                      }`}>
+                        {displayName}
+                      </span>
                       {(() => {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1 py-0.5 font-medium ${
+                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 font-medium ${
                             tvMode 
-                              ? 'bg-slate-600/80 text-slate-300 text-[10px]' 
-                              : 'bg-muted text-muted-foreground text-[10px]'
+                              ? 'bg-slate-600/60 text-slate-400 text-[10px]' 
+                              : 'bg-muted/80 text-muted-foreground text-[10px]'
                           }`}>
                             {shortTeam}
                           </span>
                         ) : null;
                       })()}
                     </div>
-                    <div className={tvMode ? 'text-xs text-slate-400' : 'text-xs text-muted-foreground'}>{sales} salg</div>
+                    <div className={`text-xs ${
+                      tvMode ? 'text-slate-500' : 'text-muted-foreground/80'
+                    }`}>
+                      {sales} salg
+                    </div>
                   </div>
                   
-                  {/* Commission */}
-                  <div className={`rounded-full font-bold text-white ${getCommissionColor(commission, period)} ${tvMode ? 'px-2.5 py-1 text-sm' : 'px-3 py-1.5 text-sm'}`}>
-                    {formatCurrency(commission)}
+                  {/* Commission - Clean, neutral styling */}
+                  <div className={`rounded-full font-semibold tabular-nums ${
+                    tvMode 
+                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-sm' 
+                      : 'bg-primary/10 text-primary px-3 py-1.5 text-sm'
+                  }`}>
+                    {formatCurrency(commission)} kr
                   </div>
                 </div>
               );
@@ -240,47 +270,44 @@ export default function CsTop20Dashboard() {
   return (
     <div className={tvMode 
       ? 'w-[1920px] h-[1080px] bg-slate-900 p-6 flex flex-col overflow-hidden' 
-      : 'min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-6'
+      : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-4 text-center flex-shrink-0">
+        <div className="mb-5 text-center flex-shrink-0">
           <h1 className="text-3xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-base text-slate-400 mt-1">Top 20 på tværs af alle teams • {periodLabel}</p>
+          <p className="text-sm text-slate-400 mt-1.5">Top 20 på tværs af alle teams • {periodLabel}</p>
         </div>
       ) : (
         <DashboardHeader 
           title="CS Top 20" 
-          subtitle={`Top 20 på tværs af alle teams og opgaver • ${periodLabel}`}
+          subtitle={`Top 20 på tværs af alle teams • ${periodLabel}`}
         />
       )}
       
       <div className={tvMode 
-        ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' 
+        ? 'grid grid-cols-3 gap-5 flex-1 min-h-0' 
         : 'grid grid-cols-1 gap-6 lg:grid-cols-3 mt-6'
       }>
         <LeaderboardCard 
-          title="Top Løn Periode" 
+          title="Løn Periode" 
           icon={Trophy}
           sellers={sortedPayrollSellers}
-          period="payroll"
-          accentColor="from-amber-500 to-orange-600"
+          accentClass="bg-amber-500"
         />
         
         <LeaderboardCard 
-          title="Top Uge" 
+          title="Denne Uge" 
           icon={Calendar}
           sellers={sortedWeeklySellers}
-          period="week"
-          accentColor="from-blue-500 to-indigo-600"
+          accentClass="bg-blue-500"
         />
         
         <LeaderboardCard 
-          title="Top Dag" 
+          title="I Dag" 
           icon={Clock}
           sellers={sortedDailySellers}
-          period="day"
-          accentColor="from-emerald-500 to-teal-600"
+          accentClass="bg-emerald-500"
         />
       </div>
     </div>
