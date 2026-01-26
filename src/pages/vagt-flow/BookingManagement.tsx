@@ -16,10 +16,10 @@ const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 // Tab configuration with permission keys
 const allTabs = [
   { value: "book-week", label: "Book uge", labelKey: "sidebar.bookWeek", icon: Calendar, permissionKey: "tab_fm_book_week" },
-  { value: "bookings", label: "Kommende bookinger", icon: ListChecks, permissionKey: "tab_fm_bookings" },
-  { value: "markets", label: "Kommende markeder", icon: Tent, permissionKey: "tab_fm_markets" },
+  { value: "bookings", label: "Bookinger", icon: ListChecks, permissionKey: "tab_fm_bookings" },
+  { value: "markets", label: "Markeder", icon: Tent, permissionKey: "tab_fm_markets" },
   { value: "locations", label: "Lokationer", labelKey: "sidebar.locations", icon: MapPin, permissionKey: "tab_fm_locations" },
-  { value: "vagtplan-fm", label: "Vagtplan FM", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
+  { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
 ];
 
 export default function BookingManagement() {
@@ -84,11 +84,11 @@ export default function BookingManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className={`grid w-full ${gridColsClass} max-w-2xl`}>
+          <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-auto gap-1">
             {visibleTabs.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
-                <tab.icon className="h-4 w-4" />
-                {tab.labelKey ? t(tab.labelKey, tab.label) : tab.label}
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 px-3">
+                <tab.icon className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">{tab.labelKey ? t(tab.labelKey, tab.label) : tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
