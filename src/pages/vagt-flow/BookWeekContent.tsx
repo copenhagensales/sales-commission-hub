@@ -37,7 +37,6 @@ import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
-import { MarketApplicationsManager } from "@/components/vagt-flow/MarketApplicationsManager";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -65,9 +64,6 @@ export default function BookWeekContent() {
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [openForApplications, setOpenForApplications] = useState(false);
-  const [applicationDeadlineDays, setApplicationDeadlineDays] = useState(7);
-  const [visibleFromWeeks, setVisibleFromWeeks] = useState(4);
   const [expectedStaffCount, setExpectedStaffCount] = useState(2);
   const [marketEndWeek, setMarketEndWeek] = useState(selectedWeek);
   
@@ -174,20 +170,6 @@ export default function BookWeekContent() {
         bookedDays = sortedDays;
       }
 
-      let visibleFrom = null;
-      let applicationDeadline = null;
-
-      // Markets default to open for applications
-      const shouldOpenForApplications = isMarket || openForApplications;
-
-      if (shouldOpenForApplications) {
-        visibleFrom = new Date(startDate);
-        visibleFrom.setDate(visibleFrom.getDate() - (visibleFromWeeks * 7));
-
-        applicationDeadline = new Date(startDate);
-        applicationDeadline.setDate(applicationDeadline.getDate() - applicationDeadlineDays);
-      }
-
       // Get campaign_id from location's client_campaign_mapping
       const location = locations?.find(l => l.id === locationId);
       const campaignMapping = location?.client_campaign_mapping as Record<string, string> | null;
@@ -206,9 +188,6 @@ export default function BookWeekContent() {
         year: isMarket && marketStartDate ? getWeekYear(marketStartDate) : selectedYear,
         expected_staff_count: expectedStaffCount,
         booked_days: bookedDays,
-        open_for_applications: shouldOpenForApplications,
-        visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
-        application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
         total_price: parsedTotalPrice,
       } as any);
 
@@ -218,7 +197,6 @@ export default function BookWeekContent() {
       toast({ title: "Booking oprettet!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
-      setOpenForApplications(false);
       setExpectedStaffCount(2);
       setMarketEndWeek(selectedWeek);
       setMarketStartDate(undefined);
@@ -358,8 +336,6 @@ export default function BookWeekContent() {
         weekNumber={selectedWeek}
         year={selectedYear}
       />
-
-      <MarketApplicationsManager />
 
       {/* Filters */}
       <Card>
@@ -699,49 +675,6 @@ export default function BookWeekContent() {
               />
             </div>
 
-            <div className="space-y-3 pt-2 border-t">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="open-applications"
-                  checked={isMarketLocation || openForApplications}
-                  onCheckedChange={(checked) => setOpenForApplications(!!checked)}
-                  disabled={isMarketLocation}
-                />
-                <label htmlFor="open-applications" className="text-sm font-medium cursor-pointer">
-                  Åben for ansøgninger
-                  {isMarketLocation && <span className="text-muted-foreground ml-1">(altid for markeder)</span>}
-                </label>
-              </div>
-
-              {(isMarketLocation || openForApplications) && (
-                <div className="pl-6 space-y-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Synlig fra:</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={visibleFromWeeks}
-                      onChange={(e) => setVisibleFromWeeks(parseInt(e.target.value) || 4)}
-                      className="w-16 h-8 text-center"
-                    />
-                    <span className="text-sm text-muted-foreground">uger før</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Deadline:</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={applicationDeadlineDays}
-                      onChange={(e) => setApplicationDeadlineDays(parseInt(e.target.value) || 7)}
-                      className="w-16 h-8 text-center"
-                    />
-                    <span className="text-sm text-muted-foreground">dage før</span>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setBookingDialogOpen(false)}>

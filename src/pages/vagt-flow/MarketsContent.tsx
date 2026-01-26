@@ -12,8 +12,7 @@ import {
   Tent,
   Users,
   MapPin,
-  Clock,
-  Eye
+  Clock
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
@@ -96,29 +95,12 @@ export default function MarketsContent() {
         employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
       }
 
-      // Fetch applications count
-      const bookingIds = bookingData?.map(b => b.id) || [];
-      let applicationsMap = new Map<string, number>();
-      
-      if (bookingIds.length > 0) {
-        const { data: appData } = await supabase
-          .from("market_application")
-          .select("booking_id")
-          .in("booking_id", bookingIds)
-          .eq("status", "pending");
-        
-        for (const app of appData || []) {
-          applicationsMap.set(app.booking_id, (applicationsMap.get(app.booking_id) || 0) + 1);
-        }
-      }
-      
       return bookingData?.map(booking => ({
         ...booking,
         booking_assignment: booking.booking_assignment?.map((a: any) => ({
           ...a,
           employee_name: employeeMap.get(a.employee_id) || "Ukendt"
-        })),
-        pending_applications: applicationsMap.get(booking.id) || 0
+        }))
       }));
     },
   });
@@ -406,17 +388,6 @@ export default function MarketsContent() {
                                   <Users className="h-3 w-3 mr-1" />
                                   {staffingStatus.label}
                                 </Badge>
-                                {booking.open_for_applications && (
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                    <Eye className="h-3 w-3 mr-1" />
-                                    Åben for ansøgninger
-                                    {booking.pending_applications > 0 && (
-                                      <span className="ml-1 bg-blue-600 text-white rounded-full px-1.5 text-xs">
-                                        {booking.pending_applications}
-                                      </span>
-                                    )}
-                                  </Badge>
-                                )}
                                 {/* Display total price for markets */}
                                 {booking.total_price != null && (
                                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
