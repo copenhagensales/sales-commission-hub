@@ -973,25 +973,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </NavLink>
           )}
 
-          {/* Code of Conduct for Salgskonsulent */}
-          {isSalgskonsulent && (
-            <NavLink
-              to="/code-of-conduct"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/code-of-conduct" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5" />
-                {t("sidebar.codeOfConduct")}
-              </div>
-              {codeOfConductRequired && (
-                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">!</Badge>
-              )}
-            </NavLink>
-          )}
 
           {/* Intern Vagtplan menu */}
           {showShiftPlanningMenu && (
@@ -1300,6 +1281,26 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}
               </CollapsibleContent>
             </Collapsible>
+          )}
+
+          {/* Code of Conduct for Salgskonsulent */}
+          {isSalgskonsulent && (
+            <NavLink
+              to="/code-of-conduct"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/code-of-conduct" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Shield className="h-5 w-5" />
+                {t("sidebar.codeOfConduct")}
+              </div>
+              {codeOfConductRequired && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">!</Badge>
+              )}
+            </NavLink>
           )}
 
 
