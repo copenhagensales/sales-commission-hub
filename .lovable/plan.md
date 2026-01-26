@@ -1,168 +1,127 @@
 
-# Markeds-booking med Dato-range og Samlet Pris
 
-## Overblik
-
-Tilpasser det eksisterende lokations- og booking-system til at håndtere markeder/messer bedre - med dato-range valg og samlet pris i stedet for dagspris.
+# Plan: Markeds-booking med Samlet Pris
 
 ## Nuværende Situation
 
-- **Lokationer**: Alle typer (Butik, Storcenter, Markeder, Messer) oprettes under "Lokationer"
-- **Booking**: Markeder bookes via dato-range picker (allerede implementeret)
-- **Pris**: Bruger `daily_rate_override` eller `location.daily_rate` - beregnet per dag
-- **Visning**: Markeder vises i "Markeder"-fanen som filtrer på `location.type`
+Dit system fungerer allerede godt:
 
-## Løsning
+1. **Lokationer** - Alle typer (Butik, Storcenter, Markeder, Messer) oprettes under "Lokationer" fanen
+2. **Booking** - Markeder bookes via "Book uge" fanen med dato-range picker (allerede implementeret!)
+3. **Markeder-oversigt** - "Markeder" fanen viser bookinger filtreret på `location.type = "Markeder"` eller `"Messer"`
 
-### 1. Database: Tilføj `total_price` felt til booking
+**Det eneste der mangler:**
+- Et felt til **samlet pris** (i stedet for dagspris) når man booker markeder
+- Visning af samlet pris i Markeder-oversigten og Billing
 
-Tilføjer et nyt felt så markeder kan bruge samlet pris i stedet for dagspris.
+## Hvad vi skal tilføje
+
+### 1. Database: Nyt `total_price` felt
+
+Tilføj en kolonne til `booking` tabellen:
 
 ```sql
-ALTER TABLE public.booking
-ADD COLUMN total_price numeric DEFAULT NULL;
-
-COMMENT ON COLUMN public.booking.total_price IS 
-'Samlet pris for hele bookingen (bruges til markeder/messer). 
-Hvis sat, ignoreres daily_rate beregning.';
+ALTER TABLE public.booking ADD COLUMN total_price numeric DEFAULT NULL;
 ```
 
-### 2. Opdater Lokations-dialogen
+**Logik:**
+- Hvis `total_price` er sat → brug denne direkte
+- Hvis `total_price` er NULL → beregn fra dagspris × dage (som nu)
 
-Når type "Markeder" eller "Messer" vælges:
+### 2. Book-dialogen: Tilføj "Samlet pris" input
 
-**Ny UI-struktur:**
-```text
-+------------------------------------------+
-| Opret ny lokation                        |
-+------------------------------------------+
-| Navn: [Bellahøj Kræmmermarked 2026    ]  |
-| Type: [Markeder ▼]                       |
-+------------------------------------------+
-| ⚠️ For markeder/messer vælges periode    |
-|    ved booking - ikke lokationsoprettelse|
-+------------------------------------------+
-| LOKATION                                 |
-| By: [København         ]                 |
-| Adresse: [Bellahøj Friluftsscene      ]  |
-| Region: [Hovedstaden ▼]                  |
-+------------------------------------------+
-| ØKONOMI                                  |
-| Standard dagspris: [—] (sættes ved book) |
-+------------------------------------------+
-|                    [Annuller] [Opret]    |
-+------------------------------------------+
-```
+Når du booker et marked via "Book uge" fanen, tilføjes et nyt felt:
 
-**Ændringer:**
-- Skjul dagspris-feltet for markeder/messer (prisen sættes ved booking)
-- Tilføj info-tekst der forklarer at periode vælges ved booking
-
-### 3. Opdater Booking-dialogen i BookWeekContent
-
-For markeder/messer vises dato-range picker (allerede implementeret) + samlet pris:
-
-**Ny UI-struktur:**
 ```text
 +------------------------------------------+
 | Book marked/messe                        |
 +------------------------------------------+
-| Bellahøj Kræmmermarked                   |
+| Kræmmermarked Fyn                        |
 | [Markeder badge]                         |
 +------------------------------------------+
 | PERIODE                                  |
-| Fra: [15. aug 2026] Til: [17. aug 2026]  |
-| (3 dage - lør-man)                       |
+| Fra: [01-02-2026] Til: [02-02-2026]      |
+| (2 dage valgt)                           |
 +------------------------------------------+
 | PRIS                                     |
-| Samlet pris: [15.000] kr                 |
+| Samlet pris: [15.000] kr                 |  ← NY
 | (for hele perioden)                      |
 +------------------------------------------+
 | Forventet antal medarbejdere: [4]        |
 +------------------------------------------+
-| [x] Åben for ansøgninger (altid)         |
-|     Synlig fra: [4] uger før             |
-|     Deadline: [7] dage før               |
-+------------------------------------------+
-|                    [Annuller] [Book]     |
-+------------------------------------------+
 ```
 
-**Ændringer:**
-- Tilføj input-felt for "Samlet pris" (kun for markeder/messer)
-- Gem værdien i `booking.total_price`
+### 3. Markeder-oversigt: Vis samlet pris
 
-### 4. Opdater Billing-logik
-
-Ændr prisberegningen til at respektere `total_price`:
-
-```typescript
-// Før
-const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-const total = dailyRate * bookedDays.length;
-
-// Efter
-const total = booking.total_price 
-  ?? (booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000) * bookedDays.length;
-```
-
-### 5. Opdater Markeder-oversigt (MarketsContent)
-
-Vis samlet pris i stedet for dagspris for markeder:
+I "Markeder" fanen vises samlet pris under hver booking:
 
 ```text
 +------------------------------------------+
-| Bellahøj Kræmmermarked                   |
-| 15-17. aug 2026 | København | Uge 33     |
-| [Eesy FM] [Fuldt bemandat] [Åben]        |
-| Samlet pris: 15.000 kr                   |
+| Kræmmermarked Fyn                        |
+| 1-2. feb 2026 | Odense | Uge 5           |
+| [Eesy FM] [Fuldt bemandat]               |
+| Samlet pris: 15.000 kr                   |  ← NY
 +------------------------------------------+
 ```
+
+### 4. Billing: Opdater prisberegning
+
+Ændr logikken så `total_price` bruges hvis sat:
+
+```typescript
+// Nuværende logik:
+const total = dailyRate × days;
+
+// Ny logik:
+const total = booking.total_price ?? (dailyRate × days);
+```
+
+### 5. EditBookingDialog: Mulighed for at redigere samlet pris
+
+Tilføj "Samlet pris" felt i redigerings-dialogen for markeder.
 
 ## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| **Database migration** | Tilføj `total_price` kolonne til `booking` |
-| `src/pages/vagt-flow/LocationsContent.tsx` | Skjul dagspris for markeder, tilføj info |
-| `src/pages/vagt-flow/BookWeekContent.tsx` | Tilføj "Samlet pris" input for markeder |
-| `src/pages/vagt-flow/MarketsContent.tsx` | Vis samlet pris i stedet for dagspris |
-| `src/pages/vagt-flow/Billing.tsx` | Opdater prisberegning til at bruge `total_price` |
-| `supabase/functions/parse-expense-formula/index.ts` | Opdater formelberegning |
+| Database migration | Tilføj `total_price` kolonne |
+| `src/pages/vagt-flow/BookWeekContent.tsx` | Tilføj "Samlet pris" input i booking-dialogen |
+| `src/pages/vagt-flow/MarketsContent.tsx` | Vis samlet pris i oversigten |
+| `src/pages/vagt-flow/Billing.tsx` | Brug `total_price` hvis sat |
 | `src/components/vagt-flow/EditBookingDialog.tsx` | Tilføj redigering af samlet pris |
 
-## Flow efter implementering
+## Lokationer forbliver som de er
 
-1. **Opret lokation**: Bruger opretter "Bellahøj Kræmmermarked" med type "Markeder" (ingen pris)
-2. **Book marked**: Bruger vælger dato-range (15-17 aug) og samlet pris (15.000 kr)
-3. **Vis i oversigt**: Markedet vises i "Markeder"-fanen med dato og pris
-4. **Fakturering**: Billing-systemet bruger `total_price` direkte
+- Markeder oprettes stadig under "Lokationer" (ingen ændring)
+- Dagspris-feltet forbliver (bruges som fallback hvis samlet pris ikke sættes)
+- "Markeder" fanen er bare en filtreret visning af bookinger
 
 ## Tekniske detaljer
 
-### State i BookWeekContent
+**Ny state i BookWeekContent:**
 ```typescript
-const [marketTotalPrice, setMarketTotalPrice] = useState<number | undefined>(undefined);
+const [marketTotalPrice, setMarketTotalPrice] = useState<string>("");
 ```
 
-### Mutation-opdatering
+**Opdateret insert i mutation:**
 ```typescript
 const { error } = await supabase.from("booking").insert({
   // ... eksisterende felter
-  total_price: isMarket ? marketTotalPrice : null,
+  total_price: isMarket && marketTotalPrice 
+    ? parseFloat(marketTotalPrice) 
+    : null,
 });
 ```
 
-### Prislogik i Billing.tsx
+**Prislogik i Billing:**
 ```typescript
 const getBookingTotal = (booking: any) => {
-  // Brug total_price hvis sat (typisk markeder)
   if (booking.total_price != null) {
     return booking.total_price;
   }
-  // Ellers beregn fra dagspris
   const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
   const days = booking.booked_days?.length || 1;
   return dailyRate * days;
 };
 ```
+
