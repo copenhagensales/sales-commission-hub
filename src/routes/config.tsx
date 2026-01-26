@@ -325,7 +325,7 @@ export const routes: RouteConfig[] = [
     positionPermission: "menu_dashboard_eesy_tm",
   },
   { path: "/dashboards/united", component: UnitedDashboard, access: "role", positionPermission: "menu_dashboard_united" },
-  { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "role", positionPermission: "menu_dashboard_cph_sales" },
+  { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "role", positionPermission: "menu_dashboard_cs_top_20" },
 
   {
     path: "/dashboards/settings",
