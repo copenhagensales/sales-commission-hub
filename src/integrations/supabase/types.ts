@@ -5409,6 +5409,33 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_watermarks: {
+        Row: {
+          id: string
+          last_processed_at: string
+          period_type: string
+          scope_id: string | null
+          scope_type: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          last_processed_at?: string
+          period_type: string
+          scope_id?: string | null
+          scope_type: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          last_processed_at?: string
+          period_type?: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lateness_record: {
         Row: {
           created_at: string
