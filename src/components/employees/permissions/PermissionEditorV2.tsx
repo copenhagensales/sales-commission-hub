@@ -75,6 +75,8 @@ import {
   type Visibility
 } from "@/hooks/useUnifiedPermissions";
 import { cn } from "@/lib/utils";
+import { PermissionRowWithChildren } from "./PermissionRowWithChildren";
+import { buildCategoryTree } from "./permissionGroups";
 
 type PermissionType = 'page' | 'tab' | 'action';
 
@@ -480,6 +482,39 @@ export function PermissionEditorV2() {
     queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
   };
 
+  // Toggle parent permission with all its children
+  const toggleParentWithChildren = async (
+    parent: PagePermission & { parent_key?: string | null; permission_type?: PermissionType },
+    children: (PagePermission & { parent_key?: string | null; permission_type?: PermissionType })[],
+    field: 'can_view' | 'can_edit',
+    newValue: boolean
+  ) => {
+    const updateData: Record<string, boolean | string> = { [field]: newValue };
+    
+    // If turning off can_view, also turn off can_edit and reset visibility
+    if (field === 'can_view' && !newValue) {
+      updateData.can_edit = false;
+      updateData.visibility = 'self';
+    }
+    
+    // Collect all IDs to update (parent + children)
+    const allIds = [parent.id, ...children.map(c => c.id)];
+    
+    const { error } = await supabase
+      .from('role_page_permissions')
+      .update(updateData)
+      .in('id', allIds);
+    
+    if (error) {
+      toast.error(`Kunne ikke opdatere: ${error.message}`);
+      return;
+    }
+    
+    const count = allIds.length;
+    toast.success(`${field === 'can_view' ? (newValue ? 'Aktiverede' : 'Deaktiverede') : (newValue ? 'Gav redigeringsadgang til' : 'Fjernede redigeringsadgang fra')} ${count} rettigheder`);
+    queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+  };
+
   // Update visibility
   const updateRowVisibility = async (permission: PermissionWithChildren, newVisibility: 'all' | 'team' | 'self') => {
     const { error } = await supabase
@@ -872,15 +907,36 @@ export function PermissionEditorV2() {
                           <AccordionContent className="px-4 pb-4">
                             <div className="space-y-1">
                               {categoryPermissions.length > 0 ? (
-                                categoryPermissions.map((permission) => (
-                                  <PermissionRowCompact
-                                    key={permission.id}
-                                    permission={permission}
-                                    togglePermission={togglePermission}
-                                    updateRowVisibility={updateRowVisibility}
-                                    openEditPermission={openEditPermission}
-                                  />
-                                ))
+                                (() => {
+                                  const { groups, standalone } = buildCategoryTree(categoryPermissions);
+                                  return (
+                                    <>
+                                      {/* Render hierarchical groups */}
+                                      {groups.map((group) => (
+                                        <PermissionRowWithChildren
+                                          key={group.parent.id}
+                                          parent={group.parent}
+                                          children={group.children}
+                                          groupLabel={group.groupLabel}
+                                          togglePermission={togglePermission}
+                                          updateRowVisibility={updateRowVisibility}
+                                          openEditPermission={openEditPermission}
+                                          toggleParentWithChildren={toggleParentWithChildren}
+                                        />
+                                      ))}
+                                      {/* Render standalone permissions */}
+                                      {standalone.map((permission) => (
+                                        <PermissionRowCompact
+                                          key={permission.id}
+                                          permission={permission}
+                                          togglePermission={togglePermission}
+                                          updateRowVisibility={updateRowVisibility}
+                                          openEditPermission={openEditPermission}
+                                        />
+                                      ))}
+                                    </>
+                                  );
+                                })()
                               ) : (
                                 <p className="text-sm text-muted-foreground py-2">
                                   Ingen rettigheder i denne kategori. Klik "Synkroniser" for at oprette.
