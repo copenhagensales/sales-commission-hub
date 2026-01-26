@@ -522,6 +522,7 @@ export function usePermissions() {
     canViewBoardsSales: hasPermission("menu_boards_sales"),
     // Dashboards menu
     canViewDashboardCphSales: canView("menu_dashboard_cph_sales"),
+    canViewDashboardCsTop20: canView("menu_dashboard_cs_top_20"),
     canViewDashboardFieldmarketing: canView("menu_dashboard_fieldmarketing"),
     canViewDashboardEesyTm: canView("menu_dashboard_eesy_tm"),
     canViewDashboardTdcErhverv: canView("menu_dashboard_tdc_erhverv"),
