@@ -1,84 +1,76 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight, Users, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
+import { 
+  useActiveSeason, 
+  useMyEnrollment, 
+  useQualificationStandings,
+  useEnrollmentCount,
+  type QualificationStanding 
+} from "@/hooks/useLeagueData";
+import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { formatPlayerName } from "@/lib/formatPlayerName";
+
+interface NeighborResult {
+  visibleStandings: QualificationStanding[];
+  myIndex: number;
+}
+
+function getNeighborStandings(
+  allStandings: QualificationStanding[],
+  myEmployeeId: string | null
+): NeighborResult {
+  if (!myEmployeeId || allStandings.length === 0) {
+    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  }
+
+  const myIndex = allStandings.findIndex(s => s.employee_id === myEmployeeId);
+  
+  // User not found in standings - show top 3
+  if (myIndex === -1) {
+    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  }
+
+  const total = allStandings.length;
+  
+  // If 5 or fewer participants, show all
+  if (total <= 5) {
+    return { visibleStandings: allStandings, myIndex };
+  }
+
+  // Calculate window: 2 above, user, 2 below (5 total)
+  let start = myIndex - 2;
+  let end = myIndex + 3; // exclusive
+
+  // Adjust if at top
+  if (start < 0) {
+    start = 0;
+    end = Math.min(5, total);
+  }
+  
+  // Adjust if at bottom
+  if (end > total) {
+    end = total;
+    start = Math.max(0, total - 5);
+  }
+
+  return { 
+    visibleStandings: allStandings.slice(start, end), 
+    myIndex: myIndex - start // Adjust index relative to visible slice
+  };
+}
 
 export function LeaguePromoCard() {
   const { user } = useAuth();
   const { data: season } = useActiveSeason();
   const { data: enrollment } = useMyEnrollment(season?.id);
   const isEnrolled = !!enrollment;
-
-  // Fetch current employee ID
-  const { data: currentEmployeeId } = useQuery({
-    queryKey: ["league-promo-employee-id"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_current_employee_id");
-      if (error || !data) return null;
-      return data as string;
-    },
-    enabled: !!user,
-  });
-
-  // Fetch top 3 standings
-  const { data: topStandings = [] } = useQuery({
-    queryKey: ["league-top-standings", season?.id],
-    queryFn: async () => {
-      if (!season?.id) return [];
-
-      const { data } = await supabase
-        .from("league_qualification_standings")
-        .select("*, employee:employee_master_data(first_name, last_name)")
-        .eq("season_id", season.id)
-        .order("current_provision", { ascending: false })
-        .limit(3);
-
-      return data || [];
-    },
-    enabled: !!season?.id,
-  });
-
-  // Fetch user's own standing
-  const { data: myStanding } = useQuery({
-    queryKey: ["league-my-standing", season?.id, currentEmployeeId],
-    queryFn: async () => {
-      if (!season?.id || !currentEmployeeId) return null;
-
-      const { data } = await supabase
-        .from("league_qualification_standings")
-        .select("*, employee:employee_master_data(first_name, last_name)")
-        .eq("season_id", season.id)
-        .eq("employee_id", currentEmployeeId)
-        .maybeSingle();
-
-      return data;
-    },
-    enabled: !!season?.id && !!currentEmployeeId,
-  });
-
-  // Fetch enrollment count
-  const { data: enrollmentCount = 0 } = useQuery({
-    queryKey: ["league-enrollment-count", season?.id],
-    queryFn: async (): Promise<number> => {
-      if (!season?.id) return 0;
-
-      // Use raw query to avoid deep type instantiation issues
-      const { count } = await (supabase
-        .from("league_enrollments")
-        .select("id", { count: "exact", head: true }) as any)
-        .eq("season_id", season.id)
-        .eq("is_active", true);
-
-      return count || 0;
-    },
-    enabled: !!season?.id,
-  });
+  const { data: currentEmployeeId } = useCurrentEmployeeId();
+  const { data: allStandings = [] } = useQualificationStandings(season?.id);
+  const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
 
   const formatProvision = (amount: number) => {
     return new Intl.NumberFormat("da-DK", {
@@ -87,7 +79,6 @@ export function LeaguePromoCard() {
       maximumFractionDigits: 0,
     }).format(amount) + " kr";
   };
-
 
   const getMedalEmoji = (rank: number) => {
     switch (rank) {
@@ -100,6 +91,14 @@ export function LeaguePromoCard() {
 
   // Don't show if no active season
   if (!season) return null;
+
+  // Get neighbor standings based on enrollment status
+  const { visibleStandings, myIndex } = isEnrolled
+    ? getNeighborStandings(allStandings, currentEmployeeId || null)
+    : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+
+  // Check if user is enrolled but not yet in standings
+  const isEnrolledButNoStanding = isEnrolled && myIndex === -1 && allStandings.length > 0;
 
   return (
     <Card className="border-0 shadow-lg bg-gradient-to-br from-yellow-500/10 via-primary/5 to-orange-500/10 backdrop-blur-sm overflow-hidden relative">
@@ -124,49 +123,59 @@ export function LeaguePromoCard() {
       </CardHeader>
       
       <CardContent className="relative z-10 space-y-4">
-        {/* Top 3 standings */}
-        {topStandings.length > 0 && (
+        {/* Standings display */}
+        {visibleStandings.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Top 3 lige nu</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+              {isEnrolled && myIndex !== -1 ? "Din placering i ligaen" : "Top 3 lige nu"}
+            </p>
             <div className="space-y-1.5">
-              {topStandings.map((standing: any, index: number) => (
-                <div 
-                  key={standing.id} 
-                  className={`flex items-center justify-between p-2 rounded-lg ${
-                    standing.employee_id === currentEmployeeId 
-                      ? "bg-primary/10 border border-primary/20" 
-                      : "bg-muted/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{getMedalEmoji(index + 1)}</span>
-                    <span className="font-medium text-sm">
-                      {formatPlayerName(standing.employee)}
-                      {standing.employee_id === currentEmployeeId && (
-                        <span className="text-primary ml-1">(dig)</span>
+              {visibleStandings.map((standing, index) => {
+                const isMe = standing.employee_id === currentEmployeeId;
+                const rank = standing.overall_rank || (index + 1);
+                const medal = getMedalEmoji(rank);
+                
+                return (
+                  <div 
+                    key={standing.id} 
+                    className={`flex items-center justify-between p-2 rounded-lg ${
+                      isMe 
+                        ? "bg-primary/10 border border-primary/20" 
+                        : "bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {/* Show medal for top 3, otherwise show rank number */}
+                      {medal ? (
+                        <span className="text-lg w-6 text-center">{medal}</span>
+                      ) : (
+                        <span className="text-sm font-bold text-muted-foreground w-6 text-center">
+                          #{rank}
+                        </span>
                       )}
+                      <span className="font-medium text-sm">
+                        {formatPlayerName(standing.employee)}
+                        {isMe && (
+                          <span className="text-primary ml-1">(dig)</span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatProvision(standing.current_provision || 0)}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold text-foreground">
-                    {formatProvision(standing.current_provision || 0)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* User's standing if enrolled and not in top 3 */}
-        {isEnrolled && myStanding && myStanding.projected_rank > 3 && (
-          <div className="pt-2 border-t border-border/50">
-            <p className="text-xs text-muted-foreground mb-2">Din placering</p>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-primary">#{myStanding.projected_rank}</span>
-                <span className="font-medium text-sm">{formatPlayerName(myStanding.employee)}</span>
-              </div>
-              <span className="text-sm font-semibold">{formatProvision(myStanding.current_provision || 0)}</span>
-            </div>
+        {/* Message for enrolled users not yet in standings */}
+        {isEnrolledButNoStanding && (
+          <div className="text-center py-2">
+            <p className="text-sm text-muted-foreground">
+              Du er med! Standings opdateres snart ⏳
+            </p>
           </div>
         )}
 

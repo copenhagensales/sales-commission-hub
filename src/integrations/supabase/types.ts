@@ -9072,6 +9072,7 @@ export type Database = {
         Returns: boolean
       }
       trigger_kpi_calculation: { Args: never; Returns: undefined }
+      trigger_kpi_incremental: { Args: never; Returns: undefined }
       update_customer_credentials: {
         Args: {
           p_client_id: string
