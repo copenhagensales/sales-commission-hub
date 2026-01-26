@@ -72,3 +72,23 @@ export function getPerformanceStatus(
   }
   return "behind";
 }
+
+// New: Get contextual message based on progress percentage (for HeroPerformanceCard)
+export function getContextualMotivation(progressPercent: number, hasGoal: boolean): string {
+  if (!hasGoal) return "Sæt et mål for at tracke din fremgang";
+  if (progressPercent >= 120) return "Du er on fire 🔥 Top 3 venter!";
+  if (progressPercent >= 100) return "Mål nået! Går du efter rekorden?";
+  if (progressPercent >= 80) return "Målstregen er i sigte - push through!";
+  if (progressPercent >= 50) return "Du er på vej! Keep going!";
+  return "Hver samtale tæller - du bygger momentum!";
+}
+
+// New: Get performance emoji based on progress
+export function getPerformanceEmoji(progressPercent: number, hasGoal: boolean): string {
+  if (!hasGoal) return "🎯";
+  if (progressPercent >= 120) return "🔥";
+  if (progressPercent >= 100) return "🏆";
+  if (progressPercent >= 80) return "💪";
+  if (progressPercent >= 50) return "📈";
+  return "🚀";
+}
