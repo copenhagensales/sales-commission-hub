@@ -79,6 +79,9 @@ export default function BookingsContent() {
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 
+  // Market types to exclude from regular bookings view
+  const MARKET_TYPES = ["Markeder", "Messer"];
+
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["vagt-bookings-list", selectedWeek, selectedYear],
     queryFn: async () => {
@@ -96,8 +99,13 @@ export default function BookingsContent() {
         .order("start_date");
       if (error) throw error;
       
+      // Filter out markets/fairs - they have their own tab now
+      const filteredData = bookingData?.filter((b: any) => 
+        !MARKET_TYPES.includes(b.location?.type)
+      ) || [];
+      
       const employeeIds = [...new Set(
-        bookingData?.flatMap(b => b.booking_assignment?.map((a: any) => a.employee_id) || []) || []
+        filteredData?.flatMap(b => b.booking_assignment?.map((a: any) => a.employee_id) || []) || []
       )];
       
       let employeeMap = new Map<string, string>();
@@ -110,7 +118,7 @@ export default function BookingsContent() {
         employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
       }
       
-      return bookingData?.map(booking => ({
+      return filteredData?.map(booking => ({
         ...booking,
         booking_assignment: booking.booking_assignment?.map((a: any) => ({
           ...a,
