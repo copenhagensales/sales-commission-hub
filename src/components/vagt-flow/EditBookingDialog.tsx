@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -89,6 +89,8 @@ export function EditBookingDialog({
   const [campaignId, setCampaignId] = useState<string>("");
   const [dailyRateOverride, setDailyRateOverride] = useState<string>("");
   const [useLocationRate, setUseLocationRate] = useState<boolean>(true);
+  const [isEditingLocationRate, setIsEditingLocationRate] = useState<boolean>(false);
+  const [locationRateInput, setLocationRateInput] = useState<string>("");
 
   // Employee tab state
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
@@ -635,6 +637,28 @@ export function EditBookingDialog({
     },
   });
 
+  // Update location daily rate mutation
+  const updateLocationRateMutation = useMutation({
+    mutationFn: async (newRate: number) => {
+      if (!booking.location?.id) throw new Error("Ingen lokation fundet");
+      const { error } = await supabase
+        .from("location")
+        .update({ daily_rate: newRate })
+        .eq("id", booking.location.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
+      setIsEditingLocationRate(false);
+      toast.success("Lokationens standardpris opdateret");
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved opdatering: " + error.message);
+    },
+  });
+
   // Remove employee assignment mutation
   const removeEmployeeAssignmentMutation = useMutation({
     mutationFn: async (employeeId: string) => {
@@ -956,12 +980,64 @@ export function EditBookingDialog({
               </Label>
               
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Lokationens standardpris:</span>
-                  <span className="font-medium text-foreground">
-                    {(booking.location?.daily_rate || 1000).toLocaleString('da-DK')} kr
-                  </span>
-                </div>
+                {isEditingLocationRate ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Lokationens standardpris:</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={locationRateInput}
+                      onChange={(e) => setLocationRateInput(e.target.value)}
+                      className="max-w-[140px] h-8"
+                      autoFocus
+                    />
+                    <span className="text-sm">kr</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        const newRate = parseFloat(locationRateInput);
+                        if (!isNaN(newRate) && newRate >= 0) {
+                          updateLocationRateMutation.mutate(newRate);
+                        } else {
+                          toast.error("Indtast en gyldig pris");
+                        }
+                      }}
+                      disabled={updateLocationRateMutation.isPending}
+                    >
+                      <Check className="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsEditingLocationRate(false)}
+                    >
+                      <Ban className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Lokationens standardpris:</span>
+                    <span className="font-medium text-foreground">
+                      {(booking.location?.daily_rate || 1000).toLocaleString('da-DK')} kr
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      onClick={() => {
+                        setLocationRateInput((booking.location?.daily_rate || 1000).toString());
+                        setIsEditingLocationRate(true);
+                      }}
+                      title="Rediger lokationens standardpris"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                    </Button>
+                  </div>
+                )}
                 
                 <div className="flex items-center gap-3">
                   <Checkbox
