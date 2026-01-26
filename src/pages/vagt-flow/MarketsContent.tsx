@@ -42,6 +42,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MarketCalendarWidget } from "@/components/vagt-flow/MarketCalendarWidget";
+import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
+import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 
 // Market/Fair location types
 const MARKET_TYPES = ["Markeder", "Messer"];
@@ -54,6 +56,7 @@ export default function MarketsContent() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
 
   // Fetch market bookings (next 12 months)
   const { data: bookings, isLoading } = useQuery({
@@ -140,6 +143,46 @@ export default function MarketsContent() {
     },
   });
 
+  // Employees for EditBookingDialog (Fieldmarketing team)
+  const { data: employees = [] } = useQuery({
+    queryKey: ["vagt-employees-for-markets-fieldmarketing"],
+    queryFn: async () => {
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, name")
+        .ilike("name", "Fieldmarketing")
+        .maybeSingle();
+
+      if (!teamData) return [];
+
+      const { data } = await supabase
+        .from("team_members")
+        .select(`employee_id, employee:employee_id(id, first_name, last_name, is_active)`)
+        .eq("team_id", teamData.id);
+
+      return (data || [])
+        .filter((tm: any) => tm.employee?.is_active)
+        .map((tm: any) => ({
+          id: tm.employee.id,
+          full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+          team: teamData.name,
+        }));
+    },
+  });
+
+  // Vehicles for EditBookingDialog
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ["vagt-vehicles-for-markets"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("vehicle")
+        .select("id, name, license_plate")
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
+    },
+  });
+
   const deleteBookingMutation = useMutation({
     mutationFn: async (bookingId: string) => {
       const { error } = await supabase.from("booking").delete().eq("id", bookingId);
@@ -149,6 +192,31 @@ export default function MarketsContent() {
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Marked-booking slettet" });
       setDeleteBookingId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Bulk assign mutation for adding employees via EditBookingDialog
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+      const inserts = assignments.flatMap(a => 
+        a.dates.map(date => ({
+          booking_id: a.bookingId,
+          employee_id: a.employeeId,
+          date,
+          start_time: "09:00",
+          end_time: "17:00",
+        }))
+      );
+      const { data, error } = await supabase.from("booking_assignment").insert(inserts).select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      toast({ title: "Medarbejdere tilføjet" });
     },
     onError: (error: any) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -250,11 +318,7 @@ export default function MarketsContent() {
       {!isLoading && (
         <MarketCalendarWidget 
           bookings={filtered} 
-          onBookingClick={(booking) => {
-            if (booking.location?.id) {
-              navigate(`/vagt-flow/locations/${booking.location.id}`);
-            }
-          }}
+          onBookingClick={(booking) => setEditBookingDialogBooking(booking)}
         />
       )}
 
@@ -312,7 +376,7 @@ export default function MarketsContent() {
                         <div 
                           key={booking.id} 
                           className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${booking.week_number}&year=${booking.year}`)}
+                          onClick={() => setEditBookingDialogBooking(booking)}
                         >
                           <div className="flex items-start justify-between">
                             <div className="space-y-1">
@@ -423,6 +487,43 @@ export default function MarketsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit booking dialog */}
+      {editBookingDialogBooking && (
+        <EditBookingDialog
+          open={!!editBookingDialogBooking}
+          onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
+          booking={editBookingDialogBooking}
+          weekNumber={editBookingDialogBooking.week_number}
+          year={editBookingDialogBooking.year}
+          weekStart={getWeekStartDate(editBookingDialogBooking.year, editBookingDialogBooking.week_number)}
+          employees={employees}
+          vehicles={vehicles}
+          onAddEmployeeAssignments={(assignments) => {
+            bulkAssignMutation.mutate(
+              assignments.map(a => ({
+                bookingId: editBookingDialogBooking.id,
+                employeeId: a.employeeId,
+                dates: a.dates,
+              }))
+            );
+          }}
+          onAddVehicleAssignment={async (assignment) => {
+            const inserts = assignment.dates.map(date => ({
+              booking_id: editBookingDialogBooking.id,
+              vehicle_id: assignment.vehicleId,
+              date,
+            }));
+            const { error } = await supabase.from("booking_vehicle").insert(inserts);
+            if (error) {
+              toast({ title: "Fejl", description: error.message, variant: "destructive" });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+              toast({ title: "Bil tilføjet" });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
