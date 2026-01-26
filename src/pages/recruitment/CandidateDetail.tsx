@@ -349,6 +349,9 @@ export default function CandidateDetail() {
 
       // If no employee record exists, create one
       if (!employeeId) {
+        // Map applied_position to job_title for employee_master_data
+        const jobTitle = candidate.applied_position || null;
+        
         // @ts-ignore - Supabase type chain too deep
         const { data: newEmployee, error: createError } = await supabase
           .from("employee_master_data")
@@ -358,7 +361,7 @@ export default function CandidateDetail() {
             email: candidate.email.toLowerCase(),
             phone: candidate.phone || null,
             is_active: false, // Will be activated after onboarding
-            applied_position: candidate.applied_position,
+            job_title: jobTitle,
             team_id: candidate.team_id,
           })
           .select("id")
