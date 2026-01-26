@@ -107,6 +107,11 @@ function useCurrentUserRole() {
           .eq('id', employee.position_id)
           .maybeSingle();
         
+        console.log('[useUnifiedPermissions] Position lookup:', { 
+          position_id: employee.position_id, 
+          system_role_key: position?.system_role_key 
+        });
+        
         if (position?.system_role_key) {
           return position.system_role_key;
         }
