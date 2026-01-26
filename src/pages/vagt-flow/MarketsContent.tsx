@@ -353,6 +353,12 @@ export default function MarketsContent() {
                                     )}
                                   </Badge>
                                 )}
+                                {/* Display total price for markets */}
+                                {booking.total_price != null && (
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    {booking.total_price.toLocaleString("da-DK")} kr
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <Button

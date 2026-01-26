@@ -415,6 +415,7 @@ export type Database = {
           location_id: string
           open_for_applications: boolean | null
           start_date: string
+          total_price: number | null
           updated_at: string | null
           visible_from: string | null
           week_number: number
@@ -435,6 +436,7 @@ export type Database = {
           location_id: string
           open_for_applications?: boolean | null
           start_date: string
+          total_price?: number | null
           updated_at?: string | null
           visible_from?: string | null
           week_number: number
@@ -455,6 +457,7 @@ export type Database = {
           location_id?: string
           open_for_applications?: boolean | null
           start_date?: string
+          total_price?: number | null
           updated_at?: string | null
           visible_from?: string | null
           week_number?: number

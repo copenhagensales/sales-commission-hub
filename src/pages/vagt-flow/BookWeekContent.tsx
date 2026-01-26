@@ -75,6 +75,9 @@ export default function BookWeekContent() {
   const [marketStartDate, setMarketStartDate] = useState<Date | undefined>(undefined);
   const [marketEndDate, setMarketEndDate] = useState<Date | undefined>(undefined);
   
+  // New state for market total price
+  const [marketTotalPrice, setMarketTotalPrice] = useState<string>("");
+  
   // Helper to detect if location is a market/fair
   const MARKET_TYPES = ["Markeder", "Messer"];
   const isMarketLocation = selectedLocation && MARKET_TYPES.includes(selectedLocation.type);
@@ -190,6 +193,9 @@ export default function BookWeekContent() {
       const campaignMapping = location?.client_campaign_mapping as Record<string, string> | null;
       const campaignId = campaignMapping?.[clientId] || null;
 
+      // Parse total price for markets
+      const parsedTotalPrice = isMarket && marketTotalPrice ? parseFloat(marketTotalPrice) : null;
+
       const { error } = await supabase.from("booking").insert({
         location_id: locationId,
         client_id: clientId,
@@ -203,6 +209,7 @@ export default function BookWeekContent() {
         open_for_applications: shouldOpenForApplications,
         visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
         application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
+        total_price: parsedTotalPrice,
       } as any);
 
       if (error) throw error;
@@ -216,6 +223,7 @@ export default function BookWeekContent() {
       setMarketEndWeek(selectedWeek);
       setMarketStartDate(undefined);
       setMarketEndDate(undefined);
+      setMarketTotalPrice("");
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
@@ -640,6 +648,23 @@ export default function BookWeekContent() {
                     })()}
                   </p>
                 )}
+                
+                {/* Total price input for markets */}
+                <div className="pt-3 border-t">
+                  <label className="text-xs font-medium uppercase text-muted-foreground">Samlet pris</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={100}
+                      placeholder="f.eks. 15000"
+                      value={marketTotalPrice}
+                      onChange={(e) => setMarketTotalPrice(e.target.value)}
+                      className="w-32"
+                    />
+                    <span className="text-sm text-muted-foreground">kr (for hele perioden)</span>
+                  </div>
+                </div>
               </div>
             ) : (
               /* Day toggle for stores */

@@ -86,8 +86,25 @@ export default function VagtBilling() {
   // Group bookings by location
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    // Use daily_rate_override if set, otherwise fall back to location's daily_rate
-    const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
+    
+    // Calculate total for this booking:
+    // If total_price is set (for markets), use it directly
+    // Otherwise calculate from daily rate × days
+    let bookingTotal: number;
+    let dailyRate: number;
+    let days: number;
+    
+    if (booking.total_price != null) {
+      // Use total_price for markets/fairs
+      bookingTotal = booking.total_price;
+      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      dailyRate = days > 0 ? bookingTotal / days : bookingTotal; // Derive daily rate for display
+    } else {
+      // Calculate from daily rate for stores
+      dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
+      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      bookingTotal = dailyRate * days;
+    }
     
     if (!acc[locationId]) {
       acc[locationId] = {
@@ -97,17 +114,15 @@ export default function VagtBilling() {
         totalDays: 0,
         totalAmount: 0,
         dailyRate: dailyRate,
+        usesTotalPrice: booking.total_price != null,
         minDate: booking.start_date,
         maxDate: booking.end_date,
       };
     }
     
     acc[locationId].bookings.push(booking);
-    
-    // Calculate days for this booking
-    const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
     acc[locationId].totalDays += days;
-    acc[locationId].totalAmount += days * dailyRate;
+    acc[locationId].totalAmount += bookingTotal;
     
     // Track date range
     if (booking.start_date < acc[locationId].minDate) {
@@ -310,7 +325,13 @@ export default function VagtBilling() {
                       <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
                       <TableCell className="text-right">{loc.bookings.length}</TableCell>
                       <TableCell className="text-right">{loc.totalDays}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{loc.dailyRate.toLocaleString("da-DK")} kr</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {loc.usesTotalPrice ? (
+                          <span className="italic">samlet</span>
+                        ) : (
+                          `${loc.dailyRate.toLocaleString("da-DK")} kr`
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-semibold">{loc.totalAmount.toLocaleString("da-DK")} kr</TableCell>
                     </TableRow>
                   ))}
