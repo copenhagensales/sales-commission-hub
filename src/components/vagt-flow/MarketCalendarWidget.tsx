@@ -228,6 +228,13 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
           </div>
         </div>
 
+        {/* Empty state message */}
+        {stats.total === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-2 bg-muted/50 rounded-lg">
+            Ingen kommende markeder planlagt — book via "Book uge" fanen
+          </p>
+        )}
+
         {/* 3-month calendar grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {monthsToShow.map((month, idx) => (
