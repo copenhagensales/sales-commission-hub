@@ -561,21 +561,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 </NavLink>
               )}
               
-              {/* Anbefal en ven */}
-              {p.canViewReferAFriend && (
-                <NavLink
-                  to="/refer-a-friend"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Gift className="h-4 w-4" />
-                  Anbefal en ven
-                </NavLink>
-              )}
-              
               {/* Løn & Mål - kun for provision-ansatte */}
               {p.canViewMyGoals && (
                 <NavLink
@@ -588,6 +573,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 >
                   <Target className="h-4 w-4" />
                   Løn & Mål
+                </NavLink>
+              )}
+              
+              {/* Anbefal en ven */}
+              {p.canViewReferAFriend && (
+                <NavLink
+                  to="/refer-a-friend"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Gift className="h-4 w-4" />
+                  Anbefal en ven
                 </NavLink>
               )}
             </CollapsibleContent>
