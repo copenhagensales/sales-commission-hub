@@ -553,13 +553,13 @@ export function PermissionEditor() {
         description: null,
       }));
       
-      // Insert in batches to avoid timeout
+      // Upsert in batches to avoid timeout and handle duplicates
       const BATCH_SIZE = 50;
       for (let i = 0; i < newPermissions.length; i += BATCH_SIZE) {
         const batch = newPermissions.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
           .from('role_page_permissions')
-          .insert(batch);
+          .upsert(batch, { onConflict: 'role_key,permission_key', ignoreDuplicates: true });
         
         if (error) {
           console.error('Error seeding permissions batch:', error);

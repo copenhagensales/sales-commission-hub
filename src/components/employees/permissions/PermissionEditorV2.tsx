@@ -357,7 +357,7 @@ export function PermissionEditorV2() {
         const batch = newPermissions.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
           .from('role_page_permissions')
-          .insert(batch);
+          .upsert(batch, { onConflict: 'role_key,permission_key', ignoreDuplicates: true });
         
         if (error) throw error;
       }
