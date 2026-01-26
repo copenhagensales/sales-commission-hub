@@ -1,174 +1,52 @@
 
-# Implementering: Klikbar Marked-booking med EditBookingDialog
+# Plan: Ret Thomas Wehages rolle og permissions
 
 ## Oversigt
-Gør marked-kortene i MarketsContent klikbare så de åbner EditBookingDialog direkte - samme dialog som bruges i BookingsContent.
+Retter Thomas Wehages adgang ved at fjerne duplikerede system_roles og opdatere hans position til "Assisterende Teamleder FM" så han får de korrekte Fieldmarketing permissions.
 
-## Ændringer i `src/pages/vagt-flow/MarketsContent.tsx`
+## Trin 1: Fjern duplikerede system_roles entries
 
-### 1. Nye imports (linje 1-47)
-Tilføj:
-```typescript
-import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
-import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
+Slet begge eksisterende roller i `system_roles` tabellen:
+
+```sql
+DELETE FROM system_roles 
+WHERE user_id = 'cb0eb55a-f2dc-476a-b09a-f8e7cb2e3f45';
 ```
 
-### 2. Ny state til dialog (efter linje 56)
-```typescript
-const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
+**Hvorfor:** `system_roles` tabellen bruges som fallback, men med den nye struktur styres permissions primært via `job_positions.system_role_key`.
+
+## Trin 2: Opdater Thomas' position til "Assisterende Teamleder FM"
+
+Opdater `employee_master_data` til at bruge den korrekte position:
+
+```sql
+UPDATE employee_master_data 
+SET position_id = '905ecb6b-e0a2-4dee-b343-81140c2454de'
+WHERE id = 'cb135e08-d329-4b64-9533-2bbfc3910515';
 ```
 
-### 3. Query til Fieldmarketing medarbejdere (efter fieldmarketingClients query)
-```typescript
-const { data: employees = [] } = useQuery({
-  queryKey: ["vagt-employees-for-markets-fieldmarketing"],
-  queryFn: async () => {
-    const { data: teamData } = await supabase
-      .from("teams")
-      .select("id, name")
-      .ilike("name", "Fieldmarketing")
-      .maybeSingle();
+**Effekt:** Hans `system_role_key` bliver nu `assisterende_teamleder_fm` som har de præcise permissions du har konfigureret.
 
-    if (!teamData) return [];
+## Resultat efter ændring
 
-    const { data } = await supabase
-      .from("team_members")
-      .select(`employee_id, employee:employee_id(id, first_name, last_name, is_active)`)
-      .eq("team_id", teamData.id);
+| Dashboard | Adgang |
+|-----------|--------|
+| CS Top 20 | Ja |
+| Eesy TM | Ja |
+| Fieldmarketing | Ja |
+| CPH Sales | Nej |
+| TDC Erhverv | Nej |
+| Relatel | Nej |
+| United | Nej |
 
-    return (data || [])
-      .filter((tm: any) => tm.employee?.is_active)
-      .map((tm: any) => ({
-        id: tm.employee.id,
-        full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
-        team: teamData.name,
-      }));
-  },
-});
-```
+| Fieldmarketing Menu | Adgang |
+|---------------------|--------|
+| Booking/Vagtplan | Ja (kan redigere) |
+| Lokationer | Ja (kan redigere) |
+| Salgsregistrering | Ja (kan redigere) |
+| Fravær | Ja (kan redigere) |
+| Fakturering | Ja (kan redigere) |
 
-### 4. Query til køretøjer
-```typescript
-const { data: vehicles = [] } = useQuery({
-  queryKey: ["vagt-vehicles-for-markets"],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("vehicle")
-      .select("id, name, license_plate")
-      .eq("is_active", true)
-      .order("name");
-    return data || [];
-  },
-});
-```
+## Teknisk note
 
-### 5. Bulk assign mutation (til tilføjelse af medarbejdere)
-```typescript
-const bulkAssignMutation = useMutation({
-  mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
-    const inserts = assignments.flatMap(a => 
-      a.dates.map(date => ({
-        booking_id: a.bookingId,
-        employee_id: a.employeeId,
-        date,
-        start_time: "09:00",
-        end_time: "17:00",
-      }))
-    );
-    const { data, error } = await supabase.from("booking_assignment").insert(inserts).select();
-    if (error) throw error;
-    return data;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
-    toast({ title: "Medarbejdere tilføjet" });
-  },
-});
-```
-
-### 6. Ændr onClick på booking-kortet (linje 315)
-Fra:
-```typescript
-onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${booking.week_number}&year=${booking.year}`)}
-```
-
-Til:
-```typescript
-onClick={() => setEditBookingDialogBooking(booking)}
-```
-
-### 7. Opdater MarketCalendarWidget onClick (linje 253-257)
-Fra:
-```typescript
-onBookingClick={(booking) => {
-  if (booking.location?.id) {
-    navigate(`/vagt-flow/locations/${booking.location.id}`);
-  }
-}}
-```
-
-Til:
-```typescript
-onBookingClick={(booking) => setEditBookingDialogBooking(booking)}
-```
-
-### 8. Tilføj EditBookingDialog komponenten (før lukkende `</div>`)
-```typescript
-{editBookingDialogBooking && (
-  <EditBookingDialog
-    open={!!editBookingDialogBooking}
-    onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
-    booking={editBookingDialogBooking}
-    weekNumber={editBookingDialogBooking.week_number}
-    year={editBookingDialogBooking.year}
-    weekStart={getWeekStartDate(editBookingDialogBooking.year, editBookingDialogBooking.week_number)}
-    employees={employees}
-    vehicles={vehicles}
-    onAddEmployeeAssignments={(assignments) => {
-      bulkAssignMutation.mutate(
-        assignments.map(a => ({
-          bookingId: editBookingDialogBooking.id,
-          employeeId: a.employeeId,
-          dates: a.dates,
-        }))
-      );
-    }}
-    onAddVehicleAssignment={async (assignment) => {
-      const inserts = assignment.dates.map(date => ({
-        booking_id: editBookingDialogBooking.id,
-        vehicle_id: assignment.vehicleId,
-        date,
-      }));
-      const { error } = await supabase.from("booking_vehicle").insert(inserts);
-      if (error) {
-        toast({ title: "Fejl", description: error.message, variant: "destructive" });
-      } else {
-        queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
-        toast({ title: "Bil tilføjet" });
-      }
-    }}
-  />
-)}
-```
-
-## Brugerflow efter implementering
-
-1. Bruger klikker på et marked-kort i "Markeder" fanen
-2. EditBookingDialog åbnes med bookingens data
-3. Bruger kan redigere:
-   - Kunde og kampagne
-   - Dagspris/samlet pris
-   - Tilføje/fjerne medarbejdere
-   - Tilføje/fjerne køretøjer
-   - Tilføje diæt
-4. Slet-knappen virker stadig separat (e.stopPropagation())
-5. Kalender-widget klik åbner også dialogen
-
-## Påvirkning
-
-| Element | Påvirkning |
-|---------|------------|
-| Vagtplan (BookingsContent) | Ingen - separate queries |
-| Billing | Ingen - læser samme data |
-| Database | Ingen nye tabeller |
-| Eksisterende funktionalitet | Bevares 100% |
+Systemet bruger nu `job_positions.system_role_key` som primær kilde til permissions via `role_page_permissions` tabellen. Ved at sætte Thomas på positionen "Assisterende Teamleder FM" får han automatisk de permissions der er defineret for `assisterende_teamleder_fm` rollen.
