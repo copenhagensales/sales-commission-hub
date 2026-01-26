@@ -34,7 +34,6 @@ import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
 
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
-import { QuickActionsBar } from "@/components/home/QuickActionsBar";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { TabbedRecognitions } from "@/components/home/TabbedRecognitions";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
@@ -476,7 +475,7 @@ const Home = () => {
       />
 
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4 md:p-8 space-y-6">
-        {/* ZONE 1: Hero Performance Card */}
+        {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
         <HeroPerformanceCard
           firstName={firstName}
           periodCommission={personalStats?.periodCommission || 0}
@@ -484,19 +483,11 @@ const Home = () => {
           progressPercent={progressPercent}
           hasGoal={hasGoal}
           onLogout={handleLogout}
+          isEnrolledInLeague={isEnrolledInLeague}
         />
 
-        {/* ZONE 2: Quick Actions + League */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Quick Actions - takes 2 cols on desktop */}
-          <div className="lg:col-span-2 flex flex-col justify-center">
-            <QuickActionsBar
-              hasGoal={hasGoal}
-              progressPercent={progressPercent}
-              isEnrolledInLeague={isEnrolledInLeague}
-            />
-          </div>
-          
+        {/* ZONE 2: League + Recognitions side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Compact League View */}
           <CompactLeagueView />
         </div>
@@ -514,7 +505,7 @@ const Home = () => {
                     {celebration.type === 'birthday' ? (
                       <span className="text-2xl">🎂</span>
                     ) : (
-                      <Award className="w-5 h-5 text-yellow-500" />
+                      <Award className="w-5 h-5 text-warning" />
                     )}
                     <div>
                       <p className="font-medium">{celebration.name}</p>
@@ -533,9 +524,7 @@ const Home = () => {
           </Card>
         )}
 
-        {/* ZONE 3: Secondary Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Tabbed Recognitions */}
+          {/* Tabbed Recognitions - closes ZONE 2 grid */}
           <TabbedRecognitions
             currentWeek={{
               topWeekly: weeklyRecognition?.currentWeek?.topWeekly || null,
@@ -546,143 +535,143 @@ const Home = () => {
               bestDay: weeklyRecognition?.lastWeek?.bestDay || null,
             }}
           />
+        </div>
 
-          {/* Team & Community */}
-          <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Users className="w-4 h-4 text-primary" />
-                Team & Fællesskab
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* New Employees */}
-              {newEmployees.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-primary" />
-                    Velkommen til nye kolleger
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {newEmployees.map((emp) => (
-                      <Badge 
-                        key={emp.id} 
-                        variant="secondary"
-                        className="px-3 py-1.5 bg-primary/10 text-primary border-0"
-                      >
-                        {emp.first_name} {emp.last_name}
-                        {(emp.teams as { name: string } | null)?.name && (
-                          <span className="ml-1 opacity-70">({(emp.teams as { name: string }).name})</span>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Upcoming Events */}
-              <div className="pt-3 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    Kommende begivenheder
-                  </p>
-                  <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Tilføj begivenhed</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="title">Titel *</Label>
-                          <Input 
-                            id="title"
-                            value={newEvent.title}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                            placeholder="Fx Fredagsbar"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="date">Dato *</Label>
-                          <Input 
-                            id="date"
-                            type="date"
-                            value={newEvent.event_date}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="time">Tidspunkt</Label>
-                          <Input 
-                            id="time"
-                            type="time"
-                            value={newEvent.event_time}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="location">Sted</Label>
-                          <Input 
-                            id="location"
-                            value={newEvent.location}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                            placeholder="Fx Kontoret"
-                          />
-                        </div>
-                        <Button 
-                          className="w-full" 
-                          onClick={() => addEventMutation.mutate(newEvent)}
-                          disabled={!newEvent.title || !newEvent.event_date || addEventMutation.isPending}
-                        >
-                          {addEventMutation.isPending ? "Tilføjer..." : "Tilføj begivenhed"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="space-y-2">
-                  {companyEvents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-3">Ingen kommende begivenheder</p>
-                  ) : (
-                    companyEvents.slice(0, 3).map((event) => (
-                      <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 group">
-                        <div className="text-center min-w-[40px]">
-                          <div className="text-xl font-bold text-primary">
-                            {format(parseISO(event.event_date), "d")}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground uppercase">
-                            {format(parseISO(event.event_date), "MMM", { locale: da })}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{event.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
-                            {event.event_time && event.location && " - "}
-                            {event.location}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => deleteEventMutation.mutate(event.id)}
-                        >
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+        {/* ZONE 3: Team & Community - Full Width */}
+        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Users className="w-4 h-4 text-primary" />
+              Team & Fællesskab
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* New Employees */}
+            {newEmployees.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-primary" />
+                  Velkommen til nye kolleger
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {newEmployees.map((emp) => (
+                    <Badge 
+                      key={emp.id} 
+                      variant="secondary"
+                      className="px-3 py-1.5 bg-primary/10 text-primary border-0"
+                    >
+                      {emp.first_name} {emp.last_name}
+                      {(emp.teams as { name: string } | null)?.name && (
+                        <span className="ml-1 opacity-70">({(emp.teams as { name: string }).name})</span>
+                      )}
+                    </Badge>
+                  ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+
+            {/* Upcoming Events */}
+            <div className="pt-3 border-t">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  Kommende begivenheder
+                </p>
+                <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Tilføj begivenhed</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Titel *</Label>
+                        <Input 
+                          id="title"
+                          value={newEvent.title}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="Fx Fredagsbar"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Dato *</Label>
+                        <Input 
+                          id="date"
+                          type="date"
+                          value={newEvent.event_date}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="time">Tidspunkt</Label>
+                        <Input 
+                          id="time"
+                          type="time"
+                          value={newEvent.event_time}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Sted</Label>
+                        <Input 
+                          id="location"
+                          value={newEvent.location}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                          placeholder="Fx Kontoret"
+                        />
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => addEventMutation.mutate(newEvent)}
+                        disabled={!newEvent.title || !newEvent.event_date || addEventMutation.isPending}
+                      >
+                        {addEventMutation.isPending ? "Tilføjer..." : "Tilføj begivenhed"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="space-y-2">
+                {companyEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">Ingen kommende begivenheder</p>
+                ) : (
+                  companyEvents.slice(0, 3).map((event) => (
+                    <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 group">
+                      <div className="text-center min-w-[40px]">
+                        <div className="text-xl font-bold text-primary">
+                          {format(parseISO(event.event_date), "d")}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase">
+                          {format(parseISO(event.event_date), "MMM", { locale: da })}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{event.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
+                          {event.event_time && event.location && " - "}
+                          {event.location}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => deleteEventMutation.mutate(event.id)}
+                      >
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Collapsible Upcoming Celebrations */}
         {upcomingCelebrations.length > 0 && (
@@ -711,7 +700,7 @@ const Home = () => {
                         {celebration.type === 'birthday' ? (
                           <Cake className="w-4 h-4 text-primary" />
                         ) : (
-                          <Award className="w-4 h-4 text-yellow-500" />
+                          <Award className="w-4 h-4 text-warning" />
                         )}
                         <span className="font-medium">{celebration.name}</span>
                         <span className="text-muted-foreground">•</span>
