@@ -92,14 +92,27 @@ function useCurrentUserRole() {
         return systemRole.role as SystemRole;
       }
       
-      // Fallback: map job_title to role
+      // Primary: Use system_role_key from job_positions via employee
       const { data: employee } = await supabase
         .from('employee_master_data')
-        .select('job_title')
+        .select('job_title, position_id')
         .eq('auth_user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
       
+      if (employee?.position_id) {
+        const { data: position } = await supabase
+          .from('job_positions')
+          .select('system_role_key')
+          .eq('id', employee.position_id)
+          .maybeSingle();
+        
+        if (position?.system_role_key) {
+          return position.system_role_key;
+        }
+      }
+      
+      // Fallback: map job_title to role (legacy support)
       if (employee?.job_title) {
         const titleLower = employee.job_title.toLowerCase();
         if (titleLower === 'ejer') return 'ejer';
