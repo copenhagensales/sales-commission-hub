@@ -1,198 +1,101 @@
 
-# Plan: Inkrementel KPI-beregning med Delta-opdatering
+# Plan: Personlig liga-visning med "din placering + nærmeste 2 over/under"
 
-## Baggrund og problem
+## Ændring
+Opdater `LeaguePromoCard` på `/home` til at vise en mere relevant og personlig liga-visning, hvor brugeren ser sin egen placering med de 2 nærmeste spillere over og under sig - i stedet for blot at vise top 3.
 
-Den nuværende `calculate-kpi-values` edge function:
-- Henter **alle** salg for hele lønperioden hver gang (6.000+ salg)
-- Udfører 12-24 paginerede database kald
-- Tager 60+ sekunder og timeout ofte
-- Genberegner alt fra bunden, selvom kun 1-10 nye salg er kommet siden sidst
+## Nuværende adfærd
+```
+Top 3 lige nu:
+🥇 Kasper M - 45.000 kr
+🥈 Anna S - 42.000 kr
+🥉 Peter L - 38.000 kr
 
-**Eksempel på ineffektivitet:**
-- Kl. 15:17 → cache opdateres med sales_count = 4 for Liva
-- Kl. 15:21 → 1 nyt salg kommer ind
-- Kl. 15:22 → funktionen henter alle 6.000+ salg igen for at beregne sales_count = 5
-- Men den timeout inden den når at gemme resultatet
-
-## Løsning: Inkrementel beregning med watermark
-
-### Koncept
-
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│  NUVÆRENDE TILGANG (ineffektiv)                                      │
-├──────────────────────────────────────────────────────────────────────┤
-│  Hvert minut:                                                        │
-│  1. Hent ALLE 6.000 salg for lønperioden                            │
-│  2. Genberegn totaler fra bunden                                     │
-│  3. Gem i cache                                                      │
-│  → Tid: 60+ sek, timeout risiko høj                                 │
-└──────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────┐
-│  NY TILGANG (inkrementel)                                            │
-├──────────────────────────────────────────────────────────────────────┤
-│  Hvert minut:                                                        │
-│  1. Læs watermark (sidst behandlede created_at)                     │
-│  2. Hent KUN nye salg (WHERE created_at > watermark) → 0-10 rækker  │
-│  3. Læs eksisterende cache-værdi                                     │
-│  4. Tilføj delta (cached_value + nye_salg_count)                    │
-│  5. Gem opdateret cache + ny watermark                               │
-│  → Tid: 1-3 sek, timeout risiko elimineret                          │
-└──────────────────────────────────────────────────────────────────────┘
+Din placering:
+#15 Jonas K - 18.000 kr
 ```
 
-### Ny tabel: kpi_watermarks
-
-Denne tabel tracker hvornår vi sidst har behandlet data:
-
-| Kolonne | Type | Formål |
-|---------|------|--------|
-| id | uuid | Primary key |
-| period_type | text | 'today', 'payroll_period' |
-| scope_type | text | 'employee', 'team', 'global' |
-| scope_id | uuid | Employee/team ID (null for global) |
-| last_processed_at | timestamptz | Watermark for sales.created_at |
-| updated_at | timestamptz | Hvornår rækken sidst blev opdateret |
-
-### Edge cases og håndtering
-
-| Scenarie | Håndtering |
-|----------|------------|
-| **Slettet salg** | Periodisk full-refresh (hvert 30 min) |
-| **Ændret commission** | Track sale_items.updated_at eller full-refresh |
-| **Første kørsel** | Hvis ingen cache → fuld beregning |
-| **Nyt period (ny dag/uge)** | Nulstil watermark ved periodeskift |
-| **FM salg** | Samme logik med fieldmarketing_sales.created_at |
-
-### Periodisk full-refresh
-
-For at håndtere edge cases (sletninger, ændringer) køres en fuld refresh:
-- Hvert 30. minut for employee-scoped KPIs
-- Hvert 60. minut for leaderboards
-- Ved periodeskift (midnat, mandag, 15. i måneden)
-
-## Implementeringsplan
-
-### 1. Database-ændringer
-
-Opret `kpi_watermarks` tabel med unik constraint på (period_type, scope_type, scope_id).
-
-Tilføj index på `sales.created_at` for effektiv inkrementel fetch.
-
-### 2. Ny edge function: calculate-kpi-incremental
-
-Denne funktion:
-1. Læser watermark fra `kpi_watermarks`
-2. Henter kun nye salg siden watermark
-3. Grupperer salg per employee
-4. Opdaterer kun berørte employees' cache-værdier
-5. Opdaterer watermark
-
-**Pseudo-kode:**
-```text
-// Læs watermark
-lastProcessed = SELECT last_processed_at FROM kpi_watermarks 
-                WHERE period_type = 'today' AND scope_type = 'employee'
-
-// Hent nye salg
-newSales = SELECT * FROM sales 
-           WHERE created_at > lastProcessed
-           ORDER BY created_at
-
-// Gruppér per employee
-affectedEmployees = grupperSalgPerEmployee(newSales)
-
-// For hver berørt employee
-FOR each employee IN affectedEmployees:
-    currentCache = SELECT value FROM kpi_cached_values 
-                   WHERE kpi_slug = 'sales_count' 
-                   AND scope_id = employee.id
-    
-    newValue = currentCache.value + employee.newSalesCount
-    
-    UPSERT INTO kpi_cached_values (value = newValue)
-
-// Opdater watermark
-UPSERT INTO kpi_watermarks (last_processed_at = MAX(newSales.created_at))
+## Ny adfærd
+```
+Din placering i ligaen:
+#13 Maria H - 19.200 kr
+#14 Thomas B - 18.800 kr
+#15 Jonas K (dig) - 18.000 kr  ← Fremhævet
+#16 Louise M - 17.500 kr
+#17 Frederik J - 17.000 kr
 ```
 
-### 3. Behold calculate-kpi-values til full-refresh
+## Visningslogik
 
-Den eksisterende funktion fortsætter som "full-refresh" version:
-- Køres hvert 30. minut (ikke hvert minut)
-- Sikrer konsistens og håndterer edge cases
-- Kan også trigges manuelt ved behov
+| Scenario | Hvad vises |
+|----------|-----------|
+| Bruger er i top 3 | Top 5 (da der ikke er nogen over dig) |
+| Bruger er #4 eller #5 | Top 5 + brugeren fremhævet |
+| Bruger er midt i feltet | 2 over + bruger + 2 under (5 i alt) |
+| Bruger er i bunden | De nederste 3-5 med bruger fremhævet |
+| Bruger ikke enrolled | Top 3 (nuværende adfærd) |
 
-### 4. Opdateret cron-skema
+## Implementering
 
-| Funktion | Schedule | Formål |
-|----------|----------|--------|
-| calculate-kpi-incremental | Hvert minut | Hurtig delta-opdatering |
-| calculate-kpi-values | Hvert 30. minut | Full-refresh for konsistens |
+### Fil: `src/components/league/LeaguePromoCard.tsx`
 
-## Forventet performance-forbedring
+1. **Ændre data-fetch logik**
+   - I stedet for at hente "top 3", henter vi alle standings for brugeren
+   - Brug eksisterende `useQualificationStandings` hook der allerede henter sorteret efter rank
+   - Find brugerens position og slice de relevante 5 personer
 
-| Metrik | Før | Efter |
-|--------|-----|-------|
-| Kørselstid | 60+ sek | 1-3 sek |
-| Database reads | 6.000+ rækker | 1-10 rækker |
-| Database queries | 12-24 | 3-5 |
-| Timeout risiko | Høj | Elimineret |
-| Data-forsinkelse | Op til 60+ min | Max 60 sek |
+2. **Ny hjælpefunktion: `getNeighborStandings`**
+   ```text
+   Input: allStandings[], myEmployeeId
+   Output: { visibleStandings[], myIndex }
+   
+   Logik:
+   - Find brugerens index i listen
+   - Beregn start/slut for 5-personers vindue
+   - Håndter edge cases (top/bund af listen)
+   ```
 
-## Tekniske detaljer
+3. **Opdater UI**
+   - Fjern "Top 3 lige nu" header
+   - Erstat med "Din placering i ligaen"
+   - Vis rank nummer (#13, #14, #15...) i stedet for medaljer
+   - Fremhæv brugerens egen række med primær farve og "(dig)" label
 
-### Inkrementel fetch query
+4. **Fallback for ikke-enrolled brugere**
+   - Hvis brugeren ikke er enrolled, vis top 3 som før
+   - Dette motiverer dem til at tilmelde sig
 
-Optimeret query der kun henter nye salg:
+## UI-eksempel (enrolled bruger)
 
-```sql
-SELECT s.id, s.agent_email, s.agent_external_id, s.sale_datetime, s.created_at,
-       si.mapped_commission, si.quantity, si.product_id
-FROM sales s
-LEFT JOIN sale_items si ON si.sale_id = s.id
-WHERE s.created_at > $watermark
-  AND s.sale_datetime >= $period_start
-  AND s.sale_datetime <= $period_end
-ORDER BY s.created_at ASC
+```
+┌─────────────────────────────────────────┐
+│ 🏆 Salgsligaen                 45 tilmeldt │
+├─────────────────────────────────────────┤
+│ Din placering i ligaen                   │
+│                                          │
+│ #13  Maria H        19.200 kr           │
+│ #14  Thomas B       18.800 kr           │
+│ #15  Jonas K (dig)  18.000 kr  ← blå bg │
+│ #16  Louise M       17.500 kr           │
+│ #17  Frederik J     17.000 kr           │
+│                                          │
+│ [     Se din position →    ]             │
+└─────────────────────────────────────────┘
 ```
 
-### Index-anbefalinger
+## Edge cases
 
-For optimal performance bør der oprettes:
+1. **Færre end 5 tilmeldte**: Vis alle
+2. **Bruger er #1**: Vis top 5 (ingen over)
+3. **Bruger er sidst**: Vis de sidste 3-5
+4. **Bruger er lige tilmeldt (ingen standing endnu)**: Vis top 3 med besked "Du er med - standings opdateres snart"
 
-```sql
-CREATE INDEX idx_sales_created_at ON sales(created_at);
-CREATE INDEX idx_sale_items_sale_id ON sale_items(sale_id);
-```
+## Teknisk tilgang
 
-### Håndtering af FM salg
+Ændringerne holdes i én fil (`LeaguePromoCard.tsx`) og bruger eksisterende hooks og data.
 
-Samme logik anvendes for fieldmarketing_sales:
+**Ny query-strategi:**
+- Hent standings via en ny "neighbor standings" query der finder brugerens position + naboer
+- Alternativt: brug allerede fetchede `useQualificationStandings` og filtrer client-side (simplere)
 
-```sql
-SELECT * FROM fieldmarketing_sales 
-WHERE created_at > $watermark
-  AND registered_at >= $period_start
-```
-
-## Risici og mitigering
-
-| Risiko | Mitigering |
-|--------|------------|
-| Misset salg ved fejl | Full-refresh hvert 30. min |
-| Concurrent writes | UPSERT med ON CONFLICT |
-| Watermark korruption | Default til full-refresh hvis watermark mangler |
-| Commission ændringer | Trackes via sale_items.updated_at |
-
-## Implementeringsrækkefølge
-
-1. Opret `kpi_watermarks` tabel og index på sales.created_at
-2. Opret ny `calculate-kpi-incremental` edge function
-3. Opret nyt cron job for inkrementel function (hvert minut)
-4. Opdater eksisterende cron job til at køre hvert 30. minut
-5. Test og verificer at data opdateres korrekt
-6. Monitor logs for at sikre stabil drift
-
+For optimal performance vælger vi client-side filtrering, da standings-data allerede caches og bruges andre steder.
