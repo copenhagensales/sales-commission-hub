@@ -79,20 +79,8 @@ const getDisplayName = (name: string) => {
 };
 
 // Commission color thresholds based on period type
-// Daily: Green ≥ 1250, Yellow ≥ 1000, Red < 1000
-// Weekly (5 days): Green ≥ 6250, Yellow ≥ 5000, Red < 5000
-// Payroll (21 days): Green ≥ 26250, Yellow ≥ 21000, Red < 21000
-const getCommissionColor = (commission: number, period: 'day' | 'week' | 'payroll') => {
-  const thresholds = {
-    day: { green: 1250, yellow: 1000 },
-    week: { green: 6250, yellow: 5000 },
-    payroll: { green: 26250, yellow: 21000 }
-  };
-  const { green, yellow } = thresholds[period];
-  if (commission >= green) return "bg-green-500";
-  if (commission >= yellow) return "bg-yellow-500";
-  return "bg-red-500";
-};
+// Neutral commission styling - clean and readable
+const getCommissionStyle = () => "bg-primary/10 text-primary";
 
 // Get goal progress color based on expected progress
 const getGoalProgressColor = (progressPercent: number, expectedPercent: number) => {
@@ -413,7 +401,7 @@ export default function TdcErhvervDashboard() {
                             {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'payroll')}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
                               {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
@@ -489,7 +477,7 @@ export default function TdcErhvervDashboard() {
                             {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'week')}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
                               {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
@@ -565,7 +553,7 @@ export default function TdcErhvervDashboard() {
                             {totalSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-bold text-white ${getCommissionColor(totalCommission, 'day')}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
                               {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
