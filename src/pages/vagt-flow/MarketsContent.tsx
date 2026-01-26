@@ -246,8 +246,8 @@ export default function MarketsContent() {
         </CardContent>
       </Card>
 
-      {/* Calendar widget */}
-      {!isLoading && filtered.length > 0 && (
+      {/* Calendar widget - always show */}
+      {!isLoading && (
         <MarketCalendarWidget 
           bookings={filtered} 
           onBookingClick={(booking) => {

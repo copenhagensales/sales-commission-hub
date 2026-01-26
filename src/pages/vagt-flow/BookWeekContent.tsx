@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
+import { getWeekStartDate, getWeekYear, getWeekNumber } from "@/lib/vagt-flow-date-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getWeek, differenceInWeeks } from "date-fns";
+import { format, getWeek, differenceInWeeks, addDays, isBefore, startOfDay } from "date-fns";
+import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
 import { MarketApplicationsManager } from "@/components/vagt-flow/MarketApplicationsManager";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 type LocationTab = "mulige" | "cooldown" | "utilgaengelige";
 
@@ -66,6 +70,10 @@ export default function BookWeekContent() {
   const [visibleFromWeeks, setVisibleFromWeeks] = useState(4);
   const [expectedStaffCount, setExpectedStaffCount] = useState(2);
   const [marketEndWeek, setMarketEndWeek] = useState(selectedWeek);
+  
+  // New state for market date range picker
+  const [marketStartDate, setMarketStartDate] = useState<Date | undefined>(undefined);
+  const [marketEndDate, setMarketEndDate] = useState<Date | undefined>(undefined);
   
   // Helper to detect if location is a market/fair
   const MARKET_TYPES = ["Markeder", "Messer"];
@@ -116,24 +124,51 @@ export default function BookWeekContent() {
 
   const createBookingMutation = useMutation({
     mutationFn: async ({ locationId, clientId, isMarket }: { locationId: string; clientId: string; isMarket: boolean }) => {
-      const weekStart = getWeekStartDate(selectedYear, selectedWeek);
-      
-      const sortedDays = [...selectedDays].sort((a, b) => a - b);
-      const firstDay = sortedDays[0];
-      const lastDay = sortedDays[sortedDays.length - 1];
-
-      const startDate = new Date(weekStart);
-      startDate.setDate(startDate.getDate() + firstDay);
-
-      // For markets, calculate end date based on multi-week selection
+      let startDate: Date;
       let endDate: Date;
-      if (isMarket && marketEndWeek > selectedWeek) {
-        const endWeekStart = getWeekStartDate(selectedYear, marketEndWeek);
-        endDate = new Date(endWeekStart);
-        endDate.setDate(endDate.getDate() + lastDay);
+      let weekNumber: number;
+      let bookedDays: number[];
+
+      if (isMarket && marketStartDate && marketEndDate) {
+        // Use specific date range for markets
+        startDate = marketStartDate;
+        endDate = marketEndDate;
+        weekNumber = getWeekNumber(startDate);
+        
+        // Calculate booked days from the date range (0 = Monday, 6 = Sunday)
+        bookedDays = [];
+        let current = new Date(startDate);
+        while (current <= endDate) {
+          const dayOfWeek = (current.getDay() + 6) % 7; // Convert Sunday=0 to Monday=0
+          if (!bookedDays.includes(dayOfWeek)) {
+            bookedDays.push(dayOfWeek);
+          }
+          current = addDays(current, 1);
+        }
+        bookedDays.sort((a, b) => a - b);
       } else {
-        endDate = new Date(weekStart);
-        endDate.setDate(endDate.getDate() + lastDay);
+        // Use week-based logic for stores
+        const weekStart = getWeekStartDate(selectedYear, selectedWeek);
+        
+        const sortedDays = [...selectedDays].sort((a, b) => a - b);
+        const firstDay = sortedDays[0];
+        const lastDay = sortedDays[sortedDays.length - 1];
+
+        startDate = new Date(weekStart);
+        startDate.setDate(startDate.getDate() + firstDay);
+
+        // For markets with multi-week selection (legacy fallback)
+        if (isMarket && marketEndWeek > selectedWeek) {
+          const endWeekStart = getWeekStartDate(selectedYear, marketEndWeek);
+          endDate = new Date(endWeekStart);
+          endDate.setDate(endDate.getDate() + lastDay);
+        } else {
+          endDate = new Date(weekStart);
+          endDate.setDate(endDate.getDate() + lastDay);
+        }
+        
+        weekNumber = selectedWeek;
+        bookedDays = sortedDays;
       }
 
       let visibleFrom = null;
@@ -161,10 +196,10 @@ export default function BookWeekContent() {
         campaign_id: campaignId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        week_number: selectedWeek,
-        year: selectedYear,
+        week_number: weekNumber,
+        year: isMarket && marketStartDate ? getWeekYear(marketStartDate) : selectedYear,
         expected_staff_count: expectedStaffCount,
-        booked_days: sortedDays,
+        booked_days: bookedDays,
         open_for_applications: shouldOpenForApplications,
         visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
         application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
@@ -179,6 +214,8 @@ export default function BookWeekContent() {
       setOpenForApplications(false);
       setExpectedStaffCount(2);
       setMarketEndWeek(selectedWeek);
+      setMarketStartDate(undefined);
+      setMarketEndDate(undefined);
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
@@ -523,50 +560,106 @@ export default function BookWeekContent() {
               />
             </div>
 
-            {/* Multi-week selection for markets */}
-            {isMarketLocation && (
+            {/* Date range picker for markets */}
+            {isMarketLocation ? (
               <div className="p-3 rounded-lg bg-muted/50 space-y-3">
-                <label className="text-xs font-medium uppercase text-muted-foreground">Periode (flere uger)</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Uge {selectedWeek}</span>
+                <label className="text-xs font-medium uppercase text-muted-foreground">Periode</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Start date picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[140px] justify-start text-left font-normal h-9",
+                          !marketStartDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {marketStartDate ? format(marketStartDate, "d. MMM yyyy", { locale: da }) : "Fra dato"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={marketStartDate}
+                        onSelect={(date) => {
+                          setMarketStartDate(date);
+                          // Auto-set end date if not set or if before new start
+                          if (!marketEndDate || (date && marketEndDate < date)) {
+                            setMarketEndDate(date);
+                          }
+                        }}
+                        disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                        initialFocus
+                        className="pointer-events-auto"
+                        locale={da}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  
                   <span className="text-muted-foreground">→</span>
-                  <Select 
-                    value={marketEndWeek.toString()} 
-                    onValueChange={(v) => setMarketEndWeek(parseInt(v))}
-                  >
-                    <SelectTrigger className="w-24 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => selectedWeek + i).map((week) => (
-                        <SelectItem key={week} value={week.toString()}>
-                          Uge {week}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm text-muted-foreground">
-                    ({marketEndWeek - selectedWeek + 1} {marketEndWeek - selectedWeek + 1 === 1 ? "uge" : "uger"})
-                  </span>
+                  
+                  {/* End date picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[140px] justify-start text-left font-normal h-9",
+                          !marketEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {marketEndDate ? format(marketEndDate, "d. MMM yyyy", { locale: da }) : "Til dato"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={marketEndDate}
+                        onSelect={setMarketEndDate}
+                        disabled={(date) => 
+                          isBefore(date, startOfDay(new Date())) || 
+                          (marketStartDate ? isBefore(date, marketStartDate) : false)
+                        }
+                        initialFocus
+                        className="pointer-events-auto"
+                        locale={da}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
+                
+                {/* Duration display */}
+                {marketStartDate && marketEndDate && (
+                  <p className="text-sm text-muted-foreground">
+                    {(() => {
+                      const days = Math.ceil((marketEndDate.getTime() - marketStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                      return `${days} ${days === 1 ? "dag" : "dage"} valgt`;
+                    })()}
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Day toggle for stores */
+              <div className="grid grid-cols-7 gap-2">
+                {DAYS.map((day) => (
+                  <div
+                    key={day.value}
+                    onClick={() => toggleDay(day.value)}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer transition-all",
+                      selectedDays.includes(day.value)
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    <span className="text-xs font-medium">{day.label.slice(0, 3)}</span>
+                  </div>
+                ))}
               </div>
             )}
-
-            <div className="grid grid-cols-7 gap-2">
-              {DAYS.map((day) => (
-                <div
-                  key={day.value}
-                  onClick={() => toggleDay(day.value)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer transition-all ${
-                    selectedDays.includes(day.value)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted hover:bg-muted/80"
-                  }`}
-                >
-                  <span className="text-xs font-medium">{day.label.slice(0, 3)}</span>
-                </div>
-              ))}
-            </div>
 
             {/* Expected staff count */}
             <div className="flex items-center gap-3">
@@ -639,9 +732,17 @@ export default function BookWeekContent() {
                   toast({ title: "Fejl", description: "Ingen kunde valgt", variant: "destructive" });
                   return;
                 }
-                if (selectedDays.length === 0) {
-                  toast({ title: "Fejl", description: "Vælg mindst én dag", variant: "destructive" });
-                  return;
+                // Validate based on type
+                if (isMarketLocation) {
+                  if (!marketStartDate || !marketEndDate) {
+                    toast({ title: "Fejl", description: "Vælg start- og slutdato", variant: "destructive" });
+                    return;
+                  }
+                } else {
+                  if (selectedDays.length === 0) {
+                    toast({ title: "Fejl", description: "Vælg mindst én dag", variant: "destructive" });
+                    return;
+                  }
                 }
                 createBookingMutation.mutate({
                   locationId: selectedLocation.id,
@@ -649,10 +750,19 @@ export default function BookWeekContent() {
                   isMarket: isMarketLocation,
                 });
               }}
-              disabled={selectedDays.length === 0 || createBookingMutation.isPending}
+              disabled={
+                (isMarketLocation ? (!marketStartDate || !marketEndDate) : selectedDays.length === 0) || 
+                createBookingMutation.isPending
+              }
             >
               {isMarketLocation 
-                ? `Book ${marketEndWeek - selectedWeek + 1} ${marketEndWeek - selectedWeek + 1 === 1 ? "uge" : "uger"}`
+                ? (() => {
+                    if (marketStartDate && marketEndDate) {
+                      const days = Math.ceil((marketEndDate.getTime() - marketStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                      return `Book ${days} ${days === 1 ? "dag" : "dage"}`;
+                    }
+                    return "Vælg datoer";
+                  })()
                 : `Book ${selectedDays.length} ${selectedDays.length === 1 ? "dag" : "dage"}`
               }
             </Button>
