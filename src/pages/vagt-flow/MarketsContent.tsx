@@ -41,6 +41,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { MarketCalendarWidget } from "@/components/vagt-flow/MarketCalendarWidget";
 
 // Market/Fair location types
 const MARKET_TYPES = ["Markeder", "Messer"];
@@ -244,6 +245,18 @@ export default function MarketsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Calendar widget */}
+      {!isLoading && filtered.length > 0 && (
+        <MarketCalendarWidget 
+          bookings={filtered} 
+          onBookingClick={(booking) => {
+            if (booking.location?.id) {
+              navigate(`/vagt-flow/locations/${booking.location.id}`);
+            }
+          }}
+        />
+      )}
 
       {/* Markets by month */}
       {isLoading ? (
