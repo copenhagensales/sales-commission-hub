@@ -1,83 +1,87 @@
 
-# Plan: Fix CS Top 20 Dashboard i Sidebar
+# Plan: Tilføj unikke farver til team badges i CS Top 20
 
-## Problemanalyse
+## Oversigt
+Gør det lettere at skelne mellem teams ved at give hvert team sin egen farve på badge'et. Designet bevarer det nuværende rene UI/UX, men tilføjer subtil farve-kodning.
 
-"CS Top 20" vises i dashboard-dropdown (DashboardHeader) men ikke i sidebaren fordi:
+## Design-tilgang (UX/UI fokus)
 
-1. **Manglende permission i `usePositionPermissions.ts`**
-   - Der er ingen `canViewDashboardCsTop20` defineret
-   - Alle andre dashboards har deres egen permission, men CS Top 20 blev glemt
+### Farvepalette (genbruger eksisterende)
+Anvender den allerede definerede palette fra systemet for konsistens:
 
-2. **Forkert permission-check i sidebaren**
-   - Linjen `{p.canViewDashboardCphSales && (...)}` bruges fejlagtigt for CS Top 20
-   - Det betyder at CS Top 20 kun vises hvis brugeren har adgang til CPH Sales dashboard
+| Team | Farve | Hex |
+|------|-------|-----|
+| Eesy TM / Eesy | Violet | `#8b5cf6` |
+| Fieldmarketing | Grøn | `#10b981` |
+| Relatel | Amber | `#f59e0b` |
+| TDC Erhverv / TDC | Rød | `#ef4444` |
+| United | Indigo | `#6366f1` |
+| Tryg | Teal | `#14b8a6` |
+| ASE | Pink | `#ec4899` |
+| Ukendt/andet | Grå | `#6b7280` |
 
----
+### Styling af badges
+- **Normal mode**: Lys baggrund med teamfarve som accent (10-15% opacity) + farvet tekst
+- **TV mode**: Mættet baggrund med hvid tekst for bedre læsbarhed på afstand
+- Beholder den kompakte størrelse (`text-[10px]`, `px-1.5 py-0.5`)
+- Afrundede hjørner (rounded) bevares
 
-## Løsning
+### Eksempel på visuel effekt
+```
+Normal mode:   [TDC]     ← rødlig baggrund, rød tekst
+               [Eesy]    ← violet baggrund, violet tekst
+               [Relatel] ← amber baggrund, amber tekst
 
-### Fil 1: `src/hooks/usePositionPermissions.ts`
-
-Tilføj den manglende permission (efter linje 524):
-
-```typescript
-// Dashboards menu
-canViewDashboardCphSales: canView("menu_dashboard_cph_sales"),
-canViewDashboardCsTop20: canView("menu_dashboard_cs_top_20"),  // ← TILFØJ
-canViewDashboardFieldmarketing: canView("menu_dashboard_fieldmarketing"),
-// ... resten
+TV mode:       [TDC]     ← solid rød baggrund, hvid tekst
+               [Eesy]    ← solid violet baggrund, hvid tekst
 ```
 
-### Fil 2: `src/components/layout/AppSidebar.tsx`
+## Tekniske ændringer
 
-Ret permission-check for CS Top 20 (linje 1201):
-
-**Før:**
-```typescript
-{p.canViewDashboardCphSales && (
-  <NavLink to="/dashboards/cs-top-20" ...>
-    CS Top 20
-  </NavLink>
-)}
-```
-
-**Efter:**
-```typescript
-{p.canViewDashboardCsTop20 && (
-  <NavLink to="/dashboards/cs-top-20" ...>
-    CS Top 20
-  </NavLink>
-)}
-```
-
----
-
-## Hvorfor Virker det i Dashboard-Dropdown?
-
-`DashboardHeader.tsx` bruger en smartere, dynamisk tilgang:
+### 1. Tilføj team farve-mapping funktion
+Opretter en `getTeamColor` funktion der returnerer passende Tailwind classes baseret på teamnavn:
 
 ```typescript
-const accessibleDashboards = useMemo(() => {
-  return DASHBOARD_LIST.filter(dashboard => {
-    if (!dashboard.permissionKey) return true;
-    return canView(dashboard.permissionKey);  // ← Direkte check
-  });
-}, [canView]);
+const getTeamBadgeStyle = (teamName: string | null | undefined, tvMode: boolean) => {
+  if (!teamName) return '';
+  const lower = teamName.toLowerCase();
+  
+  // Map team til farve-klasser
+  if (lower.includes('tdc')) {
+    return tvMode 
+      ? 'bg-red-500 text-white' 
+      : 'bg-red-500/15 text-red-600';
+  }
+  if (lower.includes('eesy')) {
+    return tvMode 
+      ? 'bg-violet-500 text-white' 
+      : 'bg-violet-500/15 text-violet-600';
+  }
+  // ... osv for andre teams
+  
+  // Default
+  return tvMode 
+    ? 'bg-slate-600/60 text-slate-400' 
+    : 'bg-muted/80 text-muted-foreground';
+};
 ```
 
-Den itererer over `DASHBOARD_LIST` fra `src/config/dashboards.ts` og tjekker hver permission key direkte. Derfor virker det korrekt der.
+### 2. Opdater badge-rendering
+Erstatter den statiske grå styling med dynamisk farve:
 
----
+```typescript
+// Før:
+<span className={`... ${tvMode ? 'bg-slate-600/60 text-slate-400' : 'bg-muted/80 text-muted-foreground'}`}>
 
-## Anbefaling: Fremtidig Forbedring
+// Efter:
+<span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName, tvMode)}`}>
+```
 
-For at undgå lignende fejl i fremtiden kunne sidebaren også bruge en dynamisk tilgang baseret på `DASHBOARD_LIST`, ligesom `DashboardHeader` gør. Dette ville sikre at nye dashboards automatisk vises korrekt begge steder.
+## Fil der ændres
+- `src/pages/CsTop20Dashboard.tsx`
 
----
-
-## Implementeringsrækkefølge
-
-1. Tilføj `canViewDashboardCsTop20` til `usePositionPermissions.ts`
-2. Ret permission-check i `AppSidebar.tsx` fra `canViewDashboardCphSales` til `canViewDashboardCsTop20`
-3. Test at CS Top 20 nu vises korrekt i sidebaren for brugere med den rette permission
+## Resultat
+- Hurtigere visuel scanning af leaderboards
+- Teams springer i øjnene uden at dominere layoutet
+- Konsistent farve-kodning på tværs af perioder (dag, uge, løn)
+- Fungerer både i normal og TV-mode
