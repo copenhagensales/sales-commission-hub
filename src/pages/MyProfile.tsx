@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
-import { MyGoalsTabContent } from "@/components/profile/MyGoalsTabContent";
+
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 
 
@@ -1143,12 +1143,6 @@ export default function MyProfile() {
               <FileText className="h-4 w-4 mr-2" />
               Kontrakter
             </TabsTrigger>
-            {employee?.salary_type === 'provision' && (
-              <TabsTrigger value="loen-maal">
-                <Target className="h-4 w-4 mr-2" />
-                Løn & Mål
-              </TabsTrigger>
-            )}
             <TabsTrigger value="vagthistorik">
               <History className="h-4 w-4 mr-2" />
               Vagthistorik
@@ -2169,15 +2163,6 @@ export default function MyProfile() {
             />
           </TabsContent>
 
-          {/* Løn & Mål Tab (kun for provision-ansatte) */}
-          {employee?.salary_type === 'provision' && (
-            <TabsContent value="loen-maal" className="mt-6">
-              <MyGoalsTabContent 
-                employeeId={employee.id} 
-                salaryType={employee.salary_type}
-              />
-            </TabsContent>
-          )}
 
           {/* Karriere Tab */}
           <TabsContent value="karriere" className="mt-6">
