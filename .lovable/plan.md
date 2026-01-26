@@ -1,124 +1,189 @@
 
-# Plan: Visuel Optimering af Marked-Kalenderen
+# Plan: Dashboards Folder Sig Ud i Rettigheds-Editoren
 
 ## Problemanalyse
-Den nuværende kalender bruger små farvede prikker (1.5x1.5px) til at vise markeder på hver dag. Dette skaber følgende problemer:
 
-1. **Svær at se på større skærme** - prikkerne er for små
-2. **Ingen tælling synlig** - man kan ikke se hvor mange markeder der er på en dag
-3. **Ingen teaminfo** - man skal hover for at se detaljer
-4. **Max 3 prikker vises** - skjuler information hvis der er flere
+I den nuværende implementering viser Permission Editor alle rettigheder som en **flad liste** inden for hver kategori-accordion. Selvom databasen har `parent_key`-relationer defineret (f.eks. `menu_dashboard_cph_sales` har `parent_key: menu_section_dashboards`), bruger UI'et ikke denne hierarki til at skabe indlejrede/foldbare rækker.
 
----
-
-## Løsningsforslag
-
-### Ændring 1: Større og tydeligere dag-celler med antal-badge
-- Forstør cellerne fra `h-8` til `h-10` eller `h-12`
-- Vis et tal-badge i cellen når der er markeder (fx "2" for 2 markeder)
-- Baggrundsfarve på cellen baseret på "værste" status (rød > gul > grøn)
-- Mere synlig visuel effekt ved hover
-
-### Ændring 2: Forbedret tooltip med mere information
-- Vis bemandingsstatus per marked i tooltip (fx "3/4 bemandat")
-- Vis landsdel/region
-- Vis antal teams tildelt
-- Gruppér efter status i tooltip for hurtigere overblik
-
-### Ændring 3: Weekend-markering (Lø/Sø)
-- Let baggrund på weekenddage for at adskille dem visuelt
-- Gør det lettere at se markeder der falder på weekender
-
-### Ændring 4: Multi-event indikator
-- Når der er mere end 3 markeder samme dag, vis "+N" indikator
-- Gradient eller stacking-effekt for at vise "densitet"
+Det betyder at:
+1. Dashboards-kategorien viser alle dashboard-rettigheder som separate rækker
+2. Der er ingen visuel gruppering eller mulighed for at folde ud/ind for at se børne-elementer
+3. "Dashboard"-rækken under andre kategorier er blot en enkelt rettighed, ikke en container
 
 ---
 
-## Tekniske ændringer
+## Løsning: Hierarkisk Visning med Foldbare Parent-Child Rækker
 
-### Fil: `src/components/vagt-flow/MarketCalendarWidget.tsx`
+### Ændring 1: Udvid `PERMISSION_HIERARCHY` med rigtige parent-child relationer
+
+Opdater hierarkiet så hver individuel dashboard-rettighed har en eksplicit parent:
+
+```typescript
+const PERMISSION_HIERARCHY: Record<string, string | null> = {
+  // ... eksisterende
+  // Dashboards - individuelle dashboards under section
+  menu_dashboard_cph_sales: 'page_dashboards',
+  menu_dashboard_cs_top_20: 'page_dashboards',
+  menu_dashboard_fieldmarketing: 'page_dashboards',
+  menu_dashboard_eesy_tm: 'page_dashboards',
+  // ... osv.
+};
+```
+
+### Ændring 2: Ny komponent `PermissionRowWithChildren`
+
+Opret en ny komponent der kan:
+- Vise en parent-rettighed med en fold-ud knap
+- Indeholde børne-rettigheder som kan vises/skjules
+- Håndtere "parent enables children" logik
 
 ```text
-1. Opdater dag-celle styling (linje ~121-153):
-   - Større højde: h-10 i stedet for h-8
-   - Baggrundsfarve baseret på "værste" booking status
-   - Vis antal-badge (tal) i stedet for prikker når bookings > 1
-   - Weekend-baggrund (lørdag/søndag med subtle bg)
-
-2. Ny helper funktion: getWorstStatusColor()
-   - Returnerer den mest kritiske farve for en dag
-   - Prioritet: rød (afventer) > gul (delvis) > grøn (bemandat)
-
-3. Forbedret tooltip (linje ~155-168):
-   - Vis staffing status per booking
-   - Vis region
-   - Gruppér efter status
-   - Tilføj "Klik for at se detaljer" hint
-
-4. Multi-event visning:
-   - Hvis 1 booking: Vis farvet prik
-   - Hvis 2-3 bookings: Vis antal som tal med farvet baggrund
-   - Hvis 4+ bookings: Vis tal + pulse animation for opmærksomhed
+┌──────────────────────────────────────────────────────┐
+│ ▼ Dashboards (Side)          Se ◉  Ret ○  Alle ○    │
+├──────────────────────────────────────────────────────┤
+│   └ CPH Salg (Menu)          Se ◉  Ret ○  Alle ○    │
+│   └ Fieldmarketing (Menu)    Se ○  Ret ○  Team ○    │
+│   └ Eesy TM (Menu)           Se ◉  Ret ○  Egen ◉    │
+│   └ TDC Erhverv (Menu)       Se ○  Ret ○  Egen ○    │
+│   └ Relatel (Menu)           Se ◉  Ret ○  Alle ○    │
+└──────────────────────────────────────────────────────┘
 ```
+
+### Ændring 3: Gruppér rettigheder hierarkisk i UI
+
+I stedet for en flad liste, omstrukturér hvordan kategorier renderes:
+
+1. Find alle "root" rettigheder (dem uden parent eller med section som parent)
+2. For hver root, find børn baseret på `parent_key`
+3. Render som collapsible træ-struktur
+
+### Ændring 4: Tilføj en hovedrettighed for "Dashboards-adgang"
+
+Opret en overordnet `page_dashboards` rettighed der fungerer som gate:
+- Hvis `page_dashboards` er slået fra, kan ingen individuelle dashboards ses
+- Hvis slået til, vises børnene og kan styres individuelt
 
 ---
 
-## Visuelt koncept
+## Tekniske Ændringer
 
-**Før:**
+### Fil: `src/components/employees/permissions/PermissionEditorV2.tsx`
+
 ```text
-┌────┐
-│ 28 │  (lille rød prik i bunden)
-└────┘
+1. Tilføj state for åbne parent-rækker:
+   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+2. Opret hjælpefunktion til at bygge hierarki:
+   function buildPermissionTree(permissions): PermissionWithChildren[] {
+     // Gruppér børn under deres parent
+     // Returnér kun root-elementer med children array
+   }
+
+3. Ny komponent: PermissionRowWithChildren
+   - Viser chevron-ikon hvis der er børn
+   - Klikbart for at folde ud/ind
+   - Renderer børne-rækker med indrykning
+   - Arver disabled-state fra parent
+
+4. Opdater AccordionContent rendering:
+   - Brug buildPermissionTree i stedet for flad liste
+   - Render PermissionRowWithChildren for elementer med børn
+   - Render PermissionRowCompact for blade (uden børn)
 ```
 
-**Efter:**
+### Fil: `src/hooks/useUnifiedPermissions.ts`
+
 ```text
-┌─────────┐
-│   28    │  ← Rød baggrund hvis afventer
-│   (3)   │  ← Antal markeder tydeligt vist
-└─────────┘
+1. Tilføj page_dashboards til permissionKeyLabels:
+   page_dashboards: 'Dashboards (hovedadgang)',
+
+2. Opdater PERMISSION_HIERARCHY med child-mappings
 ```
 
-For weekender:
-```text
-┌─────────┐
-│Lø    28 │  ← Subtle grå baggrund
-│   (2)   │  ← Gul hvis delvis bemandat
-└─────────┘
+### Database-ændring (migration)
+
+```sql
+-- Tilføj page_dashboards som parent-rettighed
+INSERT INTO role_page_permissions (role_key, permission_key, parent_key, permission_type, can_view, can_edit, visibility)
+SELECT DISTINCT 
+  role_key,
+  'page_dashboards',
+  'menu_section_dashboards',
+  'page',
+  true,
+  true,
+  'all'
+FROM role_page_permissions
+WHERE role_key IN (SELECT DISTINCT key FROM system_role_definitions)
+ON CONFLICT (role_key, permission_key) DO NOTHING;
+
+-- Opdater alle dashboard-menu items til at have page_dashboards som parent
+UPDATE role_page_permissions 
+SET parent_key = 'page_dashboards'
+WHERE permission_key IN (
+  'menu_dashboard_cph_sales',
+  'menu_dashboard_cs_top_20',
+  'menu_dashboard_fieldmarketing',
+  'menu_dashboard_eesy_tm',
+  'menu_dashboard_tdc_erhverv',
+  'menu_dashboard_relatel',
+  'menu_dashboard_mg_test',
+  'menu_dashboard_united',
+  'menu_dashboard_design',
+  'menu_dashboard_settings'
+);
 ```
 
 ---
 
 ## Implementeringsrækkefølge
 
-1. **Opdater celle-dimensioner og layout**
-   - Øg højde, tilføj flexbox struktur for bedre kontrol
+1. **Database**: Kør migration for at oprette `page_dashboards` rettighed og opdatere parent_key på dashboard-menupunkter
 
-2. **Tilføj baggrundsfarve-logik**
-   - Ny `getWorstStatusColor()` funktion
-   - Anvend som baggrund på cellen
+2. **Hooks**: Tilføj nye labels og opdater hierarki-konstanter
 
-3. **Erstat prikker med antal-badge**
-   - Vis tallet centralt i cellen
-   - Brug farvet cirkel/badge design
+3. **Byg hierarki-funktion**: Implementer `buildPermissionTree()` 
 
-4. **Forbedre tooltip**
-   - Tilføj staffing info
-   - Tilføj region
-   - Bedre formatering
+4. **Ny komponent**: Opret `PermissionRowWithChildren` med fold-ud funktionalitet
 
-5. **Weekend-styling**
-   - Detect lørdag/søndag
-   - Tilføj subtle baggrund
+5. **Opdater rendering**: Erstat flad liste med hierarkisk rendering i kategori-accordion
+
+6. **Test**: Verificér at:
+   - Dashboards-kategorien viser en foldbar "Dashboards" parent-række
+   - Klik folder ud og viser individuelle dashboards
+   - Deaktivering af parent deaktiverer alle børn
+   - Synkroniser-knappen opretter korrekt hierarki
+
+---
+
+## Visuelt Koncept
+
+**Før (flad liste):**
+```text
+Dashboards
+├── CPH Salg          Se ◉  Ret ○
+├── Fieldmarketing    Se ◉  Ret ○
+├── Eesy TM           Se ○  Ret ○
+├── TDC Erhverv       Se ◉  Ret ○
+└── ...
+```
+
+**Efter (hierarkisk med fold-ud):**
+```text
+Dashboards
+└── ▼ Dashboards (hovedadgang)    Se ◉  Ret ○  Alle
+      ├── CPH Salg                Se ◉  Ret ○  Team
+      ├── Fieldmarketing          Se ◉  Ret ○  Alle
+      ├── Eesy TM                 Se ○  Ret ○  Egen
+      └── TDC Erhverv             Se ◉  Ret ○  Alle
+```
 
 ---
 
 ## Fordele
 
-- **Øget synlighed**: Større elementer og tydeligere farver
-- **Hurtigere overblik**: Antal synligt direkte uden hover
-- **Bedre prioritering**: "Værste status" farve gør det let at se kritiske dage
-- **Weekend-fokus**: Weekender (hvor markeder typisk er) skiller sig ud
-- **Konsistent med eksisterende stil**: Bruger samme farvekoder og UI-mønstre
+- **Klar hierarki**: Administratorer kan tydeligt se hvilke dashboards der hører under hovedadgangen
+- **Bulk-styring**: Deaktivering af parent deaktiverer alle børn automatisk
+- **Bedre overblik**: Fold-funktion reducerer visual clutter
+- **Konsistent med eksisterende mønster**: Bruger samme accordion-mønster som kategorier, men på rettigheds-niveau
+- **Skalerbar**: Kan anvendes på andre sektioner (f.eks. Fieldmarketing tabs, MG undersider)
