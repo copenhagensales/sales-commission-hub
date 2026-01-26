@@ -26,11 +26,12 @@ import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { format, parseISO, differenceInYears, startOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore, isWeekend } from "date-fns";
+import { format, parseISO, differenceInYears, startOfMonth, addDays, isSameDay, isAfter, isBefore } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
+import { useRecognitionKpis } from "@/hooks/useRecognitionKpis";
 
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
@@ -303,160 +304,8 @@ const Home = () => {
     staleTime: 300000,
   });
 
-  // Fetch weekly recognition data
-  const { data: weeklyRecognition } = useQuery({
-    queryKey: ["home-weekly-recognition"],
-    queryFn: async () => {
-      const now = new Date();
-      const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
-      const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
-      const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
-      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
-      
-      const { data: sales } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_name,
-          sale_datetime,
-          sale_items (
-            id,
-            mapped_commission,
-            quantity
-          )
-        `)
-        .gte("sale_datetime", lastWeekStart)
-        .lte("sale_datetime", currentWeekEnd);
-      
-      if (!sales || sales.length === 0) {
-        return { lastWeek: { topWeekly: null, bestDay: null }, currentWeek: { topWeekly: null, bestDay: null } };
-      }
-      
-      const processWeekSales = (weekSales: typeof sales) => {
-        const agentTotals: Record<string, number> = {};
-        const agentDailyTotals: Record<string, Record<string, number>> = {};
-        
-        weekSales.forEach(sale => {
-          const agentName = sale.agent_name || "Unknown";
-          const saleDate = sale.sale_datetime ? sale.sale_datetime.split("T")[0] : "";
-          const saleCommission = sale.sale_items?.reduce((sum, item) => {
-            return sum + (item.mapped_commission || 0);
-          }, 0) || 0;
-          
-          agentTotals[agentName] = (agentTotals[agentName] || 0) + saleCommission;
-          
-          if (!agentDailyTotals[agentName]) {
-            agentDailyTotals[agentName] = {};
-          }
-          agentDailyTotals[agentName][saleDate] = (agentDailyTotals[agentName][saleDate] || 0) + saleCommission;
-        });
-        
-        let topWeeklyAgent = "";
-        let topWeeklyCommission = 0;
-        Object.entries(agentTotals).forEach(([agent, total]) => {
-          if (total > topWeeklyCommission) {
-            topWeeklyCommission = total;
-            topWeeklyAgent = agent;
-          }
-        });
-        
-        let bestDayAgent = "";
-        let bestDayDate = "";
-        let bestDayCommission = 0;
-        Object.entries(agentDailyTotals).forEach(([agent, days]) => {
-          Object.entries(days).forEach(([date, total]) => {
-            if (total > bestDayCommission) {
-              bestDayCommission = total;
-              bestDayAgent = agent;
-              bestDayDate = date;
-            }
-          });
-        });
-        
-        return { topWeeklyAgent, topWeeklyCommission, bestDayAgent, bestDayDate, bestDayCommission };
-      };
-      
-      const lastWeekSales = sales.filter(s => {
-        const dt = s.sale_datetime;
-        return dt && dt >= lastWeekStart && dt <= lastWeekEnd;
-      });
-      const currentWeekSales = sales.filter(s => {
-        const dt = s.sale_datetime;
-        return dt && dt >= currentWeekStart && dt <= currentWeekEnd;
-      });
-      
-      const lastWeekData = processWeekSales(lastWeekSales);
-      const currentWeekData = processWeekSales(currentWeekSales);
-      
-      // Get team info
-      const allAgentNames = [
-        lastWeekData.topWeeklyAgent, lastWeekData.bestDayAgent,
-        currentWeekData.topWeeklyAgent, currentWeekData.bestDayAgent
-      ].filter(Boolean);
-      
-      const { data: agents } = await supabase
-        .from("agents")
-        .select("id, name, email")
-        .in("name", allAgentNames.length > 0 ? allAgentNames : ["__none__"]);
-      
-      const agentIds = agents?.map(a => a.id).filter(Boolean) || [];
-      const { data: agentMappings } = agentIds.length > 0 ? await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, employee_id")
-        .in("agent_id", agentIds) : { data: [] };
-      
-      const employeeIdsFromMappings = agentMappings?.map(m => m.employee_id).filter(Boolean) || [];
-      
-      const { data: teamMembersData } = employeeIdsFromMappings.length > 0 ? await supabase
-        .from("team_members")
-        .select("employee_id, teams(name)")
-        .in("employee_id", employeeIdsFromMappings) : { data: [] };
-      
-      const getTeamForAgent = (agentName: string) => {
-        const agent = agents?.find(a => a.name === agentName);
-        if (!agent) return null;
-        
-        const mapping = agentMappings?.find(m => m.agent_id === agent.id);
-        if (mapping?.employee_id) {
-          const teamMember = teamMembersData?.find(tm => tm.employee_id === mapping.employee_id);
-          if (teamMember?.teams && typeof teamMember.teams === 'object' && 'name' in teamMember.teams) {
-            return { name: (teamMember.teams as { name: string }).name };
-          }
-        }
-        return null;
-      };
-      
-      return {
-        lastWeek: {
-          topWeekly: lastWeekData.topWeeklyAgent ? {
-            name: lastWeekData.topWeeklyAgent,
-            commission: lastWeekData.topWeeklyCommission,
-            team: getTeamForAgent(lastWeekData.topWeeklyAgent)?.name || null
-          } : null,
-          bestDay: lastWeekData.bestDayAgent ? {
-            name: lastWeekData.bestDayAgent,
-            date: lastWeekData.bestDayDate,
-            commission: lastWeekData.bestDayCommission,
-            team: getTeamForAgent(lastWeekData.bestDayAgent)?.name || null
-          } : null
-        },
-        currentWeek: {
-          topWeekly: currentWeekData.topWeeklyAgent ? {
-            name: currentWeekData.topWeeklyAgent,
-            commission: currentWeekData.topWeeklyCommission,
-            team: getTeamForAgent(currentWeekData.topWeeklyAgent)?.name || null
-          } : null,
-          bestDay: currentWeekData.bestDayAgent ? {
-            name: currentWeekData.bestDayAgent,
-            date: currentWeekData.bestDayDate,
-            commission: currentWeekData.bestDayCommission,
-            team: getTeamForAgent(currentWeekData.bestDayAgent)?.name || null
-          } : null
-        }
-      };
-    },
-    staleTime: 60000,
-  });
+  // Use optimized recognition hook
+  const { data: weeklyRecognition } = useRecognitionKpis();
 
   const firstName = employee?.first_name || "kollega";
 
