@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tent } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { 
   format, 
   startOfMonth, 
@@ -15,7 +14,8 @@ import {
   subMonths,
   startOfWeek,
   endOfWeek,
-  isWithinInterval
+  isWithinInterval,
+  getDay
 } from "date-fns";
 import { da } from "date-fns/locale";
 import {
@@ -34,6 +34,7 @@ interface MarketBooking {
     id: string;
     name: string;
     type: string;
+    region?: string;
   };
   clients?: {
     id: string;
@@ -46,6 +47,62 @@ interface MarketBooking {
 interface MarketCalendarWidgetProps {
   bookings: MarketBooking[];
   onBookingClick?: (booking: MarketBooking) => void;
+}
+
+type StaffingStatus = 'pending' | 'partial' | 'full';
+
+function getBookingStatus(booking: MarketBooking): StaffingStatus {
+  const assigned = booking.booking_assignment?.length || 0;
+  const expected = booking.expected_staff_count || 2;
+  
+  if (assigned === 0) return 'pending';
+  if (assigned < expected) return 'partial';
+  return 'full';
+}
+
+function getWorstStatus(bookings: MarketBooking[]): StaffingStatus | null {
+  if (bookings.length === 0) return null;
+  
+  const hasPending = bookings.some(b => getBookingStatus(b) === 'pending');
+  if (hasPending) return 'pending';
+  
+  const hasPartial = bookings.some(b => getBookingStatus(b) === 'partial');
+  if (hasPartial) return 'partial';
+  
+  return 'full';
+}
+
+function getStatusColors(status: StaffingStatus | null) {
+  switch (status) {
+    case 'pending':
+      return {
+        bg: 'bg-destructive/15',
+        border: 'border-destructive/30',
+        badge: 'bg-destructive text-destructive-foreground',
+        dot: 'bg-destructive'
+      };
+    case 'partial':
+      return {
+        bg: 'bg-amber-500/15',
+        border: 'border-amber-500/30',
+        badge: 'bg-amber-500 text-white',
+        dot: 'bg-amber-500'
+      };
+    case 'full':
+      return {
+        bg: 'bg-emerald-500/15',
+        border: 'border-emerald-500/30',
+        badge: 'bg-emerald-500 text-white',
+        dot: 'bg-emerald-500'
+      };
+    default:
+      return { bg: '', border: '', badge: '', dot: '' };
+  }
+}
+
+function isWeekend(date: Date): boolean {
+  const day = getDay(date);
+  return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
 }
 
 export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalendarWidgetProps) {
@@ -72,16 +129,6 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
     });
   };
 
-  // Get color based on staffing status
-  const getBookingColor = (booking: MarketBooking) => {
-    const assigned = booking.booking_assignment?.length || 0;
-    const expected = booking.expected_staff_count || 2;
-    
-    if (assigned === 0) return "bg-destructive/20 border-destructive/50 text-destructive";
-    if (assigned < expected) return "bg-amber-500/20 border-amber-500/50 text-amber-700";
-    return "bg-emerald-500/20 border-emerald-500/50 text-emerald-700";
-  };
-
   const renderMonth = (monthDate: Date) => {
     const monthStart = startOfMonth(monthDate);
     const monthEnd = endOfMonth(monthDate);
@@ -99,8 +146,14 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
         
         {/* Weekday headers */}
         <div className="grid grid-cols-7 gap-0.5 text-center">
-          {weekDays.map((day) => (
-            <div key={day} className="text-xs font-medium text-muted-foreground py-1">
+          {weekDays.map((day, idx) => (
+            <div 
+              key={day} 
+              className={cn(
+                "text-xs font-medium py-1",
+                idx >= 5 ? "text-muted-foreground/70" : "text-muted-foreground"
+              )}
+            >
               {day}
             </div>
           ))}
@@ -113,6 +166,10 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
             const dayBookings = getBookingsForDate(day);
             const hasBookings = dayBookings.length > 0;
             const isToday = isSameDay(day, new Date());
+            const isWeekendDay = isWeekend(day);
+            const worstStatus = getWorstStatus(dayBookings);
+            const statusColors = getStatusColors(worstStatus);
+            const bookingCount = dayBookings.length;
 
             return (
               <TooltipProvider key={idx} delayDuration={100}>
@@ -120,11 +177,16 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
                   <TooltipTrigger asChild>
                     <div
                       className={cn(
-                        "relative h-8 flex items-center justify-center text-xs rounded transition-colors",
-                        !isCurrentMonth && "text-muted-foreground/40",
-                        isCurrentMonth && "text-foreground",
-                        isToday && "ring-1 ring-primary ring-offset-1",
-                        hasBookings && isCurrentMonth && "cursor-pointer hover:bg-muted"
+                        "relative h-10 flex flex-col items-center justify-center text-xs rounded-md transition-all",
+                        !isCurrentMonth && "text-muted-foreground/30",
+                        isCurrentMonth && !hasBookings && "text-foreground",
+                        isWeekendDay && isCurrentMonth && !hasBookings && "bg-muted/40",
+                        isToday && "ring-2 ring-primary ring-offset-1",
+                        hasBookings && isCurrentMonth && statusColors.bg,
+                        hasBookings && isCurrentMonth && "border",
+                        hasBookings && isCurrentMonth && statusColors.border,
+                        hasBookings && isCurrentMonth && "cursor-pointer hover:scale-105 hover:shadow-sm",
+                        bookingCount >= 4 && isCurrentMonth && "animate-pulse"
                       )}
                       onClick={() => {
                         if (hasBookings && dayBookings[0] && onBookingClick) {
@@ -132,37 +194,70 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
                         }
                       }}
                     >
-                      <span>{format(day, "d")}</span>
+                      <span className={cn(
+                        "font-medium",
+                        hasBookings && isCurrentMonth && "text-foreground"
+                      )}>
+                        {format(day, "d")}
+                      </span>
+                      
+                      {/* Booking indicator */}
                       {hasBookings && isCurrentMonth && (
-                        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
-                          {dayBookings.slice(0, 3).map((booking, i) => (
-                            <div
-                              key={i}
-                              className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                getBookingColor(booking).includes("destructive") 
-                                  ? "bg-destructive" 
-                                  : getBookingColor(booking).includes("amber") 
-                                    ? "bg-amber-500" 
-                                    : "bg-emerald-500"
-                              )}
-                            />
-                          ))}
-                        </div>
+                        <>
+                          {bookingCount === 1 ? (
+                            <div className={cn("w-1.5 h-1.5 rounded-full mt-0.5", statusColors.dot)} />
+                          ) : (
+                            <div className={cn(
+                              "text-[9px] font-bold px-1 rounded-full mt-0.5 min-w-[14px] text-center",
+                              statusColors.badge
+                            )}>
+                              {bookingCount}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </TooltipTrigger>
                   {hasBookings && isCurrentMonth && (
-                    <TooltipContent side="bottom" className="max-w-xs">
-                      <div className="space-y-1">
-                        {dayBookings.map((booking) => (
-                          <div key={booking.id} className="text-xs">
-                            <span className="font-medium">{booking.location?.name}</span>
-                            {booking.clients?.name && (
-                              <span className="text-muted-foreground ml-1">({booking.clients.name})</span>
-                            )}
-                          </div>
-                        ))}
+                    <TooltipContent side="bottom" className="max-w-xs p-3">
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold border-b pb-1 mb-2">
+                          {format(day, "EEEE d. MMMM", { locale: da })}
+                        </div>
+                        {dayBookings.map((booking) => {
+                          const status = getBookingStatus(booking);
+                          const assigned = booking.booking_assignment?.length || 0;
+                          const expected = booking.expected_staff_count || 2;
+                          
+                          return (
+                            <div key={booking.id} className="text-xs space-y-0.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium truncate">
+                                  {booking.location?.name}
+                                </span>
+                                <span className={cn(
+                                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap",
+                                  status === 'pending' && "bg-destructive/20 text-destructive",
+                                  status === 'partial' && "bg-amber-500/20 text-amber-700",
+                                  status === 'full' && "bg-emerald-500/20 text-emerald-700"
+                                )}>
+                                  {assigned}/{expected} teams
+                                </span>
+                              </div>
+                              <div className="text-muted-foreground flex gap-2">
+                                {booking.location?.region && (
+                                  <span>{booking.location.region}</span>
+                                )}
+                                {booking.clients?.name && (
+                                  <span>• {booking.clients.name}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="text-[10px] text-muted-foreground pt-1 border-t mt-2">
+                          Klik for at se detaljer
+                        </div>
                       </div>
                     </TooltipContent>
                   )}
@@ -178,17 +273,9 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
   // Summary stats
   const stats = useMemo(() => {
     const total = bookings.length;
-    const needsStaff = bookings.filter(b => (b.booking_assignment?.length || 0) === 0).length;
-    const partialStaff = bookings.filter(b => {
-      const assigned = b.booking_assignment?.length || 0;
-      const expected = b.expected_staff_count || 2;
-      return assigned > 0 && assigned < expected;
-    }).length;
-    const fullyStaffed = bookings.filter(b => {
-      const assigned = b.booking_assignment?.length || 0;
-      const expected = b.expected_staff_count || 2;
-      return assigned >= expected;
-    }).length;
+    const needsStaff = bookings.filter(b => getBookingStatus(b) === 'pending').length;
+    const partialStaff = bookings.filter(b => getBookingStatus(b) === 'partial').length;
+    const fullyStaffed = bookings.filter(b => getBookingStatus(b) === 'full').length;
     
     return { total, needsStaff, partialStaff, fullyStaffed };
   }, [bookings]);
