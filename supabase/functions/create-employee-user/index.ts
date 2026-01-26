@@ -9,8 +9,12 @@ const corsHeaders = {
 interface CreateUserRequest {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  job_title?: string;
+  is_staff_employee?: boolean;
 }
 
 serve(async (req) => {
@@ -25,7 +29,15 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const { email, password, firstName, lastName }: CreateUserRequest = await req.json();
+    const body: CreateUserRequest = await req.json();
+    
+    // Support both camelCase and snake_case field names
+    const email = body.email;
+    const password = body.password;
+    const firstName = body.firstName || body.first_name;
+    const lastName = body.lastName || body.last_name || '';
+    const jobTitle = body.job_title;
+    const isStaffEmployee = body.is_staff_employee;
 
     if (!email || !password || !firstName) {
       return new Response(
@@ -108,14 +120,24 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!existingEmployee) {
+      const employeeData: Record<string, unknown> = {
+        first_name: firstName,
+        last_name: lastName || '',
+        private_email: email,
+        is_active: true
+      };
+      
+      // Add job_title and is_staff_employee if provided
+      if (jobTitle) {
+        employeeData.job_title = jobTitle;
+      }
+      if (isStaffEmployee !== undefined) {
+        employeeData.is_staff_employee = isStaffEmployee;
+      }
+      
       const { error: employeeError } = await supabase
         .from("employee_master_data")
-        .insert({
-          first_name: firstName,
-          last_name: lastName || '',
-          private_email: email,
-          is_active: true
-        });
+        .insert(employeeData);
 
       if (employeeError) {
         console.error("Employee creation error:", employeeError);
