@@ -69,7 +69,7 @@ export default function MarketsContent() {
         .from("booking")
         .select(`
           *,
-          location!inner(id, name, address_city, type, daily_rate),
+          location!inner(id, name, address_city, region, type, daily_rate),
           clients(id, name),
           client_campaigns:campaign_id(id, name),
           booking_assignment(id, date, employee_id)
@@ -393,7 +393,7 @@ export default function MarketsContent() {
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <MapPin className="h-3.5 w-3.5" />
-                                  {booking.location?.address_city || "Ukendt by"}
+                                  {booking.location?.region || "Ukendt landsdel"}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
