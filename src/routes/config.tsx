@@ -127,7 +127,7 @@ export const routes: RouteConfig[] = [
   { path: "/team/h2h", component: TeamH2H, access: "role", positionPermission: "menu_team_h2h" },
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
-  { path: "/my-goals", component: MyGoalsRedirect, access: "protected" },
+  { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/my-goals/:employeeId", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/my-contracts", component: MyContractsRedirect, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
