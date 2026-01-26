@@ -11,8 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
-import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
-import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -188,7 +186,6 @@ export default function MyProfile() {
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "stamdata";
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
-  const { hasConsent, isLoading: consentLoading } = useHasDataProcessingConsent();
   const { isPreviewMode, previewEmployee } = useRolePreview();
 
   // Fetch current user's employee data (or preview employee if in preview mode)
@@ -1099,8 +1096,8 @@ export default function MyProfile() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  // Wait for BOTH employee AND consent status to be fully loaded before rendering anything
-  if (isLoading || consentLoading) {
+  // Wait for employee data to be loaded before rendering
+  if (isLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -1109,9 +1106,6 @@ export default function MyProfile() {
       </MainLayout>
     );
   }
-
-  // Calculate if consent is needed - only after all data is loaded
-  const needsConsent = !!employee && !hasConsent;
 
   if (!employee) {
     return (
@@ -1129,12 +1123,6 @@ export default function MyProfile() {
 
   return (
     <MainLayout>
-      {/* GDPR Consent Dialog */}
-      <GdprConsentDialog 
-        open={needsConsent} 
-        onConsent={() => queryClient.invalidateQueries({ queryKey: ["gdpr-consents"] })} 
-      />
-
       <div className="space-y-6">
         {/* Header */}
         <div>
