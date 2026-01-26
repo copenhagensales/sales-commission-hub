@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays, getDay, getHours } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
@@ -39,7 +38,6 @@ interface MappedSellerData {
   totalCommission: number;
   avatarUrl: string | null;
   employeeId: string;
-  goalTarget: number | null;
 }
 
 // Calculate payroll period (15th to 14th)
@@ -78,17 +76,8 @@ const getDisplayName = (name: string) => {
   return name;
 };
 
-// Commission color thresholds based on period type
 // Neutral commission styling - clean and readable
 const getCommissionStyle = () => "bg-primary/10 text-primary";
-
-// Get goal progress color based on expected progress
-const getGoalProgressColor = (progressPercent: number, expectedPercent: number) => {
-  const ratio = progressPercent / expectedPercent;
-  if (ratio >= 1) return "text-green-600";
-  if (ratio >= 0.8) return "text-yellow-600";
-  return "text-red-600";
-};
 
 export default function TdcErhvervDashboard() {
   const tvMode = isTvMode();
@@ -121,9 +110,7 @@ export default function TdcErhvervDashboard() {
     { enabled: true, limit: 30 }
   );
 
-  // No more useDashboardSalesData - hours now come from cached KPIs!
-
-  // Fetch employee avatars and IDs
+  // Fetch employee avatars
   const { data: employeeData } = useQuery({
     queryKey: ["employee-data-tdc"],
     queryFn: async () => {
@@ -133,91 +120,16 @@ export default function TdcErhvervDashboard() {
         .eq("is_active", true);
       
       const avatarMap = new Map<string, string>();
-      const nameToIdMap = new Map<string, string>();
       (data || []).forEach(emp => {
         const fullName = `${emp.first_name} ${emp.last_name}`;
-        nameToIdMap.set(fullName.toLowerCase(), emp.id);
         if (emp.avatar_url) {
           avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
         }
       });
-      return { avatarMap, nameToIdMap };
+      return { avatarMap };
     },
     enabled: !tvMode
   });
-
-  // Fetch employee sales goals for payroll period
-  const periodStartStr = format(payrollPeriod.start, "yyyy-MM-dd");
-  const periodEndStr = format(payrollPeriod.end, "yyyy-MM-dd");
-  
-  const { data: employeeGoals } = useQuery({
-    queryKey: ["employee-goals-tdc", periodStartStr, periodEndStr],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("employee_sales_goals")
-        .select("employee_id, target_amount")
-        .eq("period_start", periodStartStr)
-        .eq("period_end", periodEndStr);
-      
-      const goalMap = new Map<string, number>();
-      (data || []).forEach(g => goalMap.set(g.employee_id, g.target_amount));
-      return goalMap;
-    },
-    enabled: !tvMode
-  });
-
-  // Calculate time-based progress for relative goal tracking
-  const timeProgress = useMemo(() => {
-    const now = new Date();
-    const totalWorkingDays = 21;
-    
-    // Payroll period: days elapsed out of 21
-    const payrollDaysElapsed = Math.max(1, differenceInBusinessDays(now, payrollPeriod.start) + 1);
-    const payrollExpectedPercent = Math.min(100, (payrollDaysElapsed / totalWorkingDays) * 100);
-    
-    // Week: current weekday (1=Monday to 5=Friday)
-    const weekdayIndex = getDay(now); // 0=Sunday, 1=Monday...
-    const workDaysInWeekSoFar = weekdayIndex === 0 ? 5 : weekdayIndex === 6 ? 5 : weekdayIndex;
-    const weekExpectedPercent = (workDaysInWeekSoFar / 5) * 100;
-    
-    // Day: how much of the workday is done (8:00-17:00)
-    const hour = getHours(now);
-    const dayProgressPercent = Math.min(100, Math.max(0, ((hour - 8) / 9) * 100));
-    
-    return { payrollExpectedPercent, weekExpectedPercent, dayExpectedPercent: dayProgressPercent };
-  }, [payrollPeriod.start]);
-
-  // Get goal info for an employee with period-relative expected progress
-  // Now uses goalTarget from cached leaderboard data (same source for all modes)
-  const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
-    let payrollTarget: number | undefined;
-    
-    // First try goalTarget from seller data, then fall back to employeeGoals map
-    if (sellerGoalTarget != null) {
-      payrollTarget = sellerGoalTarget;
-    } else {
-      const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-      if (employeeId) {
-        payrollTarget = employeeGoals?.get(employeeId);
-      }
-    }
-    
-    if (!payrollTarget) return null;
-
-    // Calculate target for the specific period
-    const target = period === 'payroll' ? payrollTarget 
-                 : period === 'week' ? Math.round((payrollTarget / 21) * 5)
-                 : Math.round(payrollTarget / 21);
-    
-    // Get expected progress for this period
-    const expectedPercent = period === 'payroll' ? timeProgress.payrollExpectedPercent
-                          : period === 'week' ? timeProgress.weekExpectedPercent
-                          : timeProgress.dayExpectedPercent;
-    
-    const progress = (commission / target) * 100;
-    const expectedAmount = (expectedPercent / 100) * target;
-    return { target, progress, expectedPercent, expectedAmount };
-  };
 
   // Convert cached leaderboard entries to component-expected format
   const mapCachedToSeller = (entry: LeaderboardEntry): MappedSellerData => ({
@@ -226,7 +138,6 @@ export default function TdcErhvervDashboard() {
     totalCommission: entry.commission,
     avatarUrl: entry.avatarUrl,
     employeeId: entry.employeeId,
-    goalTarget: entry.goalTarget,
   });
 
   // Sort employees by commission for each period (use cached data - same source for all modes)
@@ -373,13 +284,11 @@ export default function TdcErhvervDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedPayrollSellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
-                      const goalInfo = getGoalInfo(name, totalCommission, 'payroll', goalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -404,21 +313,6 @@ export default function TdcErhvervDashboard() {
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
                               {formatCurrency(totalCommission)}
                             </span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={totalCommission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -449,13 +343,11 @@ export default function TdcErhvervDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedWeeklySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
-                      const goalInfo = getGoalInfo(name, totalCommission, 'week', goalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -465,7 +357,7 @@ export default function TdcErhvervDashboard() {
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl || undefined} alt={name} />
+                                <AvatarImage src={avatarUrl} alt={name} />
                                 <AvatarFallback className="text-xs bg-primary/20">
                                   {getInitials(name)}
                                 </AvatarFallback>
@@ -480,21 +372,6 @@ export default function TdcErhvervDashboard() {
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
                               {formatCurrency(totalCommission)}
                             </span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={totalCommission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -525,13 +402,11 @@ export default function TdcErhvervDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedDailySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl, goalTarget } = seller;
-                      const goalInfo = getGoalInfo(name, totalCommission, 'day', goalTarget);
+                      const { name, totalSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -541,7 +416,7 @@ export default function TdcErhvervDashboard() {
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl || undefined} alt={name} />
+                                <AvatarImage src={avatarUrl} alt={name} />
                                 <AvatarFallback className="text-xs bg-primary/20">
                                   {getInitials(name)}
                                 </AvatarFallback>
@@ -557,21 +432,6 @@ export default function TdcErhvervDashboard() {
                               {formatCurrency(totalCommission)}
                             </span>
                           </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={totalCommission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty />
-                              )}
-                            </div>
-                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -580,7 +440,6 @@ export default function TdcErhvervDashboard() {
               )}
             </CardContent>
           </Card>
-
         </div>
       </div>
     </div>

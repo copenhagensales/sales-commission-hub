@@ -1,5 +1,5 @@
 import { useMemo, useEffect } from "react";
-import { format, startOfDay, startOfWeek, startOfMonth, differenceInBusinessDays, getDay, getHours } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { GoalProgressRing, GoalProgressRingEmpty } from "@/components/league/GoalProgressRing";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
-import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboards } from "@/hooks/useCachedLeaderboard";
 import { useQuery } from "@tanstack/react-query";
 
 // Check if we're in TV mode
@@ -62,14 +61,6 @@ const getInitials = (name: string) => {
 // Neutral commission styling - clean and readable
 const getCommissionStyle = () => "bg-primary/10 text-primary";
 
-// Get goal progress color based on expected progress
-const getGoalProgressColor = (progressPercent: number, expectedPercent: number) => {
-  const ratio = progressPercent / expectedPercent;
-  if (ratio >= 1) return "text-green-600";
-  if (ratio >= 0.8) return "text-yellow-600";
-  return "text-red-600";
-};
-
 export default function EesyTmDashboard() {
   const tvMode = isTvMode();
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
@@ -112,88 +103,16 @@ export default function EesyTmDashboard() {
         .eq("is_active", true);
       
       const avatarMap = new Map<string, string>();
-      const nameToIdMap = new Map<string, string>();
       (data || []).forEach(emp => {
         const fullName = `${emp.first_name} ${emp.last_name}`;
         if (emp.avatar_url) {
           avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
         }
-        nameToIdMap.set(fullName.toLowerCase(), emp.id);
       });
-      return { avatarMap, nameToIdMap };
+      return { avatarMap };
     },
     staleTime: 300000,
   });
-
-  // Fetch employee sales goals for payroll period
-  const { data: employeeGoals } = useQuery({
-    queryKey: ["employee-goals-eesy", payrollPeriod.start.toISOString()],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("employee_sales_goals")
-        .select("employee_id, target_amount")
-        .gte("period_start", payrollPeriod.start.toISOString())
-        .lte("period_start", payrollPeriod.end.toISOString());
-      
-      const goalsMap = new Map<string, number>();
-      (data || []).forEach(goal => {
-        if (goal.target_amount) {
-          goalsMap.set(goal.employee_id, goal.target_amount);
-        }
-      });
-      return goalsMap;
-    },
-    staleTime: 300000,
-  });
-
-  // Calculate time-based progress for relative goal tracking
-  const timeProgress = useMemo(() => {
-    const now = new Date();
-    const totalWorkingDays = 21;
-    
-    // Payroll period: days elapsed out of 21
-    const payrollDaysElapsed = Math.max(1, differenceInBusinessDays(now, payrollPeriod.start) + 1);
-    const payrollExpectedPercent = Math.min(100, (payrollDaysElapsed / totalWorkingDays) * 100);
-    
-    // Week: current weekday (1=Monday to 5=Friday)
-    const weekdayIndex = getDay(now); // 0=Sunday, 1=Monday...
-    const workDaysInWeekSoFar = weekdayIndex === 0 ? 5 : weekdayIndex === 6 ? 5 : weekdayIndex;
-    const weekExpectedPercent = (workDaysInWeekSoFar / 5) * 100;
-    
-    // Day: how much of the workday is done (8:00-17:00)
-    const hour = getHours(now);
-    const dayProgressPercent = Math.min(100, Math.max(0, ((hour - 8) / 9) * 100));
-    
-    return { payrollExpectedPercent, weekExpectedPercent, dayExpectedPercent: dayProgressPercent };
-  }, [payrollPeriod.start]);
-
-  // Get goal info for an employee
-  const getGoalInfo = (employeeName: string, commission: number, period: 'day' | 'week' | 'payroll', sellerGoalTarget?: number | null) => {
-    let payrollTarget: number | undefined;
-    
-    if (sellerGoalTarget != null) {
-      payrollTarget = sellerGoalTarget;
-    } else {
-      const employeeId = employeeData?.nameToIdMap.get(employeeName.toLowerCase());
-      if (employeeId) {
-        payrollTarget = employeeGoals?.get(employeeId);
-      }
-    }
-    
-    if (!payrollTarget) return null;
-
-    const target = period === 'payroll' ? payrollTarget 
-                 : period === 'week' ? Math.round((payrollTarget / 21) * 5)
-                 : Math.round(payrollTarget / 21);
-    
-    const expectedPercent = period === 'payroll' ? timeProgress.payrollExpectedPercent
-                          : period === 'week' ? timeProgress.weekExpectedPercent
-                          : timeProgress.dayExpectedPercent;
-    
-    const progress = (commission / target) * 100;
-    const expectedAmount = (expectedPercent / 100) * target;
-    return { target, progress, expectedPercent, expectedAmount };
-  };
 
   // Map cached leaderboard entries to display format
   const sortedPayrollSellers = cachedSellersPayroll;
@@ -308,48 +227,27 @@ export default function EesyTmDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedPayrollSellers.map((seller, index) => {
-                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'payroll', seller.goalTarget);
-                      
-                      return (
-                        <TableRow key={seller.employeeId} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{seller.displayName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={seller.commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                  size={32}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty size={32} />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedPayrollSellers.map((seller, index) => (
+                      <TableRow key={seller.employeeId} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.displayName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -378,48 +276,27 @@ export default function EesyTmDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedWeeklySellers.map((seller, index) => {
-                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'week', seller.goalTarget);
-                      
-                      return (
-                        <TableRow key={seller.employeeId} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{seller.displayName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={seller.commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                  size={32}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty size={32} />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedWeeklySellers.map((seller, index) => (
+                      <TableRow key={seller.employeeId} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.displayName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -448,48 +325,27 @@ export default function EesyTmDashboard() {
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
-                      <TableHead className="text-right">Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedDailySellers.map((seller, index) => {
-                      const goalInfo = getGoalInfo(seller.employeeName, seller.commission, 'day', seller.goalTarget);
-                      
-                      return (
-                        <TableRow key={seller.employeeId} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                                <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{seller.displayName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex justify-end">
-                              {goalInfo ? (
-                                <GoalProgressRing
-                                  progress={goalInfo.progress}
-                                  expectedPercent={goalInfo.expectedPercent}
-                                  current={seller.commission}
-                                  target={goalInfo.target}
-                                  expectedAmount={goalInfo.expectedAmount}
-                                  size={32}
-                                />
-                              ) : (
-                                <GoalProgressRingEmpty size={32} />
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedDailySellers.map((seller, index) => (
+                      <TableRow key={seller.employeeId} className="border-b border-border/30">
+                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{seller.displayName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
+                        <TableCell className="text-right py-2">
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
