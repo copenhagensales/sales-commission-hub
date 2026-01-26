@@ -64,6 +64,12 @@ export default function BookWeekContent() {
   const [openForApplications, setOpenForApplications] = useState(false);
   const [applicationDeadlineDays, setApplicationDeadlineDays] = useState(7);
   const [visibleFromWeeks, setVisibleFromWeeks] = useState(4);
+  const [expectedStaffCount, setExpectedStaffCount] = useState(2);
+  const [marketEndWeek, setMarketEndWeek] = useState(selectedWeek);
+  
+  // Helper to detect if location is a market/fair
+  const MARKET_TYPES = ["Markeder", "Messer"];
+  const isMarketLocation = selectedLocation && MARKET_TYPES.includes(selectedLocation.type);
 
   const DAYS = [
     { label: "Mandag", value: 0 },
@@ -109,7 +115,7 @@ export default function BookWeekContent() {
   });
 
   const createBookingMutation = useMutation({
-    mutationFn: async ({ locationId, clientId }: { locationId: string; clientId: string }) => {
+    mutationFn: async ({ locationId, clientId, isMarket }: { locationId: string; clientId: string; isMarket: boolean }) => {
       const weekStart = getWeekStartDate(selectedYear, selectedWeek);
       
       const sortedDays = [...selectedDays].sort((a, b) => a - b);
@@ -119,13 +125,24 @@ export default function BookWeekContent() {
       const startDate = new Date(weekStart);
       startDate.setDate(startDate.getDate() + firstDay);
 
-      const endDate = new Date(weekStart);
-      endDate.setDate(endDate.getDate() + lastDay);
+      // For markets, calculate end date based on multi-week selection
+      let endDate: Date;
+      if (isMarket && marketEndWeek > selectedWeek) {
+        const endWeekStart = getWeekStartDate(selectedYear, marketEndWeek);
+        endDate = new Date(endWeekStart);
+        endDate.setDate(endDate.getDate() + lastDay);
+      } else {
+        endDate = new Date(weekStart);
+        endDate.setDate(endDate.getDate() + lastDay);
+      }
 
       let visibleFrom = null;
       let applicationDeadline = null;
 
-      if (openForApplications) {
+      // Markets default to open for applications
+      const shouldOpenForApplications = isMarket || openForApplications;
+
+      if (shouldOpenForApplications) {
         visibleFrom = new Date(startDate);
         visibleFrom.setDate(visibleFrom.getDate() - (visibleFromWeeks * 7));
 
@@ -146,9 +163,9 @@ export default function BookWeekContent() {
         end_date: format(endDate, "yyyy-MM-dd"),
         week_number: selectedWeek,
         year: selectedYear,
-        expected_staff_count: 2,
+        expected_staff_count: expectedStaffCount,
         booked_days: sortedDays,
-        open_for_applications: openForApplications,
+        open_for_applications: shouldOpenForApplications,
         visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
         application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
       } as any);
@@ -160,8 +177,11 @@ export default function BookWeekContent() {
       setBookingDialogOpen(false);
       setSelectedLocation(null);
       setOpenForApplications(false);
+      setExpectedStaffCount(2);
+      setMarketEndWeek(selectedWeek);
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
     },
     onError: (error: any) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -480,14 +500,21 @@ export default function BookWeekContent() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Vælg dage til booking
+              {isMarketLocation ? "Book marked/messe" : "Vælg dage til booking"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">{selectedLocation?.name}</p>
-                <p className="text-sm text-muted-foreground">Uge {selectedWeek}, {selectedYear}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Uge {selectedWeek}, {selectedYear}</p>
+                  {isMarketLocation && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedLocation?.type}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <PhoneLink 
                 phoneNumber={selectedLocation?.contact_phone} 
@@ -495,6 +522,35 @@ export default function BookWeekContent() {
                 iconClassName="h-3.5 w-3.5"
               />
             </div>
+
+            {/* Multi-week selection for markets */}
+            {isMarketLocation && (
+              <div className="p-3 rounded-lg bg-muted/50 space-y-3">
+                <label className="text-xs font-medium uppercase text-muted-foreground">Periode (flere uger)</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Uge {selectedWeek}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <Select 
+                    value={marketEndWeek.toString()} 
+                    onValueChange={(v) => setMarketEndWeek(parseInt(v))}
+                  >
+                    <SelectTrigger className="w-24 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => selectedWeek + i).map((week) => (
+                        <SelectItem key={week} value={week.toString()}>
+                          Uge {week}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">
+                    ({marketEndWeek - selectedWeek + 1} {marketEndWeek - selectedWeek + 1 === 1 ? "uge" : "uger"})
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-7 gap-2">
               {DAYS.map((day) => (
@@ -512,26 +568,41 @@ export default function BookWeekContent() {
               ))}
             </div>
 
+            {/* Expected staff count */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-muted-foreground">Forventet antal medarbejdere:</label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={expectedStaffCount}
+                onChange={(e) => setExpectedStaffCount(parseInt(e.target.value) || 2)}
+                className="w-16 h-8 text-center"
+              />
+            </div>
+
             <div className="space-y-3 pt-2 border-t">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="open-applications"
-                  checked={openForApplications}
+                  checked={isMarketLocation || openForApplications}
                   onCheckedChange={(checked) => setOpenForApplications(!!checked)}
+                  disabled={isMarketLocation}
                 />
                 <label htmlFor="open-applications" className="text-sm font-medium cursor-pointer">
                   Åben for ansøgninger
+                  {isMarketLocation && <span className="text-muted-foreground ml-1">(altid for markeder)</span>}
                 </label>
               </div>
 
-              {openForApplications && (
+              {(isMarketLocation || openForApplications) && (
                 <div className="pl-6 space-y-3 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">Synlig fra:</span>
                     <Input
                       type="number"
                       min={1}
-                      max={12}
+                      max={24}
                       value={visibleFromWeeks}
                       onChange={(e) => setVisibleFromWeeks(parseInt(e.target.value) || 4)}
                       className="w-16 h-8 text-center"
@@ -543,7 +614,7 @@ export default function BookWeekContent() {
                     <Input
                       type="number"
                       min={1}
-                      max={30}
+                      max={60}
                       value={applicationDeadlineDays}
                       onChange={(e) => setApplicationDeadlineDays(parseInt(e.target.value) || 7)}
                       className="w-16 h-8 text-center"
@@ -559,7 +630,6 @@ export default function BookWeekContent() {
               Annuller
             </Button>
             <Button
-              className="bg-green-600 hover:bg-green-700"
               onClick={() => {
                 if (!selectedLocation) {
                   toast({ title: "Fejl", description: "Ingen lokation valgt", variant: "destructive" });
@@ -576,11 +646,15 @@ export default function BookWeekContent() {
                 createBookingMutation.mutate({
                   locationId: selectedLocation.id,
                   clientId: selectedClientId,
+                  isMarket: isMarketLocation,
                 });
               }}
               disabled={selectedDays.length === 0 || createBookingMutation.isPending}
             >
-              Book {selectedDays.length} {selectedDays.length === 1 ? "dag" : "dage"}
+              {isMarketLocation 
+                ? `Book ${marketEndWeek - selectedWeek + 1} ${marketEndWeek - selectedWeek + 1 === 1 ? "uge" : "uger"}`
+                : `Book ${selectedDays.length} ${selectedDays.length === 1 ? "dag" : "dage"}`
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
