@@ -43,7 +43,13 @@ function mapJobTitleToRoleKey(jobTitle: string | null | undefined): string {
   if (lower === 'fieldmarketing leder') return 'fm_leder';
   if (lower === 'fieldmarketing' || lower === 'fm medarbejder') return 'fm_medarbejder_';
   
-  // Team leader roles
+  // Assisterende Teamleder FM - specific role with limited dashboard access
+  if (lower === 'assisterende teamleder fm') return 'assisterende_teamleder_fm';
+  
+  // Assisterende Teamleder (generic) - maps to teamleder
+  if (lower === 'assisterende teamleder') return 'teamleder';
+  
+  // Team leader roles (generic catch-all)
   if (lower.includes('teamleder')) return 'teamleder';
   
   // Specialized roles
