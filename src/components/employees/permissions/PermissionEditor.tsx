@@ -47,7 +47,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Plus,
-  Lock
+  Lock,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -502,6 +503,9 @@ export function PermissionEditor() {
   const [roleToDelete, setRoleToDelete] = useState<RoleDefinition | null>(null);
   const [linkedPositions, setLinkedPositions] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Extended permissions with the new fields (assuming types will be updated)
   const extendedPermissions = permissions as (PagePermission & { 
@@ -967,6 +971,43 @@ export function PermissionEditor() {
   const rolePermissions = selectedRole ? (permissionsByRole[selectedRole] || []) : [];
   const hierarchy = getPermissionHierarchy(rolePermissions);
 
+  // Filter hierarchy based on search query
+  const filterHierarchy = (items: PermissionWithChildren[], query: string): PermissionWithChildren[] => {
+    if (!query.trim()) return items;
+    
+    const lowerQuery = query.toLowerCase();
+    
+    const matchesSearch = (item: PermissionWithChildren): boolean => {
+      const label = permissionKeyLabels[item.permission_key] || item.permission_key;
+      const description = item.description || '';
+      return (
+        label.toLowerCase().includes(lowerQuery) ||
+        item.permission_key.toLowerCase().includes(lowerQuery) ||
+        description.toLowerCase().includes(lowerQuery)
+      );
+    };
+    
+    const filterRecursive = (items: PermissionWithChildren[]): PermissionWithChildren[] => {
+      return items.reduce((acc, item) => {
+        const filteredChildren = item.children ? filterRecursive(item.children) : [];
+        const selfMatches = matchesSearch(item);
+        const hasMatchingChildren = filteredChildren.length > 0;
+        
+        if (selfMatches || hasMatchingChildren) {
+          acc.push({
+            ...item,
+            children: selfMatches ? item.children : filteredChildren,
+          });
+        }
+        return acc;
+      }, [] as PermissionWithChildren[]);
+    };
+    
+    return filterRecursive(items);
+  };
+
+  const filteredHierarchy = filterHierarchy(hierarchy, searchQuery);
+
   // Get pages for parent dropdown
   const availablePages = rolePermissions
     .filter(p => p.permission_type === 'page' || !p.parent_key)
@@ -1051,6 +1092,19 @@ export function PermissionEditor() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Search input */}
+            <div className="mb-4">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Søg efter rettighed..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            
             {isSeeding ? (
               <div className="flex items-center justify-center py-12">
                 <div className="flex flex-col items-center gap-2">
@@ -1087,7 +1141,7 @@ export function PermissionEditor() {
                       SIDE-ADGANG
                     </TableCell>
                   </TableRow>
-                  {hierarchy.map((page) => (
+                  {filteredHierarchy.map((page) => (
                     <PermissionRow 
                       key={page.id}
                       permission={page}
@@ -1099,10 +1153,10 @@ export function PermissionEditor() {
                       updateRowVisibility={updateRowVisibility}
                     />
                   ))}
-                  {hierarchy.length === 0 && (
+                  {filteredHierarchy.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
-                        Ingen side-rettigheder konfigureret
+                        {searchQuery ? 'Ingen rettigheder matcher søgningen' : 'Ingen side-rettigheder konfigureret'}
                       </TableCell>
                     </TableRow>
                   )}
