@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2 } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -10,12 +10,14 @@ import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 const BookWeekContent = lazy(() => import("./BookWeekContent"));
 const LocationsContent = lazy(() => import("./LocationsContent"));
 const BookingsContent = lazy(() => import("./BookingsContent"));
+const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 
 // Tab configuration with permission keys
 const allTabs = [
   { value: "book-week", label: "Book uge", labelKey: "sidebar.bookWeek", icon: Calendar, permissionKey: "tab_fm_book_week" },
   { value: "bookings", label: "Kommende bookinger", icon: ListChecks, permissionKey: "tab_fm_bookings" },
+  { value: "markets", label: "Kommende markeder", icon: Tent, permissionKey: "tab_fm_markets" },
   { value: "locations", label: "Lokationer", labelKey: "sidebar.locations", icon: MapPin, permissionKey: "tab_fm_locations" },
   { value: "vagtplan-fm", label: "Vagtplan FM", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
 ];
@@ -70,7 +72,8 @@ export default function BookingManagement() {
   // Dynamic grid columns based on visible tabs
   const gridColsClass = visibleTabs.length === 1 ? "grid-cols-1" :
                         visibleTabs.length === 2 ? "grid-cols-2" :
-                        visibleTabs.length === 3 ? "grid-cols-3" : "grid-cols-4";
+                        visibleTabs.length === 3 ? "grid-cols-3" : 
+                        visibleTabs.length === 4 ? "grid-cols-4" : "grid-cols-5";
 
   return (
     <MainLayout>
@@ -102,6 +105,14 @@ export default function BookingManagement() {
             <TabsContent value="bookings" className="mt-6">
               <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
                 <BookingsContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
+          {visibleTabs.some(t => t.value === "markets") && (
+            <TabsContent value="markets" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <MarketsContent />
               </Suspense>
             </TabsContent>
           )}

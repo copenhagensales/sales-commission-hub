@@ -405,6 +405,7 @@ export const permissionKeyLabels: Record<string, string> = {
   // BookingManagement tabs
   tab_fm_book_week: 'Fane: Book uge',
   tab_fm_bookings: 'Fane: Kommende bookinger',
+  tab_fm_markets: 'Fane: Kommende markeder',
   tab_fm_locations: 'Fane: Lokationer',
   tab_fm_vagtplan: 'Fane: Vagtplan FM',
   

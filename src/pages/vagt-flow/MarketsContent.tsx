@@ -1,0 +1,416 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useState, useMemo } from "react";
+import { 
+  ChevronUp, 
+  ChevronDown, 
+  Trash2, 
+  Calendar as CalendarIcon, 
+  Tent,
+  Users,
+  MapPin,
+  Clock,
+  Eye
+} from "lucide-react";
+import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
+import { da } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+// Market/Fair location types
+const MARKET_TYPES = ["Markeder", "Messer"];
+
+export default function MarketsContent() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  // Fetch market bookings (next 6 months)
+  const { data: bookings, isLoading } = useQuery({
+    queryKey: ["vagt-market-bookings"],
+    queryFn: async () => {
+      const today = new Date();
+      const sixMonthsFromNow = addMonths(today, 6);
+
+      const { data: bookingData, error } = await supabase
+        .from("booking")
+        .select(`
+          *,
+          location!inner(id, name, address_city, type, daily_rate),
+          clients(id, name),
+          client_campaigns:campaign_id(id, name),
+          booking_assignment(id, date, employee_id)
+        `)
+        .in("location.type", MARKET_TYPES)
+        .gte("start_date", format(today, "yyyy-MM-dd"))
+        .lte("start_date", format(sixMonthsFromNow, "yyyy-MM-dd"))
+        .order("start_date");
+
+      if (error) throw error;
+      
+      // Fetch employee names for assignments
+      const employeeIds = [...new Set(
+        bookingData?.flatMap(b => b.booking_assignment?.map((a: any) => a.employee_id) || []) || []
+      )];
+      
+      let employeeMap = new Map<string, string>();
+      if (employeeIds.length > 0) {
+        const { data: empData } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name")
+          .in("id", employeeIds);
+        
+        employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
+      }
+
+      // Fetch applications count
+      const bookingIds = bookingData?.map(b => b.id) || [];
+      let applicationsMap = new Map<string, number>();
+      
+      if (bookingIds.length > 0) {
+        const { data: appData } = await supabase
+          .from("market_application")
+          .select("booking_id")
+          .in("booking_id", bookingIds)
+          .eq("status", "pending");
+        
+        for (const app of appData || []) {
+          applicationsMap.set(app.booking_id, (applicationsMap.get(app.booking_id) || 0) + 1);
+        }
+      }
+      
+      return bookingData?.map(booking => ({
+        ...booking,
+        booking_assignment: booking.booking_assignment?.map((a: any) => ({
+          ...a,
+          employee_name: employeeMap.get(a.employee_id) || "Ukendt"
+        })),
+        pending_applications: applicationsMap.get(booking.id) || 0
+      }));
+    },
+  });
+
+  const { data: fieldmarketingClients } = useQuery({
+    queryKey: ["fieldmarketing-team-clients-markets"],
+    queryFn: async () => {
+      const { data: team } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .single();
+      
+      if (!team) return [];
+      
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
+  const deleteBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const { error } = await supabase.from("booking").delete().eq("id", bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      toast({ title: "Marked-booking slettet" });
+      setDeleteBookingId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Filter bookings
+  const filtered = useMemo(() => {
+    return bookings?.filter((b: any) => {
+      const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
+      return matchesClient;
+    }) || [];
+  }, [bookings, clientFilter]);
+
+  // Group by month
+  const groupedByMonth = useMemo(() => {
+    const groups: Record<string, { label: string; bookings: any[] }> = {};
+    
+    for (const booking of filtered) {
+      const startDate = parseISO(booking.start_date);
+      const monthKey = format(startDate, "yyyy-MM");
+      const monthLabel = format(startDate, "MMMM yyyy", { locale: da });
+      
+      if (!groups[monthKey]) {
+        groups[monthKey] = { label: monthLabel, bookings: [] };
+      }
+      groups[monthKey].bookings.push(booking);
+    }
+    
+    return groups;
+  }, [filtered]);
+
+  const toggleMonthExpand = (key: string) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const getStaffingStatus = (booking: any) => {
+    const assigned = booking.booking_assignment?.length || 0;
+    const expected = booking.expected_staff_count || 2;
+    
+    if (assigned === 0) return { label: "Afventer bemanding", color: "bg-red-100 text-red-700" };
+    if (assigned < expected) return { label: `${assigned}/${expected} bemandat`, color: "bg-yellow-100 text-yellow-700" };
+    return { label: "Fuldt bemandat", color: "bg-green-100 text-green-700" };
+  };
+
+  const getDateDisplay = (booking: any) => {
+    const start = parseISO(booking.start_date);
+    const end = parseISO(booking.end_date);
+    
+    if (format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd")) {
+      return format(start, "d. MMM yyyy", { locale: da });
+    }
+    
+    if (format(start, "yyyy-MM") === format(end, "yyyy-MM")) {
+      return `${format(start, "d.", { locale: da })} - ${format(end, "d. MMM yyyy", { locale: da })}`;
+    }
+    
+    return `${format(start, "d. MMM", { locale: da })} - ${format(end, "d. MMM yyyy", { locale: da })}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Tent className="h-6 w-6 text-primary" />
+            Kommende markeder & messer
+          </h2>
+          <p className="text-muted-foreground">Overblik over planlagte markeder og messer de næste 6 måneder</p>
+        </div>
+        <Badge variant="outline" className="text-lg px-4 py-2">
+          {filtered.length} events
+        </Badge>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Alle kunder" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle kunder</SelectItem>
+                {fieldmarketingClients?.map((client: any) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Markets by month */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-12">
+            <p className="text-center text-muted-foreground">Indlæser markeder...</p>
+          </CardContent>
+        </Card>
+      ) : Object.keys(groupedByMonth).length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <Tent className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Ingen kommende markeder eller messer</p>
+              <p className="text-sm text-muted-foreground mt-1">Book markeder via "Book uge" fanen</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        Object.entries(groupedByMonth).map(([monthKey, { label, bookings: monthBookings }]) => (
+          <Collapsible
+            key={monthKey}
+            open={expandedMonths.has(monthKey)}
+            onOpenChange={() => toggleMonthExpand(monthKey)}
+            defaultOpen={true}
+          >
+            <Card>
+              <CollapsibleTrigger className="w-full">
+                <CardHeader className="py-4 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <CalendarIcon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold capitalize">{label}</h3>
+                      <p className="text-sm text-muted-foreground">{monthBookings.length} events</p>
+                    </div>
+                  </div>
+                  {expandedMonths.has(monthKey) ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {monthBookings.map((booking: any) => {
+                      const staffingStatus = getStaffingStatus(booking);
+                      
+                      return (
+                        <div 
+                          key={booking.id} 
+                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${booking.week_number}&year=${booking.year}`)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{booking.location?.name}</h4>
+                                <Badge variant="outline" className="text-xs">
+                                  {booking.location?.type}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CalendarIcon className="h-3.5 w-3.5" />
+                                  {getDateDisplay(booking)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3.5 w-3.5" />
+                                  {booking.location?.address_city || "Ukendt by"}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Uge {booking.week_number}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="secondary">{booking.clients?.name || "Ukendt kunde"}</Badge>
+                                <Badge className={staffingStatus.color}>
+                                  <Users className="h-3 w-3 mr-1" />
+                                  {staffingStatus.label}
+                                </Badge>
+                                {booking.open_for_applications && (
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    Åben for ansøgninger
+                                    {booking.pending_applications > 0 && (
+                                      <span className="ml-1 bg-blue-600 text-white rounded-full px-1.5 text-xs">
+                                        {booking.pending_applications}
+                                      </span>
+                                    )}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteBookingId(booking.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          {/* Assigned employees */}
+                          {booking.booking_assignment && booking.booking_assignment.length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="text-xs text-muted-foreground mb-1">Tildelte medarbejdere:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {booking.booking_assignment.slice(0, 5).map((a: any) => (
+                                  <Badge key={a.id} variant="secondary" className="text-xs">
+                                    {a.employee_name}
+                                  </Badge>
+                                ))}
+                                {booking.booking_assignment.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{booking.booking_assignment.length - 5} mere
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        ))
+      )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteBookingId} onOpenChange={() => setDeleteBookingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slet marked-booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette vil slette bookingen og alle tilknyttede vagter. Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteBookingId && deleteBookingMutation.mutate(deleteBookingId)}
+            >
+              Slet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
