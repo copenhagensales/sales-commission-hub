@@ -47,9 +47,9 @@ interface FmSale {
 }
 
 interface FmPricingRule {
-  product_name: string;
+  product: { name: string };
   commission_dkk: number | null;
-  price_dkk: number | null;
+  revenue_dkk: number | null;
 }
 
 interface TeamMemberShift {
@@ -175,21 +175,33 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
 
 // ============= FM COMMISSION MAP HELPER =============
 // Fetches product pricing rules and creates a case-insensitive map of product_name -> commission_dkk
+// Joins with products table to get actual product names (product_name column doesn't exist in product_pricing_rules)
 // Prioritizes highest commission for each product
 async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; price: number }>> {
-  const { data: rules } = await supabase
+  // Join with products table to get the actual product name
+  const { data: rules, error } = await supabase
     .from("product_pricing_rules")
-    .select("product_name, commission_dkk, price_dkk")
+    .select(`
+      product:products!inner(name),
+      commission_dkk,
+      revenue_dkk
+    `)
+    .eq("is_active", true)
     .order("commission_dkk", { ascending: false, nullsFirst: false });
   
+  if (error) {
+    console.error(`[fetchFmCommissionMap] Error fetching pricing rules:`, error);
+  }
+  
   const map = new Map<string, { commission: number; price: number }>();
-  for (const rule of (rules || []) as FmPricingRule[]) {
-    const key = rule.product_name?.toLowerCase();
+  for (const rule of (rules || [])) {
+    const productData = rule.product as any;
+    const key = productData?.name?.toLowerCase();
     if (key && !map.has(key)) {
       // First occurrence has highest commission due to ordering
       map.set(key, {
         commission: rule.commission_dkk || 0,
-        price: rule.price_dkk || 0,
+        price: rule.revenue_dkk || 0,
       });
     }
   }
