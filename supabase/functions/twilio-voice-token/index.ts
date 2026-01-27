@@ -121,7 +121,12 @@ serve(async (req) => {
       const dialToParam = url.searchParams.get('dialTo');
       // Clean phone number: remove spaces and ensure proper formatting
       const rawNumber = dialToParam || to || called;
-      const destinationNumber = rawNumber.replace(/\s+/g, '');
+      // Remove spaces and ensure E.164 format with + prefix
+      let destinationNumber = rawNumber.replace(/\s+/g, '');
+      // If number doesn't start with +, add it (assume E.164 format)
+      if (destinationNumber && !destinationNumber.startsWith('+')) {
+        destinationNumber = '+' + destinationNumber;
+      }
 
       const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
       const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
