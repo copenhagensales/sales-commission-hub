@@ -253,7 +253,7 @@ export function AssignCohortDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting || (!selectedCohortId && !availableFrom)}
+            disabled={isSubmitting || !selectedTeamId || (!selectedCohortId && !availableFrom)}
           >
             {isSubmitting ? (
               <>
