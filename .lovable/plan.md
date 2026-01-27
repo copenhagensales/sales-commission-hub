@@ -1,75 +1,111 @@
 
+# Fix: Adgangsproblem for William Bornak og Thomas Wehage på Booking-siden
 
-# Problem: William Bornak kan ikke se Bookinger - Root Cause Analysis
+## Problem Identificeret
 
-## Årsag identificeret
+Brugerne ser "Du har ikke adgang til denne side" selvom de har korrekte permissions i databasen.
 
-Problemet er **24-timers localStorage caching** i `usePositionPermissions.ts`:
+### Årsag
+Der er to forskellige permission hooks i systemet som ikke er synkroniserede:
+
+1. **Rute-beskyttelse** (`RoleProtectedRoute`) bruger `usePositionPermissions` 
+   - Checker `menu_fm_booking` → Giver adgang ✅
+
+2. **Booking-komponenten** bruger `useUnifiedPermissions`
+   - Checker tab-permissions (`tab_fm_bookings`, etc.)
+   - Har en race condition: `isLoading=false` KAN forekomme FØR `pagePermissions` er klar
+   - Resulterer i at `canView()` returnerer `false` → viser fejlbesked ❌
+
+### Berørte sider
+- `/vagt-flow/booking` (BookingManagement)
+- Winback, Onboarding Dashboard, Fieldmarketing Dashboard (samme mønster)
+
+## Løsning
+
+### Trin 1: Ret `useUnifiedPermissions` hook
+
+Tilføj robust loading-håndtering ligesom `usePositionPermissions`:
 
 ```typescript
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v1';
-const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+// I useUnifiedPermissions.ts
+export function useUnifiedPermissions() {
+  const { user } = useAuth();
+  const { data: currentRole, isLoading: roleLoading, isFetched: roleFetched } = useCurrentUserRole();
+  const { data: pagePermissions, isLoading: permissionsLoading, isFetched: permissionsFetched } = usePagePermissions();
+  
+  // isLoading: Still fetching initial data
+  const isLoading = roleLoading || permissionsLoading;
+  
+  // isReady: Data is ACTUALLY available for use
+  // This prevents race conditions where isLoading=false but data is undefined
+  const isReady = roleFetched && permissionsFetched && !!currentRole && !!pagePermissions;
+  
+  // ... rest of hook
+  
+  return {
+    isLoading,
+    isReady, // <-- Ny property
+    // ...
+  };
+}
 ```
 
-### Hvad skete der
+### Trin 2: Opdater BookingManagement komponenten
 
-1. Før rettelsen blev `role_page_permissions` kun hentet med max 1000 rækker (Supabase default limit)
-2. `tab_fm_bookings` for `fm_leder` ligger på række 1062 - uden for de første 1000
-3. William Bornaks browser cachede de ufuldstændige permissions i localStorage
-4. Selvom koden nu er rettet med `.range(0, 2000)`, bruger hans browser stadig den gamle cache
+Brug `isReady` i stedet for kun `isLoading`:
 
-### Databasen er korrekt
+```typescript
+// I BookingManagement.tsx
+const { canView, isLoading, isReady } = useUnifiedPermissions();
 
-Verificeret at `fm_leder` har alle nødvendige permissions:
-- `menu_fm_booking`: can_view=true, can_edit=true
-- `tab_fm_bookings`: can_view=true, can_edit=true
-- `tab_fm_book_week`: can_view=true, can_edit=true
-- Alle andre FM-relaterede permissions er korrekte
+// Vis loading indtil data er FAKTISK tilgængelig
+if (isLoading || !isReady) {
+  return <Loader />;
+}
 
-## Løsninger
-
-### Umiddelbar fix (anbefalet)
-Bed William Bornak om at:
-1. Gå til login-siden (/auth)
-2. Klik på "Ryd cache og genindlæs" knappen (findes allerede)
-
-Alternativt: Ryd localStorage manuelt i browserens Developer Tools.
-
-### Systemisk fix (plan)
-For at forhindre lignende problemer i fremtiden:
-
-**Opdatér cache-versionen** når permission-systemet ændres:
-- Ændre `cached-permissions-v1` til `cached-permissions-v2` i `usePositionPermissions.ts`
-- Dette vil tvinge alle brugere til at hente friske permissions ved næste login
-
-**Kodeændringer:**
-
-```
-Fil: src/hooks/usePositionPermissions.ts
-Linje 91
-
-FØR:
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v1';
-
-EFTER:
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v2';
+// Nu er det sikkert at tjekke visibleTabs
+if (visibleTabs.length === 0) {
+  return "Du har ikke adgang...";
+}
 ```
 
-### Teknisk detalje
+### Trin 3: Tilføj debugging logs
 
-Systemet har to parallelle cache-lag:
-1. React Query cache (15 min) - ryddes ved refresh
-2. localStorage cache (24 timer) - persisterer på tværs af sessioner
+For at kunne verificere at rettelsen virker:
 
-Ved at bumpe cache-versionen vil den gamle `v1` cache ignoreres, og brugere vil automatisk hente friske data.
+```typescript
+console.log('[BookingManagement] Permission check:', {
+  role: role,
+  isLoading,
+  isReady,
+  pagePermissionsCount: pagePermissions?.length,
+  tabChecks: allTabs.map(t => ({ key: t.permissionKey, hasAccess: canView(t.permissionKey) }))
+});
+```
 
-## Implementeringsplan
+## Tekniske detaljer
 
-1. Opdatér cache-nøglen fra `v1` til `v2` i `usePositionPermissions.ts`
-2. Alle brugere vil automatisk få friske permissions ved næste besøg
-3. Ingen manuel intervention nødvendig for individuelle brugere
+### Hvorfor sker dette?
+React Query's `isLoading` flag indikerer kun "første gang loading" - ikke "data er tilgængelig". Når en bruger hard-refresher:
 
-## Risiko
+1. Cache ryddes
+2. Queries starter
+3. `isLoading` kan skifte til `false` før `data` er populated
+4. Komponenten renderer med tomt `pagePermissions` array
+5. `canView()` returnerer `false` for alt
+6. Brugeren ser fejlbesked
 
-Meget lav risiko - dette er en simpel ændring der kun påvirker cache-invalidering. Alle brugere vil opleve en enkelt ekstra database-forespørgsel ved deres næste login.
+### Verificering
+Efter implementering kan vi teste ved at:
+1. Logge ind som William Bornak
+2. Navigere til `/vagt-flow/booking`
+3. Verificere at alle 5 tabs vises korrekt
+4. Hard-refresh (Ctrl+Shift+R) og verificere at siden stadig virker
 
+## Filændringer
+
+| Fil | Handling |
+|-----|----------|
+| `src/hooks/useUnifiedPermissions.ts` | Tilføj `isReady` flag og `isFetched` checks |
+| `src/pages/vagt-flow/BookingManagement.tsx` | Brug `isReady` i loading check |
+| Potentielt: Winback.tsx, OnboardingDashboard.tsx, FieldmarketingDashboardFull.tsx | Samme mønster |
