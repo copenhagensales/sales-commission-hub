@@ -1,29 +1,52 @@
 
-# Plan: Vis CPR-nummer i medarbejder stamkort popup
+# Plan: Giv Lone Mikkelsen ejer-adgang (hardkodet)
 
-## Problem
-CPR-nummeret vises aktuelt som "••••••••" i popup-vinduet, fordi `masked` prop'en er sat til `true` på `ReadOnlyRow` komponenten.
+## Overblik
+Lone Mikkelsen skal have samme adgang som Kasper og Mathias ved at ændre hendes position fra "Backoffice" til "Ejer" og opdatere hendes system-rolle.
 
-## Løsning
-Fjern `masked` prop'en fra CPR-rækken i `EmployeeProfileDialog.tsx`, så det faktiske CPR-nummer vises.
+## Nuværende status
+
+| Felt | Lone Mikkelsen | Kasper Mikkelsen |
+|------|----------------|------------------|
+| job_title | Ejer ✓ | Ejer |
+| position_name | Backoffice ❌ | Ejer |
+| system_role_key | medarbejder ❌ | ejer |
+| auth_user_id | e1ac7b84-aedb-400e-88f6-dd24687317e4 | f0fb7ec3-5f00-4fcd-a6ca-2a53669147b9 |
+| employee_id | b27dc376-f821-4b66-abc6-a99a906936ae | f6d3dcde-81ef-498f-b4ac-8da218408eee |
 
 ---
 
-## Teknisk ændring
+## Løsning
 
-### Fil: `src/components/employee/EmployeeProfileDialog.tsx`
+### Database-ændringer
 
-**Før (linje 96):**
-```tsx
-<ReadOnlyRow label="CPR-nr." value={employee.cpr_number} masked />
+**1. Opdater Lone's position til "Ejer":**
+```sql
+UPDATE employee_master_data 
+SET position_id = '1ef14dcc-018a-4c0a-91a4-d6a5c4ea5737'  -- Ejer position
+WHERE id = 'b27dc376-f821-4b66-abc6-a99a906936ae';         -- Lone Mikkelsen
 ```
 
-**Efter:**
-```tsx
-<ReadOnlyRow label="CPR-nr." value={employee.cpr_number} />
+**2. Opdater system_roles til "ejer":**
+```sql
+UPDATE system_roles 
+SET role = 'ejer' 
+WHERE user_id = 'e1ac7b84-aedb-400e-88f6-dd24687317e4';    -- Lone's auth_user_id
 ```
+
+---
+
+## Resultat efter ændringer
+
+| Felt | Lone Mikkelsen (efter) |
+|------|------------------------|
+| position_name | Ejer ✓ |
+| system_role_key | ejer ✓ |
+| Løn-adgang | Fuld adgang ✓ |
 
 ---
 
 ## Bemærkning
-Dette er en enkelt-linje ændring. Ved at fjerne `masked` prop'en vil CPR-nummeret blive vist i fuld længde (f.eks. "010190-1234") i stedet for "••••••••".
+Ingen kodeændringer kræves - kun database-opdateringer. 
+
+Lone vil automatisk få fuld ejer-adgang via `useUnifiedPermissions` hook'en, som tjekker `system_roles` tabellen først og derefter `position_id → job_positions.system_role_key`.
