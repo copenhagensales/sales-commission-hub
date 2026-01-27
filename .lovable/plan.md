@@ -1,65 +1,113 @@
 
-# Forbedre synlighed af team badges på CS Top 20
+# Plan: Ny "Nye Medarbejdere" fane i Lønstyring
 
-## Problemet
-Team badges (TDC, Eesy, Relatel, United, Fieldmarketing, osv.) har for lav kontrast i det normale dashboard-view:
+## Overblik
+Opretter en ny fane "Nye medarbejdere" i lønstyringssiden, som viser medarbejdere og stab der er startet i den valgte lønperiode. Man kan bladre mellem lønperioder, og ved klik på en medarbejder åbnes deres stamkort.
 
-| Nuværende styling | Problem |
-|-------------------|---------|
-| `bg-red-500/15` (15% opacity) | Baggrunden er næsten usynlig |
-| `text-red-700 dark:text-red-400` | Teksten er svag på mørk baggrund |
+## Funktionalitet
+- Viser alle medarbejdere med `employment_start_date` inden for den valgte lønperiode
+- Adskiller visning mellem "Medarbejdere" og "Stab" (baseret på `is_staff_employee` flag)
+- Lønperiode-navigation (15. til 14.) med pile-knapper
+- Klikbar række der åbner medarbejderens stamkort (`/employees/:id`)
+- Viser relevante kolonner: Navn, Stilling, Startdato, Team
 
-Især på mørke temaer fader badges næsten helt ud og bliver svære at læse.
+---
 
-## Løsning
-Øg kontrasten markant ved at bruge:
-- **Stærkere baggrundsfarver**: Fra 15% → 25-30% opacity
-- **Hvid tekst** på farvede baggrunde for bedre læsbarhed
-- **Ensartet styling** mellem normal og TV mode
+## Teknisk implementering
 
-## Ændringer
+### Nye filer
 
-### Fil: `src/pages/CsTop20Dashboard.tsx`
+#### 1. `src/components/salary/NewEmployeesTab.tsx`
+Hovedkomponent for fanen med følgende struktur:
 
-Opdater `getTeamBadgeStyle()` funktionen (linje 72-100):
-
-**Fra:**
-```typescript
-if (lower.includes('tdc')) {
-  return tvMode 
-    ? 'bg-red-500 text-white' 
-    : 'bg-red-500/15 text-red-700 dark:text-red-400';  // ← For svag
-}
+```text
+┌─────────────────────────────────────────────────┐
+│  < 15. jan. - 14. feb. >    [PayrollPeriodSelector]
+├─────────────────────────────────────────────────┤
+│  Medarbejdere (3)                               │
+├─────────────────────────────────────────────────┤
+│  Navn          │ Stilling │ Startdato │ Team   │
+│  Anders Jensen │ Sælger   │ 17. jan.  │ Team A │
+│  ...                                            │
+├─────────────────────────────────────────────────┤
+│  Stab (1)                                       │
+├─────────────────────────────────────────────────┤
+│  Navn          │ Stilling │ Startdato │ Afd.   │
+│  Maria Hansen  │ HR       │ 20. jan.  │ Admin  │
+└─────────────────────────────────────────────────┘
 ```
 
-**Til:**
-```typescript
-if (lower.includes('tdc')) {
-  return 'bg-red-500 text-white';  // ← Samme kraftige styling altid
-}
+**Implementeringsdetaljer:**
+- Bruger eksisterende `PayrollPeriodSelector` komponent til periode-navigation
+- Henter medarbejderdata fra `employee_master_data` filtreret på `employment_start_date`
+- Opdeler i to sektioner: Almindelige medarbejdere og Stab (via `is_staff_employee`)
+- Ved klik på række: `navigate(\`/employees/\${employee.id}\`)`
+- Viser loading state og tom-tilstand korrekt
+
+### Ændringer i eksisterende filer
+
+#### 2. `src/pages/SalaryTypes.tsx`
+- Importerer den nye `NewEmployeesTab` komponent
+- Tilføjer ny `<TabsTrigger value="new-employees">Nye medarbejdere</TabsTrigger>`
+- Tilføjer tilhørende `<TabsContent>` med `NewEmployeesTab`
+
+---
+
+## Hook og dataflow
+
+Opretter en hook til at hente nye medarbejdere:
+
+**`useNewEmployees(periodStart: Date, periodEnd: Date)`**
+- Query til `employee_master_data`
+- Filter: `employment_start_date` mellem `periodStart` og `periodEnd`
+- Filter: `is_active = true`
+- Returnerer opdelt i medarbejdere og stab
+
+---
+
+## Kodestruktur
+
+```
+src/
+├── components/salary/
+│   └── NewEmployeesTab.tsx     # Ny komponent
+└── pages/
+    └── SalaryTypes.tsx          # Tilføjer fane
 ```
 
-### Komplet ny styling
+---
 
-| Team | Ny Styling | Eksempel |
-|------|-----------|----------|
-| TDC | `bg-red-500 text-white` | Rød med hvid tekst |
-| Eesy | `bg-violet-500 text-white` | Violet med hvid tekst |
-| Relatel | `bg-amber-500 text-white` | Amber med hvid tekst |
-| United | `bg-indigo-500 text-white` | Indigo med hvid tekst |
-| Fieldmarketing | `bg-emerald-500 text-white` | Grøn med hvid tekst |
-| Tryg | `bg-teal-500 text-white` | Teal med hvid tekst |
-| ASE | `bg-pink-500 text-white` | Pink med hvid tekst |
-| Stab/Default | `bg-slate-500 text-white` | Grå med hvid tekst |
+## UI-detaljer
 
-## Visuelt resultat
+**Tabelkolonner:**
+| Kolonne | Felt | Format |
+|---------|------|--------|
+| Navn | `first_name + last_name` | Fuldt navn |
+| Stilling | `job_title` | Tekst |
+| Startdato | `employment_start_date` | "d. MMM yyyy" |
+| Team/Afdeling | `teams` relation | Join på team_members |
 
-Før: Badges der næsten er usynlige  
-Efter: Klare, læsbare badges med god kontrast (som TV mode allerede har)
+**Interaktioner:**
+- Hele rækken er klikbar med hover-effekt
+- Klik åbner `/employees/:id` (eksisterende stamkortside)
+- Pile-navigation skifter lønperiode
 
-## Teknisk detalje
+---
 
-Ændringen fjerner den tvMode-betingelse og bruger den kraftigere TV mode-styling som standard. Dette giver:
-- Bedre læsbarhed på alle skærme
-- Ensartet udseende mellem desktop og TV
-- Overholder WCAG kontrastkrav
+## Sekvensdiagram
+
+```text
+Bruger             NewEmployeesTab          Supabase          EmployeeDetail
+  │                      │                      │                   │
+  │──(åbn fane)─────────>│                      │                   │
+  │                      │──(hent periode)─────>│                   │
+  │                      │<──(medarbejdere)─────│                   │
+  │<──(vis liste)────────│                      │                   │
+  │                      │                      │                   │
+  │──(klik på række)────>│                      │                   │
+  │                      │──────────────(navigate)─────────────────>│
+  │                      │                      │                   │
+  │──(bladr periode)────>│                      │                   │
+  │                      │──(ny periode query)─>│                   │
+  │<──(opdater liste)────│                      │                   │
+```
