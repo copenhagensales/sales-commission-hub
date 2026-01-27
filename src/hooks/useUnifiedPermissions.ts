@@ -79,7 +79,7 @@ export function usePagePermissions() {
 function useCurrentUserRole() {
   const { user } = useAuth();
   
-  return useQuery({
+  const query = useQuery({
     queryKey: ['current-user-role', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -137,15 +137,26 @@ function useCurrentUserRole() {
     staleTime: 15 * 60 * 1000, // 15 minutes - role doesn't change during session
     gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
   });
+  
+  return {
+    ...query,
+    isFetched: query.isFetched,
+  };
 }
 
 // Main unified permissions hook
 export function useUnifiedPermissions() {
   const { user } = useAuth();
-  const { data: currentRole, isLoading: roleLoading } = useCurrentUserRole();
-  const { data: pagePermissions, isLoading: permissionsLoading } = usePagePermissions();
+  const { data: currentRole, isLoading: roleLoading, isFetched: roleFetched } = useCurrentUserRole();
+  const { data: pagePermissions, isLoading: permissionsLoading, isFetched: permissionsFetched } = usePagePermissions();
   
+  // isLoading: Still fetching initial data
   const isLoading = roleLoading || permissionsLoading;
+  
+  // isReady: Data is ACTUALLY available for use
+  // This prevents race conditions where isLoading=false but data is undefined
+  const isReady = roleFetched && permissionsFetched && !!currentRole && !!pagePermissions;
+  
   const role = currentRole || 'medarbejder';
   
   // Role helper booleans
@@ -207,6 +218,7 @@ export function useUnifiedPermissions() {
   return {
     // Loading state
     isLoading,
+    isReady,
     isAuthenticated: !!user,
     
     // Current user's role
