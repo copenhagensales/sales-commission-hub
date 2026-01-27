@@ -88,7 +88,7 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
 };
 
 // localStorage cache key for permissions
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v1';
+const PERMISSIONS_CACHE_KEY = 'cached-permissions-v2';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getCachedPermissions(): { position: JobPosition | null; permissions: PositionPermissions; roleKey: string } | null {
