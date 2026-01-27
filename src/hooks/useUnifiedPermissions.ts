@@ -57,10 +57,13 @@ export function usePagePermissions() {
   return useQuery({
     queryKey: ['page-permissions'],
     queryFn: async () => {
+      // Supabase has a 1000 row default limit
+      // Use .range(0, 2000) to ensure all permissions are fetched (currently ~1262 rows)
       const { data, error } = await supabase
         .from('role_page_permissions')
         .select('*')
-        .order('permission_key');
+        .order('permission_key')
+        .range(0, 2000);
       
       if (error) throw error;
       return data as PagePermission[];
