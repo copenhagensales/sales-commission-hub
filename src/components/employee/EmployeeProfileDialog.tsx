@@ -93,7 +93,7 @@ export function EmployeeProfileDialog({ open, onOpenChange, employeeId }: Employ
                 <ReadOnlyTableSection title="Identitet">
                   <ReadOnlyRow label="Fornavn(e)" value={employee.first_name} />
                   <ReadOnlyRow label="Efternavn" value={employee.last_name} />
-                  <ReadOnlyRow label="CPR-nr." value={employee.cpr_number} masked />
+                  <ReadOnlyRow label="CPR-nr." value={employee.cpr_number} />
                 </ReadOnlyTableSection>
 
                 <ReadOnlyTableSection title="Kontakt">
