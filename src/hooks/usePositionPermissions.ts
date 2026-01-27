@@ -210,7 +210,8 @@ export function usePositionPermissions() {
         const roleKey = mapJobTitleToRoleKey(employee.job_title);
         console.log("usePositionPermissions: Mapped role", { 
           jobTitle: employee.job_title, 
-          roleKey 
+          roleKey,
+          cacheVersion: PERMISSIONS_CACHE_KEY
         });
 
         // Check if owner position - always full permissions
