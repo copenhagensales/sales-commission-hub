@@ -28,6 +28,8 @@ async function fetchPersonalWeekStats(
   const endStr = format(weekEnd, "yyyy-MM-dd'T'23:59:59");
 
   // Fetch sale_items with sales data for the period
+  // Note: status filter removed as sales default to null (implicitly approved)
+  // Only explicitly rejected sales should be excluded
   const { data: saleItems, error } = await supabase
     .from("sale_items")
     .select(`
@@ -42,8 +44,8 @@ async function fetchPersonalWeekStats(
     `)
     .gte("sales.sale_datetime", startStr)
     .lte("sales.sale_datetime", endStr)
-    .eq("sales.status", "approved")
-    .in("sales.agent_email", agentEmails);
+    .in("sales.agent_email", agentEmails)
+    .neq("sales.status", "rejected"); // Only exclude explicitly rejected sales
 
   if (error || !saleItems || saleItems.length === 0) {
     return { weekTotal: 0, bestDay: null };
