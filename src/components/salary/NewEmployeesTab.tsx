@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
@@ -9,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCog } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { EmployeeProfileDialog } from "@/components/employee/EmployeeProfileDialog";
 
 interface NewEmployee {
   id: string;
@@ -25,9 +25,10 @@ interface NewEmployee {
 }
 
 export function NewEmployeesTab() {
-  const navigate = useNavigate();
   const [periodStart, setPeriodStart] = useState<Date | null>(null);
   const [periodEnd, setPeriodEnd] = useState<Date | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const handlePeriodChange = useCallback((start: Date, end: Date) => {
     setPeriodStart(start);
@@ -68,7 +69,8 @@ export function NewEmployeesTab() {
   const staffEmployees = employees?.filter((e) => e.is_staff_employee) ?? [];
 
   const handleRowClick = (employeeId: string) => {
-    navigate(`/employees/${employeeId}`);
+    setSelectedEmployeeId(employeeId);
+    setDialogOpen(true);
   };
 
   const getTeamName = (employee: NewEmployee): string => {
@@ -163,6 +165,12 @@ export function NewEmployeesTab() {
           />
         </div>
       )}
+
+      <EmployeeProfileDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+        employeeId={selectedEmployeeId} 
+      />
     </div>
   );
 }
