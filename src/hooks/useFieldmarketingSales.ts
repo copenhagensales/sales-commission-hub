@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 export interface FieldmarketingSale {
   id: string;
@@ -28,23 +29,16 @@ export function useFieldmarketingSales(clientId?: string) {
     queryKey: ["fieldmarketing-sales", clientId],
     staleTime: 60000, // 1 minut
     queryFn: async () => {
-      let query = supabase
-        .from("fieldmarketing_sales")
-        .select(`
-          *,
-          seller:employee_master_data!seller_id(first_name, last_name),
-          location:location!location_id(name),
-          client:clients!client_id(name)
-        `)
-        .order("registered_at", { ascending: false });
-
-      if (clientId) {
-        query = query.eq("client_id", clientId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as FieldmarketingSale[];
+      return fetchAllRows<FieldmarketingSale>(
+        "fieldmarketing_sales",
+        `*, seller:employee_master_data!seller_id(first_name, last_name), location:location!location_id(name), client:clients!client_id(name)`,
+        (q) => {
+          let query = q.order("registered_at", { ascending: false });
+          if (clientId) query = query.eq("client_id", clientId);
+          return query;
+        },
+        { orderBy: "registered_at", ascending: false }
+      );
     },
   });
 }
@@ -56,13 +50,9 @@ export function useFieldmarketingSalesStats(clientId?: string) {
     queryFn: async () => {
       // Use Copenhagen timezone for accurate date boundaries
       const now = new Date();
-      
-      // Format dates as ISO strings with Copenhagen timezone offset
-      // Get today at midnight Copenhagen time
-      const todayDate = now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Copenhagen' }); // YYYY-MM-DD format
+      const todayDate = now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Copenhagen' });
       const todayStart = `${todayDate}T00:00:00+01:00`;
       
-      // Get start of week (Monday) Copenhagen time
       const dayOfWeek = now.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       const weekStartDate = new Date(now);
@@ -70,38 +60,31 @@ export function useFieldmarketingSalesStats(clientId?: string) {
       const weekStartStr = weekStartDate.toLocaleDateString('sv-SE', { timeZone: 'Europe/Copenhagen' });
       const weekStart = `${weekStartStr}T00:00:00+01:00`;
       
-      // Get start of month Copenhagen time
       const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
       const monthStart = `${monthStartStr}T00:00:00+01:00`;
 
-      // Build base query with client filter
-      const buildQuery = () => {
-        let q = supabase.from("fieldmarketing_sales").select("id, registered_at, product_name, seller_id");
-        if (clientId) q = q.eq("client_id", clientId);
-        return q;
-      };
+      // Fetch all month sales using pagination utility
+      const monthSales = await fetchAllRows<{ id: string; registered_at: string; product_name: string; seller_id: string }>(
+        "fieldmarketing_sales",
+        "id, registered_at, product_name, seller_id",
+        (q) => {
+          let query = q.gte("registered_at", monthStart);
+          if (clientId) query = query.eq("client_id", clientId);
+          return query;
+        },
+        { orderBy: "registered_at", ascending: false }
+      );
 
-      // Fetch counts using database-level filtering (bypasses 1000-row limit)
-      const [todayResult, weekResult, monthResult, totalResult] = await Promise.all([
-        buildQuery().gte("registered_at", todayStart),
-        buildQuery().gte("registered_at", weekStart),
-        buildQuery().gte("registered_at", monthStart),
-        buildQuery(),
-      ]);
+      // Calculate stats from fetched data
+      const salesToday = monthSales.filter(s => s.registered_at >= todayStart).length;
+      const salesThisWeek = monthSales.filter(s => s.registered_at >= weekStart).length;
+      const salesThisMonth = monthSales.length;
 
-      if (todayResult.error) throw todayResult.error;
-      if (weekResult.error) throw weekResult.error;
-      if (monthResult.error) throw monthResult.error;
-      if (totalResult.error) throw totalResult.error;
+      // Get total count (all time) - use count for efficiency
+      const totalQuery = supabase.from("fieldmarketing_sales").select("id", { count: "exact", head: true });
+      if (clientId) totalQuery.eq("client_id", clientId);
+      const { count: totalSales } = await totalQuery;
 
-      const salesToday = todayResult.data?.length || 0;
-      const salesThisWeek = weekResult.data?.length || 0;
-      const salesThisMonth = monthResult.data?.length || 0;
-      const totalSales = totalResult.data?.length || 0;
-
-      // Top sellers and product distribution from month data
-      const monthSales = monthResult.data || [];
-      
       const sellerCounts: Record<string, number> = {};
       monthSales.forEach(s => {
         sellerCounts[s.seller_id] = (sellerCounts[s.seller_id] || 0) + 1;
@@ -116,7 +99,7 @@ export function useFieldmarketingSalesStats(clientId?: string) {
         salesToday,
         salesThisWeek,
         salesThisMonth,
-        totalSales,
+        totalSales: totalSales || 0,
         topSellerIds: Object.entries(sellerCounts)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5)
