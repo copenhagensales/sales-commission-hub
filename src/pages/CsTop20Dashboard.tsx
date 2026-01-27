@@ -68,35 +68,35 @@ const getShortTeamName = (teamName?: string | null) => {
   return teamName.split(' ')[0];
 };
 
-// Get team badge styling based on team name
-const getTeamBadgeStyle = (teamName: string | null | undefined, tvMode: boolean): string => {
+// Get team badge styling based on team name - high contrast for all views
+const getTeamBadgeStyle = (teamName: string | null | undefined): string => {
   if (!teamName) return '';
   const lower = teamName.toLowerCase();
   
   if (lower.includes('tdc')) {
-    return tvMode ? 'bg-red-500 text-white' : 'bg-red-500/15 text-red-700 dark:text-red-400';
+    return 'bg-red-500 text-white';
   }
   if (lower.includes('eesy')) {
-    return tvMode ? 'bg-violet-500 text-white' : 'bg-violet-500/15 text-violet-700 dark:text-violet-400';
+    return 'bg-violet-500 text-white';
   }
   if (lower.includes('relatel')) {
-    return tvMode ? 'bg-amber-500 text-white' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+    return 'bg-amber-500 text-white';
   }
   if (lower.includes('united')) {
-    return tvMode ? 'bg-indigo-500 text-white' : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400';
+    return 'bg-indigo-500 text-white';
   }
   if (lower.includes('field')) {
-    return tvMode ? 'bg-emerald-500 text-white' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+    return 'bg-emerald-500 text-white';
   }
   if (lower.includes('tryg')) {
-    return tvMode ? 'bg-teal-500 text-white' : 'bg-teal-500/15 text-teal-700 dark:text-teal-400';
+    return 'bg-teal-500 text-white';
   }
   if (lower.includes('ase')) {
-    return tvMode ? 'bg-pink-500 text-white' : 'bg-pink-500/15 text-pink-700 dark:text-pink-400';
+    return 'bg-pink-500 text-white';
   }
   
   // Default gray
-  return tvMode ? 'bg-slate-600/60 text-slate-300' : 'bg-muted/80 text-muted-foreground';
+  return 'bg-slate-500 text-white';
 };
 
 export default function CsTop20Dashboard() {
@@ -264,7 +264,7 @@ export default function CsTop20Dashboard() {
                       {(() => {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName, tvMode)}`}>
+                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
                         ) : null;
