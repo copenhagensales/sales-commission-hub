@@ -296,8 +296,14 @@ export default function VagtBookings() {
       toast({ title: "Medarbejdere tildelt" });
       setAddEmployeeDialogBooking(null);
     },
-    onError: () => {
-      toast({ title: "Kunne ikke tildele medarbejdere", variant: "destructive" });
+    onError: (error: any) => {
+      const isUniqueViolation = error.message?.includes('unique') || 
+                                error.message?.includes('duplicate') ||
+                                error.code === '23505';
+      const message = isUniqueViolation 
+        ? "Medarbejder er allerede booket på en eller flere af de valgte dage"
+        : "Kunne ikke tildele medarbejdere";
+      toast({ title: message, variant: "destructive" });
     },
   });
 

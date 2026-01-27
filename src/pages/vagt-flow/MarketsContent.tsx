@@ -201,7 +201,13 @@ export default function MarketsContent() {
       toast({ title: "Medarbejdere tilføjet" });
     },
     onError: (error: any) => {
-      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      const isUniqueViolation = error.message?.includes('unique') || 
+                                error.message?.includes('duplicate') ||
+                                error.code === '23505';
+      const message = isUniqueViolation 
+        ? "Medarbejder er allerede booket på en eller flere af de valgte dage"
+        : error.message;
+      toast({ title: "Fejl", description: message, variant: "destructive" });
     },
   });
 

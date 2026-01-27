@@ -488,15 +488,19 @@ export function AddEmployeeDialog({
     const validEmployees = selectedEmployees.filter((e): e is string => e !== null);
     if (validEmployees.length === 0 || selectedDays.size === 0) return;
 
-    // Filter only days where employee has shift
+    // Filter only days where employee has shift AND is not already booked elsewhere
     const assignments = validEmployees.map(employeeId => ({
       employeeId,
       dates: Array.from(selectedDays)
         .filter(dayIndex => hasShiftOnDay(employeeId, dayIndex))
+        .filter(dayIndex => !isBookedOnDay(employeeId, dayIndex))
         .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
     })).filter(a => a.dates.length > 0);
 
-    if (assignments.length === 0) return;
+    if (assignments.length === 0) {
+      // All days were filtered out - show message
+      return;
+    }
 
     onAddAssignments(assignments);
     onOpenChange(false);
