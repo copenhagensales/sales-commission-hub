@@ -1,113 +1,181 @@
 
-# Plan: Ny "Nye Medarbejdere" fane i Lønstyring
+# Plan: Medarbejder Stamkort i Popup-vindue (Kun visning)
 
 ## Overblik
-Opretter en ny fane "Nye medarbejdere" i lønstyringssiden, som viser medarbejdere og stab der er startet i den valgte lønperiode. Man kan bladre mellem lønperioder, og ved klik på en medarbejder åbnes deres stamkort.
+Ændrer klik-adfærden i "Nye medarbejdere"-fanen, så medarbejderens stamkort åbnes i et popup-vindue i stedet for at navigere til en ny side. Popup'en viser alle stamdata i read-only tilstand - ingen redigeringsmuligheder.
 
 ## Funktionalitet
-- Viser alle medarbejdere med `employment_start_date` inden for den valgte lønperiode
-- Adskiller visning mellem "Medarbejdere" og "Stab" (baseret på `is_staff_employee` flag)
-- Lønperiode-navigation (15. til 14.) med pile-knapper
-- Klikbar række der åbner medarbejderens stamkort (`/employees/:id`)
-- Viser relevante kolonner: Navn, Stilling, Startdato, Team
+- Ved klik på en medarbejderræk åbnes en dialog med stamkort-oplysninger
+- Alle felter vises kun som tekst (ingen edit-knapper, input-felter eller switches)
+- Dialog'en kan lukkes med X-knappen eller ved at klikke udenfor
+- Spejler strukturen fra det eksisterende stamkort (EmployeeDetail.tsx)
 
 ---
 
 ## Teknisk implementering
 
-### Nye filer
+### Nye komponenter
 
-#### 1. `src/components/salary/NewEmployeesTab.tsx`
-Hovedkomponent for fanen med følgende struktur:
+#### 1. `src/components/employee/ReadOnlyRow.tsx`
+Read-only versioner af de eksisterende redigérbare komponenter:
 
 ```text
-┌─────────────────────────────────────────────────┐
-│  < 15. jan. - 14. feb. >    [PayrollPeriodSelector]
-├─────────────────────────────────────────────────┤
-│  Medarbejdere (3)                               │
-├─────────────────────────────────────────────────┤
-│  Navn          │ Stilling │ Startdato │ Team   │
-│  Anders Jensen │ Sælger   │ 17. jan.  │ Team A │
-│  ...                                            │
-├─────────────────────────────────────────────────┤
-│  Stab (1)                                       │
-├─────────────────────────────────────────────────┤
-│  Navn          │ Stilling │ Startdato │ Afd.   │
-│  Maria Hansen  │ HR       │ 20. jan.  │ Admin  │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│  Label           │  Værdi              │
+└─────────────────────────────────────────┘
 ```
 
-**Implementeringsdetaljer:**
-- Bruger eksisterende `PayrollPeriodSelector` komponent til periode-navigation
-- Henter medarbejderdata fra `employee_master_data` filtreret på `employment_start_date`
-- Opdeler i to sektioner: Almindelige medarbejdere og Stab (via `is_staff_employee`)
-- Ved klik på række: `navigate(\`/employees/\${employee.id}\`)`
-- Viser loading state og tom-tilstand korrekt
+**Indhold:**
+- `ReadOnlyRow` - Simpel label/value visning
+- `ReadOnlyContactRow` - Telefon med klikbart link (tel:/mailto:)
+- `ReadOnlyDateRow` - Formateret dato-visning
+- `ReadOnlyTableSection` - Genbruger TableSection strukturen
+
+Disse komponenter bruger samme styling som de eksisterende, men uden:
+- Hover-effekter med edit-ikoner
+- onClick-handlers
+- Input-felter
+- Pencil-ikoner
+
+#### 2. `src/components/employee/EmployeeProfileDialog.tsx`
+Hovedkomponent for popup-visningen:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│  [X]                                                 │
+│  Anders Jensen                                       │
+│  Salgskonsulent • Aktiv                             │
+├──────────────────────────────────────────────────────┤
+│  ┌────────────────────┐  ┌────────────────────┐     │
+│  │ Identitet          │  │ Stilling           │     │
+│  │ Fornavn: Anders    │  │ Jobtitel: Sælger   │     │
+│  │ Efternavn: Jensen  │  │ Arbejdssted: KBH   │     │
+│  │ CPR: ••••••••      │  │ Leder: Mikkel      │     │
+│  └────────────────────┘  └────────────────────┘     │
+│  ┌────────────────────┐  ┌────────────────────┐     │
+│  │ Kontakt            │  │ Ansættelse         │     │
+│  │ Tlf: 12345678      │  │ Start: 5. jan 2026 │     │
+│  │ Email: a@test.dk   │  │ Timer: 37/uge      │     │
+│  └────────────────────┘  └────────────────────┘     │
+│  ┌────────────────────┐  ┌────────────────────┐     │
+│  │ Adresse            │  │ Løn                │     │
+│  │ Vesterbro 12       │  │ Type: Provision    │     │
+│  │ 1620 København V   │  │ Ferie: Feriepenge  │     │
+│  └────────────────────┘  └────────────────────┘     │
+└──────────────────────────────────────────────────────┘
+```
+
+**Props:**
+- `open: boolean` - Om dialogen er åben
+- `onOpenChange: (open: boolean) => void` - Callback for at lukke
+- `employeeId: string | null` - ID på den valgte medarbejder
+
+**Indhold:**
+- Henter fuld medarbejderdata via useQuery
+- Henter manager-navn via separat query
+- Viser alle stamdata-sektioner i read-only format
+- Responsive 2-kolonne layout (som EmployeeDetail)
 
 ### Ændringer i eksisterende filer
 
-#### 2. `src/pages/SalaryTypes.tsx`
-- Importerer den nye `NewEmployeesTab` komponent
-- Tilføjer ny `<TabsTrigger value="new-employees">Nye medarbejdere</TabsTrigger>`
-- Tilføjer tilhørende `<TabsContent>` med `NewEmployeesTab`
+#### 3. `src/components/salary/NewEmployeesTab.tsx`
+- Fjerner `useNavigate` import og navigation-logik
+- Tilføjer state for `selectedEmployeeId` og `dialogOpen`
+- Ændrer `handleRowClick` til at åbne dialog i stedet for at navigere
+- Importerer og renderer `EmployeeProfileDialog`
 
 ---
 
-## Hook og dataflow
+## Read-Only komponent-mapping
 
-Opretter en hook til at hente nye medarbejdere:
-
-**`useNewEmployees(periodStart: Date, periodEnd: Date)`**
-- Query til `employee_master_data`
-- Filter: `employment_start_date` mellem `periodStart` og `periodEnd`
-- Filter: `is_active = true`
-- Returnerer opdelt i medarbejdere og stab
+| Original komponent | Read-only version | Forskel |
+|-------------------|-------------------|---------|
+| `EditableRow` | `ReadOnlyRow` | Ingen onClick, ingen Pencil-ikon |
+| `ContactRow` | `ReadOnlyContactRow` | Beholder telefon/email links, fjerner edit |
+| `DateRow` | `ReadOnlyDateRow` | Statisk dato-visning |
+| `SelectRow` | `ReadOnlyRow` | Viser kun displayValue |
+| `TableSection` | Genbruges direkte | Ingen ændring |
 
 ---
 
-## Kodestruktur
+## Data der vises i dialogen
+
+**Identitet:**
+- Fornavn(e)
+- Efternavn
+- CPR-nr. (maskeret: ••••••••)
+
+**Kontakt:**
+- Telefon (klikbart)
+- Privat email (klikbart)
+- Arbejdsemail (klikbart)
+
+**Adresse:**
+- Vejnavn og nr.
+- Postnummer
+- By
+- Land
+
+**Stilling:**
+- Jobtitel
+- Arbejdssted
+- Leder
+
+**Ansættelse:**
+- Startdato
+- Slutdato
+- Timer/uge
+- Mødetid
+
+**Løn:**
+- Løntype
+- Beløb (hvis relevant)
+
+**Ferie & tillæg:**
+- Ferietype
+- Feriebonus % (hvis relevant)
+- Parkering/md
+- Henvisningsbonus
+- Regulering/md
+
+---
+
+## Filstruktur
 
 ```
 src/
-├── components/salary/
-│   └── NewEmployeesTab.tsx     # Ny komponent
-└── pages/
-    └── SalaryTypes.tsx          # Tilføjer fane
+├── components/
+│   ├── employee/
+│   │   ├── ReadOnlyRow.tsx           # NYT: Read-only komponenter
+│   │   ├── EmployeeProfileDialog.tsx # NYT: Popup dialog
+│   │   └── EmployeeDetailFields.tsx  # Eksisterende (uændret)
+│   └── salary/
+│       └── NewEmployeesTab.tsx       # ÆNDRET: Dialog i stedet for navigation
 ```
-
----
-
-## UI-detaljer
-
-**Tabelkolonner:**
-| Kolonne | Felt | Format |
-|---------|------|--------|
-| Navn | `first_name + last_name` | Fuldt navn |
-| Stilling | `job_title` | Tekst |
-| Startdato | `employment_start_date` | "d. MMM yyyy" |
-| Team/Afdeling | `teams` relation | Join på team_members |
-
-**Interaktioner:**
-- Hele rækken er klikbar med hover-effekt
-- Klik åbner `/employees/:id` (eksisterende stamkortside)
-- Pile-navigation skifter lønperiode
 
 ---
 
 ## Sekvensdiagram
 
 ```text
-Bruger             NewEmployeesTab          Supabase          EmployeeDetail
-  │                      │                      │                   │
-  │──(åbn fane)─────────>│                      │                   │
-  │                      │──(hent periode)─────>│                   │
-  │                      │<──(medarbejdere)─────│                   │
-  │<──(vis liste)────────│                      │                   │
-  │                      │                      │                   │
-  │──(klik på række)────>│                      │                   │
-  │                      │──────────────(navigate)─────────────────>│
-  │                      │                      │                   │
-  │──(bladr periode)────>│                      │                   │
-  │                      │──(ny periode query)─>│                   │
-  │<──(opdater liste)────│                      │                   │
+Bruger              NewEmployeesTab         EmployeeProfileDialog    Supabase
+  │                      │                         │                    │
+  │──(klik på række)────>│                         │                    │
+  │                      │──(set employeeId)──────>│                    │
+  │                      │                         │──(fetch employee)─>│
+  │                      │                         │<──(data)───────────│
+  │<──────────────(vis dialog)─────────────────────│                    │
+  │                      │                         │                    │
+  │──(klik X/udenfor)───>│                         │                    │
+  │                      │──(close dialog)────────>│                    │
+  │<──(tilbage til liste)│                         │                    │
 ```
+
+---
+
+## Dialog-styling
+
+- `max-w-4xl` for at give plads til 2-kolonne layout
+- `max-h-[90vh]` med `overflow-y-auto` for scroll på små skærme
+- Bruger eksisterende dialog-komponent fra `@/components/ui/dialog`
+- Matcher det mørke tema fra resten af applikationen
