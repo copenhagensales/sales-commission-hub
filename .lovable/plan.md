@@ -1,81 +1,150 @@
 
-# Plan: Tilføj manglende dashboard-permissions til PERMISSION_CATEGORIES
+
+# Fix: Fieldmarketing medarbejdere på CS Top 20
 
 ## Problemet
-Kasper Mikkelsen (Ejer) redirectes til `/home` når han prøver at åbne CS Top 20 dashboardet.
+Fieldmarketing sælgere (Martina, Noa, Rebecca osv.) vises ikke på CS Top 20 dashboardet af to årsager:
 
-**Rod-årsag:** `menu_dashboard_cs_top_20` og `menu_dashboard_mg_test` mangler i `PERMISSION_CATEGORIES` i `src/config/permissions.ts`.
+### Årsag 1: Fejl i product_pricing_rules query
+Edge funktionen `calculate-kpi-values` forsøger at hente kolonner der ikke eksisterer:
 
-Ejere får deres tilladelser genereret automatisk via `generateOwnerPermissions()`, som kun inkluderer keys fra `PERMISSION_CATEGORIES`. Uden disse keys returnerer `canView("menu_dashboard_cs_top_20")` altid `false` for ejeren.
+| Kolonne funktionen bruger | Findes i database? |
+|--------------------------|-------------------|
+| `product_name` | ❌ Nej |
+| `price_dkk` | ❌ Nej |
 
-## Flow-analyse
+**Korrekt struktur:**
+- Produktnavnet ligger i `products.name` (via join på `product_id`)
+- Prisen ligger i `product_pricing_rules.revenue_dkk`
 
-```text
-1. Kasper navigerer til /dashboards/cs-top-20
-2. RoleProtectedRoute tjekker: canView("menu_dashboard_cs_top_20")
-3. usePermissions henter ejer-permissions fra generateOwnerPermissions()
-4. generateOwnerPermissions() itererer PERMISSION_CATEGORIES
-5. menu_dashboard_cs_top_20 findes IKKE i PERMISSION_CATEGORIES
-6. canView() returnerer false → redirect til /home
-```
+### Årsag 2: CS Top 20 henter kun fra `sales` tabellen
+`handleCsTop20Data()` i `tv-dashboard-data` henter kun telesales - den inkluderer slet ikke `fieldmarketing_sales` tabellen.
+
+---
 
 ## Løsning
-Tilføj de manglende dashboard-permissions til `PERMISSION_CATEGORIES` i `src/config/permissions.ts`.
 
-## Ændringer
+### Del 1: Fix `calculate-kpi-values` edge function
 
-### Fil: src/config/permissions.ts
-Tilføj to manglende dashboard-permissions til `menu_dashboards` kategorien (omkring linje 620):
+**Fil:** `supabase/functions/calculate-kpi-values/index.ts`
+
+Opdater `fetchFmCommissionMap()` funktionen (linje 179-198):
 
 ```typescript
-{
-  key: "menu_dashboard_cs_top_20",
-  label: "CS Top 20 Dashboard",
-  description: "Adgang til CS Top 20 dashboard",
-  hasEditOption: false,
-},
-{
-  key: "menu_dashboard_mg_test",
-  label: "MG Test Dashboard", 
-  description: "Adgang til MG Test dashboard",
-  hasEditOption: false,
-},
+// FRA (broken):
+const { data: rules } = await supabase
+  .from("product_pricing_rules")
+  .select("product_name, commission_dkk, price_dkk")
+
+// TIL (fixed):
+const { data: rules } = await supabase
+  .from("product_pricing_rules")
+  .select(`
+    product:products!inner(name),
+    commission_dkk,
+    revenue_dkk
+  `)
+  .eq("is_active", true)
 ```
 
-## Påvirkede områder
+Og opdater map-logikken:
+```typescript
+for (const rule of rules || []) {
+  const key = rule.product?.name?.toLowerCase();
+  if (key && !map.has(key)) {
+    map.set(key, {
+      commission: rule.commission_dkk || 0,
+      price: rule.revenue_dkk || 0,
+    });
+  }
+}
+```
 
-| Komponent | Effekt |
-|-----------|--------|
-| `generateOwnerPermissions()` | Inkluderer nu CS Top 20 og MG Test |
-| `RoleProtectedRoute` | `canView()` returnerer `true` for ejere |
-| `AppSidebar` | Dashboard links vises for ejere |
-| `DashboardHeader dropdown` | Dashboards vises i dropdown for ejere |
+### Del 2: Tilføj fieldmarketing_sales til CS Top 20
+
+**Fil:** `supabase/functions/tv-dashboard-data/index.ts`
+
+I `handleCsTop20Data()` funktionen (linje 2098-2369):
+
+1. Hent FM pricing map (genbrug logikken fra calculate-kpi-values)
+2. Hent fieldmarketing_sales for alle tre perioder (today, week, payroll)
+3. Match seller_id til employee_master_data for navne og avatars
+4. Beregn provision baseret på product_name → product_pricing_rules
+5. Kombiner FM og telesales i én samlet ranking
+
+**Ny kode der skal tilføjes:**
+
+```typescript
+// Hent FM pricing map
+const fmPricingMap = new Map();
+const { data: pricingRules } = await supabase
+  .from("product_pricing_rules")
+  .select(`product:products!inner(name), commission_dkk, revenue_dkk`)
+  .eq("is_active", true);
+
+for (const rule of pricingRules || []) {
+  const key = rule.product?.name?.toLowerCase();
+  if (key && !fmPricingMap.has(key)) {
+    fmPricingMap.set(key, rule.commission_dkk || 0);
+  }
+}
+
+// Hent FM salg for alle perioder
+const { data: fmSalesToday } = await supabase
+  .from("fieldmarketing_sales")
+  .select("id, seller_id, product_name, registered_at")
+  .gte("registered_at", `${todayStr}T00:00:00`)
+  .lte("registered_at", `${todayStr}T23:59:59`);
+
+// ... samme for week og payroll
+
+// Aggreger FM provision per employee
+for (const sale of fmSalesToday || []) {
+  const commission = fmPricingMap.get(sale.product_name?.toLowerCase()) || 0;
+  // Tilføj til seller's total
+}
+```
+
+---
+
+## Filer der skal ændres
+
+| Fil | Ændring |
+|-----|---------|
+| `supabase/functions/calculate-kpi-values/index.ts` | Fix `fetchFmCommissionMap()` til korrekt join |
+| `supabase/functions/tv-dashboard-data/index.ts` | Tilføj FM salg til `handleCsTop20Data()` |
+
+---
 
 ## Teknisk sektion
 
-### Hvorfor fejlen opstår
-`generateAllPermissions()` (linje 954-973) itererer kun over `PERMISSION_CATEGORIES`:
+### Database struktur (verificeret)
+```
+product_pricing_rules:
+  - id (uuid)
+  - product_id (uuid) ← joiner til products.id
+  - commission_dkk (numeric)
+  - revenue_dkk (numeric) ← IKKE price_dkk
+  - is_active (boolean)
 
-```typescript
-export const generateAllPermissions = (excludeKeys: string[] = []) => {
-  const allPermissions = {};
-  PERMISSION_CATEGORIES.forEach((category) => {
-    category.permissions.forEach((permission) => {
-      // Keys der ikke er defineret her, bliver ALDRIG tilføjet
-      allPermissions[permission.key] = ...;
-    });
-  });
-  return allPermissions;
-};
+products:
+  - id (uuid)
+  - name (text) ← produktnavnet ligger her
 ```
 
-### Placering af ændring
-Indsæt efter `menu_dashboard_united` (linje 620-624) i `menu_dashboards` kategorien.
+### FM sales attribution
+Fieldmarketing salg bruger `seller_id` direkte (matcher `employee_master_data.id`), ikke agent_email som telesales.
 
-### Risiko
-Minimal - tilføjer kun manglende metadata. Ingen breaking changes.
+### Eksempel på korrekte priser fra database
+- Switch Unlimited ATL: 6.196 kr kommission
+- Switch Unlimited #1: 2.992 kr kommission  
+- Switch Contact Center ATL: 2.125 kr kommission
+
+---
 
 ## Forventet resultat
-- Kasper Mikkelsen og andre ejere kan tilgå CS Top 20 dashboard
-- Dashboard vises i sidebar under "Dashboards"
-- Dashboard vises i dropdown-menuen på dashboard-sider
+- FM sælgere med provision vises på CS Top 20
+- Ranking kombinerer telesales og fieldmarketing
+- FM sælgere vises med grøn "Field" badge
+- Martina Cubranovic: ~29+ salg × 450 kr = ~13.000+ kr → burde være i top 20
+
