@@ -25,7 +25,7 @@ const allTabs = [
 export default function BookingManagement() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canView, isLoading } = useUnifiedPermissions();
+  const { canView, isLoading, isReady, role, pagePermissions } = useUnifiedPermissions();
   
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => 
@@ -49,7 +49,18 @@ export default function BookingManagement() {
     setSearchParams(params);
   };
 
-  if (isLoading) {
+  // Debug logging for permission issues
+  console.log('[BookingManagement] Permission check:', {
+    role,
+    isLoading,
+    isReady,
+    pagePermissionsCount: pagePermissions?.length,
+    tabChecks: allTabs.map(t => ({ key: t.permissionKey, hasAccess: canView(t.permissionKey) })),
+    visibleTabsCount: visibleTabs.length
+  });
+
+  // Wait until data is ACTUALLY ready - prevents race condition
+  if (isLoading || !isReady) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center py-12">
