@@ -57,16 +57,35 @@ export function usePagePermissions() {
   return useQuery({
     queryKey: ['page-permissions'],
     queryFn: async () => {
-      // Supabase has a 1000 row default limit
-      // Use .range(0, 2000) to ensure all permissions are fetched (currently ~1262 rows)
-      const { data, error } = await supabase
-        .from('role_page_permissions')
-        .select('*')
-        .order('permission_key')
-        .range(0, 2000);
+      // Supabase has a 1000 row default limit - we need to paginate to get all ~1262 rows
+      const allPermissions: PagePermission[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
       
-      if (error) throw error;
-      return data as PagePermission[];
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        
+        const { data, error } = await supabase
+          .from('role_page_permissions')
+          .select('*')
+          .order('permission_key')
+          .range(from, to);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allPermissions.push(...(data as PagePermission[]));
+          hasMore = data.length === pageSize; // If we got full page, there might be more
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      console.log(`[usePagePermissions] Fetched ${allPermissions.length} permissions`);
+      return allPermissions;
     },
     staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
     gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
