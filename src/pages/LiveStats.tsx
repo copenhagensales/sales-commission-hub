@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, startOfYear, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -73,52 +74,17 @@ export default function LiveStats() {
       const startISO = format(dateRange.from, "yyyy-MM-dd") + "T00:00:00";
       const endISO = format(dateRange.to, "yyyy-MM-dd") + "T23:59:59";
 
-      // Fetch all sales using pagination (Supabase default limit is 1000)
-      const allSales: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      // Fetch all sales using central pagination utility
+      const allSales = await fetchAllRows<any>(
+        "sales",
+        `id, sale_datetime, validation_status, agent_name,
+         client_campaigns(id, name, client_id, clients(id, name)),
+         sale_items(id, quantity, mapped_commission, products(id, name, commission_dkk))`,
+        (q) => q.gte("sale_datetime", startISO).lte("sale_datetime", endISO),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("sales")
-          .select(
-            `
-            id,
-            sale_datetime,
-            validation_status,
-            agent_name,
-            client_campaigns (
-              id,
-              name,
-              client_id,
-              clients (id, name)
-            ),
-            sale_items (
-              id,
-              quantity,
-              mapped_commission,
-              products (id, name, commission_dkk)
-            )
-          `,
-          )
-          .gte("sale_datetime", startISO)
-          .lte("sale_datetime", endISO)
-          .order("sale_datetime", { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allSales.push(...data);
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      // Filter by client if selected - exclude sales without valid client_campaigns
+      // Filter by client if selected
       let filteredData = allSales;
       if (selectedClient !== "all") {
         filteredData = filteredData.filter((s: any) => 

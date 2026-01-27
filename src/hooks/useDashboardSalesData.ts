@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, endOfDay, startOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
+import { fetchAllRows, fetchByIds } from "@/utils/supabasePagination";
 
 export interface DashboardEmployeeStats {
   employeeId: string;

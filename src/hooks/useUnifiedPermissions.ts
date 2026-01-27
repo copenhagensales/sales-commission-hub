@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { permissionKeyLabels as centralPermissionKeyLabels, type PermissionKey } from "@/config/permissionKeys";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 // Types
 export type SystemRole = 'ejer' | 'teamleder' | 'rekruttering' | 'medarbejder' | 'some';
@@ -57,32 +58,13 @@ export function usePagePermissions() {
   return useQuery({
     queryKey: ['page-permissions'],
     queryFn: async () => {
-      // Supabase has a 1000 row default limit - we need to paginate to get all ~1262 rows
-      const allPermissions: PagePermission[] = [];
-      const pageSize = 1000;
-      let page = 0;
-      let hasMore = true;
-      
-      while (hasMore) {
-        const from = page * pageSize;
-        const to = from + pageSize - 1;
-        
-        const { data, error } = await supabase
-          .from('role_page_permissions')
-          .select('*')
-          .order('permission_key')
-          .range(from, to);
-        
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          allPermissions.push(...(data as PagePermission[]));
-          hasMore = data.length === pageSize; // If we got full page, there might be more
-          page++;
-        } else {
-          hasMore = false;
-        }
-      }
+      // Use central pagination utility to fetch all permissions (>1000 rows)
+      const allPermissions = await fetchAllRows<PagePermission>(
+        "role_page_permissions",
+        "*",
+        undefined,
+        { orderBy: "permission_key", ascending: true }
+      );
       
       console.log(`[usePagePermissions] Fetched ${allPermissions.length} permissions`);
       return allPermissions;
