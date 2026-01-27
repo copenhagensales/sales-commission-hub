@@ -91,6 +91,13 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
 const PERMISSIONS_CACHE_KEY = 'cached-permissions-v2';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Force-clear old cache versions on load
+try {
+  localStorage.removeItem('cached-permissions-v1');
+} catch (e) {
+  // Ignore errors
+}
+
 function getCachedPermissions(): { position: JobPosition | null; permissions: PositionPermissions; roleKey: string } | null {
   try {
     const cached = localStorage.getItem(PERMISSIONS_CACHE_KEY);
