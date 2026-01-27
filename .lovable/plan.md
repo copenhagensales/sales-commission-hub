@@ -1,56 +1,55 @@
 
-# Plan: Tilføj Rekruttering til is_teamleder_or_above()
+# Plan: Fix "Tildel opstartshold" Fejl
 
-## Baggrund
-Oscar Belcher med job_title "Rekruttering" kan ikke se sit teams indstemplinger fordi `is_teamleder_or_above()` funktionen kun tillader disse job_titles:
-- ejer
-- teamleder
-- assisterende teamleder
-- fieldmarketing leder
+## Problemet
+Når Oscar Belcher tildeler en kandidat til et hold, virker funktionen ikke korrekt af to grunde:
+
+1. **Supabase fejl ignoreres** - Koden tjekker ikke om database-operationerne lykkes
+2. **Team kan springes over** - Man kan bekræfte uden at vælge et team
 
 ## Løsning
-Opdater database-funktionen til at inkludere 'rekruttering' i whitelisten.
 
-## Database migration
+### Del 1: Tilføj fejlhåndtering for Supabase kald
+Ændrer `onConfirm` callback'en i `CandidateDetail.tsx` til at tjekke for fejl:
 
-```sql
-CREATE OR REPLACE FUNCTION public.is_teamleder_or_above(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.system_roles
-    WHERE user_id = _user_id AND role IN ('teamleder', 'ejer')
-  )
-  OR EXISTS (
-    SELECT 1 FROM public.employee_master_data
-    WHERE auth_user_id = _user_id 
-      AND is_active = true
-      AND LOWER(job_title) IN (
-        'ejer', 
-        'teamleder', 
-        'assisterende teamleder', 
-        'fieldmarketing leder',
-        'rekruttering'  -- Ny tilføjelse
-      )
-  )
-$$;
+```typescript
+// Fra:
+await supabase.from("candidates").update(updateData).eq("id", id);
+
+// Til:
+const { error: updateError } = await supabase
+  .from("candidates")
+  .update(updateData)
+  .eq("id", id);
+
+if (updateError) throw updateError;
 ```
 
-## Påvirkede områder
-Denne ændring giver rekrutteringsmedarbejdere adgang til team-data i:
+### Del 2: Kræv team-valg
+Opdaterer knap-logikken i `AssignCohortDialog.tsx`:
 
-| Tabel | Policy |
-|-------|--------|
-| `time_stamps` | Teamledere can manage team time stamps |
-| Andre tabeller der bruger `is_teamleder_or_above()` | Alle RLS policies der kalder funktionen |
+```typescript
+// Fra:
+disabled={isSubmitting || (!selectedCohortId && !availableFrom)}
 
-## Risiko
-Lav risiko - tilføjer kun én ny titel til en eksisterende whitelist. Ingen breaking changes.
+// Til:
+disabled={isSubmitting || !selectedTeamId || (!selectedCohortId && !availableFrom)}
+```
 
 ## Teknisk sektion
-- Funktionen bruger `LOWER()` så case-sensitivity er ikke et problem
-- `SECURITY DEFINER` sikrer at funktionen kører med tilstrækkelige rettigheder
-- Ændringen træder i kraft øjeblikkeligt efter migration
+
+### Fil 1: `src/pages/recruitment/CandidateDetail.tsx`
+Ændringer i linje 945-979:
+- Tilføj `{ error }` destrukturering til candidates update
+- Tilføj `{ error }` destrukturering til cohort_members insert
+- Kast fejl hvis nogen af dem fejler
+
+### Fil 2: `src/components/recruitment/AssignCohortDialog.tsx`
+Ændring i linje 256:
+- Tilføj `!selectedTeamId` til disabled-betingelsen
+- Eventuelt tilføj hjælpetekst hvis team ikke er valgt
+
+## Forventet resultat
+- Fejl fra databasen vises til brugeren
+- Man kan ikke bekræfte uden at vælge et team
+- Kandidatens `team_id` opdateres korrekt i databasen
