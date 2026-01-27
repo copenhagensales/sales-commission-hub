@@ -623,6 +623,18 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: false,
       },
       {
+        key: "menu_dashboard_cs_top_20",
+        label: "CS Top 20 Dashboard",
+        description: "Adgang til CS Top 20 dashboard",
+        hasEditOption: false,
+      },
+      {
+        key: "menu_dashboard_mg_test",
+        label: "MG Test Dashboard",
+        description: "Adgang til MG Test dashboard",
+        hasEditOption: false,
+      },
+      {
         key: "menu_dashboard_design",
         label: "Design Dashboard",
         description: "Adgang til design dashboard",
