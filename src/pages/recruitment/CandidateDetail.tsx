@@ -957,16 +957,18 @@ export default function CandidateDetail() {
               updateData.team_id = teamId;
             }
             
-            await supabase.from("candidates").update(updateData).eq("id", id);
+            const { error: updateError } = await supabase.from("candidates").update(updateData).eq("id", id);
+            if (updateError) throw updateError;
             
             // If cohort selected, add to cohort_members with daily_bonus_client_id
             if (cohortId) {
-              await supabase.from("cohort_members").insert({
+              const { error: cohortError } = await supabase.from("cohort_members").insert({
                 cohort_id: cohortId,
                 candidate_id: id,
                 status: "pending",
                 daily_bonus_client_id: dailyBonusClientId,
               });
+              if (cohortError) throw cohortError;
             }
             
             queryClient.invalidateQueries({ queryKey: ["candidate", id] });
