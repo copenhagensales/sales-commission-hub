@@ -31,12 +31,12 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useActiveSeason, useMyEnrollment } from "@/hooks/useLeagueData";
-import { useRecognitionKpis } from "@/hooks/useRecognitionKpis";
+import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
-import { TabbedRecognitions } from "@/components/home/TabbedRecognitions";
+import { PersonalRecognitions } from "@/components/home/PersonalRecognitions";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 
 const Home = () => {
@@ -304,8 +304,8 @@ const Home = () => {
     staleTime: 300000,
   });
 
-  // Use optimized recognition hook
-  const { data: weeklyRecognition } = useRecognitionKpis();
+  // Use personal weekly stats hook
+  const { data: personalWeeklyStats } = usePersonalWeeklyStats(employee?.id);
 
   const firstName = employee?.first_name || "kollega";
 
@@ -340,16 +340,10 @@ const Home = () => {
           {/* Compact League View */}
           <CompactLeagueView />
 
-          {/* Tabbed Recognitions */}
-          <TabbedRecognitions
-            currentWeek={{
-              topWeekly: weeklyRecognition?.currentWeek?.topWeekly || null,
-              bestDay: weeklyRecognition?.currentWeek?.bestDay || null,
-            }}
-            lastWeek={{
-              topWeekly: weeklyRecognition?.lastWeek?.topWeekly || null,
-              bestDay: weeklyRecognition?.lastWeek?.bestDay || null,
-            }}
+          {/* Personal Weekly Stats */}
+          <PersonalRecognitions
+            currentWeek={personalWeeklyStats?.currentWeek || { weekTotal: 0, bestDay: null }}
+            lastWeek={personalWeeklyStats?.lastWeek || { weekTotal: 0, bestDay: null }}
           />
         </div>
 
