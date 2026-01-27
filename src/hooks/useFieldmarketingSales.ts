@@ -54,42 +54,63 @@ export function useFieldmarketingSalesStats(clientId?: string) {
     queryKey: ["fieldmarketing-sales-stats", clientId],
     staleTime: 60000, // 1 minut
     queryFn: async () => {
+      // Use Copenhagen timezone for accurate date boundaries
       const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-      let baseQuery = supabase.from("fieldmarketing_sales").select("id, registered_at, product_name, seller_id");
       
-      if (clientId) {
-        baseQuery = baseQuery.eq("client_id", clientId);
-      }
-
-      const { data, error } = await baseQuery;
-      if (error) throw error;
-
-      const sales = data || [];
+      // Format dates as ISO strings with Copenhagen timezone offset
+      // Get today at midnight Copenhagen time
+      const todayDate = now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Copenhagen' }); // YYYY-MM-DD format
+      const todayStart = `${todayDate}T00:00:00+01:00`;
       
-      const salesToday = sales.filter(s => s.registered_at >= todayStart).length;
-      const salesThisWeek = sales.filter(s => s.registered_at >= weekStart).length;
-      const salesThisMonth = sales.filter(s => s.registered_at >= monthStart).length;
-      const totalSales = sales.length;
+      // Get start of week (Monday) Copenhagen time
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const weekStartDate = new Date(now);
+      weekStartDate.setDate(now.getDate() - daysToMonday);
+      const weekStartStr = weekStartDate.toLocaleDateString('sv-SE', { timeZone: 'Europe/Copenhagen' });
+      const weekStart = `${weekStartStr}T00:00:00+01:00`;
+      
+      // Get start of month Copenhagen time
+      const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const monthStart = `${monthStartStr}T00:00:00+01:00`;
 
-      // Top sellers this month
+      // Build base query with client filter
+      const buildQuery = () => {
+        let q = supabase.from("fieldmarketing_sales").select("id, registered_at, product_name, seller_id");
+        if (clientId) q = q.eq("client_id", clientId);
+        return q;
+      };
+
+      // Fetch counts using database-level filtering (bypasses 1000-row limit)
+      const [todayResult, weekResult, monthResult, totalResult] = await Promise.all([
+        buildQuery().gte("registered_at", todayStart),
+        buildQuery().gte("registered_at", weekStart),
+        buildQuery().gte("registered_at", monthStart),
+        buildQuery(),
+      ]);
+
+      if (todayResult.error) throw todayResult.error;
+      if (weekResult.error) throw weekResult.error;
+      if (monthResult.error) throw monthResult.error;
+      if (totalResult.error) throw totalResult.error;
+
+      const salesToday = todayResult.data?.length || 0;
+      const salesThisWeek = weekResult.data?.length || 0;
+      const salesThisMonth = monthResult.data?.length || 0;
+      const totalSales = totalResult.data?.length || 0;
+
+      // Top sellers and product distribution from month data
+      const monthSales = monthResult.data || [];
+      
       const sellerCounts: Record<string, number> = {};
-      sales
-        .filter(s => s.registered_at >= monthStart)
-        .forEach(s => {
-          sellerCounts[s.seller_id] = (sellerCounts[s.seller_id] || 0) + 1;
-        });
+      monthSales.forEach(s => {
+        sellerCounts[s.seller_id] = (sellerCounts[s.seller_id] || 0) + 1;
+      });
 
-      // Product distribution this month
       const productCounts: Record<string, number> = {};
-      sales
-        .filter(s => s.registered_at >= monthStart)
-        .forEach(s => {
-          productCounts[s.product_name] = (productCounts[s.product_name] || 0) + 1;
-        });
+      monthSales.forEach(s => {
+        productCounts[s.product_name] = (productCounts[s.product_name] || 0) + 1;
+      });
 
       return {
         salesToday,
