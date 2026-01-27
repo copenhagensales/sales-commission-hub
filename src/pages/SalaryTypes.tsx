@@ -6,6 +6,7 @@ import { SellerSalariesTab } from "@/components/salary/SellerSalariesTab";
 import { TeamExpensesTab } from "@/components/salary/TeamExpensesTab";
 import { DBOverviewTab } from "@/components/salary/DBOverviewTab";
 import { CombinedSalaryTab } from "@/components/salary/CombinedSalaryTab";
+import { NewEmployeesTab } from "@/components/salary/NewEmployeesTab";
 import { Receipt } from "lucide-react";
 
 export default function SalaryTypes() {
@@ -28,6 +29,7 @@ export default function SalaryTypes() {
             <TabsTrigger value="team-expenses">Teamomkostninger</TabsTrigger>
             <TabsTrigger value="db-overview">DB Oversigt</TabsTrigger>
             <TabsTrigger value="combined">Samlet</TabsTrigger>
+            <TabsTrigger value="new-employees">Nye medarbejdere</TabsTrigger>
           </TabsList>
 
           <TabsContent value="salary-types" className="mt-4">
@@ -52,6 +54,10 @@ export default function SalaryTypes() {
 
           <TabsContent value="combined" className="mt-4">
             <CombinedSalaryTab />
+          </TabsContent>
+
+          <TabsContent value="new-employees" className="mt-4">
+            <NewEmployeesTab />
           </TabsContent>
         </Tabs>
       </div>
