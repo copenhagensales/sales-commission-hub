@@ -91,7 +91,7 @@ const Home = () => {
       if (isPreviewMode && previewEmployee?.id) {
         const { data } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, job_title, team_id, employment_start_date")
+          .select("id, first_name, last_name, job_title, team_id, employment_start_date, vacation_type")
           .eq("id", previewEmployee.id)
           .maybeSingle();
         return data;
@@ -101,7 +101,7 @@ const Home = () => {
       const lowerEmail = user.email.toLowerCase();
       const { data } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, team_id, employment_start_date")
+        .select("id, first_name, last_name, job_title, team_id, employment_start_date, vacation_type")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
@@ -175,6 +175,16 @@ const Home = () => {
   const progressPercent = targetAmount > 0 
     ? Math.round((personalStats?.periodCommission || 0) / targetAmount * 100) 
     : 0;
+
+  // Vacation pay calculation (same logic as useSellerSalariesCached)
+  const vacationPayRate = useMemo(() => {
+    if (!employee?.vacation_type) return 0;
+    if (employee.vacation_type === 'vacation_pay') return 0.125; // 12.5%
+    if (employee.vacation_type === 'vacation_bonus') return 0.01; // 1%
+    return 0;
+  }, [employee?.vacation_type]);
+
+  const vacationPay = (personalStats?.periodCommission || 0) * vacationPayRate;
 
   // Fetch upcoming birthdays and anniversaries (next 14 days)
   const { data: celebrations = [] } = useQuery({
@@ -481,6 +491,7 @@ const Home = () => {
           targetAmount={targetAmount}
           progressPercent={progressPercent}
           hasGoal={hasGoal}
+          vacationPay={vacationPay}
           onLogout={handleLogout}
           isEnrolledInLeague={isEnrolledInLeague}
         />

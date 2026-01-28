@@ -12,6 +12,7 @@ interface HeroPerformanceCardProps {
   hasGoal: boolean;
   onLogout: () => void;
   isEnrolledInLeague?: boolean;
+  vacationPay?: number;
 }
 
 export function HeroPerformanceCard({
@@ -22,6 +23,7 @@ export function HeroPerformanceCard({
   hasGoal,
   onLogout,
   isEnrolledInLeague = true,
+  vacationPay = 0,
 }: HeroPerformanceCardProps) {
   const [animatedPercent, setAnimatedPercent] = useState(0);
   const [animatedCommission, setAnimatedCommission] = useState(0);
@@ -282,6 +284,11 @@ export function HeroPerformanceCard({
               <p className="text-sm text-muted-foreground">
                 provision denne periode
               </p>
+              {vacationPay > 0 && (
+                <p className="text-sm text-emerald-500/80">
+                  + {formatCommission(vacationPay)} kr feriepenge
+                </p>
+              )}
             </div>
 
             {/* Integrated CTA Button */}
