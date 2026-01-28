@@ -1063,9 +1063,13 @@ export default function CphSalesDashboard() {
                   className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
                 >
                   <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
-                    {/* Client logo */}
+                    {/* Client logo - use dark bg for white logos like YouSee */}
                     {data.logoUrl && (
-                      <div className={`flex items-center justify-center bg-white rounded-xl shadow-sm ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
+                      <div className={`flex items-center justify-center rounded-xl shadow-sm ${
+                        client.toLowerCase().includes('yousee') || client.toLowerCase().includes('you see')
+                          ? 'bg-slate-800' 
+                          : 'bg-white'
+                      } ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
                         <img 
                           src={data.logoUrl} 
                           alt={client} 
