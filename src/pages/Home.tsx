@@ -46,7 +46,7 @@ import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
-import { PersonalRecognitions } from "@/components/home/PersonalRecognitions";
+import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 
 const Home = () => {
@@ -490,10 +490,9 @@ const Home = () => {
           {/* Compact League View */}
           <CompactLeagueView />
 
-          {/* Personal Weekly Stats */}
-          <PersonalRecognitions
-            currentWeek={personalWeeklyStats?.currentWeek || { weekTotal: 0, bestDay: null }}
-            lastWeek={personalWeeklyStats?.lastWeek || { weekTotal: 0, bestDay: null }}
+          {/* Daily Commission Chart */}
+          <DailyCommissionChart
+            dailyData={personalWeeklyStats?.dailyBreakdown || []}
           />
         </div>
 
