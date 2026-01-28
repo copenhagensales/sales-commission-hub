@@ -697,7 +697,12 @@ const Home = () => {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{event.title}</p>
+                          <p 
+                            className="font-medium text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
+                            onClick={() => setSelectedEventForDetail(event.id)}
+                          >
+                            {event.title}
+                          </p>
                           <div className="flex items-center gap-2">
                             <p className="text-xs text-muted-foreground truncate">
                               {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
