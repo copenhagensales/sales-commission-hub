@@ -1,129 +1,177 @@
 
-
-# Implementering: Én medarbejder, én booking per dag
+# Plan: Deltager-funktion til begivenheder
 
 ## Oversigt
 
-Implementerer en streng regel der sikrer at en medarbejder kun kan have ét booking-assignment per dag - uanset lokation eller booking.
+Tilføjer mulighed for medarbejdere at markere om de deltager i en begivenhed, samt se hvem der deltager via hover.
 
 ---
 
 ## Database-ændringer
 
-### Migration: Oprydning og ny constraint
+### Ny tabel: `event_attendees`
 
 ```sql
--- Trin 1: Fjern eksisterende dubletter (behold den ældste per medarbejder/dato)
-DELETE FROM public.booking_assignment a
-WHERE a.id NOT IN (
-  SELECT (array_agg(id ORDER BY created_at ASC))[1]
-  FROM public.booking_assignment
-  GROUP BY employee_id, date
+CREATE TABLE public.event_attendees (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES company_events(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES employee(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'attending' CHECK (status IN ('attending', 'not_attending')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  
+  UNIQUE (event_id, employee_id)
 );
 
--- Trin 2: Tilføj unik constraint på employee_id + date
-ALTER TABLE public.booking_assignment
-ADD CONSTRAINT booking_assignment_unique_employee_date 
-UNIQUE (employee_id, date);
+-- Index for hurtige opslag
+CREATE INDEX idx_event_attendees_event ON event_attendees(event_id);
+CREATE INDEX idx_event_attendees_employee ON event_attendees(employee_id);
+
+-- RLS policies
+ALTER TABLE event_attendees ENABLE ROW LEVEL SECURITY;
+
+-- Alle autentificerede kan se deltagere
+CREATE POLICY "Users can view all attendees" ON event_attendees
+  FOR SELECT TO authenticated USING (true);
+
+-- Medarbejdere kan kun indsætte/opdatere deres egen deltagelse
+CREATE POLICY "Employees can manage own attendance" ON event_attendees
+  FOR ALL TO authenticated
+  USING (employee_id IN (
+    SELECT id FROM employee 
+    WHERE private_email = auth.jwt()->>'email' 
+       OR work_email = auth.jwt()->>'email'
+  ));
 ```
 
 ---
 
 ## Frontend-ændringer
 
-### 1. AddEmployeeDialog.tsx
+### 1. Home.tsx - Tilføj deltager-funktionalitet
 
-**Ændring i `handleSubmit` (ca. linje 487-503):**
+**Nye imports:**
+- `ThumbsUp`, `Users` (lucide-react)
+- `HoverCard`, `HoverCardTrigger`, `HoverCardContent` fra ui/hover-card
+- `Avatar`, `AvatarFallback` fra ui/avatar
 
-Tilføj filtrering af allerede bookede dage:
-
+**Ny query - Hent deltagere for alle events:**
 ```typescript
-const assignments = validEmployees.map(employeeId => ({
-  employeeId,
-  dates: Array.from(selectedDays)
-    .filter(dayIndex => hasShiftOnDay(employeeId, dayIndex))
-    .filter(dayIndex => !isBookedOnDay(employeeId, dayIndex)) // NY
-    .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
-})).filter(a => a.dates.length > 0);
-
-if (assignments.length === 0) {
-  toast.error("Ingen gyldige dage - medarbejdere er allerede booket");
-  return;
-}
+const { data: eventAttendees = [] } = useQuery({
+  queryKey: ["event-attendees", companyEvents.map(e => e.id)],
+  queryFn: async () => {
+    const eventIds = companyEvents.map(e => e.id);
+    if (eventIds.length === 0) return [];
+    const { data } = await supabase
+      .from("event_attendees")
+      .select(`
+        *,
+        employee:employee_id(id, first_name, last_name)
+      `)
+      .in("event_id", eventIds);
+    return data || [];
+  },
+  enabled: companyEvents.length > 0,
+});
 ```
 
-### 2. EditBookingDialog.tsx
-
-**Ændring i `handleAddEmployees` (ca. linje 814-830):**
-
-Samme filtrering:
-
+**Ny mutation - Toggle deltagelse:**
 ```typescript
-const assignments = validEmployees.map(employeeId => ({
-  employeeId,
-  dates: Array.from(selectedEmployeeDays)
-    .filter(dayIndex => hasShiftOnDay(employeeId, dayIndex))
-    .filter(dayIndex => !isBookedOnDay(employeeId, dayIndex)) // NY
-    .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
-})).filter(a => a.dates.length > 0);
-
-if (assignments.length === 0) {
-  toast.error("Ingen gyldige dage - medarbejdere er allerede booket");
-  return;
-}
+const toggleAttendanceMutation = useMutation({
+  mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'not_attending' }) => {
+    if (!employee?.id) throw new Error("Ikke logget ind");
+    
+    const { error } = await supabase
+      .from("event_attendees")
+      .upsert({
+        event_id: eventId,
+        employee_id: employee.id,
+        status: status,
+      }, { onConflict: 'event_id,employee_id' });
+      
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["event-attendees"] });
+    toast.success("Din deltagelse er opdateret");
+  },
+});
 ```
 
-### 3. Bookings.tsx
+**UI-ændringer i event-listen (linje 485-512):**
 
-**Forbedret fejlhåndtering i `bulkAssignMutation` (ca. linje 295-302):**
-
-```typescript
-onError: (error: any) => {
-  const isUniqueViolation = error.message?.includes('unique') || 
-                            error.message?.includes('duplicate') ||
-                            error.code === '23505';
-  const message = isUniqueViolation 
-    ? "Medarbejder er allerede booket på en eller flere af de valgte dage"
-    : "Kunne ikke tildele medarbejdere";
-  toast({ title: message, variant: "destructive" });
-},
+Nuværende struktur:
+```
+[Dato] [Titel + tid/sted] [Slet-knap (hover)]
 ```
 
-### 4. MarketsContent.tsx
+Ny struktur:
+```
+[Dato] [Titel + tid/sted + deltagerantal] [Like-knapper] [Slet-knap (hover)]
+```
 
-**Samme forbedrede fejlhåndtering (ca. linje 183-198):**
+- **Like-knapper**: To knapper (👍/👎) der viser brugerens nuværende status
+- **Deltagerantal**: Badge med antal deltagere, f.eks. "5 deltager"
+- **HoverCard**: Når man hover over deltagerantal, vises liste over deltagere
 
-```typescript
-onError: (error: any) => {
-  const isUniqueViolation = error.message?.includes('unique') || 
-                            error.message?.includes('duplicate') ||
-                            error.code === '23505';
-  const message = isUniqueViolation 
-    ? "Medarbejder er allerede booket på en eller flere af de valgte dage"
-    : error.message;
-  toast({ title: "Fejl", description: message, variant: "destructive" });
-},
+```tsx
+<HoverCard>
+  <HoverCardTrigger asChild>
+    <Badge variant="outline" className="cursor-pointer gap-1">
+      <Users className="w-3 h-3" />
+      {attendingCount} deltager
+    </Badge>
+  </HoverCardTrigger>
+  <HoverCardContent>
+    <div className="space-y-2">
+      <p className="font-medium text-sm">Deltagere</p>
+      {attendees.filter(a => a.status === 'attending').map(a => (
+        <div className="flex items-center gap-2 text-sm">
+          <Avatar className="h-5 w-5">
+            <AvatarFallback>{a.employee.first_name[0]}{a.employee.last_name[0]}</AvatarFallback>
+          </Avatar>
+          <span>{a.employee.first_name} {a.employee.last_name}</span>
+        </div>
+      ))}
+    </div>
+  </HoverCardContent>
+</HoverCard>
 ```
 
 ---
 
-## Ændringsoversigt
+## Brugeroplevelse
+
+| Handling | Resultat |
+|----------|----------|
+| Klik 👍 på event | Markerer dig som "deltager" |
+| Klik 👎 på event | Markerer dig som "deltager ikke" |
+| Hover over "X deltager" | Viser liste med navne på deltagere |
+| Ingen deltagere | Viser "Ingen deltagere endnu" |
+
+---
+
+## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| Database migration | Slet dubletter + tilføj UNIQUE constraint |
-| `AddEmployeeDialog.tsx` | Filtrer bookede dage + fejlbesked |
-| `EditBookingDialog.tsx` | Filtrer bookede dage + fejlbesked |
-| `Bookings.tsx` | Brugervenlig fejlbesked ved constraint violation |
-| `MarketsContent.tsx` | Brugervenlig fejlbesked ved constraint violation |
+| Database migration | Ny `event_attendees` tabel med RLS |
+| `src/pages/Home.tsx` | Tilføj deltagelse-logik, HoverCard, like-knapper |
 
 ---
 
-## Resultat
+## Eksempel på visning
 
-- Eksisterende dubletter fjernes (beholder den ældste)
-- Database afviser automatisk nye dubletter
-- UI forhindrer valg af allerede bookede dage
-- Tydelige fejlbeskeder på dansk
-- **En medarbejder kan kun bookes én gang per dag**
-
+```
+┌─────────────────────────────────────────────────┐
+│ 30   Fredagsbar - John & Woo                    │
+│ JAN  Kl. 17:30 - John & Woo   [3 deltager] 👍 👎│
+│                                   ↓             │
+│                           ┌───────────────┐     │
+│                           │ Deltagere     │     │
+│                           │ 👤 Kasper M   │     │
+│                           │ 👤 Mikkel K   │     │
+│                           │ 👤 Signe I    │     │
+│                           └───────────────┘     │
+└─────────────────────────────────────────────────┘
+```
