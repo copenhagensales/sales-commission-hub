@@ -1,124 +1,104 @@
 
+# Plan: Tilføj Feriepenge under Provisionsbeløb i HeroPerformanceCard
 
-# Plan: Fix Statement Timeout på Personal Weekly Stats
+## Oversigt
 
-## Problem Identificeret
+Tilføj en diskret visning af **feriepenge** under hovedprovisionsbeløbet i Hero-kortet på forsiden. Baseret på brugerens `vacation_type` beregnes feriepenge som en procentdel af provisionen.
 
-Thomas Wehage's daglige provisions-chart viser ingen data fordi **alle 3 parallelle queries timer out** med:
-```
-"canceling statement due to statement timeout" (HTTP 500)
-```
+## Design
 
-### Bekræftet Data
-Thomas HAR faktisk salg de seneste 14 dage:
-| Dato | Provision |
-|------|-----------|
-| 21. jan | 900 kr |
-| 20. jan | 1.575 kr |
-| 15. jan | 1.750 kr |
-
-Men query'erne når aldrig at returnere data pga. timeout.
-
-## Rod-årsag
-
-1. **RLS policies på `sales` tabellen** evalueres for hver række i joinet
-2. **JOIN mellem `sale_items` og `sales`** med filter på `agent_email` er langsom
-3. **Manglende index** på `sales.agent_email` og/eller `sales.sale_datetime`
-4. **Statement timeout** (typisk 30s) nås før query fuldfører
-
-## Løsningsforslag
-
-### Option A: Database Function med SECURITY DEFINER (Anbefalet)
-
-Samme mønster som `get_weekly_recognition_stats` - en database function der:
-- Bypasser RLS (SECURITY DEFINER)
-- Accepterer employee_id som parameter
-- Returnerer daglige provision aggregeret
-- Er optimeret med direkte SQL
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_personal_daily_commission(
-  p_employee_id UUID,
-  p_start_date DATE,
-  p_end_date DATE
-)
-RETURNS TABLE (
-  sale_date DATE,
-  commission NUMERIC
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    DATE(s.sale_datetime) as sale_date,
-    COALESCE(SUM(si.mapped_commission), 0) as commission
-  FROM sale_items si
-  INNER JOIN sales s ON s.id = si.sale_id
-  INNER JOIN employee_agent_mapping eam ON eam.employee_id = p_employee_id
-  INNER JOIN agents a ON a.id = eam.agent_id
-  WHERE LOWER(s.agent_email) = LOWER(a.email)
-    AND DATE(s.sale_datetime) BETWEEN p_start_date AND p_end_date
-    AND (s.status IS NULL OR s.status != 'rejected')
-  GROUP BY DATE(s.sale_datetime)
-  ORDER BY sale_date;
-END;
-$$;
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│        ↗ 8.200 kr                                          │
+│        provision denne periode                              │
+│        + 1.025 kr feriepenge                    ← NY LINJE │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Option B: Tilføj Database Index
+Feriepenge-linjen vises kun hvis medarbejderen har en `vacation_type` sat og beløbet er > 0.
 
-Forbedrer query performance uden at ændre RLS:
-```sql
-CREATE INDEX IF NOT EXISTS idx_sales_agent_email_datetime 
-ON sales (LOWER(agent_email), sale_datetime);
-```
+## Feriepenge-beregning
 
-### Option C: Cache i kpi_cached_values
+Baseret på eksisterende logik fra `useSellerSalariesCached`:
 
-Beregn daglige stats i `calculate-kpi-incremental` og gem dem - men dette kræver mere omfattende ændringer.
-
-## Anbefaling: Option A + B
-
-1. **Opret database function** `get_personal_daily_commission`
-2. **Tilføj index** for fremtidig performance
-3. **Opdater hook** til at kalde funktionen i stedet for direkte queries
+| vacation_type | Beskrivelse | Rate |
+|---------------|-------------|------|
+| `vacation_pay` | Feriepenge medarbejder | 12.5% |
+| `vacation_bonus` | Ferie med løn (betalt ferie) | 1% |
+| `null` | Ingen feriepenge | 0% |
 
 ## Implementation
 
-### 1. Database Migration
-- Opret `get_personal_daily_commission` funktion
-- Tilføj index på `sales(LOWER(agent_email), sale_datetime)`
+### 1. Udvid Employee Query i Home.tsx
 
-### 2. Opdater Hook
-**Fil:** `src/hooks/usePersonalWeeklyStats.ts`
+Tilføj `vacation_type` til den eksisterende employee query:
 
-Erstat de 3 parallelle queries med et enkelt kald til den nye funktion:
 ```typescript
-const { data, error } = await supabase
-  .rpc('get_personal_daily_commission', {
-    p_employee_id: employeeId,
-    p_start_date: format(fourteenDaysAgo, 'yyyy-MM-dd'),
-    p_end_date: format(now, 'yyyy-MM-dd')
-  });
+.select("id, first_name, last_name, job_title, team_id, employment_start_date, vacation_type")
 ```
 
-### 3. Proces Data i Hook
-Transformér RPC-resultat til `DailyCommissionEntry[]` format med dayName, isToday, isWeekend markers.
+### 2. Tilføj Props til HeroPerformanceCard
+
+Tilføj `vacationPay` prop:
+
+```typescript
+interface HeroPerformanceCardProps {
+  // ... eksisterende props
+  vacationPay?: number;  // NY
+}
+```
+
+### 3. Opdater HeroPerformanceCard UI
+
+Under provisionsbeløbet, tilføj en diskret linje:
+
+```tsx
+{/* Commission stat */}
+<div className="space-y-1">
+  <div className="flex items-center justify-center md:justify-start gap-2">
+    <TrendingUp className="w-5 h-5 text-primary" />
+    <span className="text-2xl md:text-3xl font-bold text-foreground tabular-nums">
+      {formatCommission(animatedCommission)} kr
+    </span>
+  </div>
+  <p className="text-sm text-muted-foreground">
+    provision denne periode
+  </p>
+  {/* NY: Feriepenge linje */}
+  {vacationPay > 0 && (
+    <p className="text-sm text-emerald-500/80">
+      + {formatCommission(vacationPay)} kr feriepenge
+    </p>
+  )}
+</div>
+```
+
+### 4. Beregn Feriepenge i Home.tsx
+
+```typescript
+// Vacation pay calculation (same logic as useSellerSalariesCached)
+const vacationPayRate = useMemo(() => {
+  if (!employee?.vacation_type) return 0;
+  if (employee.vacation_type === 'vacation_pay') return 0.125; // 12.5%
+  if (employee.vacation_type === 'vacation_bonus') return 0.01; // 1%
+  return 0;
+}, [employee?.vacation_type]);
+
+const vacationPay = (personalStats?.periodCommission || 0) * vacationPayRate;
+```
 
 ## Filer der ændres
 
-| Fil/Resource | Handling |
-|--------------|----------|
-| Database | **NY** function `get_personal_daily_commission` |
-| Database | **NY** index på `sales` |
-| `src/hooks/usePersonalWeeklyStats.ts` | Brug RPC i stedet for direkte queries |
+| Fil | Handling |
+|-----|----------|
+| `src/pages/Home.tsx` | Tilføj `vacation_type` til query + beregn feriepenge |
+| `src/components/home/HeroPerformanceCard.tsx` | Tilføj `vacationPay` prop og vis beløb |
 
 ## Resultat
 
-- Query eksekveres på ~100ms i stedet for timeout
-- Thomas (og alle andre brugere) vil se deres daglige chart korrekt
-- Samme sikkerhedsmodel som eksisterende recognition stats
-
+Sælgeren ser nu:
+- **Hovedprovision** (8.200 kr) i stor skrift
+- **Feriepenge** (+ 1.025 kr) i mindre grøn tekst under provisionen
+- Feriepenge vises kun hvis medarbejderen har en vacation_type og beløbet er > 0
