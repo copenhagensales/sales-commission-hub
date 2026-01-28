@@ -1,47 +1,93 @@
 
-# Plan: Optimal Logo Baggrund Farve
+# Plan: Fix ASE API Sync - Ugyldig URL Format
 
-## Mål
-Vælg en baggrund til klient-logoer der:
-- Passer med det mørke UI/UX design
-- Giver god kontrast til både lyse og mørke logoer
-- Ikke er for lys (skærer i øjnene) eller for mørk (sluger logoer)
+## Problem Identificeret
 
-## Analyse af Eksisterende Farver
-
-Projektets farve palette (fra `src/index.css`):
-- **Background**: `hsl(222 47% 9%)` - meget mørk blå
-- **Card**: `hsl(222 47% 12%)` - lidt lysere mørk blå  
-- **Secondary**: `hsl(222 30% 20%)` - mellem mørkeblå
-- **Muted**: `hsl(222 30% 25%)` - lysere mellemtone
-
-## Anbefaling
-
-Brug en **blød mellemgrå-blå** tone der er neutral nok til alle logoer:
-
-**Valg: `bg-[hsl(220,20%,25%)]`** eller Tailwind's `bg-zinc-700/80`
-
-Denne farve:
-- Er ikke for mørk som `slate-800`
-- Er ikke for lys som hvid
-- Har en neutral undertone der passer med UI'ets blå-grå palette
-- Giver god kontrast til både hvide (YouSee) og farvede (Eesy) logoer
-
-## Ændring
-
-**Fil:** `src/pages/dashboards/CphSalesDashboard.tsx`
-
-Udskift `bg-slate-800` med `bg-zinc-700/90`:
-
-```tsx
-// Fra
-<div className={`... bg-slate-800 ...`}>
-
-// Til  
-<div className={`... bg-zinc-700/90 ...`}>
+ASE integrationen fejler med:
+```
+TypeError: Url scheme 'web' not supported
 ```
 
-`bg-zinc-700/90` giver en blød, neutral grå-tone (~`hsl(240, 5%, 34%)`) med 90% opacity der:
-- Matcher det professionelle dark theme
-- Virker godt med både lyse og mørke logoer
-- Har en subtil gennemsigtighed der integrerer med baggrunden
+**Årsag**: `api_url` feltet i databasen indeholder:
+```
+Web: https://wshero01.herobase.com/
+```
+
+"Web: " prefixet er inkluderet i URL'en, så når EnreachAdapter konstruerer API URL'en, bliver den:
+```
+web: https://wshero01.herobase.com//api/simpleleads?...
+```
+
+`fetch()` prøver at bruge `web:` som URL scheme i stedet for `https:`.
+
+---
+
+## Løsning
+
+### 1. Tilføj URL Sanitering i EnreachAdapter
+
+**Fil:** `supabase/functions/integration-engine/adapters/enreach.ts`
+
+Tilføj robust URL parsing der håndterer common input-fejl:
+
+```typescript
+constructor(credentials: EnreachCredentials, ...) {
+  let providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
+  
+  // Sanitize URL: fjern common prefixes som "Web: ", "URL: ", etc.
+  providedUrl = providedUrl.replace(/^(Web|URL|API):\s*/i, '').trim();
+  
+  // Sikr at URL starter med https://
+  if (!providedUrl.startsWith('http://') && !providedUrl.startsWith('https://')) {
+    providedUrl = 'https://' + providedUrl;
+  }
+  
+  this.baseUrl = providedUrl.endsWith("/") ? providedUrl.slice(0, -1) : providedUrl;
+  // ... rest af koden
+}
+```
+
+### 2. (Valgfrit) Ret Data i Databasen
+
+Alternativt kan ASE integrationens `api_url` rettes manuelt i Settings siden til:
+```
+https://wshero01.herobase.com/
+```
+
+---
+
+## Teknisk Flow
+
+```text
+NUVÆRENDE (FEJLER):
+  api_url: "Web: https://wshero01.herobase.com/"
+      ↓
+  baseUrl: "Web: https://wshero01.herobase.com//api"
+      ↓
+  fetch("Web: https://...") → TypeError: Url scheme 'web' not supported
+
+EFTER FIX:
+  api_url: "Web: https://wshero01.herobase.com/"
+      ↓
+  sanitize: "https://wshero01.herobase.com/"
+      ↓
+  baseUrl: "https://wshero01.herobase.com/api"
+      ↓
+  fetch("https://...") → SUCCESS
+```
+
+---
+
+## Filer der ændres
+
+| Fil | Ændring |
+|-----|---------|
+| `supabase/functions/integration-engine/adapters/enreach.ts` | Tilføj URL sanitering i constructor |
+
+---
+
+## Resultat
+
+- ASE sync vil fungere korrekt uden at brugeren skal rette URL manuelt
+- Robust mod fremtidige input-fejl med forkerte URL-formater
+- Tilføjer logging så man kan se hvad der blev saniteret
