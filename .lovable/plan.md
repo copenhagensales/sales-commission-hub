@@ -1,130 +1,124 @@
 
 
-# Plan: Daglig Provisions-Bar Chart (seneste 10 arbejdsdage)
+# Plan: Fix Statement Timeout på Personal Weekly Stats
 
-## Oversigt
+## Problem Identificeret
 
-Erstat "Din uge" komponenten med et **interaktivt søjlediagram** der viser din provision per dag for de seneste 10 arbejdsdage. Dette giver sælgere visuel feedback på deres momentum og hjælper med mønstergenkendelse.
-
-## Salgspsykologiske Fordele
-
-| Princip | Effekt |
-|---------|--------|
-| **Momentum visualisering** | Sælgere motiveres af at SE deres mønster - ikke kun tal |
-| **Pattern recognition** | Hjernen identificerer naturligt "gode dage" og vil genskabe dem |
-| **Micro-wins** | Hver søjle er en synlig sejr der bygger selvtillid |
-| **Comparative context** | Gennemsnitslinje viser om man er "over eller under" |
-| **Loss aversion** | Lave søjler trigger "jeg vil ikke have flere af de dage" |
-
-## Design
-
-```text
-┌─────────────────────────────────────────────────┐
-│  📊 Dine seneste 10 dage     Snit: 1.485 kr/dag │
-│                                                 │
-│         ┌─┐                                     │
-│       ┌─┤ │      ┌─┐       ┌─┐                  │
-│       │ │ │  ────┤─│───────┤─│─── Gennemsnit    │
-│   ┌─┐ │ │ │  ┌─┐ │ │ ┌─┐ ┌─┤ │ ●                │
-│   │ │ │ │ │  │ │ │ │ │ │ │ │ │ │                │
-│   └─┴─┴─┴─┴──┴─┴─┴─┴─┴─┴─┴─┴─┴─┘                │
-│   Ma Ti On To Fr Ma Ti On To Fr                 │
-│                              ↑                  │
-│                           I dag                 │
-│                                                 │
-│   💪 Du har 4 dage over gennemsnittet!         │
-└─────────────────────────────────────────────────┘
+Thomas Wehage's daglige provisions-chart viser ingen data fordi **alle 3 parallelle queries timer out** med:
+```
+"canceling statement due to statement timeout" (HTTP 500)
 ```
 
-## Data-strategi: Brug Eksisterende Hook
+### Bekræftet Data
+Thomas HAR faktisk salg de seneste 14 dage:
+| Dato | Provision |
+|------|-----------|
+| 21. jan | 900 kr |
+| 20. jan | 1.575 kr |
+| 15. jan | 1.750 kr |
 
-I stedet for at hente fra `kpi_cached_values` (som ikke har daglige per-employee KPIs endnu), udvider vi **`usePersonalWeeklyStats`** hook'en til at returnere daglige breakdowns.
+Men query'erne når aldrig at returnere data pga. timeout.
 
-**Fordele:**
-- Genbruger eksisterende datahentning og agent-mapping logik
-- Ingen behov for nye KPI definitioner eller edge function ændringer
-- Allerede bevist at fungere korrekt
-- Returnerer data aggregeret per dag
+## Rod-årsag
 
-## Teknisk Implementation
+1. **RLS policies på `sales` tabellen** evalueres for hver række i joinet
+2. **JOIN mellem `sale_items` og `sales`** med filter på `agent_email` er langsom
+3. **Manglende index** på `sales.agent_email` og/eller `sales.sale_datetime`
+4. **Statement timeout** (typisk 30s) nås før query fuldfører
 
-### 1. Udvid `usePersonalWeeklyStats` Hook
+## Løsningsforslag
 
+### Option A: Database Function med SECURITY DEFINER (Anbefalet)
+
+Samme mønster som `get_weekly_recognition_stats` - en database function der:
+- Bypasser RLS (SECURITY DEFINER)
+- Accepterer employee_id som parameter
+- Returnerer daglige provision aggregeret
+- Er optimeret med direkte SQL
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_personal_daily_commission(
+  p_employee_id UUID,
+  p_start_date DATE,
+  p_end_date DATE
+)
+RETURNS TABLE (
+  sale_date DATE,
+  commission NUMERIC
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    DATE(s.sale_datetime) as sale_date,
+    COALESCE(SUM(si.mapped_commission), 0) as commission
+  FROM sale_items si
+  INNER JOIN sales s ON s.id = si.sale_id
+  INNER JOIN employee_agent_mapping eam ON eam.employee_id = p_employee_id
+  INNER JOIN agents a ON a.id = eam.agent_id
+  WHERE LOWER(s.agent_email) = LOWER(a.email)
+    AND DATE(s.sale_datetime) BETWEEN p_start_date AND p_end_date
+    AND (s.status IS NULL OR s.status != 'rejected')
+  GROUP BY DATE(s.sale_datetime)
+  ORDER BY sale_date;
+END;
+$$;
+```
+
+### Option B: Tilføj Database Index
+
+Forbedrer query performance uden at ændre RLS:
+```sql
+CREATE INDEX IF NOT EXISTS idx_sales_agent_email_datetime 
+ON sales (LOWER(agent_email), sale_datetime);
+```
+
+### Option C: Cache i kpi_cached_values
+
+Beregn daglige stats i `calculate-kpi-incremental` og gem dem - men dette kræver mere omfattende ændringer.
+
+## Anbefaling: Option A + B
+
+1. **Opret database function** `get_personal_daily_commission`
+2. **Tilføj index** for fremtidig performance
+3. **Opdater hook** til at kalde funktionen i stedet for direkte queries
+
+## Implementation
+
+### 1. Database Migration
+- Opret `get_personal_daily_commission` funktion
+- Tilføj index på `sales(LOWER(agent_email), sale_datetime)`
+
+### 2. Opdater Hook
 **Fil:** `src/hooks/usePersonalWeeklyStats.ts`
 
-Tilføj en ny property til returdata der inkluderer daglige stats for de seneste ~14 dage (for at få 10 arbejdsdage):
-
+Erstat de 3 parallelle queries med et enkelt kald til den nye funktion:
 ```typescript
-export interface DailyCommissionEntry {
-  date: string;           // "2026-01-28"
-  dayName: string;        // "Tir"
-  commission: number;     // 2350
-  isToday: boolean;       // true/false
-  isWeekend: boolean;     // true for lørdag/søndag
-}
-
-export interface PersonalWeeklyData {
-  currentWeek: PersonalWeekStats;
-  lastWeek: PersonalWeekStats;
-  dailyBreakdown: DailyCommissionEntry[];  // NY - seneste 14 dage
-}
+const { data, error } = await supabase
+  .rpc('get_personal_daily_commission', {
+    p_employee_id: employeeId,
+    p_start_date: format(fourteenDaysAgo, 'yyyy-MM-dd'),
+    p_end_date: format(now, 'yyyy-MM-dd')
+  });
 ```
 
-### 2. Ny Komponent: `DailyCommissionChart`
-
-**Fil:** `src/components/home/DailyCommissionChart.tsx`
-
-Recharts-baseret bar chart med:
-- 10 søjler for arbejdsdage (filtrerer weekender ud)
-- Grøn farve for dage over gennemsnit
-- Neutral farve for dage under gennemsnit
-- Accent-farve for "i dag"
-- Horisontal gennemsnitslinje
-- Motiverende tekst-feedback
-
-### 3. Opdater Home.tsx
-
-**Fil:** `src/pages/Home.tsx`
-
-Erstat `PersonalRecognitions` med `DailyCommissionChart`:
-
-```tsx
-// Fra
-<PersonalRecognitions
-  currentWeek={personalWeeklyStats?.currentWeek || { weekTotal: 0, bestDay: null }}
-  lastWeek={personalWeeklyStats?.lastWeek || { weekTotal: 0, bestDay: null }}
-/>
-
-// Til
-<DailyCommissionChart
-  dailyData={personalWeeklyStats?.dailyBreakdown || []}
-/>
-```
-
-## Motivations-Elementer
-
-Baseret på data vises dynamisk feedback:
-
-| Scenarie | Tekst |
-|----------|-------|
-| 3+ dage over snit i træk | "🔥 Du er på en streak!" |
-| Dagens søjle over snit | "💪 Stærk dag så langt!" |
-| Under snit men trending op | "📈 Fin fremgang!" |
-| Under snit | "💡 Tid til comeback!" |
+### 3. Proces Data i Hook
+Transformér RPC-resultat til `DailyCommissionEntry[]` format med dayName, isToday, isWeekend markers.
 
 ## Filer der ændres
 
-| Fil | Handling |
-|-----|----------|
-| `src/hooks/usePersonalWeeklyStats.ts` | Udvid med `dailyBreakdown` data |
-| `src/components/home/DailyCommissionChart.tsx` | **NY** - Bar chart komponent |
-| `src/pages/Home.tsx` | Erstat PersonalRecognitions med DailyCommissionChart |
+| Fil/Resource | Handling |
+|--------------|----------|
+| Database | **NY** function `get_personal_daily_commission` |
+| Database | **NY** index på `sales` |
+| `src/hooks/usePersonalWeeklyStats.ts` | Brug RPC i stedet for direkte queries |
 
 ## Resultat
 
-Sælgeren får:
-- **Visuel momentum-feedback** på deres seneste 10 arbejdsdage
-- **Kontekst** via gennemsnitslinje
-- **Motivation** via farver og dynamiske beskeder
-- **Mønstergenkendelse** - hvilke dage performer de bedst?
+- Query eksekveres på ~100ms i stedet for timeout
+- Thomas (og alle andre brugere) vil se deres daglige chart korrekt
+- Samme sikkerhedsmodel som eksisterende recognition stats
 
