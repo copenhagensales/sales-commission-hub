@@ -1,93 +1,130 @@
 
-# Plan: Fix ASE API Sync - Ugyldig URL Format
 
-## Problem Identificeret
+# Plan: Daglig Provisions-Bar Chart (seneste 10 arbejdsdage)
 
-ASE integrationen fejler med:
+## Oversigt
+
+Erstat "Din uge" komponenten med et **interaktivt søjlediagram** der viser din provision per dag for de seneste 10 arbejdsdage. Dette giver sælgere visuel feedback på deres momentum og hjælper med mønstergenkendelse.
+
+## Salgspsykologiske Fordele
+
+| Princip | Effekt |
+|---------|--------|
+| **Momentum visualisering** | Sælgere motiveres af at SE deres mønster - ikke kun tal |
+| **Pattern recognition** | Hjernen identificerer naturligt "gode dage" og vil genskabe dem |
+| **Micro-wins** | Hver søjle er en synlig sejr der bygger selvtillid |
+| **Comparative context** | Gennemsnitslinje viser om man er "over eller under" |
+| **Loss aversion** | Lave søjler trigger "jeg vil ikke have flere af de dage" |
+
+## Design
+
+```text
+┌─────────────────────────────────────────────────┐
+│  📊 Dine seneste 10 dage     Snit: 1.485 kr/dag │
+│                                                 │
+│         ┌─┐                                     │
+│       ┌─┤ │      ┌─┐       ┌─┐                  │
+│       │ │ │  ────┤─│───────┤─│─── Gennemsnit    │
+│   ┌─┐ │ │ │  ┌─┐ │ │ ┌─┐ ┌─┤ │ ●                │
+│   │ │ │ │ │  │ │ │ │ │ │ │ │ │ │                │
+│   └─┴─┴─┴─┴──┴─┴─┴─┴─┴─┴─┴─┴─┴─┘                │
+│   Ma Ti On To Fr Ma Ti On To Fr                 │
+│                              ↑                  │
+│                           I dag                 │
+│                                                 │
+│   💪 Du har 4 dage over gennemsnittet!         │
+└─────────────────────────────────────────────────┘
 ```
-TypeError: Url scheme 'web' not supported
-```
 
-**Årsag**: `api_url` feltet i databasen indeholder:
-```
-Web: https://wshero01.herobase.com/
-```
+## Data-strategi: Brug Eksisterende Hook
 
-"Web: " prefixet er inkluderet i URL'en, så når EnreachAdapter konstruerer API URL'en, bliver den:
-```
-web: https://wshero01.herobase.com//api/simpleleads?...
-```
+I stedet for at hente fra `kpi_cached_values` (som ikke har daglige per-employee KPIs endnu), udvider vi **`usePersonalWeeklyStats`** hook'en til at returnere daglige breakdowns.
 
-`fetch()` prøver at bruge `web:` som URL scheme i stedet for `https:`.
+**Fordele:**
+- Genbruger eksisterende datahentning og agent-mapping logik
+- Ingen behov for nye KPI definitioner eller edge function ændringer
+- Allerede bevist at fungere korrekt
+- Returnerer data aggregeret per dag
 
----
+## Teknisk Implementation
 
-## Løsning
+### 1. Udvid `usePersonalWeeklyStats` Hook
 
-### 1. Tilføj URL Sanitering i EnreachAdapter
+**Fil:** `src/hooks/usePersonalWeeklyStats.ts`
 
-**Fil:** `supabase/functions/integration-engine/adapters/enreach.ts`
-
-Tilføj robust URL parsing der håndterer common input-fejl:
+Tilføj en ny property til returdata der inkluderer daglige stats for de seneste ~14 dage (for at få 10 arbejdsdage):
 
 ```typescript
-constructor(credentials: EnreachCredentials, ...) {
-  let providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
-  
-  // Sanitize URL: fjern common prefixes som "Web: ", "URL: ", etc.
-  providedUrl = providedUrl.replace(/^(Web|URL|API):\s*/i, '').trim();
-  
-  // Sikr at URL starter med https://
-  if (!providedUrl.startsWith('http://') && !providedUrl.startsWith('https://')) {
-    providedUrl = 'https://' + providedUrl;
-  }
-  
-  this.baseUrl = providedUrl.endsWith("/") ? providedUrl.slice(0, -1) : providedUrl;
-  // ... rest af koden
+export interface DailyCommissionEntry {
+  date: string;           // "2026-01-28"
+  dayName: string;        // "Tir"
+  commission: number;     // 2350
+  isToday: boolean;       // true/false
+  isWeekend: boolean;     // true for lørdag/søndag
+}
+
+export interface PersonalWeeklyData {
+  currentWeek: PersonalWeekStats;
+  lastWeek: PersonalWeekStats;
+  dailyBreakdown: DailyCommissionEntry[];  // NY - seneste 14 dage
 }
 ```
 
-### 2. (Valgfrit) Ret Data i Databasen
+### 2. Ny Komponent: `DailyCommissionChart`
 
-Alternativt kan ASE integrationens `api_url` rettes manuelt i Settings siden til:
+**Fil:** `src/components/home/DailyCommissionChart.tsx`
+
+Recharts-baseret bar chart med:
+- 10 søjler for arbejdsdage (filtrerer weekender ud)
+- Grøn farve for dage over gennemsnit
+- Neutral farve for dage under gennemsnit
+- Accent-farve for "i dag"
+- Horisontal gennemsnitslinje
+- Motiverende tekst-feedback
+
+### 3. Opdater Home.tsx
+
+**Fil:** `src/pages/Home.tsx`
+
+Erstat `PersonalRecognitions` med `DailyCommissionChart`:
+
+```tsx
+// Fra
+<PersonalRecognitions
+  currentWeek={personalWeeklyStats?.currentWeek || { weekTotal: 0, bestDay: null }}
+  lastWeek={personalWeeklyStats?.lastWeek || { weekTotal: 0, bestDay: null }}
+/>
+
+// Til
+<DailyCommissionChart
+  dailyData={personalWeeklyStats?.dailyBreakdown || []}
+/>
 ```
-https://wshero01.herobase.com/
-```
 
----
+## Motivations-Elementer
 
-## Teknisk Flow
+Baseret på data vises dynamisk feedback:
 
-```text
-NUVÆRENDE (FEJLER):
-  api_url: "Web: https://wshero01.herobase.com/"
-      ↓
-  baseUrl: "Web: https://wshero01.herobase.com//api"
-      ↓
-  fetch("Web: https://...") → TypeError: Url scheme 'web' not supported
-
-EFTER FIX:
-  api_url: "Web: https://wshero01.herobase.com/"
-      ↓
-  sanitize: "https://wshero01.herobase.com/"
-      ↓
-  baseUrl: "https://wshero01.herobase.com/api"
-      ↓
-  fetch("https://...") → SUCCESS
-```
-
----
+| Scenarie | Tekst |
+|----------|-------|
+| 3+ dage over snit i træk | "🔥 Du er på en streak!" |
+| Dagens søjle over snit | "💪 Stærk dag så langt!" |
+| Under snit men trending op | "📈 Fin fremgang!" |
+| Under snit | "💡 Tid til comeback!" |
 
 ## Filer der ændres
 
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/integration-engine/adapters/enreach.ts` | Tilføj URL sanitering i constructor |
-
----
+| Fil | Handling |
+|-----|----------|
+| `src/hooks/usePersonalWeeklyStats.ts` | Udvid med `dailyBreakdown` data |
+| `src/components/home/DailyCommissionChart.tsx` | **NY** - Bar chart komponent |
+| `src/pages/Home.tsx` | Erstat PersonalRecognitions med DailyCommissionChart |
 
 ## Resultat
 
-- ASE sync vil fungere korrekt uden at brugeren skal rette URL manuelt
-- Robust mod fremtidige input-fejl med forkerte URL-formater
-- Tilføjer logging så man kan se hvad der blev saniteret
+Sælgeren får:
+- **Visuel momentum-feedback** på deres seneste 10 arbejdsdage
+- **Kontekst** via gennemsnitslinje
+- **Motivation** via farver og dynamiske beskeder
+- **Mønstergenkendelse** - hvilke dage performer de bedst?
+
