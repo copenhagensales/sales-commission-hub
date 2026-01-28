@@ -249,6 +249,30 @@ export default function CphSalesDashboard() {
     staleTime: 30000,
   });
 
+  // Fetch fieldmarketing sales for today (Eesy FM, YouSee FM)
+  const { data: fmTodaySales = [] } = useQuery({
+    queryKey: ["cph-dashboard-fm-sales", todayStr],
+    queryFn: async () => {
+      const startOfDay = `${todayStr}T00:00:00`;
+      const endOfDay = `${todayStr}T23:59:59`;
+      
+      const { data, error } = await supabase
+        .from("fieldmarketing_sales")
+        .select(`
+          id, product_name, registered_at, seller_id,
+          client:clients!client_id(id, name, logo_url),
+          seller:employee_master_data!seller_id(first_name, last_name)
+        `)
+        .gte("registered_at", startOfDay)
+        .lte("registered_at", endOfDay);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+  });
+
   const todaySales = todaySalesData?.sales || [];
   const clientLogos = todaySalesData?.clientLogos || {};
 
@@ -615,6 +639,48 @@ export default function CphSalesDashboard() {
         }
       });
 
+      // ============ FIELDMARKETING SALES INTEGRATION ============
+      // Fetch FM sales for the month and add to team totals
+      const { data: fmSalesData } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, seller_id, client_id, registered_at")
+        .gte("registered_at", `${monthStart}T00:00:00`)
+        .lte("registered_at", `${todayStr}T23:59:59`);
+
+      // Build seller_id -> team_id map (seller_id is the employee_id)
+      (fmSalesData || []).forEach((fmSale: any) => {
+        const teamId = employeeToTeam[fmSale.seller_id];
+        if (!teamId || !teamSales[teamId]) return;
+        
+        const saleDate = fmSale.registered_at?.split("T")[0];
+        if (!saleDate) return;
+        
+        // Month (always add)
+        teamSales[teamId].month += 1;
+        
+        // Find client name for this FM sale via client_id
+        const fmClientInfo = teamToClients[teamId]?.find(c => c.clientId === fmSale.client_id);
+        if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
+          teamClientSales[teamId][fmClientInfo.clientName].month += 1;
+        }
+        
+        // Week (if >= weekStart)
+        if (saleDate >= weekStart) {
+          teamSales[teamId].week += 1;
+          if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
+            teamClientSales[teamId][fmClientInfo.clientName].week += 1;
+          }
+        }
+        
+        // Day (if == today)
+        if (saleDate === todayStr) {
+          teamSales[teamId].day += 1;
+          if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
+            teamClientSales[teamId][fmClientInfo.clientName].day += 1;
+          }
+        }
+      });
+
       // Helper function to count work days (excluding weekends) within a period overlap
       const countWorkDaysInOverlap = (
         absenceStart: string, 
@@ -799,9 +865,11 @@ export default function CphSalesDashboard() {
     }, 0);
   };
 
-  // Calculate sellers on board (unique sellers with at least 1 sale)
+  // Calculate sellers on board (unique sellers with at least 1 sale - including FM sellers)
   const calculateSellersOnBoard = (sales: typeof todaySales) => {
     const sellersWithSales = new Set<string>();
+    
+    // Telesales sellers
     for (const sale of sales) {
       const saleItems = (sale as any).sale_items || [];
       const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
@@ -809,6 +877,16 @@ export default function CphSalesDashboard() {
         sellersWithSales.add(sale.agent_name.toLowerCase());
       }
     }
+    
+    // FM sellers
+    for (const fmSale of fmTodaySales) {
+      const seller = fmSale.seller as any;
+      if (seller?.first_name && seller?.last_name) {
+        const sellerName = `${seller.first_name} ${seller.last_name}`.toLowerCase();
+        sellersWithSales.add(sellerName);
+      }
+    }
+    
     return sellersWithSales.size;
   };
 
@@ -886,14 +964,26 @@ export default function CphSalesDashboard() {
     return result;
   };
 
-  // Convert regular sales by client to include logo
+  // Convert regular sales by client to include logo (merged with FM sales)
   const getSalesByClientWithLogos = (): Record<string, { count: number; logoUrl: string | null }> => {
     const byClient = calculateSalesByClient(knownClientSales);
+    
+    // Add FM sales to client counts
+    for (const fmSale of fmTodaySales) {
+      const clientName = (fmSale.client as any)?.name;
+      if (clientName) {
+        byClient[clientName] = (byClient[clientName] || 0) + 1;
+      }
+    }
+    
+    // Convert to format with logos
     const result: Record<string, { count: number; logoUrl: string | null }> = {};
     for (const [client, count] of Object.entries(byClient)) {
+      // Check for FM client logo if not in regular clientLogos
+      const fmClientLogo = fmTodaySales.find(s => (s.client as any)?.name === client)?.client as any;
       result[client] = { 
         count, 
-        logoUrl: clientLogos[client] || null 
+        logoUrl: clientLogos[client] || fmClientLogo?.logo_url || null 
       };
     }
     return result;
@@ -901,7 +991,8 @@ export default function CphSalesDashboard() {
 
   // Use TV data if in TV mode, otherwise use regular queries
   const displaySales = tvMode && tvData ? filterTvSales(tvData.sales.recent) : calculateRecentSalesWithCommission(knownClientSales);
-  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales);
+  // Include FM sales in total count
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales) + fmTodaySales.length;
   const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
   const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
   const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
