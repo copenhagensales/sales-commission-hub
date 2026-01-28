@@ -2141,6 +2141,7 @@ export type Database = {
           event_time: string | null
           id: string
           location: string | null
+          show_popup: boolean
           title: string
           updated_at: string
         }
@@ -2152,6 +2153,7 @@ export type Database = {
           event_time?: string | null
           id?: string
           location?: string | null
+          show_popup?: boolean
           title: string
           updated_at?: string
         }
@@ -2163,6 +2165,7 @@ export type Database = {
           event_time?: string | null
           id?: string
           location?: string | null
+          show_popup?: boolean
           title?: string
           updated_at?: string
         }
@@ -4457,6 +4460,78 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "company_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_invitation_views: {
+        Row: {
+          employee_id: string
+          event_id: string
+          id: string
+          seen_at: string
+        }
+        Insert: {
+          employee_id: string
+          event_id: string
+          id?: string
+          seen_at?: string
+        }
+        Update: {
+          employee_id?: string
+          event_id?: string
+          id?: string
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_invitation_views_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_invitation_views_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "company_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_team_invitations: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_team_invitations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "company_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_team_invitations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
