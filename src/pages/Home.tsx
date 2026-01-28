@@ -22,7 +22,13 @@ import {
   ChevronDown,
   ThumbsUp,
   ThumbsDown,
+  Info,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { EventDetailDialog } from "@/components/home/EventDetailDialog";
+import { EventInvitationPopup } from "@/components/home/EventInvitationPopup";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -50,8 +56,17 @@ const Home = () => {
   const { isPreviewMode, previewEmployee } = useRolePreview();
   
   const [addEventOpen, setAddEventOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
+  const [newEvent, setNewEvent] = useState({ 
+    title: "", 
+    event_date: "", 
+    event_time: "", 
+    location: "", 
+    description: "",
+    show_popup: false,
+    invited_teams: [] as string[]
+  });
   const [celebrationsOpen, setCelebrationsOpen] = useState(true);
+  const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
 
   const handleLogout = async () => {
     queryClient.clear();
@@ -233,6 +248,19 @@ const Home = () => {
   const todayCelebrations = celebrations.filter(c => c.isToday);
   const upcomingCelebrations = celebrations.filter(c => !c.isToday);
 
+  // Fetch teams for event creation
+  const { data: teams = [] } = useQuery({
+    queryKey: ["teams-list"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("teams")
+        .select("id, name")
+        .order("name");
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
   // Fetch company events
   const { data: companyEvents = [] } = useQuery({
     queryKey: ["home-company-events"],
@@ -307,21 +335,37 @@ const Home = () => {
   // Add event mutation
   const addEventMutation = useMutation({
     mutationFn: async (event: typeof newEvent) => {
-      const { error } = await supabase
+      // 1. Insert event
+      const { data: createdEvent, error } = await supabase
         .from("company_events")
         .insert({
           title: event.title,
           event_date: event.event_date,
           event_time: event.event_time || null,
           location: event.location || null,
+          description: event.description || null,
+          show_popup: event.show_popup,
           created_by: user?.id
-        });
+        })
+        .select()
+        .single();
       if (error) throw error;
+      
+      // 2. Insert team invitations if any
+      if (event.invited_teams.length > 0 && createdEvent) {
+        const { error: invError } = await supabase
+          .from("event_team_invitations")
+          .insert(event.invited_teams.map(teamId => ({
+            event_id: createdEvent.id,
+            team_id: teamId
+          })));
+        if (invError) throw invError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-company-events"] });
       setAddEventOpen(false);
-      setNewEvent({ title: "", event_date: "", event_time: "", location: "" });
+      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, invited_teams: [] });
       toast.success("Begivenhed tilføjet");
     },
     onError: () => {
@@ -373,8 +417,55 @@ const Home = () => {
     return format(date, "d. MMM", { locale: da });
   };
 
+  // Get selected event for detail dialog
+  const selectedEvent = companyEvents.find(e => e.id === selectedEventForDetail);
+  const selectedEventAttendees = selectedEventForDetail 
+    ? eventAttendees.filter(a => a.event_id === selectedEventForDetail)
+    : [];
+  const selectedEventMyStatus = selectedEventForDetail 
+    ? getMyAttendance(selectedEventForDetail) 
+    : null;
+
   return (
     <MainLayout>
+      {/* Event Invitation Popup - Shows on first login for invited employees */}
+      <EventInvitationPopup 
+        employeeId={employee?.id} 
+        teamId={employee?.team_id} 
+      />
+      
+      {/* Event Detail Dialog */}
+      <EventDetailDialog
+        event={selectedEvent ? {
+          id: selectedEvent.id,
+          title: selectedEvent.title,
+          event_date: selectedEvent.event_date,
+          event_time: selectedEvent.event_time,
+          location: selectedEvent.location,
+          description: selectedEvent.description,
+        } : null}
+        open={!!selectedEventForDetail}
+        onOpenChange={(open) => !open && setSelectedEventForDetail(null)}
+        attendees={selectedEventAttendees.map(a => ({
+          id: a.id,
+          event_id: a.event_id,
+          employee_id: a.employee_id,
+          status: a.status,
+          employee: (a.employee as any) ? {
+            id: (a.employee as any).id,
+            first_name: (a.employee as any).first_name,
+            last_name: (a.employee as any).last_name,
+          } : null,
+        }))}
+        myStatus={selectedEventMyStatus}
+        onToggleAttendance={(status) => {
+          if (selectedEventForDetail) {
+            toggleAttendanceMutation.mutate({ eventId: selectedEventForDetail, status });
+          }
+        }}
+        isLoading={toggleAttendanceMutation.isPending}
+      />
+
       {/* Mobile Sticky Performance Bar */}
       <StickyPerformanceBar
         progressPercent={progressPercent}
@@ -489,7 +580,7 @@ const Home = () => {
                     <DialogHeader>
                       <DialogTitle>Tilføj begivenhed</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
+                    <div className="space-y-4 pt-4 max-h-[70vh] overflow-y-auto">
                       <div className="space-y-2">
                         <Label htmlFor="title">Titel *</Label>
                         <Input 
@@ -500,22 +591,34 @@ const Home = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="date">Dato *</Label>
-                        <Input 
-                          id="date"
-                          type="date"
-                          value={newEvent.event_date}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
+                        <Label htmlFor="description">Beskrivelse</Label>
+                        <Textarea 
+                          id="description"
+                          value={newEvent.description}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Beskriv begivenheden..."
+                          rows={3}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="time">Tidspunkt</Label>
-                        <Input 
-                          id="time"
-                          type="time"
-                          value={newEvent.event_time}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="date">Dato *</Label>
+                          <Input 
+                            id="date"
+                            type="date"
+                            value={newEvent.event_date}
+                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="time">Tidspunkt</Label>
+                          <Input 
+                            id="time"
+                            type="time"
+                            value={newEvent.event_time}
+                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="location">Sted</Label>
@@ -526,6 +629,44 @@ const Home = () => {
                           placeholder="Fx Kontoret"
                         />
                       </div>
+                      
+                      {/* Team selection */}
+                      {teams.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Inviter teams</Label>
+                          <div className="flex flex-wrap gap-3">
+                            {teams.map((team) => (
+                              <label key={team.id} className="flex items-center gap-2 cursor-pointer">
+                                <Checkbox
+                                  checked={newEvent.invited_teams.includes(team.id)}
+                                  onCheckedChange={(checked) => {
+                                    setNewEvent(prev => ({
+                                      ...prev,
+                                      invited_teams: checked 
+                                        ? [...prev.invited_teams, team.id]
+                                        : prev.invited_teams.filter(id => id !== team.id)
+                                    }));
+                                  }}
+                                />
+                                <span className="text-sm">{team.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Show popup toggle */}
+                      <div className="flex items-center justify-between py-2">
+                        <Label htmlFor="show-popup" className="cursor-pointer">
+                          Vis popup-invitation ved login
+                        </Label>
+                        <Switch
+                          id="show-popup"
+                          checked={newEvent.show_popup}
+                          onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, show_popup: checked }))}
+                        />
+                      </div>
+                      
                       <Button 
                         className="w-full" 
                         onClick={() => addEventMutation.mutate(newEvent)}
@@ -610,6 +751,15 @@ const Home = () => {
                             disabled={toggleAttendanceMutation.isPending}
                           >
                             <ThumbsDown className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setSelectedEventForDetail(event.id)}
+                            title="Læs mere"
+                          >
+                            <Info className="w-3.5 h-3.5 text-muted-foreground" />
                           </Button>
                           <Button
                             variant="ghost"
