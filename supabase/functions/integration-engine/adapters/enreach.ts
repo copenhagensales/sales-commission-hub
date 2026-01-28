@@ -36,7 +36,21 @@ export class EnreachAdapter implements DialerAdapter {
   private callsOrgCodes: string[] | null;
 
   constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null, callsOrgCodes?: string[] | null) {
-    const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
+    let providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
+    
+    // Sanitize URL: remove common prefixes like "Web: ", "URL: ", "API: " that users may accidentally include
+    const originalUrl = providedUrl;
+    providedUrl = providedUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
+    
+    // Ensure URL starts with https://
+    if (!providedUrl.startsWith('http://') && !providedUrl.startsWith('https://')) {
+      providedUrl = 'https://' + providedUrl;
+    }
+    
+    if (originalUrl !== providedUrl) {
+      console.log(`[EnreachAdapter] URL sanitized: "${originalUrl}" -> "${providedUrl}"`);
+    }
+    
     this.baseUrl = providedUrl.endsWith("/") ? providedUrl.slice(0, -1) : providedUrl;
     if (!this.baseUrl.endsWith("/api")) {
       this.baseUrl = this.baseUrl + "/api";
