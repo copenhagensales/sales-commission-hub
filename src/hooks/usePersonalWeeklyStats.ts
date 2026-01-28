@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
+import { startOfWeek, endOfWeek, subWeeks, subDays, format, isWeekend, isToday } from "date-fns";
+import { da } from "date-fns/locale";
 
 export interface PersonalWeekStats {
   weekTotal: number;
@@ -10,9 +11,18 @@ export interface PersonalWeekStats {
   } | null;
 }
 
+export interface DailyCommissionEntry {
+  date: string;           // "2026-01-28"
+  dayName: string;        // "Tir"
+  commission: number;     // 2350
+  isToday: boolean;
+  isWeekend: boolean;
+}
+
 export interface PersonalWeeklyData {
   currentWeek: PersonalWeekStats;
   lastWeek: PersonalWeekStats;
+  dailyBreakdown: DailyCommissionEntry[];
 }
 
 async function fetchPersonalWeekStats(
@@ -89,6 +99,7 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
         return {
           currentWeek: { weekTotal: 0, bestDay: null },
           lastWeek: { weekTotal: 0, bestDay: null },
+          dailyBreakdown: [],
         };
       }
 
@@ -102,6 +113,7 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
         return {
           currentWeek: { weekTotal: 0, bestDay: null },
           lastWeek: { weekTotal: 0, bestDay: null },
+          dailyBreakdown: [],
         };
       }
 
@@ -117,6 +129,7 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
         return {
           currentWeek: { weekTotal: 0, bestDay: null },
           lastWeek: { weekTotal: 0, bestDay: null },
+          dailyBreakdown: [],
         };
       }
 
@@ -128,6 +141,7 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
         return {
           currentWeek: { weekTotal: 0, bestDay: null },
           lastWeek: { weekTotal: 0, bestDay: null },
+          dailyBreakdown: [],
         };
       }
 
@@ -138,16 +152,87 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
       const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
       const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
 
-      // Step 4: Fetch stats for both weeks in parallel
-      const [currentWeek, lastWeek] = await Promise.all([
+      // Step 4: Calculate 14-day range for daily breakdown (to get 10 workdays)
+      const fourteenDaysAgo = subDays(now, 13); // 14 days including today
+
+      // Step 5: Fetch stats for both weeks and daily breakdown in parallel
+      const [currentWeek, lastWeek, dailyBreakdown] = await Promise.all([
         fetchPersonalWeekStats(agentEmails, currentWeekStart, currentWeekEnd),
         fetchPersonalWeekStats(agentEmails, lastWeekStart, lastWeekEnd),
+        fetchDailyBreakdown(agentEmails, fourteenDaysAgo, now),
       ]);
 
-      return { currentWeek, lastWeek };
+      return { currentWeek, lastWeek, dailyBreakdown };
     },
     enabled: !!employeeId,
     staleTime: 60000,
     refetchInterval: 120000,
   });
+}
+
+async function fetchDailyBreakdown(
+  agentEmails: string[],
+  startDate: Date,
+  endDate: Date
+): Promise<DailyCommissionEntry[]> {
+  if (agentEmails.length === 0) {
+    return [];
+  }
+
+  const startStr = format(startDate, "yyyy-MM-dd'T'00:00:00");
+  const endStr = format(endDate, "yyyy-MM-dd'T'23:59:59");
+
+  const { data: saleItems, error } = await supabase
+    .from("sale_items")
+    .select(`
+      id,
+      mapped_commission,
+      sales!inner(
+        id,
+        sale_datetime,
+        agent_email,
+        status
+      )
+    `)
+    .gte("sales.sale_datetime", startStr)
+    .lte("sales.sale_datetime", endStr)
+    .in("sales.agent_email", agentEmails)
+    .neq("sales.status", "rejected");
+
+  // Build daily totals map
+  const dailyTotals: Record<string, number> = {};
+
+  if (saleItems && !error) {
+    for (const item of saleItems) {
+      const sale = item.sales as any;
+      if (!sale) continue;
+
+      const commission = item.mapped_commission || 0;
+      const saleDate = sale.sale_datetime?.split("T")[0] || "";
+
+      if (saleDate) {
+        dailyTotals[saleDate] = (dailyTotals[saleDate] || 0) + commission;
+      }
+    }
+  }
+
+  // Generate entries for each day in the range
+  const entries: DailyCommissionEntry[] = [];
+  const today = new Date();
+  
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const dateStr = format(d, "yyyy-MM-dd");
+    const dayDate = new Date(d);
+    
+    entries.push({
+      date: dateStr,
+      dayName: format(dayDate, "EEE", { locale: da }).charAt(0).toUpperCase() + 
+               format(dayDate, "EEE", { locale: da }).slice(1, 3),
+      commission: dailyTotals[dateStr] || 0,
+      isToday: isToday(dayDate),
+      isWeekend: isWeekend(dayDate),
+    });
+  }
+
+  return entries;
 }
