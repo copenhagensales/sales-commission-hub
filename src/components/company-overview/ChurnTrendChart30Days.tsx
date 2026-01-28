@@ -10,10 +10,13 @@ const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
   const lower = name.toLowerCase().trim();
   if (lower.includes("stab")) return "Stab";
+  if (lower.includes("united")) return "United";
+  if (lower.includes("eesy")) return "Eesy TM";
   return name;
 };
 
-const EXCLUDED_TEAMS = ["Stab", "Ukendt"];
+// Only include United and Eesy TM teams
+const INCLUDED_TEAMS = ["United", "Eesy TM"];
 
 export function ChurnTrendChart30Days() {
   const { data: chartData, isLoading } = useQuery({
@@ -65,7 +68,7 @@ export function ChurnTrendChart30Days() {
         // Find employees who STARTED in this specific month (from historical data - they've left)
         const historicalStartedInMonth = (historicalData || []).filter(emp => {
           const teamName = normalizeTeamName(emp.team_name);
-          if (EXCLUDED_TEAMS.includes(teamName)) return false;
+          if (!INCLUDED_TEAMS.includes(teamName)) return false;
           if (!emp.start_date) return false;
           
           // Data quality validation
@@ -80,7 +83,7 @@ export function ChurnTrendChart30Days() {
         // Find employees from employee_master_data who STARTED in this specific month
         const masterDataStartedInMonth = (currentEmployees || []).filter(emp => {
           const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
-          if (EXCLUDED_TEAMS.includes(teamName)) return false;
+          if (!INCLUDED_TEAMS.includes(teamName)) return false;
           if (!emp.employment_start_date) return false;
           const startDate = parseISO(emp.employment_start_date);
           
@@ -147,9 +150,9 @@ export function ChurnTrendChart30Days() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>30-dages Churn Udvikling (Kohorte)</CardTitle>
+        <CardTitle>30-dages Churn Udvikling – United & Eesy TM</CardTitle>
         <CardDescription>
-          Andel af nye medarbejdere i hver måned der stoppede inden for de første 30 dage
+          Andel af nye medarbejdere (United/Eesy TM) der stoppede inden for 30 dage
         </CardDescription>
       </CardHeader>
       <CardContent>
