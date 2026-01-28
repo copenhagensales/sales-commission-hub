@@ -8,8 +8,7 @@ import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureC
 import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
 import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
 import { ChurnTrendChart } from "@/components/company-overview/ChurnTrendChart";
-import { ChurnTrendChart30Days } from "@/components/company-overview/ChurnTrendChart30Days";
-import { ChurnTrendChart60DaysFiltered } from "@/components/company-overview/ChurnTrendChart60DaysFiltered";
+import { ChurnTrendChartCombined } from "@/components/company-overview/ChurnTrendChartCombined";
 import { ChurnCalculator } from "@/components/company-overview/ChurnCalculator";
 
 // Normalize team names to handle variations
@@ -401,8 +400,7 @@ export default function CompanyOverview() {
           <NewHireChurnKpi />
           <HistoricalTenureStats />
           <ChurnTrendChart />
-          <ChurnTrendChart30Days />
-          <ChurnTrendChart60DaysFiltered />
+          <ChurnTrendChartCombined />
         </div>
       </div>
     </MainLayout>
