@@ -9076,6 +9076,17 @@ export type Database = {
           status: string
         }[]
       }
+      get_personal_daily_commission: {
+        Args: {
+          p_employee_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          commission: number
+          sale_date: string
+        }[]
+      }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
