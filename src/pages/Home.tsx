@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { 
   Cake, 
@@ -18,6 +20,8 @@ import {
   Plus,
   Trash2,
   ChevronDown,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -244,6 +248,61 @@ const Home = () => {
     },
     staleTime: 60000,
   });
+
+  // Fetch event attendees
+  const { data: eventAttendees = [] } = useQuery({
+    queryKey: ["event-attendees", companyEvents.map(e => e.id)],
+    queryFn: async () => {
+      const eventIds = companyEvents.map(e => e.id);
+      if (eventIds.length === 0) return [];
+      const { data } = await supabase
+        .from("event_attendees")
+        .select(`
+          *,
+          employee:employee_id(id, first_name, last_name)
+        `)
+        .in("event_id", eventIds);
+      return data || [];
+    },
+    enabled: companyEvents.length > 0,
+    staleTime: 30000,
+  });
+
+  // Toggle attendance mutation
+  const toggleAttendanceMutation = useMutation({
+    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'not_attending' }) => {
+      if (!employee?.id) throw new Error("Ikke logget ind");
+      
+      const { error } = await supabase
+        .from("event_attendees")
+        .upsert({
+          event_id: eventId,
+          employee_id: employee.id,
+          status: status,
+        }, { onConflict: 'event_id,employee_id' });
+        
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-attendees"] });
+      toast.success("Din deltagelse er opdateret");
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere deltagelse");
+    }
+  });
+
+  // Helper to get attendees for a specific event
+  const getEventAttendees = (eventId: string) => {
+    return eventAttendees.filter(a => a.event_id === eventId && a.status === 'attending');
+  };
+
+  // Helper to get current user's attendance status
+  const getMyAttendance = (eventId: string): 'attending' | 'not_attending' | null => {
+    if (!employee?.id) return null;
+    const myAttendance = eventAttendees.find(a => a.event_id === eventId && a.employee_id === employee.id);
+    return myAttendance?.status as 'attending' | 'not_attending' | null;
+  };
 
   // Add event mutation
   const addEventMutation = useMutation({
@@ -482,34 +541,88 @@ const Home = () => {
                 {companyEvents.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-3">Ingen kommende begivenheder</p>
                 ) : (
-                  companyEvents.slice(0, 3).map((event) => (
-                    <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 group">
-                      <div className="text-center min-w-[40px]">
-                        <div className="text-xl font-bold text-primary">
-                          {format(parseISO(event.event_date), "d")}
+                  companyEvents.slice(0, 3).map((event) => {
+                    const attendees = getEventAttendees(event.id);
+                    const myStatus = getMyAttendance(event.id);
+                    
+                    return (
+                      <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 group">
+                        <div className="text-center min-w-[40px]">
+                          <div className="text-xl font-bold text-primary">
+                            {format(parseISO(event.event_date), "d")}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground uppercase">
+                            {format(parseISO(event.event_date), "MMM", { locale: da })}
+                          </div>
                         </div>
-                        <div className="text-[10px] text-muted-foreground uppercase">
-                          {format(parseISO(event.event_date), "MMM", { locale: da })}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{event.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground truncate">
+                              {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
+                              {event.event_time && event.location && " - "}
+                              {event.location}
+                            </p>
+                            {attendees.length > 0 && (
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <Badge variant="outline" className="cursor-pointer gap-1 text-xs px-1.5 py-0">
+                                    <Users className="w-3 h-3" />
+                                    {attendees.length}
+                                  </Badge>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-56 p-3">
+                                  <p className="font-medium text-sm mb-2">Deltagere</p>
+                                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {attendees.map((a) => (
+                                      <div key={a.id} className="flex items-center gap-2 text-sm">
+                                        <Avatar className="h-5 w-5">
+                                          <AvatarFallback className="text-[10px]">
+                                            {(a.employee as any)?.first_name?.[0]}{(a.employee as any)?.last_name?.[0]}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <span className="truncate">
+                                          {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant={myStatus === 'attending' ? "default" : "ghost"}
+                            size="sm"
+                            className={`h-7 w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
+                            onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
+                            disabled={toggleAttendanceMutation.isPending}
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant={myStatus === 'not_attending' ? "default" : "ghost"}
+                            size="sm"
+                            className={`h-7 w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
+                            onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
+                            disabled={toggleAttendanceMutation.isPending}
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => deleteEventMutation.mutate(event.id)}
+                          >
+                            <Trash2 className="w-3 h-3 text-destructive" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{event.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
-                          {event.event_time && event.location && " - "}
-                          {event.location}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => deleteEventMutation.mutate(event.id)}
-                      >
-                        <Trash2 className="w-3 h-3 text-destructive" />
-                      </Button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
