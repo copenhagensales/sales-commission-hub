@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +9,31 @@ import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
-import { useMemo } from "react";
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { DateRange } from "react-day-picker";
+
+// Calculate payroll period (15th to 14th)
+function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
+  const day = baseDate.getDate();
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  
+  if (day >= 15) {
+    return {
+      start: new Date(year, month, 15),
+      end: new Date(year, month + 1, 14, 23, 59, 59),
+    };
+  } else {
+    return {
+      start: new Date(year, month - 1, 15),
+      end: new Date(year, month, 14, 23, 59, 59),
+    };
+  }
+}
 
 interface TopSeller {
   name: string;
@@ -70,6 +91,19 @@ export default function CphSalesDashboard() {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   const tvMode = isTvMode();
+  
+  // Date range state for "Salg per opgave" - default to payroll period (15th to 14th)
+  const defaultPayrollPeriod = getPayrollPeriod(new Date());
+  const [salesDateRange, setSalesDateRange] = useState<DateRange | undefined>({
+    from: defaultPayrollPeriod.start,
+    to: defaultPayrollPeriod.end,
+  });
+  const [isCustomSalesRange, setIsCustomSalesRange] = useState(false);
+  
+  const handleSalesDateRangeChange = (range: DateRange | undefined) => {
+    setSalesDateRange(range);
+    setIsCustomSalesRange(true);
+  };
 
   // Fetch global cached KPIs for main stats (fast, pre-computed)
   const { data: globalKpis } = usePrecomputedKpis(
@@ -271,6 +305,122 @@ export default function CphSalesDashboard() {
     },
     enabled: !tvMode,
     refetchInterval: 60000,
+  });
+
+  // Fetch sales for selected date range (for "Salg per opgave" section)
+  const salesPeriodStart = salesDateRange?.from ? format(salesDateRange.from, "yyyy-MM-dd") : format(defaultPayrollPeriod.start, "yyyy-MM-dd");
+  const salesPeriodEnd = salesDateRange?.to ? format(salesDateRange.to, "yyyy-MM-dd") : format(defaultPayrollPeriod.end, "yyyy-MM-dd");
+  
+  const { data: periodSalesData } = useQuery({
+    queryKey: ["cph-dashboard-period-sales", salesPeriodStart, salesPeriodEnd],
+    queryFn: async () => {
+      const startOfPeriod = `${salesPeriodStart}T00:00:00`;
+      const endOfPeriod = `${salesPeriodEnd}T23:59:59`;
+      
+      // Fetch TM sales for period
+      let salesData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: salesPage } = await supabase
+          .from("sales")
+          .select(`
+            id, agent_name, sale_datetime, status, client_campaign_id,
+            sale_items (
+              quantity,
+              product_id,
+              mapped_commission,
+              products (counts_as_sale)
+            )
+          `)
+          .gte("sale_datetime", startOfPeriod)
+          .lte("sale_datetime", endOfPeriod)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (!salesPage || salesPage.length === 0) break;
+        salesData = [...salesData, ...salesPage];
+        if (salesPage.length < pageSize) break;
+        page++;
+      }
+      
+      // Get campaign -> client mapping
+      const campaignIds = [...new Set(salesData.map(s => s.client_campaign_id).filter(Boolean))] as string[];
+      let campaignClientMap: Record<string, string> = {};
+      let clientLogoMap: Record<string, string | null> = {};
+      
+      if (campaignIds.length > 0) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id, name, client_id")
+          .in("id", campaignIds);
+        
+        const clientIds = [...new Set((campaigns || []).map(c => c.client_id).filter(Boolean))];
+        let clientMap: Record<string, string> = {};
+        
+        if (clientIds.length > 0) {
+          const { data: clients } = await supabase
+            .from("clients")
+            .select("id, name, logo_url")
+            .in("id", clientIds);
+          clientMap = Object.fromEntries((clients || []).map(c => [c.id, c.name]));
+          clientLogoMap = Object.fromEntries((clients || []).map(c => [c.name, c.logo_url]));
+        }
+        
+        campaignClientMap = Object.fromEntries(
+          (campaigns || []).map(c => [c.id, clientMap[c.client_id] || "Ukendt"])
+        );
+      }
+      
+      // Fetch FM sales for period
+      const { data: fmSales } = await supabase
+        .from("fieldmarketing_sales")
+        .select(`
+          id, product_name, registered_at, seller_id,
+          client:clients!client_id(id, name, logo_url)
+        `)
+        .gte("registered_at", startOfPeriod)
+        .lte("registered_at", endOfPeriod);
+      
+      // Calculate sales by client
+      const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
+      
+      // TM sales
+      for (const sale of salesData) {
+        const saleItems = sale.sale_items || [];
+        let saleCount = 0;
+        for (const item of saleItems) {
+          if (item.products?.counts_as_sale === true) {
+            saleCount += item.quantity || 1;
+          }
+        }
+        if (saleCount > 0) {
+          const clientName = sale.client_campaign_id ? campaignClientMap[sale.client_campaign_id] || "Ukendt" : "Ukendt";
+          if (clientName !== "Ukendt") {
+            if (!salesByClient[clientName]) {
+              salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
+            }
+            salesByClient[clientName].count += saleCount;
+          }
+        }
+      }
+      
+      // FM sales
+      for (const fmSale of (fmSales || [])) {
+        const clientName = (fmSale.client as any)?.name;
+        const clientLogo = (fmSale.client as any)?.logo_url;
+        if (clientName) {
+          if (!salesByClient[clientName]) {
+            salesByClient[clientName] = { count: 0, logoUrl: clientLogo || null };
+          }
+          salesByClient[clientName].count += 1;
+        }
+      }
+      
+      return salesByClient;
+    },
+    enabled: !tvMode,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   const todaySales = todaySalesData?.sales || [];
@@ -993,7 +1143,9 @@ export default function CphSalesDashboard() {
   const displaySales = tvMode && tvData ? filterTvSales(tvData.sales.recent) : calculateRecentSalesWithCommission(knownClientSales);
   // Include FM sales in total count
   const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales) + fmTodaySales.length;
-  const displaySalesByClient = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
+  const displaySalesByClientToday = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
+  // Use period data for "Salg per opgave" section
+  const displaySalesByClientPeriod = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : (periodSalesData || {});
   const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
   const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
   const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : calculateSellersOnBoard(knownClientSales);
@@ -1047,37 +1199,49 @@ export default function CphSalesDashboard() {
 
       {/* Sales by Client - Cards with colors - MOVED TO TOP */}
       <div>
-        <div className={`flex items-center gap-2 mb-3 ${tvMode ? 'mb-2' : ''}`}>
-          <Target className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
-          <h3 className={`font-semibold ${tvMode ? 'text-sm' : 'text-base'}`}>Salg per opgave</h3>
+        <div className={`flex items-center justify-between mb-3 ${tvMode ? 'mb-2' : ''}`}>
+          <div className="flex items-center gap-2">
+            <Target className={`text-primary ${tvMode ? 'h-4 w-4' : 'h-5 w-5'}`} />
+            <h3 className={`font-semibold ${tvMode ? 'text-sm' : 'text-base'}`}>
+              {isCustomSalesRange ? "Salg per opgave" : "Salg per opgave (Lønperiode)"}
+            </h3>
+          </div>
+          {!tvMode && (
+            <DashboardDateRangePicker 
+              dateRange={salesDateRange} 
+              onDateRangeChange={handleSalesDateRangeChange} 
+            />
+          )}
         </div>
-        {Object.keys(displaySalesByClient).length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">Ingen salg registreret i dag</p>
+        {Object.keys(displaySalesByClientPeriod).length === 0 ? (
+          <p className="text-muted-foreground text-center py-4">Ingen salg registreret i perioden</p>
         ) : (
           <div className={`grid ${tvMode ? 'grid-cols-4 gap-2' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3'}`}>
-            {Object.entries(displaySalesByClient)
-              .sort(([, a], [, b]) => b.count - a.count)
-              .map(([client, data], index) => (
-                <Card 
-                  key={client} 
-                  className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
-                >
-                  <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
-                    {/* Client logo with consistent dark background */}
-                    {data.logoUrl && (
-                      <div className={`flex items-center justify-center rounded-xl shadow-sm bg-zinc-700/90 ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
-                        <img 
-                          src={data.logoUrl} 
-                          alt={client} 
-                          className="object-contain max-h-full max-w-full"
-                        />
-                      </div>
-                    )}
-                    <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{data.count}</span>
-                    <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
-                      {client}
-                    </span>
-                    {/* Absence info per client - only show in non-TV mode */}
+            {Object.entries(displaySalesByClientPeriod)
+              .sort(([, a], [, b]) => (b as { count: number }).count - (a as { count: number }).count)
+              .map(([client, data], index) => {
+                const clientData = data as { count: number; logoUrl: string | null };
+                return (
+                  <Card 
+                    key={client} 
+                    className={`bg-gradient-to-br ${clientColors[index % clientColors.length]} ${tvMode ? 'py-2' : 'py-3'}`}
+                  >
+                    <CardContent className={`flex flex-col items-center justify-center ${tvMode ? 'p-2' : 'p-3'}`}>
+                      {/* Client logo with consistent dark background */}
+                      {clientData.logoUrl && (
+                        <div className={`flex items-center justify-center rounded-xl shadow-sm bg-zinc-700/90 ${tvMode ? 'h-14 w-28 mb-2 p-2' : 'h-16 w-32 mb-3 p-2.5'}`}>
+                          <img 
+                            src={clientData.logoUrl} 
+                            alt={client} 
+                            className="object-contain max-h-full max-w-full"
+                          />
+                        </div>
+                      )}
+                      <span className={`font-bold ${tvMode ? 'text-2xl' : 'text-3xl'}`}>{clientData.count}</span>
+                      <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
+                        {client}
+                      </span>
+                      {/* Absence info per client - only show in non-TV mode */}
                     {!tvMode && absenceData && (
                       (() => {
                         const sickCount = absenceData.sickByClient?.[client] || 0;
@@ -1113,7 +1277,8 @@ export default function CphSalesDashboard() {
                     )}
                   </CardContent>
                 </Card>
-              ))}
+              );
+            })}
           </div>
         )}
       </div>
