@@ -1192,14 +1192,22 @@ export function EditBookingDialog({
                           .map((employee) => {
                             const empAbsences = absencesByEmployeeAndDay.get(employee.id);
                             const empBookings = bookingsByEmployeeAndDay.get(employee.id);
-                            const empHasAbsence = !!empAbsences;
-                            const empHasBooking = !!empBookings;
+                            
+                            // Only check if employee is booked on the SELECTED booked_days, not all days in the week
+                            const bookedDaysArray = (booking?.booked_days || []) as number[];
+                            const empHasBookingOnSelectedDays = bookedDaysArray.some(dayIndex => 
+                              empBookings?.has(dayIndex)
+                            );
+                            const empHasAbsenceOnSelectedDays = bookedDaysArray.some(dayIndex => 
+                              empAbsences?.has(dayIndex)
+                            );
+                            
                             const empHasNoShifts = hasNoShiftsAtAll(employee.id);
                             return (
                               <SelectItem 
                                 key={employee.id} 
                                 value={employee.id} 
-                                className={`text-popover-foreground ${empHasNoShifts ? "text-gray-400 bg-gray-50 dark:bg-gray-950/20" : empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : empHasBooking ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                                className={`text-popover-foreground ${empHasNoShifts ? "text-gray-400 bg-gray-50 dark:bg-gray-950/20" : empHasAbsenceOnSelectedDays ? "text-red-600 bg-red-50 dark:bg-red-950/20" : empHasBookingOnSelectedDays ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : ""}`}
                               >
                                 <span className="flex items-center gap-2">
                                   {employee.full_name}
@@ -1209,13 +1217,13 @@ export function EditBookingDialog({
                                       <span className="text-xs text-gray-400">(Ingen vagter)</span>
                                     </>
                                   )}
-                                  {!empHasNoShifts && empHasAbsence && (
+                                  {!empHasNoShifts && empHasAbsenceOnSelectedDays && (
                                     <>
                                       <AlertTriangle className="h-3 w-3 text-red-500" />
                                       <span className="text-xs text-red-500">(Fravær)</span>
                                     </>
                                   )}
-                                  {!empHasNoShifts && empHasBooking && !empHasAbsence && (
+                                  {!empHasNoShifts && empHasBookingOnSelectedDays && !empHasAbsenceOnSelectedDays && (
                                     <>
                                       <AlertTriangle className="h-3 w-3 text-amber-500" />
                                       <span className="text-xs text-amber-500">(Booket)</span>
