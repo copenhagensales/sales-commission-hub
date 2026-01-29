@@ -17,7 +17,26 @@ import {
 } from "@/hooks/useFieldmarketingSales";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth } from "date-fns";
+import { format } from "date-fns";
+
+// Calculate payroll period (15th to 14th)
+function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
+  const day = baseDate.getDate();
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  
+  if (day >= 15) {
+    return {
+      start: new Date(year, month, 15),
+      end: new Date(year, month + 1, 14, 23, 59, 59),
+    };
+  } else {
+    return {
+      start: new Date(year, month - 1, 15),
+      end: new Date(year, month, 14, 23, 59, 59),
+    };
+  }
+}
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy, Loader2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -41,9 +60,10 @@ interface ClientDashboardProps {
   clientId: string;
   clientName: string;
   dateRange: DateRange | undefined;
+  isPayrollPeriod: boolean;
 }
 
-const ClientDashboard = ({ clientId, clientName, dateRange }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: ClientDashboardProps) => {
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
   const { data: stats, isLoading: statsLoading } = useFieldmarketingSalesStats(clientId);
 
@@ -80,8 +100,9 @@ const ClientDashboard = ({ clientId, clientName, dateRange }: ClientDashboardPro
     queryKey: ["fieldmarketing-period-sellers", clientId, productCommissions, dateRange?.from, dateRange?.to],
     staleTime: 120000, // 2 minutter
     queryFn: async () => {
-      const periodStart = dateRange?.from?.toISOString() || startOfMonth(new Date()).toISOString();
-      const periodEnd = dateRange?.to?.toISOString() || new Date().toISOString();
+      const defaultPayrollPeriod = getPayrollPeriod(new Date());
+      const periodStart = dateRange?.from?.toISOString() || defaultPayrollPeriod.start.toISOString();
+      const periodEnd = dateRange?.to?.toISOString() || defaultPayrollPeriod.end.toISOString();
       
       const { data: periodSales, error } = await supabase
         .from("fieldmarketing_sales")
@@ -215,11 +236,13 @@ const ClientDashboard = ({ clientId, clientName, dateRange }: ClientDashboardPro
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Month Sellers Table */}
+        {/* Period Sellers Table */}
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Periodens sælgere</CardTitle>
+            <CardTitle className="text-lg">
+              {isPayrollPeriod ? "Lønperiode" : "Valgt periode"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {topSellers && topSellers.length > 0 ? (
@@ -353,11 +376,18 @@ const ClientDashboard = ({ clientId, clientName, dateRange }: ClientDashboardPro
 const FieldmarketingDashboardFull = () => {
   const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
   
-  // Date range state - default to current month
+  // Date range state - default to payroll period (15th to 14th)
+  const defaultPayrollPeriod = getPayrollPeriod(new Date());
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
+    from: defaultPayrollPeriod.start,
+    to: defaultPayrollPeriod.end,
   });
+  const [isCustomRange, setIsCustomRange] = useState(false);
+  
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    setIsCustomRange(true);
+  };
   
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => 
@@ -424,7 +454,7 @@ const FieldmarketingDashboardFull = () => {
           <div className="flex items-center gap-4">
             <DashboardDateRangePicker 
               dateRange={dateRange} 
-              onDateRangeChange={setDateRange} 
+              onDateRangeChange={handleDateRangeChange} 
             />
             <div className="h-10 flex items-center">
               {activeClient?.logo_url ? (
@@ -456,6 +486,7 @@ const FieldmarketingDashboardFull = () => {
               clientId={TAB_TO_CLIENT_ID[tab.value]} 
               clientName={tab.label}
               dateRange={dateRange}
+              isPayrollPeriod={!isCustomRange}
             />
           </TabsContent>
         ))}
