@@ -1,54 +1,50 @@
 
-# Fix: Thomas Wehage mangler rettigheder til fraværshåndtering
+# Fix: Mulighed for at fjerne Fridag og Udeblivelse
 
-## Problem
-Thomas Wehage kan stadig ikke oprette fravær for teammedlemmer, selvom `is_teamleder_or_above()` funktionen nu returnerer `true` for ham.
+## Problem identificeret
+Når en leder tilføjer en **Fridag** eller **Udeblivelse** til en medarbejder, vises knappen **"Fjern status"** ikke i popover-menuen. Det betyder, at det ikke er muligt at slette/fjerne disse fraværstyper, hvis man har lavet en fejl.
 
-## Årsag identificeret
-RLS-policyen for `absence_request_v2` bruger **to funktioner**:
+## Årsag
+I `ShiftOverview.tsx` (linje 1356) defineres `hasStatus` som:
 
-```sql
-is_teamleder_or_above(auth.uid()) AND can_view_employee(employee_id, auth.uid())
+```javascript
+const hasStatus = isVacation || isSick || isLate;
 ```
 
-Mens `is_teamleder_or_above()` nu virker ✅, fejler `can_view_employee()` ❌ fordi den kalder `get_user_manager_scope()` som returnerer `'self'` baseret på `role_page_permissions`.
+Her mangler `isDayOff` (Fridag) og `isNoShow` (Udeblivelse).
 
-### Nuværende rettigheder for `assisterende_teamleder_fm`:
+Derfor vises "Fjern status" knappen (linje 1657-1669) **kun** for:
+- Ferie (vacation)
+- Syg (sick)
+- Forsinket (late)
 
-| Permission Key | can_view | can_edit | visibility |
-|----------------|----------|----------|------------|
-| `menu_absence` | false | false | self |
-| `menu_employees` | false | false | self |
-
-### Teamleder har til sammenligning:
-
-| Permission Key | can_view | can_edit | visibility |
-|----------------|----------|----------|------------|
-| `menu_absence` | true | true | team |
-| `menu_employees` | true | true | team |
+Men **ikke** for:
+- Fridag (day_off) ❌
+- Udeblivelse (no_show) ❌
 
 ## Løsning
-Opdater `role_page_permissions` for `assisterende_teamleder_fm` rollen så den får team-niveau adgang til fravær:
+Opdatér `hasStatus` til at inkludere alle fraværstyper:
 
-### SQL Migration:
-```sql
-UPDATE role_page_permissions
-SET can_view = true, can_edit = true, visibility = 'team'
-WHERE role_key = 'assisterende_teamleder_fm'
-AND permission_key IN ('menu_absence', 'menu_employees');
+```javascript
+// Før
+const hasStatus = isVacation || isSick || isLate;
+
+// Efter
+const hasStatus = isVacation || isSick || isLate || isDayOff || isNoShow;
 ```
 
-## Hvad dette ændrer
-- **menu_absence**: Giver adgang til fraværsmenu og team-niveau synlighed
-- **menu_employees**: Giver adgang til medarbejderoversigt og team-niveau synlighed
+## Fil der ændres
+`src/pages/shift-planning/ShiftOverview.tsx` - linje 1356
 
-## Resultat efter ændring
-1. `get_user_manager_scope()` returnerer `'team'` i stedet for `'self'`
-2. `can_view_employee()` returnerer `true` for teammedlemmer
-3. Thomas kan oprette, se og redigere fravær for sit Fieldmarketing team
+## Resultat
+Efter ændringen vil "Fjern status" knappen vises for alle fraværstyper:
+- Ferie ✅
+- Syg ✅
+- Forsinket ✅
+- Fridag ✅ (ny)
+- Udeblivelse ✅ (ny)
 
-## Alternativ (UI-baseret)
-Ændringen kan også laves via Permission Editor UI'en på `/employees?tab=permissions`:
-1. Find rollen "Assisterende Teamleder FM" 
-2. Aktivér "Menu - Fravær" med visibility = Team
-3. Aktivér "Menu - Medarbejdere" med visibility = Team
+Dette gør det muligt at rette fejlindtastninger for alle fraværstyper.
+
+## Teknisk detalje
+Den eksisterende `handleClearStatus()` funktion (linje 960-974) håndterer allerede sletning af alle absence-typer korrekt - den kalder `deleteAbsence.mutate(absenceToDelete.id)` uanset hvilken type det er. Derfor kræves kun én enkelt linje ændring.
