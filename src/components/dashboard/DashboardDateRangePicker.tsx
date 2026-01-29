@@ -13,7 +13,30 @@ interface DashboardDateRangePickerProps {
   onDateRangeChange: (range: DateRange | undefined) => void;
 }
 
+// Calculate payroll period (15th to 14th)
+function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
+  const day = baseDate.getDate();
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  
+  if (day >= 15) {
+    return {
+      start: new Date(year, month, 15),
+      end: new Date(year, month + 1, 14, 23, 59, 59),
+    };
+  } else {
+    return {
+      start: new Date(year, month - 1, 15),
+      end: new Date(year, month, 14, 23, 59, 59),
+    };
+  }
+}
+
 const presets = [
+  { label: "Lønperiode", getValue: () => {
+    const period = getPayrollPeriod(new Date());
+    return { from: period.start, to: period.end };
+  }},
   { label: "I dag", getValue: () => ({ from: startOfDay(new Date()), to: new Date() }) },
   { label: "I går", getValue: () => ({ from: startOfDay(subDays(new Date(), 1)), to: startOfDay(new Date()) }) },
   { label: "Denne uge", getValue: () => ({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: endOfWeek(new Date(), { weekStartsOn: 1 }) }) },
