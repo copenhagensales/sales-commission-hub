@@ -304,9 +304,8 @@ Deno.serve(async (req) => {
       (clientCampaigns || []).map(c => [c.id, c.client_id])
     );
 
-    // Calculate sales by client and track seller commission
+    // Calculate sales by client and track sellers with sales (for sellersOnBoard count)
     const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
-    const sellerCommission: Record<string, { commission: number; name: string }> = {};
     const sellersWithSales = new Set<string>();
     let totalCountedSales = 0;
     const recentSales: any[] = [];
@@ -333,7 +332,7 @@ Deno.serve(async (req) => {
         clientName = clientMap[clientId] || "Ukendt";
       }
 
-      // Count sale items and track commission
+      // Count sale items
       let saleItemCount = 0;
       let saleCommission = 0;
       const saleItems = (sale as any).sale_items || [];
@@ -345,7 +344,7 @@ Deno.serve(async (req) => {
           const qty = item.quantity || 1;
           saleItemCount += qty;
         }
-        // Sum commission (mapped_commission already includes quantity)
+        // Sum commission for recent sales display
         saleCommission += item.mapped_commission || 0;
       }
 
@@ -356,15 +355,9 @@ Deno.serve(async (req) => {
         salesByClient[clientName].count += saleItemCount;
         totalCountedSales += saleItemCount;
         
-        // Track seller
+        // Track seller for sellersOnBoard count
         if (sale.agent_name) {
-          const lowerName = sale.agent_name.toLowerCase();
-          sellersWithSales.add(lowerName);
-          
-          if (!sellerCommission[lowerName]) {
-            sellerCommission[lowerName] = { commission: 0, name: sale.agent_name };
-          }
-          sellerCommission[lowerName].commission += saleCommission;
+          sellersWithSales.add(sale.agent_name.toLowerCase());
         }
       }
 
@@ -393,7 +386,6 @@ Deno.serve(async (req) => {
 
       const fmItems = (fmSale as any).sale_items || [];
       let fmItemCount = 0;
-      let fmCommission = 0;
 
       for (const item of fmItems) {
         const product = item.products;
@@ -401,7 +393,6 @@ Deno.serve(async (req) => {
         if (product && product.id && product.counts_as_sale === true) {
           const qty = item.quantity || 1;
           fmItemCount += qty;
-          fmCommission += (product.commission_dkk || 0) * qty;
         }
       }
 
@@ -417,15 +408,9 @@ Deno.serve(async (req) => {
         salesByClient[clientName].count += fmItemCount;
         totalCountedSales += fmItemCount;
 
-        // Track FM seller
+        // Track FM seller for sellersOnBoard count
         if (fmSale.seller_name) {
-          const lowerName = fmSale.seller_name.toLowerCase();
-          sellersWithSales.add(lowerName);
-          
-          if (!sellerCommission[lowerName]) {
-            sellerCommission[lowerName] = { commission: 0, name: fmSale.seller_name };
-          }
-          sellerCommission[lowerName].commission += fmCommission;
+          sellersWithSales.add(fmSale.seller_name.toLowerCase());
         }
       }
     }
@@ -434,25 +419,41 @@ Deno.serve(async (req) => {
     console.log(`Total counted sales (incl. FM): ${totalCountedSales}`);
     console.log(`Sellers on board: ${sellersWithSales.size}`);
 
-    // Resolve agent names to employee names for top sellers
-    const agentEmails = Object.keys(sellerCommission);
-    let nameMap = new Map<string, string>();
-    
-    if (agentEmails.length > 0) {
-      nameMap = await resolveAgentNames(supabase, agentEmails);
+    // ============= TOP SELLERS FROM CACHED LEADERBOARD =============
+    // Use the same cached data as Normal View for consistency
+    const { data: cachedLeaderboard, error: leaderboardError } = await supabase
+      .from("kpi_leaderboard_cache")
+      .select("leaderboard_data, calculated_at")
+      .eq("period_type", "today")
+      .eq("scope_type", "global")
+      .is("scope_id", null)
+      .order("calculated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (leaderboardError) {
+      console.error("Error fetching cached leaderboard:", leaderboardError);
     }
 
-    // Build top 20 sellers list with resolved names
-    const topSellers = Object.entries(sellerCommission)
-      .map(([email, data]) => ({
-        name: nameMap.get(email) || data.name,
-        commission: data.commission,
-      }))
-      .sort((a, b) => b.commission - a.commission)
-      .slice(0, 20)
-      .map((seller, index) => ({ ...seller, rank: index + 1 }));
+    // Helper function to format display name as "Firstname L."
+    const formatDisplayName = (fullName: string): string => {
+      const parts = fullName.trim().split(" ");
+      if (parts.length >= 2) {
+        return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+      }
+      return fullName;
+    };
 
-    console.log(`Top sellers:`, topSellers.slice(0, 5));
+    // Build top 20 sellers from cached leaderboard
+    const topSellers = cachedLeaderboard?.leaderboard_data
+      ? (cachedLeaderboard.leaderboard_data as any[]).slice(0, 20).map((entry: any, index: number) => ({
+          name: formatDisplayName(entry.employeeName || entry.displayName || "Ukendt"),
+          commission: entry.commission || 0,
+          rank: index + 1,
+        }))
+      : [];
+
+    console.log(`Top sellers (from cache, calculated at ${cachedLeaderboard?.calculated_at || 'N/A'}):`, topSellers.slice(0, 5));
 
     // Fetch employee counts
     const { count: activeEmployees } = await supabase
