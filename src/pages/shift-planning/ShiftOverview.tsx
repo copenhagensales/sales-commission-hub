@@ -1353,7 +1353,7 @@ export default function ShiftOverview() {
                           : rawWorkTimes)
                       : null;
                     const hasWorkTimes = !!(workTimes || hasShift);
-                    const hasStatus = isVacation || isSick || isLate;
+                    const hasStatus = isVacation || isSick || isLate || isDayOff || isNoShow;
                     
                     // Check if employee uses timestamp-based hours
                     const usesTimestamp = getHoursSourceForEmployee(employee.id) === 'timestamp';
