@@ -17,12 +17,14 @@ import {
 } from "@/hooks/useFieldmarketingSales";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy, Loader2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { DateRange } from "react-day-picker";
 
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
@@ -35,7 +37,13 @@ const allTabs = [
   { value: "yousee", label: "Yousee", permissionKey: "tab_fm_yousee" },
 ];
 
-const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientName: string }) => {
+interface ClientDashboardProps {
+  clientId: string;
+  clientName: string;
+  dateRange: DateRange | undefined;
+}
+
+const ClientDashboard = ({ clientId, clientName, dateRange }: ClientDashboardProps) => {
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
   const { data: stats, isLoading: statsLoading } = useFieldmarketingSalesStats(clientId);
 
@@ -67,15 +75,15 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
     },
   });
 
-  // Fetch ALL sellers with sales this month and calculate commission
+  // Fetch ALL sellers with sales in the selected period and calculate commission
   const { data: topSellers } = useQuery({
-    queryKey: ["fieldmarketing-month-sellers", clientId, productCommissions],
+    queryKey: ["fieldmarketing-period-sellers", clientId, productCommissions, dateRange?.from, dateRange?.to],
     staleTime: 120000, // 2 minutter
     queryFn: async () => {
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const periodStart = dateRange?.from?.toISOString() || startOfMonth(new Date()).toISOString();
+      const periodEnd = dateRange?.to?.toISOString() || new Date().toISOString();
       
-      const { data: monthSales, error } = await supabase
+      const { data: periodSales, error } = await supabase
         .from("fieldmarketing_sales")
         .select(`
           seller_id,
@@ -83,12 +91,13 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
           seller:employee_master_data!seller_id(first_name, last_name)
         `)
         .eq("client_id", clientId)
-        .gte("registered_at", monthStart);
+        .gte("registered_at", periodStart)
+        .lte("registered_at", periodEnd);
       
       if (error) throw error;
 
       const sellerStats: Record<string, { name: string; count: number; commission: number }> = {};
-      (monthSales || []).forEach((sale: any) => {
+      (periodSales || []).forEach((sale: any) => {
         const sellerId = sale.seller_id;
         const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
         const commission = productCommissions?.[sale.product_name] || 0;
@@ -210,7 +219,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Månedens sælgere</CardTitle>
+            <CardTitle className="text-lg">Periodens sælgere</CardTitle>
           </CardHeader>
           <CardContent>
             {topSellers && topSellers.length > 0 ? (
@@ -243,7 +252,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
                 </Table>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm text-center py-8">Ingen salg denne måned</p>
+              <p className="text-muted-foreground text-sm text-center py-8">Ingen salg i perioden</p>
             )}
           </CardContent>
         </Card>
@@ -344,6 +353,12 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
 const FieldmarketingDashboardFull = () => {
   const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
   
+  // Date range state - default to current month
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
+  
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => 
     allTabs.filter(tab => canView(tab.permissionKey)),
@@ -406,16 +421,22 @@ const FieldmarketingDashboardFull = () => {
         title="Fieldmarketing Dashboard" 
         subtitle="Oversigt over salg fra fieldmarketing events"
         rightContent={
-          <div className="h-10 flex items-center">
-            {activeClient?.logo_url ? (
-              <img 
-                src={activeClient.logo_url} 
-                alt={activeClient.name} 
-                className="max-h-10 max-w-32 object-contain"
-              />
-            ) : (
-              <span className="text-sm font-medium text-muted-foreground">{activeClient?.name || "..."}</span>
-            )}
+          <div className="flex items-center gap-4">
+            <DashboardDateRangePicker 
+              dateRange={dateRange} 
+              onDateRangeChange={setDateRange} 
+            />
+            <div className="h-10 flex items-center">
+              {activeClient?.logo_url ? (
+                <img 
+                  src={activeClient.logo_url} 
+                  alt={activeClient.name} 
+                  className="max-h-10 max-w-32 object-contain"
+                />
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">{activeClient?.name || "..."}</span>
+              )}
+            </div>
           </div>
         }
       />
@@ -433,7 +454,8 @@ const FieldmarketingDashboardFull = () => {
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <ClientDashboard 
               clientId={TAB_TO_CLIENT_ID[tab.value]} 
-              clientName={tab.label} 
+              clientName={tab.label}
+              dateRange={dateRange}
             />
           </TabsContent>
         ))}
