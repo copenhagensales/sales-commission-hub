@@ -1,66 +1,77 @@
 
-# Fix: Event Invitation Popup - RLS Policy
+# Tilføj datovælger til Fieldmarketing Dashboard
 
-## Problem
-Medarbejdere kan ikke trykke "Deltager" på event invitationer, og får fejlen "Der opstod en fejl".
+## Overblik
+Tilføjer en datovælger i headerområdet af Fieldmarketing dashboardet, så brugere kan filtrere salgsdata til en specifik periode i stedet for kun at se faste perioder (i dag, denne uge, denne måned).
 
-## Årsag
-RLS-policyen på `event_invitation_views` tabellen bruger en forældet `employee` tabel (med kun 2 poster) i stedet for `employee_master_data` (134 medarbejdere).
+## Ændringer
 
-**Nuværende policy:**
-```sql
-WHERE employee_id IN (SELECT id FROM employee WHERE email = auth.jwt()->>'email')
-```
+### 1. Opdater FieldmarketingDashboardFull.tsx
+- Tilføj en `dateRange` state med `useState` til at holde valgt periode
+- Standard-værdi: "Denne måned" (fra månedens start til i dag)
+- Placer `DashboardDateRangePicker` i `rightContent` prop på `DashboardHeader`
+- Send `dateRange` ned til `ClientDashboard` komponenten
 
-**Korrekt policy:**
-```sql
-WHERE employee_id IN (
-  SELECT id FROM employee_master_data 
-  WHERE LOWER(private_email) = LOWER(auth.jwt()->>'email') 
-     OR LOWER(work_email) = LOWER(auth.jwt()->>'email')
-)
-```
+### 2. Opdater ClientDashboard komponenten
+- Modtag `dateRange` som prop
+- Brug valgt periode til at filtrere:
+  - Sælger-tabellen (månedens sælgere → periodens sælgere)
+  - "Seneste salg" tabellen
+- KPI-kortene forbliver som de er (viser altid i dag/uge/måned) for hurtig sammenligning
 
-## Løsning
+### 3. Opdater hooks/queries
+- Justér de eksisterende queries til at bruge det valgte datointerval
+- `topSellers` og `todaySellers` queries skal filtrere på `dateRange.from` og `dateRange.to`
 
-### Database ændring
-Opdater RLS-policyen på `event_invitation_views`:
+## UI Layout
 
-```sql
--- Drop den fejlagtige policy
-DROP POLICY IF EXISTS "Users can manage own invitation views" ON event_invitation_views;
-
--- Opret korrekt policy med employee_master_data
-CREATE POLICY "Users can manage own invitation views"
-ON event_invitation_views
-FOR ALL
-TO authenticated
-USING (
-  employee_id IN (
-    SELECT id FROM employee_master_data 
-    WHERE LOWER(private_email) = LOWER(auth.jwt()->>'email') 
-       OR LOWER(work_email) = LOWER(auth.jwt()->>'email')
-  )
-)
-WITH CHECK (
-  employee_id IN (
-    SELECT id FROM employee_master_data 
-    WHERE LOWER(private_email) = LOWER(auth.jwt()->>'email') 
-       OR LOWER(work_email) = LOWER(auth.jwt()->>'email')
-  )
-);
+```text
++-------------------------------------------------------+
+| [CPH Sales Logo]  Fieldmarketing Dashboard     [Logo] |
+|                                      [Datovælger 📅]  |
++-------------------------------------------------------+
+| [Tab: Eesy FM] [Tab: YouSee]                          |
++-------------------------------------------------------+
+| KPI: I dag | KPI: Uge | KPI: Måned | KPI: Total      |
++-------------------------------------------------------+
+| Periodens sælgere (filtreret) | Dagens sælgere       |
++-------------------------------------------------------+
+| Seneste salg (filtreret på periode)                  |
++-------------------------------------------------------+
 ```
 
 ## Tekniske detaljer
 
-| Tabel | Antal poster |
-|-------|--------------|
-| `employee` (forældet) | 2 |
-| `employee_master_data` | 134 |
+**Fil-ændringer:**
+1. `src/pages/dashboards/FieldmarketingDashboardFull.tsx`
+   - Import `DashboardDateRangePicker` og `DateRange` type
+   - Tilføj `dateRange` state med default til denne måned
+   - Send datovælger til header via `rightContent`
+   - Send `dateRange` som prop til `ClientDashboard`
 
-Policyen matcher brugerens email fra JWT mod tabellens emails. Da næsten alle medarbejdere kun findes i `employee_master_data`, fejler INSERT for alle undtagen de 2 i `employee`.
+2. `ClientDashboard` i samme fil
+   - Modtag `dateRange` som prop i interface
+   - Opdatér `topSellers` query til at bruge `dateRange.from`/`dateRange.to`
+   - Opdatér salg-tabellen til at filtrere på perioden
+   - Opdatér kort-titlen "Månedens sælgere" → "Periodens sælgere"
 
-## Påvirkning
-- Ingen kodeændringer nødvendige
-- Kun én database migration
-- Alle medarbejdere vil kunne bruge popup'en efter ændringen
+**Kodeeksempel:**
+```tsx
+// State i hovedkomponenten
+const [dateRange, setDateRange] = useState<DateRange | undefined>({
+  from: startOfMonth(new Date()),
+  to: new Date(),
+});
+
+// I DashboardHeader rightContent
+<DashboardDateRangePicker 
+  dateRange={dateRange} 
+  onDateRangeChange={setDateRange} 
+/>
+```
+
+## Brugerflow
+1. Bruger åbner dashboardet → ser data for denne måned (default)
+2. Bruger klikker på datovælger → vælger "Sidste 7 dage" eller custom periode
+3. Sælger-tabellen og salg opdateres til at vise data for den valgte periode
+4. KPI-kortene viser stadig "I dag", "Denne uge" osv. for hurtig sammenligning
