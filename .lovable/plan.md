@@ -1,134 +1,104 @@
 
-# Lønperiode som standard på Fieldmarketing Dashboard
 
-## Opsummering
-Ændrer Fieldmarketing Dashboard så "Periodens sælgere" som standard viser data for lønperioden (15. til 14. i måneden) og omdøbes til "Lønperiode". Når brugeren manuelt vælger en dato via datovælgeren, skifter titlen til "Valgt periode".
+# Synkroniser datalogi mellem Normal View og TV Mode
 
-## Ændringer
+## Problemanalyse
 
-### 1. FieldmarketingDashboardFull.tsx
+Der er **to forskellige datakilder** for top-sælgere og salgstal:
 
-**Opdater standard dateRange til lønperiode:**
+### Normal View (browser)
+- **Top sellers:** Læser fra `kpi_leaderboard_cache` tabellen via `useCachedLeaderboard` hook
+- **Cache opdateres** af `calculate-kpi-values` edge function (kører på schedule, ca. hvert 30. minut)
+- **Logik:** Bruger korrekt `mapped_commission` fra `sale_items` + FM sales med `fmCommissionMap`
 
-```typescript
-// Tilføj import af getPayrollPeriod logik (eller genimplementer inline)
-function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
-  const day = baseDate.getDate();
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  
-  if (day >= 15) {
-    return {
-      start: new Date(year, month, 15),
-      end: new Date(year, month + 1, 14, 23, 59, 59),
-    };
-  } else {
-    return {
-      start: new Date(year, month - 1, 15),
-      end: new Date(year, month, 14, 23, 59, 59),
-    };
-  }
-}
-```
+### TV Mode (edge function)
+- **Top sellers:** Beregnes **on-the-fly** i `tv-dashboard-data/index.ts`
+- **15 sekunders in-memory cache** (linje 15)
+- **Logik:** Tæller `mapped_commission` + FM commission fra products
 
-**Opdater useState til at bruge lønperiode:**
+### Forskelle der kan forårsage uoverensstemmelser:
+
+| Aspekt | Normal View (Cache) | TV Mode (On-the-fly) |
+|--------|---------------------|----------------------|
+| **Data alder** | Op til 30 min gammel | Max 15 sek gammel |
+| **FM commission** | Via `fmCommissionMap` (lookup) | Via `products.commission_dkk` |
+| **Name resolution** | Fuldt opløst via employeeMap | Opløst via `resolveAgentNames()` |
+| **Period** | "today" fra cache | Beregnet for dagens dato |
+
+## Løsningsforslag
+
+### Option A: TV mode bruger cached leaderboard (Anbefalet)
+
+Opdatér `tv-dashboard-data/index.ts` til at læse fra `kpi_leaderboard_cache` i stedet for at beregne on-the-fly:
 
 ```typescript
-// Før
-const [dateRange, setDateRange] = useState<DateRange | undefined>({
-  from: startOfMonth(new Date()),
-  to: new Date(),
-});
+// I tv-dashboard-data/index.ts - erstat topSellers beregning
 
-// Efter
-const defaultPayrollPeriod = getPayrollPeriod(new Date());
-const [dateRange, setDateRange] = useState<DateRange | undefined>({
-  from: defaultPayrollPeriod.start,
-  to: defaultPayrollPeriod.end,
-});
+// Hent cached global leaderboard for "today"
+const { data: cachedLeaderboard } = await supabase
+  .from("kpi_leaderboard_cache")
+  .select("leaderboard_data")
+  .eq("period_type", "today")
+  .eq("scope_type", "global")
+  .is("scope_id", null)
+  .order("calculated_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
-// Track om brugeren har valgt en custom periode
-const [isCustomRange, setIsCustomRange] = useState(false);
+const topSellers = cachedLeaderboard?.leaderboard_data
+  ? (cachedLeaderboard.leaderboard_data as any[]).slice(0, 20).map((entry, index) => ({
+      name: formatDisplayName(entry.employeeName),
+      commission: entry.commission,
+      rank: index + 1,
+    }))
+  : [];
 ```
 
-**Opdater onDateRangeChange handler:**
+### Fordele ved Option A:
+- **Ensartet data** - Begge views bruger præcis samme beregning
+- **Mindre database load** - Ingen ekstra beregning i TV mode
+- **Hurtigere response** - Simple table lookup i stedet for kompleks aggregation
+- **Vedligeholdbar** - Kun ét sted at opdatere logikken
 
-```typescript
-const handleDateRangeChange = (range: DateRange | undefined) => {
-  setDateRange(range);
-  setIsCustomRange(true);
-};
-```
+### Option B: Øg cache-frekvens (Alternativ)
 
-**Send isCustomRange videre til ClientDashboard:**
+Hvis real-time opdatering er kritisk, kan `calculate-kpi-values` køres oftere (fx hvert 5. minut) og TV mode læser stadig fra cache.
 
-```typescript
-<ClientDashboard 
-  clientId={TAB_TO_CLIENT_ID[tab.value]} 
-  clientName={tab.label}
-  dateRange={dateRange}
-  isPayrollPeriod={!isCustomRange}
-/>
-```
+## Implementeringsplan
 
-### 2. ClientDashboard komponent
+### 1. Opdatér tv-dashboard-data edge function
 
-**Opdater props interface:**
+**Fil:** `supabase/functions/tv-dashboard-data/index.ts`
 
-```typescript
-interface ClientDashboardProps {
-  clientId: string;
-  clientName: string;
-  dateRange: DateRange | undefined;
-  isPayrollPeriod: boolean;
-}
-```
+**Ændringer:**
+- Fjern inline topSellers beregning (sellerCommission tracking, resolveAgentNames call)
+- Tilføj cache lookup fra `kpi_leaderboard_cache`
+- Behold FM sales aggregation for `salesByClient` (dette fungerer korrekt)
 
-**Opdater CardTitle dynamisk:**
+### 2. Test synkronisering
 
-```typescript
-<CardHeader className="flex flex-row items-center gap-2">
-  <Users className="h-5 w-5 text-primary" />
-  <CardTitle className="text-lg">
-    {isPayrollPeriod ? "Lønperiode" : "Valgt periode"}
-  </CardTitle>
-</CardHeader>
-```
+Verificer at:
+- Top 20 sælgere viser identiske navne og beløb
+- Salgstal per klient matcher
+- "Sælgere på board" tæller er ens
 
-### 3. DashboardDateRangePicker (valgfrit)
-
-Tilføj "Lønperiode" som preset i dropdown:
-
-```typescript
-const presets = [
-  { label: "Lønperiode", getValue: () => {
-    const period = getPayrollPeriod(new Date());
-    return { from: period.start, to: period.end };
-  }},
-  { label: "I dag", getValue: () => ({ from: startOfDay(new Date()), to: new Date() }) },
-  // ... resten af presets
-];
-```
-
-## Teknisk detalje
-
-Lønperioden beregnes således:
-- Hvis vi er **på eller efter den 15.** i måneden: perioden er 15. denne måned → 14. næste måned
-- Hvis vi er **før den 15.** i måneden: perioden er 15. forrige måned → 14. denne måned
-
-Eksempel (29. januar 2026):
-- Lønperiode = 15. jan. 2026 → 14. feb. 2026
-
-## Fil-ændringer
+## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Tilføj `getPayrollPeriod`, opdater default state, tilføj `isCustomRange` tracking, opdater props |
-| `src/components/dashboard/DashboardDateRangePicker.tsx` | Tilføj "Lønperiode" preset (valgfrit) |
+| `supabase/functions/tv-dashboard-data/index.ts` | Brug cached leaderboard i stedet for on-the-fly beregning |
 
 ## Resultat
 
-1. Dashboard åbner med lønperioden (15.-14.) som default
-2. Tabeltitel viser "Lønperiode" ved default
-3. Når brugeren vælger en custom dato, skifter titlen til "Valgt periode"
-4. Datovælgeren viser den korrekte lønperiode-range i knappen
+Efter implementering vil:
+1. TV mode og normal view vise **identiske top-sælger data**
+2. Begge views bruge **samme beregningslogik** (fra `calculate-kpi-values`)
+3. Database load blive **reduceret** (færre queries i TV mode)
+4. Forsinkelse være **max 30 minutter** (cache opdaterings-interval)
+
+## Teknisk note
+
+`kpi_leaderboard_cache` tabellen opdateres af `calculate-kpi-values` edge function. Denne kører på et cron-schedule. Aktuelle data viser at cachen opdateres ca. hvert 30. minut (seneste: 09:00, 08:30, 08:00).
+
+Hvis strammere synkronisering ønskes, kan cron-intervallet reduceres til fx hvert 10. minut.
+
