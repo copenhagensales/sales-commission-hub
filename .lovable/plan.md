@@ -1,37 +1,74 @@
 
+# Fix: Thomas Wehage kan ikke melde folk syge
 
-# Fix: Weekend-booking for Fieldmarketing medarbejdere
+## Problem identificeret
+Thomas Wehage (Assisterende Teamleder FM) får RLS-fejl ved oprettelse af fravær fordi database-funktionen `is_teamleder_or_above()` **mangler hans job title** i whitelisten.
 
-## Problem
-Medarbejdere med individuelle vagter i weekenden kan ikke bookes fordi UI'en fejlagtigt viser dem som "Booket" selvom de kun er booket på hverdage.
+## Teknisk årsag
 
-## Årsag
-`hasNoShiftsAtAll()` og medarbejder-dropdown logikken tjekker om medarbejderen har NOGEN bookinger i ugen, og markerer dem som "(Booket)" generelt - uden at skelne mellem hvilke specifikke dage de er booket.
-
-## Løsning
-
-### 1. Opdater medarbejder-dropdown visning
-I `EditBookingDialog.tsx` (ca. linje 1192-1226), ændr logikken for "(Booket)" label så den kun vises hvis medarbejderen er booket på de specifikke dage der er valgt i `booked_days`:
-
-```typescript
-// Tjek kun om medarbejder er booket på de bookede dage (5=lør, 6=søn)
-const bookedDays = booking?.booked_days || [];
-const empHasBookingOnBookedDays = bookedDays.some(dayIndex => 
-  empBookings?.has(dayIndex)
-);
+### Nuværende `is_teamleder_or_above()` funktion:
+```sql
+LOWER(job_title) IN (
+  'ejer', 
+  'teamleder', 
+  'assisterende teamleder',  -- ✅ uden FM
+  'fieldmarketing leder',
+  'rekruttering'
+)
 ```
 
-### 2. Opdater dag-validering
-Sørg for at "Ingen vagt" advarslen kun vises når `hasShiftOnDay()` returnerer false, og at individuelle vagter i `shift` tabellen korrekt genkendes (dette ser ud til at virke baseret på netværksdata).
+### Thomas Wehages data:
+- **job_title**: "Assisterende Teamleder FM" ❌ (matcher ikke)
+- **system_role_key**: "assisterende_teamleder_fm"
+- Ingen entry i `system_roles` tabellen
 
-### 3. Fjern forkert "Allerede booket" advarsel
-`employeesAlreadyBooked` beregningen skal også kun tjekke de faktisk valgte dage, ikke alle dage i ugen.
+## Løsning
+Opdater `is_teamleder_or_above()` funktionen til at inkludere "assisterende teamleder fm" i job title listen.
 
-## Filer der skal ændres
-- `src/components/vagt-flow/EditBookingDialog.tsx`
+### SQL Migration:
+```sql
+CREATE OR REPLACE FUNCTION public.is_teamleder_or_above(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.system_roles
+    WHERE user_id = _user_id AND role IN ('teamleder', 'ejer')
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.employee_master_data
+    WHERE auth_user_id = _user_id 
+      AND is_active = true
+      AND LOWER(job_title) IN (
+        'ejer', 
+        'teamleder', 
+        'assisterende teamleder', 
+        'assisterende teamleder fm',  -- NY TILFØJELSE
+        'fieldmarketing leder',
+        'rekruttering'
+      )
+  )
+$$;
+```
+
+## Påvirkede tabeller
+Denne funktion bruges i RLS-politikker for:
+- `absence_request_v2` (fraværsanmodninger)
+- Muligvis andre tabeller der kræver leder-adgang
 
 ## Forventet resultat
-- Marco, Lucas og Frederik kan bookes til lørdag/søndag
-- "(Booket)" status vises kun for medarbejdere der faktisk er booket på de valgte dage
-- Knappen viser "Tilføj 2 vagter" i stedet for "Tilføj 0 vagter"
+Efter ændringen vil Thomas Wehage kunne:
+- Oprette fraværsanmodninger for teammedlemmer
+- Opdatere eksisterende fravær
+- Slette fravær
 
+## Alternativ løsning
+Tilføj Thomas til `system_roles` tabellen med rollen 'teamleder':
+```sql
+INSERT INTO system_roles (user_id, role)
+VALUES ('cb0eb55a-f2dc-476a-b09a-f8e7cb2e3f45', 'teamleder');
+```
+Men den primære løsning (opdatering af funktionen) er bedre da den gælder alle fremtidige "Assisterende Teamleder FM" ansatte.
