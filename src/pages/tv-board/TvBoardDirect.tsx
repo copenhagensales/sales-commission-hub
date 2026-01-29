@@ -19,6 +19,7 @@ import EesyTmDashboard from "@/pages/EesyTmDashboard";
 import TdcErhvervDashboard from "@/pages/TdcErhvervDashboard";
 import RelatelDashboard from "@/pages/RelatelDashboard";
 import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
+import UnitedDashboard from "@/pages/UnitedDashboard";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
@@ -27,7 +28,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "eesy-tm": EesyTmDashboard,
   "tdc-erhverv": TdcErhvervDashboard,
   "relatel": RelatelDashboard,
-  "united": TdcErhvervDashboard,
+  "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,
 };
 
