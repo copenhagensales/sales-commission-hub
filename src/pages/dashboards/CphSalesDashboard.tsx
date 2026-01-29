@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -92,11 +92,11 @@ export default function CphSalesDashboard() {
   const todayStr = format(today, "yyyy-MM-dd");
   const tvMode = isTvMode();
   
-  // Date range state for "Salg per opgave" - default to payroll period (15th to 14th)
-  const defaultPayrollPeriod = getPayrollPeriod(new Date());
+  // Date range state for "Salg per opgave" - default to today
+  const todayStart = startOfDay(today);
   const [salesDateRange, setSalesDateRange] = useState<DateRange | undefined>({
-    from: defaultPayrollPeriod.start,
-    to: defaultPayrollPeriod.end,
+    from: todayStart,
+    to: today,
   });
   const [isCustomSalesRange, setIsCustomSalesRange] = useState(false);
   
@@ -308,8 +308,8 @@ export default function CphSalesDashboard() {
   });
 
   // Fetch sales for selected date range (for "Salg per opgave" section)
-  const salesPeriodStart = salesDateRange?.from ? format(salesDateRange.from, "yyyy-MM-dd") : format(defaultPayrollPeriod.start, "yyyy-MM-dd");
-  const salesPeriodEnd = salesDateRange?.to ? format(salesDateRange.to, "yyyy-MM-dd") : format(defaultPayrollPeriod.end, "yyyy-MM-dd");
+  const salesPeriodStart = salesDateRange?.from ? format(salesDateRange.from, "yyyy-MM-dd") : format(todayStart, "yyyy-MM-dd");
+  const salesPeriodEnd = salesDateRange?.to ? format(salesDateRange.to, "yyyy-MM-dd") : format(today, "yyyy-MM-dd");
   
   const { data: periodSalesData } = useQuery({
     queryKey: ["cph-dashboard-period-sales", salesPeriodStart, salesPeriodEnd],
