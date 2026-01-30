@@ -1,34 +1,76 @@
 
-# Plan: Ret TV Link mapping for United Dashboard
+# Plan: Ret United Dashboard TV Mode Data
 
 ## Problem
-Når du opretter et TV Link på United dashboard'et, vises TDC Erhverv dashboard i stedet for United dashboard. 
+TV-versionen af United dashboardet viser "Ingen salg" og 0 i alle KPI-kort, mens den normale browser-version viser korrekt data (877 salg denne uge, 1705 i lønperiode, osv.).
 
-Dette skyldes at `TvBoardDirect.tsx` og `TvBoardView.tsx` har en hård-kodet mapping hvor "united" slug'en fejlagtigt peger på `TdcErhvervDashboard` komponenten.
+## Root Cause
+Alle data-queries i `UnitedDashboard.tsx` er deaktiveret i TV mode med `enabled: !tvMode`:
+
+1. **Team ID query** (linje 134): `enabled: !tvMode` → `unitedTeamId` er `null` i TV mode
+2. **Leaderboards** (linje 145): `enabled: !tvMode && !!unitedTeamId` → dobbelt deaktiveret
+3. **Client sales** (linje 220): `enabled: !tvMode` → ingen opgave-data
+4. **Client hours** (linje 312): `enabled: !tvMode` → ingen timer-data
+5. **Avatars** (linje 333): `enabled: !tvMode` → ingen avatars
 
 ## Løsning
-Opdater begge TV Board filer til at importere og bruge `UnitedDashboard` komponenten for "united" slug'en.
+Opdater `UnitedDashboard.tsx` til at hente data i **begge** modes (ligesom TdcErhvervDashboard gør):
 
-## Tekniske ændringer
+### Tekniske ændringer
 
-### 1. TvBoardDirect.tsx
-- Tilføj import af `UnitedDashboard` fra `@/pages/UnitedDashboard`
-- Ret mapping i `dashboardComponents` fra:
-  ```typescript
-  "united": TdcErhvervDashboard
-  ```
-  til:
-  ```typescript
-  "united": UnitedDashboard
-  ```
+1. **Team ID query** - Fjern `!tvMode` betingelse:
+   ```typescript
+   // FØR:
+   enabled: !tvMode
+   
+   // EFTER:
+   enabled: true
+   ```
 
-### 2. TvBoardView.tsx  
-- Tilføj import af `UnitedDashboard` fra `@/pages/UnitedDashboard`
-- Ret samme mapping i `dashboardComponents`
+2. **Cached Leaderboards** - Fjern `!tvMode` betingelse:
+   ```typescript
+   // FØR:
+   { enabled: !tvMode && !!unitedTeamId, limit: 30 }
+   
+   // EFTER:
+   { enabled: !!unitedTeamId, limit: 30 }
+   ```
+
+3. **Client sales data** - Fjern `!tvMode` betingelse:
+   ```typescript
+   // FØR:
+   enabled: !tvMode && !!teamClients && teamClients.length > 0
+   
+   // EFTER:
+   enabled: !!teamClients && teamClients.length > 0
+   ```
+
+4. **Client hours queries** - Fjern `!tvMode` betingelse:
+   ```typescript
+   // FØR:
+   enabled: !tvMode && !!teamClients && teamClients.length > 0
+   
+   // EFTER:
+   enabled: !!teamClients && teamClients.length > 0
+   ```
+
+5. **Employee avatars** - Fjern `!tvMode` betingelse:
+   ```typescript
+   // FØR:
+   enabled: !tvMode
+   
+   // EFTER:
+   enabled: true
+   ```
 
 ## Påvirkede filer
-- `src/pages/tv-board/TvBoardDirect.tsx` (2 ændringer: import + mapping)
-- `src/pages/tv-board/TvBoardView.tsx` (2 ændringer: import + mapping)
+- `src/pages/UnitedDashboard.tsx` (5 ændringer)
+
+## Hvorfor dette virker
+TdcErhvervDashboard og andre dashboards bruger `kpi_leaderboard_cache` tabellen, som har en public RLS policy der tillader læseadgang uden auth. Ved at fjerne `!tvMode` betingelserne vil United dashboardet kunne hente cached data via de samme mekanismer.
 
 ## Test
-Efter ændringen vil TV link med koden "8T9N" korrekt vise United dashboard i stedet for TDC Erhverv.
+Efter ændringen vil TV link med koden "8T9N" vise:
+- Korrekte KPI-tal (877 uge, 1705 løn osv.)
+- Sælger-leaderboards med data
+- "Salg per opgave" sektion med opgave-breakdown
