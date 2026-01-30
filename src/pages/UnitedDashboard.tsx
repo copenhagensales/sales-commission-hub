@@ -131,7 +131,7 @@ export default function UnitedDashboard() {
         .maybeSingle();
       return team?.id || null;
     },
-    enabled: !tvMode
+    enabled: true
   });
 
   // Use cached leaderboards for team-scoped data (much faster than useDashboardSalesData)
@@ -142,7 +142,7 @@ export default function UnitedDashboard() {
     isLoading: leaderboardsLoading 
   } = useCachedLeaderboards(
     { type: "team", id: unitedTeamId || null },
-    { enabled: !tvMode && !!unitedTeamId, limit: 30 }
+    { enabled: !!unitedTeamId, limit: 30 }
   );
 
   // Fetch per-client sales data with actual hours using useDashboardSalesData pattern
@@ -217,7 +217,7 @@ export default function UnitedDashboard() {
 
       return results.sort((a, b) => b.salesMonth - a.salesMonth);
     },
-    enabled: !tvMode && !!teamClients && teamClients.length > 0
+    enabled: !!teamClients && teamClients.length > 0
   });
 
   // Fetch actual hours per client using shift data via employee_agent_mapping
@@ -309,7 +309,7 @@ export default function UnitedDashboard() {
 
       return hoursMap;
     },
-    enabled: !tvMode && !!teamClients && teamClients.length > 0
+    enabled: !!teamClients && teamClients.length > 0
   });
 
   // Fetch employee avatars
@@ -330,7 +330,7 @@ export default function UnitedDashboard() {
       });
       return avatarMap;
     },
-    enabled: !tvMode
+    enabled: true
   });
 
   // Map cached leaderboard entries to seller format
