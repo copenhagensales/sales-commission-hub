@@ -710,7 +710,8 @@ Deno.serve(async (req) => {
       }
     });
     
-    // Calculate global leaderboards for each period
+    // Calculate global leaderboards for each period and SAVE IMMEDIATELY
+    const globalLeaderboards: LeaderboardCache[] = [];
     for (const period of periods) {
       try {
         const leaderboard = await calculateGlobalLeaderboard(
@@ -723,7 +724,7 @@ Deno.serve(async (req) => {
           30 // Top 30
         );
         
-        leaderboardCaches.push({
+        globalLeaderboards.push({
           period_type: period.type,
           scope_type: "global",
           scope_id: null,
@@ -737,12 +738,23 @@ Deno.serve(async (req) => {
       }
     }
     
+    // SAVE GLOBAL LEADERBOARDS IMMEDIATELY (most critical for dashboards)
+    if (globalLeaderboards.length > 0) {
+      const { error: globalError } = await supabase
+        .from("kpi_leaderboard_cache")
+        .upsert(globalLeaderboards, { onConflict: "period_type,scope_type,scope_id" });
+      if (globalError) console.error("Error saving global leaderboards:", globalError);
+      else console.log(`Saved ${globalLeaderboards.length} global leaderboards`);
+      leaderboardCaches.push(...globalLeaderboards);
+    }
+    
     // Fetch teams for team-scoped leaderboards
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name");
     
-    // Calculate team-scoped leaderboards
+    // Calculate team-scoped leaderboards and SAVE AFTER EACH TEAM
+    const teamLeaderboards: LeaderboardCache[] = [];
     for (const team of (teams || []) as { id: string; name: string }[]) {
       for (const period of periods) {
         try {
@@ -757,7 +769,7 @@ Deno.serve(async (req) => {
             20 // Top 20 per team
           );
           
-          leaderboardCaches.push({
+          teamLeaderboards.push({
             period_type: period.type,
             scope_type: "team",
             scope_id: team.id,
@@ -769,10 +781,21 @@ Deno.serve(async (req) => {
         }
       }
     }
+    
+    // SAVE ALL TEAM LEADERBOARDS (critical for United dashboard)
+    if (teamLeaderboards.length > 0) {
+      const { error: teamError } = await supabase
+        .from("kpi_leaderboard_cache")
+        .upsert(teamLeaderboards, { onConflict: "period_type,scope_type,scope_id" });
+      if (teamError) console.error("Error saving team leaderboards:", teamError);
+      else console.log(`Saved ${teamLeaderboards.length} team leaderboards`);
+      leaderboardCaches.push(...teamLeaderboards);
+    }
 
     // ============= CLIENT-SCOPED LEADERBOARD CACHE CALCULATION =============
     console.log("Calculating client-scoped leaderboards...");
     
+    const clientLeaderboards: LeaderboardCache[] = [];
     for (const client of clientList) {
       for (const period of periods) {
         try {
@@ -787,7 +810,7 @@ Deno.serve(async (req) => {
             30 // Top 30 per client
           );
           
-          leaderboardCaches.push({
+          clientLeaderboards.push({
             period_type: period.type,
             scope_type: "client",
             scope_id: client.id,
@@ -802,6 +825,16 @@ Deno.serve(async (req) => {
           console.error(`Error calculating client leaderboard for ${client.name} ${period.type}:`, err);
         }
       }
+    }
+    
+    // SAVE ALL CLIENT LEADERBOARDS 
+    if (clientLeaderboards.length > 0) {
+      const { error: clientError } = await supabase
+        .from("kpi_leaderboard_cache")
+        .upsert(clientLeaderboards, { onConflict: "period_type,scope_type,scope_id" });
+      if (clientError) console.error("Error saving client leaderboards:", clientError);
+      else console.log(`Saved ${clientLeaderboards.length} client leaderboards`);
+      leaderboardCaches.push(...clientLeaderboards);
     }
 
     // Upsert all cached KPI values
@@ -818,19 +851,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert all leaderboard caches
-    if (leaderboardCaches.length > 0) {
-      const { error: leaderboardError } = await supabase
-        .from("kpi_leaderboard_cache")
-        .upsert(leaderboardCaches, {
-          onConflict: "period_type,scope_type,scope_id",
-        });
-
-      if (leaderboardError) {
-        console.error("Error upserting leaderboard caches:", leaderboardError);
-        throw leaderboardError;
-      }
-    }
+    // NOTE: Leaderboards are now saved progressively above (global, team, client batches)
+    // This ensures data is persisted even if the function times out later
 
     console.log(`Successfully calculated ${cachedValues.length} KPI values and ${leaderboardCaches.length} leaderboards`);
 
@@ -1665,11 +1687,15 @@ async function calculateTotalRevenue(
 }
 
 // Shared shift data cache for performance (fetched once per execution)
-let shiftDataCache: {
+// OPTIMIZED: Cache structure and timestamps separately to avoid refetching for each date range
+let shiftConfigCache: {
   teamMembers: TeamMemberShift[];
   primaryShifts: TeamStandardShift[];
   shiftDays: ShiftDay[];
-  timeStampsData: TimeStampRecord[];
+} | null = null;
+
+let timestampCache: {
+  data: TimeStampRecord[];
   startDate: string;
   endDate: string;
 } | null = null;
@@ -1678,73 +1704,123 @@ async function fetchShiftData(
   supabase: SupabaseClient,
   startStr: string,
   endStr: string
-): Promise<typeof shiftDataCache> {
-  // Return cached data if available and date range matches
-  if (shiftDataCache && shiftDataCache.startDate === startStr && shiftDataCache.endDate === endStr) {
-    return shiftDataCache;
+): Promise<{
+  teamMembers: TeamMemberShift[];
+  primaryShifts: TeamStandardShift[];
+  shiftDays: ShiftDay[];
+  timeStampsData: TimeStampRecord[];
+  startDate: string;
+  endDate: string;
+} | null> {
+  // Fetch static shift configuration ONCE (team members, shifts, shift days don't change per date range)
+  if (!shiftConfigCache) {
+    console.log("[HoursCalc] Fetching shift configuration data (one-time)...");
+    
+    // Fetch team members
+    const { data: teamMembersData } = await supabase
+      .from("team_members")
+      .select("employee_id, team_id");
+    
+    const teamMembers = (teamMembersData || []) as TeamMemberShift[];
+    const teamIds = [...new Set(teamMembers.map(tm => tm.team_id))];
+    
+    // Fetch primary shifts for all teams
+    const { data: shiftsData } = await supabase
+      .from("team_standard_shifts")
+      .select("id, team_id, start_time, end_time, hours_source")
+      .in("team_id", teamIds.length > 0 ? teamIds : ['no-teams'])
+      .eq("is_active", true);
+    
+    const primaryShifts = (shiftsData || []) as TeamStandardShift[];
+    
+    // Fetch shift days for all shifts
+    const shiftIds = primaryShifts.map(s => s.id);
+    const { data: daysData } = await supabase
+      .from("team_standard_shift_days")
+      .select("shift_id, day_of_week, start_time, end_time")
+      .in("shift_id", shiftIds.length > 0 ? shiftIds : ['no-shifts']);
+    
+    const shiftDays = (daysData || []) as ShiftDay[];
+    
+    shiftConfigCache = { teamMembers, primaryShifts, shiftDays };
+    console.log(`[HoursCalc] Loaded ${teamMembers.length} team members, ${primaryShifts.length} shifts, ${shiftDays.length} shift days`);
   }
-
-  console.log("[HoursCalc] Fetching shift configuration data...");
   
-  // Fetch team members
-  const { data: teamMembersData } = await supabase
-    .from("team_members")
-    .select("employee_id, team_id");
-  
-  const teamMembers = (teamMembersData || []) as TeamMemberShift[];
-  const teamIds = [...new Set(teamMembers.map(tm => tm.team_id))];
-  
-  // Fetch primary shifts for all teams
-  const { data: shiftsData } = await supabase
-    .from("team_standard_shifts")
-    .select("id, team_id, start_time, end_time, hours_source")
-    .in("team_id", teamIds)
-    .eq("is_active", true);
-  
-  const primaryShifts = (shiftsData || []) as TeamStandardShift[];
-  
-  // Fetch shift days for all shifts
-  const { data: daysData } = await supabase
-    .from("team_standard_shift_days")
-    .select("shift_id, day_of_week, start_time, end_time")
-    .in("shift_id", primaryShifts.map(s => s.id));
-  
-  const shiftDays = (daysData || []) as ShiftDay[];
-  
-  // Fetch timestamps for teams using 'timestamp' hours_source
-  const teamsUsingTimestamps = primaryShifts
+  // Fetch timestamps only if needed and date range differs or extends beyond cached range
+  let timeStampsData: TimeStampRecord[] = [];
+  const teamsUsingTimestamps = shiftConfigCache.primaryShifts
     .filter(s => s.hours_source === "timestamp")
     .map(s => s.team_id);
   
-  let timeStampsData: TimeStampRecord[] = [];
   if (teamsUsingTimestamps.length > 0) {
-    const employeesWithTimestampTeams = teamMembers
-      .filter(tm => teamsUsingTimestamps.includes(tm.team_id))
-      .map(tm => tm.employee_id);
+    // Check if we need to fetch timestamps (new range or no cache)
+    const needsFetch = !timestampCache || 
+      new Date(startStr) < new Date(timestampCache.startDate) ||
+      new Date(endStr) > new Date(timestampCache.endDate);
     
-    if (employeesWithTimestampTeams.length > 0) {
-      const { data: stamps } = await supabase
-        .from("time_stamps")
-        .select("employee_id, clock_in, clock_out, break_minutes")
-        .in("employee_id", employeesWithTimestampTeams)
-        .gte("clock_in", startStr)
-        .lte("clock_in", endStr);
+    if (needsFetch) {
+      // Determine the widest range we might need (payroll period is typically widest)
+      const fetchStart = timestampCache && new Date(startStr) >= new Date(timestampCache.startDate) 
+        ? timestampCache.startDate 
+        : startStr;
+      const fetchEnd = timestampCache && new Date(endStr) <= new Date(timestampCache.endDate)
+        ? timestampCache.endDate
+        : endStr;
       
-      timeStampsData = (stamps || []) as TimeStampRecord[];
+      const employeesWithTimestampTeams = shiftConfigCache.teamMembers
+        .filter(tm => teamsUsingTimestamps.includes(tm.team_id))
+        .map(tm => tm.employee_id);
+      
+      if (employeesWithTimestampTeams.length > 0) {
+        console.log(`[HoursCalc] Fetching timestamps for ${employeesWithTimestampTeams.length} employees...`);
+        const { data: stamps } = await supabase
+          .from("time_stamps")
+          .select("employee_id, clock_in, clock_out, break_minutes")
+          .in("employee_id", employeesWithTimestampTeams)
+          .gte("clock_in", fetchStart)
+          .lte("clock_in", fetchEnd);
+        
+        timestampCache = {
+          data: (stamps || []) as TimeStampRecord[],
+          startDate: fetchStart,
+          endDate: fetchEnd
+        };
+      }
+    }
+    
+    // Filter cached timestamps to requested range
+    if (timestampCache) {
+      timeStampsData = timestampCache.data.filter(ts => {
+        if (!ts.clock_in) return false;
+        const tsDate = new Date(ts.clock_in);
+        return tsDate >= new Date(startStr) && tsDate <= new Date(endStr);
+      });
     }
   }
   
-  shiftDataCache = { teamMembers, primaryShifts, shiftDays, timeStampsData, startDate: startStr, endDate: endStr };
-  console.log(`[HoursCalc] Loaded ${teamMembers.length} team members, ${primaryShifts.length} shifts, ${shiftDays.length} shift days`);
-  
-  return shiftDataCache;
+  return { 
+    ...shiftConfigCache, 
+    timeStampsData, 
+    startDate: startStr, 
+    endDate: endStr 
+  };
 }
+
+// Type for the shift data returned by fetchShiftData
+type ShiftDataResult = {
+  teamMembers: TeamMemberShift[];
+  primaryShifts: TeamStandardShift[];
+  shiftDays: ShiftDay[];
+  timeStampsData: TimeStampRecord[];
+  startDate: string;
+  endDate: string;
+};
 
 function calculateHoursForEmployees(
   employeeIds: string[],
   startStr: string,
   endStr: string,
-  shiftData: NonNullable<typeof shiftDataCache>
+  shiftData: ShiftDataResult
 ): number {
   const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
   
@@ -1758,19 +1834,19 @@ function calculateHoursForEmployees(
     const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
     
     for (const empId of employeeIds) {
-      const empTeam = teamMembers.find(tm => tm.employee_id === empId);
+      const empTeam = teamMembers.find((tm: TeamMemberShift) => tm.employee_id === empId);
       if (!empTeam) continue;
       
-      const empShift = primaryShifts.find(s => s.team_id === empTeam.team_id);
+      const empShift = primaryShifts.find((s: TeamStandardShift) => s.team_id === empTeam.team_id);
       if (!empShift) continue;
       
       const hoursSource = empShift.hours_source || "shift";
-      const empShiftDays = shiftDays.filter(sd => sd.shift_id === empShift.id);
-      const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
+      const empShiftDays = shiftDays.filter((sd: ShiftDay) => sd.shift_id === empShift.id);
+      const shiftForDay = empShiftDays.find((sd: ShiftDay) => sd.day_of_week === adjustedDayOfWeek);
       
       let hours = 0;
       if (hoursSource === "timestamp") {
-        const empTimestamp = timeStampsData.find(ts => ts.employee_id === empId && ts.date === dateStr);
+        const empTimestamp = timeStampsData.find((ts: TimeStampRecord) => ts.employee_id === empId && ts.date === dateStr);
         if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
           const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
           const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
