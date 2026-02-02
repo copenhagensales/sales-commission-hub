@@ -206,3 +206,6 @@ verify_jwt = false
 
 [functions.import-economic-zip]
 verify_jwt = false
+
+[functions.adversus-lead-check]
+verify_jwt = false
