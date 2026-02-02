@@ -47,14 +47,28 @@ export class AdversusAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
-  private async get(endpoint: string) {
-    // Use /v1 for standard endpoints
-    const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
-      headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
-    });
-    if (res.status === 429) throw new Error("Rate Limit Adversus Excedido");
-    if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
-    return await res.json();
+  private async get(endpoint: string, retries = 3, baseDelay = 1000): Promise<any> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
+        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
+      });
+
+      if (res.status === 429) {
+        if (attempt === retries) {
+          throw new Error("Rate Limit Adversus Excedido (after retries)");
+        }
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`[Adversus] Rate limited, waiting ${delay}ms before retry ${attempt}/${retries}`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
+      return await res.json();
+    }
+    // Should not reach here but TypeScript needs return
+    throw new Error("Adversus API Error: Retries exhausted");
   }
 
   async fetchUsers(): Promise<StandardUser[]> {
@@ -355,23 +369,36 @@ export class AdversusAdapter implements DialerAdapter {
     let totalLeads = 0;
     let totalOpps = 0;
 
-    for (const { campaignId, oppFieldId } of campaignConfigs) {
-      try {
-        const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
-        const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
+    for (let configIndex = 0; configIndex < campaignConfigs.length; configIndex++) {
+      const { campaignId, oppFieldId } = campaignConfigs[configIndex];
+      let retryAttempt = 0;
+      const maxRetries = 3;
+      
+      while (retryAttempt < maxRetries) {
+        try {
+          const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
+          const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
 
-        const res = await fetch(url, {
-          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
-        });
+          const res = await fetch(url, {
+            headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
+          });
 
-        if (!res.ok) {
-          console.log(`[Adversus] Campaign ${campaignId}: Failed (${res.status})`);
-          // Delay extra si es rate limit
           if (res.status === 429) {
-            await new Promise(r => setTimeout(r, 1000));
+            retryAttempt++;
+            if (retryAttempt >= maxRetries) {
+              console.log(`[Adversus] Campaign ${campaignId}: Rate limited, max retries reached`);
+              break;
+            }
+            const delay = 2000 * Math.pow(2, retryAttempt - 1);
+            console.log(`[Adversus] Rate limited on campaign ${campaignId}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
           }
-          continue;
-        }
+
+          if (!res.ok) {
+            console.log(`[Adversus] Campaign ${campaignId}: Failed (${res.status})`);
+            break;
+          }
 
         const data = await res.json();
         const leads = data.leads || data || [];
@@ -417,14 +444,17 @@ export class AdversusAdapter implements DialerAdapter {
           });
         }
 
-        totalLeads += leads.length;
-        totalOpps += oppsFound;
-        console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs`);
+          totalLeads += leads.length;
+          totalOpps += oppsFound;
+          console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs`);
 
-        // Delay entre requests para evitar rate limit
-        await new Promise(r => setTimeout(r, 100));
-      } catch (e) {
-        console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
+          // Delay mellem requests for at undgå rate limit (øget fra 100ms til 250ms)
+          await new Promise(r => setTimeout(r, 250));
+          break; // Success, exit retry loop
+        } catch (e) {
+          console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
+          break; // Exit retry loop on error
+        }
       }
     }
 
@@ -490,9 +520,9 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
         
-        // Delay between batches to avoid rate limiting
+        // Delay between batches to avoid rate limiting (øget fra 200ms til 400ms)
         if (i + batchSize < missingLeadIds.length) {
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 400));
         }
       }
       
@@ -560,35 +590,55 @@ export class AdversusAdapter implements DialerAdapter {
 
     while (hasMore && page <= 100) { // Max 100,000 ventas
       const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+      let retryAttempt = 0;
+      const maxRetries = 3;
 
-      try {
-        const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
+      while (retryAttempt < maxRetries) {
+        try {
+          const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
-        if (!res.ok) {
-          console.log(`[Adversus] Page ${page} failed with status ${res.status}`);
+          if (res.status === 429) {
+            retryAttempt++;
+            if (retryAttempt >= maxRetries) {
+              console.log(`[Adversus] Page ${page}: Rate limited, max retries reached`);
+              hasMore = false;
+              break;
+            }
+            const delay = 2000 * Math.pow(2, retryAttempt - 1);
+            console.log(`[Adversus] Rate limited on page ${page}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+
+          if (!res.ok) {
+            console.log(`[Adversus] Page ${page} failed with status ${res.status}`);
+            hasMore = false;
+            break;
+          }
+
+          const data = await res.json();
+          const pageData = data.sales || data || [];
+
+          if (pageData.length === 0) {
+            hasMore = false;
+          } else {
+            allSales.push(...pageData);
+            console.log(`[Adversus] Page ${page}: ${pageData.length} sales (total: ${allSales.length})`);
+
+            if (pageData.length < pageSize) {
+              hasMore = false; // Última página incompleta
+            } else {
+              page++;
+              // Delay for at undgå rate limit (øget fra 50ms til 150ms)
+              await new Promise(r => setTimeout(r, 150));
+            }
+          }
+          break; // Success, exit retry loop
+        } catch (e) {
+          console.error(`[Adversus] Error fetching page ${page}:`, e);
+          hasMore = false;
           break;
         }
-
-        const data = await res.json();
-        const pageData = data.sales || data || [];
-
-        if (pageData.length === 0) {
-          hasMore = false;
-        } else {
-          allSales.push(...pageData);
-          console.log(`[Adversus] Page ${page}: ${pageData.length} sales (total: ${allSales.length})`);
-
-          if (pageData.length < pageSize) {
-            hasMore = false; // Última página incompleta
-          } else {
-            page++;
-            // Pequeño delay para evitar rate limit
-            await new Promise(r => setTimeout(r, 50));
-          }
-        }
-      } catch (e) {
-        console.error(`[Adversus] Error fetching page ${page}:`, e);
-        break;
       }
     }
 
