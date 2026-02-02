@@ -1,101 +1,64 @@
 
-# Fix: Adversus Rate Limit Fejl for Relatel_CPHSALES
+# Plan: Opret Lead-Specifik Diagnostik Funktion
 
-## Problem
-Integrationen **Relatel_CPHSALES** fejler konsekvent med "Rate Limit Adversus Excedido" - 10 fejl alene de seneste 2 dage.
+## Problemanalyse
 
-## Root Cause Analyse
+### Hvad vi har opdaget:
+1. **Sales API'en** (`/sales`) returnerer **altid tom** `leadResultData: []` for kampagne 98374 og 101396
+2. **Leads API'en** (`/leads?filters=campaignId`) returnerer **korrekt** `resultData` med felter (bevist af diagnostik for kampagne 85913)
+3. Synkroniseringslogikken i `adversus.ts` henter leads via `/leads` endpoint - men noget går galt for specifikke kampagner
 
-### 1. Samtidig API-kald
-- **2 Adversus integrationer** kører begge hvert 5. minut (`*/5 * * * *`):
-  - `Lovablecph` (26fac751)
-  - `Relatel_CPHSALES` (657c2050)
-- Når de overlapper, rammer den ene Adversus API rate limit
-
-### 2. Manglende retry-logik i `get()` metoden
-Den nuværende kode kaster fejl ved rate limit uden at forsøge igen:
-
-```typescript
-// adversus.ts linje 50-57
-private async get(endpoint: string) {
-  const res = await fetch(...);
-  if (res.status === 429) throw new Error("Rate Limit Adversus Excedido"); // ← Fejler direkte
-  ...
-}
-```
-
-### 3. Ingen staggering af cron jobs
-Begge jobs starter på samme minut, hvilket maximerer API-kollisioner.
+### Root Cause Hypotese:
+Den nuværende synkronisering bruger `/leads?filters=campaignId` til at bygge et lead-cache, men:
+- Kampagne 98374 og 101396 har muligvis for mange leads (>5000 pageSize limit)
+- Eller leads fra disse kampagner er "arkiverede" og ikke inkluderet i standard `/leads` query
 
 ## Løsning
 
-### Ændring 1: Tilføj exponential backoff til `get()` metoden
-I `supabase/functions/integration-engine/adapters/adversus.ts`:
+Opret en ny diagnostik-funktion der tester et **specifikt lead ID** direkte via `/leads/{leadId}` endpoint for at verificere om Adversus API'en returnerer data for det lead.
+
+### Ændringer:
+
+**Fil: `supabase/functions/adversus-lead-check/index.ts`** (NY FIL)
+
+Ny edge function der:
+1. Modtager `integration_name` og `lead_id` som parametre
+2. Henter credentials fra `dialer_integrations`
+3. Kalder `/leads/{leadId}` endpoint direkte
+4. Returnerer det fulde lead objekt inkl. `resultData`
 
 ```typescript
-private async get(endpoint: string, retries = 3, baseDelay = 1000): Promise<any> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
-      headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
-    });
-    
-    if (res.status === 429) {
-      if (attempt === retries) {
-        throw new Error("Rate Limit Adversus Excedido (after retries)");
-      }
-      // Exponential backoff: 1s, 2s, 4s
-      const delay = baseDelay * Math.pow(2, attempt - 1);
-      console.log(`[Adversus] Rate limited, waiting ${delay}ms before retry ${attempt}/${retries}`);
-      await new Promise(r => setTimeout(r, delay));
-      continue;
-    }
-    
-    if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
-    return await res.json();
-  }
-}
+// Nøglefunktionalitet:
+const leadUrl = `${baseUrl}/leads/${leadId}`;
+const leadRes = await fetch(leadUrl, { headers: { Authorization: authHeader } });
+const leadData = await leadRes.json();
+
+return {
+  leadId,
+  hasResultData: (leadData.resultData || []).length > 0,
+  resultData: leadData.resultData,
+  resultFields: buildResultFields(leadData.resultData),
+  fullLead: leadData
+};
 ```
 
-### Ændring 2: Tilføj retry til `fetchSalesSequential()` 
-I samme fil, tilføj retry-logik når sales-pagination rammer rate limit:
+**Fil: `supabase/config.toml`**
+- Tilføj konfiguration for den nye `adversus-lead-check` funktion
 
-```typescript
-// I fetchSalesSequential() - omkring linje 565
-if (res.status === 429) {
-  console.log(`[Adversus] Rate limited on page ${page}, waiting 2s...`);
-  await new Promise(r => setTimeout(r, 2000));
-  continue; // Retry same page
-}
+## Forventet Resultat
+
+Efter deploy kan vi kalde:
+```bash
+curl -X POST /adversus-lead-check \
+  -d '{"integration_name": "Relatel_CPHSALES", "lead_id": "966712638"}'
 ```
 
-### Ændring 3: Tilføj retry til lead-fetching
-I `buildLeadDataMap()` - omkring linje 363:
+Og verificere om:
+- Adversus API'en **kan** returnere resultData for det lead
+- Eller om leadet virkelig ikke har nogen felter udfyldt i Adversus
 
-```typescript
-// Tilføj retry ved rate limit på kampagne lead-fetch
-if (res.status === 429) {
-  console.log(`[Adversus] Rate limited on campaign ${campaignId}, waiting 2s...`);
-  await new Promise(r => setTimeout(r, 2000));
-  // Retry campaign
-  continue;
-}
-```
+## Næste Skridt (Efter Diagnostik)
 
-### Ændring 4: Øg delays mellem API calls
-Nuværende delays er for korte:
-- `fetchSalesSequential`: 50ms → **150ms**
-- `buildLeadDataMap`: 100ms → **250ms**
-- Fallback batch: 200ms → **400ms**
-
-## Påvirkede filer
-- `supabase/functions/integration-engine/adapters/adversus.ts`
-
-## Forventet resultat
-- Rate limit fejl vil blive håndteret automatisk med retry
-- Synkroniseringer vil gennemføres selvom de kortvarigt rammer rate limit
-- Færre fejl i integration logs
-
-## Alternativ/Fremtidig forbedring
-- Stagger cron jobs så de kører forskudt (f.eks. minut 0 og 2)
-- Implementer cursor-baseret resumable sync for store datasæt
-
+Baseret på resultatet:
+1. **Hvis lead HAR data**: Problemet er i synkroniseringslogikken (pagination/caching issue)
+2. **Hvis lead IKKE har data**: Problemet er i Adversus kampagne-konfiguration
