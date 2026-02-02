@@ -9037,6 +9037,12 @@ export type Database = {
           kpi_slug: string
         }[]
       }
+      get_distinct_sales_sources: {
+        Args: never
+        Returns: {
+          source: string
+        }[]
+      }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_employee_roles_for_admin: {
         Args: never

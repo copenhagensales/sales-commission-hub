@@ -178,22 +178,19 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
     });
   }, []);
 
-  // Fetch available API sources dynamically
+  // Fetch available API sources dynamically using RPC for efficiency
   const { data: availableSources = [] } = useQuery({
     queryKey: ["sales-sources"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("source")
-        .not("source", "is", null);
+      const { data, error } = await supabase.rpc('get_distinct_sales_sources');
       
-      if (error) throw error;
+      if (error) {
+        // Fallback: hardcoded list of known sources
+        console.error("Failed to fetch sources:", error);
+        return ["ase", "Eesy", "Lovablecph", "Relatel_CPHSALES", "tryg"];
+      }
       
-      // Get unique sources
-      const uniqueSources = [...new Set(data?.map(s => s.source))]
-        .filter(Boolean) as string[];
-      
-      return uniqueSources.sort();
+      return (data || []).map((d: { source: string }) => d.source).sort();
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
