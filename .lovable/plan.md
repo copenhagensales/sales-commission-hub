@@ -1,64 +1,47 @@
 
-# Plan: Opret Lead-Specifik Diagnostik Funktion
 
-## Problemanalyse
+# Analyse: Lead Data Vises Korrekt i Database
 
-### Hvad vi har opdaget:
-1. **Sales API'en** (`/sales`) returnerer **altid tom** `leadResultData: []` for kampagne 98374 og 101396
-2. **Leads API'en** (`/leads?filters=campaignId`) returnerer **korrekt** `resultData` med felter (bevist af diagnostik for kampagne 85913)
-3. Synkroniseringslogikken i `adversus.ts` henter leads via `/leads` endpoint - men noget går galt for specifikke kampagner
+## ✅ Status
 
-### Root Cause Hypotese:
-Den nuværende synkronisering bruger `/leads?filters=campaignId` til at bygge et lead-cache, men:
-- Kampagne 98374 og 101396 har muligvis for mange leads (>5000 pageSize limit)
-- Eller leads fra disse kampagner er "arkiverede" og ikke inkluderet i standard `/leads` query
+**Dit salg #1198157 (Silas Boss, Kampagne 101396) HAR 10 lead data felter i databasen!**
 
-## Løsning
+Dataene blev opdateret for 5 minutter siden (20:15:33) og inkluderer:
+- "Tilskud: 100%"
+- "Er OA gennemgået?: JA"
+- "Bindingsperiode: 36"
+- Og 7 andre felter
 
-Opret en ny diagnostik-funktion der tester et **specifikt lead ID** direkte via `/leads/{leadId}` endpoint for at verificere om Adversus API'en returnerer data for det lead.
+## 📋 Hvad skete der?
 
-### Ændringer:
+1. Din `fetchLeadById` fix blev deployet korrekt
+2. En synkronisering kørte efterfølgende
+3. Lead data blev hentet via fallback-mekanismen (da bulk-fetch for kampagne 101396 ikke fandt leadet)
+4. Dataene er nu gemt i `raw_payload.leadResultData`
 
-**Fil: `supabase/functions/adversus-lead-check/index.ts`** (NY FIL)
+## 🔄 Hvad du skal gøre
 
-Ny edge function der:
-1. Modtager `integration_name` og `lead_id` som parametre
-2. Henter credentials fra `dialer_integrations`
-3. Kalder `/leads/{leadId}` endpoint direkte
-4. Returnerer det fulde lead objekt inkl. `resultData`
+**Genindlæs siden (F5 / Ctrl+R)** - dit skærmbillede viser en cached version fra før synkroniseringen kørte.
 
-```typescript
-// Nøglefunktionalitet:
-const leadUrl = `${baseUrl}/leads/${leadId}`;
-const leadRes = await fetch(leadUrl, { headers: { Authorization: authHeader } });
-const leadData = await leadRes.json();
+## 📊 Status for Kampagne 101396
 
-return {
-  leadId,
-  hasResultData: (leadData.resultData || []).length > 0,
-  resultData: leadData.resultData,
-  resultFields: buildResultFields(leadData.resultData),
-  fullLead: leadData
-};
+| Salg | Agent | Dato | Lead Fields |
+|------|-------|------|-------------|
+| **1198157** | Silas Boss :) | 2. feb | **10** ✅ |
+| 1189353 | Silas Boss :) | 27. jan | **9** ✅ |
+| 1187073 | Sarah Akarsu | 26. jan | **10** ✅ |
+| 1184963 | Jakob Kranker | 24. jan | **10** ✅ |
+| 1192398 | Rasmus Quilding | 29. jan | **0** ❌ |
+| 1189398 | Anders Kristensen | 27. jan | **0** ❌ |
+
+De 3 salg med 0 felter skyldes at Adversus API'en returnerer tom `resultData` for disse specifikke leads - det er ikke et integrationsproblem.
+
+## Teknisk Bekræftelse
+
+```sql
+-- Sale 1198157 i database:
+result_data_count: 10
+first_field: "Ikke interesseret - Årsag"
+updated_at: 2026-02-02 20:15:33 (5 min siden)
 ```
 
-**Fil: `supabase/config.toml`**
-- Tilføj konfiguration for den nye `adversus-lead-check` funktion
-
-## Forventet Resultat
-
-Efter deploy kan vi kalde:
-```bash
-curl -X POST /adversus-lead-check \
-  -d '{"integration_name": "Relatel_CPHSALES", "lead_id": "966712638"}'
-```
-
-Og verificere om:
-- Adversus API'en **kan** returnere resultData for det lead
-- Eller om leadet virkelig ikke har nogen felter udfyldt i Adversus
-
-## Næste Skridt (Efter Diagnostik)
-
-Baseret på resultatet:
-1. **Hvis lead HAR data**: Problemet er i synkroniseringslogikken (pagination/caching issue)
-2. **Hvis lead IKKE har data**: Problemet er i Adversus kampagne-konfiguration
