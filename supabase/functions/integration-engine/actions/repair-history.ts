@@ -36,11 +36,12 @@ export async function repairHistory(
         p_encryption_key: encryptionKey,
       })
       const adapter = getAdapter(
-        "adversus",
+        integration.provider,
         credentials,
         integration.name,
         integration.api_url,
-        integration.config
+        integration.config,
+        integration.calls_org_codes
       )
       const sales = await adapter.fetchSales(days || 90, campaignMappings)
       const result = await engine.processSales(sales)
