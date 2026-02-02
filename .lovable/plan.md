@@ -1,89 +1,101 @@
 
-# Fix: Manglende Lead Data for salg
+# Fix: Adversus Rate Limit Fejl for Relatel_CPHSALES
 
 ## Problem
-Salget fra screenshottet (Lead: 960554083, Opportunity: 1198157) viser "Lead data ikke modtaget fra kildesystemet" fordi `leadResultData` er tom `[]`.
+Integrationen **Relatel_CPHSALES** fejler konsekvent med "Rate Limit Adversus Excedido" - 10 fejl alene de seneste 2 dage.
 
 ## Root Cause Analyse
 
-### 1. Feltnavn mismatch
-Adversus API returnerer lead result data med **`label`** property:
-```json
-{"id": 74539, "label": "Er OA gennemgået?", "value": "JA"}
-```
+### 1. Samtidig API-kald
+- **2 Adversus integrationer** kører begge hvert 5. minut (`*/5 * * * *`):
+  - `Lovablecph` (26fac751)
+  - `Relatel_CPHSALES` (657c2050)
+- Når de overlapper, rammer den ene Adversus API rate limit
 
-Men koden i `buildLeadDataMap()` søger efter **`name`** property:
+### 2. Manglende retry-logik i `get()` metoden
+Den nuværende kode kaster fejl ved rate limit uden at forsøge igen:
+
 ```typescript
-// Linje 393 i adversus.ts
-if (field && field.name !== undefined) {
-  resultFields[field.name] = field.value;
+// adversus.ts linje 50-57
+private async get(endpoint: string) {
+  const res = await fetch(...);
+  if (res.status === 429) throw new Error("Rate Limit Adversus Excedido"); // ← Fejler direkte
+  ...
 }
 ```
 
-### 2. Kampagne 101396 har ingen lead data
-- Kampagnenavn: "CPH Sales - Blandet"
-- 31 salg total, 0 med lead data (0% coverage)
-- Bulk lead fetch inkluderer denne kampagne, men Adversus API returnerer tom `resultData` for disse leads
-
-### 3. Sammenligning med fungerende kampagner
-| Kampagne | Navn | Total | Med data | Coverage |
-|----------|------|-------|----------|----------|
-| 105958 | CPH Sales - Switch Krydssalgs | 363 | 293 | 81% |
-| 101396 | CPH Sales - Blandet | 31 | 0 | **0%** |
-| 98374 | Cph Sales - Google 1-5 | 77 | 0 | **0%** |
+### 3. Ingen staggering af cron jobs
+Begge jobs starter på samme minut, hvilket maximerer API-kollisioner.
 
 ## Løsning
 
-### Ændring 1: Ret feltnavn i `buildLeadDataMap`
-I `supabase/functions/integration-engine/adapters/adversus.ts` (linje 391-407):
+### Ændring 1: Tilføj exponential backoff til `get()` metoden
+I `supabase/functions/integration-engine/adapters/adversus.ts`:
 
 ```typescript
-// NUVÆRENDE (fejler for label)
-if (field && field.name !== undefined) {
-  resultFields[field.name] = field.value;
-}
-
-// RETTET (støtter både name og label)
-const fieldName = field.name || field.label;
-if (field && fieldName !== undefined) {
-  resultFields[fieldName] = field.value;
+private async get(endpoint: string, retries = 3, baseDelay = 1000): Promise<any> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
+      headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
+    });
+    
+    if (res.status === 429) {
+      if (attempt === retries) {
+        throw new Error("Rate Limit Adversus Excedido (after retries)");
+      }
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.log(`[Adversus] Rate limited, waiting ${delay}ms before retry ${attempt}/${retries}`);
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    
+    if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
+    return await res.json();
+  }
 }
 ```
 
-### Ændring 2: Ret også i fallback-logikken
-I samme fil (linje 456-469), samme rettelse for individuel lead fetch.
-
-### Ændring 3: Gem også label-baserede felter i resultData
-Sørg for at `resultData` gemmes korrekt med label info:
+### Ændring 2: Tilføj retry til `fetchSalesSequential()` 
+I samme fil, tilføj retry-logik når sales-pagination rammer rate limit:
 
 ```typescript
-// Linje 385: Ændre type til at inkludere label
-const resultData: Array<{ 
-  id: number; 
-  name?: string; 
-  label?: string; 
-  type?: string; 
-  value: any 
-}> = lead.resultData || [];
+// I fetchSalesSequential() - omkring linje 565
+if (res.status === 429) {
+  console.log(`[Adversus] Rate limited on page ${page}, waiting 2s...`);
+  await new Promise(r => setTimeout(r, 2000));
+  continue; // Retry same page
+}
 ```
+
+### Ændring 3: Tilføj retry til lead-fetching
+I `buildLeadDataMap()` - omkring linje 363:
+
+```typescript
+// Tilføj retry ved rate limit på kampagne lead-fetch
+if (res.status === 429) {
+  console.log(`[Adversus] Rate limited on campaign ${campaignId}, waiting 2s...`);
+  await new Promise(r => setTimeout(r, 2000));
+  // Retry campaign
+  continue;
+}
+```
+
+### Ændring 4: Øg delays mellem API calls
+Nuværende delays er for korte:
+- `fetchSalesSequential`: 50ms → **150ms**
+- `buildLeadDataMap`: 100ms → **250ms**
+- Fallback batch: 200ms → **400ms**
 
 ## Påvirkede filer
 - `supabase/functions/integration-engine/adapters/adversus.ts`
 
-## Forventet resultat efter fix
-- Fremtidige synkroniseringer vil korrekt gemme lead data med label-baserede felter
-- **OBS**: Eksisterende salg med tom `leadResultData` kræver re-sync for at få data
+## Forventet resultat
+- Rate limit fejl vil blive håndteret automatisk med retry
+- Synkroniseringer vil gennemføres selvom de kortvarigt rammer rate limit
+- Færre fejl i integration logs
 
-## Re-sync af historiske data
-Efter deployment kan du køre en repair sync:
-```
-POST /integration-engine
-{
-  "source": "adversus",
-  "action": "repair-history",
-  "days": 30
-}
-```
+## Alternativ/Fremtidig forbedring
+- Stagger cron jobs så de kører forskudt (f.eks. minut 0 og 2)
+- Implementer cursor-baseret resumable sync for store datasæt
 
-## Alternativ: Manuelt tjek i Adversus
-Hvis kampagne 101396 slet ikke har result fields konfigureret i Adversus admin panel, vil der aldrig komme lead data. Dette skal verificeres direkte i Adversus.
