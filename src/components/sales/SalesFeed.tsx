@@ -55,8 +55,21 @@ interface RawPayload {
   id?: number; // Opportunity/Sales ID
   campaignId?: number;
   leadResultData?: LeadResultField[];
+  data?: Record<string, unknown>; // Enreach/HeroBase format
   [key: string]: unknown;
 }
+
+// Convert Enreach/HeroBase data object to array format
+const convertEnreachDataToFields = (data: Record<string, unknown>): LeadResultField[] => {
+  const excludeKeys = ['uniqueId', 'campaignId', 'status', 'closure', 'lastModifiedTime'];
+  return Object.entries(data)
+    .filter(([key]) => !excludeKeys.includes(key))
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => ({
+      label: key,
+      value: String(value)
+    }));
+};
 
 interface Sale {
   id: string;
@@ -507,12 +520,23 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
     const payload = sale.raw_payload;
     if (!payload) return null;
     
-    const hasLeadResultData = payload.leadResultData && payload.leadResultData.length > 0;
+    // Check for Adversus format first, then Enreach format
+    let leadFields: LeadResultField[] = [];
+    
+    if (payload.leadResultData && payload.leadResultData.length > 0) {
+      // Adversus format
+      leadFields = payload.leadResultData;
+    } else if (payload.data && typeof payload.data === 'object') {
+      // Enreach/HeroBase format - convert to array
+      leadFields = convertEnreachDataToFields(payload.data);
+    }
+    
+    const hasLeadData = leadFields.length > 0;
     const isExpanded = expandedSaleIds.has(sale.id);
-    const fieldCount = hasLeadResultData ? payload.leadResultData!.length : 0;
+    const fieldCount = leadFields.length;
     
     // Determine button label based on available data
-    const buttonLabel = hasLeadResultData 
+    const buttonLabel = hasLeadData 
       ? `${isExpanded ? "Skjul" : "Vis"} lead data (${fieldCount})`
       : `${isExpanded ? "Skjul" : "Vis"} salgsinfo`;
     
@@ -526,9 +550,9 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          {hasLeadResultData ? (
+          {hasLeadData ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-3 pt-3 border-t text-sm">
-              {payload.leadResultData!.map((field, idx) => (
+              {leadFields.map((field, idx) => (
                 <div key={idx} className="space-y-0.5 min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{field.label}</p>
                   <p className="font-medium truncate text-sm" title={field.value || "-"}>
