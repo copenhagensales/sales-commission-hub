@@ -23,12 +23,19 @@ import {
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
+  // Adversus betingelser (Relatel etc.)
   Bindingsperiode: ["12", "24", "36"],
   "Tilfredshedsgaranti - Switch": ["Ja", "Nej"],
   "Tilfredshedsgaranti - MBB": ["Ja", "Nej"],
   Tilskud: ["0%", "100%"],
   "Hoved oms trin": ["ATL", "1", "3", "5"],
   "Omstillingsbruger trin": ["ATL", "1", "3", "5"],
+  
+  // ASE/Enreach betingelser
+  "A-kasse type": ["Lønmodtager", "Ung under uddannelse", "Selvstændig"],
+  "A-kasse salg": ["Ja", "Nej"],
+  "Forening": ["Fagforening med lønsikring", "Ase Lønmodtager"],
+  "Lønsikring": ["Lønsikring Udvidet", "Lønsikring Super"],
 };
 
 interface PricingRule {
