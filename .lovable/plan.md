@@ -1,35 +1,25 @@
-# Plan: Flyt ASE Produktlogik fra Kode til Database-Regler
 
-## Status: ✅ IMPLEMENTERET
+# Ret ASE API URL
 
-### Gennemførte Ændringer
+## Problem
+ASE-integrationen har en forkert API URL der forhindrer synkronisering:
+- **Nuværende**: `Web: https://wshero01.herobase.com/`
+- **Korrekt**: `https://wshero01.herobase.com/api`
 
-#### 1. Database: ASE conditionalRules ✅
-Opdateret `dialer_integrations.config` for ASE med:
-- A-kasse salg + A-kasse type → `akasse - {{A-kasse type}}`
-- Forening = "Fagforening med lønsikring" → `Fagforening med lønsikring`
-- Lønsikring ikke-tom → `{{Lønsikring}}`
+## Løsning
+Opdater `api_url` feltet i `dialer_integrations` tabellen for ASE-integrationen.
 
-#### 2. Database: Nye Produkter ✅
-Oprettet:
-- `akasse - Selvstændig` (350 kr / 800 kr, counts_as_sale=true)
-- `Lønsikring Udvidet` (0 kr / 0 kr, counts_as_sale=false)
-- `Lønsikring Super` (0 kr / 0 kr, counts_as_sale=false)
+```sql
+UPDATE dialer_integrations 
+SET api_url = 'https://wshero01.herobase.com/api'
+WHERE name = 'ase';
+```
 
-#### 3. PricingRuleEditor: ASE Betingelser ✅
-Tilføjet til `CONDITION_OPTIONS`:
-- `A-kasse type`: Lønmodtager, Ung under uddannelse, Selvstændig
-- `A-kasse salg`: Ja, Nej
-- `Forening`: Fagforening med lønsikring, Ase Lønmodtager
-- `Lønsikring`: Lønsikring Udvidet, Lønsikring Super
+## Efter rettelsen
+Når URL'en er rettet, skal du køre en ny synkronisering for ASE (45 dage) for at:
+1. Hente salgsdata fra HeroBase API'et
+2. Anvende de nye `conditionalRules` for produktmapping
+3. Opdatere eksisterende salg med korrekte produkter
 
-#### 4. Integration Engine: Enreach Data Support ✅
-`matchPricingRule()` i `sales.ts` understøtter nu:
-- Adversus: `rawPayload.leadResultData[]`
-- Enreach: `rawPayload.data{}`
-
-## Næste Skridt
-
-1. **Genkør integration-engine** for ASE kampagner for at genberegne produkter og prissætning
-2. **Opret prissætningsregler** via UI for specifikke kombinationer (f.eks. Straksbetaling-tillæg)
-
+## Teknisk note
+Enreach-adapteren har allerede logik til at fjerne `"Web: "` præfikset automatisk, men den manglende `/api` sti er det egentlige problem.
