@@ -323,7 +323,7 @@ export class AdversusAdapter implements DialerAdapter {
   // Interface for lead data with all result fields
   private LeadData = class {
     opp: string | null = null;
-    resultData: Array<{ id: number; name: string; type: string; value: any }> = [];
+    resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = [];
     resultFields: Record<string, any> = {};
   };
 
@@ -331,8 +331,8 @@ export class AdversusAdapter implements DialerAdapter {
   private async buildLeadDataMap(
     sales: any[],
     campaignConfigMap: Map<string, CampaignMappingConfig>
-  ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name: string; type: string; value: any }>; resultFields: Record<string, any> }>> {
-    const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name: string; type: string; value: any }>; resultFields: Record<string, any> }>();
+  ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>> {
+    const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>();
 
     // 1. Obtener campaignIds únicos de las ventas
     const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
@@ -382,7 +382,7 @@ export class AdversusAdapter implements DialerAdapter {
 
         for (const lead of leads) {
           const leadId = String(lead.id);
-          const resultData: Array<{ id: number; name: string; type: string; value: any }> = lead.resultData || [];
+          const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = lead.resultData || [];
 
           // Build resultFields object (name -> value)
           const resultFields: Record<string, any> = {};
@@ -390,9 +390,11 @@ export class AdversusAdapter implements DialerAdapter {
 
           if (Array.isArray(resultData)) {
             for (const field of resultData) {
-              if (field && field.name !== undefined) {
-                // Store field by name
-                resultFields[field.name] = field.value;
+              // Support both 'name' and 'label' properties (Adversus API uses both)
+              const fieldName = field?.name || field?.label;
+              if (field && fieldName !== undefined) {
+                // Store field by name/label
+                resultFields[fieldName] = field.value;
                 
                 // Check for OPP pattern
                 if (field.value) {
@@ -449,14 +451,16 @@ export class AdversusAdapter implements DialerAdapter {
             const leadData = await this.fetchLeadById(leadId);
             
             if (leadData) {
-              const resultData: Array<{ id: number; name: string; type: string; value: any }> = leadData.resultData || [];
+              const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = leadData.resultData || [];
               const resultFields: Record<string, any> = {};
               let opp: string | null = null;
               
               if (Array.isArray(resultData)) {
                 for (const field of resultData) {
-                  if (field && field.name !== undefined) {
-                    resultFields[field.name] = field.value;
+                  // Support both 'name' and 'label' properties (Adversus API uses both)
+                  const fieldName = field?.name || field?.label;
+                  if (field && fieldName !== undefined) {
+                    resultFields[fieldName] = field.value;
                     
                     if (field.value) {
                       const value = String(field.value);
