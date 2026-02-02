@@ -25,6 +25,7 @@ function isExcludedEmail(email: string | null | undefined): boolean {
 
 /**
  * Match a pricing rule based on leadResultData conditions.
+ * Supports both Adversus format (leadResultData[]) and Enreach format (rawPayload.data{}).
  * Returns the matching rule with highest priority, or null if no match.
  */
 function matchPricingRule(
@@ -32,17 +33,34 @@ function matchPricingRule(
   pricingRulesMap: Map<string, PricingRule[]>,
   leadResultData: Array<{ id?: number; label: string; value: string }>,
   campaignMappingId?: string | null,
-  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
+  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
+  rawPayloadData?: Record<string, unknown> // NEW: Support for Enreach/HeroBase data format
 ): { commission: number; revenue: number; ruleId: string; ruleName: string } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
+
+  // Combine Adversus leadResultData with Enreach rawPayloadData into unified format
+  const allFields: Array<{ label: string; value: string }> = [...leadResultData];
+  
+  // Convert Enreach rawPayload.data object to the same array format
+  if (rawPayloadData && typeof rawPayloadData === 'object') {
+    for (const [key, value] of Object.entries(rawPayloadData)) {
+      // Skip internal fields and null/undefined values
+      if (value !== null && value !== undefined && value !== '') {
+        // Don't add duplicates if already in leadResultData
+        if (!allFields.some(f => f.label === key)) {
+          allFields.push({ label: key, value: String(value) });
+        }
+      }
+    }
+  }
 
   // Sort by priority descending (highest first)
   const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
 
   // Track if we have conditional rules but empty lead data
   const hasConditionalRules = sortedRules.some(r => r.is_active && Object.keys(r.conditions || {}).length > 0);
-  const hasEmptyLeadData = !leadResultData || leadResultData.length === 0;
+  const hasEmptyLeadData = allFields.length === 0;
   
   if (hasConditionalRules && hasEmptyLeadData) {
     log?.("WARN", `Product ${productId} has conditional pricing rules but leadResultData is empty - checking for campaign fallback`);
@@ -59,15 +77,15 @@ function matchPricingRule(
       continue;
     }
 
-    // Check all conditions match
+    // Check all conditions match using unified allFields
     const conditions = rule.conditions || {};
     const conditionKeys = Object.keys(conditions);
     let allConditionsMet = true;
     let failedCondition: string | null = null;
 
     for (const [condKey, condValue] of Object.entries(conditions)) {
-      // Find the matching field in leadResultData
-      const leadField = leadResultData.find(f => f.label === condKey);
+      // Find the matching field in allFields (combined Adversus + Enreach data)
+      const leadField = allFields.find(f => f.label === condKey);
       if (!leadField || leadField.value !== condValue) {
         allConditionsMet = false;
         failedCondition = condKey;
@@ -175,8 +193,11 @@ function prepareSaleItems(
   itemsArray: any[],
   log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
-  // Extract leadResultData from rawPayload
+  // Extract leadResultData from rawPayload (Adversus format)
   const leadResultData = (sale.rawPayload?.leadResultData as Array<{ id?: number; label: string; value: string }>) || [];
+  
+  // Extract rawPayload.data (Enreach/HeroBase format) for pricing rule matching
+  const rawPayloadData = sale.rawPayload?.data as Record<string, unknown> | undefined;
   
   // Get campaign mapping ID for this sale
   const campaignMappingId = sale.campaignId ? campaignMappingsMap.get(sale.campaignId) : null;
@@ -193,13 +214,14 @@ function prepareSaleItems(
     const qty = p.quantity || 1
 
     if (productId) {
-      // First: try to match a pricing rule based on leadResultData conditions
+      // First: try to match a pricing rule based on leadResultData (Adversus) or rawPayload.data (Enreach)
       const matchedRule = matchPricingRule(
         productId,
         pricingRulesMap,
         leadResultData,
         campaignMappingId,
-        log
+        log,
+        rawPayloadData  // Pass Enreach data for condition matching
       );
 
       if (matchedRule) {
