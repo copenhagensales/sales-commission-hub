@@ -534,6 +534,7 @@ export class AdversusAdapter implements DialerAdapter {
 
   /**
    * Fetch a single lead by ID - used as fallback when bulk fetch misses leads
+   * NOTE: Adversus API returns { leads: [...] } even for single-lead queries
    */
   private async fetchLeadById(leadId: string): Promise<any | null> {
     try {
@@ -557,7 +558,12 @@ export class AdversusAdapter implements DialerAdapter {
           return null;
         }
         
-        return await retryRes.json();
+        const data = await retryRes.json();
+        // Handle wrapped response: { leads: [...] }
+        if (data?.leads && Array.isArray(data.leads)) {
+          return data.leads[0] || null;
+        }
+        return data;
       }
       
       if (!res.ok) {
@@ -565,7 +571,12 @@ export class AdversusAdapter implements DialerAdapter {
         return null;
       }
       
-      return await res.json();
+      const data = await res.json();
+      // Handle wrapped response: { leads: [...] }
+      if (data?.leads && Array.isArray(data.leads)) {
+        return data.leads[0] || null;
+      }
+      return data;
     } catch (e) {
       console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
       return null;
