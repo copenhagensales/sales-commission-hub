@@ -1,76 +1,74 @@
 
-# Plan: Ret United Dashboard TV Mode Data
+# Fix: TV Dashboard viser ikke Fieldmarketing salg
 
 ## Problem
-TV-versionen af United dashboardet viser "Ingen salg" og 0 i alle KPI-kort, mens den normale browser-version viser korrekt data (877 salg denne uge, 1705 i lønperiode, osv.).
+TV-skærmen viser 115 salg, mens PC-dashboardet viser 124 salg. Forskellen er 9 "Eesy FM" salg der mangler på TV.
 
-## Root Cause
-Alle data-queries i `UnitedDashboard.tsx` er deaktiveret i TV mode med `enabled: !tvMode`:
+## Årsag
+Edge function `tv-dashboard-data` (linje 247-268) forsøger at hente `fieldmarketing_sales` med en ugyldig join til `sale_items`:
 
-1. **Team ID query** (linje 134): `enabled: !tvMode` → `unitedTeamId` er `null` i TV mode
-2. **Leaderboards** (linje 145): `enabled: !tvMode && !!unitedTeamId` → dobbelt deaktiveret
-3. **Client sales** (linje 220): `enabled: !tvMode` → ingen opgave-data
-4. **Client hours** (linje 312): `enabled: !tvMode` → ingen timer-data
-5. **Avatars** (linje 333): `enabled: !tvMode` → ingen avatars
+```typescript
+// NUVÆRENDE KODE (FEJLER)
+.select(`
+  id, client_id, seller_name, registered_at,
+  sale_items (...)  // ← Ingen FK relation eksisterer!
+`)
+```
+
+Supabase returnerer fejl `PGRST200` og 0 FM salg.
+
+PC-dashboardet bruger korrekt query uden `sale_items` join.
 
 ## Løsning
-Opdater `UnitedDashboard.tsx` til at hente data i **begge** modes (ligesom TdcErhvervDashboard gør):
 
-### Tekniske ændringer
+### Ændring i `supabase/functions/tv-dashboard-data/index.ts`
 
-1. **Team ID query** - Fjern `!tvMode` betingelse:
-   ```typescript
-   // FØR:
-   enabled: !tvMode
-   
-   // EFTER:
-   enabled: true
-   ```
+**1. Ret FM-query (linje 247-268)**
 
-2. **Cached Leaderboards** - Fjern `!tvMode` betingelse:
-   ```typescript
-   // FØR:
-   { enabled: !tvMode && !!unitedTeamId, limit: 30 }
-   
-   // EFTER:
-   { enabled: !!unitedTeamId, limit: 30 }
-   ```
+Fjern den ugyldige `sale_items` join og brug samme mønster som PC-dashboardet:
 
-3. **Client sales data** - Fjern `!tvMode` betingelse:
-   ```typescript
-   // FØR:
-   enabled: !tvMode && !!teamClients && teamClients.length > 0
-   
-   // EFTER:
-   enabled: !!teamClients && teamClients.length > 0
-   ```
+```typescript
+// EFTER (VIRKER)
+const { data: fmSalesData, error: fmError } = await supabase
+  .from("fieldmarketing_sales")
+  .select(`
+    id,
+    client_id,
+    seller_id,
+    registered_at
+  `)
+  .gte("registered_at", startOfDay)
+  .lte("registered_at", endOfDay);
+```
 
-4. **Client hours queries** - Fjern `!tvMode` betingelse:
-   ```typescript
-   // FØR:
-   enabled: !tvMode && !!teamClients && teamClients.length > 0
-   
-   // EFTER:
-   enabled: !!teamClients && teamClients.length > 0
-   ```
+**2. Simplificer FM-processing (linje 378-416)**
 
-5. **Employee avatars** - Fjern `!tvMode` betingelse:
-   ```typescript
-   // FØR:
-   enabled: !tvMode
-   
-   // EFTER:
-   enabled: true
-   ```
+Da FM salg ikke har `sale_items`, tæl hvert salg som 1:
+
+```typescript
+// Process fieldmarketing sales - each counts as 1 sale
+for (const fmSale of fmSales) {
+  const clientId = fmSale.client_id;
+  let clientName = clientId ? clientMap[clientId] || "Ukendt FM" : "Ukendt FM";
+
+  // FM salg tælles som 1 (ingen sale_items)
+  if (!salesByClient[clientName]) {
+    salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
+  }
+  salesByClient[clientName].count += 1;
+  totalCountedSales += 1;
+
+  // Track FM seller for sellersOnBoard count
+  if (fmSale.seller_id) {
+    sellersWithSales.add(fmSale.seller_id);
+  }
+}
+```
 
 ## Påvirkede filer
-- `src/pages/UnitedDashboard.tsx` (5 ændringer)
+- `supabase/functions/tv-dashboard-data/index.ts`
 
-## Hvorfor dette virker
-TdcErhvervDashboard og andre dashboards bruger `kpi_leaderboard_cache` tabellen, som har en public RLS policy der tillader læseadgang uden auth. Ved at fjerne `!tvMode` betingelserne vil United dashboardet kunne hente cached data via de samme mekanismer.
-
-## Test
-Efter ændringen vil TV link med koden "8T9N" vise:
-- Korrekte KPI-tal (877 uge, 1705 løn osv.)
-- Sælger-leaderboards med data
-- "Salg per opgave" sektion med opgave-breakdown
+## Forventet resultat
+- TV-skærm vil vise 124 total salg (samme som PC)
+- "Eesy FM" vil vises i "Salg per opgave" med 9 salg
+- "Sælgere på tavlen" vil inkludere FM-sælgere
