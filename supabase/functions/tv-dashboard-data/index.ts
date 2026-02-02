@@ -245,24 +245,14 @@ Deno.serve(async (req) => {
     console.log(`Found ${sales.length} sales with items`);
 
     // Fetch fieldmarketing_sales for today (Yousee, Eesy FM, etc.)
+    // NOTE: fieldmarketing_sales has NO FK relation to sale_items, so we fetch directly
     const { data: fmSalesData, error: fmError } = await supabase
       .from("fieldmarketing_sales")
       .select(`
         id,
         client_id,
-        seller_name,
-        registered_at,
-        sale_items (
-          id,
-          quantity,
-          product_id,
-          products (
-            id,
-            name,
-            counts_as_sale,
-            commission_dkk
-          )
-        )
+        seller_id,
+        registered_at
       `)
       .gte("registered_at", startOfDay)
       .lte("registered_at", endOfDay);
@@ -376,42 +366,21 @@ Deno.serve(async (req) => {
     }
 
     // Process fieldmarketing sales and add to salesByClient
+    // NOTE: FM sales don't have sale_items relation, so each FM sale counts as 1
     for (const fmSale of fmSales) {
       const clientId = fmSale.client_id;
-      let clientName = "Ukendt FM";
-      
-      if (clientId) {
-        clientName = clientMap[clientId] || "Ukendt FM";
+      let clientName = clientId ? clientMap[clientId] || "Ukendt FM" : "Ukendt FM";
+
+      // FM salg tælles som 1 (ingen sale_items relation)
+      if (!salesByClient[clientName]) {
+        salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
       }
+      salesByClient[clientName].count += 1;
+      totalCountedSales += 1;
 
-      const fmItems = (fmSale as any).sale_items || [];
-      let fmItemCount = 0;
-
-      for (const item of fmItems) {
-        const product = item.products;
-        // Count items where product is mapped and counts_as_sale is true
-        if (product && product.id && product.counts_as_sale === true) {
-          const qty = item.quantity || 1;
-          fmItemCount += qty;
-        }
-      }
-
-      // If no items, count the sale itself as 1
-      if (fmItemCount === 0 && fmItems.length === 0) {
-        fmItemCount = 1;
-      }
-
-      if (fmItemCount > 0) {
-        if (!salesByClient[clientName]) {
-          salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
-        }
-        salesByClient[clientName].count += fmItemCount;
-        totalCountedSales += fmItemCount;
-
-        // Track FM seller for sellersOnBoard count
-        if (fmSale.seller_name) {
-          sellersWithSales.add(fmSale.seller_name.toLowerCase());
-        }
+      // Track FM seller for sellersOnBoard count
+      if (fmSale.seller_id) {
+        sellersWithSales.add(fmSale.seller_id);
       }
     }
 
