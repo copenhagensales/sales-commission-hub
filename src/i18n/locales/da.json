@@ -257,6 +257,7 @@
     "commission": "Provision (DKK)",
     "cpoRevenue": "CPO / omsætning (DKK)",
     "countAsSale": "Tæl som salg",
+    "countAsCrossSale": "Tæl som bisalg",
     "noTitle": "(ingen titel)",
     "internalProduct": "Internt produkt",
     "missing": "(mangler)",
