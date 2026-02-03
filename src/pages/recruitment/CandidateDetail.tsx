@@ -961,12 +961,16 @@ export default function CandidateDetail() {
             if (updateError) throw updateError;
             
             // If cohort selected, add to cohort_members with daily_bonus_client_id
+            // Use upsert to handle case where candidate is already in cohort
             if (cohortId) {
-              const { error: cohortError } = await supabase.from("cohort_members").insert({
+              const { error: cohortError } = await supabase.from("cohort_members").upsert({
                 cohort_id: cohortId,
                 candidate_id: id,
-                status: "pending",
+                status: "assigned",  // Must be one of: assigned, confirmed, started, completed, cancelled
                 daily_bonus_client_id: dailyBonusClientId,
+              }, {
+                onConflict: 'cohort_id,candidate_id',
+                ignoreDuplicates: false
               });
               if (cohortError) throw cohortError;
             }
