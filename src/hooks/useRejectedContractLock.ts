@@ -22,17 +22,38 @@ export function useRejectedContractLock() {
 
       if (!employee) return { isLocked: false, contract: null };
 
-      // Check for rejected contracts
+      // Check for rejected contracts (most recent first)
       const { data: rejectedContracts } = await supabase
         .from("contracts")
-        .select("id, title")
+        .select("id, title, created_at")
         .eq("employee_id", employee.id)
         .eq("status", "rejected")
+        .order("created_at", { ascending: false })
         .limit(1);
 
+      if (!rejectedContracts || rejectedContracts.length === 0) {
+        return { isLocked: false, contract: null };
+      }
+
+      const mostRecentRejected = rejectedContracts[0];
+
+      // Check if there's a signed contract created AFTER the rejected one
+      const { data: signedContracts } = await supabase
+        .from("contracts")
+        .select("id, created_at")
+        .eq("employee_id", employee.id)
+        .eq("status", "signed")
+        .gt("created_at", mostRecentRejected.created_at)
+        .limit(1);
+
+      // If there's a signed contract after the rejection, unlock
+      if (signedContracts && signedContracts.length > 0) {
+        return { isLocked: false, contract: null };
+      }
+
       return {
-        isLocked: rejectedContracts && rejectedContracts.length > 0,
-        contract: rejectedContracts?.[0] ?? null,
+        isLocked: true,
+        contract: mostRecentRejected,
       };
     },
     enabled: !!user?.email,
