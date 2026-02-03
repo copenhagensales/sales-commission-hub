@@ -1,103 +1,101 @@
 
-## Tilføj "Tæl som bisalg" knap med gensidig udelukkelse
+
+## Opdatering af ASE produkt-ekstraktionsregler
 
 ### Oversigt
-Tilføj en ny indstilling "Tæl som bisalg" til produkt-prissætningsdialogen, hvor brugeren ikke kan vælge både "Tæl som salg" og "Tæl som bisalg" samtidigt. Disse skal være gensidigt udelukkende.
+Tilføj to nye regler til ASE-integrationen, der konverterer "Ja - Afdeling" værdier til produktnavne:
+- "Ja - Afdeling" = "Lead" → Produktnavn "Lead"
+- "Ja - Afdeling" = "Salg" → Produktnavn "Salg"
 
 ---
 
-### Implementeringsplan
+### Nuværende konfiguration
+ASE-integrationen har i dag disse regler:
+1. A-kasse salg = Ja + A-kasse type er udfyldt → "akasse - {{A-kasse type}}"
+2. Forening = "Fagforening med lønsikring" → "Fagforening med lønsikring"
+3. Lønsikring er udfyldt → "{{Lønsikring}}"
 
-#### 1. Database-migration
-**Ny kolonne:** `counts_as_cross_sale` i `products` tabellen
+### Nye regler der tilføjes
+4. **Ja - Afdeling = "Lead"** → Produktnavn "Lead"
+5. **Ja - Afdeling = "Salg"** → Produktnavn "Salg"
 
-```sql
-ALTER TABLE products 
-ADD COLUMN counts_as_cross_sale BOOLEAN NOT NULL DEFAULT false;
+---
 
--- Tilføj også til product_price_history for historik
-ALTER TABLE product_price_history 
-ADD COLUMN counts_as_cross_sale BOOLEAN DEFAULT false;
-```
+### Implementering
 
-#### 2. Opdater ProductPricingRulesDialog.tsx
-**Fil:** `src/components/mg-test/ProductPricingRulesDialog.tsx`
+#### Databaseopdatering
+Opdater `config.productExtraction.conditionalRules` i `dialer_integrations` tabellen for ASE:
 
-Ændringer:
-- Tilføj prop `countsAsCrossSale: boolean`
-- Tilføj lokal state `localCountsAsCrossSale`
-- Implementer gensidig udelukkelse logik:
-  - Når "Tæl som salg" vælges → "Tæl som bisalg" deaktiveres automatisk
-  - Når "Tæl som bisalg" vælges → "Tæl som salg" deaktiveres automatisk
-- Opdater mutation `updateCountsAsSale` til også at håndtere `counts_as_cross_sale`
-- Opdater visning og redigerings-UI med begge checkboxes
-
-**UI i visningsmode:**
-```
-✅ Tæl som salg       eller      ✅ Tæl som bisalg
-```
-
-**UI i redigeringsmode:**
-```
-☐ Tæl som salg
-☐ Tæl som bisalg
-(kun én kan være valgt ad gangen)
-```
-
-#### 3. Opdater MgTest.tsx interfaces og queries
-**Fil:** `src/pages/MgTest.tsx`
-
-Ændringer:
-- Tilføj `counts_as_cross_sale` til `AggregatedProductRow` interface
-- Tilføj `counts_as_cross_sale` til `AggregatedProduct.product` interface
-- Opdater SQL queries til at inkludere den nye kolonne
-- Opdater `toggleCountsAsSale` mutation til at håndtere begge felter
-- Evt. tilføj badge "B" for bisalg (ligesom "S" for salg)
-
-#### 4. Opdater i18n
-**Fil:** `src/i18n/locales/da.json`
-
-Tilføj:
 ```json
-"countAsCrossSale": "Tæl som bisalg"
+{
+  "conditionalRules": [
+    // Eksisterende regel 1: A-kasse
+    {
+      "conditions": [
+        {"field": "A-kasse salg", "operator": "equals", "value": "Ja"},
+        {"field": "A-kasse type", "operator": "isNotEmpty", "value": ""}
+      ],
+      "conditionsLogic": "AND",
+      "extractionType": "composite",
+      "productNameTemplate": "akasse - {{A-kasse type}}"
+    },
+    // Eksisterende regel 2: Fagforening med lønsikring
+    {
+      "conditions": [
+        {"field": "Forening", "operator": "equals", "value": "Fagforening med lønsikring"}
+      ],
+      "extractionType": "static_value",
+      "staticProductName": "Fagforening med lønsikring"
+    },
+    // Eksisterende regel 3: Lønsikring
+    {
+      "conditions": [
+        {"field": "Lønsikring", "operator": "isNotEmpty", "value": ""}
+      ],
+      "extractionType": "composite",
+      "productNameTemplate": "{{Lønsikring}}"
+    },
+    // NY REGEL 4: Ja - Afdeling = Lead
+    {
+      "conditions": [
+        {"field": "Ja - Afdeling", "operator": "equals", "value": "Lead"}
+      ],
+      "extractionType": "static_value",
+      "staticProductName": "Lead"
+    },
+    // NY REGEL 5: Ja - Afdeling = Salg
+    {
+      "conditions": [
+        {"field": "Ja - Afdeling", "operator": "equals", "value": "Salg"}
+      ],
+      "extractionType": "static_value",
+      "staticProductName": "Salg"
+    }
+  ]
+}
 ```
 
 ---
 
-### Teknisk: Gensidig udelukkelse logik
+### Tekniske detaljer
 
-```typescript
-const handleCountsAsSaleChange = (checked: boolean) => {
-  setLocalCountsAsSale(checked);
-  if (checked) {
-    // Hvis salg vælges, fjern bisalg
-    setLocalCountsAsCrossSale(false);
-  }
-};
+#### Regelrækkefølge
+Integrationen evaluerer reglerne i rækkefølge og kan matche flere regler samtidig (break blev fjernet i koden). Et salg kan derfor få flere produkter, f.eks.:
+- "akasse - Lønmodtager" OG "Salg" (hvis begge regler matcher)
 
-const handleCountsAsCrossSaleChange = (checked: boolean) => {
-  setLocalCountsAsCrossSale(checked);
-  if (checked) {
-    // Hvis bisalg vælges, fjern salg
-    setLocalCountsAsSale(false);
-  }
-};
+#### Eksisterende lead-data bekræfter feltnavnet
 ```
+"Ja - Afdeling": "Salg"   // Fra lead_data
+"Ja - Afdeling": "Lead"   // Fra lead_data
+```
+
+#### Udførsel
+1. SQL-migration opdaterer ASE-konfigurationen
+2. Næste sync (hvert 5. minut) vil anvende de nye regler
+3. Produkter "Lead" og "Salg" skal evt. oprettes i produkttabellen for at kunne matches
 
 ---
 
 ### Filer der ændres
+1. **Database migration** - Opdatering af ASE `dialer_integrations.config`
 
-1. **Database migration** - Ny kolonne `counts_as_cross_sale` i `products` og `product_price_history`
-2. **`src/components/mg-test/ProductPricingRulesDialog.tsx`** - UI og logik for begge checkboxes
-3. **`src/pages/MgTest.tsx`** - Interfaces, queries og mutations
-4. **`src/i18n/locales/da.json`** - Oversættelse
-
----
-
-### Forventet resultat
-
-- Ny "Tæl som bisalg" checkbox vises ved siden af "Tæl som salg"
-- Brugeren kan kun vælge én af de to (eller ingen)
-- Valg gemmes i databasen og vises korrekt i UI
-- Historik-tabellen opdateres med den nye kolonne
