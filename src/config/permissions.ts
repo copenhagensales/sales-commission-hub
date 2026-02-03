@@ -848,6 +848,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til medarbejderrapporter",
         hasEditOption: false,
       },
+      {
+        key: "menu_reports_revenue_by_client",
+        label: "Omsætning per opgave",
+        description: "Adgang til omsætningsrapport per kunde/opgave",
+        hasEditOption: false,
+      },
     ],
   },
 
