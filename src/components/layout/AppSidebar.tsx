@@ -50,7 +50,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
@@ -440,7 +440,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = p.canView("menu_section_reports") && 
-    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || p.canView("menu_reports_revenue_by_client"));
+    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
   const SALARY_ALLOWED_USER_IDS = [
@@ -941,6 +941,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.codeOfConductAdmin")}
                   </NavLink>
                 )}
+                {p.canView("menu_reports_revenue_by_client") && (
+                  <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/revenue-by-client" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <TrendingUp className="h-4 w-4" />
+                    Omsætning per opgave
+                  </NavLink>
+                )}
                 {p.canViewPulseSurvey && (
                   <NavLink to="/pulse-survey-results" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1353,15 +1362,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <User className="h-4 w-4" />
                     Rapporter Medarbejder
-                  </NavLink>
-                )}
-                {p.canView("menu_reports_revenue_by_client") && (
-                  <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/revenue-by-client" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <TrendingUp className="h-4 w-4" />
-                    Omsætning per opgave
                   </NavLink>
                 )}
               </CollapsibleContent>
