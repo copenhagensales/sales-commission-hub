@@ -14,8 +14,13 @@ export function PageLoader() {
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  
+  // Check if this is a password recovery flow - don't redirect even if logged in
+  // Supabase SDK parses the hash and logs the user in, but we need to show the password form
+  const isRecoveryFlow = window.location.hash.includes('type=recovery');
+  
   if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/" replace />;
+  if (user && !isRecoveryFlow) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
