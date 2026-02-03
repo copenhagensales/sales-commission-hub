@@ -165,12 +165,18 @@ export interface FetchParams {
   campaignId?: string;
 }
 
+// Numeric condition for range-based matching (e.g., "Dækningssum >= 6000")
+export interface NumericCondition {
+  operator: 'gte' | 'lte' | 'gt' | 'lt';
+  value: number;
+}
+
 // Pricing rule for conditional commission/revenue calculation
 export interface PricingRule {
   id: string;
   product_id: string;
   name: string;
-  conditions: Record<string, string>;
+  conditions: Record<string, string | NumericCondition>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
