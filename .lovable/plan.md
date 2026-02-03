@@ -1,73 +1,38 @@
 
 
-## Opdatering af ASE produkt-ekstraktionsregler
+## Opdater ASE produkt-ekstraktionsregler
 
-### Oversigt
-Tilføj to nye regler til ASE-integrationen, der konverterer "Ja - Afdeling" værdier til produktnavne:
-- "Ja - Afdeling" = "Lead" → Produktnavn "Lead"
-- "Ja - Afdeling" = "Salg" → Produktnavn "Salg"
+### Problem
+Lead-dataene indeholder flere felter der matcher eksisterende regler:
+- `Forening: "Fagforening med lønsikring"` → matcher regel 2
+- `Lønsikring: "Lønsikring Udvidet"` → matcher regel 3  
+- `Ja - Afdeling: "Salg"` → matcher regel 5
 
----
+Alle tre regler matcher, og derfor oprettes tre produkter i stedet for kun "Salg".
 
-### Nuværende konfiguration
-ASE-integrationen har i dag disse regler:
-1. A-kasse salg = Ja + A-kasse type er udfyldt → "akasse - {{A-kasse type}}"
-2. Forening = "Fagforening med lønsikring" → "Fagforening med lønsikring"
-3. Lønsikring er udfyldt → "{{Lønsikring}}"
+### Løsning
+Fjern de gamle regler (Fagforening med lønsikring, Lønsikring, A-kasse) og behold kun de to nye regler baseret på "Ja - Afdeling":
 
-### Nye regler der tilføjes
-4. **Ja - Afdeling = "Lead"** → Produktnavn "Lead"
-5. **Ja - Afdeling = "Salg"** → Produktnavn "Salg"
-
----
+| Regel | Betingelse | Produkt |
+|-------|-----------|---------|
+| 1 | Ja - Afdeling = "Lead" | Lead |
+| 2 | Ja - Afdeling = "Salg" | Salg |
 
 ### Implementering
 
-#### Databaseopdatering
-Opdater `config.productExtraction.conditionalRules` i `dialer_integrations` tabellen for ASE:
+**Database opdatering:**
+Opdater ASE-integrationen til kun at have de to "Ja - Afdeling" regler:
 
 ```json
 {
   "conditionalRules": [
-    // Eksisterende regel 1: A-kasse
     {
-      "conditions": [
-        {"field": "A-kasse salg", "operator": "equals", "value": "Ja"},
-        {"field": "A-kasse type", "operator": "isNotEmpty", "value": ""}
-      ],
-      "conditionsLogic": "AND",
-      "extractionType": "composite",
-      "productNameTemplate": "akasse - {{A-kasse type}}"
-    },
-    // Eksisterende regel 2: Fagforening med lønsikring
-    {
-      "conditions": [
-        {"field": "Forening", "operator": "equals", "value": "Fagforening med lønsikring"}
-      ],
-      "extractionType": "static_value",
-      "staticProductName": "Fagforening med lønsikring"
-    },
-    // Eksisterende regel 3: Lønsikring
-    {
-      "conditions": [
-        {"field": "Lønsikring", "operator": "isNotEmpty", "value": ""}
-      ],
-      "extractionType": "composite",
-      "productNameTemplate": "{{Lønsikring}}"
-    },
-    // NY REGEL 4: Ja - Afdeling = Lead
-    {
-      "conditions": [
-        {"field": "Ja - Afdeling", "operator": "equals", "value": "Lead"}
-      ],
+      "conditions": [{"field": "Ja - Afdeling", "operator": "equals", "value": "Lead"}],
       "extractionType": "static_value",
       "staticProductName": "Lead"
     },
-    // NY REGEL 5: Ja - Afdeling = Salg
     {
-      "conditions": [
-        {"field": "Ja - Afdeling", "operator": "equals", "value": "Salg"}
-      ],
+      "conditions": [{"field": "Ja - Afdeling", "operator": "equals", "value": "Salg"}],
       "extractionType": "static_value",
       "staticProductName": "Salg"
     }
@@ -75,27 +40,7 @@ Opdater `config.productExtraction.conditionalRules` i `dialer_integrations` tabe
 }
 ```
 
----
-
-### Tekniske detaljer
-
-#### Regelrækkefølge
-Integrationen evaluerer reglerne i rækkefølge og kan matche flere regler samtidig (break blev fjernet i koden). Et salg kan derfor få flere produkter, f.eks.:
-- "akasse - Lønmodtager" OG "Salg" (hvis begge regler matcher)
-
-#### Eksisterende lead-data bekræfter feltnavnet
-```
-"Ja - Afdeling": "Salg"   // Fra lead_data
-"Ja - Afdeling": "Lead"   // Fra lead_data
-```
-
-#### Udførsel
-1. SQL-migration opdaterer ASE-konfigurationen
-2. Næste sync (hvert 5. minut) vil anvende de nye regler
-3. Produkter "Lead" og "Salg" skal evt. oprettes i produkttabellen for at kunne matches
-
----
-
-### Filer der ændres
-1. **Database migration** - Opdatering af ASE `dialer_integrations.config`
+### Efter opdatering
+- Eksisterende salg skal resynces for at fjerne de forkerte produkter
+- Nye salg vil kun få ét produkt baseret på "Ja - Afdeling" værdien
 
