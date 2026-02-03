@@ -4,10 +4,12 @@ import { ContractLockOverlay } from "./ContractLockOverlay";
 import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { MfaLockOverlay } from "./MfaLockOverlay";
 import { GoalLockOverlay } from "./GoalLockOverlay";
+import { RejectedContractLockOverlay } from "./RejectedContractLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
 import { useGoalLock } from "@/hooks/useGoalLock";
+import { useRejectedContractLock } from "@/hooks/useRejectedContractLock";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 interface LockOverlaysProps {
@@ -15,6 +17,7 @@ interface LockOverlaysProps {
 }
 
 export function LockOverlays({ children }: LockOverlaysProps) {
+  const { isLocked: isRejectedContractLocked, isLoading: rejectedContractLoading } = useRejectedContractLock();
   const { isLocked: isContractLocked, contract, isLoading: contractLoading } = usePendingContractLock();
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
   const { isRequired: isMfaRequired, isVerified: isMfaVerified, isLoading: mfaLoading } = useMfa();
@@ -23,28 +26,36 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   const location = useLocation();
   const [mfaVerified, setMfaVerified] = useState(false);
 
+  // Priority 1: Rejected contract lock (highest priority, no way out)
+  const showRejectedContractLock = isRejectedContractLocked && !isPreviewMode;
+
   // Don't show car quiz lock if we're already on the car-quiz page
   const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
 
-  // Skip locks in preview mode
-  const showContractLock = isContractLocked && !isPreviewMode;
-  const showCarQuizLock = showQuizLock && !isContractLocked && !isPreviewMode;
+  // Priority 2: Skip locks in preview mode
+  const showContractLock = isContractLocked && !isPreviewMode && !showRejectedContractLock;
+  const showCarQuizLock = showQuizLock && !isContractLocked && !isPreviewMode && !showRejectedContractLock;
   
-  // Show MFA lock if required but not verified (and not in preview mode)
+  // Priority 3: Show MFA lock if required but not verified (and not in preview mode)
   // Only show after other locks are resolved
-  const showMfaLock = isMfaRequired && !isMfaVerified && !mfaVerified && !isPreviewMode && !showContractLock && !showCarQuizLock;
+  const showMfaLock = isMfaRequired && !isMfaVerified && !mfaVerified && !isPreviewMode && !showContractLock && !showCarQuizLock && !showRejectedContractLock;
   
-  // Show goal lock for commission employees without a goal for current period
+  // Priority 4: Show goal lock for commission employees without a goal for current period
   // Only show after contract, quiz, and MFA locks are resolved
-  const showGoalLock = isGoalLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock;
+  const showGoalLock = isGoalLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showRejectedContractLock;
 
   // Show loading state while checking locks (skip in preview mode)
-  if ((contractLoading || quizLoading || mfaLoading || goalLoading) && !isPreviewMode) {
+  if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading) && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
       </div>
     );
+  }
+
+  // Priority 1: Rejected contract lock - highest priority
+  if (showRejectedContractLock) {
+    return <RejectedContractLockOverlay />;
   }
 
   // Return ONLY the lock overlay when locked - don't render children at all
