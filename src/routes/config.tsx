@@ -95,6 +95,7 @@ import {
   ReportsManagement,
   ReportsEmployee,
   DailyReports,
+  RevenueByClient,
   SecurityDashboard,
   UpcomingStarts,
   SalarySchemes,
@@ -374,6 +375,7 @@ export const routes: RouteConfig[] = [
   { path: "/reports/management", component: ReportsManagement, access: "role", positionPermission: "menu_reports_management" },
   { path: "/reports/employee", component: ReportsEmployee, access: "role", positionPermission: "menu_reports_employee" },
   { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_daily" },
+  { path: "/reports/revenue-by-client", component: RevenueByClient, access: "role", positionPermission: "menu_reports_revenue_by_client" },
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },

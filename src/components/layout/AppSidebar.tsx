@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -440,7 +440,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = p.canView("menu_section_reports") && 
-    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee);
+    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || p.canView("menu_reports_revenue_by_client"));
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
   const SALARY_ALLOWED_USER_IDS = [
@@ -1353,6 +1353,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <User className="h-4 w-4" />
                     Rapporter Medarbejder
+                  </NavLink>
+                )}
+                {p.canView("menu_reports_revenue_by_client") && (
+                  <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/revenue-by-client" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <TrendingUp className="h-4 w-4" />
+                    Omsætning per opgave
                   </NavLink>
                 )}
               </CollapsibleContent>
