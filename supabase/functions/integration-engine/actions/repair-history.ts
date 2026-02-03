@@ -2,11 +2,16 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { IngestionEngine } from "../core.ts"
 import { getAdapter } from "../adapters/registry.ts"
 
+const MAX_RECORDS = 500
+const BATCH_SIZE = 100
+
 export async function repairHistory(
   supabase: SupabaseClient,
   days: number,
-  integrationId?: string
+  integrationId?: string,
+  maxRecords?: number
 ) {
+  const recordLimit = maxRecords ?? MAX_RECORDS
   const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY")
   let query = supabase.from("dialer_integrations").select("*").eq("is_active", true)
   if (integrationId) {
@@ -28,7 +33,7 @@ export async function repairHistory(
   const campaignMappings = await engine.getCampaignMappings()
   let totalProcessed = 0
   let totalErrors = 0
-  const results: { name: string; status: string; processed?: number; errors?: number; error?: string }[] = []
+  const results: { name: string; status: string; processed?: number; errors?: number; error?: string; limited?: boolean }[] = []
   for (const integration of integrations!) {
     try {
       const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
@@ -43,23 +48,39 @@ export async function repairHistory(
         integration.config,
         integration.calls_org_codes
       )
-      const sales = await adapter.fetchSales(days || 90, campaignMappings)
-      const result = await engine.processSales(sales)
-      totalProcessed += result.processed
-      totalErrors += result.errors
+      let sales = await adapter.fetchSales(days || 90, campaignMappings)
+      const wasLimited = sales.length > recordLimit
+      if (wasLimited) {
+        console.log(`[repair-history] ${integration.name}: Limiting from ${sales.length} to ${recordLimit} records`)
+        sales = sales.slice(0, recordLimit)
+      }
+      
+      // Process in batches to avoid CPU timeout
+      let batchProcessed = 0
+      let batchErrors = 0
+      for (let i = 0; i < sales.length; i += BATCH_SIZE) {
+        const batch = sales.slice(i, i + BATCH_SIZE)
+        const result = await engine.processSales(batch)
+        batchProcessed += result.processed
+        batchErrors += result.errors
+      }
+      
+      totalProcessed += batchProcessed
+      totalErrors += batchErrors
       results.push({
         name: integration.name,
         status: "success",
-        processed: result.processed,
-        errors: result.errors,
+        processed: batchProcessed,
+        errors: batchErrors,
+        limited: wasLimited,
       })
       await supabase.from("integration_logs").insert({
         integration_type: "dialer",
         integration_id: integration.id,
         integration_name: integration.name,
         status: "success",
-        message: `Historical repair: ${result.processed} sales processed`,
-        details: { action: "repair-history", days, processed: result.processed, errors: result.errors },
+        message: `Historical repair: ${batchProcessed} sales processed${wasLimited ? ` (limited to ${recordLimit})` : ""}`,
+        details: { action: "repair-history", days, processed: batchProcessed, errors: batchErrors, limited: wasLimited },
       })
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e)
@@ -75,6 +96,6 @@ export async function repairHistory(
       })
     }
   }
-  return { totalProcessed, totalErrors, results }
+  return { totalProcessed, totalErrors, results, maxRecords: recordLimit }
 }
 
