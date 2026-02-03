@@ -223,9 +223,10 @@ export default function DailyReports() {
     return []; // "egen" = only self, no teams
   }, [allTeams, scopeReportsDaily, ledTeamIds]);
 
-  // Pre-select user's team when scope is "team" and only one team available
+  // Auto-select team based on scope restrictions
   useEffect(() => {
-    if (scopeReportsDaily === "team" && teams.length === 1 && selectedTeam === "all") {
+    // For team-scoped users: pre-select their team when "all" is selected
+    if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeam === "all") {
       setSelectedTeam(teams[0].id);
     }
   }, [scopeReportsDaily, teams, selectedTeam]);
@@ -292,7 +293,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
@@ -429,6 +430,19 @@ export default function DailyReports() {
         if (empError) throw empError;
 
         filteredEmployees = employeesData || [];
+        
+        // Apply scope-based filtering first
+        if (scopeReportsDaily === "team" && ledTeamIds.length > 0) {
+          // Team scope: only employees from user's led teams
+          filteredEmployees = filteredEmployees.filter(emp =>
+            emp.team_members?.some((tm: any) => ledTeamIds.includes(tm.team?.id))
+          );
+        } else if (scopeReportsDaily === "egen" && currentEmployee?.id) {
+          // Own scope: only current user's data
+          filteredEmployees = filteredEmployees.filter(emp => emp.id === currentEmployee.id);
+        }
+        
+        // Then apply selected team filter
         if (selectedTeam !== "all") {
           filteredEmployees = filteredEmployees.filter(emp => 
             emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
@@ -1109,7 +1123,9 @@ export default function DailyReports() {
                         </div>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
+                        {scopeReportsDaily === "alt" && (
+                          <SelectItem value="all">Alle</SelectItem>
+                        )}
                         {teams.map((team) => (
                           <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
                         ))}
