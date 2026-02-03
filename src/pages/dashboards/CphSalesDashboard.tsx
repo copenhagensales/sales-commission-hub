@@ -79,6 +79,12 @@ interface TvDashboardData {
     vacation: { day: number; week: number; month: number };
     workDays?: { day: number; week: number; month: number };
   }>;
+  absenceByClient?: {
+    sickByClient: Record<string, number>;
+    vacationByClient: Record<string, number>;
+    noShowByClient: Record<string, number>;
+    employeeCountByClient: Record<string, number>;
+  };
 }
 
 // Check if we're in TV mode (accessed via /tv route with sessionStorage code)
@@ -1241,40 +1247,42 @@ export default function CphSalesDashboard() {
                       <span className={`text-muted-foreground text-center truncate w-full ${tvMode ? 'text-[10px]' : 'text-xs'}`}>
                         {client}
                       </span>
-                      {/* Absence info per client - only show in non-TV mode */}
-                    {!tvMode && absenceData && (
-                      (() => {
-                        const sickCount = absenceData.sickByClient?.[client] || 0;
-                        const vacationCount = absenceData.vacationByClient?.[client] || 0;
-                        const noShowCount = absenceData.noShowByClient?.[client] || 0;
-                        const employeeCount = absenceData.employeeCountByClient?.[client] || 0;
-                        
-                        if (employeeCount === 0) return null;
-                        
-                        const totalAbsent = sickCount + vacationCount + noShowCount;
-                        if (totalAbsent === 0) return null;
-                        
-                        return (
-                          <div className="flex flex-wrap gap-1 justify-center mt-1">
-                            {sickCount > 0 && (
-                              <span className="text-[10px] text-rose-400">
-                                🤒 {Math.round((sickCount / employeeCount) * 100)}% ({sickCount})
-                              </span>
-                            )}
-                            {vacationCount > 0 && (
-                              <span className="text-[10px] text-blue-400">
-                                🌴 {Math.round((vacationCount / employeeCount) * 100)}% ({vacationCount})
-                              </span>
-                            )}
-                            {noShowCount > 0 && (
-                              <span className="text-[10px] text-gray-400">
-                                ⚠️ {noShowCount}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()
-                    )}
+                      {/* Absence info per client - works in both TV and non-TV mode */}
+                    {(() => {
+                      // Use tvData.absenceByClient in TV mode, else use regular absenceData
+                      const displayAbsence = tvMode ? tvData?.absenceByClient : absenceData;
+                      if (!displayAbsence) return null;
+                      
+                      const sickCount = displayAbsence.sickByClient?.[client] || 0;
+                      const vacationCount = displayAbsence.vacationByClient?.[client] || 0;
+                      const noShowCount = displayAbsence.noShowByClient?.[client] || 0;
+                      const employeeCount = displayAbsence.employeeCountByClient?.[client] || 0;
+                      
+                      if (employeeCount === 0) return null;
+                      
+                      const totalAbsent = sickCount + vacationCount + noShowCount;
+                      if (totalAbsent === 0) return null;
+                      
+                      return (
+                        <div className="flex flex-wrap gap-1 justify-center mt-1">
+                          {sickCount > 0 && (
+                            <span className={`text-rose-400 ${tvMode ? 'text-[8px]' : 'text-[10px]'}`}>
+                              🤒 {Math.round((sickCount / employeeCount) * 100)}% ({sickCount})
+                            </span>
+                          )}
+                          {vacationCount > 0 && (
+                            <span className={`text-blue-400 ${tvMode ? 'text-[8px]' : 'text-[10px]'}`}>
+                              🌴 {Math.round((vacationCount / employeeCount) * 100)}% ({vacationCount})
+                            </span>
+                          )}
+                          {noShowCount > 0 && (
+                            <span className={`text-gray-400 ${tvMode ? 'text-[8px]' : 'text-[10px]'}`}>
+                              ⚠️ {noShowCount}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );
