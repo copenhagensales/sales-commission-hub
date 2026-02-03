@@ -113,17 +113,23 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
           duration: null,
           created_at: c.created_at,
           notes: c.content,
-          source: 'communication_logs'
+          source: 'communication_logs',
+          connected_at: null
         })),
-        ...callRecords.map(c => ({
-          id: c.id,
-          direction: c.direction,
-          status: c.status || 'completed',
-          duration: c.duration_seconds,
-          created_at: c.started_at,
-          notes: c.notes,
-          source: 'call_records'
-        }))
+        ...callRecords.map(c => {
+          // Determine if this is a missed inbound call
+          const isMissedInbound = (c.direction === 'inbound' || c.direction === 'incoming') && !c.connected_at;
+          return {
+            id: c.id,
+            direction: c.direction,
+            status: isMissedInbound ? 'missed' : (c.status || 'completed'),
+            duration: c.duration_seconds,
+            created_at: c.started_at,
+            notes: c.notes,
+            source: 'call_records',
+            connected_at: c.connected_at
+          };
+        })
       ];
 
       // Sort by date descending
@@ -162,8 +168,10 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
     return `${duration.seconds}s`;
   };
 
-  const getCallIcon = (direction: string, status: string) => {
-    if (status === 'missed' || status === 'no-answer' || status === 'busy') {
+  const getCallIcon = (direction: string, status: string, connectedAt?: string | null) => {
+    // For inbound calls without connected_at, treat as missed
+    const isMissedInbound = (direction === 'incoming' || direction === 'inbound') && !connectedAt;
+    if (status === 'missed' || status === 'no-answer' || status === 'busy' || isMissedInbound) {
       return <PhoneMissed className="h-5 w-5 text-destructive" />;
     }
     if (direction === 'incoming' || direction === 'inbound') {
@@ -227,7 +235,7 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
             {/* Phone icon with status */}
             <div className="flex-shrink-0 relative">
               <div className="h-12 w-12 rounded-full bg-background border-2 border-border flex items-center justify-center">
-                {getCallIcon(call.direction, call.status)}
+                {getCallIcon(call.direction, call.status, call.connected_at)}
               </div>
             </div>
 

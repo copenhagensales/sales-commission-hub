@@ -81,6 +81,21 @@ export default function Messages() {
     },
   });
 
+  // Fetch call records separately since they're stored in a different table
+  const { data: callRecords = [] } = useQuery({
+    queryKey: ["call_records_for_messages"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("call_records")
+        .select("*, candidates(first_name, last_name)")
+        .order("started_at", { ascending: false })
+        .limit(200);
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const { data: candidates = [] } = useQuery({
     queryKey: ["candidates"],
     queryFn: async () => {
@@ -106,6 +121,17 @@ export default function Messages() {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ["communication_logs"] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'call_records',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["call_records_for_messages"] });
         }
       )
       .subscribe();
@@ -168,6 +194,33 @@ export default function Messages() {
       conv.phone_number.includes(searchQuery) ||
       conv.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+  // Transform call_records to match message format for the calls tab
+  const callsFromRecords = callRecords.map((cr: any) => {
+    const candidateData = cr.candidates as { first_name: string; last_name: string } | null;
+    const isMissed = cr.direction === 'inbound' && !cr.connected_at;
+    const status = isMissed ? 'missed' : (cr.status || 'completed');
+    
+    return {
+      id: cr.id,
+      type: 'call' as const,
+      direction: cr.direction === 'inbound' ? 'inbound' : 'outbound',
+      content: cr.direction === 'inbound' 
+        ? (isMissed ? 'Misset opkald' : 'Indgående opkald') 
+        : 'Udgående opkald',
+      created_at: cr.started_at,
+      read: true, // Calls don't have read status
+      outcome: status,
+      application_id: null,
+      phone_number: cr.direction === 'inbound' ? cr.from_number : cr.to_number,
+      candidate_name: candidateData 
+        ? `${candidateData.first_name} ${candidateData.last_name}` 
+        : null,
+      duration_seconds: cr.duration_seconds,
+      is_missed: isMissed,
+      source: 'call_records'
+    };
+  });
 
   const filteredMessages = messages.filter((message) => {
     const matchesSearch = message.content?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -379,8 +432,8 @@ export default function Messages() {
                 </ScrollArea>
               </TabsContent>
 
-              {/* Other message types - basic list view */}
-              {['all', 'email', 'call'].map((tabValue) => (
+              {/* Other message types - basic list view (except call which has its own) */}
+              {['all', 'email'].map((tabValue) => (
                 <TabsContent key={tabValue} value={tabValue} className="flex-1 min-h-0 mt-3">
                   <ScrollArea className="h-full">
                     <div className="space-y-2 pr-2">
@@ -421,6 +474,92 @@ export default function Messages() {
                   </ScrollArea>
                 </TabsContent>
               ))}
+
+              {/* Call records tab - uses call_records table */}
+              <TabsContent value="call" className="flex-1 min-h-0 mt-3">
+                <ScrollArea className="h-full">
+                  <div className="space-y-2 pr-2">
+                    {callsFromRecords.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Phone className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                        <p>Ingen opkald registreret</p>
+                      </div>
+                    ) : (
+                      callsFromRecords
+                        .filter((call: any) => 
+                          searchQuery === '' || 
+                          call.phone_number?.includes(searchQuery) ||
+                          call.candidate_name?.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                        .map((call: any) => {
+                          // Find candidate for this call if not already matched
+                          const normalizedPhone = call.phone_number?.replace(/\D/g, '').slice(-8);
+                          const matchedCandidate = call.candidate_name || candidates.find(c => 
+                            c.phone?.replace(/\D/g, '').slice(-8) === normalizedPhone
+                          );
+                          const displayName = call.candidate_name || 
+                            (matchedCandidate && typeof matchedCandidate === 'object' 
+                              ? `${matchedCandidate.first_name} ${matchedCandidate.last_name}` 
+                              : call.phone_number || 'Ukendt');
+                          
+                          return (
+                            <Card 
+                              key={call.id} 
+                              className={cn(
+                                "bg-card border-border",
+                                call.is_missed && "border-l-4 border-l-destructive"
+                              )}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-start gap-3">
+                                  <div className={cn(
+                                    "p-2 rounded-lg shrink-0",
+                                    call.is_missed 
+                                      ? "bg-destructive/20 text-destructive" 
+                                      : getTypeColor('call')
+                                  )}>
+                                    <Phone className="h-4 w-4" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <Badge variant="outline" className={cn(
+                                        "text-xs",
+                                        call.is_missed 
+                                          ? "bg-destructive/20 text-destructive border-destructive/30" 
+                                          : getTypeColor('call')
+                                      )}>
+                                        {call.direction === "outbound" ? "↑ UDGÅENDE" : "↓ INDGÅENDE"}
+                                      </Badge>
+                                      {call.is_missed && (
+                                        <Badge variant="destructive" className="text-xs">
+                                          Misset
+                                        </Badge>
+                                      )}
+                                      {call.duration_seconds && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {Math.floor(call.duration_seconds / 60)}m {call.duration_seconds % 60}s
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm font-medium text-foreground">
+                                      {displayName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {call.phone_number}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {format(new Date(call.created_at), "d. MMM HH:mm", { locale: da })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
 
               {/* Sent messages tab - outbound SMS and Email */}
               <TabsContent value="sent" className="flex-1 min-h-0 mt-3">
