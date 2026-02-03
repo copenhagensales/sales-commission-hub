@@ -47,7 +47,8 @@ export class AdversusAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
-  private async get(endpoint: string, retries = 3, baseDelay = 1000): Promise<any> {
+  // OPTIMIZED: Reduced retries from 3 to 2, delays from 1-4s to 500ms-1s
+  private async get(endpoint: string, retries = 2, baseDelay = 500): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
@@ -57,7 +58,7 @@ export class AdversusAdapter implements DialerAdapter {
         if (attempt === retries) {
           throw new Error("Rate Limit Adversus Excedido (after retries)");
         }
-        // Exponential backoff: 1s, 2s, 4s
+        // Reduced exponential backoff: 500ms, 1s
         const delay = baseDelay * Math.pow(2, attempt - 1);
         console.log(`[Adversus] Rate limited, waiting ${delay}ms before retry ${attempt}/${retries}`);
         await new Promise(r => setTimeout(r, delay));
@@ -461,18 +462,25 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
 
     // 4. FALLBACK: For missing leads, fetch directly by lead ID
+    // OPTIMIZED: Limit fallback lookups to max 20 to prevent CPU timeout
+    const MAX_FALLBACK_LEADS = 20;
     const allLeadIds = sales.map(s => s.leadId).filter(Boolean).map(String);
-    const missingLeadIds = allLeadIds.filter(lid => !leadIdToData.has(lid));
+    let missingLeadIds = allLeadIds.filter(lid => !leadIdToData.has(lid));
     
     if (missingLeadIds.length > 0) {
-      console.log(`[Adversus] FALLBACK: ${missingLeadIds.length} leads missing from bulk fetch, fetching individually...`);
+      const wasLimited = missingLeadIds.length > MAX_FALLBACK_LEADS;
+      if (wasLimited) {
+        console.log(`[Adversus] FALLBACK: Limiting from ${missingLeadIds.length} to ${MAX_FALLBACK_LEADS} leads to prevent timeout`);
+        missingLeadIds = missingLeadIds.slice(0, MAX_FALLBACK_LEADS);
+      }
+      console.log(`[Adversus] FALLBACK: Fetching ${missingLeadIds.length} missing leads individually...`);
       
       let fallbackSuccess = 0;
       let fallbackFailed = 0;
       const oppPattern = /OPP-\d{4,6}/;
       
-      // Process in small batches to avoid rate limiting
-      const batchSize = 10;
+      // OPTIMIZED: Reduced batch size from 10 to 5 and delays
+      const batchSize = 5;
       for (let i = 0; i < missingLeadIds.length; i += batchSize) {
         const batch = missingLeadIds.slice(i, i + batchSize);
         
@@ -487,7 +495,6 @@ export class AdversusAdapter implements DialerAdapter {
               
               if (Array.isArray(resultData)) {
                 for (const field of resultData) {
-                  // Support both 'name' and 'label' properties (Adversus API uses both)
                   const fieldName = field?.name || field?.label;
                   if (field && fieldName !== undefined) {
                     resultFields[fieldName] = field.value;
@@ -505,12 +512,6 @@ export class AdversusAdapter implements DialerAdapter {
               
               leadIdToData.set(leadId, { opp, resultData, resultFields });
               fallbackSuccess++;
-              
-              // Log successful fallback with field info for debugging
-              if (resultData.length > 0) {
-                const fieldNames = resultData.map(f => f.name).filter(Boolean).join(', ');
-                console.log(`[Adversus] Fallback lead ${leadId}: Found ${resultData.length} fields (${fieldNames.substring(0, 100)})`);
-              }
             } else {
               fallbackFailed++;
             }
@@ -520,13 +521,13 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
         
-        // Delay between batches to avoid rate limiting (øget fra 200ms til 400ms)
+        // OPTIMIZED: Reduced delay from 400ms to 150ms
         if (i + batchSize < missingLeadIds.length) {
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 150));
         }
       }
       
-      console.log(`[Adversus] Fallback complete: ${fallbackSuccess} leads fetched, ${fallbackFailed} failed`);
+      console.log(`[Adversus] Fallback complete: ${fallbackSuccess} leads fetched, ${fallbackFailed} failed${wasLimited ? ' (limited)' : ''}`);
     }
 
     return leadIdToData;
@@ -545,9 +546,9 @@ export class AdversusAdapter implements DialerAdapter {
       });
       
       if (res.status === 429) {
-        // Rate limited - wait and retry once
+        // OPTIMIZED: Reduced wait from 1000ms to 500ms
         console.log(`[Adversus] Rate limited on lead ${leadId}, waiting...`);
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 500));
         
         const retryRes = await fetch(url, {
           headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
