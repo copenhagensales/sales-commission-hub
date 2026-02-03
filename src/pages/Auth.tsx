@@ -232,22 +232,38 @@ export default function Auth() {
   }, [mustChangePassword, user]);
 
   useEffect(() => {
-
-    // Check URL for error parameters (expired/invalid token)
+    // Check URL for error parameters (expired/invalid token) and recovery flow
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const errorDescription = hashParams.get('error_description');
     const error = hashParams.get('error');
+    const tokenType = hashParams.get('type');
     
-    if (error || errorDescription) {
+    console.log('[Auth] Checking URL hash:', { 
+      hasHash: window.location.hash.length > 1,
+      tokenType, 
+      hasError: !!error,
+      errorDescription 
+    });
+    
+    // Detect recovery from URL hash (in case PASSWORD_RECOVERY event was missed due to timing)
+    if (tokenType === 'recovery' && !error) {
+      console.log('[Auth] Recovery flow detected from URL hash - showing password form');
+      setIsNewPasswordMode(true);
+      setIsResetMode(false);
+      setExpiredLinkError(false);
+    } else if (error || errorDescription) {
+      console.log('[Auth] Error in URL hash - showing expired link message');
       setExpiredLinkError(true);
       setIsResetMode(true);
       // Clear the hash to clean up URL
       window.history.replaceState(null, '', window.location.pathname);
     }
 
-    // Listen for password recovery event
+    // Listen for password recovery event (backup mechanism)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log('[Auth] Auth state changed:', event);
       if (event === 'PASSWORD_RECOVERY') {
+        console.log('[Auth] PASSWORD_RECOVERY event received - showing password form');
         setIsNewPasswordMode(true);
         setIsResetMode(false);
         setExpiredLinkError(false);
