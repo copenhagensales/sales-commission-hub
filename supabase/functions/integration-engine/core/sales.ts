@@ -1,6 +1,29 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { StandardSale, PricingRule } from "../types.ts"
+import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk } from "../utils/batch.ts"
+
+/**
+ * Check if a condition value is a NumericCondition object
+ */
+function isNumericCondition(value: unknown): value is NumericCondition {
+  return typeof value === 'object' && value !== null && 'operator' in value && 'value' in value;
+}
+
+/**
+ * Evaluate a numeric condition against a lead field value
+ */
+function evaluateNumericCondition(condition: NumericCondition, leadValue: string | undefined): boolean {
+  const numericLeadValue = parseFloat(leadValue || '0');
+  if (isNaN(numericLeadValue)) return false;
+  
+  switch (condition.operator) {
+    case 'gte': return numericLeadValue >= condition.value;
+    case 'lte': return numericLeadValue <= condition.value;
+    case 'gt': return numericLeadValue > condition.value;
+    case 'lt': return numericLeadValue < condition.value;
+    default: return false;
+  }
+}
 
 /**
  * List of email domains that should be excluded from syncing.
@@ -86,10 +109,21 @@ function matchPricingRule(
     for (const [condKey, condValue] of Object.entries(conditions)) {
       // Find the matching field in allFields (combined Adversus + Enreach data)
       const leadField = allFields.find(f => f.label === condKey);
-      if (!leadField || leadField.value !== condValue) {
-        allConditionsMet = false;
-        failedCondition = condKey;
-        break;
+      
+      if (isNumericCondition(condValue)) {
+        // Numeric condition: evaluate using operator
+        if (!evaluateNumericCondition(condValue, leadField?.value)) {
+          allConditionsMet = false;
+          failedCondition = `${condKey} ${condValue.operator} ${condValue.value}`;
+          break;
+        }
+      } else {
+        // String condition: exact match
+        if (!leadField || leadField.value !== condValue) {
+          allConditionsMet = false;
+          failedCondition = condKey;
+          break;
+        }
       }
     }
 

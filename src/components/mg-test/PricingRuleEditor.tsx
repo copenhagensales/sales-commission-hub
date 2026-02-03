@@ -38,11 +38,33 @@ const CONDITION_OPTIONS: Record<string, string[]> = {
   "Lønsikring": ["Lønsikring Udvidet", "Lønsikring Super"],
 };
 
+// Keys that use numeric comparison instead of dropdown
+const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
+
+// Operators for numeric conditions
+const NUMERIC_OPERATORS = [
+  { value: "gte", label: "Over eller lig med (≥)" },
+  { value: "lte", label: "Under eller lig med (≤)" },
+  { value: "gt", label: "Over (>)" },
+  { value: "lt", label: "Under (<)" },
+];
+
+// Type for numeric condition value
+interface NumericConditionValue {
+  operator: 'gte' | 'lte' | 'gt' | 'lt';
+  value: number;
+}
+
+// Check if a condition value is numeric
+function isNumericCondition(value: unknown): value is NumericConditionValue {
+  return typeof value === 'object' && value !== null && 'operator' in value && 'value' in value;
+}
+
 interface PricingRule {
   id: string;
   product_id: string;
   campaign_mapping_ids: string[] | null;
-  conditions: Record<string, string>;
+  conditions: Record<string, string | NumericConditionValue>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
@@ -82,7 +104,7 @@ export function PricingRuleEditor({
     existingRule?.campaign_mapping_ids || []
   );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
-  const [conditions, setConditions] = useState<Record<string, string>>(
+  const [conditions, setConditions] = useState<Record<string, string | NumericConditionValue>>(
     existingRule?.conditions || {}
   );
   const [commission, setCommission] = useState(
@@ -93,9 +115,10 @@ export function PricingRuleEditor({
   );
   const [isActive, setIsActive] = useState(existingRule?.is_active ?? true);
 
-  // Get available condition keys (not already used)
+  // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
-  const availableKeys = Object.keys(CONDITION_OPTIONS).filter(
+  const allAvailableKeys = [...Object.keys(CONDITION_OPTIONS), ...NUMERIC_CONDITION_KEYS];
+  const availableKeys = allAvailableKeys.filter(
     (key) => !usedKeys.includes(key)
   );
 
@@ -117,10 +140,13 @@ export function PricingRuleEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Convert conditions to JSON-compatible format for Supabase
+      const conditionsJson = JSON.parse(JSON.stringify(conditions));
+      
       const ruleData = {
         product_id: productId,
         campaign_mapping_ids: selectedCampaignIds.length > 0 ? selectedCampaignIds : null,
-        conditions,
+        conditions: conditionsJson,
         commission_dkk: parseFloat(commission) || 0,
         revenue_dkk: parseFloat(revenue) || 0,
         priority,
@@ -155,12 +181,36 @@ export function PricingRuleEditor({
   });
 
   const addCondition = (key: string) => {
-    const defaultValue = CONDITION_OPTIONS[key]?.[0] || "";
-    setConditions((prev) => ({ ...prev, [key]: defaultValue }));
+    if (NUMERIC_CONDITION_KEYS.includes(key)) {
+      // Add numeric condition with default values
+      setConditions((prev) => ({ 
+        ...prev, 
+        [key]: { operator: 'gte' as const, value: 0 } 
+      }));
+    } else {
+      const defaultValue = CONDITION_OPTIONS[key]?.[0] || "";
+      setConditions((prev) => ({ ...prev, [key]: defaultValue }));
+    }
   };
 
-  const updateCondition = (key: string, value: string) => {
+  const updateCondition = (key: string, value: string | NumericConditionValue) => {
     setConditions((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateNumericCondition = (key: string, field: 'operator' | 'value', newValue: string | number) => {
+    setConditions((prev) => {
+      const currentValue = prev[key];
+      if (isNumericCondition(currentValue)) {
+        return {
+          ...prev,
+          [key]: {
+            ...currentValue,
+            [field]: field === 'value' ? Number(newValue) : newValue
+          }
+        };
+      }
+      return prev;
+    });
   };
 
   const removeCondition = (key: string) => {
@@ -286,23 +336,56 @@ export function PricingRuleEditor({
                 key={key}
                 className="flex items-center gap-2 bg-muted/30 p-2 rounded"
               >
-                <span className="flex-1 font-medium text-sm">{key}</span>
-                <span className="text-muted-foreground">=</span>
-                <Select
-                  value={value}
-                  onValueChange={(newValue) => updateCondition(key, newValue)}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONDITION_OPTIONS[key]?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="flex-shrink-0 font-medium text-sm">{key}</span>
+                
+                {isNumericCondition(value) ? (
+                  // Numeric condition UI: operator dropdown + number input
+                  <>
+                    <Select
+                      value={value.operator}
+                      onValueChange={(op) => updateNumericCondition(key, 'operator', op)}
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NUMERIC_OPERATORS.map((op) => (
+                          <SelectItem key={op.value} value={op.value}>
+                            {op.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      className="w-28"
+                      value={value.value}
+                      onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
+                      placeholder="Beløb"
+                    />
+                  </>
+                ) : (
+                  // String condition UI: equals + dropdown
+                  <>
+                    <span className="text-muted-foreground">=</span>
+                    <Select
+                      value={value as string}
+                      onValueChange={(newValue) => updateCondition(key, newValue)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONDITION_OPTIONS[key]?.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+                
                 <Button
                   variant="ghost"
                   size="icon"
