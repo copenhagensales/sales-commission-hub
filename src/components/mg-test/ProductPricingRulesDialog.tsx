@@ -33,6 +33,7 @@ interface ProductPricingRulesDialogProps {
   baseCommission: number;
   baseRevenue: number;
   countsAsSale: boolean;
+  countsAsCrossSale: boolean;
   clientId?: string;
   onBaseValuesChange?: () => void;
 }
@@ -62,6 +63,7 @@ export function ProductPricingRulesDialog({
   baseCommission,
   baseRevenue,
   countsAsSale,
+  countsAsCrossSale,
   clientId,
   onBaseValuesChange,
 }: ProductPricingRulesDialogProps) {
@@ -75,13 +77,15 @@ export function ProductPricingRulesDialog({
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
   const [localRevenue, setLocalRevenue] = useState(String(baseRevenue));
   const [localCountsAsSale, setLocalCountsAsSale] = useState(countsAsSale);
+  const [localCountsAsCrossSale, setLocalCountsAsCrossSale] = useState(countsAsCrossSale);
 
   // Update local state when props change
   useEffect(() => {
     setLocalCommission(String(baseCommission));
     setLocalRevenue(String(baseRevenue));
     setLocalCountsAsSale(countsAsSale);
-  }, [baseCommission, baseRevenue, countsAsSale]);
+    setLocalCountsAsCrossSale(countsAsCrossSale);
+  }, [baseCommission, baseRevenue, countsAsSale, countsAsCrossSale]);
 
   // Fetch existing rules for this product
   const { data: rules, isLoading: rulesLoading } = useQuery({
@@ -136,18 +140,18 @@ export function ProductPricingRulesDialog({
     },
   });
 
-  // Mutation to update counts_as_sale
-  const updateCountsAsSale = useMutation({
-    mutationFn: async (countsAsSale: boolean) => {
+  // Mutation to update counts_as_sale and counts_as_cross_sale
+  const updateCountFlags = useMutation({
+    mutationFn: async ({ countsAsSale, countsAsCrossSale }: { countsAsSale: boolean; countsAsCrossSale: boolean }) => {
       const { error } = await supabase
         .from("products")
-        .update({ counts_as_sale: countsAsSale })
+        .update({ counts_as_sale: countsAsSale, counts_as_cross_sale: countsAsCrossSale })
         .eq("id", productId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Tæl som salg opdateret");
+      toast.success("Indstillinger opdateret");
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -201,7 +205,7 @@ export function ProductPricingRulesDialog({
     if (isToday || isRetroactive) {
       // Immediate or retroactive change - update products table directly
       await updateBaseValues.mutateAsync({ commission, revenue });
-      await updateCountsAsSale.mutateAsync(localCountsAsSale);
+      await updateCountFlags.mutateAsync({ countsAsSale: localCountsAsSale, countsAsCrossSale: localCountsAsCrossSale });
       
       // Insert into history
       await supabase.from("product_price_history").insert({
@@ -209,6 +213,7 @@ export function ProductPricingRulesDialog({
         commission_dkk: commission,
         revenue_dkk: revenue,
         counts_as_sale: localCountsAsSale,
+        counts_as_cross_sale: localCountsAsCrossSale,
         effective_from: format(effectiveDate, "yyyy-MM-dd"),
         is_retroactive: isRetroactive,
         applied_at: new Date().toISOString()
@@ -224,6 +229,7 @@ export function ProductPricingRulesDialog({
         commission_dkk: commission,
         revenue_dkk: revenue,
         counts_as_sale: localCountsAsSale,
+        counts_as_cross_sale: localCountsAsCrossSale,
         effective_from: format(effectiveDate, "yyyy-MM-dd"),
         is_retroactive: false,
         applied_at: null
@@ -245,12 +251,26 @@ export function ProductPricingRulesDialog({
     setLocalCommission(String(baseCommission));
     setLocalRevenue(String(baseRevenue));
     setLocalCountsAsSale(countsAsSale);
+    setLocalCountsAsCrossSale(countsAsCrossSale);
     setIsEditingBase(false);
     setEffectiveDate(new Date());
   };
 
+  // Mutual exclusion handlers
   const handleCountsAsSaleChange = (checked: boolean) => {
     setLocalCountsAsSale(checked);
+    if (checked) {
+      // If sale is selected, deselect cross-sale
+      setLocalCountsAsCrossSale(false);
+    }
+  };
+
+  const handleCountsAsCrossSaleChange = (checked: boolean) => {
+    setLocalCountsAsCrossSale(checked);
+    if (checked) {
+      // If cross-sale is selected, deselect sale
+      setLocalCountsAsSale(false);
+    }
   };
 
   const formatConditions = (conditions: Record<string, string>) => {
@@ -348,13 +368,23 @@ export function ProductPricingRulesDialog({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {localCountsAsSale ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                    <span className="text-sm">Tæl som salg</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      {localCountsAsSale ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <span className="text-sm">Tæl som salg</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {localCountsAsCrossSale ? (
+                        <CheckCircle className="h-5 w-5 text-blue-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <span className="text-sm">Tæl som bisalg</span>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -391,16 +421,31 @@ export function ProductPricingRulesDialog({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="counts-as-sale"
-                      checked={localCountsAsSale}
-                      onCheckedChange={handleCountsAsSaleChange}
-                    />
-                    <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
-                      Tæl som salg
-                    </Label>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="counts-as-sale"
+                        checked={localCountsAsSale}
+                        onCheckedChange={handleCountsAsSaleChange}
+                      />
+                      <Label htmlFor="counts-as-sale" className="text-sm cursor-pointer">
+                        Tæl som salg
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="counts-as-cross-sale"
+                        checked={localCountsAsCrossSale}
+                        onCheckedChange={handleCountsAsCrossSaleChange}
+                      />
+                      <Label htmlFor="counts-as-cross-sale" className="text-sm cursor-pointer">
+                        Tæl som bisalg
+                      </Label>
+                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Kun én kan være valgt ad gangen
+                  </p>
 
                   {/* Date picker */}
                   <div className="space-y-2 pt-2">

@@ -60,6 +60,7 @@ interface AggregatedProduct {
     revenue_dkk: number | null;
     client_campaign_id: string | null;
     counts_as_sale: boolean;
+    counts_as_cross_sale?: boolean;
     is_hidden?: boolean;
   } | null;
   campaignId: string | null;
@@ -268,6 +269,7 @@ export default function MgTest() {
     baseCommission: number;
     baseRevenue: number;
     countsAsSale: boolean;
+    countsAsCrossSale: boolean;
     clientId?: string;
   } | null>(null);
 
@@ -1260,6 +1262,7 @@ export default function MgTest() {
         baseCommission: data.commission_dkk ?? 0,
         baseRevenue: data.revenue_dkk ?? 0,
         countsAsSale: data.counts_as_sale ?? true,
+        countsAsCrossSale: data.counts_as_cross_sale ?? false,
         clientId: undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
@@ -2295,6 +2298,7 @@ export default function MgTest() {
                                                   baseCommission: row.product?.commission_dkk ?? 0,
                                                   baseRevenue: row.product?.revenue_dkk ?? 0,
                                                   countsAsSale: row.product?.counts_as_sale ?? true,
+                                                  countsAsCrossSale: row.product?.counts_as_cross_sale ?? false,
                                                   clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
                                                 })}
                                                 title="Administrer prissætning"
@@ -3591,6 +3595,7 @@ export default function MgTest() {
           baseCommission={pricingRulesProduct.baseCommission}
           baseRevenue={pricingRulesProduct.baseRevenue}
           countsAsSale={pricingRulesProduct.countsAsSale}
+          countsAsCrossSale={pricingRulesProduct.countsAsCrossSale}
           clientId={pricingRulesProduct.clientId}
           onBaseValuesChange={() => {
             queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
