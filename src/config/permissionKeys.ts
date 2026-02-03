@@ -195,6 +195,7 @@ export const PERMISSION_KEYS = {
   menu_reports_daily: { label: 'Daglige rapporter', section: 'reports' },
   menu_reports_management: { label: 'Ledelsesrapporter', section: 'reports' },
   menu_reports_employee: { label: 'Medarbejderrapporter', section: 'reports' },
+  menu_reports_revenue_by_client: { label: 'Omsætning per opgave', section: 'reports' },
 
   // ==================== ONBOARDING ====================
   menu_onboarding_overview: { label: 'Onboarding overblik', section: 'onboarding' },
