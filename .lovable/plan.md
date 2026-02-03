@@ -1,68 +1,89 @@
 
-# Plan: Vis sygefravær/ferie på TV-skærm under "Salg per opgave"
+# Plan: Daglig Omsætning per Opgave - Ledelsesrapport
 
 ## Oversigt
-Tilføjer absence-data (syg/ferie/no-show) per klient til TV-skærmen, så de små indikatorer under hver opgave-kort også vises i TV mode.
+Opretter en ny side under Ledelse/Rapporter der viser daglig omsætning fordelt på opgaver (klienter). Siden vil give ledelsen et overblik over hvilke opgaver der performer bedst i en given periode.
 
-## Nuværende Situation
-- **Normal visning**: Viser syge/ferie-indikatorer under hvert klient-kort (🤒 12% (2), 🌴 8% (1))
-- **TV mode**: Disse indikatorer er skjult fordi:
-  1. Edge function returnerer ikke absence-data per klient
-  2. Frontend skipper visningen i TV mode (`!tvMode && absenceData`)
+## Placering i navigation
+Siden tilføjes under **Rapporter** sektionen i sidebaren som "Omsætning per opgave" med ruten `/reports/revenue-by-client`.
 
-## Løsning
+## Funktionalitet
 
-### 1. Edge Function: Tilføj absence per klient
-Udvid `tv-dashboard-data/index.ts` til at returnere absence-data grupperet per klient:
+### Filtre
+- **Periode**: I dag, i går, denne uge, sidste uge, denne måned, valgfri datoer
+- **Klient**: Valgfri filtrering på specifik klient
 
-```typescript
-// I response-objektet (linje ~453):
-const response = {
-  // ... eksisterende felter ...
-  absenceByClient: {
-    sickByClient: { "Tryg": 2, "ASE": 1 },
-    vacationByClient: { "Tryg": 1 },
-    noShowByClient: { "ASE": 1 },
-    employeeCountByClient: { "Tryg": 25, "ASE": 18 }
-  }
-};
-```
+### Datavisning
+1. **Oversigts-kort**: Total omsætning for perioden
+2. **Tabel med daglig omsætning per klient**:
+   - Klient navn
+   - Antal salg
+   - Total omsætning
+   - Gennemsnitlig omsætning per salg
+3. **Søjlediagram**: Daglig omsætning per klient over tid
 
-### 2. Frontend: Brug data i TV mode
-Opdater `CphSalesDashboard.tsx` til at vise absence-data i TV mode:
+### Datakilder
+- `sales` + `sale_items` (TM salg med omsætning)
+- `fieldmarketing_sales` + `products` (FM salg med omsætning)
+- Genbrug af omsætningsberegningslogik fra `DailyRevenueChart`
 
-```typescript
-// Linje ~1244: Fjern !tvMode betingelsen
-{absenceData && (
-  // ... eksisterende kode ...
-)}
+## Tekniske detaljer
 
-// Brug tvData.absenceByClient hvis i TV mode
-const displayAbsenceData = tvMode && tvData?.absenceByClient 
-  ? tvData.absenceByClient 
-  : absenceData;
-```
+### Nye filer
 
-## Filer der ændres
+| Fil | Beskrivelse |
+|-----|-------------|
+| `src/pages/reports/RevenueByClient.tsx` | Hovedsiden med filtre, tabel og chart |
+
+### Eksisterende filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/tv-dashboard-data/index.ts` | Tilføj absence-beregning per klient og inkluder i response |
-| `src/pages/dashboards/CphSalesDashboard.tsx` | Fjern `!tvMode` check og brug TV-data når tilgængeligt |
+| `src/routes/pages.ts` | Tilføj lazy export for `RevenueByClient` |
+| `src/routes/config.tsx` | Tilføj rute `/reports/revenue-by-client` med permission |
+| `src/config/permissionKeys.ts` | Tilføj `menu_reports_revenue_by_client` permission key |
+| `src/components/layout/AppSidebar.tsx` | Tilføj navigation link under Rapporter |
 
-## Tekniske Detaljer
+### Permission
+- Ny permission key: `menu_reports_revenue_by_client`
+- Label: "Omsætning per opgave"
+- Sektion: `reports`
 
-### Edge Function Logik
-Beregningen genbruger eksisterende data:
-1. Hent `absence_request_v2` for i dag
-2. Map employee → team via `team_members`
-3. Map team → client via `team_clients`
-4. Aggregér counts per klient
+### UI Struktur
 
-### UI Ændring
-Minimal ændring - kun fjern betingelsen der skjuler data i TV mode og brug de rigtige data.
+```text
++------------------------------------------+
+| Daglig omsætning per opgave              |
+| Overblik over omsætning fordelt på klienter |
++------------------------------------------+
+| [Periode ▼] [Klient ▼]                   |
++------------------------------------------+
+| Total omsætning:  245.600 kr             |
++------------------------------------------+
+|                                          |
+|  [Bar chart - omsætning per dag/klient]  |
+|                                          |
++------------------------------------------+
+| Klient       | Salg | Omsætning | Gns.   |
+|--------------|------|-----------|--------|
+| Tryg         |   45 | 125.000   | 2.778  |
+| Eesy         |   32 |  78.400   | 2.450  |
+| ASE          |   18 |  42.200   | 2.344  |
++------------------------------------------+
+```
 
-## Forventet Resultat
-- TV-skærmen viser nu syge/ferie-indikatorer under hver opgave-kort
-- Samme visuelle format som normal visning
-- Data opdateres sammen med resten af TV dashboard (hvert minut)
+### Omsætningsberegning
+Genbrug af logik fra `DailyRevenueChart`:
+1. Hent salg fra `sales` med `client_campaigns.client_id`
+2. Hent `sale_items` med `mapped_revenue`
+3. Anvend campaign overrides fra `product_campaign_overrides`
+4. Tilføj FM salg fra `fieldmarketing_sales` med produktomsætning fra `products`
+5. Aggregér per klient og dato
+
+## Database
+Ingen ændringer nødvendige - bruger eksisterende tabeller.
+
+## Opsummering af ændringer
+1. Opret ny page-komponent med filtre og data-visning
+2. Registrer rute og permission
+3. Tilføj sidebar-navigation
