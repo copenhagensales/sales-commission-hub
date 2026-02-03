@@ -1,107 +1,107 @@
 
-## Problem: Karl kan stadig se alle teams i Dagssedler
+## Lås System for Medarbejdere med Afvist Kontrakt
 
-### Identificerede årsager
+### Problemet
+Når en medarbejder afviser en kontrakt, beholder de stadig fuld adgang til systemet. Der er aktuelt **7 medarbejdere** med afviste kontrakter som alle stadig er aktive (`is_active: true`).
 
-Efter grundig undersøgelse har jeg fundet **3 sammenhængende problemer**:
-
-#### Problem 1: LocalStorage Cache
-Permissions caches i `localStorage` med nøglen `cached-permissions-v2` i 24 timer. Hvis Karl loggede ind før `scope_reports_daily` blev tilføjet til mappingen, vil hans cache stadig indeholde de gamle permissions **uden** `scope_reports_daily`.
-
-#### Problem 2: "Alle" option vises altid
-I team-dropdown (linje 1112) vises "Alle" som første option **uanset brugerens scope**:
-```jsx
-<SelectItem value="all">Alle</SelectItem>
-{teams.map((team) => (...))}
-```
-
-Selvom `teams` listen er filtreret korrekt til kun at vise Karl's team (Relatel), kan han stadig vælge "Alle".
-
-#### Problem 3: Data-hentning respekterer ikke scope
-Når `selectedTeam === "all"` henter queryFn data for ALLE medarbejdere ufiltreret. Der er ingen server-side enforcement af scope.
+### Løsning
+Opret en ny "Rejected Contract Lock" der låser systemet for medarbejdere med afviste kontrakter og viser en besked om at kontakte nærmeste leder.
 
 ---
 
-### Løsningsplan
+### Implementeringsplan
 
-#### Trin 1: Bump cache-version
-**Fil:** `src/hooks/usePositionPermissions.ts`
+#### 1. Opret hook: `useRejectedContractLock`
+**Ny fil:** `src/hooks/useRejectedContractLock.ts`
 
-Ændre cache-nøgle fra `v2` til `v3` og tilføj den gamle version til cleanup-listen:
-```typescript
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v3';
+Formål: Tjek om den aktuelle bruger har en afvist kontrakt.
 
-// Force-clear old cache versions on load
-try {
-  localStorage.removeItem('cached-permissions-v1');
-  localStorage.removeItem('cached-permissions-v2'); // NY!
-} catch (e) {
-  // Ignore errors
-}
+Logik:
+- Hent employee_id for den loggede bruger
+- Tjek om der findes kontrakter med `status = 'rejected'` for denne medarbejder
+- Returnér `isLocked: true` hvis der findes afviste kontrakter
+
+#### 2. Opret overlay-komponent: `RejectedContractLockOverlay`
+**Ny fil:** `src/components/layout/RejectedContractLockOverlay.tsx`
+
+Design:
+- Fuld-skærm overlay (som eksisterende locks)
+- Rød/destructive farvetema
+- Ikon: `XCircle` eller `Ban`
+- Titel: "Adgang spærret"
+- Besked: "Du kan ikke bruge systemet, da du har afvist en kontrakt. Kontakt venligst din nærmeste leder for at løse dette."
+- Kun "Log ud" knap (ingen handling de selv kan udføre)
+
+#### 3. Integrér i `LockOverlays.tsx`
+**Fil:** `src/components/layout/LockOverlays.tsx`
+
+Ændringer:
+- Importér `useRejectedContractLock` og `RejectedContractLockOverlay`
+- Tilføj hook-kald
+- Afvist-kontrakt-lock skal have **højeste prioritet** - vises FØR pending contract lock
+- Hvis `isRejectedContractLocked === true` → vis `RejectedContractLockOverlay`
+
+---
+
+### Prioriteringsrækkefølge for locks
+
+1. **Afvist kontrakt** (ny) - Højeste prioritet, ingen vej ud
+2. Pending kontrakt (>5 dage)
+3. Car Quiz
+4. MFA
+5. Goal
+
+---
+
+### UI Design
+
+Overlay-strukturen:
+
 ```
-
-#### Trin 2: Skjul "Alle" option for team-scoped brugere
-**Fil:** `src/pages/reports/DailyReports.tsx`
-
-Kun vis "Alle" option for brugere med `scopeReportsDaily === "alt"`:
-```jsx
-<SelectContent>
-  {scopeReportsDaily === "alt" && (
-    <SelectItem value="all">Alle</SelectItem>
-  )}
-  {teams.map((team) => (
-    <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-  ))}
-</SelectContent>
-```
-
-#### Trin 3: Forbedret initial team-valg
-Opdater useEffect til at håndtere edge cases:
-```typescript
-useEffect(() => {
-  // For team-scoped users: pre-select their team
-  if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeam === "all") {
-    setSelectedTeam(teams[0].id);
-  }
-  // For egen-scoped users: disable team selection entirely
-  if (scopeReportsDaily === "egen" && selectedTeam !== "all") {
-    setSelectedTeam("all"); // Will show only their own data
-  }
-}, [scopeReportsDaily, teams, selectedTeam]);
-```
-
-#### Trin 4: Tilføj scope-baseret data-filtrering
-I report data query-funktionen (linje 296+), tilføj scope-check for at sikre server-side enforcement:
-```typescript
-// Apply scope restrictions to employee query
-if (scopeReportsDaily === "team" && ledTeamIds.length > 0) {
-  // Only fetch employees from user's led teams
-  filteredEmployees = filteredEmployees.filter(emp =>
-    emp.team_members?.some((tm: any) => ledTeamIds.includes(tm.team?.id))
-  );
-}
-if (scopeReportsDaily === "egen" && currentEmployee?.id) {
-  // Only fetch current user's data
-  filteredEmployees = filteredEmployees.filter(emp => emp.id === currentEmployee.id);
-}
+┌─────────────────────────────────────┐
+│                                     │
+│            🚫 (ikon)                │
+│                                     │
+│        Adgang spærret               │
+│                                     │
+│   Du kan ikke bruge systemet,       │
+│   da du har afvist en kontrakt.     │
+│   Kontakt venligst din nærmeste     │
+│   leder for at løse dette.          │
+│                                     │
+│        [Log ud]                     │
+│                                     │
+└─────────────────────────────────────┘
 ```
 
 ---
 
-### Tekniske detaljer
+### Tekniske Detaljer
 
-#### Filer der ændres:
-1. `src/hooks/usePositionPermissions.ts` - Bump cache version til v3
-2. `src/pages/reports/DailyReports.tsx` - Implementer komplet scope-filtrering
+**Hook query:**
+```typescript
+const { data: rejectedContracts } = await supabase
+  .from("contracts")
+  .select("id, title")
+  .eq("employee_id", employeeData)
+  .eq("status", "rejected")
+  .limit(1);
 
-#### Database-bekræftelse:
-- Karl's role_key: `teamleder`
-- Karl's permission: `menu_reports_daily` → `visibility: team` ✓
-- Karl's team: Relatel (team_id: `f4210d48-5062-4e3a-b945-7ff1d5a874dd`) ✓
-- Karl er `team_leader_id` for Relatel ✓
+return { 
+  isLocked: rejectedContracts && rejectedContracts.length > 0,
+  contract: rejectedContracts?.[0] ?? null 
+};
+```
 
-#### Forventet resultat efter fix:
-- Karl kan KUN se Relatel i team-dropdown (ingen "Alle" option)
-- Karl kan KUN se medarbejdere fra Relatel
-- Ejere kan stadig se alle teams og vælge "Alle"
-- Cache opdateres automatisk for alle brugere ved næste login
+**Filer der oprettes:**
+1. `src/hooks/useRejectedContractLock.ts`
+2. `src/components/layout/RejectedContractLockOverlay.tsx`
+
+**Fil der ændres:**
+1. `src/components/layout/LockOverlays.tsx`
+
+### Forventet Resultat
+- Medarbejdere med afviste kontrakter kan ikke bruge systemet
+- De ser kun et overlay med instruktion om at kontakte deres leder
+- Eneste handling er at logge ud
+- Ejere/admins i preview-mode kan stadig teste systemet
