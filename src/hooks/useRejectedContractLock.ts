@@ -33,19 +33,30 @@ export function useRejectedContractLock() {
         return { isLocked: false, contract: null };
       }
 
-      // Find the most recent contract
-      const mostRecentContract = allContracts[0];
-
-      // Only lock if the MOST RECENT contract is rejected
-      // If they have a newer signed contract, they're unlocked
-      if (mostRecentContract.status === "rejected") {
-        return {
-          isLocked: true,
-          contract: mostRecentContract,
-        };
+      // Find the most recent rejected contract
+      const mostRecentRejected = allContracts.find(c => c.status === "rejected");
+      
+      if (!mostRecentRejected) {
+        // No rejected contracts at all - not locked
+        return { isLocked: false, contract: null };
       }
 
-      return { isLocked: false, contract: null };
+      // Check if there's any contract (signed OR pending) created AFTER the rejection
+      // This allows users to sign a new pending contract to unlock themselves
+      const hasNewerContract = allContracts.some(c => 
+        (c.status === "signed" || c.status === "pending_employee") && 
+        new Date(c.created_at) > new Date(mostRecentRejected.created_at)
+      );
+
+      if (hasNewerContract) {
+        return { isLocked: false, contract: null };
+      }
+
+      // Locked: has rejected contract with no newer signed/pending contract
+      return {
+        isLocked: true,
+        contract: mostRecentRejected,
+      };
     },
     enabled: !!user?.email,
     staleTime: 1000 * 60 * 5, // 5 minutes
