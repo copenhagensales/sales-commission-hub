@@ -450,6 +450,9 @@ Deno.serve(async (req) => {
     // Fetch team performance data for TV mode
     const teamPerformance = await fetchTeamPerformanceData(supabase, todayStr);
 
+    // Fetch absence data per client for TV mode
+    const absenceByClient = await fetchAbsenceByClient(supabase, todayStr);
+
     const response = {
       date: todayStr,
       timestamp: new Date().toISOString(),
@@ -470,6 +473,7 @@ Deno.serve(async (req) => {
       sellersOnBoard: sellersWithSales.size,
       topSellers,
       teamPerformance,
+      absenceByClient,
     };
 
     console.log("Response prepared:", JSON.stringify({
@@ -863,6 +867,123 @@ function getWeekStart(date: Date): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
   return d.toISOString().split('T')[0];
+}
+
+// Fetch absence data grouped by client for TV mode "Salg per opgave" display
+async function fetchAbsenceByClient(supabase: any, todayStr: string): Promise<{
+  sickByClient: Record<string, number>;
+  vacationByClient: Record<string, number>;
+  noShowByClient: Record<string, number>;
+  employeeCountByClient: Record<string, number>;
+}> {
+  console.log(`[AbsenceByClient] Fetching absence data for ${todayStr}`);
+  
+  // Get today's absences
+  const { data: absences, error: absError } = await supabase
+    .from("absence_request_v2")
+    .select("employee_id, type, start_date, end_date")
+    .eq("status", "approved")
+    .lte("start_date", todayStr)
+    .gte("end_date", todayStr);
+  
+  if (absError) {
+    console.error("[AbsenceByClient] Error fetching absences:", absError);
+  }
+
+  // Get team_clients mapping
+  const { data: teamClients } = await supabase
+    .from("team_clients")
+    .select("team_id, client_id, clients(name)");
+
+  // Get team_members for employee-team mapping
+  const { data: teamMembers } = await supabase
+    .from("team_members")
+    .select("employee_id, team_id");
+
+  // Get active employee count per team
+  const { data: activeByTeam } = await supabase
+    .from("team_members")
+    .select("team_id, employee:employee_master_data!inner(id, is_active, is_staff_employee)")
+    .eq("employee.is_active", true)
+    .eq("employee.is_staff_employee", false);
+
+  // Build team -> client name map
+  const teamToClient: Record<string, string> = {};
+  (teamClients || []).forEach((tc: any) => {
+    if (tc.clients?.name) {
+      teamToClient[tc.team_id] = tc.clients.name;
+    }
+  });
+
+  // Build employee -> team map
+  const employeeToTeam: Record<string, string> = {};
+  (teamMembers || []).forEach((tm: any) => {
+    employeeToTeam[tm.employee_id] = tm.team_id;
+  });
+
+  // Count employees per team
+  const employeesPerTeam: Record<string, number> = {};
+  (activeByTeam || []).forEach((tm: any) => {
+    employeesPerTeam[tm.team_id] = (employeesPerTeam[tm.team_id] || 0) + 1;
+  });
+
+  // Initialize result objects
+  const sickByClient: Record<string, number> = {};
+  const vacationByClient: Record<string, number> = {};
+  const noShowByClient: Record<string, number> = {};
+  const employeeCountByClient: Record<string, number> = {};
+
+  // Map teams to clients for employee counts
+  (teamClients || []).forEach((tc: any) => {
+    const clientName = tc.clients?.name;
+    if (clientName && employeesPerTeam[tc.team_id]) {
+      employeeCountByClient[clientName] = (employeeCountByClient[clientName] || 0) + employeesPerTeam[tc.team_id];
+    }
+  });
+
+  // Map absences to clients by type
+  const sickToday = (absences || []).filter((a: any) => a.type === "sick");
+  const vacationToday = (absences || []).filter((a: any) => a.type === "vacation");
+  const noShowToday = (absences || []).filter((a: any) => a.type === "no_show");
+
+  sickToday.forEach((absence: any) => {
+    const teamId = employeeToTeam[absence.employee_id];
+    if (teamId) {
+      const clientName = teamToClient[teamId];
+      if (clientName) {
+        sickByClient[clientName] = (sickByClient[clientName] || 0) + 1;
+      }
+    }
+  });
+
+  vacationToday.forEach((absence: any) => {
+    const teamId = employeeToTeam[absence.employee_id];
+    if (teamId) {
+      const clientName = teamToClient[teamId];
+      if (clientName) {
+        vacationByClient[clientName] = (vacationByClient[clientName] || 0) + 1;
+      }
+    }
+  });
+
+  noShowToday.forEach((absence: any) => {
+    const teamId = employeeToTeam[absence.employee_id];
+    if (teamId) {
+      const clientName = teamToClient[teamId];
+      if (clientName) {
+        noShowByClient[clientName] = (noShowByClient[clientName] || 0) + 1;
+      }
+    }
+  });
+
+  console.log(`[AbsenceByClient] Results:`, {
+    sickByClient,
+    vacationByClient,
+    noShowByClient,
+    employeeCountByClient,
+  });
+
+  return { sickByClient, vacationByClient, noShowByClient, employeeCountByClient };
 }
 
 // Handle team-specific dashboards
