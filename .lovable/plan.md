@@ -1,120 +1,131 @@
 
-# Plan: Debug PASSWORD_RECOVERY Event Handling
+# Plan: Fix Opkaldsvisning og Status-Tracking
 
 ## Problemanalyse
 
-### Nuværende flow for Supabase Password Reset (fra login-siden):
-1. Bruger klikker "Glemt adgangskode?" på `/auth`
-2. Supabase sender en email med link til: `https://[project].lovableproject.com/auth#access_token=XXX&type=recovery...`
-3. Bruger klikker linket → browser navigerer til `/auth` med hash-fragmentet
-4. Supabase SDK parser hash-fragmentet og trigger `PASSWORD_RECOVERY` event
-5. `Auth.tsx` skal fange dette event og sætte `isNewPasswordMode = true`
+Oscar Belcher kan ikke se indgående/missede opkald. Efter undersøgelse er der identificeret to hovedproblemer:
 
-### Identificeret problem:
-I `src/routes/guards.tsx` (linje 15-20):
-```typescript
-export function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/" replace />;  // ⚠️ PROBLEM HER
-  return <>{children}</>;
-}
-```
+### Problem 1: Messages-siden viser ikke opkaldsdata
+**Årsag**: Messages-siden (`/recruitment/Messages.tsx`) henter KUN fra `communication_logs` tabellen, men opkaldsdata gemmes i `call_records` tabellen af Twilio webhook.
 
-**Race condition:** Når brugeren klikker på reset-linket:
-1. Supabase SDK parser hash-fragmentet og logger brugeren ind (for at lade dem skifte password)
-2. `AuthRoute` ser at `user` eksisterer og redirecter straks til `/`
-3. `PASSWORD_RECOVERY` eventet når aldrig at blive fanget i `Auth.tsx`
-4. Brugeren ender på forsiden - stadig logget ind, men uden mulighed for at oprette ny adgangskode
+**Beviser fra database**:
+- `communication_logs` med type='call': **0 rækker**
+- `call_records` med indgående opkald: **Mange rækker** (inkl. +4530809044)
 
-### Yderligere problem i Auth.tsx:
-`useEffect` (linje 234-258) registrerer `onAuthStateChange` listeneren, men:
-- SDK'et har muligvis allerede parset hash-fragmentet før listeneren er sat op
-- Eventet kan være "mistet" hvis det sker under initial render
+### Problem 2: Opkaldsstatus opdateres ikke
+**Årsag**: 35 opkald sidder fast på `in-progress`, kun 6 har `completed`. Twilio webhook callbacks for slutstatus (no-answer, busy, completed) modtages ikke korrekt.
 
 ---
 
 ## Løsningsplan
 
-### Trin 1: Tilføj URL-baseret recovery detection i AuthRoute
-**Fil:** `src/routes/guards.tsx`
+### Trin 1: Opdater Messages-siden til at inkludere call_records
+**Fil**: `src/pages/recruitment/Messages.tsx`
 
-Opdater `AuthRoute` til at tjekke om URL'en indeholder `type=recovery` i hash-fragmentet:
-- Hvis ja, tillad rendering af Auth-siden (skip redirect)
-- Dette sikrer at brugeren kan se password-formularen
+Ændringer:
+1. Tilføj en separat query for `call_records` 
+2. Kombiner data fra begge kilder i "Opkald"-fanen
+3. Normaliser data-strukturen så begge kilder vises ens
 
-```typescript
-export function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
-  // Check if this is a password recovery flow - don't redirect even if logged in
-  const isRecoveryFlow = window.location.hash.includes('type=recovery');
-  
-  if (loading) return <PageLoader />;
-  if (user && !isRecoveryFlow) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-```
+Forventet ændring (ca. 30-50 linjer):
+- Tilføj `useQuery` for `call_records`
+- Opdater filteredMessages logikken for "call" tab
+- Vis indgående opkald med korrekt status (missed/no-answer/completed)
 
-### Trin 2: Tilføj robust recovery detection i Auth.tsx
-**Fil:** `src/pages/Auth.tsx`
+### Trin 2: Tilføj visning af missede opkald på kandidat-siden
+**Fil**: `src/components/recruitment/CandidateCallLogs.tsx`
 
-Forbedre `useEffect` til også at tjekke URL hash for `type=recovery`:
+Denne komponent henter allerede fra `call_records` - men status-logikken kan forbedres:
+- Vis "Misset" badge for opkald uden `connected_at`
+- Forbedret status-detection for indgående opkald
 
-```typescript
-useEffect(() => {
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  const errorDescription = hashParams.get('error_description');
-  const error = hashParams.get('error');
-  const tokenType = hashParams.get('type');
-  
-  // Detect recovery from URL hash (in case event was missed)
-  if (tokenType === 'recovery' && !error) {
-    console.log('[Auth] Recovery flow detected from URL hash');
-    setIsNewPasswordMode(true);
-    setIsResetMode(false);
-    setExpiredLinkError(false);
-  } else if (error || errorDescription) {
-    setExpiredLinkError(true);
-    setIsResetMode(true);
-    window.history.replaceState(null, '', window.location.pathname);
-  }
-
-  // Listen for password recovery event (backup)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-    console.log('[Auth] Auth state changed:', event);
-    if (event === 'PASSWORD_RECOVERY') {
-      setIsNewPasswordMode(true);
-      setIsResetMode(false);
-      setExpiredLinkError(false);
-    }
-  });
-
-  return () => subscription.unsubscribe();
-}, []);
-```
-
-### Trin 3: Tilføj debug logging
-Tilføj console.log statements for at spore:
-- Om hash-fragmentet indeholder recovery token
-- Om `PASSWORD_RECOVERY` event bliver modtaget
-- Om brugeren redirectes væk
+### Trin 3: Undersøg og ret webhook-konfiguration (separat opgave)
+For at løse det underliggende problem med at status ikke opdateres:
+- Verificer at Twilio webhook URLs er konfigureret korrekt
+- Tjek at `StatusCallbackEvent` inkluderer alle relevante events
+- Tilføj logging til `incoming-call` funktionen for at debugge
 
 ---
 
 ## Tekniske detaljer
 
-### Ændrede filer:
-1. `src/routes/guards.tsx` - AuthRoute komponent
-2. `src/pages/Auth.tsx` - useEffect med recovery detection
+### Database-struktur
 
-### Test-scenarie:
-1. Send password reset email fra login-siden
-2. Klik på linket i emailen
-3. Verificer at bruger ser "Vælg ny adgangskode" formularen
-4. Indtast ny adgangskode og bekræft
+**call_records** (korrekt data):
+```
+id, candidate_id, from_number, to_number, direction, status, 
+started_at, connected_at, ended_at, duration_seconds
+```
 
-### Forventet resultat:
-- Bruger bliver ikke længere redirectet væk fra `/auth`
-- Password-formularen vises korrekt
-- Bruger kan oprette ny adgangskode
+**communication_logs** (bruges nu, men mangler opkald):
+```
+id, candidate_id, type, direction, content, phone_number, 
+outcome, created_at, read
+```
+
+### Ændringer i Messages.tsx
+
+Nuværende kode (linje 71-82):
+```typescript
+const { data: messages = [] } = useQuery({
+  queryKey: ["communication_logs"],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("communication_logs")
+      .select("*")
+      .order("created_at", { ascending: false });
+    return data;
+  },
+});
+```
+
+Ny kode tilføjer:
+```typescript
+const { data: callRecords = [] } = useQuery({
+  queryKey: ["call_records_for_messages"],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("call_records")
+      .select("*, candidates(first_name, last_name)")
+      .order("started_at", { ascending: false })
+      .limit(200);
+    return data;
+  },
+});
+```
+
+Kombiner i filteredMessages for "call" tab:
+```typescript
+const callsFromRecords = callRecords.map(cr => ({
+  id: cr.id,
+  type: 'call',
+  direction: cr.direction,
+  content: `${cr.direction === 'inbound' ? 'Indgående' : 'Udgående'} opkald`,
+  created_at: cr.started_at,
+  read: true, // Opkald har ikke "læst" status
+  outcome: cr.status,
+  phone_number: cr.direction === 'inbound' ? cr.from_number : cr.to_number,
+  candidate_name: cr.candidates ? 
+    `${cr.candidates.first_name} ${cr.candidates.last_name}` : null,
+  duration_seconds: cr.duration_seconds,
+  is_missed: cr.direction === 'inbound' && !cr.connected_at
+}));
+```
+
+### RLS-tilladelser
+Oscar Belcher har `job_title = 'Rekruttering'` som er inkluderet i:
+- `is_rekruttering()` → Giver fuld adgang til `call_records`
+- `is_teamleder_or_above()` → Giver læseadgang til `call_records`
+
+**Ingen RLS-ændringer nødvendige**.
+
+---
+
+## Filer der ændres
+1. `src/pages/recruitment/Messages.tsx` - Tilføj call_records query og kombiner data
+2. `src/components/recruitment/CandidateCallLogs.tsx` - Forbedret status-visning for missede opkald
+
+## Forventet resultat
+- "Opkald"-fanen på Messages-siden viser alle opkald fra `call_records`
+- Missede opkald vises med korrekt status og rødt badge
+- Oscar kan se når kandidater har forsøgt at ringe forgæves
