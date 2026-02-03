@@ -85,6 +85,7 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
   'menu_some': 'scope_some',
   'menu_sales': 'scope_sales',
   'menu_car_quiz_admin': 'scope_quiz',
+  'menu_reports_daily': 'scope_reports_daily',
 };
 
 // localStorage cache key for permissions
@@ -440,6 +441,7 @@ export function usePermissions() {
     scopeQuiz: getDataScope("scope_quiz"),
     scopeExtraWork: getDataScope("scope_extra_work"),
     scopeFieldmarketing: getDataScope("scope_fieldmarketing"),
+    scopeReportsDaily: getDataScope("scope_reports_daily"),
     // Main menu permissions
     canViewDashboard: hasPermission("menu_dashboard"),
     canViewHomeGoals: canView("menu_home_goals"),

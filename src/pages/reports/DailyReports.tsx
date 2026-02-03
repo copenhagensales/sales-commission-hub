@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -17,6 +17,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useCurrentEmployee } from "@/hooks/useShiftPlanning";
 
 // Helper function to fetch employees with activity on a specific client
 // Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
@@ -100,6 +102,9 @@ interface EmployeeReportData {
 }
 
 export default function DailyReports() {
+  const { scopeReportsDaily } = usePermissions();
+  const { data: currentEmployee } = useCurrentEmployee();
+  
   const [period, setPeriod] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
@@ -185,8 +190,22 @@ export default function DailyReports() {
     return !isSameDay(dateRange.start, dateRange.end);
   }, [dateRange]);
 
-  // Fetch teams
-  const { data: teams = [] } = useQuery({
+  // Fetch teams where current user is leader (for scope = "team")
+  const { data: ledTeamIds = [] } = useQuery({
+    queryKey: ["daily-report-led-teams", currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return [];
+      const { data } = await supabase
+        .from("teams")
+        .select("id")
+        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
+      return data?.map(t => t.id) || [];
+    },
+    enabled: !!currentEmployee?.id && scopeReportsDaily === "team",
+  });
+
+  // Fetch all teams
+  const { data: allTeams = [] } = useQuery({
     queryKey: ["daily-report-teams"],
     queryFn: async () => {
       const { data } = await supabase
@@ -196,6 +215,20 @@ export default function DailyReports() {
       return data || [];
     },
   });
+
+  // Filter teams based on scope
+  const teams = useMemo(() => {
+    if (scopeReportsDaily === "alt") return allTeams; // Owner sees all
+    if (scopeReportsDaily === "team") return allTeams.filter(t => ledTeamIds.includes(t.id));
+    return []; // "egen" = only self, no teams
+  }, [allTeams, scopeReportsDaily, ledTeamIds]);
+
+  // Pre-select user's team when scope is "team" and only one team available
+  useEffect(() => {
+    if (scopeReportsDaily === "team" && teams.length === 1 && selectedTeam === "all") {
+      setSelectedTeam(teams[0].id);
+    }
+  }, [scopeReportsDaily, teams, selectedTeam]);
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
