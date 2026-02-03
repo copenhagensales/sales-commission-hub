@@ -1,70 +1,138 @@
 
-# Plan: Løsning af Integration Engine WORKER_LIMIT Timeout
+# Plan: Tilføj Dækningssum-betingelser med Numeriske Operatorer
 
-## Problem
-Integration-engine funktionen rammer CPU/wall-clock timeout (WORKER_LIMIT) under synkronisering. Hovedårsagen er den intensive `buildLeadDataMap()` proces der:
+## Oversigt
+Udvider pricing rule editoren til at understøtte "Dækningssum" som en numerisk betingelse, hvor brugeren kan vælge et beløb og om reglen skal gælde når værdien er "over" eller "under" dette beløb.
 
-1. Henter leads bulk per kampagne (kan rate-limites)
-2. Fallback-henter individuelle leads der mangler (mange API-kald)
-3. Retries med delays ved 429-fejl forbruger wall-clock tid
+## Nuværende Situation
+- `conditions` feltet gemmer simple key-value par: `{"Tilskud": "0%", "A-kasse type": "Lønmodtager"}`
+- Alle betingelser evalueres med exact match (`===`)
+- UI understøtter kun dropdown med foruddefinerede værdier
 
-## Løsning
+## Løsning: Udvidet Condition Format
 
-Implementerer **3-lags optimering** for at reducere CPU-brug og undgå timeout:
+### Nyt JSON-format for numeriske betingelser
+```text
++----------------------------------+
+| Eksisterende format (bevares)    |
++----------------------------------+
+| { "Tilskud": "0%" }              |
+| - Matcher via equals             |
++----------------------------------+
 
-### 1. Reducér maksimum records yderligere
-- Sænk `effectiveMaxRecords` fra 100 til **50** i `index.ts`
-- Sænk `MAX_RECORDS` fra 100 til **50** i `repair-history.ts`
-- Sænk `BATCH_SIZE` fra 50 til **25** i `repair-history.ts`
++----------------------------------+
+| Nyt format for numeriske         |
++----------------------------------+
+| {                                |
+|   "Dækningssum": {               |
+|     "operator": "gte",           |
+|     "value": 6000                |
+|   }                              |
+| }                                |
++----------------------------------+
+```
 
-### 2. Begræns fallback lead-lookups i Adversus adapter
-- Tilføj `maxFallbackLeads` parameter (default 20)
-- Skip fallback lead-lookups helt hvis antallet overstiger grænsen
-- Prioritér de nyeste leads først hvis begrænset
-
-### 3. Reducér retry delays
-- Sænk retry delays fra 1-4 sekunder til 500ms-1.5s
-- Begræns max retries fra 3 til 2 for lead-lookups
-- Tilføj tidlig timeout-check efter hver batch
+### Understøttede operatorer
+- `gte` = Greater than or equal (≥) / "over eller lig med"
+- `lte` = Less than or equal (≤) / "under eller lig med"
+- `gt` = Greater than (>) / "over"
+- `lt` = Less than (<) / "under"
 
 ## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/integration-engine/index.ts` | `effectiveMaxRecords` 100 → 50 |
-| `supabase/functions/integration-engine/actions/repair-history.ts` | `MAX_RECORDS` 100 → 50, `BATCH_SIZE` 50 → 25 |
-| `supabase/functions/integration-engine/adapters/adversus.ts` | Begræns fallback lookups, reducér delays |
+| `src/components/mg-test/PricingRuleEditor.tsx` | Tilføj special håndtering for numeriske betingelser |
+| `supabase/functions/integration-engine/core/sales.ts` | Udvid matchPricingRule() til at evaluere numeriske operatorer |
+| `supabase/functions/integration-engine/types.ts` | Tilføj type for numerisk betingelse |
 
-## Tekniske detaljer
+## Tekniske Detaljer
 
-### index.ts
+### 1. PricingRuleEditor.tsx
+
+Tilføj "Dækningssum" som en special numerisk betingelse:
+
 ```typescript
-// Linje ~32
-const effectiveMaxRecords = maxRecords ?? 50;
+// Ny konstant for numeriske betingelser
+const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
+
+// Operatorer til UI
+const NUMERIC_OPERATORS = [
+  { value: "gte", label: "Over eller lig med" },
+  { value: "lte", label: "Under eller lig med" },
+  { value: "gt", label: "Over" },
+  { value: "lt", label: "Under" },
+];
 ```
 
-### repair-history.ts
-```typescript
-// Linje 4-5
-const MAX_RECORDS = 50
-const BATCH_SIZE = 25
+**UI for numerisk betingelse:**
+```text
++---------------------------------------------+
+| Dækningssum                                 |
+|  +--------+  +---------------+              |
+|  |  >=  v |  |  6000       |  [X]          |
+|  +--------+  +---------------+              |
++---------------------------------------------+
 ```
 
-### adversus.ts - buildLeadDataMap()
+- Dropdown til operator (over/under/over-eller-lig/under-eller-lig)
+- Input felt til beløb (number)
+- Slet-knap
+
+### 2. sales.ts - matchPricingRule()
+
+Udvid betingelses-evalueringen til at håndtere både:
+1. Simple strings (eksisterende): `"Tilskud"` → `"0%"`
+2. Numeriske objekter (nyt): `"Dækningssum"` → `{operator: "gte", value: 6000}`
+
 ```typescript
-// I fallback-sektionen (~linje 467-530):
-// - Begræns missingLeadIds til max 20
-// - Reducér delays mellem batches
-// - Reducér batch size fra 10 til 5
+// I matchPricingRule():
+for (const [condKey, condValue] of Object.entries(conditions)) {
+  const leadField = allFields.find(f => f.label === condKey);
+  
+  if (typeof condValue === 'object' && condValue !== null && 'operator' in condValue) {
+    // Numerisk sammenligning
+    const numericCond = condValue as { operator: string; value: number };
+    const leadValue = parseFloat(leadField?.value || '0');
+    
+    switch (numericCond.operator) {
+      case 'gte': allConditionsMet = leadValue >= numericCond.value; break;
+      case 'lte': allConditionsMet = leadValue <= numericCond.value; break;
+      case 'gt': allConditionsMet = leadValue > numericCond.value; break;
+      case 'lt': allConditionsMet = leadValue < numericCond.value; break;
+    }
+  } else {
+    // Eksisterende string-sammenligning
+    allConditionsMet = leadField?.value === condValue;
+  }
+}
 ```
 
-## Forventede resultater
-- Synkronisering gennemføres på under 30 sekunder
-- 50 salg per kørsel (kør flere gange for mere data)
-- Færre rate-limit fejl fra Adversus API
+### 3. types.ts
 
-## Alternativ: Frontend batching (fremtidig forbedring)
-Hvis problemet fortsætter, kan vi implementere:
-- Frontend sender datointervaller i stedet for antal dage
-- Edge function returnerer hurtigt med job-ID
-- Frontend poller for status
+Tilføj type for numeriske betingelser:
+
+```typescript
+export interface NumericCondition {
+  operator: 'gte' | 'lte' | 'gt' | 'lt';
+  value: number;
+}
+
+// Opdateret PricingRule interface
+export interface PricingRule {
+  // ...
+  conditions: Record<string, string | NumericCondition>;
+  // ...
+}
+```
+
+## Bagudkompatibilitet
+- Eksisterende regler med simple string-værdier fortsætter med at virke
+- Ingen databasemigration nødvendig - JSONB understøtter allerede det nye format
+- Backend evaluerer først om værdien er et objekt (numerisk) eller string (eksisterende)
+
+## Validering
+- Input-felt accepterer kun tal
+- Operator er påkrævet for numeriske betingelser
+- Backend logger tydeligt når numeriske sammenligninger evalueres
+
