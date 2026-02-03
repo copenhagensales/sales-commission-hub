@@ -1,107 +1,103 @@
 
-## Lås System for Medarbejdere med Afvist Kontrakt
+## Tilføj "Tæl som bisalg" knap med gensidig udelukkelse
 
-### Problemet
-Når en medarbejder afviser en kontrakt, beholder de stadig fuld adgang til systemet. Der er aktuelt **7 medarbejdere** med afviste kontrakter som alle stadig er aktive (`is_active: true`).
-
-### Løsning
-Opret en ny "Rejected Contract Lock" der låser systemet for medarbejdere med afviste kontrakter og viser en besked om at kontakte nærmeste leder.
+### Oversigt
+Tilføj en ny indstilling "Tæl som bisalg" til produkt-prissætningsdialogen, hvor brugeren ikke kan vælge både "Tæl som salg" og "Tæl som bisalg" samtidigt. Disse skal være gensidigt udelukkende.
 
 ---
 
 ### Implementeringsplan
 
-#### 1. Opret hook: `useRejectedContractLock`
-**Ny fil:** `src/hooks/useRejectedContractLock.ts`
+#### 1. Database-migration
+**Ny kolonne:** `counts_as_cross_sale` i `products` tabellen
 
-Formål: Tjek om den aktuelle bruger har en afvist kontrakt.
+```sql
+ALTER TABLE products 
+ADD COLUMN counts_as_cross_sale BOOLEAN NOT NULL DEFAULT false;
 
-Logik:
-- Hent employee_id for den loggede bruger
-- Tjek om der findes kontrakter med `status = 'rejected'` for denne medarbejder
-- Returnér `isLocked: true` hvis der findes afviste kontrakter
+-- Tilføj også til product_price_history for historik
+ALTER TABLE product_price_history 
+ADD COLUMN counts_as_cross_sale BOOLEAN DEFAULT false;
+```
 
-#### 2. Opret overlay-komponent: `RejectedContractLockOverlay`
-**Ny fil:** `src/components/layout/RejectedContractLockOverlay.tsx`
-
-Design:
-- Fuld-skærm overlay (som eksisterende locks)
-- Rød/destructive farvetema
-- Ikon: `XCircle` eller `Ban`
-- Titel: "Adgang spærret"
-- Besked: "Du kan ikke bruge systemet, da du har afvist en kontrakt. Kontakt venligst din nærmeste leder for at løse dette."
-- Kun "Log ud" knap (ingen handling de selv kan udføre)
-
-#### 3. Integrér i `LockOverlays.tsx`
-**Fil:** `src/components/layout/LockOverlays.tsx`
+#### 2. Opdater ProductPricingRulesDialog.tsx
+**Fil:** `src/components/mg-test/ProductPricingRulesDialog.tsx`
 
 Ændringer:
-- Importér `useRejectedContractLock` og `RejectedContractLockOverlay`
-- Tilføj hook-kald
-- Afvist-kontrakt-lock skal have **højeste prioritet** - vises FØR pending contract lock
-- Hvis `isRejectedContractLocked === true` → vis `RejectedContractLockOverlay`
+- Tilføj prop `countsAsCrossSale: boolean`
+- Tilføj lokal state `localCountsAsCrossSale`
+- Implementer gensidig udelukkelse logik:
+  - Når "Tæl som salg" vælges → "Tæl som bisalg" deaktiveres automatisk
+  - Når "Tæl som bisalg" vælges → "Tæl som salg" deaktiveres automatisk
+- Opdater mutation `updateCountsAsSale` til også at håndtere `counts_as_cross_sale`
+- Opdater visning og redigerings-UI med begge checkboxes
 
----
-
-### Prioriteringsrækkefølge for locks
-
-1. **Afvist kontrakt** (ny) - Højeste prioritet, ingen vej ud
-2. Pending kontrakt (>5 dage)
-3. Car Quiz
-4. MFA
-5. Goal
-
----
-
-### UI Design
-
-Overlay-strukturen:
-
+**UI i visningsmode:**
 ```
-┌─────────────────────────────────────┐
-│                                     │
-│            🚫 (ikon)                │
-│                                     │
-│        Adgang spærret               │
-│                                     │
-│   Du kan ikke bruge systemet,       │
-│   da du har afvist en kontrakt.     │
-│   Kontakt venligst din nærmeste     │
-│   leder for at løse dette.          │
-│                                     │
-│        [Log ud]                     │
-│                                     │
-└─────────────────────────────────────┘
+✅ Tæl som salg       eller      ✅ Tæl som bisalg
 ```
 
+**UI i redigeringsmode:**
+```
+☐ Tæl som salg
+☐ Tæl som bisalg
+(kun én kan være valgt ad gangen)
+```
+
+#### 3. Opdater MgTest.tsx interfaces og queries
+**Fil:** `src/pages/MgTest.tsx`
+
+Ændringer:
+- Tilføj `counts_as_cross_sale` til `AggregatedProductRow` interface
+- Tilføj `counts_as_cross_sale` til `AggregatedProduct.product` interface
+- Opdater SQL queries til at inkludere den nye kolonne
+- Opdater `toggleCountsAsSale` mutation til at håndtere begge felter
+- Evt. tilføj badge "B" for bisalg (ligesom "S" for salg)
+
+#### 4. Opdater i18n
+**Fil:** `src/i18n/locales/da.json`
+
+Tilføj:
+```json
+"countAsCrossSale": "Tæl som bisalg"
+```
+
 ---
 
-### Tekniske Detaljer
+### Teknisk: Gensidig udelukkelse logik
 
-**Hook query:**
 ```typescript
-const { data: rejectedContracts } = await supabase
-  .from("contracts")
-  .select("id, title")
-  .eq("employee_id", employeeData)
-  .eq("status", "rejected")
-  .limit(1);
+const handleCountsAsSaleChange = (checked: boolean) => {
+  setLocalCountsAsSale(checked);
+  if (checked) {
+    // Hvis salg vælges, fjern bisalg
+    setLocalCountsAsCrossSale(false);
+  }
+};
 
-return { 
-  isLocked: rejectedContracts && rejectedContracts.length > 0,
-  contract: rejectedContracts?.[0] ?? null 
+const handleCountsAsCrossSaleChange = (checked: boolean) => {
+  setLocalCountsAsCrossSale(checked);
+  if (checked) {
+    // Hvis bisalg vælges, fjern salg
+    setLocalCountsAsSale(false);
+  }
 };
 ```
 
-**Filer der oprettes:**
-1. `src/hooks/useRejectedContractLock.ts`
-2. `src/components/layout/RejectedContractLockOverlay.tsx`
+---
 
-**Fil der ændres:**
-1. `src/components/layout/LockOverlays.tsx`
+### Filer der ændres
 
-### Forventet Resultat
-- Medarbejdere med afviste kontrakter kan ikke bruge systemet
-- De ser kun et overlay med instruktion om at kontakte deres leder
-- Eneste handling er at logge ud
-- Ejere/admins i preview-mode kan stadig teste systemet
+1. **Database migration** - Ny kolonne `counts_as_cross_sale` i `products` og `product_price_history`
+2. **`src/components/mg-test/ProductPricingRulesDialog.tsx`** - UI og logik for begge checkboxes
+3. **`src/pages/MgTest.tsx`** - Interfaces, queries og mutations
+4. **`src/i18n/locales/da.json`** - Oversættelse
+
+---
+
+### Forventet resultat
+
+- Ny "Tæl som bisalg" checkbox vises ved siden af "Tæl som salg"
+- Brugeren kan kun vælge én af de to (eller ingen)
+- Valg gemmes i databasen og vises korrekt i UI
+- Historik-tabellen opdateres med den nye kolonne
