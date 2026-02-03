@@ -1071,19 +1071,6 @@ export function PermissionEditor() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => seedPermissionsForRole(selectedRole)}
-                  disabled={isSeeding}
-                >
-                  {isSeeding ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                  )}
-                  Synkroniser alle
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
                   onClick={() => handleDeleteRoleClick(selectedRoleData)}
                 >
                   Slet rolle
