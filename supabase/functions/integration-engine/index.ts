@@ -29,8 +29,8 @@ serve(async (req) => {
     const body = await req.json();
     const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to, maxRecords } = body;
     
-    // AGGRESSIVE limits to prevent CPU timeout - reduced from 500 to 100
-    const effectiveMaxRecords = maxRecords ?? 100;
+    // AGGRESSIVE limits to prevent CPU timeout - reduced from 100 to 50
+    const effectiveMaxRecords = maxRecords ?? 50;
 
     const supabase = getSupabase();
 

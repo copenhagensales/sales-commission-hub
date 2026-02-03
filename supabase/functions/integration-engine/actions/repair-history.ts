@@ -2,8 +2,8 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { IngestionEngine } from "../core.ts"
 import { getAdapter } from "../adapters/registry.ts"
 
-const MAX_RECORDS = 100
-const BATCH_SIZE = 50
+const MAX_RECORDS = 50
+const BATCH_SIZE = 25
 
 export async function repairHistory(
   supabase: SupabaseClient,
