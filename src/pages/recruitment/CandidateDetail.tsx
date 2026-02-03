@@ -895,7 +895,11 @@ export default function CandidateDetail() {
                 mode="single"
                 selected={interviewDate}
                 onSelect={setInterviewDate}
-                disabled={(date) => date < new Date()}
+                disabled={(date) => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  return date < today;
+                }}
                 locale={da}
                 className={cn("rounded-md border pointer-events-auto")}
               />
