@@ -1,67 +1,56 @@
 
-# Analyse: Beregning af annullering på Relatel
 
-## Nuværende beregning (korrekt ifølge implementeringen)
+# Plan: Ret beregningslogik for annulleringer og fradrag
 
-For Relatel med 10% annullering:
+## Ønsket forretningslogik
+
+Beregningen skal ske i følgende rækkefølge, baseret på **indtjeningen** (ikke omsætningen):
+
+```
+1. Start med basis indtjening (26.951 kr)
+2. Træk annullering % fra indtjening → 26.951 - 10% = 24.255,9 kr
+3. Træk fradrag % fra det resterende → 24.255,9 - 10% = 21.830,31 kr
+```
+
+---
+
+## Teknisk ændring
+
+**Fil:** `src/pages/reports/RevenueByClient.tsx` (linje 585-593)
+
+**Fra (nuværende logik):**
+```typescript
+const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
+const revenueAfterCancellation = client.totalRevenue - cancellationAmount;
+const deductionAmount = revenueAfterCancellation * (deductionPct / 100);
+const adjustedEarnings = client.totalEarnings - cancellationAmount - deductionAmount;
+```
+
+**Til (ny logik):**
+```typescript
+// 1. Start med basis indtjening
+// 2. Træk annullering % fra indtjeningen
+const cancellationAmount = client.totalEarnings * (cancellationPct / 100);
+const earningsAfterCancellation = client.totalEarnings - cancellationAmount;
+// 3. Træk fradrag % fra det resterende beløb
+const deductionAmount = earningsAfterCancellation * (deductionPct / 100);
+const adjustedEarnings = earningsAfterCancellation - deductionAmount;
+```
+
+---
+
+## Eksempel med Relatel
 
 | Trin | Beregning | Resultat |
 |------|-----------|----------|
-| Total omsætning | - | 49.852 kr |
-| Provision + feriepenge | - | 22.901 kr |
-| Basis indtjening | 49.852 - 22.901 | **26.951 kr** |
-| Annulleringsbeløb | 49.852 × 10% | 4.985 kr |
-| Justeret indtjening | 26.951 - 4.985 | **21.966 kr** |
-
-Den viste værdi på **21.966 kr er matematisk korrekt** baseret på den nuværende logik.
+| Basis indtjening | - | 26.951 kr |
+| Annullering (10%) | 26.951 × 10% | 2.695,1 kr |
+| Efter annullering | 26.951 - 2.695,1 | **24.255,9 kr** |
+| Fradrag (10%) | 24.255,9 × 10% | 2.425,59 kr |
+| Justeret indtjening | 24.255,9 - 2.425,59 | **21.830,31 kr** |
 
 ---
 
-## Mulig forventning fra brugeren
+## Fil der ændres
+- `src/pages/reports/RevenueByClient.tsx`
 
-Du nævnte at "det er ikke 21966 (oprindelig beløb 26951)". Måske forventer du at annulleringen beregnes anderledes?
-
-### Alternativ 1: Annullering beregnes på indtjening (ikke omsætning)
-```
-Annulleringsbeløb = 26.951 × 10% = 2.695 kr
-Justeret indtjening = 26.951 - 2.695 = 24.256 kr
-```
-
-### Alternativ 2: Proportionel reduktion af alt
-```
-Reduceret omsætning = 49.852 × 90% = 44.867 kr
-Reduceret provision = 22.901 × 90% = 20.611 kr  
-Ny indtjening = 44.867 - 20.611 = 24.256 kr
-```
-
----
-
-## Afklaring nødvendig
-
-Hvilken forretningslogik ønskes?
-
-1. **Nuværende**: Annullering trækkes fra omsætningen, og det fulde beløb fratrækkes indtjeningen
-   - Resultat: 21.966 kr ✓ (dette er hvad koden gør nu)
-
-2. **Alternativ**: Annullering beregnes som procent af indtjeningen (ikke omsætningen)
-   - Resultat: 24.256 kr
-
-3. **Andet**: Beskriv venligst den ønskede beregningsmetode
-
----
-
-## Teknisk ændring (hvis alternativ 2 ønskes)
-
-**Fil:** `src/pages/reports/RevenueByClient.tsx` (linje 585-591)
-
-Fra:
-```typescript
-const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
-```
-
-Til:
-```typescript
-const cancellationAmount = client.totalEarnings * (cancellationPct / 100);
-```
-
-Dette vil ændre beregningen så procenten trækkes fra **indtjeningen** i stedet for **omsætningen**.
