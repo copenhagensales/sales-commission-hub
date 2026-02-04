@@ -348,8 +348,8 @@ export default function RevenueByClient() {
           location:location_id(id, daily_rate)
         `)
         .in("client_id", [EESY_FM_ID, YOUSEE_ID])
-        .gte("start_date", startDateStr)
-        .lte("start_date", endDateStr);
+        .lte("start_date", endDateStr)  // Booking starts before or on period end
+        .gte("end_date", startDateStr); // Booking ends after or on period start
 
       // Aggregate location costs per client
       const locationCostsByClient: Record<string, number> = {};
