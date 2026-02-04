@@ -7,7 +7,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek } from "date-fns";
+import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval } from "date-fns";
+
+/**
+ * Convert JavaScript getDay (0=Sunday) to booked_days format (0=Monday, 6=Sunday)
+ */
+function getBookedDayIndex(date: Date): number {
+  const jsDay = date.getDay();
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
@@ -455,27 +463,30 @@ export function ClientDBTab() {
 
     const adjustmentMap = new Map(adjustmentPercents?.map(a => [a.client_id, a]) || []);
 
-    // Calculate location costs per client from bookings
+    // Calculate location costs per client from bookings (daily iteration, matching ClientDBDailyBreakdown)
     const locationCostsMap = new Map<string, number>();
+    const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd });
+
     for (const booking of bookings || []) {
       if (!booking.client_id) continue;
       
-      // Check if booking overlaps with period
       const bookingStart = parseISO(booking.start_date);
       const bookingEnd = parseISO(booking.end_date);
+      const bookedDays = (booking.booked_days as number[]) || [];
+      const dailyRate = booking.daily_rate_override || (booking.location as any)?.daily_rate || 0;
       
-      const overlapsStart = bookingStart <= periodEnd;
-      const overlapsEnd = bookingEnd >= periodStart;
-      
-      if (overlapsStart && overlapsEnd) {
-        const dailyRate = booking.daily_rate_override || (booking.location as any)?.daily_rate || 0;
-        const bookedDays = (booking.booked_days as number[])?.length || 7;
-        const cost = dailyRate * bookedDays;
+      for (const day of daysInPeriod) {
+        const dayIndex = getBookedDayIndex(day);
         
-        locationCostsMap.set(
-          booking.client_id, 
-          (locationCostsMap.get(booking.client_id) || 0) + cost
-        );
+        // Only add cost if:
+        // 1. The day falls within the booking interval
+        // 2. The day matches one of the booked weekdays
+        if (day >= bookingStart && day <= bookingEnd && bookedDays.includes(dayIndex)) {
+          locationCostsMap.set(
+            booking.client_id,
+            (locationCostsMap.get(booking.client_id) || 0) + dailyRate
+          );
+        }
       }
     }
 
