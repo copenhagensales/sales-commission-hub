@@ -8954,6 +8954,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_kpi_cache: { Args: never; Returns: number }
+      cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
       consume_password_reset_token: {
         Args: { _token_hash: string }
@@ -9141,6 +9142,20 @@ export type Database = {
           id: string
           last_name: string
           referral_code: string
+        }[]
+      }
+      get_sales_aggregates: {
+        Args: {
+          p_client_id?: string
+          p_employee_id?: string
+          p_end: string
+          p_start: string
+          p_team_id?: string
+        }
+        Returns: {
+          total_commission: number
+          total_revenue: number
+          total_sales: number
         }[]
       }
       get_sales_with_unknown_products: {

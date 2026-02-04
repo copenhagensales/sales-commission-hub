@@ -76,12 +76,21 @@ export class AdversusAdapter implements DialerAdapter {
     const data = await this.get("/users");
     const users = data.users || data || [];
 
-    return users.map((u: any) => ({
-      externalId: String(u.id),
-      name: u.name || u.displayName,
-      email: u.email || `agent-${u.id}@adversus.local`,
-      isActive: u.active,
-    }));
+    return users
+      .filter((u: any) => {
+        // Skip users without real email
+        if (!u.email || u.email.trim() === '') {
+          console.log(`[Adversus] Skipping user ${u.id} - no email`);
+          return false;
+        }
+        return true;
+      })
+      .map((u: any) => ({
+        externalId: String(u.id),
+        name: u.name || u.displayName,
+        email: u.email,
+        isActive: u.active,
+      }));
   }
 
   async fetchCampaigns(): Promise<StandardCampaign[]> {

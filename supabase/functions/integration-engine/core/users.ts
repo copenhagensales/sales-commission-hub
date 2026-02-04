@@ -2,24 +2,38 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardUser } from "../types.ts"
 
 /**
- * List of email domains that should be excluded from syncing.
- * These are internal/partner accounts that shouldn't be visible to users.
+ * List of VALID email domains that SHOULD be synced.
+ * Only employees with these domains will have their data stored.
  */
-const EXCLUDED_EMAIL_DOMAINS = [
-  "@relatel.dk",
-  "@ps-marketing.dk",
-  "@finansforbundet.dk",
-  "@straightlineagency.dk",
-  "@staightlineagency.dk",
-  "@tele-part.dk",
-  "@aogtil.dk",
-  "@ase.dk",
+const VALID_EMAIL_DOMAINS = [
+  "@copenhagensales.dk",
+  "@cph-relatel.dk",
+  "@cph-sales.dk",
 ];
 
-function isExcludedEmail(email: string | null | undefined): boolean {
+/**
+ * Patterns for emails that should be excluded (pseudo-emails from integrations)
+ */
+const EXCLUDED_EMAIL_PATTERNS = [
+  /^agent-\d+@adversus\.local$/i,
+];
+
+/**
+ * Check if an email is valid for syncing to the database.
+ * Returns true only for emails matching VALID_EMAIL_DOMAINS
+ * and not matching EXCLUDED_EMAIL_PATTERNS.
+ */
+function isValidSyncEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
-  return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+  
+  // First check if it matches an excluded pattern (pseudo-emails)
+  if (EXCLUDED_EMAIL_PATTERNS.some(pattern => pattern.test(emailLower))) {
+    return false;
+  }
+  
+  // Then check if it's from a valid domain
+  return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
 }
 
 /**
@@ -68,9 +82,9 @@ export async function processUsers(
 
   for (const user of users) {
     try {
-      // Skip users with excluded email domains
-      if (isExcludedEmail(user.email)) {
-        log("INFO", `Skipping excluded email domain: ${user.email}`)
+      // Skip users with invalid email domains (whitelist approach)
+      if (!isValidSyncEmail(user.email)) {
+        log("INFO", `Skipping invalid sync email: ${user.email}`)
         skipped++
         continue
       }
@@ -100,7 +114,11 @@ export async function processUsers(
       if (existing) {
         await supabase.from("agents").update(agentData).eq("id", existing.id)
       } else {
-        await supabase.from("agents").insert(agentData)
+        // Use upsert with email conflict to prevent duplicate key errors
+        const { error } = await supabase.from("agents").upsert(agentData, { onConflict: "email" })
+        if (error) {
+          log("WARN", `Upsert conflict for ${user.email}: ${error.message}`)
+        }
       }
       processed++
     } catch (e) {
