@@ -144,10 +144,10 @@ async function fetchFmSalesForPeriod(
   supabase: SupabaseClient,
   startStr: string,
   endStr: string
-): Promise<FmSale[]> {
+): Promise<(FmSale & { registered_at: string })[]> {
   const { data, error } = await supabase
     .from("fieldmarketing_sales")
-    .select("id, product_name, seller_id, client_id")
+    .select("id, product_name, seller_id, client_id, registered_at")
     .gte("registered_at", startStr)
     .lte("registered_at", endStr);
   
@@ -156,7 +156,7 @@ async function fetchFmSalesForPeriod(
     return [];
   }
   
-  return (data || []) as FmSale[];
+  return (data || []) as (FmSale & { registered_at: string })[];
 }
 
 // ============= LEADERBOARD CALCULATION =============
@@ -395,7 +395,7 @@ Deno.serve(async (req) => {
       });
       
       const periodFmSales = fmSales.filter(s => {
-        const saleDate = new Date((s as any).registered_at || "");
+        const saleDate = new Date(s.registered_at);
         return saleDate >= period.start && saleDate <= period.end;
       });
 
