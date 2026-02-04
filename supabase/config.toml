@@ -3,6 +3,9 @@ project_id = "jwlimmeijpfmaksvmuru"
 [functions.calculate-kpi-incremental]
 verify_jwt = false
 
+[functions.calculate-leaderboard-incremental]
+verify_jwt = false
+
 [functions.generate-dashboard-layout]
 verify_jwt = false
 
