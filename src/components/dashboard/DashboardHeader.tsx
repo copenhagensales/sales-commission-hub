@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, LayoutGrid, Maximize2, Minimize2 } from "lucide-react";
+import { LayoutGrid, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -125,17 +125,6 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
         {!isTvBoardMode && (
           <>
             <ScreenResolutionIndicator />
-            
-            {/* Go to menu button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGoToMenu}
-              className="gap-2"
-            >
-              <Menu className="h-4 w-4" />
-              <span className="hidden md:inline">Gå til menu</span>
-            </Button>
 
             {/* Dashboard selector */}
             <DropdownMenu>

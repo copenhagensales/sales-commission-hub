@@ -56,6 +56,17 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+// AppModeProvider wrapper that needs to be inside BrowserRouter
+import { AppModeProvider } from "@/contexts/AppModeContext";
+
+const AppContent = () => (
+  <AppModeProvider>
+    <SessionTimeoutProvider>
+      <AppRouter />
+    </SessionTimeoutProvider>
+  </AppModeProvider>
+);
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -65,9 +76,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <SessionTimeoutProvider>
-                <AppRouter />
-              </SessionTimeoutProvider>
+              <AppContent />
             </BrowserRouter>
           </TwilioDeviceProvider>
         </RolePreviewProvider>
