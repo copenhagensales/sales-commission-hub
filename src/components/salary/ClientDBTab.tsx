@@ -82,6 +82,7 @@ interface TeamSalaryInfo {
 const SELLER_VACATION_RATE = 0.125; // 12.5%
 const LEADER_VACATION_RATE = 0.01; // 1%
 const FM_CLIENT_NAMES = ["Eesy FM", "Yousee"];
+const STANDARD_MONTH_DAYS = 30;
 
 export function ClientDBTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
@@ -574,10 +575,15 @@ export function ClientDBTab() {
         client.dbBeforeLeader = client.basisDB - client.assistantAllocation;
       }
 
-      // Calculate team-level leader salary
+      // Calculate team-level leader salary with prorated minimum
       const teamTotalDBBeforeLeader = teamClients.reduce((sum, c) => sum + c.dbBeforeLeader, 0);
       const calculatedLeaderSalary = teamTotalDBBeforeLeader * (teamInfo.percentageRate / 100);
-      const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, teamInfo.minimumSalary);
+      
+      // Prorate minimum salary based on period length
+      const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd }).length;
+      const prorationFactor = daysInPeriod / STANDARD_MONTH_DAYS;
+      const proratedMinimumSalary = teamInfo.minimumSalary * prorationFactor;
+      const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
 
       // Allocate leader salary proportionally by DB before leader
       const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1); // Avoid division by zero
