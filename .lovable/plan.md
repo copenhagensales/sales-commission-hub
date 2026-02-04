@@ -1,165 +1,155 @@
 
-# Plan: Ejer Fuld Adgang - Med Løn-undtagelse for William
+# Analyse: Hvorfor TDC Erhverv Dashboard viser "Ingen salg"
 
-## Oversigt
-Sikre at alle Ejere har fuld adgang til ALT undtagen:
-1. **Softphone-funktioner** (allerede undtaget via `OWNER_EXCLUDED_PERMISSIONS`)
-2. **Løn-adgang for William Hoé Seiding** (hardcoded undtagelse)
+## Root Cause Identificeret
 
-## Nuværende Situation
+### Tidslinje for problemet:
+1. **18:00:08** - KPI Full Refresh kørte og opdaterede `kpi_leaderboard_cache` (inkl. TDC Erhverv "today" = 0 entries)
+2. **18:11:45** - TDC Erhverv salg blev synkroniseret til databasen (12 salg)
+3. **18:18:49** - Du ser på dashboardet → viser **cached data fra 18:00** = "Ingen salg"
+4. **18:30:xx** - Næste Full Refresh vil opdatere leaderboards med de nye salg
 
-### William Hoé Seiding
-- **auth_user_id:** `9ad9b492-8c14-4d0f-96aa-1e867823fe91`
-- **job_title:** Ejer
-- **Email:** ws@copenhagensales.dk
+### Kerneproblemet
+**Den inkrementelle KPI-beregning (hvert minut) opdaterer KUN `kpi_cached_values` (employee-scoped data) - men IKKE `kpi_leaderboard_cache` som dashboardet bruger.**
 
-### Løn-beskyttelse i dag
-Løn-menuen er allerede hardcoded i `AppSidebar.tsx`:
-```typescript
-const SALARY_ALLOWED_USER_IDS = [
-  'f0fb7ec3-5f00-4fcd-a6ca-2a53669147b9', // Kasper Mikkelsen
-  '71267f4e-fd9e-4c16-8fe9-da0f48ce2598', // Mathias Grubak
-  'e1ac7b84-aedb-400e-88f6-dd24687317e4', // Lone Mikkelsen
-];
-```
-William er IKKE i denne liste - så løn-menuen er allerede skjult for ham.
-
-## Løsning
-
-### Fase 1: Tilføj manglende scopeKey
-**Fil:** `src/config/permissions.ts` (linje 834-838)
-
-```typescript
-{
-  key: "menu_reports_daily",
-  label: "Dagsrapporter",
-  description: "Adgang til daglige rapporter med vagtregistrering",
-  hasEditOption: false,
-  scopeKey: "scope_reports_daily",  // TILFØJET
-},
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    NUVÆRENDE ARKITEKTUR                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  calculate-kpi-incremental (hvert minut)                        │
+│  └─ Opdaterer: kpi_cached_values (employee KPIs)                │
+│  └─ OPDATERER IKKE: kpi_leaderboard_cache ← Problem!            │
+│                                                                 │
+│  calculate-kpi-values (hver 30. minut)                          │
+│  └─ Opdaterer: kpi_cached_values (alle scopes)                  │
+│  └─ Opdaterer: kpi_leaderboard_cache (global, team, client)     │
+│                                                                 │
+│  TDC Dashboard                                                  │
+│  └─ Læser fra: kpi_leaderboard_cache (client-scoped)            │
+│  └─ Kan være op til 30 minutter forsinket!                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Fase 2: Opret SALARY_EXCLUDED_OWNER_IDS konstant
-**Fil:** `src/hooks/usePositionPermissions.ts`
+---
 
-Tilføj ny konstant til at definere Ejere der IKKE skal have løn-adgang:
+## Løsninger
 
-```typescript
-// Owners excluded from salary access (still get all other permissions)
-const SALARY_EXCLUDED_OWNER_IDS = [
-  '9ad9b492-8c14-4d0f-96aa-1e867823fe91', // William Hoé Seiding
-];
-
-// Permission keys related to salary
-const SALARY_PERMISSION_KEYS = [
-  'menu_section_salary',
-  'menu_payroll',
-  'menu_salary_types',
-  'scope_payroll',
-];
-```
-
-### Fase 3: Opdater usePermissions() med owner-override og salary-undtagelse
-**Fil:** `src/hooks/usePositionPermissions.ts`
-
-Opdater `hasPermission`, `canView`, `canEdit` og `getDataScope`:
+### Option A: Tilføj Leaderboard-opdatering til Incremental Function (Anbefalet)
+Udvid `calculate-kpi-incremental` til også at opdatere leaderboard-cache for berørte perioder:
 
 ```typescript
-export function usePermissions() {
-  const { user } = useAuth();
-  const { data, isLoading, ... } = usePositionPermissions();
-  
-  // Check if current user is an owner
-  const isOwner = data?.roleKey === 'ejer';
-  
-  // Check if this owner is excluded from salary access
-  const isOwnerExcludedFromSalary = isOwner && 
-    user?.id && 
-    SALARY_EXCLUDED_OWNER_IDS.includes(user.id);
+// Efter KPI values er opdateret, genberegn leaderboards for today og payroll_period
+const affectedPeriods = ["today", "payroll_period"];
+const affectedScopes = ["global", "client", "team"];
 
-  const hasPermission = (key: string, type?: "view" | "edit"): boolean => {
-    // Owner override: full access EXCEPT salary for excluded owners
-    if (isOwner) {
-      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
-        return false; // Deny salary access for this owner
-      }
-      return true; // All other permissions granted
-    }
-    // ... existing logic for non-owners
-  };
-
-  const canView = (key: string): boolean => {
-    if (isOwner) {
-      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
-        return false;
-      }
-      return true;
-    }
-    return hasPermission(key, "view") || hasPermission(key);
-  };
-
-  const canEdit = (key: string): boolean => {
-    if (isOwner) {
-      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
-        return false;
-      }
-      return true;
-    }
-    return hasPermission(key, "edit");
-  };
-
-  const getDataScope = (key: string): DataScope => {
-    if (isOwner) {
-      if (isOwnerExcludedFromSalary && key === 'scope_payroll') {
-        return "egen"; // Restrict salary data scope
-      }
-      return "alt"; // Full scope for everything else
-    }
-    // ... existing logic
-  };
-  
-  // ...
+for (const period of affectedPeriods) {
+  for (const scope of affectedScopes) {
+    await recalculateLeaderboard(supabase, period, scope, ...);
+  }
 }
 ```
 
-## Teknisk Arkitektur
+**Fordele:**
+- Leaderboards opdateres inden for 1 minut efter nye salg
+- Dashboards viser altid friske data
 
-```text
-┌─────────────────────────────────────────────────────────┐
-│              Permission Resolution Flow                 │
-├─────────────────────────────────────────────────────────┤
-│  1. Er bruger Ejer?                                     │
-│     └─ NEJ → Standard permission lookup                 │
-│     └─ JA → Fuld adgang MED undtagelser ↓               │
-│                                                         │
-│  2. Er permission i OWNER_EXCLUDED_PERMISSIONS?         │
-│     (softphone_outbound, softphone_inbound, etc.)       │
-│     └─ JA → NÆGTET                                      │
-│     └─ NEJ → Fortsæt ↓                                  │
-│                                                         │
-│  3. Er Ejer i SALARY_EXCLUDED_OWNER_IDS?                │
-│     └─ NEJ → TILLADT                                    │
-│     └─ JA → Er permission løn-relateret? ↓              │
-│                                                         │
-│  4. Er permission i SALARY_PERMISSION_KEYS?             │
-│     └─ JA → NÆGTET (kun løn)                            │
-│     └─ NEJ → TILLADT (alt andet)                        │
-└─────────────────────────────────────────────────────────┘
+**Ulemper:**
+- Øger execution time for incremental function
+- Kan timeout hvis der er mange teams/clients
+
+### Option B: Øg Frekvens af Full Refresh til Hvert 5. Minut
+Ændr cron schedule fra `*/30 * * * *` til `*/5 * * * *`:
+
+```sql
+SELECT cron.alter_job(
+  54, -- calculate-kpi-values-full-refresh
+  schedule => '*/5 * * * *'
+);
 ```
 
-## Berørte Filer
+**Fordele:**
+- Simpelt at implementere
+- Maksimal forsinkelse reduceret til 5 minutter
 
+**Ulemper:**
+- Øget database belastning
+- Full refresh er tungt (kan tage 30+ sekunder)
+
+### Option C: Hybrid - Leaderboard-Only Incremental (Anbefalet)
+Opret en ny edge function `calculate-leaderboard-incremental` der KUN opdaterer leaderboards:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    NY ARKITEKTUR                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  calculate-kpi-incremental (hvert minut)                        │
+│  └─ Opdaterer: kpi_cached_values (employee KPIs)                │
+│                                                                 │
+│  calculate-leaderboard-incremental (hvert minut) ← NY           │
+│  └─ Opdaterer: kpi_leaderboard_cache (today + payroll_period)   │
+│  └─ Kun global og client-scoped (vigtigst for dashboards)       │
+│                                                                 │
+│  calculate-kpi-values (hver 30. minut)                          │
+│  └─ Full refresh af alt (inkl. this_week, this_month)           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Anbefalet Implementering: Option C
+
+### Trin 1: Opret `calculate-leaderboard-incremental` edge function
+- Henter alle salg for "today" og "payroll_period"
+- Beregner leaderboards for global og client scopes
+- Gemmer i `kpi_leaderboard_cache`
+- Kører hvert minut
+
+### Trin 2: Tilføj cron job for ny function
+```sql
+SELECT cron.schedule(
+  'calculate-leaderboard-incremental',
+  '* * * * *', -- Hvert minut
+  $$SELECT public.trigger_leaderboard_incremental()$$
+);
+```
+
+### Trin 3: Opret trigger function i databasen
+```sql
+CREATE OR REPLACE FUNCTION public.trigger_leaderboard_incremental()
+RETURNS void AS $$
+BEGIN
+  PERFORM net.http_post(
+    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/calculate-leaderboard-incremental',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_key'))
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+
+## Øjeblikkeligt Fix (Mens vi implementerer)
+Manuelt trigger en full refresh nu:
+
+```bash
+curl -X POST https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/calculate-kpi-values \
+  -H "Authorization: Bearer [SERVICE_KEY]"
+```
+
+---
+
+## Berørte Filer
 | Fil | Ændring |
 |-----|---------|
-| `src/config/permissions.ts` | Tilføj scopeKey til menu_reports_daily |
-| `src/hooks/usePositionPermissions.ts` | Tilføj SALARY_EXCLUDED_OWNER_IDS, opdater permission funktioner |
+| `supabase/functions/calculate-leaderboard-incremental/index.ts` | NY - Incremental leaderboard updates |
+| `supabase/config.toml` | Tilføj ny function |
+| Database migration | Opret `trigger_leaderboard_incremental()` og cron job |
 
 ## Resultat
-- **Alle Ejere**: Fuld adgang til alt (undtagen softphone)
-- **William Hoé Seiding**: Fuld adgang til alt UNDTAGEN løn-menuen og løn-data
-- **Andre roller**: Uændret - styres via role_page_permissions
-
-## Bemærkninger
-- Løn-menuen i sidebar er allerede beskyttet via `SALARY_ALLOWED_USER_IDS` i AppSidebar.tsx
-- Denne ændring sikrer at permission-systemet OGSÅ respekterer undtagelsen
-- Ingen database-ændringer nødvendige
+- Dashboards viser friske data inden for 1-2 minutter efter salg synkroniseres
+- Ingen 30-minutters forsinkelse på leaderboards
+- Fuld robusthed via monthly full refresh backup
