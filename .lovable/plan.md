@@ -1,92 +1,114 @@
 
-# Plan: Ret manglende Tryg-salg fra i dag
+# Plan: Daglig DB-visning per Klient med Centre/Boder Udgifter
 
-## Problem Identificeret
+## Problemet
 
-**Root cause:** Integration Engine processer kun 25 salg per sync, men API'en returnerer data **usorteret**. Dette betyder at de samme 25 ældste salg processer igen og igen, mens 26 nye salg fra i dag (4. februar) aldrig når frem.
+I dag beregner `ClientDBTab` centre/boder-udgifter som en samlet sum for hele perioden. Dette fungerer fint til månedsoversigt, men gør det umuligt at se daglig indtjening, fordi udgifterne ikke er fordelt på specifikke datoer.
 
-### Bevis fra undersøgelsen
+**Eksempel på problemet:**
 
-| Data punkt | Værdi |
-|------------|-------|
-| Tryg-salg med `closure=Success` i rå data | 88 |
-| Salg fra **i dag** (4. feb) i rå data | 26 |
-| Tryg-salg i databasen fra i dag | **0** |
-| Salg processet per sync | 25 |
-| Specifik ID `81107234S3064` (fra kl 16:17 i dag) | Findes IKKE i DB |
+| Klient | Periode | Centre/Boder |
+|--------|---------|--------------|
+| Eesy FM | Feb 1-28 | 75.000 kr |
+
+Du vil gerne kunne se:
+
+| Dato | Omsætning | Sælgerløn | Centre/Boder | DB |
+|------|-----------|-----------|--------------|-----|
+| 3. feb | 12.000 | -3.000 | -6.500 | 2.500 |
+| 4. feb | 15.000 | -3.750 | -6.500 | 4.750 |
 
 ---
 
 ## Løsning
 
-Sortér salg efter salgsdato (nyeste først) **FØR** `maxRecords`-begrænsningen anvendes. Dette sikrer at dagens salg altid processer først.
+Opret en ny `ClientDBDailyBreakdown` komponent der beregner lokationsomkostninger pr. dag baseret på booking-data.
+
+**Hvordan lokationsomkostninger beregnes pr. dag:**
+
+1. For hver booking, tjek om datoen falder inden for `start_date` og `end_date`
+2. Tjek om datoen's ugedag (mandag=0, tirsdag=1, osv.) matcher et indeks i `booked_days` array
+3. Hvis begge betingelser opfyldes → tilføj `daily_rate` til den dato
+
+```text
+Eksempel: Booking for Eesy FM
+┌──────────────────────────────────────────────────────────────────────────┐
+│ start_date: 2026-02-02                                                   │
+│ end_date: 2026-02-06                                                     │
+│ booked_days: [0, 1, 2, 3, 4]  ← Mandag til fredag                        │
+│ daily_rate: 1.500 kr                                                     │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Resultat:                                                                │
+│ - 2. feb (mandag) → 1.500 kr                                             │
+│ - 3. feb (tirsdag) → 1.500 kr                                            │
+│ - 4. feb (onsdag) → 1.500 kr                                             │
+│ - 5. feb (torsdag) → 1.500 kr                                            │
+│ - 6. feb (fredag) → 1.500 kr                                             │
+│ - Weekend → 0 kr (ikke i booked_days)                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Tekniske ændringer
 
-### 1. Opdater `sync-integration.ts`
+### 1. Opret ny komponent: `ClientDBDailyBreakdown.tsx`
 
-Tilføj sortering efter salgsdato før maxRecords-begrænsningen (omkring linje 80-89):
+**Props:**
+- `clientId` - ID på den klient der vises
+- `clientName` - Klientnavn til header
+- `periodStart` / `periodEnd` - Valgt periode
+- `onClose` - Callback til at lukke panelet
 
-**Nuværende kode:**
+**Funktionalitet:**
+1. Hent salgsdata grupperet pr. dato via `useSalesAggregatesExtended`
+2. Hent bookings for klienten der overlapper med perioden
+3. For hver dato med salg:
+   - Beregn omsætning og provision fra salgsdata
+   - Beregn lokationsomkostninger ved at iterere alle bookings og tjekke om datoen matcher
+
+**Hjælpefunktion til ugedagskonvertering:**
 ```typescript
-// Apply max records limit to prevent CPU timeout
-if (maxRecords && sales.length > maxRecords) {
-  log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} to prevent timeout`);
-  sales = sales.slice(0, maxRecords);
+// JavaScript getDay: 0=søndag, 1=mandag, ..., 6=lørdag
+// booked_days format: 0=mandag, 1=tirsdag, ..., 6=søndag
+function getBookedDayIndex(date: Date): number {
+  const jsDay = date.getDay(); // 0=søndag
+  return jsDay === 0 ? 6 : jsDay - 1; // Konverter til 0=mandag
 }
 ```
 
-**Ny kode:**
-```typescript
-// Sort sales by date DESCENDING (newest first) before applying limit
-sales.sort((a, b) => {
-  const dateA = new Date(a.saleDate || a.date || 0).getTime();
-  const dateB = new Date(b.saleDate || b.date || 0).getTime();
-  return dateB - dateA; // Newest first
-});
+### 2. Opdater `ClientDBTab.tsx`
 
-// Apply max records limit to prevent CPU timeout
-if (maxRecords && sales.length > maxRecords) {
-  log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} (keeping newest)`);
-  sales = sales.slice(0, maxRecords);
-}
-```
-
-### 2. Øg `effectiveMaxRecords` (valgfrit men anbefalet)
-
-I `index.ts` (linje 32):
-
-```typescript
-// Øg fra 25 til 50-100 for hurtigere indhentning af backlog
-const effectiveMaxRecords = maxRecords ?? 50;
-```
+- Tilføj state for `selectedClientForDaily` (klient der vises i daglig view)
+- Tilføj en kalender-knap i hver klient-række
+- Render `ClientDBDailyBreakdown` når en klient er valgt
 
 ---
 
-## Fordele
+## UI-ændring
 
-- **Dagens salg processer altid først** - uanset backlog-størrelse
-- **Ældre salg indhentes gradvist** over flere sync-cykler
-- **Ingen ændring i CPU-forbrug** - samme antal records processer
-- **Kompatibilitet bevares** - ingen ændring i API eller dataformat
+I `ClientDBTab` tabellen tilføjes en ny kolonne med kalender-ikon:
+
+| Klient | Team | Salg | Omsætning | ... | Final DB | 📅 |
+|--------|------|------|-----------|-----|----------|----|
+
+Klik på 📅 åbner daglig breakdown under tabellen (ligesom `DBDailyBreakdown` gør for teams).
 
 ---
 
-## Fil-ændringer
+## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/integration-engine/actions/sync-integration.ts` | Tilføj sortering af salg efter dato (nyeste først) før maxRecords-begrænsning |
-| `supabase/functions/integration-engine/index.ts` | (Valgfrit) Øg effectiveMaxRecords fra 25 til 50 |
+| `src/components/salary/ClientDBDailyBreakdown.tsx` | **Ny fil** - Daglig DB-visning for én klient med centre/boder pr. dag |
+| `src/components/salary/ClientDBTab.tsx` | Tilføj state og knap for daglig view, render `ClientDBDailyBreakdown` |
 
 ---
 
 ## Forventet resultat
 
-Efter deploy vil næste sync:
-1. Sortere de 88 Tryg-salg efter dato
-2. Tage de 25 (eller 50) nyeste
-3. Processse og gemme de 26 salg fra i dag
-4. Tryg-salg vises korrekt i Client DB-rapporten inden for 5 minutter
+Efter implementation kan du:
+1. Gå til "DB per Klient" fanen
+2. Klikke på kalender-ikonet ud for fx "Eesy FM"
+3. Se en daglig tabel med omsætning, sælgerløn, centre/boder udgifter og DB pr. dag
+4. Lokationsomkostninger er nu korrekt fordelt på de dage hvor bookinger faktisk var aktive
