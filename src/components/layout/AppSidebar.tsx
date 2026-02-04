@@ -1,4 +1,10 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, PanelLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -463,10 +469,27 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
         {!isMobile && (
-          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+          <div className="flex h-16 items-center border-b border-sidebar-border px-2">
+            {p.canView("menu_section_dashboards") && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => navigate("/dashboards")}
+                    className="h-9 w-9 shrink-0 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Gå til dashboards</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             <div 
               onClick={() => navigate("/")} 
-              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              className="flex-1 flex justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>

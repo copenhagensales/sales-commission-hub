@@ -87,20 +87,14 @@ export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSide
       <div className="flex h-full flex-col">
         {/* Logo and Home Button */}
         {!isMobile && (
-          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-            <div 
-              onClick={() => navigate(accessibleDashboards[0]?.path || "/home")} 
-              className="flex items-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
-            >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
-            </div>
+          <div className="flex h-16 items-center border-b border-sidebar-border px-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
                   variant="outline" 
                   size="icon" 
                   onClick={handleGoToMain}
-                  className="h-9 w-9 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border"
+                  className="h-9 w-9 shrink-0 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border"
                 >
                   <Home className="h-4 w-4" />
                 </Button>
@@ -109,6 +103,12 @@ export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSide
                 <p>Gå til hovedsystem</p>
               </TooltipContent>
             </Tooltip>
+            <div 
+              onClick={() => navigate(accessibleDashboards[0]?.path || "/home")} 
+              className="flex-1 flex justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+            >
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+            </div>
           </div>
         )}
 
