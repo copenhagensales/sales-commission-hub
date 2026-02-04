@@ -4,6 +4,7 @@ import { PreviewSidebar } from "./PreviewSidebar";
 import { LockOverlays } from "./LockOverlays";
 import { RolePreviewBanner } from "./RolePreviewBanner";
 import { CompleteProfileBanner } from "./CompleteProfileBanner";
+import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
@@ -49,16 +50,26 @@ export function MainLayout({ children }: MainLayoutProps) {
             <img src={cphSalesLogo} alt="CPH Sales" className="h-8 w-auto object-contain" />
           </div>
           
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 border-primary h-12 w-12">
-                <Menu className="h-7 w-7" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-              <SidebarComponent isMobile onNavigate={() => setMobileMenuOpen(false)} />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-2">
+            {/* Environment Switcher - Mobile */}
+            <EnvironmentSwitcher compact />
+            
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 border-primary h-12 w-12">
+                  <Menu className="h-7 w-7" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
+                <SidebarComponent isMobile onNavigate={() => setMobileMenuOpen(false)} />
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+        
+        {/* Desktop Environment Switcher - Fixed position top right */}
+        <div className={`hidden md:flex fixed right-4 z-50 ${isPreviewMode ? "top-14" : "top-4"}`}>
+          <EnvironmentSwitcher />
         </div>
         
         {/* Main content with responsive margin */}
