@@ -1,93 +1,171 @@
-# Central Sales Aggregation & Data Cleanup Plan
 
-## Implementeringsrækkefølge (Opdateret)
+# Komplet Status & Resterende Opgaver
 
-| # | Opgave | Type | Prioritet | Status |
-|---|--------|------|-----------|--------|
-| 1 | Slet salg med pseudo-emails | SQL Migration | Kritisk | ✅ |
-| 2 | Slet Enreach-salg uden email | SQL Migration | Kritisk | ✅ |
-| 3 | Fix UNIQUE constraints | SQL Migration | Kritisk | ✅ |
-| 4 | Ryd cache-duplikater | SQL Migration | Kritisk | ✅ |
-| 5 | Opret RPC get_sales_aggregates | SQL Migration | Høj | ✅ |
-| 6 | Opdater excluded-domains.ts med whitelist | Frontend | Høj | ✅ (existed) |
-| 7 | Opdater users.ts med whitelist + patterns | Edge Function | Høj | ✅ (existed) |
-| 8 | Opdater sales.ts med email-filtrering | Edge Function | Høj | ✅ (existed) |
-| 9 | Opdater adversus.ts - skip brugere uden email | Edge Function | Høj | ✅ |
-| 10 | Opdater enreach.ts - skip data uden email | Edge Function | Høj | ✅ |
-| 11 | Opret useSalesAggregates.ts | Ny fil | Høj | ✅ |
-| 12 | Paginering: DBOverviewTab | Frontend | Høj | ✅ |
-| 13 | Paginering: CombinedSalaryTab | Frontend | Høj | ✅ |
-| 14 | Paginering: DBDailyBreakdown | Frontend | Høj | ✅ |
-| 15 | Paginering: useCelebrationData | Frontend | Høj | ✅ |
-| 16 | Paginering: useRecognitionKpis | Frontend | Medium | ✅ |
-| 17 | Paginering: usePreviousPeriodComparison | Frontend | Medium | ✅ |
-| 18 | Paginering: EmployeeCommissionHistory | Frontend | Medium | ⏸️ Single-user, bounded |
-| 19 | Paginering: SalesGoalTracker (NY!) | Frontend | Medium | ⏸️ Uses props, not query |
-| 20 | Paginering: HeadToHeadComparison (NY!) | Frontend | Medium | ⏸️ Complex, low priority |
-| 21 | Paginering: tv-dashboard-data (NY!) | Edge Function | Høj | ⏸️ Uses kpi_leaderboard_cache |
-| 22 | Opret cleanup cron | SQL Migration | Lav | ⏳ |
+## Analyse af Nuværende Situation
 
-**Total estimat:** ~7-8 timer
+### ✅ Hvad ER Implementeret (verificeret i koden)
 
----
+| # | Opgave | Status | Detaljer |
+|---|--------|--------|----------|
+| 1-4 | SQL Migrations (cleanup + constraints) | ✅ | Udført tidligere |
+| 5 | RPC `get_sales_aggregates_v2` | ✅ | Fungerer, bekræftet i /salary |
+| 6 | `excluded-domains.ts` whitelist | ✅ | VALID_EMAIL_DOMAINS defineret |
+| 7-8 | `users.ts` + `sales.ts` filtrering | ✅ | Bruger `isValidSyncEmail()` |
+| 9 | `adversus.ts` email-filtrering | ✅ | Linje 134-182: Whitelist aktiv |
+| 10 | `enreach.ts` email-filtrering | ✅ | Linje 338-354: Whitelist aktiv |
+| 11 | `useSalesAggregates.ts` hook | ✅ | + wrapper hooks |
+| 12-17 | Frontend migrations | ✅ | Bekræftet med browser-test |
 
-## Completed ✅
+### ❌ Hvad MANGLER Stadig
 
-### SQL Migrations (1-4)
-- Deleted 310 sales with missing email (Enreach)
-- No pseudo-email sales found (adversus.local pattern) - adapter now filters at source
-- Created UNIQUE index on kpi_leaderboard_cache
-- Created indexes on sales.agent_email and sales.source
+#### Problem 1: Legacy Data i Databasen
+- **376 salg** med ugyldige emails (gmail.com, hotmail.com)
+- **65 agenter** med ugyldige emails
+- Fordeling:
+  - `Relatel_CPHSALES`: 342 salg (3 unikke emails)
+  - `Lovablecph`: 33 salg (2 unikke emails)  
+  - `Eesy`: 1 salg (1 unik email)
 
-### RPC & Central Hook (5, 11)
-- `get_sales_aggregates_v2` with grouping (employee, date, both, none)
-- `useSalesAggregatesExtended.ts` with RPC-first + fallback
-- Wrapper hooks: `usePersonalSalesStats`, `useDashboardAggregates`, `useTeamDBStats`
+#### Problem 2: Case-Sensitivity Bug
+- **48 salg** med `louh@Copenhagensales.dk` (stort C)
+- Disse tæller som "ugyldige" fordi whitelist bruger lowercase check
 
-### Edge Function Email Filtering (6-10)
-- `excluded-domains.ts` - Already had whitelist (VALID_EMAIL_DOMAINS)
-- `users.ts` - Already filters by whitelist
-- `sales.ts` - Already filters by whitelist
-- `adversus.ts` - Updated to skip invalid emails (return null → filter)
-- `enreach.ts` - Updated to filter after mapping with whitelist
-
-### Frontend Migrations (12-17)
-- `usePreviousPeriodComparison.ts` - Uses central hook
-- `useCelebrationData.ts` - Uses `useDashboardAggregates`
-- `useRecognitionKpis.ts` - Uses RPC with fallback
-- `CombinedSalaryTab.tsx` - Uses `useTeamDBStats`
-- `DBOverviewTab.tsx` - Uses `useTeamDBStats`
-- `DBDailyBreakdown.tsx` - Uses `useTeamDBStats.byDate`
+#### Problem 3: Cleanup Cron Mangler
+- Task 22 aldrig implementeret
+- Ingen automatisk oprydning af legacy data
 
 ---
 
-## Deprioritized (18-21)
+## Plan: Komplet Oprydning
 
-### EmployeeCommissionHistory (#18)
-- Single-user, single-period scope - no pagination risk
-- Data set is inherently bounded
+### Fase 1: Case-Sensitivity Fix (5 min)
 
-### SalesGoalTracker (#19)
-- Receives data via props (`commissionStats`)
-- Does not fetch sales directly
+Normaliser emails i databasen til lowercase:
 
-### HeadToHeadComparison (#20)
-- 1914 lines, very complex
-- Low impact on overall pagination issues
-- Uses optimized refetchIntervals (2 minutes)
+```text
+UPDATE sales 
+SET agent_email = LOWER(agent_email)
+WHERE agent_email != LOWER(agent_email);
 
-### tv-dashboard-data (#21)
-- Already uses `kpi_leaderboard_cache` (pre-computed)
-- High risk of breaking TV boards
+UPDATE agents 
+SET email = LOWER(email)
+WHERE email != LOWER(email);
+```
+
+### Fase 2: Slet Legacy Data (10 min)
+
+Fjern historiske salg med ugyldige emails:
+
+```text
+-- Slet sale_items først (foreign key)
+DELETE FROM sale_items 
+WHERE sale_id IN (
+  SELECT id FROM sales 
+  WHERE agent_email IS NOT NULL 
+    AND agent_email != ''
+    AND NOT (
+      LOWER(agent_email) LIKE '%@copenhagensales.dk' OR
+      LOWER(agent_email) LIKE '%@cph-relatel.dk' OR
+      LOWER(agent_email) LIKE '%@cph-sales.dk'
+    )
+);
+
+-- Slet salg
+DELETE FROM sales 
+WHERE agent_email IS NOT NULL 
+  AND agent_email != ''
+  AND NOT (
+    LOWER(agent_email) LIKE '%@copenhagensales.dk' OR
+    LOWER(agent_email) LIKE '%@cph-relatel.dk' OR
+    LOWER(agent_email) LIKE '%@cph-sales.dk'
+  );
+
+-- Slet ugyldige agenter
+DELETE FROM agents 
+WHERE email IS NOT NULL 
+  AND email != ''
+  AND NOT (
+    LOWER(email) LIKE '%@copenhagensales.dk' OR
+    LOWER(email) LIKE '%@cph-relatel.dk' OR
+    LOWER(email) LIKE '%@cph-sales.dk'
+  );
+```
+
+### Fase 3: Cleanup Cron Job (15 min)
+
+Opret en database-funktion + cron job der kører ugentligt:
+
+```text
+-- Funktion til at rydde op i ugyldige emails
+CREATE OR REPLACE FUNCTION cleanup_invalid_email_sales()
+RETURNS integer AS $$
+DECLARE
+  deleted_count integer;
+BEGIN
+  -- Slet sale_items for salg med ugyldige emails
+  DELETE FROM sale_items 
+  WHERE sale_id IN (
+    SELECT id FROM sales 
+    WHERE agent_email IS NOT NULL 
+      AND agent_email != ''
+      AND NOT (
+        agent_email LIKE '%@copenhagensales.dk' OR
+        agent_email LIKE '%@cph-relatel.dk' OR
+        agent_email LIKE '%@cph-sales.dk'
+      )
+  );
+  
+  -- Slet salg med ugyldige emails
+  WITH deleted AS (
+    DELETE FROM sales 
+    WHERE agent_email IS NOT NULL 
+      AND agent_email != ''
+      AND NOT (
+        agent_email LIKE '%@copenhagensales.dk' OR
+        agent_email LIKE '%@cph-relatel.dk' OR
+        agent_email LIKE '%@cph-sales.dk'
+      )
+    RETURNING id
+  )
+  SELECT COUNT(*) INTO deleted_count FROM deleted;
+  
+  RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cron job: kør hver søndag kl. 04:00
+SELECT cron.schedule(
+  'cleanup-invalid-email-sales-weekly',
+  '0 4 * * 0',
+  'SELECT cleanup_invalid_email_sales()'
+);
+```
 
 ---
 
-## Architecture Benefits
+## Teknisk Opsummering
 
-1. **Single source of truth** - All sales aggregation through central hook
-2. **Server-side calculation** - RPC reduces client load
-3. **Consistent logic** - `counts_as_sale`, `validation_status`, `quantity * mapped_commission` handled uniformly
-4. **Automatic pagination** - `fetchAllRows` fallback built-in
-5. **Better performance** - Cache sharing via react-query
-6. **Email whitelist at source** - Invalid data never enters DB
-7. **Easier maintenance** - Changes in one place
+### Verificeret Fungerende
+- Email whitelist **virker i adapters** - ingen nye gmail-salg siden 27. januar
+- Central hook bruger RPC korrekt (234ms responstid)
+- Alle frontend-komponenter migreret
+
+### Deprioriteret (stadig gældende)
+- Task 18-21: Lav risiko, høj kompleksitet
+
+### Estimat for Resterende Arbejde
+- Fase 1: 5 minutter
+- Fase 2: 10 minutter  
+- Fase 3: 15 minutter
+- **Total: ~30 minutter**
+
+---
+
+## Forventet Resultat
+
+Efter implementering:
+- ✅ 0 salg med ugyldige emails
+- ✅ 0 agenter med ugyldige emails  
+- ✅ Case-insensitive email matching
+- ✅ Automatisk ugentlig oprydning
+- ✅ Fremtidig beskyttelse via adapter-filtrering
