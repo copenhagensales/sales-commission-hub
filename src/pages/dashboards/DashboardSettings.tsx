@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target, LayoutGrid, Monitor } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target, LayoutGrid, Monitor, Shield } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +20,7 @@ import { WidgetSettingsTab } from "@/components/dashboard/WidgetSettingsTab";
 import { KpiSettingsTab } from "@/components/dashboard/KpiSettingsTab";
 import { DesignSettingsTab } from "@/components/dashboard/DesignSettingsTab";
 import { TvLinksSettingsTab } from "@/components/dashboard/TvLinksSettingsTab";
+import { DashboardPermissionsTab } from "@/components/dashboard/DashboardPermissionsTab";
 
 interface DashboardKpi {
   id: string;
@@ -533,6 +534,10 @@ const DashboardSettings = () => {
               <Monitor className="h-4 w-4" />
               TV Links
             </TabsTrigger>
+            <TabsTrigger value="permissions" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Rettigheder
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="kpi-types" className="mt-6">
@@ -818,6 +823,10 @@ const DashboardSettings = () => {
 
           <TabsContent value="tv-links" className="mt-6">
             <TvLinksSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="permissions" className="mt-6">
+            <DashboardPermissionsTab />
           </TabsContent>
         </Tabs>
 
