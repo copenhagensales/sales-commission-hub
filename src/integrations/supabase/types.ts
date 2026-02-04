@@ -8953,6 +8953,7 @@ export type Database = {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
       }
+      cleanup_invalid_email_sales: { Args: never; Returns: Json }
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
