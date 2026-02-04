@@ -303,19 +303,19 @@ Deno.serve(async (req) => {
     
     // ============= TIERED REFRESH STRATEGY =============
     // - "today": Every run (1 min) - highest volatility
-    // - "this_week": Every 5 minutes - medium volatility  
-    // - "payroll_period": Every 10 minutes - lowest volatility
+    // - "this_week": Every 3 minutes - medium volatility  
+    // - "payroll_period": Every 5 minutes - lower volatility
     const periods: { type: string; start: Date; end: Date }[] = [
       { type: "today", start: getStartOfDay(now), end: now },
     ];
     
-    // Add this_week every 5 minutes (minutes 0, 5, 10, 15, ...)
-    if (currentMinute % 5 === 0) {
+    // Add this_week every 3 minutes (minutes 0, 3, 6, 9, ...)
+    if (currentMinute % 3 === 0) {
       periods.push({ type: "this_week", start: getStartOfWeek(now), end: now });
     }
     
-    // Add payroll_period every 10 minutes (minutes 0, 10, 20, 30, ...)
-    if (currentMinute % 10 === 0) {
+    // Add payroll_period every 5 minutes (minutes 0, 5, 10, 15, ...)
+    if (currentMinute % 5 === 0) {
       const payroll = getPayrollPeriod(now);
       periods.push({ type: "payroll_period", start: payroll.start, end: payroll.end });
     }
