@@ -703,6 +703,62 @@ export default function RevenueByClient() {
                         );
                       })
                     )}
+                    {/* Total row */}
+                    {clientSummary.length > 0 && (() => {
+                      // Calculate totals with adjustments
+                      let totalSales = 0;
+                      let totalAdjustedRevenue = 0;
+                      let totalLaborCost = 0;
+                      let totalLocationCosts = 0;
+                      let totalAdjustedEarnings = 0;
+                      
+                      clientSummary.forEach((client) => {
+                        const deductionPct = deductionPercents[client.clientId] || 0;
+                        const cancellationPct = cancellationPercents[client.clientId] || 0;
+                        
+                        const cancellationOnCommission = client.totalCommission * (cancellationPct / 100);
+                        const cancellationOnVacationPay = client.totalVacationPay * (cancellationPct / 100);
+                        const cancellationOnRevenue = client.totalRevenue * (cancellationPct / 100);
+                        
+                        const adjustedCommission = client.totalCommission - cancellationOnCommission;
+                        const adjustedVacationPay = client.totalVacationPay - cancellationOnVacationPay;
+                        const adjustedRevenue = client.totalRevenue - cancellationOnRevenue;
+                        const locationCosts = client.locationCosts || 0;
+                        
+                        const laborCost = adjustedCommission + adjustedVacationPay;
+                        const baseEarnings = adjustedRevenue - adjustedCommission - adjustedVacationPay - locationCosts;
+                        const deductionAmount = baseEarnings * (deductionPct / 100);
+                        const adjustedEarnings = baseEarnings - deductionAmount;
+                        
+                        totalSales += client.salesCount;
+                        totalAdjustedRevenue += adjustedRevenue;
+                        totalLaborCost += laborCost;
+                        totalLocationCosts += locationCosts;
+                        totalAdjustedEarnings += adjustedEarnings;
+                      });
+                      
+                      return (
+                        <TableRow className="bg-muted/50 font-bold border-t-2">
+                          <TableCell>I alt</TableCell>
+                          <TableCell className="text-right">{totalSales}</TableCell>
+                          <TableCell className="text-right text-primary">
+                            {Math.round(totalAdjustedRevenue).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell className="text-right text-orange-500">
+                            {Math.round(totalLocationCosts).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className={`text-right ${totalAdjustedEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>
+                            {Math.round(totalAdjustedEarnings).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </CardContent>
