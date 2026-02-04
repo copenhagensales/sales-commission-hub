@@ -72,10 +72,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
         
-        {/* Desktop Environment Switcher - Fixed position top right */}
-        <div className={`hidden md:flex fixed right-4 z-50 ${isPreviewMode ? "top-14" : "top-4"}`}>
-          <EnvironmentSwitcher />
-        </div>
         
         {/* Main content with sidebar margin on desktop */}
         <main className={`md:ml-64 min-h-screen ${isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"}`}>
