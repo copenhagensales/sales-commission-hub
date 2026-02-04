@@ -11,6 +11,7 @@ import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, 
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
+import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
@@ -211,6 +212,33 @@ export function ClientDBTab() {
       return totalStabExpenses;
     },
   });
+
+  // Fetch staff employee IDs for hours calculation
+  const { data: staffEmployeeIds } = useQuery({
+    queryKey: ["staff-employee-ids-for-client-db"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("personnel_salaries")
+        .select("employee_id")
+        .eq("salary_type", "staff")
+        .eq("is_active", true);
+      if (error) throw error;
+      return (data || []).map(s => s.employee_id);
+    },
+  });
+
+  // Calculate staff salaries based on hours (for hourly employees)
+  const { data: staffHoursData, isLoading: staffHoursLoading } = useStaffHoursCalculation(
+    periodStart,
+    periodEnd,
+    staffEmployeeIds || []
+  );
+
+  // Total staff salary cost (from hours-based calculation)
+  const totalStaffSalaryCost = useMemo(() => {
+    if (!staffHoursData) return 0;
+    return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
+  }, [staffHoursData]);
 
   // Fetch team salary info (leaders and assistants)
   const { data: teamSalaries } = useQuery({
@@ -537,7 +565,7 @@ export function ClientDBTab() {
     return clientDataList.sort((a, b) => b.finalDB - a.finalDB);
   }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, periodStart, periodEnd]);
 
-  const isLoading = (useKpiCache ? kpiLoading : directSalesLoading) || assistantHoursLoading;
+  const isLoading = (useKpiCache ? kpiLoading : directSalesLoading) || assistantHoursLoading || staffHoursLoading;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { 
@@ -565,12 +593,17 @@ export function ClientDBTab() {
       { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, finalDB: 0 }
     );
     
+    // Total overhead = stab expenses + staff salaries (hours-based)
+    const totalOverhead = stabExpenseAmount + totalStaffSalaryCost;
+    
     return {
       ...base,
       stabExpenses: stabExpenseAmount,
-      netEarnings: base.finalDB - stabExpenseAmount,
+      staffSalaries: totalStaffSalaryCost,
+      totalOverhead,
+      netEarnings: base.finalDB - totalOverhead,
     };
-  }, [clientDBData, stabExpenseAmount]);
+  }, [clientDBData, stabExpenseAmount, totalStaffSalaryCost]);
 
   return (
     <div className="space-y-4">
@@ -767,6 +800,23 @@ export function ClientDBTab() {
                       <TableCell></TableCell>
                       <TableCell className="text-right text-destructive font-medium">
                         -{formatCurrency(totals.stabExpenses)}
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    
+                    {/* Staff salaries row (hours-based) */}
+                    <TableRow>
+                      <TableCell className="font-medium">Stabslønninger</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right text-destructive font-medium">
+                        -{formatCurrency(totals.staffSalaries)}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
