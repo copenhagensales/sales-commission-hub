@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,10 +46,75 @@ export default function RevenueByClient() {
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
   const [deductionPercents, setDeductionPercents] = useState<Record<string, number>>({});
   const [cancellationPercents, setCancellationPercents] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
 
-  // Hard-coded access control
+  // Hard-coded access control (must be defined before useQuery that depends on it)
   const userEmail = user?.email?.toLowerCase() || "";
   const hasAccess = ALLOWED_EMAILS.includes(userEmail);
+
+  // Fetch saved adjustment percents
+  const { data: savedPercents } = useQuery({
+    queryKey: ["client-adjustment-percents"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_adjustment_percents")
+        .select("client_id, deduction_percent, cancellation_percent");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: hasAccess,
+  });
+
+  // Initialize state from saved percents
+  useEffect(() => {
+    if (savedPercents && savedPercents.length > 0) {
+      const deductions: Record<string, number> = {};
+      const cancellations: Record<string, number> = {};
+      savedPercents.forEach((item) => {
+        deductions[item.client_id] = Number(item.deduction_percent) || 0;
+        cancellations[item.client_id] = Number(item.cancellation_percent) || 0;
+      });
+      setDeductionPercents(deductions);
+      setCancellationPercents(cancellations);
+    }
+  }, [savedPercents]);
+
+  // Mutation to save percents
+  const savePercentMutation = useMutation({
+    mutationFn: async ({ clientId, deduction, cancellation }: { clientId: string; deduction: number; cancellation: number }) => {
+      const { error } = await supabase
+        .from("client_adjustment_percents")
+        .upsert({
+          client_id: clientId,
+          deduction_percent: deduction,
+          cancellation_percent: cancellation,
+        }, { onConflict: "client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-adjustment-percents"] });
+    },
+  });
+
+  // Debounced save handler
+  const handlePercentChange = useCallback((clientId: string, type: "deduction" | "cancellation", value: number) => {
+    if (type === "deduction") {
+      setDeductionPercents(prev => ({ ...prev, [clientId]: value }));
+      savePercentMutation.mutate({
+        clientId,
+        deduction: value,
+        cancellation: cancellationPercents[clientId] || 0,
+      });
+    } else {
+      setCancellationPercents(prev => ({ ...prev, [clientId]: value }));
+      savePercentMutation.mutate({
+        clientId,
+        deduction: deductionPercents[clientId] || 0,
+        cancellation: value,
+      });
+    }
+  }, [deductionPercents, cancellationPercents, savePercentMutation]);
+
 
   // Calculate date range based on period selection
   const { startDate, endDate } = useMemo(() => {
@@ -544,10 +609,7 @@ export default function RevenueByClient() {
                                 className="w-20 text-right h-8"
                                 placeholder="0"
                                 value={deductionPercents[client.clientId] || ""}
-                                onChange={(e) => setDeductionPercents(prev => ({
-                                  ...prev,
-                                  [client.clientId]: parseFloat(e.target.value) || 0
-                                }))}
+                                onChange={(e) => handlePercentChange(client.clientId, "deduction", parseFloat(e.target.value) || 0)}
                               />
                             </TableCell>
                             <TableCell className="text-right">
@@ -559,10 +621,7 @@ export default function RevenueByClient() {
                                 className="w-20 text-right h-8"
                                 placeholder="0"
                                 value={cancellationPercents[client.clientId] || ""}
-                                onChange={(e) => setCancellationPercents(prev => ({
-                                  ...prev,
-                                  [client.clientId]: parseFloat(e.target.value) || 0
-                                }))}
+                                onChange={(e) => handlePercentChange(client.clientId, "cancellation", parseFloat(e.target.value) || 0)}
                               />
                             </TableCell>
                             <TableCell className={`text-right font-medium ${adjustedEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>

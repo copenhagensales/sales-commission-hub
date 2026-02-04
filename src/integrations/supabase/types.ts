@@ -1329,6 +1329,41 @@ export type Database = {
           },
         ]
       }
+      client_adjustment_percents: {
+        Row: {
+          cancellation_percent: number
+          client_id: string
+          created_at: string
+          deduction_percent: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          cancellation_percent?: number
+          client_id: string
+          created_at?: string
+          deduction_percent?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          cancellation_percent?: number
+          client_id?: string
+          created_at?: string
+          deduction_percent?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_adjustment_percents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_campaigns: {
         Row: {
           client_id: string
