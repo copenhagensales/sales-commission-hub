@@ -9158,6 +9158,24 @@ export type Database = {
           total_sales: number
         }[]
       }
+      get_sales_aggregates_v2: {
+        Args: {
+          p_agent_emails?: string[]
+          p_client_id?: string
+          p_employee_id?: string
+          p_end: string
+          p_group_by?: string
+          p_start: string
+          p_team_id?: string
+        }
+        Returns: {
+          group_key: string
+          group_name: string
+          total_commission: number
+          total_revenue: number
+          total_sales: number
+        }[]
+      }
       get_sales_with_unknown_products: {
         Args: never
         Returns: {

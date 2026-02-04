@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, startOfWeek } from "date-fns";
-import { fetchAllRows } from "@/utils/supabasePagination";
+import { format, startOfMonth } from "date-fns";
+import { useDashboardAggregates } from "./useDashboardAggregates";
 
 export interface CelebrationTriggerData {
   employeeName: string | null;
@@ -27,7 +27,8 @@ interface UseCelebrationDataParams {
 }
 
 /**
- * Hook for fetching celebration trigger data from a specific dashboard
+ * Hook for fetching celebration trigger data from a specific dashboard.
+ * Now uses the central useDashboardAggregates hook for consistent data.
  */
 export function useCelebrationData({
   dashboardSlug,
@@ -36,193 +37,86 @@ export function useCelebrationData({
 }: UseCelebrationDataParams) {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
-  const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
-  const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["celebration-data", dashboardSlug, metric, todayStr],
-    queryFn: async (): Promise<CelebrationTriggerData> => {
-      console.log("[CelebrationData] Fetching data for:", { dashboardSlug, metric, todayStr });
-      
-      // Get team/client configuration based on dashboard slug
+  // Use the central dashboard aggregates hook
+  const {
+    todayData,
+    weekData,
+    monthData,
+    topPerformer,
+    isLoading,
+  } = useDashboardAggregates(dashboardSlug, enabled);
+
+  // Fetch goal data if relevant
+  const { data: goalData } = useQuery({
+    queryKey: ["celebration-goal", dashboardSlug, metric, todayStr],
+    queryFn: async () => {
       const dashboardConfig = getDashboardConfig(dashboardSlug);
-      console.log("[CelebrationData] Dashboard config:", dashboardConfig);
       
-      // Build select fields - use fetchAllRows to bypass 1000 row limit
-      const selectFields = dashboardConfig.clientId
-        ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
-        : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
-
-      // Build filter function for date and client filtering
-      const buildFilters = (startDate: string, endDate: string) => {
-        return (query: any) => {
-          let q = query
-            .gte("sale_datetime", `${startDate}T00:00:00`)
-            .lte("sale_datetime", `${endDate}T23:59:59`);
-          
-          if (dashboardConfig.clientId) {
-            q = q.eq("client_campaigns.client_id", dashboardConfig.clientId);
-          }
-          return q;
-        };
-      };
-
-      // Fetch sales data using pagination utility
-      const [todaySales, monthSales, weekSales] = await Promise.all([
-        fetchAllRows<any>(
-          "sales",
-          selectFields,
-          buildFilters(todayStr, todayStr),
-          { orderBy: "sale_datetime", ascending: false }
-        ),
-        fetchAllRows<any>(
-          "sales",
-          selectFields,
-          buildFilters(monthStart, todayStr),
-          { orderBy: "sale_datetime", ascending: false }
-        ),
-        fetchAllRows<any>(
-          "sales",
-          selectFields,
-          buildFilters(weekStart, todayStr),
-          { orderBy: "sale_datetime", ascending: false }
-        ),
-      ]);
-
-      console.log("[CelebrationData] Query results:", {
-        todayCount: todaySales.length,
-        monthCount: monthSales.length,
-        weekCount: weekSales.length,
-      });
-
-      // Calculate totals
-      const calculateSalesAndCommission = (sales: any[]) => {
-        let totalSales = 0;
-        let totalCommission = 0;
-        const employeeSales: Record<string, { name: string; sales: number; commission: number }> = {};
-
-        sales?.forEach((sale) => {
-          const agentEmail = sale.agent_email || "Unknown";
-          if (!employeeSales[agentEmail]) {
-            employeeSales[agentEmail] = { name: agentEmail.split("@")[0], sales: 0, commission: 0 };
-          }
-          
-          sale.sale_items?.forEach((item: any) => {
-            const countsAsSale = item.products?.counts_as_sale !== false;
-            if (countsAsSale) {
-              totalSales += Number(item.quantity) || 1;
-              employeeSales[agentEmail].sales += Number(item.quantity) || 1;
-            }
-            totalCommission += Number(item.mapped_commission) || 0;
-            employeeSales[agentEmail].commission += Number(item.mapped_commission) || 0;
-          });
-        });
-
-        return { totalSales, totalCommission, employeeSales };
-      };
-
-      const todayData = calculateSalesAndCommission(todaySales);
-      const monthData = calculateSalesAndCommission(monthSales);
-      const weekData = calculateSalesAndCommission(weekSales);
-
-      // Find top performer today for employee name
-      let topEmployeeName: string | null = null;
-      let topSales = 0;
-      Object.entries(todayData.employeeSales).forEach(([_, empData]) => {
-        if (empData.sales > topSales) {
-          topSales = empData.sales;
-          topEmployeeName = empData.name;
-        }
-      });
-
-      // Fetch goal data if relevant
-      let goalProgress = 0;
-      let goalTarget = 0;
-      let goalRemaining = 0;
-
-      if (dashboardConfig.clientId && (metric.includes("goal") || dashboardSlug?.includes("goals"))) {
-        const currentMonth = today.getMonth() + 1;
-        const currentYear = today.getFullYear();
-        
-        const { data: goalData } = await supabase
-          .from("client_monthly_goals")
-          .select("sales_target")
-          .eq("client_id", dashboardConfig.clientId)
-          .eq("month", currentMonth)
-          .eq("year", currentYear)
-          .single();
-
-        if (goalData) {
-          goalTarget = goalData.sales_target || 0;
-          goalRemaining = Math.max(0, goalTarget - monthData.totalCommission);
-          goalProgress = goalTarget > 0 ? Math.round((monthData.totalCommission / goalTarget) * 100) : 0;
-        }
+      if (!dashboardConfig.clientId || (!metric.includes("goal") && !dashboardSlug?.includes("goals"))) {
+        return { target: 0, progress: 0, remaining: 0 };
       }
 
-      // Get the specific metric value
-      const getMetricValue = (metricKey: string): number => {
-        switch (metricKey) {
-          case "sales_today": return todayData.totalSales;
-          case "sales_month": return monthData.totalSales;
-          case "sales_week": return weekData.totalSales;
-          case "total_sales": return monthData.totalSales;
-          case "commission_today": return todayData.totalCommission;
-          case "commission_month": return monthData.totalCommission;
-          case "goal_progress": return goalProgress;
-          case "goal_target": return goalTarget;
-          case "goal_remaining": return goalRemaining;
-          default: return todayData.totalSales;
-        }
-      };
-
-      const result = {
-        employeeName: topEmployeeName,
-        salesCount: todayData.totalSales,
-        commission: todayData.totalCommission,
-        metricValue: getMetricValue(metric),
-        salesToday: todayData.totalSales,
-        salesMonth: monthData.totalSales,
-        salesWeek: weekData.totalSales,
-        totalSales: monthData.totalSales,
-        commissionToday: todayData.totalCommission,
-        commissionMonth: monthData.totalCommission,
-        goalProgress,
-        goalTarget,
-        goalRemaining,
-      };
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
       
-      console.log("[CelebrationData] Returning data:", result);
-      return result;
+      const { data } = await supabase
+        .from("client_monthly_goals")
+        .select("sales_target")
+        .eq("client_id", dashboardConfig.clientId)
+        .eq("month", currentMonth)
+        .eq("year", currentYear)
+        .single();
+
+      if (data) {
+        const target = data.sales_target || 0;
+        const remaining = Math.max(0, target - monthData.commission);
+        const progress = target > 0 ? Math.round((monthData.commission / target) * 100) : 0;
+        return { target, progress, remaining };
+      }
+      
+      return { target: 0, progress: 0, remaining: 0 };
     },
-    enabled: enabled && !!dashboardSlug,
-    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
-    staleTime: 60000,
+    enabled: enabled && !!dashboardSlug && (metric.includes("goal") || dashboardSlug?.includes("goals")),
   });
 
+  // Get the specific metric value
+  const getMetricValue = (metricKey: string): number => {
+    switch (metricKey) {
+      case "sales_today": return todayData.sales;
+      case "sales_month": return monthData.sales;
+      case "sales_week": return weekData.sales;
+      case "total_sales": return monthData.sales;
+      case "commission_today": return todayData.commission;
+      case "commission_month": return monthData.commission;
+      case "goal_progress": return goalData?.progress || 0;
+      case "goal_target": return goalData?.target || 0;
+      case "goal_remaining": return goalData?.remaining || 0;
+      default: return todayData.sales;
+    }
+  };
+
+  const data: CelebrationTriggerData = {
+    employeeName: topPerformer?.name || null,
+    salesCount: todayData.sales,
+    commission: todayData.commission,
+    metricValue: getMetricValue(metric),
+    salesToday: todayData.sales,
+    salesMonth: monthData.sales,
+    salesWeek: weekData.sales,
+    totalSales: monthData.sales,
+    commissionToday: todayData.commission,
+    commissionMonth: monthData.commission,
+    goalProgress: goalData?.progress || 0,
+    goalTarget: goalData?.target || 0,
+    goalRemaining: goalData?.remaining || 0,
+  };
+
   return {
-    data,
+    data: enabled && dashboardSlug ? data : undefined,
     isLoading,
-    refetch,
+    refetch: () => {}, // Handled by react-query internally
   };
-}
-
-/**
- * Get dashboard configuration (client ID, team ID) based on slug
- */
-function getDashboardConfig(slug: string | null): { clientId?: string; teamId?: string } {
-  if (!slug) return {};
-  
-  // Map dashboard slugs to their actual client IDs from database
-  const clientIdMap: Record<string, string> = {
-    "tdc-erhverv": "20744525-7466-4b2c-afa7-6ee09a9112b0",
-    "relatel": "0ff8476d-16d8-4150-aee9-48ac90ec962d",
-    "codan": "789f7e51-d3c8-42c6-b461-b45ea20d1e1f",
-    "fieldmarketing": "9a92ea4c-6404-4b58-be08-065e7552d552",
-    "eesy-tm": "81993a7b-ff24-46b8-8ffb-37a83138ddba",
-  };
-
-  const clientId = clientIdMap[slug];
-  return clientId ? { clientId } : {};
 }
 
 /**
@@ -251,4 +145,23 @@ export function replaceCelebrationVariables(
     .replace(/{goal_progress}/g, `${data.goalProgress}%`)
     .replace(/{goal_target}/g, formatCurrency(data.goalTarget))
     .replace(/{goal_remaining}/g, formatCurrency(data.goalRemaining));
+}
+
+/**
+ * Get dashboard configuration (client ID, team ID) based on slug
+ */
+function getDashboardConfig(slug: string | null): { clientId?: string; teamId?: string } {
+  if (!slug) return {};
+  
+  // Map dashboard slugs to their actual client IDs from database
+  const clientIdMap: Record<string, string> = {
+    "tdc-erhverv": "20744525-7466-4b2c-afa7-6ee09a9112b0",
+    "relatel": "0ff8476d-16d8-4150-aee9-48ac90ec962d",
+    "codan": "789f7e51-d3c8-42c6-b461-b45ea20d1e1f",
+    "fieldmarketing": "9a92ea4c-6404-4b58-be08-065e7552d552",
+    "eesy-tm": "81993a7b-ff24-46b8-8ffb-37a83138ddba",
+  };
+
+  const clientId = clientIdMap[slug];
+  return clientId ? { clientId } : {};
 }
