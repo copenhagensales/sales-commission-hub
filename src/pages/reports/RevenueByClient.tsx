@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { TrendingUp, Loader2, CalendarIcon, Building2 } from "lucide-react";
+import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PeriodType = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "custom";
@@ -21,6 +21,9 @@ interface ClientRevenueData {
   clientName: string;
   salesCount: number;
   totalRevenue: number;
+  totalCommission: number;
+  totalVacationPay: number;
+  totalEarnings: number;
   avgRevenue: number;
 }
 
@@ -118,7 +121,7 @@ export default function RevenueByClient() {
         const batchIds = saleIds.slice(i, i + BATCH_SIZE);
         const { data: batchItems } = await supabase
           .from("sale_items")
-          .select("sale_id, mapped_revenue, product_id")
+          .select("sale_id, mapped_revenue, mapped_commission, product_id")
           .in("sale_id", batchIds);
         if (batchItems) {
           saleItems = [...saleItems, ...batchItems];
@@ -135,15 +138,17 @@ export default function RevenueByClient() {
         campaignIdToMappingId.set(m.adversus_campaign_id, m.id);
       });
 
-      // Get product campaign overrides
+      // Get product campaign overrides (for both revenue and commission)
       const { data: productCampaignOverrides } = await supabase
         .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, revenue_dkk");
+        .select("product_id, campaign_mapping_id, revenue_dkk, commission_dkk");
       
-      const overrideMap = new Map<string, number>();
+      const revenueOverrideMap = new Map<string, number>();
+      const commissionOverrideMap = new Map<string, number>();
       productCampaignOverrides?.forEach((o) => {
         const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        overrideMap.set(key, o.revenue_dkk ?? 0);
+        if (o.revenue_dkk !== null) revenueOverrideMap.set(key, o.revenue_dkk);
+        if (o.commission_dkk !== null) commissionOverrideMap.set(key, o.commission_dkk);
       });
 
       // Map sale_items to sales
@@ -160,18 +165,21 @@ export default function RevenueByClient() {
         .gte("registered_at", `${startDateStr}T00:00:00`)
         .lte("registered_at", `${endDateStr}T23:59:59`);
 
-      // Get products for FM revenue lookup
+      // Get products for FM revenue and commission lookup
       const { data: products } = await supabase
         .from("products")
-        .select("name, revenue_dkk");
+        .select("name, revenue_dkk, commission_dkk");
       
       const productRevenueMap = new Map<string, number>();
+      const productCommissionMap = new Map<string, number>();
       products?.forEach((p) => {
-        productRevenueMap.set(p.name.toLowerCase(), p.revenue_dkk ?? 0);
+        const lowerName = p.name.toLowerCase();
+        productRevenueMap.set(lowerName, p.revenue_dkk ?? 0);
+        productCommissionMap.set(lowerName, p.commission_dkk ?? 0);
       });
 
-      // Aggregate per client and date
-      const revenueByClientAndDate: Record<string, Record<string, { count: number; revenue: number }>> = {};
+      // Aggregate per client and date (now includes commission)
+      const revenueByClientAndDate: Record<string, Record<string, { count: number; revenue: number; commission: number }>> = {};
       const clientNames: Record<string, string> = {};
 
       // Process TM sales
@@ -191,23 +199,32 @@ export default function RevenueByClient() {
           : null;
         
         let saleRevenue = 0;
+        let saleCommission = 0;
         items.forEach((item) => {
           const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const override = overrideKey ? overrideMap.get(overrideKey) : null;
+          const revenueOverride = overrideKey ? revenueOverrideMap.get(overrideKey) : undefined;
+          const commissionOverride = overrideKey ? commissionOverrideMap.get(overrideKey) : undefined;
           
-          if (override !== null && override !== undefined) {
-            saleRevenue += override;
+          if (revenueOverride !== undefined) {
+            saleRevenue += revenueOverride;
           } else {
             saleRevenue += Number(item.mapped_revenue) || 0;
+          }
+          
+          if (commissionOverride !== undefined) {
+            saleCommission += commissionOverride;
+          } else {
+            saleCommission += Number(item.mapped_commission) || 0;
           }
         });
 
         if (!revenueByClientAndDate[clientId]) revenueByClientAndDate[clientId] = {};
         if (!revenueByClientAndDate[clientId][saleDate]) {
-          revenueByClientAndDate[clientId][saleDate] = { count: 0, revenue: 0 };
+          revenueByClientAndDate[clientId][saleDate] = { count: 0, revenue: 0, commission: 0 };
         }
         revenueByClientAndDate[clientId][saleDate].count += 1;
         revenueByClientAndDate[clientId][saleDate].revenue += saleRevenue;
+        revenueByClientAndDate[clientId][saleDate].commission += saleCommission;
       });
 
       // Process FM sales
@@ -223,13 +240,15 @@ export default function RevenueByClient() {
         const saleDate = format(parseISO(sale.registered_at), "yyyy-MM-dd");
         const productName = (sale.product_name || "").toLowerCase();
         const revenue = productRevenueMap.get(productName) || 0;
+        const commission = productCommissionMap.get(productName) || 0;
 
         if (!revenueByClientAndDate[clientId]) revenueByClientAndDate[clientId] = {};
         if (!revenueByClientAndDate[clientId][saleDate]) {
-          revenueByClientAndDate[clientId][saleDate] = { count: 0, revenue: 0 };
+          revenueByClientAndDate[clientId][saleDate] = { count: 0, revenue: 0, commission: 0 };
         }
         revenueByClientAndDate[clientId][saleDate].count += 1;
         revenueByClientAndDate[clientId][saleDate].revenue += revenue;
+        revenueByClientAndDate[clientId][saleDate].commission += commission;
       });
 
       return { revenueByClientAndDate, clientNames };
@@ -247,17 +266,25 @@ export default function RevenueByClient() {
     Object.entries(revenueByClientAndDate).forEach(([clientId, dates]) => {
       let totalSales = 0;
       let totalRevenue = 0;
+      let totalCommission = 0;
 
-      Object.values(dates).forEach(({ count, revenue }) => {
+      Object.values(dates).forEach(({ count, revenue, commission }) => {
         totalSales += count;
         totalRevenue += revenue;
+        totalCommission += commission;
       });
+
+      const totalVacationPay = totalCommission * 0.125;
+      const totalEarnings = totalRevenue - totalCommission - totalVacationPay;
 
       summary.push({
         clientId,
         clientName: clientNames[clientId] || "Ukendt",
         salesCount: totalSales,
         totalRevenue,
+        totalCommission,
+        totalVacationPay,
+        totalEarnings,
         avgRevenue: totalSales > 0 ? totalRevenue / totalSales : 0,
       });
     });
@@ -265,9 +292,13 @@ export default function RevenueByClient() {
     return summary.sort((a, b) => b.totalRevenue - a.totalRevenue);
   }, [revenueData]);
 
-  // Calculate total revenue
+  // Calculate totals
   const totalRevenue = useMemo(() => {
     return clientSummary.reduce((sum, c) => sum + c.totalRevenue, 0);
+  }, [clientSummary]);
+
+  const totalEarnings = useMemo(() => {
+    return clientSummary.reduce((sum, c) => sum + c.totalEarnings, 0);
   }, [clientSummary]);
 
   // Build chart data - daily revenue per client
@@ -412,23 +443,44 @@ export default function RevenueByClient() {
           </Card>
         ) : (
           <>
-            {/* Total Revenue Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5 text-emerald-500" />
-                  Total omsætning
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-emerald-500">
-                  {formatRevenue(totalRevenue)}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {format(startDate, "d. MMMM", { locale: da })} - {format(endDate, "d. MMMM yyyy", { locale: da })}
-                </p>
-              </CardContent>
-            </Card>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Total Revenue Card */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Total omsætning
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-primary">
+                    {formatRevenue(totalRevenue)}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {format(startDate, "d. MMMM", { locale: da })} - {format(endDate, "d. MMMM yyyy", { locale: da })}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Total Earnings Card */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Wallet className="h-5 w-5 text-blue-500" />
+                    Total indtjening
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-3xl font-bold ${totalEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>
+                    {formatRevenue(totalEarnings)}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Efter provision + 12,5% feriepenge
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Chart */}
             {chartData.length > 0 && (
@@ -494,29 +546,40 @@ export default function RevenueByClient() {
                       <TableHead>Klient</TableHead>
                       <TableHead className="text-right">Antal salg</TableHead>
                       <TableHead className="text-right">Total omsætning</TableHead>
+                      <TableHead className="text-right">Provision + feriepenge</TableHead>
+                      <TableHead className="text-right">Indtjening</TableHead>
                       <TableHead className="text-right">Gns. per salg</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {clientSummary.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                           Ingen data for den valgte periode
                         </TableCell>
                       </TableRow>
                     ) : (
-                      clientSummary.map((client) => (
-                        <TableRow key={client.clientId}>
-                          <TableCell className="font-medium">{client.clientName}</TableCell>
-                          <TableCell className="text-right">{client.salesCount}</TableCell>
-                          <TableCell className="text-right font-medium text-emerald-600">
-                            {client.totalRevenue.toLocaleString("da-DK")} kr
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {Math.round(client.avgRevenue).toLocaleString("da-DK")} kr
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      clientSummary.map((client) => {
+                        const totalLaborCost = client.totalCommission + client.totalVacationPay;
+                        return (
+                          <TableRow key={client.clientId}>
+                            <TableCell className="font-medium">{client.clientName}</TableCell>
+                            <TableCell className="text-right">{client.salesCount}</TableCell>
+                            <TableCell className="text-right font-medium text-primary">
+                              {client.totalRevenue.toLocaleString("da-DK")} kr
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${client.totalEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>
+                              {Math.round(client.totalEarnings).toLocaleString("da-DK")} kr
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {Math.round(client.avgRevenue).toLocaleString("da-DK")} kr
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
