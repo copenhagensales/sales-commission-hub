@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfDay, startOfMonth, startOfWeek } from "date-fns";
+import { format, startOfMonth, startOfWeek } from "date-fns";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 export interface CelebrationTriggerData {
   employeeName: string | null;
@@ -47,51 +48,51 @@ export function useCelebrationData({
       const dashboardConfig = getDashboardConfig(dashboardSlug);
       console.log("[CelebrationData] Dashboard config:", dashboardConfig);
       
-      // Build query with client filter via campaign relation if needed
-      // Note: The column is client_campaign_id (not campaign_id)
+      // Build select fields - use fetchAllRows to bypass 1000 row limit
       const selectFields = dashboardConfig.clientId
         ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
         : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-      // Fetch sales data for today
-      let salesTodayQuery = supabase
-        .from("sales")
-        .select(selectFields)
-        .gte("sale_datetime", `${todayStr}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
+      // Build filter function for date and client filtering
+      const buildFilters = (startDate: string, endDate: string) => {
+        return (query: any) => {
+          let q = query
+            .gte("sale_datetime", `${startDate}T00:00:00`)
+            .lte("sale_datetime", `${endDate}T23:59:59`);
+          
+          if (dashboardConfig.clientId) {
+            q = q.eq("client_campaigns.client_id", dashboardConfig.clientId);
+          }
+          return q;
+        };
+      };
 
-      // Fetch sales data for month
-      let salesMonthQuery = supabase
-        .from("sales")
-        .select(selectFields)
-        .gte("sale_datetime", `${monthStart}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-      // Fetch sales data for week
-      let salesWeekQuery = supabase
-        .from("sales")
-        .select(selectFields)
-        .gte("sale_datetime", `${weekStart}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-      // Apply client filter if dashboard has a specific client
-      if (dashboardConfig.clientId) {
-        salesTodayQuery = salesTodayQuery.eq("client_campaigns.client_id", dashboardConfig.clientId);
-        salesMonthQuery = salesMonthQuery.eq("client_campaigns.client_id", dashboardConfig.clientId);
-        salesWeekQuery = salesWeekQuery.eq("client_campaigns.client_id", dashboardConfig.clientId);
-      }
-
-      const [todayRes, monthRes, weekRes] = await Promise.all([
-        salesTodayQuery,
-        salesMonthQuery,
-        salesWeekQuery,
+      // Fetch sales data using pagination utility
+      const [todaySales, monthSales, weekSales] = await Promise.all([
+        fetchAllRows<any>(
+          "sales",
+          selectFields,
+          buildFilters(todayStr, todayStr),
+          { orderBy: "sale_datetime", ascending: false }
+        ),
+        fetchAllRows<any>(
+          "sales",
+          selectFields,
+          buildFilters(monthStart, todayStr),
+          { orderBy: "sale_datetime", ascending: false }
+        ),
+        fetchAllRows<any>(
+          "sales",
+          selectFields,
+          buildFilters(weekStart, todayStr),
+          { orderBy: "sale_datetime", ascending: false }
+        ),
       ]);
 
       console.log("[CelebrationData] Query results:", {
-        todayCount: todayRes.data?.length ?? 0,
-        todayError: todayRes.error,
-        monthCount: monthRes.data?.length ?? 0,
-        weekCount: weekRes.data?.length ?? 0,
+        todayCount: todaySales.length,
+        monthCount: monthSales.length,
+        weekCount: weekSales.length,
       });
 
       // Calculate totals
@@ -120,9 +121,9 @@ export function useCelebrationData({
         return { totalSales, totalCommission, employeeSales };
       };
 
-      const todayData = calculateSalesAndCommission(todayRes.data || []);
-      const monthData = calculateSalesAndCommission(monthRes.data || []);
-      const weekData = calculateSalesAndCommission(weekRes.data || []);
+      const todayData = calculateSalesAndCommission(todaySales);
+      const monthData = calculateSalesAndCommission(monthSales);
+      const weekData = calculateSalesAndCommission(weekSales);
 
       // Find top performer today for employee name
       let topEmployeeName: string | null = null;

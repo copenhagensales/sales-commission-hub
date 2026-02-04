@@ -26,24 +26,36 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
 }
 
 /**
- * List of email domains that should be excluded from syncing.
- * These are internal/partner accounts that shouldn't be visible to users.
+ * List of VALID email domains that SHOULD be synced.
+ * Only employees with these domains will have their data stored.
  */
-const EXCLUDED_EMAIL_DOMAINS = [
-  "@relatel.dk",
-  "@ps-marketing.dk",
-  "@finansforbundet.dk",
-  "@straightlineagency.dk",
-  "@staightlineagency.dk",
-  "@tele-part.dk",
-  "@aogtil.dk",
-  "@ase.dk",
+const VALID_EMAIL_DOMAINS = [
+  "@copenhagensales.dk",
+  "@cph-relatel.dk",
+  "@cph-sales.dk",
 ];
 
-function isExcludedEmail(email: string | null | undefined): boolean {
+/**
+ * Patterns for emails that should be excluded (pseudo-emails from integrations)
+ */
+const EXCLUDED_EMAIL_PATTERNS = [
+  /^agent-\d+@adversus\.local$/i,
+];
+
+/**
+ * Check if an email is valid for syncing to the database.
+ */
+function isValidSyncEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
-  return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+  
+  // First check if it matches an excluded pattern (pseudo-emails)
+  if (EXCLUDED_EMAIL_PATTERNS.some(pattern => pattern.test(emailLower))) {
+    return false;
+  }
+  
+  // Then check if it's from a valid domain
+  return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
 }
 
 /**
@@ -474,12 +486,12 @@ export async function processSales(
   const dedupedSales = Array.from(byExternalId.values())
   if (dedupedSales.length === 0) return { processed: 0, errors: 0 }
 
-  // Filter out sales from excluded email domains
-  const filteredSales = dedupedSales.filter(s => !isExcludedEmail(s.agentEmail))
+  // Filter out sales without valid sync email (whitelist approach)
+  const filteredSales = dedupedSales.filter(s => isValidSyncEmail(s.agentEmail))
   const skippedByDomain = dedupedSales.length - filteredSales.length
   
   if (skippedByDomain > 0) {
-    log("INFO", `Skipped ${skippedByDomain} sales from excluded email domains`)
+    log("INFO", `Skipped ${skippedByDomain} sales from invalid/excluded email domains`)
   }
   
   if (filteredSales.length === 0) return { processed: 0, errors: 0, skipped: skippedByDomain }
