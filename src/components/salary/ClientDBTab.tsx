@@ -10,7 +10,7 @@ import { startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { cn } from "@/lib/utils";
 
-type PeriodMode = "payroll" | "month" | "custom";
+type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 
 interface ClientDBData {
   clientId: string;
