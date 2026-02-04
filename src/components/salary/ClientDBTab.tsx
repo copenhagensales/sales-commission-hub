@@ -1,14 +1,16 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { TrendingUp, HelpCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { TrendingUp, HelpCircle, Pencil } from "lucide-react";
 import { startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 
@@ -49,10 +51,67 @@ export function ClientDBTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
   const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const queryClient = useQueryClient();
 
   const handlePeriodChange = (start: Date, end: Date) => {
     setPeriodStart(start);
     setPeriodEnd(end);
+  };
+
+  const handleEditClick = (clientId: string, currentValue: number) => {
+    setEditingClientId(clientId);
+    setEditValue(currentValue.toString());
+  };
+
+  const handleSaveCancellationPercent = async (clientId: string) => {
+    const newValue = parseFloat(editValue);
+    if (isNaN(newValue) || newValue < 0 || newValue > 100) {
+      toast.error("Ugyldig værdi. Indtast et tal mellem 0 og 100.");
+      return;
+    }
+
+    try {
+      // Check if record exists
+      const { data: existing } = await supabase
+        .from("client_adjustment_percents")
+        .select("id")
+        .eq("client_id", clientId)
+        .single();
+
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from("client_adjustment_percents")
+          .update({ cancellation_percent: newValue })
+          .eq("client_id", clientId);
+
+        if (error) throw error;
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from("client_adjustment_percents")
+          .insert({ client_id: clientId, cancellation_percent: newValue });
+
+        if (error) throw error;
+      }
+
+      toast.success("Annulleringsprocent opdateret");
+      queryClient.invalidateQueries({ queryKey: ["client-adjustment-percents"] });
+      setEditingClientId(null);
+    } catch (error) {
+      console.error("Error updating cancellation percent:", error);
+      toast.error("Kunne ikke opdatere annulleringsprocent");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, clientId: string) => {
+    if (e.key === "Enter") {
+      handleSaveCancellationPercent(clientId);
+    } else if (e.key === "Escape") {
+      setEditingClientId(null);
+    }
   };
 
   // Fetch clients with team mapping
@@ -449,8 +508,32 @@ export function ClientDBTab() {
                             ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
                             : "-"}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "-"}
+                        <TableCell className="text-right">
+                          {editingClientId === client.clientId ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <Input
+                                type="number"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, client.clientId)}
+                                onBlur={() => handleSaveCancellationPercent(client.clientId)}
+                                className="w-20 h-7 text-right text-sm"
+                                min={0}
+                                max={100}
+                                step={0.1}
+                                autoFocus
+                              />
+                              <span className="text-muted-foreground">%</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleEditClick(client.clientId, client.cancellationPercent)}
+                              className="group inline-flex items-center gap-1 hover:text-primary transition-colors text-muted-foreground"
+                            >
+                              {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "-"}
+                              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          )}
                         </TableCell>
                         <TableCell 
                           className={cn(
