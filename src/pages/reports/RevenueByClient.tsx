@@ -399,7 +399,9 @@ export default function RevenueByClient() {
       });
 
       const totalVacationPay = totalCommission * 0.125;
-      const totalEarnings = totalRevenue - totalCommission - totalVacationPay;
+      const locationCosts = locationCostsByClient[clientId] || 0;
+      // Earnings = Revenue - Commission - VacationPay - LocationCosts
+      const totalEarnings = totalRevenue - totalCommission - totalVacationPay - locationCosts;
 
       summary.push({
         clientId,
@@ -627,23 +629,36 @@ export default function RevenueByClient() {
                       </TableRow>
                     ) : (
                       clientSummary.map((client) => {
-                        const totalLaborCost = client.totalCommission + client.totalVacationPay;
                         const deductionPct = deductionPercents[client.clientId] || 0;
                         const cancellationPct = cancellationPercents[client.clientId] || 0;
-                        // 1. Start med basis indtjening, træk annullering % fra
-                        const cancellationAmount = client.totalEarnings * (cancellationPct / 100);
-                        const earningsAfterCancellation = client.totalEarnings - cancellationAmount;
-                        // 2. Derefter: Træk fradrag % fra det resterende beløb
-                        const deductionAmount = earningsAfterCancellation * (deductionPct / 100);
-                        // 3. Endelig: Beregn justeret indtjening
-                        const adjustedEarnings = earningsAfterCancellation - deductionAmount;
+                        
+                        // Annullering trækkes fra provision og omsætning (ikke earnings direkte)
+                        const cancellationOnCommission = client.totalCommission * (cancellationPct / 100);
+                        const cancellationOnVacationPay = client.totalVacationPay * (cancellationPct / 100);
+                        const cancellationOnRevenue = client.totalRevenue * (cancellationPct / 100);
+                        
+                        // Justeret provision og omsætning efter annullering
+                        const adjustedCommission = client.totalCommission - cancellationOnCommission;
+                        const adjustedVacationPay = client.totalVacationPay - cancellationOnVacationPay;
+                        const adjustedRevenue = client.totalRevenue - cancellationOnRevenue;
+                        const locationCosts = client.locationCosts || 0;
+                        
+                        // Lønomkostninger efter annullering
+                        const totalLaborCost = adjustedCommission + adjustedVacationPay;
+                        
+                        // Earnings = justeret omsætning - justeret provision - justeret feriepenge - lokationsudgifter
+                        const baseEarnings = adjustedRevenue - adjustedCommission - adjustedVacationPay - locationCosts;
+                        
+                        // Fradrag trækkes fra earnings
+                        const deductionAmount = baseEarnings * (deductionPct / 100);
+                        const adjustedEarnings = baseEarnings - deductionAmount;
                         
                         return (
                           <TableRow key={client.clientId}>
                             <TableCell className="font-medium">{client.clientName}</TableCell>
                             <TableCell className="text-right">{client.salesCount}</TableCell>
                             <TableCell className="text-right font-medium text-primary">
-                              {client.totalRevenue.toLocaleString("da-DK")} kr
+                              {Math.round(adjustedRevenue).toLocaleString("da-DK")} kr
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
