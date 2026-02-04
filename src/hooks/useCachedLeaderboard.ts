@@ -66,8 +66,8 @@ export function useCachedLeaderboard(
       return entries.slice(0, limit);
     },
     enabled,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // 1 minute
+    staleTime: 60000, // 1 minute - matches backend update frequency
+    refetchInterval: 120000, // 2 minutes - reduces polling while staying responsive
   });
 }
 
