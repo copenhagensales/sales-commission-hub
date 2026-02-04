@@ -109,31 +109,12 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
     >
       {/* Left side - Logo with home button and title */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <img 
-            src={cphSalesLogo} 
-            alt="CPH Sales" 
-            className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={handleGoToMenu}
-          />
-          {!isTvBoardMode && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleGoToMenu}
-                  className="h-8 w-8"
-                >
-                  <Home className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Gå til hovedsystem</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
+        <img 
+          src={cphSalesLogo} 
+          alt="CPH Sales" 
+          className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={handleGoToMenu}
+        />
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">{title}</h1>
           {subtitle && (
