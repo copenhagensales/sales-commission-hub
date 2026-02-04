@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutGrid, Maximize2, Minimize2 } from "lucide-react";
+import { LayoutGrid, Maximize2, Minimize2, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +13,11 @@ import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useTvBoardContext } from "@/contexts/TvBoardContext";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
 interface DashboardHeaderProps {
@@ -102,14 +107,33 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
           : ''
       }`}
     >
-      {/* Left side - Logo and title */}
-      <div className="flex items-center gap-4">
-        <img 
-          src={cphSalesLogo} 
-          alt="CPH Sales" 
-          className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={handleGoToMenu}
-        />
+      {/* Left side - Logo with home button and title */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <img 
+            src={cphSalesLogo} 
+            alt="CPH Sales" 
+            className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={handleGoToMenu}
+          />
+          {!isTvBoardMode && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleGoToMenu}
+                  className="h-8 w-8"
+                >
+                  <Home className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Gå til hovedsystem</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">{title}</h1>
           {subtitle && (
