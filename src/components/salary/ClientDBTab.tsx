@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, HelpCircle, Pencil, Calendar } from "lucide-react";
+import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
@@ -15,6 +15,9 @@ import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
+
+type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "cancellationPercent" | "finalDB";
+type SortDirection = "asc" | "desc";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 
@@ -79,7 +82,27 @@ export function ClientDBTab() {
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const queryClient = useQueryClient();
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-3 w-3 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-3 w-3" /> 
+      : <ArrowDown className="h-3 w-3" />;
+  };
 
   const handlePeriodChange = (start: Date, end: Date) => {
     setPeriodStart(start);
@@ -562,8 +585,67 @@ export function ClientDBTab() {
       }
     }
 
-    return clientDataList.sort((a, b) => b.finalDB - a.finalDB);
+    return clientDataList;
   }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, periodStart, periodEnd]);
+
+  // Sorted client data
+  const sortedClientDBData = useMemo(() => {
+    const sorted = [...clientDBData];
+    sorted.sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+      
+      switch (sortColumn) {
+        case "clientName":
+          aVal = a.clientName.toLowerCase();
+          bVal = b.clientName.toLowerCase();
+          break;
+        case "teamName":
+          aVal = (a.teamName || "").toLowerCase();
+          bVal = (b.teamName || "").toLowerCase();
+          break;
+        case "sales":
+          aVal = a.sales;
+          bVal = b.sales;
+          break;
+        case "revenue":
+          aVal = a.adjustedRevenue;
+          bVal = b.adjustedRevenue;
+          break;
+        case "sellerCost":
+          aVal = a.adjustedSellerCost;
+          bVal = b.adjustedSellerCost;
+          break;
+        case "locationCosts":
+          aVal = a.locationCosts;
+          bVal = b.locationCosts;
+          break;
+        case "assistantAllocation":
+          aVal = a.assistantAllocation;
+          bVal = b.assistantAllocation;
+          break;
+        case "leaderAllocation":
+          aVal = a.leaderAllocation + a.leaderVacationPay;
+          bVal = b.leaderAllocation + b.leaderVacationPay;
+          break;
+        case "cancellationPercent":
+          aVal = a.cancellationPercent;
+          bVal = b.cancellationPercent;
+          break;
+        case "finalDB":
+        default:
+          aVal = a.finalDB;
+          bVal = b.finalDB;
+          break;
+      }
+      
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortDirection === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
+    return sorted;
+  }, [clientDBData, sortColumn, sortDirection]);
 
   const isLoading = (useKpiCache ? kpiLoading : directSalesLoading) || assistantHoursLoading || staffHoursLoading;
 
@@ -641,34 +723,106 @@ export function ClientDBTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Klient</TableHead>
-                  <TableHead>Team</TableHead>
-                  <TableHead className="text-right">Salg</TableHead>
-                  <TableHead className="text-right">Omsætning</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("clientName")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Klient
+                      <SortIcon column="clientName" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("teamName")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Team
+                      <SortIcon column="teamName" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("sales")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Salg
+                      <SortIcon column="sales" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("revenue")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Omsætning
+                      <SortIcon column="revenue" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("sellerCost")}
+                  >
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger className="flex items-center gap-1 ml-auto">
                           Sælgerløn*
+                          <SortIcon column="sellerCost" />
                         </TooltipTrigger>
                         <TooltipContent>Provision + 12,5% feriepenge (efter annullering)</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </TableHead>
-                  <TableHead className="text-right">Centre/Boder</TableHead>
-                  <TableHead className="text-right">Assist.løn</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("locationCosts")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Centre/Boder
+                      <SortIcon column="locationCosts" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("assistantAllocation")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Assist.løn
+                      <SortIcon column="assistantAllocation" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("leaderAllocation")}
+                  >
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger className="flex items-center gap-1 ml-auto">
                           Lederløn**
+                          <SortIcon column="leaderAllocation" />
                         </TooltipTrigger>
                         <TooltipContent>Proportionel andel + 1% feriepenge</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </TableHead>
-                  <TableHead className="text-right">Annul. %</TableHead>
-                  <TableHead className="text-right">Final DB</TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("cancellationPercent")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Annul. %
+                      <SortIcon column="cancellationPercent" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("finalDB")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Final DB
+                      <SortIcon column="finalDB" />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -679,7 +833,7 @@ export function ClientDBTab() {
                       Indlæser...
                     </TableCell>
                   </TableRow>
-                ) : clientDBData.length === 0 ? (
+                ) : sortedClientDBData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Ingen data for denne periode
@@ -687,7 +841,7 @@ export function ClientDBTab() {
                   </TableRow>
                 ) : (
                   <>
-                    {clientDBData.map((client) => (
+                    {sortedClientDBData.map((client) => (
                       <TableRow key={client.clientId}>
                         <TableCell className="font-medium">{client.clientName}</TableCell>
                         <TableCell className="text-muted-foreground">
