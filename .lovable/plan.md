@@ -1,135 +1,225 @@
 
-# Komplet Status & Resterende Opgaver
 
-## Analyse af Nuværende Situation
+# Komplet Email Oprydning & Fremtidig Beskyttelse
 
-### ✅ Hvad ER Implementeret (verificeret i koden)
+## Nuværende Status
 
-| # | Opgave | Status | Detaljer |
-|---|--------|--------|----------|
-| 1-4 | SQL Migrations (cleanup + constraints) | ✅ | Udført tidligere |
-| 5 | RPC `get_sales_aggregates_v2` | ✅ | Fungerer, bekræftet i /salary |
-| 6 | `excluded-domains.ts` whitelist | ✅ | VALID_EMAIL_DOMAINS defineret |
-| 7-8 | `users.ts` + `sales.ts` filtrering | ✅ | Bruger `isValidSyncEmail()` |
-| 9 | `adversus.ts` email-filtrering | ✅ | Linje 134-182: Whitelist aktiv |
-| 10 | `enreach.ts` email-filtrering | ✅ | Linje 338-354: Whitelist aktiv |
-| 11 | `useSalesAggregates.ts` hook | ✅ | + wrapper hooks |
-| 12-17 | Frontend migrations | ✅ | Bekræftet med browser-test |
+| Problem | Antal | Beskrivelse |
+|---------|-------|-------------|
+| Duplikerede agenter (case) | 6 | 3 agenter med både uppercase og lowercase email |
+| Salg med uppercase emails | 435 | F.eks. `louh@Copenhagensales.dk` |
+| Salg med ugyldige emails | 376 | gmail.com, hotmail.com, etc. |
+| Agenter med ugyldige emails | 65 | Historiske agenter fra før whitelist |
 
-### ❌ Hvad MANGLER Stadig
+## Eksisterende Beskyttelse (Verificeret)
 
-#### Problem 1: Legacy Data i Databasen
-- **376 salg** med ugyldige emails (gmail.com, hotmail.com)
-- **65 agenter** med ugyldige emails
-- Fordeling:
-  - `Relatel_CPHSALES`: 342 salg (3 unikke emails)
-  - `Lovablecph`: 33 salg (2 unikke emails)  
-  - `Eesy`: 1 salg (1 unik email)
+| Lag | Status | Beskyttelse |
+|-----|--------|-------------|
+| Adapter-niveau (adversus.ts) | ✅ | `isValidSyncEmail()` filtrerer FØR database |
+| Adapter-niveau (enreach.ts) | ✅ | `isValidSyncEmail()` filtrerer FØR database |
+| Core sales.ts | ✅ | Whitelist defineret |
+| Core users.ts | ✅ | Whitelist defineret |
+| **Database-niveau** | ❌ | **INGEN CONSTRAINT ELLER TRIGGER** |
 
-#### Problem 2: Case-Sensitivity Bug
-- **48 salg** med `louh@Copenhagensales.dk` (stort C)
-- Disse tæller som "ugyldige" fordi whitelist bruger lowercase check
-
-#### Problem 3: Cleanup Cron Mangler
-- Task 22 aldrig implementeret
-- Ingen automatisk oprydning af legacy data
+**Problem**: Hvis nogen bypasser adapterne (direkte SQL, ny integration, bug), kan ugyldige emails stadig indsættes.
 
 ---
 
-## Plan: Komplet Oprydning
+## 5-Fase Plan
 
-### Fase 1: Case-Sensitivity Fix (5 min)
+### Fase 1: Merge Duplikerede Agenter
 
-Normaliser emails i databasen til lowercase:
+**Hvad sker der:**
+1. Opdater salg fra uppercase til lowercase email
+2. Slet de tomme uppercase agent-poster
 
+**SQL:**
 ```text
+-- Flyt salg til lowercase
 UPDATE sales 
 SET agent_email = LOWER(agent_email)
-WHERE agent_email != LOWER(agent_email);
+WHERE agent_email IN ('Flkl@copenhagensales.dk', 'Dajo@copenhagensales.dk', 'Sima@copenhagensales.dk');
 
-UPDATE agents 
-SET email = LOWER(email)
-WHERE email != LOWER(email);
+-- Slet duplikat-agenter (nu orphaned)
+DELETE FROM agents 
+WHERE email IN ('Flkl@copenhagensales.dk', 'Dajo@copenhagensales.dk', 'Sima@copenhagensales.dk');
 ```
 
-### Fase 2: Slet Legacy Data (10 min)
+---
 
-Fjern historiske salg med ugyldige emails:
+### Fase 2: Normaliser Alle Emails til Lowercase
 
+**Hvad sker der:** Alle resterende emails konverteres til lowercase.
+
+**SQL:**
+```text
+UPDATE sales SET agent_email = LOWER(agent_email)
+WHERE agent_email IS NOT NULL AND agent_email != LOWER(agent_email);
+
+UPDATE agents SET email = LOWER(email)
+WHERE email IS NOT NULL AND email != LOWER(email);
+```
+
+---
+
+### Fase 3: Slet Legacy Data med Ugyldige Emails
+
+**Hvad sker der:** Fjern historiske data der ikke matcher whitelist.
+
+**SQL:**
 ```text
 -- Slet sale_items først (foreign key)
 DELETE FROM sale_items 
 WHERE sale_id IN (
   SELECT id FROM sales 
-  WHERE agent_email IS NOT NULL 
-    AND agent_email != ''
-    AND NOT (
-      LOWER(agent_email) LIKE '%@copenhagensales.dk' OR
-      LOWER(agent_email) LIKE '%@cph-relatel.dk' OR
-      LOWER(agent_email) LIKE '%@cph-sales.dk'
-    )
+  WHERE agent_email IS NOT NULL AND agent_email != ''
+    AND NOT (agent_email LIKE '%@copenhagensales.dk' 
+          OR agent_email LIKE '%@cph-relatel.dk' 
+          OR agent_email LIKE '%@cph-sales.dk')
 );
 
 -- Slet salg
 DELETE FROM sales 
-WHERE agent_email IS NOT NULL 
-  AND agent_email != ''
-  AND NOT (
-    LOWER(agent_email) LIKE '%@copenhagensales.dk' OR
-    LOWER(agent_email) LIKE '%@cph-relatel.dk' OR
-    LOWER(agent_email) LIKE '%@cph-sales.dk'
-  );
+WHERE agent_email IS NOT NULL AND agent_email != ''
+  AND NOT (agent_email LIKE '%@copenhagensales.dk' 
+        OR agent_email LIKE '%@cph-relatel.dk' 
+        OR agent_email LIKE '%@cph-sales.dk');
 
 -- Slet ugyldige agenter
 DELETE FROM agents 
-WHERE email IS NOT NULL 
-  AND email != ''
-  AND NOT (
-    LOWER(email) LIKE '%@copenhagensales.dk' OR
-    LOWER(email) LIKE '%@cph-relatel.dk' OR
-    LOWER(email) LIKE '%@cph-sales.dk'
-  );
+WHERE email IS NOT NULL AND email != ''
+  AND NOT (email LIKE '%@copenhagensales.dk' 
+        OR email LIKE '%@cph-relatel.dk' 
+        OR email LIKE '%@cph-sales.dk');
 ```
 
-### Fase 3: Cleanup Cron Job (15 min)
+---
 
-Opret en database-funktion + cron job der kører ugentligt:
+### Fase 4: Database-Level Beskyttelse (NY!)
+
+**Dette sikrer at problemet ALDRIG kan ske igen** - selv ved direkte SQL eller nye integrationer.
+
+**4A: Trigger på `sales` tabellen**
 
 ```text
--- Funktion til at rydde op i ugyldige emails
-CREATE OR REPLACE FUNCTION cleanup_invalid_email_sales()
-RETURNS integer AS $$
-DECLARE
-  deleted_count integer;
+CREATE OR REPLACE FUNCTION validate_sales_email()
+RETURNS TRIGGER AS $$
 BEGIN
-  -- Slet sale_items for salg med ugyldige emails
+  -- Allow NULL or empty emails (some sales may not have agent)
+  IF NEW.agent_email IS NULL OR NEW.agent_email = '' THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Normalize to lowercase
+  NEW.agent_email := LOWER(NEW.agent_email);
+  
+  -- Validate against whitelist
+  IF NOT (
+    NEW.agent_email LIKE '%@copenhagensales.dk' OR
+    NEW.agent_email LIKE '%@cph-relatel.dk' OR
+    NEW.agent_email LIKE '%@cph-sales.dk'
+  ) THEN
+    RAISE EXCEPTION 'Invalid email domain. Only @copenhagensales.dk, @cph-relatel.dk, @cph-sales.dk are allowed. Got: %', NEW.agent_email;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_sales_email_trigger
+  BEFORE INSERT OR UPDATE ON public.sales
+  FOR EACH ROW
+  EXECUTE FUNCTION validate_sales_email();
+```
+
+**4B: Trigger på `agents` tabellen**
+
+```text
+CREATE OR REPLACE FUNCTION validate_agents_email()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Allow NULL or empty emails
+  IF NEW.email IS NULL OR NEW.email = '' THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Normalize to lowercase
+  NEW.email := LOWER(NEW.email);
+  
+  -- Validate against whitelist
+  IF NOT (
+    NEW.email LIKE '%@copenhagensales.dk' OR
+    NEW.email LIKE '%@cph-relatel.dk' OR
+    NEW.email LIKE '%@cph-sales.dk'
+  ) THEN
+    RAISE EXCEPTION 'Invalid email domain. Only @copenhagensales.dk, @cph-relatel.dk, @cph-sales.dk are allowed. Got: %', NEW.email;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_agents_email_trigger
+  BEFORE INSERT OR UPDATE ON public.agents
+  FOR EACH ROW
+  EXECUTE FUNCTION validate_agents_email();
+```
+
+**Fordele ved denne tilgang:**
+- Automatisk lowercase-normalisering ved insert/update
+- Afviser ugyldige emails med klar fejlbesked
+- Fungerer uanset hvordan data kommer ind (adapters, SQL, fremtidige integrationer)
+
+---
+
+### Fase 5: Automatisk Ugentlig Oprydning (Sikkerhedsnet)
+
+**Hvad sker der:** Backup-mekanisme der kører ugentligt og fjerner eventuelle edge cases.
+
+```text
+CREATE OR REPLACE FUNCTION cleanup_invalid_email_sales()
+RETURNS jsonb AS $$
+DECLARE
+  sales_deleted integer := 0;
+  agents_deleted integer := 0;
+BEGIN
+  -- Delete sale_items for invalid sales
   DELETE FROM sale_items 
   WHERE sale_id IN (
     SELECT id FROM sales 
-    WHERE agent_email IS NOT NULL 
-      AND agent_email != ''
-      AND NOT (
-        agent_email LIKE '%@copenhagensales.dk' OR
-        agent_email LIKE '%@cph-relatel.dk' OR
-        agent_email LIKE '%@cph-sales.dk'
-      )
+    WHERE agent_email IS NOT NULL AND agent_email != ''
+      AND NOT (agent_email LIKE '%@copenhagensales.dk' 
+            OR agent_email LIKE '%@cph-relatel.dk' 
+            OR agent_email LIKE '%@cph-sales.dk')
   );
   
-  -- Slet salg med ugyldige emails
-  WITH deleted AS (
+  -- Delete invalid sales
+  WITH deleted_sales AS (
     DELETE FROM sales 
-    WHERE agent_email IS NOT NULL 
-      AND agent_email != ''
-      AND NOT (
-        agent_email LIKE '%@copenhagensales.dk' OR
-        agent_email LIKE '%@cph-relatel.dk' OR
-        agent_email LIKE '%@cph-sales.dk'
-      )
+    WHERE agent_email IS NOT NULL AND agent_email != ''
+      AND NOT (agent_email LIKE '%@copenhagensales.dk' 
+            OR agent_email LIKE '%@cph-relatel.dk' 
+            OR agent_email LIKE '%@cph-sales.dk')
     RETURNING id
   )
-  SELECT COUNT(*) INTO deleted_count FROM deleted;
+  SELECT COUNT(*) INTO sales_deleted FROM deleted_sales;
   
-  RETURN deleted_count;
+  -- Delete invalid agents
+  WITH deleted_agents AS (
+    DELETE FROM agents 
+    WHERE email IS NOT NULL AND email != ''
+      AND NOT (email LIKE '%@copenhagensales.dk' 
+            OR email LIKE '%@cph-relatel.dk' 
+            OR email LIKE '%@cph-sales.dk')
+    RETURNING id
+  )
+  SELECT COUNT(*) INTO agents_deleted FROM deleted_agents;
+  
+  RETURN jsonb_build_object(
+    'sales_deleted', sales_deleted,
+    'agents_deleted', agents_deleted,
+    'executed_at', NOW()
+  );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -143,29 +233,81 @@ SELECT cron.schedule(
 
 ---
 
-## Teknisk Opsummering
+## Beskyttelseslag Efter Implementering
 
-### Verificeret Fungerende
-- Email whitelist **virker i adapters** - ingen nye gmail-salg siden 27. januar
-- Central hook bruger RPC korrekt (234ms responstid)
-- Alle frontend-komponenter migreret
-
-### Deprioriteret (stadig gældende)
-- Task 18-21: Lav risiko, høj kompleksitet
-
-### Estimat for Resterende Arbejde
-- Fase 1: 5 minutter
-- Fase 2: 10 minutter  
-- Fase 3: 15 minutter
-- **Total: ~30 minutter**
+```text
+┌─────────────────────────────────────────────────────────┐
+│                    EKSTERN DATA                          │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  LAG 1: ADAPTER-FILTRERING (adversus.ts / enreach.ts)   │
+│  • isValidSyncEmail() - whitelist                        │
+│  • Filtrerer før data når core                           │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  LAG 2: CORE-FILTRERING (sales.ts / users.ts)           │
+│  • Sekundær whitelist-check                              │
+│  • Logger skippede emails                                │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  LAG 3: DATABASE TRIGGERS (NY!)                          │
+│  • validate_sales_email_trigger                          │
+│  • validate_agents_email_trigger                         │
+│  • Auto-lowercase + afviser ugyldige                     │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  LAG 4: UGENTLIG CRON (sikkerhedsnet)                   │
+│  • cleanup_invalid_email_sales()                         │
+│  • Kører søndag 04:00                                    │
+│  • Fjerner eventuelle edge cases                         │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Forventet Resultat
 
-Efter implementering:
-- ✅ 0 salg med ugyldige emails
-- ✅ 0 agenter med ugyldige emails  
-- ✅ Case-insensitive email matching
-- ✅ Automatisk ugentlig oprydning
-- ✅ Fremtidig beskyttelse via adapter-filtrering
+| Metrik | Før | Efter |
+|--------|-----|-------|
+| Duplikerede agenter | 6 | 0 |
+| Salg med uppercase emails | 435 | 0 |
+| Salg med ugyldige emails | 376 | 0 |
+| Agenter med ugyldige emails | 65 | 0 |
+| Database-level beskyttelse | ❌ | ✅ Trigger |
+| Automatisk oprydning | ❌ | ✅ Ugentligt |
+| Adapter-beskyttelse | ✅ | ✅ |
+
+---
+
+## Teknisk Sektion
+
+### Hvorfor Trigger i Stedet for CHECK Constraint?
+
+1. **Dynamisk normalisering**: Trigger kan ændre data (lowercase) før insert - CHECK kan kun validere
+2. **Bedre fejlbeskeder**: RAISE EXCEPTION giver brugbar feedback
+3. **Supabase-kompatibel**: Undgår problemer med immutable CHECK constraints
+
+### Eksekveringsrækkefølge
+
+Faserne skal køres i rækkefølge:
+1. **Fase 1 + 2** først (normaliser data)
+2. **Fase 3** derefter (slet ugyldige)
+3. **Fase 4** så (installer triggers - kræver clean data)
+4. **Fase 5** til sidst (cron job)
+
+### Estimeret Tid
+
+- Fase 1-2: 5 minutter
+- Fase 3: 5 minutter
+- Fase 4: 10 minutter
+- Fase 5: 5 minutter
+- **Total: ~25 minutter**
+
