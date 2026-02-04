@@ -67,10 +67,10 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    const authUserId = claimsData?.claims?.sub;
-    if (claimsError || !authUserId) {
-      console.error('[initiate-call] Auth failed', { claimsError });
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    const authUserId = userData?.user?.id;
+    if (userError || !authUserId) {
+      console.error('[initiate-call] Auth failed', { userError });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
