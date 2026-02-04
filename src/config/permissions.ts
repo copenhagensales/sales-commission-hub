@@ -835,6 +835,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         label: "Dagsrapporter",
         description: "Adgang til daglige rapporter med vagtregistrering",
         hasEditOption: false,
+        scopeKey: "scope_reports_daily",
       },
       {
         key: "menu_reports_management",

@@ -23,6 +23,19 @@ interface JobPosition {
 // Owner position always has full access (except excluded permissions like softphone)
 const OWNER_POSITION_NAME = "Ejer";
 
+// Owners excluded from salary access (still get all other permissions)
+const SALARY_EXCLUDED_OWNER_IDS = [
+  '9ad9b492-8c14-4d0f-96aa-1e867823fe91', // William Hoé Seiding
+];
+
+// Permission keys related to salary
+const SALARY_PERMISSION_KEYS = [
+  'menu_section_salary',
+  'menu_payroll',
+  'menu_salary_types',
+  'scope_payroll',
+];
+
 // Use the shared generateAllPermissions from config
 // For owner, exclude softphone permissions
 const generateAllPermissions = (): PositionPermissions => 
@@ -364,6 +377,7 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
+  const { user } = useAuth();
   const { data, isLoading, isFetched, isError, error, isFetching, isPending } = usePositionPermissions();
   const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
   
@@ -379,12 +393,28 @@ export function usePermissions() {
   // This prevents false "deactivated" messages during database retry attempts
   const isRetrying = isFetching && !data?.position;
   
+  // Check if current user is an owner
+  const isOwner = data?.roleKey === 'ejer';
+  
+  // Check if this owner is excluded from salary access
+  const isOwnerExcludedFromSalary = isOwner && 
+    user?.id && 
+    SALARY_EXCLUDED_OWNER_IDS.includes(user.id);
+  
   // Use preview permissions when in preview mode, otherwise use actual permissions
   const permissions = isPreviewMode && previewPermissions 
     ? previewPermissions as PositionPermissions 
     : (data?.permissions || {});
   
   const hasPermission = (key: string, type?: "view" | "edit"): boolean => {
+    // Owner override: full access EXCEPT salary for excluded owners
+    if (isOwner && !isPreviewMode) {
+      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
+        return false; // Deny salary access for this owner
+      }
+      return true; // All other permissions granted
+    }
+    
     const value = permissions[key];
     
     if (type) {
@@ -402,10 +432,37 @@ export function usePermissions() {
     return false;
   };
 
-  const canView = (key: string): boolean => hasPermission(key, "view") || hasPermission(key);
-  const canEdit = (key: string): boolean => hasPermission(key, "edit");
+  const canView = (key: string): boolean => {
+    // Owner override: full access EXCEPT salary for excluded owners
+    if (isOwner && !isPreviewMode) {
+      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
+        return false;
+      }
+      return true;
+    }
+    return hasPermission(key, "view") || hasPermission(key);
+  };
+  
+  const canEdit = (key: string): boolean => {
+    // Owner override: full access EXCEPT salary for excluded owners
+    if (isOwner && !isPreviewMode) {
+      if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
+        return false;
+      }
+      return true;
+    }
+    return hasPermission(key, "edit");
+  };
 
   const getDataScope = (key: string): DataScope => {
+    // Owner override: full scope EXCEPT salary for excluded owners
+    if (isOwner && !isPreviewMode) {
+      if (isOwnerExcludedFromSalary && key === 'scope_payroll') {
+        return "egen"; // Restrict salary data scope
+      }
+      return "alt"; // Full scope for everything else
+    }
+    
     const value = permissions[key];
     if (value === "egen" || value === "team" || value === "alt") {
       return value;
