@@ -130,8 +130,19 @@ export class AdversusAdapter implements DialerAdapter {
     const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
 
+    // Valid email domains for syncing
+    const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const isValidSyncEmail = (email: string | null): boolean => {
+      if (!email) return false;
+      const emailLower = email.toLowerCase();
+      return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+    };
+
     // Mapeo a StandardSale usando el mapa de OPPs y el mapa de usuarios
-    return rawSales.map((s: any) => {
+    // FILTER out sales with invalid emails at source to prevent DB pollution
+    let skippedInvalidEmail = 0;
+
+    const mappedSales = rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
 
@@ -165,10 +176,9 @@ export class AdversusAdapter implements DialerAdapter {
         }
       }
 
-      // 4. Final fallback - only if we truly have no email
-      if (!agentEmail) {
-        agentEmail = `agent-${agentId}@adversus.local`;
-        console.log(`[Adversus] Warning: No email found for agent ${agentId}, using fallback`);
+      // 4. SKIP sales without valid email instead of using pseudo-email
+      if (!agentEmail || !isValidSyncEmail(agentEmail)) {
+        return null; // Will be filtered out
       }
 
       agentName = agentName || "Desconocido";
@@ -236,6 +246,16 @@ export class AdversusAdapter implements DialerAdapter {
         },
       };
     });
+
+    // Filter out nulls (invalid email sales) and log count
+    const validSales = mappedSales.filter((sale): sale is NonNullable<typeof sale> => sale !== null) as StandardSale[];
+    skippedInvalidEmail = rawSales.length - validSales.length;
+    
+    if (skippedInvalidEmail > 0) {
+      console.log(`[Adversus] Skipped ${skippedInvalidEmail} sales with invalid/missing email (whitelist filter)`);
+    }
+
+    return validSales;
   }
   async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     const hasTimeFrom = range.from.includes("T")
@@ -257,7 +277,17 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Fetched ${rawSales.length} sales (range)`);
     const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
-    return rawSales.map((s: any) => {
+    // Valid email domains for syncing (same as fetchSales)
+    const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const isValidSyncEmail = (email: string | null): boolean => {
+      if (!email) return false;
+      const emailLower = email.toLowerCase();
+      return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+    };
+
+    let skippedInvalidEmail = 0;
+
+    const mappedSales = rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
 
@@ -289,9 +319,9 @@ export class AdversusAdapter implements DialerAdapter {
         }
       }
 
-      // 4. Final fallback
-      if (!agentEmail) {
-        agentEmail = `agent-${agentId}@adversus.local`;
+      // 4. SKIP sales without valid email instead of using pseudo-email
+      if (!agentEmail || !isValidSyncEmail(agentEmail)) {
+        return null; // Will be filtered out
       }
 
       agentName = agentName || "Desconocido";
@@ -342,6 +372,16 @@ export class AdversusAdapter implements DialerAdapter {
         },
       };
     });
+
+    // Filter out nulls (invalid email sales) and log count
+    const validSales = mappedSales.filter((sale): sale is NonNullable<typeof sale> => sale !== null) as StandardSale[];
+    skippedInvalidEmail = rawSales.length - validSales.length;
+    
+    if (skippedInvalidEmail > 0) {
+      console.log(`[Adversus] Skipped ${skippedInvalidEmail} sales with invalid/missing email (range, whitelist filter)`);
+    }
+
+    return validSales;
   }
 
   // Interface for lead data with all result fields

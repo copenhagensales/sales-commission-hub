@@ -331,7 +331,29 @@ export class EnreachAdapter implements DialerAdapter {
           filteredByDataFilters += (beforeFilter - filtered.length);
         }
 
-        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+        // Map leads to sales, then filter by valid email
+        const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+        
+        // Filter out sales with invalid/missing email using whitelist
+        const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+        const isValidSyncEmail = (email: string | null | undefined): boolean => {
+          if (!email) return false;
+          const emailLower = email.toLowerCase();
+          return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+        };
+        
+        const validSales = mappedSales.filter(sale => {
+          if (!isValidSyncEmail(sale.agentEmail)) {
+            const externalId = sale.externalId;
+            if (externalId) {
+              skipReasonMap.set(externalId, `invalid_email:${sale.agentEmail || 'empty'}`);
+            }
+            return false;
+          }
+          return true;
+        });
+        
+        return validSales;
       };
 
       const results = await this.processPageByPage(endpoint, pageProcessor);
@@ -348,7 +370,7 @@ export class EnreachAdapter implements DialerAdapter {
       console.log(`[EnreachAdapter] Total leads from API: ${totalLeadsReceived}`);
       console.log(`[EnreachAdapter] Leads with closure=success: ${closureSuccessCount}`);
       console.log(`[EnreachAdapter] Filtered out by data filters: ${filteredByDataFilters}`);
-      console.log(`[EnreachAdapter] Final sales count: ${results.length}`);
+      console.log(`[EnreachAdapter] Final sales count (after email whitelist): ${results.length}`);
       console.log(`[EnreachAdapter] Debug data stored: ${allRawLeads.length} raw leads, ${skipReasonMap.size} skip reasons`);
 
       if (todayLeads.length > 0) {
@@ -404,7 +426,18 @@ export class EnreachAdapter implements DialerAdapter {
           filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic));
         }
 
-        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+        // Map leads to sales, then filter by valid email
+        const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+        
+        // Filter out sales with invalid/missing email using whitelist
+        const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+        const isValidSyncEmail = (email: string | null | undefined): boolean => {
+          if (!email) return false;
+          const emailLower = email.toLowerCase();
+          return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+        };
+        
+        return mappedSales.filter(sale => isValidSyncEmail(sale.agentEmail));
       };
 
       return await this.processPageByPage(endpoint, pageProcessor);
