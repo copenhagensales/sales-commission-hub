@@ -450,13 +450,7 @@ export default function RevenueByClient() {
   ];
 
   const formatRevenue = (value: number) => {
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M kr`;
-    }
-    if (value >= 1000) {
-      return `${Math.round(value / 1000)}k kr`;
-    }
-    return `${value.toLocaleString("da-DK")} kr`;
+    return `${Math.round(value).toLocaleString("da-DK")} kr`;
   };
 
   // Access control check AFTER all hooks
