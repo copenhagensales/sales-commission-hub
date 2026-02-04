@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/utils/supabasePagination";
+import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ export function CombinedSalaryTab() {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
 
+  // Use the central aggregation hook for employee commission data
+  const { byEmployee, isLoading: aggregatesLoading } = useTeamDBStats(monthStart, monthEnd);
+
   const { data, isLoading } = useQuery({
     queryKey: ["combined-salaries", monthStart.toISOString(), monthEnd.toISOString()],
     queryFn: async () => {
@@ -35,41 +38,36 @@ export function CombinedSalaryTab() {
         .eq("is_active", true)
         .eq("is_staff_employee", false);
 
+      // Get agent mappings to match employee to agent emails
       const employeeIds = employees?.map(e => e.id) || [];
-
       const { data: agentMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(email, external_dialer_id)")
+        .select("employee_id, agent_id, agents(email)")
         .in("employee_id", employeeIds);
 
-      // Use paginated fetch to bypass 1000-row limit
-      const saleItems = await fetchAllRows<{
-        id: string;
-        quantity: number;
-        mapped_commission: number;
-        sales: { sale_datetime: string; agent_email: string; agent_external_id: string };
-      }>(
-        "sale_items",
-        "id, quantity, mapped_commission, sales!inner(sale_datetime, agent_email, agent_external_id)",
-        (query) =>
-          query
-            .gte("sales.sale_datetime", monthStart.toISOString())
-            .lte("sales.sale_datetime", monthEnd.toISOString()),
-        { orderBy: "id", ascending: true }
-      );
+      // Build employee -> emails map
+      const employeeEmails: Record<string, string[]> = {};
+      for (const mapping of agentMappings || []) {
+        const email = (mapping.agents as any)?.email?.toLowerCase();
+        if (email) {
+          if (!employeeEmails[mapping.employee_id]) {
+            employeeEmails[mapping.employee_id] = [];
+          }
+          employeeEmails[mapping.employee_id].push(email);
+        }
+      }
 
+      // Match employees to aggregated commission data
       employees?.forEach(emp => {
-        const empAgents = agentMappings?.filter(am => am.employee_id === emp.id) || [];
-        const agentEmails = empAgents.map(a => a.agents?.email?.toLowerCase()).filter(Boolean);
-        const agentExtIds = empAgents.map(a => a.agents?.external_dialer_id).filter(Boolean);
-
-        const empSales = saleItems?.filter(si => {
-          const email = si.sales?.agent_email?.toLowerCase();
-          const extId = si.sales?.agent_external_id;
-          return agentEmails.includes(email) || agentExtIds.includes(extId);
-        }) || [];
-
-        const commission = empSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0), 0);
+        const emails = employeeEmails[emp.id] || [];
+        let commission = 0;
+        
+        for (const email of emails) {
+          const emailData = byEmployee[email] || byEmployee[email.toLowerCase()];
+          if (emailData) {
+            commission += emailData.commission;
+          }
+        }
 
         if (commission > 0) {
           entries.push({
@@ -119,6 +117,7 @@ export function CombinedSalaryTab() {
 
       return entries.sort((a, b) => b.amount - a.amount);
     },
+    enabled: !aggregatesLoading, // Wait for aggregates to load first
   });
 
   const formatCurrency = (amount: number) =>
