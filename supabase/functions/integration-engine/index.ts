@@ -30,8 +30,8 @@ serve(async (req) => {
     const body = await req.json();
     const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to, maxRecords } = body;
     
-    // AGGRESSIVE limits to prevent CPU timeout
-    const effectiveMaxRecords = maxRecords ?? 50;
+    // AGGRESSIVE limits to prevent CPU timeout - reduced from 50 to 25
+    const effectiveMaxRecords = maxRecords ?? 25;
 
     const supabase = getSupabase();
 
@@ -103,21 +103,57 @@ serve(async (req) => {
       );
     }
 
-    // Process each integration
-    const results = await Promise.all(
-      integrations.map((integration) =>
-        syncIntegration(supabase, integration, engine, campaignMappings, {
-          source,
-          action,
-          actions,
-          days,
-          campaignId,
-          from,
-          to,
-          maxRecords: effectiveMaxRecords,
-        }, log)
-      )
-    );
+    // Background processing mode - run in background and return immediately
+    if (background) {
+      log("INFO", `Starting background sync for ${integrations.length} integration(s)`);
+      
+      const backgroundProcess = async () => {
+        try {
+          for (const integration of integrations) {
+            await syncIntegration(supabase, integration, engine, campaignMappings, {
+              source,
+              action,
+              actions,
+              days,
+              campaignId,
+              from,
+              to,
+              maxRecords: effectiveMaxRecords,
+            }, log);
+          }
+          log("INFO", `Background sync completed for ${integrations.length} integration(s)`);
+        } catch (err) {
+          log("ERROR", `Background sync failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      };
+      
+      EdgeRuntime.waitUntil(backgroundProcess());
+      
+      return new Response(JSON.stringify({
+        success: true,
+        background: true,
+        message: `Started background sync for ${integrations.length} integration(s). Check logs for progress.`,
+        integrations: integrations.map(i => ({ id: i.id, name: i.name })),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Foreground processing - process one at a time to reduce CPU pressure
+    const results: any[] = [];
+    for (const integration of integrations) {
+      const result = await syncIntegration(supabase, integration, engine, campaignMappings, {
+        source,
+        action,
+        actions,
+        days,
+        campaignId,
+        from,
+        to,
+        maxRecords: effectiveMaxRecords,
+      }, log);
+      results.push(result);
+    }
 
     // Calculate aggregate stats
     const totalCreated = results.reduce((acc, r) => {
