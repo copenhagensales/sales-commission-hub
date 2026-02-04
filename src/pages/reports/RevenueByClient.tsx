@@ -517,9 +517,13 @@ export default function RevenueByClient() {
                         const totalLaborCost = client.totalCommission + client.totalVacationPay;
                         const deductionPct = deductionPercents[client.clientId] || 0;
                         const cancellationPct = cancellationPercents[client.clientId] || 0;
-                        const deductionAmount = client.totalRevenue * (deductionPct / 100);
+                        // 1. Først: Beregn annulleringsbeløb fra total omsætning
                         const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
-                        const adjustedEarnings = client.totalEarnings - deductionAmount - cancellationAmount;
+                        // 2. Derefter: Beregn fradrag fra reduceret omsætning (efter annulleringer)
+                        const revenueAfterCancellation = client.totalRevenue - cancellationAmount;
+                        const deductionAmount = revenueAfterCancellation * (deductionPct / 100);
+                        // 3. Endelig: Beregn justeret indtjening
+                        const adjustedEarnings = client.totalEarnings - cancellationAmount - deductionAmount;
                         
                         return (
                           <TableRow key={client.clientId}>
