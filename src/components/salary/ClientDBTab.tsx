@@ -1,18 +1,39 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, HelpCircle, Pencil } from "lucide-react";
-import { startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
+
+// Map UI period mode to KPI cache period_type
+function mapPeriodModeToKpiPeriod(mode: PeriodMode, periodStart: Date): KpiPeriod | null {
+  const now = new Date();
+  switch (mode) {
+    case "day":
+      // Only use cache if it's today
+      return isSameDay(periodStart, now) ? "today" : null;
+    case "week":
+      // Only use cache if it's this week
+      return isSameWeek(periodStart, now, { weekStartsOn: 1 }) ? "this_week" : null;
+    case "month":
+      // Only use cache if it's this month
+      return periodStart.getMonth() === now.getMonth() && 
+             periodStart.getFullYear() === now.getFullYear() ? "this_month" : null;
+    case "payroll":
+      return "payroll_period";
+    default:
+      return null; // Custom → fallback to direct query
+  }
+}
 
 interface ClientDBData {
   clientId: string;
@@ -192,22 +213,59 @@ export function ClientDBTab() {
     },
   });
 
-  // Fetch sales aggregates per client
-  const clientIds = clientsWithTeams?.map(c => c.id) || [];
-  
-  // We need to fetch aggregates for each client
-  const { data: allAggregates, isLoading: aggregatesLoading } = useSalesAggregatesExtended({
-    periodStart,
-    periodEnd,
-    groupBy: ['employee'],
-    enabled: true,
-  });
+  // Determine if we should use KPI cache
+  const kpiPeriodType = mapPeriodModeToKpiPeriod(periodMode, periodStart);
+  const useKpiCache = !!kpiPeriodType;
 
-  // Fetch sales by client directly
-  const { data: salesByClient, isLoading: salesLoading } = useQuery({
-    queryKey: ["sales-by-client", periodStart.toISOString(), periodEnd.toISOString()],
+  // Fetch KPI-cached sales data per client (for standard periods)
+  const { data: kpiClientData, isLoading: kpiLoading } = useQuery({
+    queryKey: ["kpi-client-sales", kpiPeriodType],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from("kpi_cached_values")
+        .select("scope_id, kpi_slug, value")
+        .eq("scope_type", "client")
+        .eq("period_type", kpiPeriodType!)
+        .in("kpi_slug", ["sales_count", "total_commission", "total_revenue"]);
+
+      if (error) throw error;
+
+      // Group by client_id (scope_id)
+      const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
+      
+      for (const row of data || []) {
+        if (!row.scope_id) continue;
+        
+        if (!byClient[row.scope_id]) {
+          byClient[row.scope_id] = { sales: 0, commission: 0, revenue: 0 };
+        }
+
+        switch (row.kpi_slug) {
+          case "sales_count":
+            byClient[row.scope_id].sales = Number(row.value) || 0;
+            break;
+          case "total_commission":
+            byClient[row.scope_id].commission = Number(row.value) || 0;
+            break;
+          case "total_revenue":
+            byClient[row.scope_id].revenue = Number(row.value) || 0;
+            break;
+        }
+      }
+
+      return byClient;
+    },
+    enabled: useKpiCache,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  // Fetch sales by client directly (fallback for custom periods)
+  const { data: salesByClientDirect, isLoading: directSalesLoading } = useQuery({
+    queryKey: ["sales-by-client-direct", periodStart.toISOString(), periodEnd.toISOString()],
+    queryFn: async () => {
+      // Fetch telesales
+      const { data: telesalesData, error: telesalesError } = await supabase
         .from("sales")
         .select(`
           id,
@@ -218,12 +276,33 @@ export function ClientDBTab() {
         .gte("sale_datetime", periodStart.toISOString())
         .lte("sale_datetime", periodEnd.toISOString());
       
-      if (error) throw error;
+      if (telesalesError) throw telesalesError;
+
+      // Fetch fieldmarketing sales
+      const { data: fmSalesData, error: fmError } = await supabase
+        .from("fieldmarketing_sales")
+        .select(`
+          id,
+          client_id,
+          product_name
+        `)
+        .gte("registered_at", periodStart.toISOString())
+        .lte("registered_at", periodEnd.toISOString());
+      
+      if (fmError) throw fmError;
+
+      // Fetch products to get commission/revenue for FM sales
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, commission_dkk, revenue_dkk");
+      
+      const productsByName = new Map(products?.map(p => [p.name?.toLowerCase(), p]) || []);
 
       // Group by client
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       
-      for (const sale of data || []) {
+      // Process telesales
+      for (const sale of telesalesData || []) {
         const clientId = (sale.client_campaigns as any)?.client_id;
         if (!clientId) continue;
 
@@ -240,10 +319,38 @@ export function ClientDBTab() {
         }
       }
 
+      // Process fieldmarketing sales (each row = 1 sale)
+      for (const fmSale of fmSalesData || []) {
+        const clientId = fmSale.client_id;
+        if (!clientId) continue;
+
+        if (!byClient[clientId]) {
+          byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
+        }
+
+        // Each FM sale counts as 1
+        byClient[clientId].sales += 1;
+        
+        // Try to match product by name for commission/revenue
+        const product = productsByName.get(fmSale.product_name?.toLowerCase());
+        if (product) {
+          byClient[clientId].commission += Number(product.commission_dkk) || 0;
+          byClient[clientId].revenue += Number(product.revenue_dkk) || 0;
+        }
+      }
+
       return byClient;
     },
-    enabled: clientsWithTeams !== undefined,
+    enabled: !useKpiCache && clientsWithTeams !== undefined,
   });
+
+  // Merge data sources: prefer KPI cache, fallback to direct query
+  const salesByClient = useMemo(() => {
+    if (useKpiCache && kpiClientData) {
+      return kpiClientData;
+    }
+    return salesByClientDirect || {};
+  }, [useKpiCache, kpiClientData, salesByClientDirect]);
 
   // Calculate client DB data
   const clientDBData = useMemo((): ClientDBData[] => {
@@ -379,7 +486,7 @@ export function ClientDBTab() {
     return clientDataList.sort((a, b) => b.finalDB - a.finalDB);
   }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, periodStart, periodEnd]);
 
-  const isLoading = salesLoading || aggregatesLoading;
+  const isLoading = (useKpiCache ? kpiLoading : directSalesLoading);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { 
