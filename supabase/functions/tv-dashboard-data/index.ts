@@ -42,6 +42,47 @@ function cleanupCache(): void {
   }
 }
 
+// ============= PAGINATED FETCH HELPER =============
+// Fetches all rows with automatic pagination to bypass 1000-row limit
+async function fetchAllSales(
+  supabase: any,
+  selectFields: string,
+  dateStart: string,
+  dateEnd: string,
+  clientFilter?: { field: string; value: string }
+): Promise<any[]> {
+  const pageSize = 1000;
+  let allData: any[] = [];
+  let page = 0;
+  
+  while (true) {
+    let query = supabase
+      .from("sales")
+      .select(selectFields)
+      .gte("sale_datetime", dateStart)
+      .lte("sale_datetime", dateEnd)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (clientFilter) {
+      query = query.eq(clientFilter.field, clientFilter.value);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error(`[fetchAllSales] Error at page ${page}:`, error);
+      break;
+    }
+    
+    if (!data || data.length === 0) break;
+    allData = [...allData, ...data];
+    if (data.length < pageSize) break;
+    page++;
+  }
+  
+  return allData;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1221,46 +1262,23 @@ async function handleCelebrationData(
   const clientId = clientIdMap[dashboardSlug] || null;
   console.log(`[CelebrationData] Client ID for ${dashboardSlug}: ${clientId}`);
 
-  // Build queries
+  // Build queries - use paginated fetch for month data (can exceed 1000)
   const selectFields = clientId
     ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))"
     : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // Fetch today's sales
-  let salesTodayQuery = supabase
-    .from("sales")
-    .select(selectFields)
-    .gte("sale_datetime", `${todayStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  const clientFilter = clientId 
+    ? { field: "client_campaigns.client_id", value: clientId } 
+    : undefined;
 
-  // Fetch month's sales
-  let salesMonthQuery = supabase
-    .from("sales")
-    .select(selectFields)
-    .gte("sale_datetime", `${monthStart}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-  // Fetch week's sales
-  let salesWeekQuery = supabase
-    .from("sales")
-    .select(selectFields)
-    .gte("sale_datetime", `${weekStart}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-  // Apply client filter if needed
-  if (clientId) {
-    salesTodayQuery = salesTodayQuery.eq("client_campaigns.client_id", clientId);
-    salesMonthQuery = salesMonthQuery.eq("client_campaigns.client_id", clientId);
-    salesWeekQuery = salesWeekQuery.eq("client_campaigns.client_id", clientId);
-  }
-
-  const [todayRes, monthRes, weekRes] = await Promise.all([
-    salesTodayQuery,
-    salesMonthQuery,
-    salesWeekQuery,
+  // Fetch all periods using paginated helper (month can exceed 1000 rows)
+  const [salesToday, salesMonth, salesWeek] = await Promise.all([
+    fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`, clientFilter),
+    fetchAllSales(supabase, selectFields, `${monthStart}T00:00:00`, `${todayStr}T23:59:59`, clientFilter),
+    fetchAllSales(supabase, selectFields, `${weekStart}T00:00:00`, `${todayStr}T23:59:59`, clientFilter),
   ]);
 
-  console.log(`[CelebrationData] Query results: today=${todayRes.data?.length || 0}, month=${monthRes.data?.length || 0}, week=${weekRes.data?.length || 0}`);
+  console.log(`[CelebrationData] Query results: today=${salesToday.length}, month=${salesMonth.length}, week=${salesWeek.length}`);
 
   // Calculate totals
   const calculateSalesAndCommission = (sales: any[]) => {
@@ -1288,9 +1306,9 @@ async function handleCelebrationData(
     return { totalSales, totalCommission, employeeSales };
   };
 
-  const todayData = calculateSalesAndCommission(todayRes.data || []);
-  const monthData = calculateSalesAndCommission(monthRes.data || []);
-  const weekData = calculateSalesAndCommission(weekRes.data || []);
+  const todayData = calculateSalesAndCommission(salesToday);
+  const monthData = calculateSalesAndCommission(salesMonth);
+  const weekData = calculateSalesAndCommission(salesWeek);
 
   // Find top performer today
   let topEmployeeName: string | null = null;
@@ -1411,33 +1429,20 @@ async function handleEesyTmData(
 
   const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // Fetch today's sales
-  const { data: salesToday } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", EESY_CLIENT_ID)
-    .gte("sale_datetime", `${todayStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  const eesyFilter = { field: "client_campaigns.client_id", value: EESY_CLIENT_ID };
 
-  // Fetch week's sales
-  const { data: salesWeek } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", EESY_CLIENT_ID)
-    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  // Fetch all periods using paginated helper (payroll period can exceed 1000 rows)
+  const [salesToday, salesWeek, salesMonth] = await Promise.all([
+    fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`, eesyFilter),
+    fetchAllSales(supabase, selectFields, `${weekStartStr}T00:00:00`, `${todayStr}T23:59:59`, eesyFilter),
+    fetchAllSales(supabase, selectFields, `${payrollStartStr}T00:00:00`, `${todayStr}T23:59:59`, eesyFilter),
+  ]);
 
-  // Fetch payroll period sales (lønperiode)
-  const { data: salesMonth } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", EESY_CLIENT_ID)
-    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  console.log(`[EesyTmData] Fetched: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesMonth.length}`);
 
   // Collect all unique agent emails from sales for name resolution
   const allAgentEmails = new Set<string>();
-  [...(salesToday || []), ...(salesWeek || []), ...(salesMonth || [])].forEach((sale: any) => {
+  [...salesToday, ...salesWeek, ...salesMonth].forEach((sale: any) => {
     if (sale.agent_email) {
       allAgentEmails.add(sale.agent_email.toLowerCase());
     }
@@ -1639,33 +1644,20 @@ async function handleTdcErhvervData(
 
   const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // Fetch today's sales
-  const { data: salesToday } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
-    .gte("sale_datetime", `${todayStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  const tdcFilter = { field: "client_campaigns.client_id", value: TDC_ERHVERV_CLIENT_ID };
 
-  // Fetch week's sales
-  const { data: salesWeek } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
-    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  // Fetch all periods using paginated helper (payroll period can exceed 1000 rows)
+  const [salesToday, salesWeek, salesMonth] = await Promise.all([
+    fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`, tdcFilter),
+    fetchAllSales(supabase, selectFields, `${weekStartStr}T00:00:00`, `${todayStr}T23:59:59`, tdcFilter),
+    fetchAllSales(supabase, selectFields, `${payrollStartStr}T00:00:00`, `${todayStr}T23:59:59`, tdcFilter),
+  ]);
 
-  // Fetch payroll period sales (lønperiode)
-  const { data: salesMonth } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
-    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  console.log(`[TdcErhvervData] Fetched: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesMonth.length}`);
 
   // Get unique agent emails from all sales
   const allAgentEmails = new Set<string>();
-  [...(salesToday || []), ...(salesWeek || []), ...(salesMonth || [])].forEach((sale: any) => {
+  [...salesToday, ...salesWeek, ...salesMonth].forEach((sale: any) => {
     if (sale.agent_email) {
       allAgentEmails.add(sale.agent_email.toLowerCase());
     }
@@ -1985,33 +1977,20 @@ async function handleRelatelData(
 
   const selectFields = "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // Fetch today's sales
-  const { data: salesToday } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
-    .gte("sale_datetime", `${todayStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  const relatelFilter = { field: "client_campaigns.client_id", value: RELATEL_CLIENT_ID };
 
-  // Fetch week's sales
-  const { data: salesWeek } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
-    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  // Fetch all periods using paginated helper (payroll period can exceed 1000 rows)
+  const [salesToday, salesWeek, salesPayroll] = await Promise.all([
+    fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`, relatelFilter),
+    fetchAllSales(supabase, selectFields, `${weekStartStr}T00:00:00`, `${todayStr}T23:59:59`, relatelFilter),
+    fetchAllSales(supabase, selectFields, `${payrollStartStr}T00:00:00`, `${todayStr}T23:59:59`, relatelFilter),
+  ]);
 
-  // Fetch payroll period sales
-  const { data: salesPayroll } = await supabase
-    .from("sales")
-    .select(selectFields)
-    .eq("client_campaigns.client_id", RELATEL_CLIENT_ID)
-    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  console.log(`[RelatelData] Fetched: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesPayroll.length}`);
 
   // Get unique agent emails from all sales
   const allAgentEmails = new Set<string>();
-  [...(salesToday || []), ...(salesWeek || []), ...(salesPayroll || [])].forEach((sale: any) => {
+  [...salesToday, ...salesWeek, ...salesPayroll].forEach((sale: any) => {
     if (sale.agent_email) {
       allAgentEmails.add(sale.agent_email.toLowerCase());
     }
