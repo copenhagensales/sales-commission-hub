@@ -1,102 +1,111 @@
 
-# Plan: Dashboard-miljø med Separat Rettighedsstyring
+# Økonomisk Overblik per Opgave (Klient)
 
-## Oversigt
-Denne plan opretter et separat "Dashboard-miljø" med sin egen menu, navigation og rettighedsstyring. Brugere kan skifte mellem det eksisterende **Hovedsystem** og det nye **Dashboard-system** via en skifteknap i øverste højre hjørne.
+## Formål
+En ny fane i Lønstyring der viser den reelle nettoindtjening per klient/opgave, hvor alle omkostninger er korrekt fordelt:
+- **Sælgerløn** = provision + 12,5% feriepenge
+- **Teamlederløn** = procentsats af DB (efter annullering og andre omkostninger) + 1% feriepenge til teamleder
+- **Assistentløn** = fordelt proportionelt på klienter i teamet
+- **Andre udgifter** = lokationsomkostninger (centre/boder) for FM-klienter
 
-## Hvad du får
-- **To separate miljøer**: Hovedsystem (nuværende) og Dashboard-miljø (nyt)
-- **Skifteknap** øverst til højre for at skifte mellem miljøerne
-- **Separate rettigheder**: Dashboard-miljøet får sine egne rettigheder der administreres uafhængigt
-- **Dedikeret navigation**: Dashboard-miljøet får sin egen sidebar med kun dashboard-relaterede menupunkter
+---
 
-## Brugeroplevelse
+## Beregningslogik
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ [Logo]                           [Hovedsystem ⇄ Dashboards] │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   Nuværende system med alle funktioner                      │
-│   (Mit Hjem, Personale, Rekruttering, osv.)                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+### Trin 1: Grundlæggende tal per klient
+- **Bruttoomsætning** = sum af `mapped_revenue` fra salg
+- **Provision** = sum af `mapped_commission` fra salg
+- **Feriepenge (sælger)** = provision × 12,5%
+- **Lokationsomkostninger** = fra `booking` tabel (kun Eesy FM og YouSee)
 
-                          ↕ Skift miljø
+### Trin 2: Annullering
+- **Annullering %** = justerbar per klient (fra `client_adjustment_percents`)
+- Annullering modregnes på både omsætning og lønomkostninger proportionelt
 
-┌─────────────────────────────────────────────────────────────┐
-│ [Logo]                           [Hovedsystem ⇄ Dashboards] │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   Dashboard-miljø med kun dashboard-funktioner              │
-│   (CPH Sales, Fieldmarketing, Eesy TM, osv.)               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+### Trin 3: Basis DB (før teamleder)
+```
+Basis DB = Justeret omsætning 
+         - Justeret provision 
+         - Justeret feriepenge (sælger) 
+         - Lokationsomkostninger
 ```
 
-## Tekniske Ændringer
+### Trin 4: Assistentløn fordeling
+- Hent assistentløn for teamet fra `personnel_salaries`
+- Hvis teamet har flere klienter: fordel proportionelt baseret på klientens andel af teamets samlede omsætning
+```
+Klientens assistentløn = (Klient omsætning / Team total omsætning) × Assistentløn
+```
 
-### 1. Ny Context: `AppModeContext`
-Opretter en ny context til at styre hvilket miljø brugeren befinder sig i:
-- Gemmer valgt miljø i localStorage for at huske valget
-- Tilbyder `mode` (hovedsystem | dashboard) og `switchMode()` funktion
+### Trin 5: DB før teamleder
+```
+DB før teamleder = Basis DB - Assistentløn (proportionelt)
+```
 
-### 2. Ny Komponent: `EnvironmentSwitcher`
-En toggle-knap der vises øverst til højre:
-- Viser "Hovedsystem" og "Dashboards" som valg
-- Navigerer automatisk til relevant startside ved skift
-- Kun synlig for brugere med adgang til mindst ét dashboard
+### Trin 6: Teamlederløn beregning
+- Hent `percentage_rate` og `minimum_salary` fra `personnel_salaries`
+- Beregn på **team-niveau** først (sum af alle klienters DB før teamleder)
+- Teamlederløn = MAX(team_db × procentsats, minimum_salary)
+- Fordel teamlederløn proportionelt på klienter baseret på deres andel af team-DB
+- Tilføj 1% feriepenge til teamlederløn
 
-### 3. Dashboard-specifik Sidebar: `DashboardSidebar`
-Ny sidebar der kun viser dashboard-menupunkter:
-- CPH Sales, Fieldmarketing, Eesy TM, TDC Erhverv, etc.
-- Dashboard-indstillinger og TV-board admin
-- Bruger eksisterende dashboard-rettigheder (`menu_dashboard_*`)
+### Trin 7: Final DB per klient
+```
+Final DB = DB før teamleder 
+         - Teamlederløn (proportionelt) 
+         - Teamleder feriepenge (1%)
+```
 
-### 4. Opdateret Layout-logik
-- `MainLayout` viser `EnvironmentSwitcher` og bruger standard sidebar
-- `DashboardLayout` viser `EnvironmentSwitcher` og bruger `DashboardSidebar`
-- Begge layouts deler header-struktur med skifteknappen
+---
 
-### 5. Rettighedsstyring
-Dashboard-miljøet bruger de eksisterende rettigheder:
-- `menu_section_dashboards` - Adgang til dashboard-sektionen
-- `menu_dashboard_cph_sales`, `menu_dashboard_fieldmarketing`, etc. - Individuelle dashboards
+## UI Design
 
-Disse rettigheder administreres allerede i Permission Editor og forbliver uændrede i database-struktur.
+### Placering
+Ny fane i `/salary/types`: **"DB per klient"** (mellem "DB Oversigt" og "Samlet")
 
-### 6. Routing-opdateringer
-- Dashboard-ruter (`/dashboards/*`) forbliver som de er
-- Ved skift til dashboard-miljø navigeres til første tilgængelige dashboard
-- Ved skift til hovedsystem navigeres til `/home`
+### Tabel kolonner
+| Klient | Salg | Omsætning | Sælgerløn* | Centre/Boder | Assist.løn | Lederløn** | Annul. % | Final DB |
 
-## Filer der oprettes
-1. `src/contexts/AppModeContext.tsx` - Ny context for miljø-skift
-2. `src/components/layout/EnvironmentSwitcher.tsx` - Skifteknap-komponent
-3. `src/components/layout/DashboardSidebar.tsx` - Dashboard-specifik sidebar
+*Sælgerløn = provision + 12,5% feriepenge  
+**Lederløn = beregnet andel + 1% feriepenge
 
-## Filer der ændres
-1. `src/App.tsx` - Tilføj `AppModeProvider`
-2. `src/components/layout/MainLayout.tsx` - Tilføj `EnvironmentSwitcher` i header
-3. `src/components/layout/DashboardLayout.tsx` - Tilføj `EnvironmentSwitcher` og `DashboardSidebar`
-4. `src/components/dashboard/DashboardHeader.tsx` - Fjern "Gå til menu" knap (erstattes af switcher)
+### Features
+- Periodefilter (måned, lønperiode, custom)
+- Totalrække nederst
+- Klik på klient for detaljevisning
+- Farvemarkering: positiv DB (grøn), negativ DB (rød)
 
-## Eksempel på brug
+---
 
-**Bruger med kun dashboard-adgang:**
-- Ser kun dashboard-miljøet
-- Skifteknap er skjult (ingen adgang til hovedsystem)
+## Tekniske filer
 
-**Bruger med begge adgange:**
-- Kan frit skifte mellem miljøer
-- Valget huskes på tværs af sessioner
+### Ny komponent
+`src/components/salary/ClientDBTab.tsx`
+- Bruger eksisterende hooks: `useSalesAggregatesExtended` for salgsdata
+- Henter team-klient mapping fra `team_clients`
+- Henter løndata fra `personnel_salaries`
+- Henter bookings for lokationsomkostninger
+- Beregner proportionel fordeling af team-omkostninger
 
-**TV-board mode:**
-- Skifteknap er skjult (intet login)
-- Fungerer som hidtil
+### Opdateringer
+`src/pages/SalaryTypes.tsx`
+- Tilføj ny tab trigger og content for "DB per klient"
 
-## Fordele
-- **Klar adskillelse**: Dashboard-brugere forstyrres ikke af andre menupunkter
-- **Enklere navigation**: Færre menupunkter i hver kontekst
-- **Fleksibel adgang**: Rettigheder styres individuelt per miljø
-- **Bagudkompatibel**: Eksisterende funktionalitet forbliver uændret
+---
+
+## Datakrav (allerede tilgængelige)
+- `sales` + `sale_items` → omsætning og provision
+- `fieldmarketing_sales` → FM-salg
+- `team_clients` → klient-team mapping
+- `personnel_salaries` → teamleder % og assistentløn
+- `booking` → lokationsomkostninger
+- `client_adjustment_percents` → annullerings-% (eksisterende tabel)
+
+---
+
+## Edge cases håndtering
+1. **Klient uden team** → Vis "Ikke tildelt" og spring leder/assistent-beregning over
+2. **Team uden leder** → Ingen lederløn-beregning
+3. **Teamleder minimum_salary > beregnet** → Brug minimum og fordel proportionelt
+4. **Klient med 0 omsætning** → Ingen proportionel andel af team-omkostninger
+5. **FM-klienter** → Inkluder lokationsomkostninger fra bookings
