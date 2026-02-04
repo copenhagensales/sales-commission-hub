@@ -1,78 +1,61 @@
 
-# Plan: Tilføj Indtjening (Profit) per Klient
+# Plan: Ret beregningsrækkefølge for fradrag og annulleringer
 
-## Overblik
-Denne plan tilføjer en ny kolonne i tabellen der viser **netto indtjening** per klient. Beregningen er:
+## Ændring
 
-**Indtjening = Omsætning - Provision - Feriepenge (12.5% af provision)**
+Den nuværende beregning trækker begge procenter fra som separate beløb baseret på total omsætning. Den korrekte rækkefølge er:
 
----
-
-## Hvad ændres
-
-### Tabel-ændringer
-Tabellen får 2 nye kolonner:
-| Klient | Antal salg | Total omsætning | **Provision + feriepenge** | **Indtjening** | Gns. per salg |
-|--------|------------|-----------------|---------------------------|----------------|---------------|
-
-- **Provision + feriepenge**: Viser total sælgerløn inkl. 12.5% feriepenge
-- **Indtjening**: Omsætning minus (provision × 1.125)
-
-### Nyt summary card
-Et nyt kort viser total indtjening for perioden med grøn/blå farve.
-
----
-
-## Tekniske detaljer
-
-### Data-hentning
-Udvid `sale_items` query til at inkludere `mapped_commission`:
-```typescript
-.select("sale_id, mapped_revenue, mapped_commission, product_id")
+**Nuværende logik:**
+```
+Annulleringsbeløb = Omsætning × Annullering%
+Fradragsbeløb = Omsætning × Fradrag%
+Indtjening = Basisindtjening - Annulleringsbeløb - Fradragsbeløb
 ```
 
-Hent også `commission_dkk` fra `product_campaign_overrides` og `products` tabellen for at kunne beregne FM-commission korrekt.
-
-### Aggregerings-logik
-Opdater `revenueByClientAndDate` strukturen til at tracke både revenue og commission:
-```typescript
-Record<string, Record<string, { 
-  count: number; 
-  revenue: number; 
-  commission: number;  // NYT
-}>>
+**Ny logik:**
 ```
-
-### Beregnings-formel
-For hver klient:
-1. Sum af commission fra alle sale_items
-2. Feriepenge = commission × 0.125
-3. Total lønomkostning = commission + feriepenge = commission × 1.125
-4. Indtjening = omsætning - total lønomkostning
-
-### Campaign Override Håndtering
-Samme logik som for revenue - tjek `product_campaign_overrides.commission_dkk` før fallback til `mapped_commission`.
-
-### FM Sales
-For fieldmarketing sales bruges `products.commission_dkk` da disse ikke har `sale_items`.
-
-### Interface udvidelse
-```typescript
-interface ClientRevenueData {
-  clientId: string;
-  clientName: string;
-  salesCount: number;
-  totalRevenue: number;
-  totalCommission: number;      // NYT
-  totalVacationPay: number;     // NYT (12.5%)
-  totalEarnings: number;        // NYT (revenue - commission - vacation)
-  avgRevenue: number;
-}
+1. Annulleringsbeløb = Omsætning × Annullering%
+2. Reduceret omsætning = Omsætning - Annulleringsbeløb
+3. Fradragsbeløb = Reduceret omsætning × Fradrag%
+4. Indtjening = Basisindtjening - Annulleringsbeløb - Fradragsbeløb
 ```
 
 ---
 
-## Opsummering
-- **Filer der ændres**: `src/pages/reports/RevenueByClient.tsx`
-- **Nye data-punkter**: Commission + feriepenge + indtjening per klient
-- **Visuel ændring**: 2 nye kolonner i tabel + nyt summary card
+## Teknisk ændring
+
+**Fil:** `src/pages/reports/RevenueByClient.tsx` (linje 520-522)
+
+Fra:
+```typescript
+const deductionAmount = client.totalRevenue * (deductionPct / 100);
+const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
+const adjustedEarnings = client.totalEarnings - deductionAmount - cancellationAmount;
+```
+
+Til:
+```typescript
+// 1. Først: Beregn annulleringsbeløb fra total omsætning
+const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
+// 2. Derefter: Beregn fradrag fra reduceret omsætning (efter annulleringer)
+const revenueAfterCancellation = client.totalRevenue - cancellationAmount;
+const deductionAmount = revenueAfterCancellation * (deductionPct / 100);
+// 3. Endelig: Beregn justeret indtjening
+const adjustedEarnings = client.totalEarnings - cancellationAmount - deductionAmount;
+```
+
+---
+
+## Eksempel
+
+| Omsætning | Annullering % | Fradrag % | **Nuværende** | **Ny beregning** |
+|-----------|---------------|-----------|---------------|------------------|
+| 100.000 kr | 10% | 5% | 85.000 kr | 85.500 kr |
+
+**Nuværende:** 100.000 - 10.000 - 5.000 = 85.000 kr
+**Ny:** 100.000 - 10.000 - (90.000 × 5%) = 100.000 - 10.000 - 4.500 = 85.500 kr
+
+---
+
+## Fil der ændres
+- `src/pages/reports/RevenueByClient.tsx`
