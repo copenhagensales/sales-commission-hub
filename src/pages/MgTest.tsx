@@ -1629,6 +1629,7 @@ export default function MgTest() {
           action: "sync",
           campaignId,
           days,
+          background: true, // Run in background to avoid CPU timeout
         },
       });
 
@@ -1638,7 +1639,11 @@ export default function MgTest() {
       return response.data;
     },
     onSuccess: (data) => {
-      toast.success(`Retroaktiv opdatering gennemført: ${data.created || 0} oprettet, ${data.updated || 0} opdateret`);
+      if (data.background) {
+        toast.success("Retroaktiv opdatering startet i baggrunden. Tjek logs for fremdrift.");
+      } else {
+        toast.success(`Retroaktiv opdatering gennemført: ${data.created || 0} oprettet, ${data.updated || 0} opdateret`);
+      }
       setRetroactiveDialog(null);
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
     },

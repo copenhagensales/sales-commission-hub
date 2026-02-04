@@ -88,6 +88,7 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
           actions: ["sales"],
           from: batch.from,
           to: batch.to,
+          maxRecords: 15, // Small batches to avoid CPU timeout
         },
       });
 
