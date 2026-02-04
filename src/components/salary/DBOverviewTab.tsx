@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
+import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Calendar } from "lucide-react";
+import { TrendingUp, Calendar, HelpCircle } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DBTeamDetailCard } from "./DBTeamDetailCard";
 import { DBPeriodSelector } from "./DBPeriodSelector";
@@ -50,24 +52,45 @@ export function DBOverviewTab() {
     true
   );
 
-  const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString()],
-    queryFn: async (): Promise<TeamDB[]> => {
-      // Get all teams with leaders and assistants
-      const { data: teams, error: teamsError } = await (supabase
-        .from("teams") as any)
+  // First, fetch basic team structure to get assistant IDs
+  const { data: teamsBasic } = useQuery({
+    queryKey: ["teams-basic-structure"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
         .select("id, name, team_leader_id, assistant_team_leader_id");
-      if (teamsError) throw teamsError;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Get assistant IDs for hours calculation
+  const assistantIds = useMemo(() => {
+    return (teamsBasic || [])
+      .map(t => t.assistant_team_leader_id)
+      .filter(Boolean) as string[];
+  }, [teamsBasic]);
+
+  // Calculate assistant salaries based on hours
+  const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
+    periodStart,
+    periodEnd,
+    assistantIds
+  );
+
+  const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
+    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData)],
+    queryFn: async (): Promise<TeamDB[]> => {
+      const teams = teamsBasic || [];
 
       // Get leader and assistant names
       const leaderIds = teams?.map((t: any) => t.team_leader_id).filter(Boolean) as string[];
-      const assistantIds = teams?.map((t: any) => t.assistant_team_leader_id).filter(Boolean) as string[];
       const allEmployeeIds = [...new Set([...leaderIds, ...assistantIds])];
 
       const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
-        .in("id", allEmployeeIds);
+        .in("id", allEmployeeIds.length > 0 ? allEmployeeIds : ["none"]);
 
       // Get team expenses for the period
       const { data: expenses } = await supabase
@@ -82,15 +105,7 @@ export function DBOverviewTab() {
         .select("employee_id, percentage_rate, minimum_salary, monthly_salary")
         .eq("salary_type", "team_leader")
         .eq("is_active", true)
-        .in("employee_id", leaderIds);
-
-      // Get personnel salaries for assistants
-      const { data: assistantSalaries } = await supabase
-        .from("personnel_salaries")
-        .select("employee_id, monthly_salary")
-        .eq("salary_type", "assistant")
-        .eq("is_active", true)
-        .in("employee_id", assistantIds);
+        .in("employee_id", leaderIds.length > 0 ? leaderIds : ["none"]);
 
       // Get team members for each team
       const { data: teamMembers } = await supabase
@@ -129,9 +144,10 @@ export function DBOverviewTab() {
         const calculatedLeaderSalary = dbBeforeLeader * (percentageRate / 100);
         const finalLeaderSalary = Math.max(calculatedLeaderSalary, minimumSalary);
 
-        // Assistant salary
-        const assistantSalary = assistantSalaries?.find(ps => ps.employee_id === team.assistant_team_leader_id);
-        const finalAssistantSalary = Number(assistantSalary?.monthly_salary) || 0;
+        // Assistant salary - now based on hours worked
+        const assistantId = team.assistant_team_leader_id;
+        const assistantData = assistantId && assistantHoursData ? assistantHoursData[assistantId] : null;
+        const finalAssistantSalary = assistantData?.totalSalary || 0;
 
         // Final DB
         const db = revenue - sellerSalaryCosts - finalLeaderSalary - finalAssistantSalary - totalExpenses;
@@ -159,10 +175,10 @@ export function DBOverviewTab() {
 
       return teamsWithDB.sort((a, b) => b.db - a.db);
     },
-    enabled: !aggregatesLoading && Object.keys(aggregatesByEmployee).length >= 0,
+    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading,
   });
 
-  const isLoading = teamsLoading || aggregatesLoading;
+  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);

@@ -10,6 +10,7 @@ import { TrendingUp, HelpCircle, Pencil, Calendar } from "lucide-react";
 import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
+import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
@@ -63,7 +64,7 @@ interface TeamSalaryInfo {
   teamId: string;
   percentageRate: number;
   minimumSalary: number;
-  assistantSalary: number;
+  assistantId: string | null;
 }
 
 const SELLER_VACATION_RATE = 0.125; // 12.5%
@@ -220,7 +221,6 @@ export function ClientDBTab() {
         .select("id, name, team_leader_id, assistant_team_leader_id");
 
       const leaderIds = teams?.map(t => t.team_leader_id).filter(Boolean) || [];
-      const assistantIds = teams?.map(t => t.assistant_team_leader_id).filter(Boolean) || [];
 
       const { data: leaderSalaries } = await supabase
         .from("personnel_salaries")
@@ -229,28 +229,35 @@ export function ClientDBTab() {
         .eq("is_active", true)
         .in("employee_id", leaderIds.length > 0 ? leaderIds : ["none"]);
 
-      const { data: assistantSalaries } = await supabase
-        .from("personnel_salaries")
-        .select("employee_id, monthly_salary")
-        .eq("salary_type", "assistant")
-        .eq("is_active", true)
-        .in("employee_id", assistantIds.length > 0 ? assistantIds : ["none"]);
-
       const result: Record<string, TeamSalaryInfo> = {};
       for (const team of teams || []) {
         const leader = leaderSalaries?.find(l => l.employee_id === team.team_leader_id);
-        const assistant = assistantSalaries?.find(a => a.employee_id === team.assistant_team_leader_id);
         
         result[team.id] = {
           teamId: team.id,
           percentageRate: Number(leader?.percentage_rate) || 0,
           minimumSalary: Number(leader?.minimum_salary) || 0,
-          assistantSalary: Number(assistant?.monthly_salary) || 0,
+          assistantId: team.assistant_team_leader_id || null,
         };
       }
       return result;
     },
   });
+
+  // Get all assistant IDs for hours calculation
+  const allAssistantIds = useMemo(() => {
+    if (!teamSalaries) return [];
+    return Object.values(teamSalaries)
+      .map(ts => ts.assistantId)
+      .filter(Boolean) as string[];
+  }, [teamSalaries]);
+
+  // Calculate assistant salaries based on hours
+  const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
+    periodStart,
+    periodEnd,
+    allAssistantIds
+  );
 
   // Determine if we should use KPI cache
   const kpiPeriodType = mapPeriodModeToKpiPeriod(periodMode, periodStart);
@@ -493,10 +500,15 @@ export function ClientDBTab() {
       const teamTotalRevenue = teamClients.reduce((sum, c) => sum + c.adjustedRevenue, 0);
       if (teamTotalRevenue === 0) continue;
 
+      // Get assistant salary from hours calculation (timer-based)
+      const assistantId = teamInfo.assistantId;
+      const assistantData = assistantId && assistantHoursData ? assistantHoursData[assistantId] : null;
+      const totalAssistantSalary = assistantData?.totalSalary || 0;
+
       // Allocate assistant salary proportionally by revenue
       for (const client of teamClients) {
         const revenueShare = client.adjustedRevenue / teamTotalRevenue;
-        client.assistantAllocation = teamInfo.assistantSalary * revenueShare;
+        client.assistantAllocation = totalAssistantSalary * revenueShare;
         client.dbBeforeLeader = client.basisDB - client.assistantAllocation;
       }
 
@@ -523,9 +535,9 @@ export function ClientDBTab() {
     }
 
     return clientDataList.sort((a, b) => b.finalDB - a.finalDB);
-  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, periodStart, periodEnd]);
+  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, periodStart, periodEnd]);
 
-  const isLoading = (useKpiCache ? kpiLoading : directSalesLoading);
+  const isLoading = (useKpiCache ? kpiLoading : directSalesLoading) || assistantHoursLoading;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { 

@@ -6572,6 +6572,7 @@ export type Database = {
         Row: {
           created_at: string
           employee_id: string
+          hourly_rate: number | null
           id: string
           is_active: boolean | null
           minimum_salary: number | null
@@ -6585,6 +6586,7 @@ export type Database = {
         Insert: {
           created_at?: string
           employee_id: string
+          hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
           minimum_salary?: number | null
@@ -6598,6 +6600,7 @@ export type Database = {
         Update: {
           created_at?: string
           employee_id?: string
+          hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
           minimum_salary?: number | null
