@@ -1,91 +1,92 @@
 
-# Plan: Hent salgstal fra KPI Definitioner
+# Plan: Ret manglende Tryg-salg fra i dag
 
-## Problemet
-ClientDBTab henter salgsdata direkte fra `sales`-tabellen, men:
-1. **Mangler fieldmarketing-salg** fra `fieldmarketing_sales` (Eesy FM, Yousee)
-2. **Ingen pagination** - risikerer at misse data ved 1000+ rækker
-3. **Ignorerer pre-computed KPI-cache** som allerede har korrekte tal
+## Problem Identificeret
 
-## Løsning: Hybrid tilgang
+**Root cause:** Integration Engine processer kun 25 salg per sync, men API'en returnerer data **usorteret**. Dette betyder at de samme 25 ældste salg processer igen og igen, mens 26 nye salg fra i dag (4. februar) aldrig når frem.
 
-### Standard perioder → Brug KPI-cache
-For "I dag", "Denne uge", "Denne måned" og "Lønperiode" hentes data fra `kpi_cached_values`:
+### Bevis fra undersøgelsen
 
-| Periode UI | KPI period_type |
-|------------|-----------------|
-| I dag | `today` |
-| Denne uge | `this_week` |
-| Denne måned | `this_month` |
-| Lønperiode | `payroll_period` |
+| Data punkt | Værdi |
+|------------|-------|
+| Tryg-salg med `closure=Success` i rå data | 88 |
+| Salg fra **i dag** (4. feb) i rå data | 26 |
+| Tryg-salg i databasen fra i dag | **0** |
+| Salg processet per sync | 25 |
+| Specifik ID `81107234S3064` (fra kl 16:17 i dag) | Findes IKKE i DB |
 
-**KPI-slugs der hentes:**
-- `sales_count` → antal salg
-- `total_commission` → provision
-- `total_revenue` → omsætning
+---
 
-### Custom perioder → Direkte query med FM-salg
-For brugerdefinerede datoperioder hentes data direkte, men:
-- Inkluder `fieldmarketing_sales` (via `client_id`)
-- Tilføj pagination med `fetchAllRows` pattern
+## Løsning
+
+Sortér salg efter salgsdato (nyeste først) **FØR** `maxRecords`-begrænsningen anvendes. Dette sikrer at dagens salg altid processer først.
+
+---
 
 ## Tekniske ændringer
 
-### 1. Tilføj KPI-mapping funktion
+### 1. Opdater `sync-integration.ts`
+
+Tilføj sortering efter salgsdato før maxRecords-begrænsningen (omkring linje 80-89):
+
+**Nuværende kode:**
 ```typescript
-function mapPeriodModeToKpiPeriod(mode: PeriodMode): string | null {
-  switch (mode) {
-    case "day": return "today";
-    case "week": return "this_week";
-    case "month": return "this_month";
-    case "payroll": return "payroll_period";
-    default: return null; // Custom → fallback
-  }
+// Apply max records limit to prevent CPU timeout
+if (maxRecords && sales.length > maxRecords) {
+  log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} to prevent timeout`);
+  sales = sales.slice(0, maxRecords);
 }
 ```
 
-### 2. Ny query: Hent KPI-data per klient
+**Ny kode:**
 ```typescript
-const { data: kpiClientData } = useQuery({
-  queryKey: ["kpi-client-sales", kpiPeriodType],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("kpi_cached_values")
-      .select("scope_id, kpi_slug, value")
-      .eq("scope_type", "client")
-      .eq("period_type", kpiPeriodType)
-      .in("kpi_slug", ["sales_count", "total_commission", "total_revenue"]);
-    
-    // Group by client_id
-    return groupByClient(data);
-  },
-  enabled: !!kpiPeriodType, // Kun for standard perioder
+// Sort sales by date DESCENDING (newest first) before applying limit
+sales.sort((a, b) => {
+  const dateA = new Date(a.saleDate || a.date || 0).getTime();
+  const dateB = new Date(b.saleDate || b.date || 0).getTime();
+  return dateB - dateA; // Newest first
 });
+
+// Apply max records limit to prevent CPU timeout
+if (maxRecords && sales.length > maxRecords) {
+  log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} (keeping newest)`);
+  sales = sales.slice(0, maxRecords);
+}
 ```
 
-### 3. Fallback query for custom perioder
-Opdater eksisterende `salesByClient` query til at:
-- Inkludere `fieldmarketing_sales` data
-- Bruge pagination (`fetchAllRows` pattern)
-- Kun køre når `mode === "custom"`
+### 2. Øg `effectiveMaxRecords` (valgfrit men anbefalet)
 
-### 4. Merge datakilder i useMemo
+I `index.ts` (linje 32):
+
 ```typescript
-const salesByClientFinal = useMemo(() => {
-  if (kpiClientData && kpiPeriodType) {
-    return kpiClientData; // Fra KPI-cache
-  }
-  return salesByClientDirect; // Fallback til direkte query
-}, [kpiClientData, salesByClientDirect, kpiPeriodType]);
+// Øg fra 25 til 50-100 for hurtigere indhentning af backlog
+const effectiveMaxRecords = maxRecords ?? 50;
 ```
+
+---
 
 ## Fordele
-- Hurtigere datahentning fra pre-computed cache
-- Inkluderer fieldmarketing-salg korrekt
-- Undgår 1000-rækkers begrænsningen
-- Konsistente tal med andre dashboards
 
-## Filer der ændres
+- **Dagens salg processer altid først** - uanset backlog-størrelse
+- **Ældre salg indhentes gradvist** over flere sync-cykler
+- **Ingen ændring i CPU-forbrug** - samme antal records processer
+- **Kompatibilitet bevares** - ingen ændring i API eller dataformat
+
+---
+
+## Fil-ændringer
+
 | Fil | Ændring |
 |-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Tilføj KPI-cache query, periode-mapping, merge-logik |
+| `supabase/functions/integration-engine/actions/sync-integration.ts` | Tilføj sortering af salg efter dato (nyeste først) før maxRecords-begrænsning |
+| `supabase/functions/integration-engine/index.ts` | (Valgfrit) Øg effectiveMaxRecords fra 25 til 50 |
+
+---
+
+## Forventet resultat
+
+Efter deploy vil næste sync:
+1. Sortere de 88 Tryg-salg efter dato
+2. Tage de 25 (eller 50) nyeste
+3. Processse og gemme de 26 salg fra i dag
+4. Tryg-salg vises korrekt i Client DB-rapporten inden for 5 minutter
