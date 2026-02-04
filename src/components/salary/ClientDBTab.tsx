@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, HelpCircle, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, HelpCircle, Pencil, Calendar } from "lucide-react";
 import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek } from "date-fns";
 import { DBPeriodSelector } from "./DBPeriodSelector";
+import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
@@ -74,6 +76,7 @@ export function ClientDBTab() {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
   const queryClient = useQueryClient();
 
   const handlePeriodChange = (start: Date, end: Date) => {
@@ -621,18 +624,19 @@ export function ClientDBTab() {
                   </TableHead>
                   <TableHead className="text-right">Annul. %</TableHead>
                   <TableHead className="text-right">Final DB</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : clientDBData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Ingen data for denne periode
                     </TableCell>
                   </TableRow>
@@ -695,6 +699,17 @@ export function ClientDBTab() {
                         >
                           {formatCurrency(client.finalDB)}
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setSelectedClientForDaily({ id: client.clientId, name: client.clientName })}
+                            title="Vis daglig breakdown"
+                          >
+                            <Calendar className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                     {/* Subtotal - Teams DB */}
@@ -724,6 +739,7 @@ export function ClientDBTab() {
                       >
                         {formatCurrency(totals.finalDB)}
                       </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                     
                     {/* Stab expenses row */}
@@ -740,6 +756,7 @@ export function ClientDBTab() {
                       <TableCell className="text-right text-destructive font-medium">
                         -{formatCurrency(totals.stabExpenses)}
                       </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                     
                     {/* Net earnings - final row */}
@@ -761,6 +778,7 @@ export function ClientDBTab() {
                       >
                         {formatCurrency(totals.netEarnings)}
                       </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   </>
                 )}
@@ -773,6 +791,17 @@ export function ClientDBTab() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Daily breakdown panel */}
+      {selectedClientForDaily && (
+        <ClientDBDailyBreakdown
+          clientId={selectedClientForDaily.id}
+          clientName={selectedClientForDaily.name}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          onClose={() => setSelectedClientForDaily(null)}
+        />
+      )}
     </div>
   );
 }
