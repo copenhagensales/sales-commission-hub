@@ -301,21 +301,15 @@ Deno.serve(async (req) => {
     const calculatedAt = now.toISOString();
     const currentMinute = now.getMinutes();
     
-    // ============= TIERED REFRESH STRATEGY =============
-    // - "today": Every run (1 min) - highest volatility
-    // - "this_week": Every 3 minutes - medium volatility  
-    // - "payroll_period": Every 5 minutes - lower volatility
-    const periods: { type: string; start: Date; end: Date }[] = [
-      { type: "today", start: getStartOfDay(now), end: now },
-    ];
+    // ============= SYNCHRONIZED REFRESH STRATEGY =============
+    // All periods update every 2 minutes to match frontend polling (120s)
+    // This ensures data freshness while minimizing unnecessary calculations
+    const periods: { type: string; start: Date; end: Date }[] = [];
     
-    // Add this_week every 3 minutes (minutes 0, 3, 6, 9, ...)
-    if (currentMinute % 3 === 0) {
+    // Only run on even minutes (0, 2, 4, 6, ...) to achieve 2-minute intervals
+    if (currentMinute % 2 === 0) {
+      periods.push({ type: "today", start: getStartOfDay(now), end: now });
       periods.push({ type: "this_week", start: getStartOfWeek(now), end: now });
-    }
-    
-    // Add payroll_period every 5 minutes (minutes 0, 5, 10, 15, ...)
-    if (currentMinute % 5 === 0) {
       const payroll = getPayrollPeriod(now);
       periods.push({ type: "payroll_period", start: payroll.start, end: payroll.end });
     }
