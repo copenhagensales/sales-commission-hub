@@ -299,27 +299,41 @@ Deno.serve(async (req) => {
 
     const now = new Date();
     const calculatedAt = now.toISOString();
+    const currentMinute = now.getMinutes();
     
-    // Calculate "today", "this_week", and "payroll_period" leaderboards
-    const periods = [
+    // ============= TIERED REFRESH STRATEGY =============
+    // - "today": Every run (1 min) - highest volatility
+    // - "this_week": Every 5 minutes - medium volatility  
+    // - "payroll_period": Every 10 minutes - lowest volatility
+    const periods: { type: string; start: Date; end: Date }[] = [
       { type: "today", start: getStartOfDay(now), end: now },
-      { type: "this_week", start: getStartOfWeek(now), end: now },
-      { type: "payroll_period", ...getPayrollPeriod(now) },
     ];
+    
+    // Add this_week every 5 minutes (minutes 0, 5, 10, 15, ...)
+    if (currentMinute % 5 === 0) {
+      periods.push({ type: "this_week", start: getStartOfWeek(now), end: now });
+    }
+    
+    // Add payroll_period every 10 minutes (minutes 0, 10, 20, 30, ...)
+    if (currentMinute % 10 === 0) {
+      const payroll = getPayrollPeriod(now);
+      periods.push({ type: "payroll_period", start: payroll.start, end: payroll.end });
+    }
 
-    console.log(`[calculate-leaderboard-incremental] Starting...`);
-    console.log(`[calculate-leaderboard-incremental] Today: ${periods[0].start.toISOString()} - ${periods[0].end.toISOString()}`);
-    console.log(`[calculate-leaderboard-incremental] This Week: ${periods[1].start.toISOString()} - ${periods[1].end.toISOString()}`);
-    console.log(`[calculate-leaderboard-incremental] Payroll: ${periods[2].start.toISOString()} - ${periods[2].end.toISOString()}`);
+    console.log(`[calculate-leaderboard-incremental] Starting... (minute=${currentMinute})`);
+    console.log(`[calculate-leaderboard-incremental] Periods to update: ${periods.map(p => p.type).join(", ")}`);
+    periods.forEach(p => {
+      console.log(`[calculate-leaderboard-incremental] ${p.type}: ${p.start.toISOString()} - ${p.end.toISOString()}`);
+    });
 
     // ============= FETCH CORE DATA =============
-    // Fetch all sales for payroll period (covers both periods)
-    const payrollStart = periods[1].start.toISOString();
-    const payrollEnd = periods[1].end.toISOString();
+    // Determine the widest date range needed (earliest start, latest end)
+    const earliestStart = periods.reduce((min, p) => p.start < min ? p.start : min, periods[0].start);
+    const latestEnd = periods.reduce((max, p) => p.end > max ? p.end : max, periods[0].end);
     
     const [salesWithItems, fmSales, fmCommissionMap] = await Promise.all([
-      fetchAllSalesWithItems(supabase, payrollStart, payrollEnd),
-      fetchFmSalesForPeriod(supabase, payrollStart, payrollEnd),
+      fetchAllSalesWithItems(supabase, earliestStart.toISOString(), latestEnd.toISOString()),
+      fetchFmSalesForPeriod(supabase, earliestStart.toISOString(), latestEnd.toISOString()),
       fetchFmCommissionMap(supabase),
     ]);
 
