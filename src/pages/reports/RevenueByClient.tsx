@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,12 @@ interface ClientRevenueData {
   totalVacationPay: number;
   totalEarnings: number;
   avgRevenue: number;
+  locationCosts?: number;
 }
+
+// FM Client IDs for location costs
+const EESY_FM_ID = "9a92ea4c-6404-4b58-be08-065e7552d552";
+const YOUSEE_ID = "5011a7cd-bf07-4838-a63f-55a12c604b40";
 
 interface ClientPieData {
   name: string;
@@ -329,7 +334,48 @@ export default function RevenueByClient() {
         revenueByClientAndDate[clientId][saleDate].commission += commission;
       });
 
-      return { revenueByClientAndDate, clientNames };
+      // Fetch booking data for Eesy FM and Yousee location costs
+      const { data: bookings } = await supabase
+        .from("booking")
+        .select(`
+          id,
+          client_id,
+          start_date,
+          end_date,
+          booked_days,
+          daily_rate_override,
+          total_price,
+          location:location_id(id, daily_rate)
+        `)
+        .in("client_id", [EESY_FM_ID, YOUSEE_ID])
+        .gte("start_date", startDateStr)
+        .lte("start_date", endDateStr);
+
+      // Aggregate location costs per client
+      const locationCostsByClient: Record<string, number> = {};
+
+      bookings?.forEach((booking) => {
+        const clientId = booking.client_id;
+        if (!clientId) return;
+
+        let bookingTotal: number;
+
+        if (booking.total_price != null) {
+          // Markets: use total price
+          bookingTotal = booking.total_price;
+        } else {
+          // Stores/centres: daily rate × days
+          const location = booking.location as { id: string; daily_rate: number | null } | null;
+          const dailyRate = booking.daily_rate_override ?? location?.daily_rate ?? 1000;
+          const days = booking.booked_days?.length ||
+            (differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1);
+          bookingTotal = dailyRate * days;
+        }
+
+        locationCostsByClient[clientId] = (locationCostsByClient[clientId] || 0) + bookingTotal;
+      });
+
+      return { revenueByClientAndDate, clientNames, locationCostsByClient };
     },
     refetchInterval: 60000,
   });
@@ -338,7 +384,7 @@ export default function RevenueByClient() {
   const clientSummary: ClientRevenueData[] = useMemo(() => {
     if (!revenueData) return [];
     
-    const { revenueByClientAndDate, clientNames } = revenueData;
+    const { revenueByClientAndDate, clientNames, locationCostsByClient } = revenueData;
     const summary: ClientRevenueData[] = [];
 
     Object.entries(revenueByClientAndDate).forEach(([clientId, dates]) => {
@@ -364,6 +410,7 @@ export default function RevenueByClient() {
         totalVacationPay,
         totalEarnings,
         avgRevenue: totalSales > 0 ? totalRevenue / totalSales : 0,
+        locationCosts: locationCostsByClient[clientId] || 0,
       });
     });
 
@@ -564,6 +611,7 @@ export default function RevenueByClient() {
                       <TableHead className="text-right">Antal salg</TableHead>
                       <TableHead className="text-right">Total omsætning</TableHead>
                       <TableHead className="text-right">Provision + feriepenge</TableHead>
+                      <TableHead className="text-right">Centre/Boder</TableHead>
                       <TableHead className="text-right w-24">Fradrag %</TableHead>
                       <TableHead className="text-right w-24">Annullering %</TableHead>
                       <TableHead className="text-right">Indtjening</TableHead>
@@ -573,7 +621,7 @@ export default function RevenueByClient() {
                   <TableBody>
                     {clientSummary.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                           Ingen data for den valgte periode
                         </TableCell>
                       </TableRow>
@@ -599,6 +647,12 @@ export default function RevenueByClient() {
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
+                            </TableCell>
+                            <TableCell className="text-right text-orange-500">
+                              {(client.clientId === EESY_FM_ID || client.clientId === YOUSEE_ID)
+                                ? `${Math.round(client.locationCosts || 0).toLocaleString("da-DK")} kr`
+                                : "-"
+                              }
                             </TableCell>
                             <TableCell className="text-right">
                               <Input
