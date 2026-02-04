@@ -10,12 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
-type PeriodMode = "payroll" | "month" | "custom";
+type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 
 interface DBPeriodSelectorProps {
   periodStart: Date;
@@ -68,8 +68,15 @@ export function DBPeriodSelector({
       start: startOfMonth(subMonths(now, 1)),
       end: endOfMonth(subMonths(now, 1)),
     };
+    const today = { start: startOfDay(now), end: endOfDay(now) };
+    const thisWeek = { 
+      start: startOfWeek(now, { weekStartsOn: 1 }), 
+      end: endOfWeek(now, { weekStartsOn: 1 }) 
+    };
 
     return [
+      { label: "I dag", mode: "day" as PeriodMode, ...today },
+      { label: "Denne uge", mode: "week" as PeriodMode, ...thisWeek },
       { label: "Denne lønperiode", mode: "payroll" as PeriodMode, ...currentPayroll },
       { label: "Forrige lønperiode", mode: "payroll" as PeriodMode, ...prevPayroll },
       { label: "Denne måned", mode: "month" as PeriodMode, ...thisMonth },
@@ -84,6 +91,14 @@ export function DBPeriodSelector({
     } else if (mode === "month") {
       const prevMonth = subMonths(periodStart, 1);
       onChange(startOfMonth(prevMonth), endOfMonth(prevMonth));
+    } else if (mode === "week") {
+      const prevWeek = new Date(periodStart);
+      prevWeek.setDate(prevWeek.getDate() - 7);
+      onChange(startOfWeek(prevWeek, { weekStartsOn: 1 }), endOfWeek(prevWeek, { weekStartsOn: 1 }));
+    } else if (mode === "day") {
+      const prevDay = new Date(periodStart);
+      prevDay.setDate(prevDay.getDate() - 1);
+      onChange(startOfDay(prevDay), endOfDay(prevDay));
     }
   };
 
@@ -94,6 +109,14 @@ export function DBPeriodSelector({
     } else if (mode === "month") {
       const nextMonth = addMonths(periodStart, 1);
       onChange(startOfMonth(nextMonth), endOfMonth(nextMonth));
+    } else if (mode === "week") {
+      const nextWeek = new Date(periodStart);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      onChange(startOfWeek(nextWeek, { weekStartsOn: 1 }), endOfWeek(nextWeek, { weekStartsOn: 1 }));
+    } else if (mode === "day") {
+      const nextDay = new Date(periodStart);
+      nextDay.setDate(nextDay.getDate() + 1);
+      onChange(startOfDay(nextDay), endOfDay(nextDay));
     }
   };
 
@@ -115,7 +138,11 @@ export function DBPeriodSelector({
   };
 
   const formatPeriodDisplay = () => {
-    if (mode === "payroll") {
+    if (mode === "day") {
+      return format(periodStart, "d. MMMM yyyy", { locale: da });
+    } else if (mode === "week") {
+      return `Uge ${format(periodStart, "w", { locale: da })}, ${format(periodStart, "yyyy", { locale: da })}`;
+    } else if (mode === "payroll") {
       return `${format(periodStart, "d. MMM", { locale: da })} - ${format(periodEnd, "d. MMM yyyy", { locale: da })}`;
     } else if (mode === "month") {
       return format(periodStart, "MMMM yyyy", { locale: da });
@@ -126,6 +153,10 @@ export function DBPeriodSelector({
 
   const getModeLabel = () => {
     switch (mode) {
+      case "day":
+        return "Dag";
+      case "week":
+        return "Uge";
       case "payroll":
         return "Lønperiode";
       case "month":

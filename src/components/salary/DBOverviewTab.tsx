@@ -11,7 +11,7 @@ import { DBTeamDetailCard } from "./DBTeamDetailCard";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { DBDailyBreakdown } from "./DBDailyBreakdown";
 
-type PeriodMode = "payroll" | "month" | "custom";
+type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 interface TeamDB {
   teamId: string;
   teamName: string;
