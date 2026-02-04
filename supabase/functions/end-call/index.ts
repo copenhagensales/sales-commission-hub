@@ -27,15 +27,15 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.log("[end-call] Auth failed", { claimsError });
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user?.id) {
+      console.log("[end-call] Auth failed", { userError });
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = userData.user.id;
 
     const body = await req.json().catch(() => ({}));
     const callSid = String(body?.callSid || "").trim();
@@ -49,7 +49,7 @@ serve(async (req) => {
 
     console.log("[end-call] Request", {
       callSid,
-      userId: claimsData.claims.sub,
+      userId,
       ts: new Date().toISOString(),
     });
 
