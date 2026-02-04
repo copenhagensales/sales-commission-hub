@@ -49,6 +49,15 @@ function getStartOfDay(date: Date): Date {
   return d;
 }
 
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 function getPayrollPeriod(date: Date): { start: Date; end: Date } {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -145,18 +154,37 @@ async function fetchFmSalesForPeriod(
   startStr: string,
   endStr: string
 ): Promise<(FmSale & { registered_at: string })[]> {
-  const { data, error } = await supabase
-    .from("fieldmarketing_sales")
-    .select("id, product_name, seller_id, client_id, registered_at")
-    .gte("registered_at", startStr)
-    .lte("registered_at", endStr);
+  const PAGE_SIZE = 500;
+  const allFmSales: (FmSale & { registered_at: string })[] = [];
+  let page = 0;
+  let hasMore = true;
   
-  if (error) {
-    console.error("[fetchFmSalesForPeriod] Error:", error);
-    return [];
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("fieldmarketing_sales")
+      .select("id, product_name, seller_id, client_id, registered_at")
+      .gte("registered_at", startStr)
+      .lte("registered_at", endStr)
+      .order("registered_at", { ascending: true })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    
+    if (error) {
+      console.error(`[fetchFmSalesForPeriod] Error on page ${page}:`, error);
+      hasMore = false;
+      continue;
+    }
+    
+    if (data && data.length > 0) {
+      allFmSales.push(...(data as (FmSale & { registered_at: string })[]));
+      hasMore = data.length === PAGE_SIZE;
+      page++;
+    } else {
+      hasMore = false;
+    }
   }
   
-  return (data || []) as (FmSale & { registered_at: string })[];
+  console.log(`[fetchFmSalesForPeriod] Fetched ${allFmSales.length} FM sales in ${page || 1} page(s)`);
+  return allFmSales;
 }
 
 // ============= LEADERBOARD CALCULATION =============
@@ -272,15 +300,17 @@ Deno.serve(async (req) => {
     const now = new Date();
     const calculatedAt = now.toISOString();
     
-    // Only calculate "today" and "payroll_period" leaderboards (most critical for dashboards)
+    // Calculate "today", "this_week", and "payroll_period" leaderboards
     const periods = [
       { type: "today", start: getStartOfDay(now), end: now },
+      { type: "this_week", start: getStartOfWeek(now), end: now },
       { type: "payroll_period", ...getPayrollPeriod(now) },
     ];
 
     console.log(`[calculate-leaderboard-incremental] Starting...`);
     console.log(`[calculate-leaderboard-incremental] Today: ${periods[0].start.toISOString()} - ${periods[0].end.toISOString()}`);
-    console.log(`[calculate-leaderboard-incremental] Payroll: ${periods[1].start.toISOString()} - ${periods[1].end.toISOString()}`);
+    console.log(`[calculate-leaderboard-incremental] This Week: ${periods[1].start.toISOString()} - ${periods[1].end.toISOString()}`);
+    console.log(`[calculate-leaderboard-incremental] Payroll: ${periods[2].start.toISOString()} - ${periods[2].end.toISOString()}`);
 
     // ============= FETCH CORE DATA =============
     // Fetch all sales for payroll period (covers both periods)
