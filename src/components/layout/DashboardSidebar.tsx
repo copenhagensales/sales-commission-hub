@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Monitor, LogOut, Home } from "lucide-react";
+import { LayoutDashboard, Monitor, LogOut, Home, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -155,27 +155,48 @@ export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSide
             </NavLink>
           ))}
 
-          {/* TV Board Admin */}
-          {canView("menu_tv_board_admin") && (
+          {/* Administration Section */}
+          {(canView("menu_tv_board_admin") || canView("menu_dashboard_settings")) && (
             <>
               <div className="px-3 py-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Administration
               </div>
-              <NavLink
-                to="/admin/tv-boards"
-                onClick={handleNavClick}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all border-l-4",
-                    isActive
-                      ? "bg-primary/15 text-primary border-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent hover:border-sidebar-accent"
-                  )
-                }
-              >
-                <Monitor className="h-4 w-4" />
-                TV Boards
-              </NavLink>
+              
+              {canView("menu_tv_board_admin") && (
+                <NavLink
+                  to="/admin/tv-boards"
+                  onClick={handleNavClick}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all border-l-4",
+                      isActive
+                        ? "bg-primary/15 text-primary border-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent hover:border-sidebar-accent"
+                    )
+                  }
+                >
+                  <Monitor className="h-4 w-4" />
+                  TV Boards
+                </NavLink>
+              )}
+
+              {canView("menu_dashboard_settings") && (
+                <NavLink
+                  to="/dashboards/settings"
+                  onClick={handleNavClick}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all border-l-4",
+                      isActive
+                        ? "bg-primary/15 text-primary border-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent hover:border-sidebar-accent"
+                    )
+                  }
+                >
+                  <Settings className="h-4 w-4" />
+                  Indstillinger
+                </NavLink>
+              )}
             </>
           )}
         </nav>
