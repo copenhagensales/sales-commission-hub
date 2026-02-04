@@ -172,6 +172,42 @@ export function ClientDBTab() {
     },
   });
 
+  // Fetch Stab team expenses (administrative costs)
+  const STAB_TEAM_ID = "09012ce9-e307-4f6d-a51e-f72af7200d74";
+  const { data: stabExpenses } = useQuery({
+    queryKey: ["stab-expenses", periodStart.toISOString(), periodEnd.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_expenses")
+        .select("amount, expense_date, all_days, is_recurring")
+        .eq("team_id", STAB_TEAM_ID);
+      
+      if (error) throw error;
+      
+      // Calculate total Stab expenses for the period
+      // For recurring/all_days expenses, prorate to selected period
+      let totalStabExpenses = 0;
+      const daysInMonth = 30; // Simplified
+      const periodDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      for (const expense of data || []) {
+        if (expense.is_recurring || expense.all_days) {
+          // Prorate monthly expenses to selected period
+          const monthlyAmount = Number(expense.amount) || 0;
+          totalStabExpenses += (monthlyAmount / daysInMonth) * periodDays;
+        } else {
+          // Specific date expense - check if within period
+          const expenseDate = new Date(expense.expense_date);
+          if (expenseDate >= periodStart && expenseDate <= periodEnd) {
+            totalStabExpenses += Number(expense.amount) || 0;
+          }
+        }
+      }
+      
+      return totalStabExpenses;
+    },
+  });
+
   // Fetch team salary info (leaders and assistants)
   const { data: teamSalaries } = useQuery({
     queryKey: ["team-salaries-for-client-db"],
@@ -497,8 +533,11 @@ export function ClientDBTab() {
 
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
+  // Calculate totals and final earnings
+  const stabExpenseAmount = stabExpenses || 0;
+  
   const totals = useMemo(() => {
-    return clientDBData.reduce(
+    const base = clientDBData.reduce(
       (acc, c) => ({
         sales: acc.sales + c.sales,
         revenue: acc.revenue + c.revenue,
@@ -510,7 +549,13 @@ export function ClientDBTab() {
       }),
       { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, finalDB: 0 }
     );
-  }, [clientDBData]);
+    
+    return {
+      ...base,
+      stabExpenses: stabExpenseAmount,
+      netEarnings: base.finalDB - stabExpenseAmount,
+    };
+  }, [clientDBData, stabExpenseAmount]);
 
   return (
     <div className="space-y-4">
@@ -652,8 +697,9 @@ export function ClientDBTab() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {/* Subtotal - Teams DB */}
                     <TableRow className="bg-muted/50 font-medium">
-                      <TableCell>Total</TableCell>
+                      <TableCell>Samlet Team DB</TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right">{totals.sales}</TableCell>
                       <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
@@ -677,6 +723,43 @@ export function ClientDBTab() {
                         )}
                       >
                         {formatCurrency(totals.finalDB)}
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Stab expenses row */}
+                    <TableRow className="border-t-2">
+                      <TableCell className="font-medium">Stab-udgifter</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right text-destructive font-medium">
+                        -{formatCurrency(totals.stabExpenses)}
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Net earnings - final row */}
+                    <TableRow className="bg-primary/10 font-bold border-t-2">
+                      <TableCell>Samlet Indtjening</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell 
+                        className={cn(
+                          "text-right font-bold text-lg",
+                          totals.netEarnings >= 0 ? "text-primary" : "text-destructive"
+                        )}
+                      >
+                        {formatCurrency(totals.netEarnings)}
                       </TableCell>
                     </TableRow>
                   </>
