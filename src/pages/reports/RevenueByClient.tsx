@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -13,6 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Hard-coded whitelist - ONLY these users can access this report
+const ALLOWED_EMAILS = ["km@copenhagensales.dk", "mg@copenhagensales.dk"];
 
 type PeriodType = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "custom";
 
@@ -33,10 +38,15 @@ interface ClientPieData {
 }
 
 export default function RevenueByClient() {
+  const { user, loading: authLoading } = useAuth();
   const [period, setPeriod] = useState<PeriodType>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
+
+  // Hard-coded access control
+  const userEmail = user?.email?.toLowerCase() || "";
+  const hasAccess = ALLOWED_EMAILS.includes(userEmail);
 
   // Calculate date range based on period selection
   const { startDate, endDate } = useMemo(() => {
@@ -331,6 +341,21 @@ export default function RevenueByClient() {
     }
     return `${value.toLocaleString("da-DK")} kr`;
   };
+
+  // Access control check AFTER all hooks
+  if (authLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!hasAccess) {
+    return <Navigate to="/home" replace />;
+  }
 
   return (
     <MainLayout>

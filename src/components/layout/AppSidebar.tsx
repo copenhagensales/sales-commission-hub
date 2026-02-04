@@ -941,7 +941,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.codeOfConductAdmin")}
                   </NavLink>
                 )}
-                {p.canView("menu_reports_revenue_by_client") && (
+                {/* Hard-coded access: only km@ and mg@ can see this menu item */}
+                {p.canView("menu_reports_revenue_by_client") && 
+                 ["km@copenhagensales.dk", "mg@copenhagensales.dk"].includes(user?.email?.toLowerCase() || "") && (
                   <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/reports/revenue-by-client" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
