@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -41,16 +42,21 @@ export function CombinedSalaryTab() {
         .select("employee_id, agent_id, agents(email, external_dialer_id)")
         .in("employee_id", employeeIds);
 
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select(`
-          id,
-          quantity,
-          mapped_commission,
-          sales!inner(sale_datetime, agent_email, agent_external_id)
-        `)
-        .gte("sales.sale_datetime", monthStart.toISOString())
-        .lte("sales.sale_datetime", monthEnd.toISOString());
+      // Use paginated fetch to bypass 1000-row limit
+      const saleItems = await fetchAllRows<{
+        id: string;
+        quantity: number;
+        mapped_commission: number;
+        sales: { sale_datetime: string; agent_email: string; agent_external_id: string };
+      }>(
+        "sale_items",
+        "id, quantity, mapped_commission, sales!inner(sale_datetime, agent_email, agent_external_id)",
+        (query) =>
+          query
+            .gte("sales.sale_datetime", monthStart.toISOString())
+            .lte("sales.sale_datetime", monthEnd.toISOString()),
+        { orderBy: "id", ascending: true }
+      );
 
       employees?.forEach(emp => {
         const empAgents = agentMappings?.filter(am => am.employee_id === emp.id) || [];

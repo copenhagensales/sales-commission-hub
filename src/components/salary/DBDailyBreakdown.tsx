@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -45,23 +46,22 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
       const agentEmails = agentMappings?.map(a => (a.agents as any)?.email?.toLowerCase()).filter(Boolean) || [];
       const agentExtIds = agentMappings?.map(a => (a.agents as any)?.external_dialer_id).filter(Boolean) || [];
 
-      // Get sale items for the period
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select(`
-          id,
-          quantity,
-          mapped_commission,
-          mapped_revenue,
-          sales!inner(
-            id,
-            sale_datetime,
-            agent_email,
-            agent_external_id
-          )
-        `)
-        .gte("sales.sale_datetime", periodStart.toISOString())
-        .lte("sales.sale_datetime", periodEnd.toISOString());
+      // Get sale items for the period with pagination to bypass 1000-row limit
+      const saleItems = await fetchAllRows<{
+        id: string;
+        quantity: number;
+        mapped_commission: number;
+        mapped_revenue: number;
+        sales: { id: string; sale_datetime: string; agent_email: string; agent_external_id: string };
+      }>(
+        "sale_items",
+        "id, quantity, mapped_commission, mapped_revenue, sales!inner(id, sale_datetime, agent_email, agent_external_id)",
+        (query) =>
+          query
+            .gte("sales.sale_datetime", periodStart.toISOString())
+            .lte("sales.sale_datetime", periodEnd.toISOString()),
+        { orderBy: "id", ascending: true }
+      );
 
       // Filter to team sales
       const teamSales = saleItems?.filter(si => {
