@@ -92,9 +92,17 @@ export async function syncIntegration(
         log("INFO", `Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
       }
 
+      // Sort sales by date DESCENDING (newest first) before applying limit
+      // This ensures today's sales are always processed first, regardless of backlog size
+      sales.sort((a, b) => {
+        const dateA = new Date(a.saleDate || a.date || 0).getTime();
+        const dateB = new Date(b.saleDate || b.date || 0).getTime();
+        return dateB - dateA; // Newest first
+      });
+
       // Apply max records limit to prevent CPU timeout
       if (maxRecords && sales.length > maxRecords) {
-        log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} to prevent timeout`);
+        log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} (keeping newest)`);
         sales = sales.slice(0, maxRecords);
       }
 

@@ -30,8 +30,8 @@ serve(async (req) => {
     const body = await req.json();
     const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to, maxRecords } = body;
     
-    // AGGRESSIVE limits to prevent CPU timeout - reduced from 50 to 25
-    const effectiveMaxRecords = maxRecords ?? 25;
+    // Balanced limit: 50 records per sync to handle backlog while preventing CPU timeout
+    const effectiveMaxRecords = maxRecords ?? 50;
 
     const supabase = getSupabase();
 
