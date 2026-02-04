@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/utils/supabasePagination";
+import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -41,8 +41,17 @@ export function DBOverviewTab() {
     setPeriodEnd(end);
   };
 
-  const { data: teamsDB, isLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db", periodStart.toISOString(), periodEnd.toISOString()],
+  // Get aggregated sales data from central hook
+  const { byEmployee: aggregatesByEmployee, isLoading: aggregatesLoading } = useTeamDBStats(
+    periodStart,
+    periodEnd,
+    undefined, // No specific team - we want all teams
+    undefined,
+    true
+  );
+
+  const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
+    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async (): Promise<TeamDB[]> => {
       // Get all teams with leaders and assistants
       const { data: teams, error: teamsError } = await (supabase
@@ -88,29 +97,7 @@ export function DBOverviewTab() {
         .from("team_members")
         .select("team_id, employee_id");
 
-      // Get agent mappings
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(email, external_dialer_id)");
-
-      // Get sale items for the period with pagination to bypass 1000-row limit
-      const saleItems = await fetchAllRows<{
-        id: string;
-        quantity: number;
-        mapped_commission: number;
-        mapped_revenue: number;
-        sales: { id: string; sale_datetime: string; agent_email: string; agent_external_id: string };
-      }>(
-        "sale_items",
-        "id, quantity, mapped_commission, mapped_revenue, sales!inner(id, sale_datetime, agent_email, agent_external_id)",
-        (query) =>
-          query
-            .gte("sales.sale_datetime", periodStart.toISOString())
-            .lte("sales.sale_datetime", periodEnd.toISOString()),
-        { orderBy: "id", ascending: true }
-      );
-
-      // Calculate DB for each team
+      // Calculate DB for each team using aggregated data
       const teamsWithDB: TeamDB[] = (teams || []).map((team: any) => {
         // Team expenses
         const teamExpenses = expenses?.filter(e => e.team_id === team.id) || [];
@@ -120,20 +107,17 @@ export function DBOverviewTab() {
         const members = teamMembers?.filter(m => m.team_id === team.id) || [];
         const memberIds = members.map(m => m.employee_id);
 
-        // Agent info for team members
-        const memberAgents = agentMappings?.filter(am => memberIds.includes(am.employee_id)) || [];
-        const agentEmails = memberAgents.map(a => (a.agents as any)?.email?.toLowerCase()).filter(Boolean);
-        const agentExtIds = memberAgents.map(a => (a.agents as any)?.external_dialer_id).filter(Boolean);
-
-        // Sales for team
-        const teamSales = saleItems?.filter(si => {
-          const email = (si.sales as any)?.agent_email?.toLowerCase();
-          const extId = (si.sales as any)?.agent_external_id;
-          return agentEmails.includes(email) || agentExtIds.includes(extId);
-        }) || [];
-
-        const revenue = teamSales.reduce((sum, si) => sum + (Number(si.mapped_revenue) || 0) * (si.quantity || 1), 0);
-        const sellerSalaryCosts = teamSales.reduce((sum, si) => sum + (Number(si.mapped_commission) || 0) * (si.quantity || 1), 0);
+        // Sum revenue and commission from aggregated data for team members
+        let revenue = 0;
+        let sellerSalaryCosts = 0;
+        
+        for (const employeeId of memberIds) {
+          const employeeData = aggregatesByEmployee[employeeId];
+          if (employeeData) {
+            revenue += employeeData.revenue;
+            sellerSalaryCosts += employeeData.commission;
+          }
+        }
 
         // Leader salary calculation
         const leaderSalary = leaderSalaries?.find(ps => ps.employee_id === team.team_leader_id);
@@ -175,7 +159,10 @@ export function DBOverviewTab() {
 
       return teamsWithDB.sort((a, b) => b.db - a.db);
     },
+    enabled: !aggregatesLoading && Object.keys(aggregatesByEmployee).length >= 0,
   });
+
+  const isLoading = teamsLoading || aggregatesLoading;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
