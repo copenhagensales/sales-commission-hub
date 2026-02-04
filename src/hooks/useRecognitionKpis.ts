@@ -19,7 +19,75 @@ interface RecognitionData {
   lastWeek: WeekRecognition;
 }
 
+/**
+ * Fetch recognition data using central aggregates RPC with grouping.
+ * Falls back to manual aggregation if RPC fails.
+ */
 async function fetchWeekRecognition(weekStart: Date, weekEnd: Date): Promise<WeekRecognition> {
+  const startStr = weekStart.toISOString();
+  const endStr = weekEnd.toISOString();
+
+  try {
+    // Try RPC with 'both' grouping (employee + date)
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_sales_aggregates_v2", {
+      p_start: startStr,
+      p_end: endStr,
+      p_group_by: "both",
+    });
+
+    if (!rpcError && rpcData && rpcData.length > 0) {
+      // Aggregate by employee (weekly totals)
+      const employeeTotals: Record<string, { name: string; commission: number }> = {};
+      // Track best day per entry
+      const dailyEntries: Array<{ name: string; commission: number; date: string }> = [];
+
+      for (const row of rpcData) {
+        // group_key format: "email|YYYY-MM-DD"
+        const [email, date] = (row.group_key || "").split("|");
+        const name = row.group_name || email?.split("@")[0] || "Ukendt";
+        const commission = Number(row.total_commission) || 0;
+
+        // Sum weekly totals per employee
+        if (!employeeTotals[email]) {
+          employeeTotals[email] = { name, commission: 0 };
+        }
+        employeeTotals[email].commission += commission;
+
+        // Track daily entries for best day
+        if (date && commission > 0) {
+          dailyEntries.push({ name, commission, date });
+        }
+      }
+
+      // Find top weekly performer
+      const topWeeklyEntry = Object.values(employeeTotals)
+        .filter((e) => e.commission > 0)
+        .sort((a, b) => b.commission - a.commission)[0];
+
+      const topWeekly: RecognitionPerson | null = topWeeklyEntry
+        ? { name: topWeeklyEntry.name, commission: topWeeklyEntry.commission, team: null }
+        : null;
+
+      // Find best single day
+      const bestDayEntry = dailyEntries.sort((a, b) => b.commission - a.commission)[0];
+      const bestDay: RecognitionPerson | null = bestDayEntry
+        ? { name: bestDayEntry.name, commission: bestDayEntry.commission, team: null, date: bestDayEntry.date }
+        : null;
+
+      return { topWeekly, bestDay };
+    }
+  } catch {
+    // RPC failed, fall back to manual aggregation
+  }
+
+  // Fallback: manual aggregation
+  return fetchWeekRecognitionFallback(weekStart, weekEnd);
+}
+
+/**
+ * Fallback method using direct queries when RPC is unavailable.
+ */
+async function fetchWeekRecognitionFallback(weekStart: Date, weekEnd: Date): Promise<WeekRecognition> {
   const startStr = format(weekStart, "yyyy-MM-dd'T'00:00:00");
   const endStr = format(weekEnd, "yyyy-MM-dd'T'23:59:59");
 
