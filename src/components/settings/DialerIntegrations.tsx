@@ -369,7 +369,7 @@ export function DialerIntegrations() {
     },
   });
 
-  // Trigger Sync - uses integration_id, provider is fetched from DB by integration-engine
+  // Trigger Sync - uses background mode to avoid CPU timeout
   const syncMutation = useMutation({
     mutationFn: async ({ integrationId, dialerName, days }: { integrationId: string; dialerName: string; days: number }) => {
       setSyncingId(integrationId);
@@ -378,6 +378,7 @@ export function DialerIntegrations() {
           integration_id: integrationId,
           action: "sync",
           days,
+          background: true, // Run in background to avoid CPU timeout
         },
       });
 
@@ -385,10 +386,16 @@ export function DialerIntegrations() {
       return { ...data, dialerName };
     },
     onSuccess: (data) => {
-      const salesCount = data.results?.[0]?.data?.sales?.processed || 0;
-      toast.success(`${data.dialerName}: Synkronisering gennemført`, {
-        description: `${salesCount} salg behandlet`,
-      });
+      if (data.background) {
+        toast.success(`${data.dialerName}: Synkronisering startet i baggrunden`, {
+          description: "Tjek logs for fremdrift",
+        });
+      } else {
+        const salesCount = data.results?.[0]?.data?.sales?.processed || 0;
+        toast.success(`${data.dialerName}: Synkronisering gennemført`, {
+          description: `${salesCount} salg behandlet`,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
     },
     onError: (error) => {
@@ -399,7 +406,7 @@ export function DialerIntegrations() {
     },
   });
 
-  // Fetch Calls - uses integration_id only, provider is resolved by integration-engine
+  // Fetch Calls - uses background mode to avoid CPU timeout
   const fetchCallsMutation = useMutation({
     mutationFn: async ({ integrationId, dialerName, days }: { integrationId: string; dialerName: string; days: number }) => {
       setFetchingCallsId(integrationId);
@@ -408,6 +415,7 @@ export function DialerIntegrations() {
           integration_id: integrationId,
           actions: ["calls"],
           days,
+          background: true, // Run in background to avoid CPU timeout
         },
       });
 
@@ -415,10 +423,16 @@ export function DialerIntegrations() {
       return { ...data, dialerName };
     },
     onSuccess: (data) => {
-      const callsResult = data.results?.[0]?.data?.calls || {};
-      toast.success(`${data.dialerName}: Calls hentet`, {
-        description: `${callsResult.processed || 0} calls (${callsResult.matched || 0} matched)`,
-      });
+      if (data.background) {
+        toast.success(`${data.dialerName}: Henter calls i baggrunden`, {
+          description: "Tjek logs for fremdrift",
+        });
+      } else {
+        const callsResult = data.results?.[0]?.data?.calls || {};
+        toast.success(`${data.dialerName}: Calls hentet`, {
+          description: `${callsResult.processed || 0} calls (${callsResult.matched || 0} matched)`,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["dialer-calls-by-agent"] });
     },
     onError: (error) => {
