@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,9 +27,9 @@ interface ClientRevenueData {
   avgRevenue: number;
 }
 
-interface DailyClientRevenue {
-  date: string;
-  [clientName: string]: string | number;
+interface ClientPieData {
+  name: string;
+  value: number;
 }
 
 export default function RevenueByClient() {
@@ -301,38 +301,14 @@ export default function RevenueByClient() {
     return clientSummary.reduce((sum, c) => sum + c.totalEarnings, 0);
   }, [clientSummary]);
 
-  // Build chart data - daily revenue per client
-  const chartData: DailyClientRevenue[] = useMemo(() => {
-    if (!revenueData) return [];
-    
-    const { revenueByClientAndDate, clientNames } = revenueData;
-    const allDates = new Set<string>();
-    
-    Object.values(revenueByClientAndDate).forEach((dates) => {
-      Object.keys(dates).forEach((date) => allDates.add(date));
-    });
+  // Build pie chart data - total revenue per client
+  const pieChartData: ClientPieData[] = useMemo(() => {
+    return clientSummary.map((client) => ({
+      name: client.clientName,
+      value: client.totalRevenue,
+    }));
+  }, [clientSummary]);
 
-    const sortedDates = Array.from(allDates).sort();
-    
-    return sortedDates.map((date) => {
-      const entry: DailyClientRevenue = { 
-        date: format(parseISO(date), "dd/MM", { locale: da }) 
-      };
-      
-      Object.entries(revenueByClientAndDate).forEach(([clientId, dates]) => {
-        const clientName = clientNames[clientId] || "Ukendt";
-        entry[clientName] = dates[date]?.revenue || 0;
-      });
-      
-      return entry;
-    });
-  }, [revenueData]);
-
-  // Get unique client names for chart colors
-  const clientNamesForChart = useMemo(() => {
-    if (!revenueData) return [];
-    return Object.values(revenueData.clientNames);
-  }, [revenueData]);
 
   // Chart colors
   const CHART_COLORS = [
@@ -482,59 +458,7 @@ export default function RevenueByClient() {
               </Card>
             </div>
 
-            {/* Chart */}
-            {chartData.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Omsætning per dag og klient
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                        <XAxis 
-                          dataKey="date" 
-                          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(v) => `${Math.round(v / 1000)}k`}
-                          width={50}
-                        />
-                        <Tooltip 
-                          formatter={(value: number, name: string) => [`${value.toLocaleString('da-DK')} kr`, name]}
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                        />
-                        <Legend />
-                        {clientNamesForChart.map((clientName, index) => (
-                          <Bar
-                            key={clientName}
-                            dataKey={clientName}
-                            stackId="a"
-                            fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            radius={index === clientNamesForChart.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                          />
-                        ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Table */}
+            {/* Table - Now first */}
             <Card>
               <CardHeader>
                 <CardTitle>Omsætning per klient</CardTitle>
@@ -585,6 +509,50 @@ export default function RevenueByClient() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Pie Chart - Now below table */}
+            {pieChartData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Omsætning per klient
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieChartData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={150}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        >
+                          {pieChartData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number) => [`${value.toLocaleString('da-DK')} kr`, 'Omsætning']}
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                          }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>
