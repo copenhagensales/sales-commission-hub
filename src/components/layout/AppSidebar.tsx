@@ -476,7 +476,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <Button 
                     variant="outline" 
                     size="icon" 
-                    onClick={() => navigate("/dashboards")}
+                    onClick={() => navigate("/dashboards/cph-sales")}
                     className="h-9 w-9 shrink-0 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border"
                   >
                     <LayoutDashboard className="h-4 w-4" />
