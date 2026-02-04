@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,8 @@ export default function RevenueByClient() {
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
+  const [deductionPercents, setDeductionPercents] = useState<Record<string, number>>({});
+  const [cancellationPercents, setCancellationPercents] = useState<Record<string, number>>({});
 
   // Hard-coded access control
   const userEmail = user?.email?.toLowerCase() || "";
@@ -496,6 +499,8 @@ export default function RevenueByClient() {
                       <TableHead className="text-right">Antal salg</TableHead>
                       <TableHead className="text-right">Total omsætning</TableHead>
                       <TableHead className="text-right">Provision + feriepenge</TableHead>
+                      <TableHead className="text-right w-24">Fradrag %</TableHead>
+                      <TableHead className="text-right w-24">Annullering %</TableHead>
                       <TableHead className="text-right">Indtjening</TableHead>
                       <TableHead className="text-right">Gns. per salg</TableHead>
                     </TableRow>
@@ -503,13 +508,19 @@ export default function RevenueByClient() {
                   <TableBody>
                     {clientSummary.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                           Ingen data for den valgte periode
                         </TableCell>
                       </TableRow>
                     ) : (
                       clientSummary.map((client) => {
                         const totalLaborCost = client.totalCommission + client.totalVacationPay;
+                        const deductionPct = deductionPercents[client.clientId] || 0;
+                        const cancellationPct = cancellationPercents[client.clientId] || 0;
+                        const deductionAmount = client.totalRevenue * (deductionPct / 100);
+                        const cancellationAmount = client.totalRevenue * (cancellationPct / 100);
+                        const adjustedEarnings = client.totalEarnings - deductionAmount - cancellationAmount;
+                        
                         return (
                           <TableRow key={client.clientId}>
                             <TableCell className="font-medium">{client.clientName}</TableCell>
@@ -520,8 +531,38 @@ export default function RevenueByClient() {
                             <TableCell className="text-right text-muted-foreground">
                               {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
                             </TableCell>
-                            <TableCell className={`text-right font-medium ${client.totalEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>
-                              {Math.round(client.totalEarnings).toLocaleString("da-DK")} kr
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                className="w-20 text-right h-8"
+                                placeholder="0"
+                                value={deductionPercents[client.clientId] || ""}
+                                onChange={(e) => setDeductionPercents(prev => ({
+                                  ...prev,
+                                  [client.clientId]: parseFloat(e.target.value) || 0
+                                }))}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                className="w-20 text-right h-8"
+                                placeholder="0"
+                                value={cancellationPercents[client.clientId] || ""}
+                                onChange={(e) => setCancellationPercents(prev => ({
+                                  ...prev,
+                                  [client.clientId]: parseFloat(e.target.value) || 0
+                                }))}
+                              />
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${adjustedEarnings >= 0 ? 'text-blue-500' : 'text-destructive'}`}>
+                              {Math.round(adjustedEarnings).toLocaleString("da-DK")} kr
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {Math.round(client.avgRevenue).toLocaleString("da-DK")} kr
