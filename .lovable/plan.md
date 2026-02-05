@@ -1,97 +1,114 @@
 
+# Tilføj Slet Kontrakt Funktion for Ejere
 
-# Opsætning af Frontend Test Konfiguration
+## Oversigt
+Giver ejere mulighed for at slette kontrakter direkte fra medarbejderens detaljeside. Dette er nyttigt for at fjerne fejlagtige eller forældede kontrakter.
 
-## Problem
-Projektet har unit tests i `src/lib/calculations/` men mangler den nødvendige infrastruktur til at køre dem:
+## Nuværende Tilstand
+- RLS-politikker tillader allerede ejere at slette kontrakter via `is_owner(auth.uid())`
+- Contracts.tsx har slet-funktionalitet, men kun for ikke-underskrevne kontrakter
+- EmployeeDetail.tsx viser kontrakter men har ingen slet-mulighed
+- `isOwner` beregnes i usePermissions men eksporteres ikke
 
-- ❌ Ingen `vitest.config.ts` konfigurationsfil
-- ❌ Ingen `test` script i `package.json`
-- ❌ Ingen `src/test/setup.ts` setup fil
-- ❌ `tsconfig.app.json` mangler `vitest/globals` types
+## Implementeringsplan
 
-## Løsning
+### Step 1: Eksportér isOwner fra usePermissions
+Tilføj `isOwner` til return-objektet så komponenter kan tjekke ejer-status.
 
-### Step 1: Opret vitest.config.ts
+**Fil:** `src/hooks/usePositionPermissions.ts`
+
+### Step 2: Tilføj Slet-funktionalitet til EmployeeDetail
+Opdater kontrakt-sektionen i EmployeeDetail.tsx:
+
+1. **Import:** Tilføj `Trash2` ikon og `AlertDialog` komponenter
+2. **State:** Tilføj `deleteContractId` state til at holde styr på hvilken kontrakt der skal slettes
+3. **Mutation:** Tilføj `useMutation` til at slette kontrakter (sletter først signaturer, derefter kontrakten)
+4. **UI:** Tilføj slet-knap ved siden af hver kontrakt (kun synlig for ejere)
+5. **Dialog:** Tilføj bekræftelsesdialog før sletning
+
+**Fil:** `src/pages/EmployeeDetail.tsx`
+
+## UI Design
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  📄 Salgskonsulent kontrakt                                     │
+│  Sendt 12. jan. 2026                                           │
+│                                              [Afventer] [🗑️]   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+- Slet-knappen vises kun for ejere
+- Klikker man på slet-knappen åbnes en bekræftelsesdialog
+- Bekræftelsesdialog advarer om at handlingen ikke kan fortrydes
+
+## Bekræftelsesdialog
+
+```text
+┌────────────────────────────────────────┐
+│  Slet kontrakt?                        │
+│                                        │
+│  Er du sikker på at du vil slette      │
+│  denne kontrakt? Handlingen kan ikke   │
+│  fortrydes.                            │
+│                                        │
+│           [Annuller] [Slet]            │
+└────────────────────────────────────────┘
+```
+
+## Tekniske Detaljer
+
+### usePermissions ændring
 ```typescript
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
+return {
+  // ... eksisterende exports
+  isOwner, // NY - tjekker om bruger er ejer
+};
+```
 
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+### Slet-mutation i EmployeeDetail
+```typescript
+const deleteContractMutation = useMutation({
+  mutationFn: async (id: string) => {
+    // Slet signaturer først (foreign key)
+    await supabase
+      .from("contract_signatures")
+      .delete()
+      .eq("contract_id", id);
+    
+    // Derefter slet kontrakt
+    const { error } = await supabase
+      .from("contracts")
+      .delete()
+      .eq("id", id);
+    
+    if (error) throw error;
   },
-  resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
-  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ 
+      queryKey: ["employee-contracts", id] 
+    });
+    toast({ title: "Kontrakt slettet" });
+  }
 });
 ```
 
-### Step 2: Opret src/test/setup.ts
-```typescript
-import "@testing-library/jest-dom";
+## Berørte Filer
 
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: (query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => {},
-  }),
-});
-```
+| Fil | Ændring |
+|-----|---------|
+| `src/hooks/usePositionPermissions.ts` | Eksportér `isOwner` |
+| `src/pages/EmployeeDetail.tsx` | Tilføj slet-knap, dialog og mutation |
 
-### Step 3: Tilføj test script til package.json
-```json
-"scripts": {
-  "test": "vitest run",
-  "test:watch": "vitest"
-}
-```
+## Sikkerhed
+- RLS-politik `is_owner(auth.uid())` sikrer at kun ejere kan slette kontrakter på database-niveau
+- Frontend-tjek med `isOwner` skjuler knappen for ikke-ejere
+- Bekræftelsesdialog forhindrer utilsigtede sletninger
 
-### Step 4: Opdater tsconfig.app.json
-Tilføj `"vitest/globals"` til `types` array i `compilerOptions`.
-
-### Step 5: Tilføj test dependencies (devDependencies)
-```json
-"@testing-library/jest-dom": "^6.6.0",
-"@testing-library/react": "^16.0.0",
-"jsdom": "^20.0.3"
-```
-
----
-
-## Eksisterende Tests der vil blive kørt
-
-| Fil | Antal Tests | Beskrivelse |
-|-----|-------------|-------------|
-| `hours.test.ts` | ~25 | Break-logik, shift-beregninger, timestamp parsing |
-| `vacation-pay.test.ts` | ~11 | Feriepenge rates og beregninger |
-
----
-
-## Forventet Resultat
-Efter implementering kan tests køres med:
-```bash
-npm run test
-```
-
-Output:
-```
-✓ src/lib/calculations/hours.test.ts (25 tests)
-✓ src/lib/calculations/vacation-pay.test.ts (11 tests)
-
-Test Files  2 passed
-Tests       36 passed
-```
-
+## Test
+1. Log ind som ejer
+2. Gå til en medarbejders detaljeside
+3. Klik på "Kontrakter" tab
+4. Verificér at slet-knappen vises ved hver kontrakt
+5. Klik slet og bekræft i dialogen
+6. Verificér at kontrakten forsvinder fra listen
