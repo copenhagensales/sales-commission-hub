@@ -8,7 +8,8 @@
 | Fase 1: Shared Edge Function Modules | ✅ Komplet |
 | Fase 2: Frontend Utility Library | ✅ Komplet |
 | Fase 3: Migration af Edge Functions | ✅ Komplet |
-| **Fase 4: Migration af Frontend Komponenter** | ✅ Komplet |
+| Fase 4: Migration af Frontend Komponenter | ✅ Komplet |
+| **Test og Verifikation** | ✅ Komplet |
 
 ---
 
@@ -48,6 +49,14 @@ Ikke implementeret i denne fase. Kan migreres inkrementelt i fremtiden.
 
 ---
 
+## Test og Verifikation ✅
+
+36 unit tests bestået:
+- `vacation-pay.test.ts`: 9 tests (rates, getVacationPayRate, calculateVacationPay)
+- `hours.test.ts`: 27 tests (shift beregning, pauser, overnight, timestamps)
+
+---
+
 ## Resultat
 
 | Metrik | Før | Efter |
@@ -56,6 +65,7 @@ Ikke implementeret i denne fase. Kan migreres inkrementelt i fremtiden.
 | calculateHoursFromShift() | 2 kopier | 1 central (`hours.ts`) |
 | Edge Function pricing logic | 4+ kopier | 1 central (`pricing-service.ts`) |
 | Vedligeholdelse | Ændringer i mange filer | Ændringer ét sted |
+| Unit tests | 0 | 36 |
 
 ---
 
