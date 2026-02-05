@@ -6573,6 +6573,7 @@ export type Database = {
           created_at: string
           employee_id: string
           hourly_rate: number | null
+          hours_source: string | null
           id: string
           is_active: boolean | null
           minimum_salary: number | null
@@ -6587,6 +6588,7 @@ export type Database = {
           created_at?: string
           employee_id: string
           hourly_rate?: number | null
+          hours_source?: string | null
           id?: string
           is_active?: boolean | null
           minimum_salary?: number | null
@@ -6601,6 +6603,7 @@ export type Database = {
           created_at?: string
           employee_id?: string
           hourly_rate?: number | null
+          hours_source?: string | null
           id?: string
           is_active?: boolean | null
           minimum_salary?: number | null
