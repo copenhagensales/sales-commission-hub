@@ -10,9 +10,19 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
@@ -77,7 +87,7 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canEditEmployees, hasPermission, canSendEmployeeSms } = usePermissions();
+  const { canEditEmployees, hasPermission, canSendEmployeeSms, isOwner } = usePermissions();
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
@@ -86,6 +96,7 @@ export default function EmployeeDetail() {
   const [newPassword, setNewPassword] = useState("");
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -393,6 +404,34 @@ export default function EmployeeDetail() {
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete contract mutation (owner only)
+  const deleteContractMutation = useMutation({
+    mutationFn: async (contractId: string) => {
+      // Delete signatures first (foreign key constraint)
+      const { error: sigError } = await supabase
+        .from("contract_signatures")
+        .delete()
+        .eq("contract_id", contractId);
+      if (sigError) throw sigError;
+      
+      // Then delete the contract
+      const { error } = await supabase
+        .from("contracts")
+        .delete()
+        .eq("id", contractId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-contracts", id] });
+      toast({ title: "Kontrakt slettet" });
+      setDeleteContractId(null);
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved sletning", description: error.message, variant: "destructive" });
+      setDeleteContractId(null);
     },
   });
 
@@ -1214,10 +1253,12 @@ export default function EmployeeDetail() {
                       return (
                         <div
                           key={contract.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                          onClick={() => navigate(`/contract/sign/${contract.id}`)}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex items-center gap-4">
+                          <div 
+                            className="flex items-center gap-4 flex-1 cursor-pointer"
+                            onClick={() => navigate(`/contract/sign/${contract.id}`)}
+                          >
                             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                               <FileText className="h-5 w-5 text-primary" />
                             </div>
@@ -1236,6 +1277,19 @@ export default function EmployeeDetail() {
                               <span className="text-xs text-muted-foreground">
                                 Underskrevet {format(new Date(employeeSignature.signed_at), "d. MMM yyyy", { locale: da })}
                               </span>
+                            )}
+                            {isOwner && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteContractId(contract.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -1344,6 +1398,28 @@ export default function EmployeeDetail() {
           onOpenChange={setSmsDialogOpen}
           employee={employee}
         />
+
+        {/* Delete Contract Confirmation Dialog - Owner only */}
+        <AlertDialog open={!!deleteContractId} onOpenChange={(open) => !open && setDeleteContractId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Slet kontrakt?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Er du sikker på at du vil slette denne kontrakt? Handlingen kan ikke fortrydes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deleteContractId && deleteContractMutation.mutate(deleteContractId)}
+                disabled={deleteContractMutation.isPending}
+              >
+                {deleteContractMutation.isPending ? "Sletter..." : "Slet"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

@@ -498,6 +498,7 @@ export function usePermissions() {
     isError,
     error,
     isPreviewMode,
+    isOwner, // True if current user has 'ejer' role - for owner-only features
     position: positionData,
     permissions,
     hasPermission,
