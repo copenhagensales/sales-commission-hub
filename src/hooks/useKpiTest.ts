@@ -256,17 +256,23 @@ async function testTotalCommission(start: Date, end: Date, clientId?: string): P
     }
   });
 
-  // === Fetch product campaign overrides ===
-  const { data: productCampaignOverrides } = await supabase
-    .from("product_campaign_overrides")
-    .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+  // === Fetch product pricing rules (replaces deprecated product_campaign_overrides) ===
+  const { data: productPricingRules } = await supabase
+    .from("product_pricing_rules")
+    .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk")
+    .eq("is_active", true);
   
   const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-  productCampaignOverrides?.forEach(o => {
-    const key = `${o.product_id}_${o.campaign_mapping_id}`;
-    campaignOverrideMap.set(key, {
-      commission: o.commission_dkk ?? 0,
-      revenue: o.revenue_dkk ?? 0
+  productPricingRules?.forEach(rule => {
+    const campaignIds = rule.campaign_mapping_ids || [];
+    campaignIds.forEach((campaignMappingId: string) => {
+      const key = `${rule.product_id}_${campaignMappingId}`;
+      if (!campaignOverrideMap.has(key)) {
+        campaignOverrideMap.set(key, {
+          commission: rule.commission_dkk ?? 0,
+          revenue: rule.revenue_dkk ?? 0
+        });
+      }
     });
   });
 
@@ -312,22 +318,24 @@ async function testTotalCommission(start: Date, end: Date, clientId?: string): P
     .from("products")
     .select("id, name, commission_dkk");
   
-  // Get campaign overrides - prefer highest commission
-  const { data: campaignOverrides } = await supabase
-    .from("product_campaign_overrides")
-    .select("product_id, commission_dkk");
+  // Get pricing rules for FM products - prefer highest commission by priority
+  const { data: fmPricingRules } = await supabase
+    .from("product_pricing_rules")
+    .select("product_id, commission_dkk")
+    .eq("is_active", true)
+    .order("priority", { ascending: false, nullsFirst: true });
   
   const overrideByProductId = new Map<string, number>();
-  campaignOverrides?.forEach(o => {
-    const existing = overrideByProductId.get(o.product_id);
-    if (!existing || (o.commission_dkk ?? 0) > existing) {
-      overrideByProductId.set(o.product_id, o.commission_dkk ?? 0);
+  fmPricingRules?.forEach(rule => {
+    if (!overrideByProductId.has(rule.product_id)) {
+      overrideByProductId.set(rule.product_id, rule.commission_dkk ?? 0);
     }
   });
   
   const productCommissionMap = new Map<string, number>();
   allProducts?.forEach(p => {
     if (p.name) {
+      // Use pricing rule if available, otherwise fallback to product base price
       const override = overrideByProductId.get(p.id);
       const commission = override ?? p.commission_dkk ?? 0;
       productCommissionMap.set(p.name.toLowerCase(), commission);
@@ -395,17 +403,23 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
     }
   });
 
-  // === Fetch product campaign overrides ===
-  const { data: productCampaignOverrides } = await supabase
-    .from("product_campaign_overrides")
-    .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+  // === Fetch product pricing rules (replaces deprecated product_campaign_overrides) ===
+  const { data: productPricingRules } = await supabase
+    .from("product_pricing_rules")
+    .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk")
+    .eq("is_active", true);
   
   const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-  productCampaignOverrides?.forEach(o => {
-    const key = `${o.product_id}_${o.campaign_mapping_id}`;
-    campaignOverrideMap.set(key, {
-      commission: o.commission_dkk ?? 0,
-      revenue: o.revenue_dkk ?? 0
+  productPricingRules?.forEach(rule => {
+    const campaignIds = rule.campaign_mapping_ids || [];
+    campaignIds.forEach((campaignMappingId: string) => {
+      const key = `${rule.product_id}_${campaignMappingId}`;
+      if (!campaignOverrideMap.has(key)) {
+        campaignOverrideMap.set(key, {
+          commission: rule.commission_dkk ?? 0,
+          revenue: rule.revenue_dkk ?? 0
+        });
+      }
     });
   });
 
@@ -450,21 +464,24 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
     .from("products")
     .select("id, name, revenue_dkk");
   
-  const { data: campaignOverrides } = await supabase
-    .from("product_campaign_overrides")
-    .select("product_id, revenue_dkk");
+  // Get pricing rules for FM products - prefer highest revenue by priority
+  const { data: fmPricingRules } = await supabase
+    .from("product_pricing_rules")
+    .select("product_id, revenue_dkk")
+    .eq("is_active", true)
+    .order("priority", { ascending: false, nullsFirst: true });
   
   const overrideByProductId = new Map<string, number>();
-  campaignOverrides?.forEach(o => {
-    const existing = overrideByProductId.get(o.product_id);
-    if (!existing || (o.revenue_dkk ?? 0) > existing) {
-      overrideByProductId.set(o.product_id, o.revenue_dkk ?? 0);
+  fmPricingRules?.forEach(rule => {
+    if (!overrideByProductId.has(rule.product_id)) {
+      overrideByProductId.set(rule.product_id, rule.revenue_dkk ?? 0);
     }
   });
   
   const productRevenueMap = new Map<string, number>();
   allProducts?.forEach(p => {
     if (p.name) {
+      // Use pricing rule if available, otherwise fallback to product base price
       const override = overrideByProductId.get(p.id);
       const revenue = override ?? p.revenue_dkk ?? 0;
       productRevenueMap.set(p.name.toLowerCase(), revenue);

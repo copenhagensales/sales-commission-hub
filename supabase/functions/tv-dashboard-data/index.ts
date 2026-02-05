@@ -2194,22 +2194,41 @@ async function handleCsTop20Data(
 
   const selectFields = "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // ============= FM PRICING MAP =============
-  // Build a map of product_name -> commission for fieldmarketing sales
+  // ============= FM PRICING MAP (Unified Pricing Service) =============
+  // Implements two-tier fallback: product_pricing_rules -> products.commission_dkk
+  // This ensures FM products (like Yousee) that don't have pricing rules still get their pricing
   const fmPricingMap = new Map<string, number>();
-  const { data: pricingRules } = await supabase
-    .from("product_pricing_rules")
-    .select(`product:products!inner(name), commission_dkk`)
-    .eq("is_active", true)
-    .order("commission_dkk", { ascending: false, nullsFirst: false });
+  
+  // 1. Load ALL products with base prices FIRST (fallback)
+  const { data: allProducts } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk");
 
-  for (const rule of pricingRules || []) {
-    const key = (rule.product as any)?.name?.toLowerCase();
-    if (key && !fmPricingMap.has(key)) {
-      fmPricingMap.set(key, rule.commission_dkk || 0);
+  for (const product of allProducts || []) {
+    const key = product.name?.toLowerCase();
+    if (key && product.commission_dkk !== null) {
+      fmPricingMap.set(key, product.commission_dkk || 0);
     }
   }
-  console.log(`[CsTop20Data] Loaded ${fmPricingMap.size} FM pricing rules`);
+  console.log(`[CsTop20Data] Loaded ${fmPricingMap.size} products with base prices`);
+
+  // 2. Override with active pricing rules (higher priority)
+  const { data: pricingRules } = await supabase
+    .from("product_pricing_rules")
+    .select(`product:products!inner(name), commission_dkk, priority`)
+    .eq("is_active", true)
+    .order("priority", { ascending: false, nullsFirst: true });
+
+  const rulesApplied = new Set<string>();
+  for (const rule of pricingRules || []) {
+    const key = (rule.product as any)?.name?.toLowerCase();
+    if (key && !rulesApplied.has(key)) {
+      fmPricingMap.set(key, rule.commission_dkk || 0);
+      rulesApplied.add(key);
+    }
+  }
+  console.log(`[CsTop20Data] Applied ${rulesApplied.size} pricing rules. Final map size: ${fmPricingMap.size}`);
+
 
   // ============= FETCH FM EMPLOYEE DATA =============
   // Get all FM employees (seller_id -> employee data)

@@ -73,15 +73,23 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         campaignIdToMappingId.set(m.adversus_campaign_id, m.id);
       });
 
-      // Get product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, revenue_dkk");
+      // Get product pricing rules (replaces deprecated product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, revenue_dkk")
+        .eq("is_active", true);
       
+      // Build override map: product_id + campaign_mapping_id -> revenue
       const overrideMap = new Map<string, number>();
-      productCampaignOverrides?.forEach((o) => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        overrideMap.set(key, o.revenue_dkk ?? 0);
+      productPricingRules?.forEach((rule) => {
+        const campaignIds = rule.campaign_mapping_ids || [];
+        campaignIds.forEach((campaignMappingId: string) => {
+          const key = `${rule.product_id}_${campaignMappingId}`;
+          // Only set if not already set (first rule wins by priority from DB order)
+          if (!overrideMap.has(key)) {
+            overrideMap.set(key, rule.revenue_dkk ?? 0);
+          }
+        });
       });
 
       // Map sale_items to sales
