@@ -1,101 +1,94 @@
 
-
-# Plan: Opdater ClientDBTab til at bruge junction-tabellen for flere assistenter
+# Plan: Tilføj understøttelse af månedsløn for assistenter
 
 ## Problembeskrivelse
 
-`ClientDBTab.tsx` blev ikke opdateret da vi implementerede understøttelse af flere assisterende teamledere. Komponenten bruger stadig den gamle `teams.assistant_team_leader_id` kolonne, som kun understøtter én assistent.
+Johannes Hedebrink har en månedsløn på 40.000 kr, men `useAssistantHoursCalculation` behandler alle værdier som timelønninger. Dette betyder at hans løn beregnes forkert (40.000 kr × timer = astronomisk beløb).
 
-**Status i databasen:**
-- TDC Erhverv har nu **to** assistenter i junction-tabellen:
-  - Jeppe Buster Munk
-  - Johannes Hedebrink
+## Løsning
 
-**Status i koden:**
-- `ClientDBTab` henter kun `assistant_team_leader_id` fra `teams` tabellen
-- Kun én assistent beregnes per team
-- Jeppe Munks løn medregnes ikke i rapporten
+Tilføj samme logik som `useStaffHoursCalculation` bruger - med en tærskelværdi på 1.000 kr til at skelne mellem timeløn og månedsløn. For månedslønnede prorateres lønnen baseret på arbejdsdage i perioden.
 
----
+## Ændringer i useAssistantHoursCalculation.ts
 
-## Ændringer
-
-### 1. Import hook til junction-data
-
-Tilføj import af `useTeamAssistantLeaders` og hjælpefunktioner:
+### 1. Tilføj imports og konstant
 
 ```typescript
-import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
+import { startOfMonth, endOfMonth } from "date-fns";
+import { countWorkDaysInPeriod } from "@/lib/calculations";
+
+const HOURLY_RATE_THRESHOLD = 1000; // Under dette = timeløn, over = månedsløn
 ```
 
----
-
-### 2. Hent junction-data
-
-Tilføj query til at hente alle team-assistent-relationer:
+### 2. Udvid interface
 
 ```typescript
-const { data: teamAssistants = [] } = useTeamAssistantLeaders();
-```
-
----
-
-### 3. Opdater allAssistantIds til at bruge junction-tabellen
-
-**Fra:**
-```typescript
-const allAssistantIds = useMemo(() => {
-  if (!teamSalaries) return [];
-  return Object.values(teamSalaries)
-    .map(ts => ts.assistantId)
-    .filter(Boolean) as string[];
-}, [teamSalaries]);
-```
-
-**Til:**
-```typescript
-const allAssistantIds = useMemo(() => {
-  return getAllAssistantIds(teamAssistants);
-}, [teamAssistants]);
-```
-
----
-
-### 4. Opdater beregning af assistentløn per team
-
-**Fra:** (linje 603-606)
-```typescript
-const assistantId = teamInfo.assistantId;
-const assistantData = assistantId && assistantHoursData ? assistantHoursData[assistantId] : null;
-const totalAssistantSalary = assistantData?.totalSalary || 0;
-```
-
-**Til:**
-```typescript
-// Get all assistant IDs for this team from junction table
-const teamAssistantIds = getTeamAssistantIds(teamAssistants, teamId);
-// Sum salary for all assistants
-let totalAssistantSalary = 0;
-for (const aId of teamAssistantIds) {
-  const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
-  totalAssistantSalary += assistantData?.totalSalary || 0;
+interface AssistantHoursData {
+  employeeId: string;
+  hourlyRate: number;
+  workedHours: number;
+  baseSalary: number;
+  vacationPay: number;
+  totalSalary: number;
+  isHourlyBased: boolean; // NY: true = timeløn, false = månedsløn
 }
 ```
 
----
+### 3. Tilføj logik til at skelne løntyper
 
-### 5. Opdater TeamSalaryInfo interface
-
-Fjern `assistantId` da det nu hentes fra junction-tabellen:
+For hver assistent:
 
 ```typescript
-interface TeamSalaryInfo {
-  teamId: string;
-  percentageRate: number;
-  minimumSalary: number;
-  // assistantId fjernes - hentes nu fra junction-tabellen
-}
+const monthlySalary = Number(salary?.monthly_salary) || 0;
+const hourlyRate = Number(salary?.hourly_rate) || 0;
+
+// Brug hourly_rate hvis sat, ellers tjek om monthly_salary er lav (timeløn)
+const effectiveHourlyRate = hourlyRate > 0 
+  ? hourlyRate 
+  : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
+const isHourlyBased = effectiveHourlyRate > 0;
 ```
+
+### 4. Håndter månedslønnede separat
+
+```typescript
+if (!isHourlyBased) {
+  // Proratér månedsløn baseret på arbejdsdage
+  const monthStart = startOfMonth(periodStart);
+  const monthEnd = endOfMonth(periodStart);
+  
+  const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+  const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
+  
+  const prorationFactor = workdaysInMonth > 0 
+    ? workdaysInPeriod / workdaysInMonth 
+    : 1;
+  const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
+  const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
+  
+  result[assistantId] = {
+    employeeId: assistantId,
+    hourlyRate: 0,
+    workedHours: workdaysInPeriod, // Viser arbejdsdage for klarhed
+    baseSalary,
+    vacationPay,
+    totalSalary: baseSalary + vacationPay,
+    isHourlyBased: false,
+  };
+  continue;
+}
+// ... resten af time-baseret beregning
+```
+
+---
+
+## Eksempel på beregning for Johannes (40.000 kr/md)
+
+| Periode | Arbejdsdage i periode | Arbejdsdage i måneden | Proratering | Basisløn | Feriepenge (12,5%) | Total |
+|---------|----------------------|----------------------|-------------|----------|-------------------|-------|
+| 1 dag   | 1                    | 20                   | 1/20        | 2.000 kr | 250 kr            | 2.250 kr |
+| 1 uge   | 5                    | 20                   | 5/20        | 10.000 kr| 1.250 kr          | 11.250 kr |
+| Hel md  | 20                   | 20                   | 20/20       | 40.000 kr| 5.000 kr          | 45.000 kr |
 
 ---
 
@@ -103,14 +96,10 @@ interface TeamSalaryInfo {
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Opdater til at bruge junction-tabel |
-
----
+| `src/hooks/useAssistantHoursCalculation.ts` | Tilføj understøttelse af månedsløn med proratering |
 
 ## Forventet resultat
 
-Efter implementering vil:
-- Både Jeppe Munk og Johannes Hedebrink indgå i assistentløn for TDC Erhverv
-- "Assist.løn" kolonnen vil vise den samlede assistentomkostning for begge
-- Korrekt fordeling af assistentløn på tværs af klienter baseret på omsætningsandel
-
+- Jeppe Munk (timeløn 180 kr) beregnes som hidtil: timer × 180 kr × 1,125
+- Johannes Hedebrink (månedsløn 40.000 kr) prorateres korrekt baseret på arbejdsdage
+- Begges løn indgår i TDC Erhvervs assistentomkostninger
