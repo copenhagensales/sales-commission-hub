@@ -22,6 +22,7 @@ function getBookedDayIndex(date: Date): number {
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
+import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -79,7 +80,7 @@ interface TeamSalaryInfo {
   teamId: string;
   percentageRate: number;
   minimumSalary: number;
-  assistantId: string | null;
+  // assistantId removed - now fetched from team_assistant_leaders junction table
 }
 
 const FM_CLIENT_NAMES = ["Eesy FM", "Yousee"];
@@ -309,13 +310,16 @@ export function ClientDBTab() {
     return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
   }, [staffHoursData]);
 
-  // Fetch team salary info (leaders and assistants)
+  // Fetch team assistant leaders from junction table
+  const { data: teamAssistants = [] } = useTeamAssistantLeaders();
+
+  // Fetch team salary info (leaders only - assistants now from junction table)
   const { data: teamSalaries } = useQuery({
     queryKey: ["team-salaries-for-client-db"],
     queryFn: async () => {
       const { data: teams } = await supabase
         .from("teams")
-        .select("id, name, team_leader_id, assistant_team_leader_id");
+        .select("id, name, team_leader_id");
 
       const leaderIds = teams?.map(t => t.team_leader_id).filter(Boolean) || [];
 
@@ -334,20 +338,16 @@ export function ClientDBTab() {
           teamId: team.id,
           percentageRate: Number(leader?.percentage_rate) || 0,
           minimumSalary: Number(leader?.minimum_salary) || 0,
-          assistantId: team.assistant_team_leader_id || null,
         };
       }
       return result;
     },
   });
 
-  // Get all assistant IDs for hours calculation
+  // Get all assistant IDs for hours calculation from junction table
   const allAssistantIds = useMemo(() => {
-    if (!teamSalaries) return [];
-    return Object.values(teamSalaries)
-      .map(ts => ts.assistantId)
-      .filter(Boolean) as string[];
-  }, [teamSalaries]);
+    return getAllAssistantIds(teamAssistants);
+  }, [teamAssistants]);
 
   // Calculate assistant salaries based on hours
   const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
@@ -600,10 +600,14 @@ export function ClientDBTab() {
       const teamTotalRevenue = teamClients.reduce((sum, c) => sum + c.adjustedRevenue, 0);
       if (teamTotalRevenue === 0) continue;
 
-      // Get assistant salary from hours calculation (timer-based)
-      const assistantId = teamInfo.assistantId;
-      const assistantData = assistantId && assistantHoursData ? assistantHoursData[assistantId] : null;
-      const totalAssistantSalary = assistantData?.totalSalary || 0;
+      // Get all assistant IDs for this team from junction table
+      const teamAssistantIds = getTeamAssistantIds(teamAssistants, teamId);
+      // Sum salary for all assistants
+      let totalAssistantSalary = 0;
+      for (const aId of teamAssistantIds) {
+        const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
+        totalAssistantSalary += assistantData?.totalSalary || 0;
+      }
 
       // Allocate assistant salary proportionally by revenue
       for (const client of teamClients) {
@@ -640,7 +644,7 @@ export function ClientDBTab() {
     }
 
     return clientDataList;
-  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, periodStart, periodEnd]);
+  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, periodStart, periodEnd]);
 
   // Sorted client data
   const sortedClientDBData = useMemo(() => {
