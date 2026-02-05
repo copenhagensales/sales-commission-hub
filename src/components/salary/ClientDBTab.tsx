@@ -88,6 +88,7 @@ export function ClientDBTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
   const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
+  const [selectedPresetLabel, setSelectedPresetLabel] = useState<string | undefined>("Denne måned");
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
@@ -734,6 +735,8 @@ export function ClientDBTab() {
             onChange={handlePeriodChange}
             mode={periodMode}
             onModeChange={setPeriodMode}
+            selectedPresetLabel={selectedPresetLabel}
+            onPresetLabelChange={setSelectedPresetLabel}
           />
 
           <div className="rounded-md border overflow-x-auto">

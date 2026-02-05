@@ -23,6 +23,8 @@ interface DBPeriodSelectorProps {
   onChange: (start: Date, end: Date) => void;
   mode: PeriodMode;
   onModeChange: (mode: PeriodMode) => void;
+  selectedPresetLabel?: string;
+  onPresetLabelChange?: (label: string | undefined) => void;
 }
 
 // Get payroll period (15th to 14th)
@@ -52,6 +54,8 @@ export function DBPeriodSelector({
   onChange,
   mode,
   onModeChange,
+  selectedPresetLabel,
+  onPresetLabelChange,
 }: DBPeriodSelectorProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -123,10 +127,12 @@ export function DBPeriodSelector({
   const handlePresetSelect = (preset: (typeof presets)[0]) => {
     onModeChange(preset.mode);
     onChange(preset.start, preset.end);
+    onPresetLabelChange?.(preset.label);
   };
 
   const handleCustomSelect = () => {
     onModeChange("custom");
+    onPresetLabelChange?.("Brugerdefineret");
     setCalendarOpen(true);
   };
 
@@ -166,6 +172,13 @@ export function DBPeriodSelector({
     }
   };
 
+  const getButtonLabel = () => {
+    if (selectedPresetLabel) {
+      return selectedPresetLabel;
+    }
+    return "Vælg periode";
+  };
+
   return (
     <div className="flex items-center gap-2">
       {/* Arrow navigation - disabled for custom mode */}
@@ -198,7 +211,7 @@ export function DBPeriodSelector({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1">
             <CalendarIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Vælg periode</span>
+            <span className="hidden sm:inline">{getButtonLabel()}</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>

@@ -35,6 +35,7 @@ export function DBOverviewTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
   const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
+  const [selectedPresetLabel, setSelectedPresetLabel] = useState<string | undefined>("Denne måned");
   const [selectedTeam, setSelectedTeam] = useState<TeamDB | null>(null);
   const [dailyViewTeam, setDailyViewTeam] = useState<TeamDB | null>(null);
 
@@ -212,6 +213,8 @@ export function DBOverviewTab() {
             onChange={handlePeriodChange}
             mode={periodMode}
             onModeChange={setPeriodMode}
+            selectedPresetLabel={selectedPresetLabel}
+            onPresetLabelChange={setSelectedPresetLabel}
           />
 
           {/* Table */}
