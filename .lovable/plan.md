@@ -1,102 +1,70 @@
 
-# Plan: Vis "Straksbetaling (ASE)" dynamisk baseret på medarbejderens salg
+# Plan: Fix "Straksbetaling (ASE)" menu visibility bug
 
-## Oversigt
-I stedet for at bruge en statisk permission (`menu_immediate_payment_ase`), skal menupunktet vises automatisk for alle medarbejdere der har mindst ét ASE-salg med en prisregel der tillader straksbetaling (`allows_immediate_payment = true`).
+## Problemet
+Alexander Godsk har mange ASE-salg med `allows_immediate_payment = true`, men menupunktet vises ikke fordi hook'en `useHasImmediatePaymentSales` har to fejl:
 
----
-
-## 1. Opret ny hook: `src/hooks/useHasImmediatePaymentSales.ts`
-
-Denne hook tjekker om den aktuelle medarbejder har kvalificerende salg:
-
+### Fejl 1: Agent ID vs Email (linje 53)
 ```typescript
-export function useHasImmediatePaymentSales() {
-  const { user } = useAuth();
+// NUVÆRENDE (forkert):
+const agentEmails = agentMappings.map(m => m.agent_id);
+// agent_id er en UUID, ikke en email!
 
-  return useQuery({
-    queryKey: ["has-immediate-payment-sales", user?.email],
-    queryFn: async () => {
-      // 1. Find employee → agent mappings
-      // 2. Find ASE campaigns
-      // 3. Tjek om der findes salg med allows_immediate_payment = true
-      // Returnerer: boolean
-    },
-    enabled: !!user?.email,
-    staleTime: 5 * 60 * 1000, // 5 min cache
-  });
-}
+// KORREKT:
+// Skal joine med agents-tabellen for at få email
 ```
 
-**Logik:**
-1. Hent medarbejderens agent emails via `employee_agent_mapping`
-2. Find ASE kampagne IDs (`client_campaigns` hvor `client_id` = ASE)
-3. Søg i `sales` → `sale_items` → `product_pricing_rules`
-4. Returnér `true` hvis mindst ét salg har `allows_immediate_payment = true`
-
----
-
-## 2. Opdater AppSidebar.tsx
-
-**Tilføj import:**
+### Fejl 2: Forkert kolonnenavn (linje 75)
 ```typescript
-import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
-```
+// NUVÆRENDE (forkert):
+.eq("campaign_id", campaignId)
 
-**Brug hooken:**
-```typescript
-const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
-```
-
-**Ændr betingelsen for menupunktet (linje 601-614):**
-```typescript
-// Før:
-{p.canViewImmediatePaymentAse && (
-
-// Efter:
-{hasImmediatePaymentSales && (
+// KORREKT:
+.eq("client_campaign_id", campaignId)
 ```
 
 ---
 
-## 3. Opdater mitHjemOpen state (linje 49-51)
+## Løsning
 
-Tilføj `/immediate-payment-ase` til listen af paths der holder Mit Hjem åben:
+### Ændringer i `src/hooks/useHasImmediatePaymentSales.ts`
 
+**1. Opdater agent mapping query (linje 46-53):**
 ```typescript
-const [mitHjemOpen, setMitHjemOpen] = useState(
-  ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals", "/immediate-payment-ase"].some(path => ...)
-);
+// Hent agent emails via join
+const { data: agentMappings } = await supabase
+  .from("employee_agent_mapping")
+  .select("agent_id, agents(email)")
+  .eq("employee_id", employee.id);
+
+if (!agentMappings || agentMappings.length === 0) return false;
+
+// Udtræk emails fra joined data
+const agentEmails = agentMappings
+  .map(m => (m.agents as any)?.email)
+  .filter(Boolean)
+  .map((e: string) => e.toLowerCase());
 ```
 
----
+**2. Ret kolonnenavn (linje 75):**
+```typescript
+// Ændr fra:
+.eq("campaign_id", campaignId)
 
-## 4. Fjern statisk permission (valgfrit oprydning)
-
-Følgende filer kan opdateres for at fjerne den nu ubrugte permission:
-- `src/config/permissions.ts` - fjern `menu_immediate_payment_ase`
-- `src/config/permissionKeys.ts` - fjern key
-- `src/hooks/usePositionPermissions.ts` - fjern `canViewImmediatePaymentAse`
-- `src/components/employees/permissions/PermissionEditorV2.tsx` - fjern fra keys array
+// Til:
+.eq("client_campaign_id", campaignId)
+```
 
 ---
 
 ## Berørte filer
 
-| Fil | Handling |
-|-----|----------|
-| `src/hooks/useHasImmediatePaymentSales.ts` | **Opret** - ny hook |
-| `src/components/layout/AppSidebar.tsx` | Ændr betingelse til dynamisk |
-| `src/config/permissions.ts` | Fjern permission (oprydning) |
-| `src/config/permissionKeys.ts` | Fjern key (oprydning) |
-| `src/hooks/usePositionPermissions.ts` | Fjern helper (oprydning) |
-| `src/components/employees/permissions/PermissionEditorV2.tsx` | Fjern fra array (oprydning) |
+| Fil | Ændring |
+|-----|---------|
+| `src/hooks/useHasImmediatePaymentSales.ts` | Ret agent email hentning + kolonnenavn |
 
 ---
 
 ## Forventet resultat
 
-1. Alle medarbejdere med mindst ét kvalificerende ASE-salg ser menupunktet
-2. Medarbejdere uden kvalificerende salg ser det ikke
-3. Ingen manuel tildeling af rettigheder nødvendig
-4. Menupunktet opdateres automatisk når nye salg matcher kriterierne
+Efter rettelsen vil Alexander Godsk (og alle andre medarbejdere med kvalificerende ASE-salg) se menupunktet "Tilføj straksbetaling (ASE)" under "Mit Hjem".
