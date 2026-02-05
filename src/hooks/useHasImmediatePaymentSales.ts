@@ -42,15 +42,19 @@ export function useHasImmediatePaymentSales() {
 
       if (!employee) return false;
 
-      // 2. Find agent IDs (emails) mapped to this employee
+      // 2. Find agent emails mapped to this employee (via agents table join)
       const { data: agentMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("agent_id")
+        .select("agent_id, agents(email)")
         .eq("employee_id", employee.id);
 
       if (!agentMappings || agentMappings.length === 0) return false;
 
-      const agentEmails = agentMappings.map(m => m.agent_id);
+      // Extract emails from joined agents data
+      const agentEmails = agentMappings
+        .map(m => (m.agents as any)?.email)
+        .filter(Boolean)
+        .map((e: string) => e.toLowerCase());
 
       // 3. Find ASE campaign IDs
       const { data: aseCampaigns } = await supabase
@@ -68,11 +72,10 @@ export function useHasImmediatePaymentSales() {
       
       for (const agentEmail of agentEmails) {
         for (const campaignId of aseCampaignIds) {
-          // @ts-expect-error Supabase type instantiation too deep
           const result = await supabase
             .from("sales")
             .select("id")
-            .eq("campaign_id", campaignId)
+            .eq("client_campaign_id", campaignId)
             .eq("agent_email", agentEmail)
             .limit(10);
           
