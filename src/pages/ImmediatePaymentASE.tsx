@@ -1,15 +1,28 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { CreditCard, Loader2, FileX } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { toast } from "@/hooks/use-toast";
 
 const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
 
@@ -42,13 +55,58 @@ interface ImmediatePaymentSale {
   customer_company: string | null;
   customer_phone: string | null;
   product_name: string;
+  sale_item_id: string;
+  matched_pricing_rule_id: string;
+  is_immediate_payment: boolean;
 }
 
 export default function ImmediatePaymentASE() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [convertingSaleId, setConvertingSaleId] = useState<string | null>(null);
   
   // Calculate current payroll period
   const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
+
+  // Mutation for converting to immediate payment
+  const convertMutation = useMutation({
+    mutationFn: async (sale: ImmediatePaymentSale) => {
+      // 1. Get pricing rule with immediate_payment values
+      const { data: rule, error: ruleError } = await supabase
+        .from("product_pricing_rules")
+        .select("immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
+        .eq("id", sale.matched_pricing_rule_id)
+        .single();
+      
+      if (ruleError || !rule) {
+        throw new Error("Kunne ikke hente prisregel");
+      }
+      
+      // 2. Update sale_item with new values
+      const { error: updateError } = await supabase
+        .from("sale_items")
+        .update({
+          is_immediate_payment: true,
+          mapped_commission: rule.immediate_payment_commission_dkk,
+          mapped_revenue: rule.immediate_payment_revenue_dkk,
+        })
+        .eq("id", sale.sale_item_id);
+      
+      if (updateError) {
+        throw new Error("Kunne ikke opdatere salget");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["immediate-payment-ase-sales"] });
+      toast({ title: "Straksbetaling tilføjet", description: "Salget er nu konverteret til straksbetaling." });
+      setConvertingSaleId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      setConvertingSaleId(null);
+    },
+  });
+
   const { data: agentEmails = [] } = useQuery({
     queryKey: ["employee-agent-emails", user?.email],
     queryFn: async () => {
@@ -107,7 +165,9 @@ export default function ImmediatePaymentASE() {
           customer_phone,
           agent_email,
           sale_items!inner(
+            id,
             matched_pricing_rule_id,
+            is_immediate_payment,
             product_id,
             products(name)
           )
@@ -154,6 +214,9 @@ export default function ImmediatePaymentASE() {
             customer_company: sale.customer_company,
             customer_phone: sale.customer_phone,
             product_name: (matchingItem as any).products?.name || "Ukendt produkt",
+            sale_item_id: (matchingItem as any).id,
+            matched_pricing_rule_id: (matchingItem as any).matched_pricing_rule_id,
+            is_immediate_payment: (matchingItem as any).is_immediate_payment || false,
           });
         }
       }
@@ -204,6 +267,7 @@ export default function ImmediatePaymentASE() {
                     <TableHead>Produkt</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Handling</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -217,7 +281,49 @@ export default function ImmediatePaymentASE() {
                         {sale.customer_company || sale.customer_phone || "Ukendt"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">Afventer</Badge>
+                        {sale.is_immediate_payment ? (
+                          <Badge variant="default">Aktiveret</Badge>
+                        ) : (
+                          <Badge variant="outline">Afventer</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {sale.is_immediate_payment ? (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        ) : (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                disabled={convertMutation.isPending && convertingSaleId === sale.sale_item_id}
+                              >
+                                {convertMutation.isPending && convertingSaleId === sale.sale_item_id 
+                                  ? "Behandler..." 
+                                  : "Tilføj straksbetaling"}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Er du sikker?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Ved at tilføje straksbetaling øges din provision for dette salg. 
+                                  Denne handling kan ikke fortrydes.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => {
+                                    setConvertingSaleId(sale.sale_item_id);
+                                    convertMutation.mutate(sale);
+                                  }}
+                                >
+                                  Bekræft
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
