@@ -1,6 +1,6 @@
  import { useQuery } from "@tanstack/react-query";
  import { supabase } from "@/integrations/supabase/client";
- import { eachDayOfInterval, format, getDay } from "date-fns";
+import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
  
  interface StaffHoursData {
    employeeId: string;
@@ -16,6 +16,21 @@
  const VACATION_PAY_RATE = 0.125; // 12.5%
  const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, not monthly
  
+/**
+ * Count workdays (Mon-Fri) in a period
+ */
+function countWorkDaysInPeriod(start: Date, end: Date): number {
+  let count = 0;
+  const days = eachDayOfInterval({ start, end });
+  for (const day of days) {
+    const dow = getDay(day);
+    if (dow !== 0 && dow !== 6) {
+      count++;
+    }
+  }
+  return count;
+}
+
  /**
   * Hook to calculate staff salary based on actual worked hours (for hourly employees).
   * Supports two modes based on personnel_salaries.hours_source:
@@ -135,13 +150,23 @@
          const isHourlyBased = effectiveHourlyRate > 0;
          
          if (!isHourlyBased) {
-           // Fixed monthly salary - return as-is with vacation pay
-           const baseSalary = monthlySalary;
+          // Fixed monthly salary - prorate based on workdays in period vs full month
+          // Get the month containing most of the period (use periodStart's month)
+          const monthStart = startOfMonth(periodStart);
+          const monthEnd = endOfMonth(periodStart);
+          
+          const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+          const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
+          
+          // Prorate: if viewing 1 day, salary = monthly / workdays_in_month
+          const prorationFactor = workdaysInMonth > 0 ? workdaysInPeriod / workdaysInMonth : 1;
+          const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
            const vacationPay = baseSalary * VACATION_PAY_RATE;
+          
            result[staffId] = {
              employeeId: staffId,
              hourlyRate: 0,
-             workedHours: 0,
+            workedHours: workdaysInPeriod,
              baseSalary,
              vacationPay,
              totalSalary: baseSalary + vacationPay,
