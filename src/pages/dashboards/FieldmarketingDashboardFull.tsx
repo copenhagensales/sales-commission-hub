@@ -44,6 +44,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
+import { FieldmarketingExcelExport } from "@/components/fieldmarketing/FieldmarketingExcelExport";
 
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
@@ -452,6 +453,7 @@ const FieldmarketingDashboardFull = () => {
         subtitle="Oversigt over salg fra fieldmarketing events"
         rightContent={
           <div className="flex items-center gap-4">
+            <FieldmarketingExcelExport />
             <DashboardDateRangePicker 
               dateRange={dateRange} 
               onDateRangeChange={handleDateRangeChange} 
