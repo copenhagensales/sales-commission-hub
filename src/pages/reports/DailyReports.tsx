@@ -199,8 +199,17 @@ export default function DailyReports() {
       const { data } = await supabase
         .from("teams")
         .select("id")
-        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
-      return data?.map(t => t.id) || [];
+        .eq("team_leader_id", currentEmployee.id);
+      
+      // Also check junction table for assistant roles
+      const { data: assistantTeams } = await supabase
+        .from("team_assistant_leaders")
+        .select("team_id")
+        .eq("employee_id", currentEmployee.id);
+      
+      const leaderTeamIds = data?.map(t => t.id) || [];
+      const assistantTeamIds = assistantTeams?.map(t => t.team_id) || [];
+      return [...new Set([...leaderTeamIds, ...assistantTeamIds])];
     },
     enabled: !!currentEmployee?.id && scopeReportsDaily === "team",
   });

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
+import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,8 +21,8 @@ interface TeamDB {
   teamName: string;
   leaderId: string | null;
   leaderName: string;
-  assistantId: string | null;
-  assistantName: string;
+  assistantIds: string[];
+  assistantNames: string[];
   revenue: number;
   sellerSalaryCosts: number;
   leaderSalary: number;
@@ -54,24 +55,25 @@ export function DBOverviewTab() {
     true
   );
 
-  // First, fetch basic team structure to get assistant IDs
+  // First, fetch basic team structure
   const { data: teamsBasic } = useQuery({
     queryKey: ["teams-basic-structure"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teams")
-        .select("id, name, team_leader_id, assistant_team_leader_id");
+        .select("id, name, team_leader_id");
       if (error) throw error;
       return data;
     },
   });
 
-  // Get assistant IDs for hours calculation
+  // Fetch team assistant leaders from junction table
+  const { data: teamAssistants = [] } = useTeamAssistantLeaders();
+
+  // Get all unique assistant IDs for hours calculation
   const assistantIds = useMemo(() => {
-    return (teamsBasic || [])
-      .map(t => t.assistant_team_leader_id)
-      .filter(Boolean) as string[];
-  }, [teamsBasic]);
+    return getAllAssistantIds(teamAssistants);
+  }, [teamAssistants]);
 
   // Calculate assistant salaries based on hours
   const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
@@ -81,7 +83,7 @@ export function DBOverviewTab() {
   );
 
   const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData)],
+    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants)],
     queryFn: async (): Promise<TeamDB[]> => {
       const teams = teamsBasic || [];
 
@@ -146,24 +148,32 @@ export function DBOverviewTab() {
         const calculatedLeaderSalary = dbBeforeLeader * (percentageRate / 100);
         const finalLeaderSalary = Math.max(calculatedLeaderSalary, minimumSalary);
 
-        // Assistant salary - now based on hours worked
-        const assistantId = team.assistant_team_leader_id;
-        const assistantData = assistantId && assistantHoursData ? assistantHoursData[assistantId] : null;
-        const finalAssistantSalary = assistantData?.totalSalary || 0;
+        // Assistant salary - now based on hours worked (supports multiple assistants)
+        const teamAssistantIds = getTeamAssistantIds(teamAssistants, team.id);
+        let finalAssistantSalary = 0;
+        for (const aId of teamAssistantIds) {
+          const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
+          finalAssistantSalary += assistantData?.totalSalary || 0;
+        }
 
         // Final DB
         const db = revenue - sellerSalaryCosts - finalLeaderSalary - finalAssistantSalary - totalExpenses;
 
         const leader = employees?.find(e => e.id === team.team_leader_id);
-        const assistant = employees?.find(e => e.id === team.assistant_team_leader_id);
+        const assistantNames = teamAssistantIds
+          .map(id => {
+            const emp = employees?.find(e => e.id === id);
+            return emp ? `${emp.first_name} ${emp.last_name}` : null;
+          })
+          .filter(Boolean) as string[];
 
         return {
           teamId: team.id,
           teamName: team.name,
           leaderId: team.team_leader_id,
           leaderName: leader ? `${leader.first_name} ${leader.last_name}` : "Ikke tildelt",
-          assistantId: team.assistant_team_leader_id,
-          assistantName: assistant ? `${assistant.first_name} ${assistant.last_name}` : "-",
+          assistantIds: teamAssistantIds,
+          assistantNames,
           revenue,
           sellerSalaryCosts,
           leaderSalary: finalLeaderSalary,
