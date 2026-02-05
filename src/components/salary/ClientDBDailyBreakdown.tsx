@@ -9,6 +9,7 @@ import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { cn } from "@/lib/utils";
+import { VACATION_PAY_RATES } from "@/lib/calculations";
 
 interface ClientDBDailyBreakdownProps {
   clientId: string;
@@ -28,8 +29,6 @@ interface DailyData {
   locationCosts: number;
   db: number;
 }
-
-const SELLER_VACATION_RATE = 0.125;
 
 /**
  * Convert JavaScript getDay (0=Sunday) to booked_days format (0=Monday, 6=Sunday)
@@ -117,9 +116,9 @@ export function ClientDBDailyBreakdown({
       // Only include days with sales OR location costs
       if (salesForDay || locationCosts > 0) {
         const sales = salesForDay?.sales || 0;
-        const revenue = salesForDay?.revenue || 0;
+       const revenue = salesForDay?.revenue || 0;
         const commission = salesForDay?.commission || 0;
-        const sellerVacationPay = commission * SELLER_VACATION_RATE;
+        const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
         const sellerSalaryCost = commission + sellerVacationPay;
         const db = revenue - sellerSalaryCost - locationCosts;
 

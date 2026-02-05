@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
+import { VACATION_PAY_RATES } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 
@@ -819,8 +820,7 @@ export default function MyProfile() {
       todaySalesCount += fmTodaySales?.length || 0;
 
       // Calculate vacation pay (12.5% of earned commission)
-      const vacationPayRate = 0.125;
-      const earnedVacationPay = periodCommission * vacationPayRate;
+      const earnedVacationPay = periodCommission * VACATION_PAY_RATES.SELLER;
 
       return {
         periodCommission,
@@ -902,8 +902,7 @@ export default function MyProfile() {
       : 0;
     
     // Calculate vacation pay (12.5% of earned salary)
-    const vacationPayRate = 0.125;
-    const earnedVacationPay = earnedInPeriod * vacationPayRate;
+    const earnedVacationPay = earnedInPeriod * VACATION_PAY_RATES.SELLER;
     
     return {
       // Payroll period stats

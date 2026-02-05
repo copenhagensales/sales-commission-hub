@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay } from "date-fns";
+import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
 
 interface AssistantHoursData {
   employeeId: string;
@@ -10,8 +11,6 @@ interface AssistantHoursData {
   vacationPay: number; // 12.5%
   totalSalary: number;
 }
-
-const ASSISTANT_VACATION_PAY_RATE = 0.125; // 12.5%
 
 /**
  * Hook to calculate assistant team leader salary based on actual worked hours.
@@ -203,8 +202,8 @@ export function useAssistantHoursCalculation(
           }
         }
 
-        const baseSalary = totalHours * hourlyRate;
-        const vacationPay = baseSalary * ASSISTANT_VACATION_PAY_RATE;
+       const baseSalary = totalHours * hourlyRate;
+        const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
         const totalSalary = baseSalary + vacationPay;
 
         result[assistantId] = {
@@ -224,27 +223,4 @@ export function useAssistantHoursCalculation(
   });
 }
 
-/**
- * Calculate hours from start_time and end_time strings (HH:mm or HH:mm:ss format).
- * Applies 30-minute break deduction for shifts over 6 hours.
- */
-function calculateHoursFromShift(startTime: string, endTime: string): number {
-  const [startH, startM] = startTime.split(":").map(Number);
-  const [endH, endM] = endTime.split(":").map(Number);
-
-  const startMinutes = startH * 60 + (startM || 0);
-  const endMinutes = endH * 60 + (endM || 0);
-
-  let totalMinutes = endMinutes - startMinutes;
-  if (totalMinutes < 0) {
-    // Handle overnight shifts (though rare for assistants)
-    totalMinutes += 24 * 60;
-  }
-
-  // Apply 30-minute break for shifts over 6 hours
-  if (totalMinutes > 360) {
-    totalMinutes -= 30;
-  }
-
-  return Math.round((totalMinutes / 60) * 100) / 100; // Round to 2 decimals
-}
+// Note: calculateHoursFromShift is now imported from @/lib/calculations
