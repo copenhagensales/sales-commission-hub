@@ -141,7 +141,7 @@ export const routes: RouteConfig[] = [
   { path: "/some", component: Some, access: "role", positionPermission: "menu_some" },
   { path: "/messages", component: Messages, access: "role", positionPermission: "menu_messages_personal" },
   { path: "/refer-a-friend", component: ReferAFriend, access: "role", positionPermission: "menu_refer_a_friend" },
-  { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "role", positionPermission: "menu_immediate_payment_ase" },
+  { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "protected" },
   { path: "/commission-league", component: CommissionLeague, access: "role", positionPermission: "menu_commission_league" },
   { path: "/commission-league/test", component: CommissionLeagueTest, access: "role", positionPermission: "menu_commission_league" },
 
