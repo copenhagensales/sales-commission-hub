@@ -1,132 +1,243 @@
 
 
-# Plan: Fix "Glemt adgangskode" Flow
+# Plan: Medarbejder-specifik timeberegning for stab
 
-## Problemanalyse
+## Overblik
 
-Når brugeren klikker "Glemt adgangskode" på login-siden, bruges Supabase's native `resetPasswordForEmail` flow. Problemet er:
+Opdater `useStaffHoursCalculation` så den understøtter individuel `hours_source` per stab-medarbejder og korrekt håndterer sygdom som betalt arbejdstid.
 
-1. **Supabase logger automatisk brugeren ind** når de klikker på recovery-linket
-2. **Race condition**: Auth.tsx forsøger at detektere `PASSWORD_RECOVERY` event eller `type=recovery` i URL hash, men dette kan fejle pga. timing
-3. **Resultat**: Brugeren bliver logget ind og redirected til dashboard uden at ændre adgangskode
+## Forretningsregler
 
-## Løsning
+| Medarbejder | Timeløn | hours_source | Ferie/Fri | Sygdom |
+|-------------|---------|--------------|-----------|--------|
+| Jeppe Buster Munk | 200 kr | `shift` | 0 kr | Normal løn (som planlagt vagt) |
+| Alfred Rud | 160 kr | `timestamp` | 0 kr | 0 kr (medmindre indstemplet) |
+| William Hoé Seiding | 190 kr | `timestamp` | 0 kr | 0 kr (medmindre indstemplet) |
 
-Erstat Supabase's native recovery flow med det **eksisterende custom token-baserede flow** (`send-password-reset` → `/reset-password`), som allerede fungerer korrekt for admin-initierede resets.
+---
 
-### Arkitektur-diagram
+## Tekniske ændringer
 
-```text
-NUVÆRENDE FLOW (problematisk):
-┌─────────────┐    ┌──────────────────┐    ┌────────────┐
-│ Auth.tsx    │───▶│ Supabase native  │───▶│ Auth.tsx   │
-│ isResetMode │    │ resetPassword-   │    │ Auto-login │
-│             │    │ ForEmail()       │    │ (BUG!)     │
-└─────────────┘    └──────────────────┘    └────────────┘
+### 1. Database-migration
 
-NYT FLOW (robust):
-┌─────────────┐    ┌──────────────────┐    ┌────────────────┐    ┌──────────────┐
-│ Auth.tsx    │───▶│ initiate-        │───▶│ Email med      │───▶│/reset-password│
-│ isResetMode │    │ password-reset   │    │ custom token   │    │(KRÆVER kode) │
-│             │    │ (Edge Function)  │    │                │    │              │
-└─────────────┘    └──────────────────┘    └────────────────┘    └──────────────┘
+Tilføj `hours_source` kolonne til `personnel_salaries` tabellen:
+
+```sql
+ALTER TABLE personnel_salaries 
+ADD COLUMN hours_source TEXT DEFAULT 'shift' 
+CHECK (hours_source IN ('shift', 'timestamp'));
+
+-- Sæt Alfred Rud og William Hoé til 'timestamp'
+UPDATE personnel_salaries 
+SET hours_source = 'timestamp' 
+WHERE employee_id IN (
+  'f66edb4c-7649-4617-94a3-ba02b7aea02f',  -- Alfred Rud
+  '712e71af-bcc4-4988-b525-2d32f53b69b1'   -- William Hoé Seiding
+);
+
+-- Jeppe Buster forbliver 'shift' (default)
 ```
 
-## Implementering
+### 2. Opdater useStaffHoursCalculation.ts
 
-### Del 1: Opret ny Edge Function
-
-Opretter `initiate-password-reset` som slår brugeren op i `employee_master_data` baseret på email og genererer et reset token.
-
-**Fil:** `supabase/functions/initiate-password-reset/index.ts`
-
-```typescript
-// Lookup employee by email (private_email OR work_email)
-// Generate token, hash it, store in password_reset_tokens
-// Send email via M365 med link til /reset-password?token=xxx
-```
-
-**Vigtige punkter:**
-- Bruger `employee_master_data` til at finde brugerens navn
-- Genbruger token-hashing logik fra `send-password-reset`
-- Sender email via M365 Graph API (eksisterende setup)
-- Returnerer success selv hvis brugeren ikke findes (sikkerhed)
-
-### Del 2: Opdater Auth.tsx
-
-Ændrer `isResetMode` submitlogik til at kalde den nye Edge Function i stedet for `supabase.auth.resetPasswordForEmail`.
-
-**Ændringer i `src/pages/Auth.tsx` (linje ~352-362):**
+**Ændring 1 - Hent hours_source fra personnel_salaries (linje 37-41):**
 
 ```typescript
 // FØR:
-} else if (isResetMode) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth`,
-  });
-  // ...
+const { data: salaries } = await supabase
+  .from("personnel_salaries")
+  .select("employee_id, monthly_salary, hourly_rate")
+  .eq("salary_type", "staff")
+  .eq("is_active", true)
+  .in("employee_id", staffIds);
+
+// EFTER:
+const { data: salaries } = await supabase
+  .from("personnel_salaries")
+  .select("employee_id, monthly_salary, hourly_rate, hours_source")
+  .eq("salary_type", "staff")
+  .eq("is_active", true)
+  .in("employee_id", staffIds);
+```
+
+**Ændring 2 - Hent team via team_members (linje 43-49):**
+
+```typescript
+// FØR:
+const { data: employees } = await supabase
+  .from("employee_master_data")
+  .select("id, team_id")
+  .in("id", staffIds);
+
+const teamIds = [...new Set(employees?.map(e => e.team_id).filter(Boolean))] as string[];
+
+// EFTER:
+const { data: teamMemberships } = await supabase
+  .from("team_members")
+  .select("employee_id, team_id")
+  .in("employee_id", staffIds);
+
+const employeeTeamMap = new Map<string, string>();
+for (const tm of teamMemberships || []) {
+  employeeTeamMap.set(tm.employee_id, tm.team_id);
+}
+
+const teamIds = [...new Set(
+  (teamMemberships || []).map(tm => tm.team_id).filter(Boolean)
+)] as string[];
+```
+
+**Ændring 3 - Hent absences med type (linje 84-90):**
+
+```typescript
+// FØR:
+const { data: absences } = await supabase
+  .from("absence_request_v2")
+  .select("employee_id, start_date, end_date, is_full_day")
+  ...
+
+// EFTER:
+const { data: absences } = await supabase
+  .from("absence_request_v2")
+  .select("employee_id, start_date, end_date, is_full_day, type")
+  ...
+```
+
+**Ændring 4 - Hent time_stamps (ny query efter absences):**
+
+```typescript
+// NY QUERY - Hent faktiske stemplinger
+const { data: timeStamps } = await supabase
+  .from("time_stamps")
+  .select("employee_id, clock_in, clock_out, break_minutes")
+  .in("employee_id", staffIds)
+  .gte("clock_in", format(periodStart, "yyyy-MM-dd") + "T00:00:00")
+  .lte("clock_in", format(periodEnd, "yyyy-MM-dd") + "T23:59:59");
+```
+
+**Ændring 5 - Opdater absence map til at inkludere type:**
+
+```typescript
+// FØR:
+const absenceDates = new Set<string>();
+for (const absence of empAbsences) {
+  ...
+  for (const day of days) {
+    absenceDates.add(format(day, "yyyy-MM-dd"));
+  }
 }
 
 // EFTER:
-} else if (isResetMode) {
-  const { data, error: invokeError } = await supabase.functions.invoke(
-    "initiate-password-reset",
-    { body: { email: email.trim().toLowerCase() } }
-  );
-  
-  if (invokeError) throw invokeError;
-  
-  toast({
-    title: "Email sendt",
-    description: "Hvis din email er registreret, modtager du et link inden for få minutter. Tjek også spam-mappen.",
-  });
-  setIsResetMode(false);
+const absenceDateMap = new Map<string, { type: string }>();
+for (const absence of empAbsences) {
+  const start = new Date(absence.start_date);
+  const end = new Date(absence.end_date);
+  const days = eachDayOfInterval({ start, end });
+  for (const day of days) {
+    absenceDateMap.set(format(day, "yyyy-MM-dd"), { type: absence.type });
+  }
 }
 ```
 
-### Del 3: Oprydning i Auth.tsx
+**Ændring 6 - Hovedlogik for timer-beregning:**
 
-Fjerner eller forenkler den eksisterende `PASSWORD_RECOVERY` og `type=recovery` detection, da dette ikke længere er nødvendigt:
+```typescript
+const hoursSource = salary?.hours_source || 'shift';
+let totalHours = 0;
 
-- Fjern recovery-detection i `useEffect` (linje 248-260)
-- Behold `onAuthStateChange` listener for andre events
-- Fjern `isNewPasswordMode` state og tilhørende UI (bruger `/reset-password` i stedet)
+if (hoursSource === 'timestamp') {
+  // === ALFRED RUD / WILLIAM HOÉ: Brug faktiske stemplinger ===
+  const empTimeStamps = (timeStamps || []).filter(ts => ts.employee_id === staffId);
+  
+  for (const ts of empTimeStamps) {
+    if (ts.clock_in && ts.clock_out) {
+      const clockIn = new Date(ts.clock_in);
+      const clockOut = new Date(ts.clock_out);
+      
+      const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
+      const breakMins = ts.break_minutes || 0;
+      const netMinutes = Math.max(0, totalMinutes - breakMins);
+      
+      totalHours += Math.round((netMinutes / 60) * 100) / 100;
+    }
+  }
+} else {
+  // === JEPPE BUSTER: Brug planlagte vagter ===
+  const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd });
 
-## Tekniske detaljer
-
-### Ny Edge Function struktur
-
-```text
-supabase/functions/initiate-password-reset/
-└── index.ts
+  for (const day of daysInPeriod) {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const jsWeekday = getDay(day);
+    
+    const absenceInfo = absenceDateMap.get(dateStr);
+    
+    // Ferie/fri/no_show = 0 timer
+    if (absenceInfo && absenceInfo.type !== 'sick') {
+      continue;
+    }
+    
+    // Find planlagt vagt for denne dag
+    let scheduledHours = 0;
+    
+    if (individualShiftMap.has(dateStr)) {
+      const shift = individualShiftMap.get(dateStr)!;
+      scheduledHours = calculateHoursFromShift(shift.start, shift.end);
+    } else if (empShiftDays) {
+      const dayShift = empShiftDays.find(d => d.dayOfWeek === jsWeekday);
+      if (dayShift) {
+        scheduledHours = calculateHoursFromShift(dayShift.startTime, dayShift.endTime);
+      }
+    } else if (teamShiftDays) {
+      const dayShift = teamShiftDays.find(d => d.dayOfWeek === jsWeekday);
+      if (dayShift) {
+        scheduledHours = calculateHoursFromShift(dayShift.startTime, dayShift.endTime);
+      }
+    }
+    
+    // Sygdom = normal løn (som om planlagt vagt)
+    // Ingen fravær = normal løn
+    if (scheduledHours > 0) {
+      totalHours += scheduledHours;
+    }
+  }
+}
 ```
 
-### Database tabeller (eksisterende)
-- `password_reset_tokens` - Gemmer hashed tokens med expiry
-- `employee_master_data` - Lookup af brugerinfo
+---
 
-### Email-afsendelse
-Genbruger M365 Graph API setup fra `send-password-reset`:
-- Kræver `M365_TENANT_ID`, `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, `M365_SENDER_EMAIL`
+## Forventet resultat (denne uge: 2-8. februar)
 
-### Sikkerhed
-- Returnerer altid "Email sendt" besked for at forhindre user enumeration
-- Token expires efter 24 timer
-- Token kan kun bruges én gang
+### Med `hours_source = 'shift'` (Jeppe Buster):
+- Mandag-fredag: 5 dage × 7 timer = 35 timer
+- Løn: 35 × 200 kr = 7.000 kr
+- Feriepenge: 7.000 × 12,5% = 875 kr
+- **Total: 7.875 kr**
+
+### Med `hours_source = 'timestamp'` (Alfred Rud):
+- Faktiske stemplinger: ~15,3 timer (fra database)
+- Løn: 15,3 × 160 kr = 2.448 kr
+- Feriepenge: 2.448 × 12,5% = 306 kr
+- **Total: ~2.754 kr**
+
+### Med `hours_source = 'timestamp'` (William Hoé):
+- Ingen stemplinger denne uge = 0 timer
+- **Total: 0 kr**
+
+---
 
 ## Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/initiate-password-reset/index.ts` | **NY** - Edge Function |
-| `src/pages/Auth.tsx` | Opdater reset-mode submit + fjern recovery detection |
-| `supabase/config.toml` | Auto-opdateret med ny function |
+| Database migration | Tilføj `hours_source` kolonne til `personnel_salaries` |
+| `src/hooks/useStaffHoursCalculation.ts` | Tilføj logik for `timestamp` vs `shift`, sygdoms-håndtering |
+
+---
 
 ## Test-scenarier
 
-1. Bruger indtaster registreret email → modtager email med link
-2. Bruger klikker link → kommer til `/reset-password` med token
-3. Bruger opretter ny adgangskode → redirectes til login
-4. Bruger logger ind med ny adgangskode → success
-5. Bruger indtaster ukendt email → modtager stadig "Email sendt" (sikkerhed)
+1. Vælg "Denne uge" → Jeppe får 7.875 kr (fra vagtplan)
+2. Vælg "Denne uge" → Alfred får ~2.754 kr (fra indstemplinger)
+3. Tilføj sygdom for Jeppe → Han får stadig normal løn
+4. Tilføj ferie for Jeppe → 0 kr for den dag
 
