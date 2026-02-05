@@ -226,7 +226,7 @@ export function useAbsenceRequests(status?: "pending" | "approved" | "rejected",
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name)
+          employee:employee_master_data!absence_request_v2_employee_id_fkey(id, first_name, last_name)
         `)
         .order("created_at", { ascending: false });
 
@@ -278,7 +278,7 @@ export function useAbsencesForDateRange(startDate: string, endDate: string) {
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name)
+          employee:employee_master_data!absence_request_v2_employee_id_fkey(id, first_name, last_name)
         `)
         .eq("status", "approved")
         .lte("start_date", endDate)
