@@ -1,243 +1,360 @@
 
+# Plan: Centraliseret Beregnings-Arkitektur (Unified Calculation Services)
 
-# Plan: Medarbejder-specifik timeberegning for stab
+## Executive Summary
 
-## Overblik
-
-Opdater `useStaffHoursCalculation` så den understøtter individuel `hours_source` per stab-medarbejder og korrekt håndterer sygdom som betalt arbejdstid.
-
-## Forretningsregler
-
-| Medarbejder | Timeløn | hours_source | Ferie/Fri | Sygdom |
-|-------------|---------|--------------|-----------|--------|
-| Jeppe Buster Munk | 200 kr | `shift` | 0 kr | Normal løn (som planlagt vagt) |
-| Alfred Rud | 160 kr | `timestamp` | 0 kr | 0 kr (medmindre indstemplet) |
-| William Hoé Seiding | 190 kr | `timestamp` | 0 kr | 0 kr (medmindre indstemplet) |
+En grundig analyse af kodebasen afslører **6 hovedområder** med fragmenteret og duplikeret beregningslogik, hvilket forårsager inkonsistens, vedligeholdelsesproblemer og fejl som Yousee's manglende omsætning. Denne plan foreslår en centraliseret arkitektur med delte services.
 
 ---
 
-## Tekniske ændringer
+## Identificerede Problemområder
 
-### 1. Database-migration
+### 1. Provision & Omsætning (17+ steder)
 
-Tilføj `hours_source` kolonne til `personnel_salaries` tabellen:
+**Problem**: Beregning af commission og revenue sker på 17+ forskellige steder med inkonsistent logik.
 
-```sql
-ALTER TABLE personnel_salaries 
-ADD COLUMN hours_source TEXT DEFAULT 'shift' 
-CHECK (hours_source IN ('shift', 'timestamp'));
+| Lokation | Implementering | Problem |
+|----------|----------------|---------|
+| `calculate-kpi-values` (Edge) | `fetchFmCommissionMap()` bruger KUN `product_pricing_rules` | Yousee FM = 0 kr |
+| `calculate-kpi-incremental` (Edge) | Separat version af `fetchFmCommissionMap()` | Inkonsistent |
+| `calculate-leaderboard-incremental` (Edge) | Tredje version | Inkonsistent |
+| `tv-dashboard-data` (Edge) | `fmPricingMap` - fjerde implementering | Inkonsistent |
+| `HeadToHeadComparison.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
+| `RevenueByClient.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
+| `DailyRevenueChart.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
+| `EmployeeCommissionHistory.tsx` | Direkte `products.commission_dkk` | Mangler rules |
 
--- Sæt Alfred Rud og William Hoé til 'timestamp'
-UPDATE personnel_salaries 
-SET hours_source = 'timestamp' 
-WHERE employee_id IN (
-  'f66edb4c-7649-4617-94a3-ba02b7aea02f',  -- Alfred Rud
-  '712e71af-bcc4-4988-b525-2d32f53b69b1'   -- William Hoé Seiding
-);
+**Root Cause**: FM-produkter (Yousee) har priser i `products` tabellen, men Edge Functions kigger kun i `product_pricing_rules`.
 
--- Jeppe Buster forbliver 'shift' (default)
-```
+---
 
-### 2. Opdater useStaffHoursCalculation.ts
+### 2. Feriepenge-Beregning (9+ steder)
 
-**Ændring 1 - Hent hours_source fra personnel_salaries (linje 37-41):**
+**Problem**: Feriepenge-satser er hardcoded på mindst 9 forskellige steder med varierende logik.
 
-```typescript
-// FØR:
-const { data: salaries } = await supabase
-  .from("personnel_salaries")
-  .select("employee_id, monthly_salary, hourly_rate")
-  .eq("salary_type", "staff")
-  .eq("is_active", true)
-  .in("employee_id", staffIds);
+| Fil | Konstant | Værdi |
+|-----|----------|-------|
+| `useStaffHoursCalculation.ts` | `VACATION_PAY_RATE` | 0.125 (12.5%) |
+| `useAssistantHoursCalculation.ts` | `ASSISTANT_VACATION_PAY_RATE` | 0.125 (12.5%) |
+| `ClientDBTab.tsx` | `SELLER_VACATION_RATE` | 0.125 (12.5%) |
+| `ClientDBTab.tsx` | `LEADER_VACATION_RATE` | 0.01 (1%) |
+| `ClientDBDailyBreakdown.tsx` | `SELLER_VACATION_RATE` | 0.125 (12.5%) |
+| `Home.tsx` | Inline beregning | 0.125 eller 0.01 |
+| `MyProfile.tsx` | Inline beregning | 0.125 |
+| `RevenueByClient.tsx` | Inline beregning | 0.125 |
+| `useSellerSalariesCached.ts` | Via `salary_types` tabel | Dynamisk lookup |
 
-// EFTER:
-const { data: salaries } = await supabase
-  .from("personnel_salaries")
-  .select("employee_id, monthly_salary, hourly_rate, hours_source")
-  .eq("salary_type", "staff")
-  .eq("is_active", true)
-  .in("employee_id", staffIds);
-```
+**Inkonsistens**: Nogle steder bruger hardcoded værdier, andre bruger dynamiske lookups fra `salary_types` tabellen.
 
-**Ændring 2 - Hent team via team_members (linje 43-49):**
+---
 
-```typescript
-// FØR:
-const { data: employees } = await supabase
-  .from("employee_master_data")
-  .select("id, team_id")
-  .in("id", staffIds);
+### 3. Timer-Beregning (6+ steder)
 
-const teamIds = [...new Set(employees?.map(e => e.team_id).filter(Boolean))] as string[];
+**Problem**: Logik for at beregne arbejdstimer fra vagter/stemplinger er duplikeret.
 
-// EFTER:
-const { data: teamMemberships } = await supabase
-  .from("team_members")
-  .select("employee_id, team_id")
-  .in("employee_id", staffIds);
+| Fil | Funktion | Logik |
+|-----|----------|-------|
+| `useStaffHoursCalculation.ts` | `calculateHoursFromShift()` | Parser HH:mm, 30 min pause ved >6t |
+| `useAssistantHoursCalculation.ts` | `calculateHoursFromShift()` | Identisk kopi |
+| `useKpiTest.ts` | `calculateHoursFromTimes()` | Lignende men med break_minutes param |
+| `useEffectiveHourlyRate.ts` | Inline beregning | Bruger `differenceInMinutes` |
+| `VagtplanFMContent.tsx` | Inline beregning | Direkte parse af tider |
+| `ShiftOverview.tsx` | Inline beregning | Direkte parse af tider |
 
-const employeeTeamMap = new Map<string, string>();
-for (const tm of teamMemberships || []) {
-  employeeTeamMap.set(tm.employee_id, tm.team_id);
-}
+**Inkonsistens**: Pausehåndtering varierer mellem funktioner.
 
-const teamIds = [...new Set(
-  (teamMemberships || []).map(tm => tm.team_id).filter(Boolean)
-)] as string[];
-```
+---
 
-**Ændring 3 - Hent absences med type (linje 84-90):**
+### 4. Periode-Beregning (26+ steder)
 
-```typescript
-// FØR:
-const { data: absences } = await supabase
-  .from("absence_request_v2")
-  .select("employee_id, start_date, end_date, is_full_day")
-  ...
+**Problem**: Payroll periode (15.-14.) og andre datoperioder beregnes på mange steder.
 
-// EFTER:
-const { data: absences } = await supabase
-  .from("absence_request_v2")
-  .select("employee_id, start_date, end_date, is_full_day, type")
-  ...
-```
+| Kategori | Antal steder |
+|----------|--------------|
+| `getPayrollPeriod()` i Edge Functions | 4 |
+| `calculatePayrollPeriod()` i frontend | 5+ |
+| `getDateRange()` funktioner | 10+ |
+| `getStartOfDay/Week/Month` helpers | 15+ |
 
-**Ændring 4 - Hent time_stamps (ny query efter absences):**
+**Inkonsistens**: Alle Edge Functions har deres egen kopi af dato-helpers.
+
+---
+
+### 5. Formattering (33+ steder)
+
+**Problem**: `formatCurrency()`, `formatValue()`, `formatNumber()` er defineret lokalt i 33+ filer.
 
 ```typescript
-// NY QUERY - Hent faktiske stemplinger
-const { data: timeStamps } = await supabase
-  .from("time_stamps")
-  .select("employee_id, clock_in, clock_out, break_minutes")
-  .in("employee_id", staffIds)
-  .gte("clock_in", format(periodStart, "yyyy-MM-dd") + "T00:00:00")
-  .lte("clock_in", format(periodEnd, "yyyy-MM-dd") + "T23:59:59");
+// Eksempel: Samme funktion i 33+ filer
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("da-DK", { 
+    style: "currency", 
+    currency: "DKK", 
+    maximumFractionDigits: 0 
+  }).format(amount);
 ```
 
-**Ændring 5 - Opdater absence map til at inkludere type:**
+---
+
+### 6. Arbejdsdage-Beregning (8+ steder)
+
+**Problem**: `countWorkDays()` og lignende funktioner er duplikeret.
+
+| Fil | Funktion |
+|-----|----------|
+| `useStaffHoursCalculation.ts` | `countWorkDaysInPeriod()` |
+| `TeamPerformanceTabs.tsx` | `getWorkDays()`, `getPossibleWorkDays()` |
+| `useEffectiveHourlyRate.ts` | `isWeekend()` check i loop |
+| `PayrollPeriodSelector.tsx` | Inline beregning |
+
+---
+
+## Løsningsarkitektur
+
+### Fase 1: Shared Edge Function Modules
+
+Opret centrale moduler i `supabase/functions/_shared/`:
+
+```text
+supabase/functions/_shared/
+├── pricing-service.ts      ← Provision & omsætning
+├── date-helpers.ts         ← Periode-beregninger
+├── format-helpers.ts       ← Formattering
+└── shift-helpers.ts        ← Timer-beregninger (fremtidig)
+```
+
+**Fil 1: `pricing-service.ts`**
 
 ```typescript
-// FØR:
-const absenceDates = new Set<string>();
-for (const absence of empAbsences) {
-  ...
-  for (const day of days) {
-    absenceDates.add(format(day, "yyyy-MM-dd"));
+// Unified pricing lookup with fallback hierarchy
+export async function getFmPricingMap(supabase: SupabaseClient) {
+  const map = new Map<string, PricingInfo>();
+
+  // 1. Load ALL products with base prices
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk, revenue_dkk");
+
+  for (const product of products || []) {
+    if (product.name && (product.commission_dkk || product.revenue_dkk)) {
+      map.set(product.name.toLowerCase(), {
+        commission: product.commission_dkk || 0,
+        revenue: product.revenue_dkk || 0,
+        source: 'product_base',
+      });
+    }
   }
-}
 
-// EFTER:
-const absenceDateMap = new Map<string, { type: string }>();
-for (const absence of empAbsences) {
-  const start = new Date(absence.start_date);
-  const end = new Date(absence.end_date);
-  const days = eachDayOfInterval({ start, end });
-  for (const day of days) {
-    absenceDateMap.set(format(day, "yyyy-MM-dd"), { type: absence.type });
+  // 2. Override with active pricing rules (higher priority)
+  const { data: rules } = await supabase
+    .from("product_pricing_rules")
+    .select("product:products!inner(name), commission_dkk, revenue_dkk")
+    .eq("is_active", true);
+
+  for (const rule of rules || []) {
+    const name = (rule.product as any)?.name?.toLowerCase();
+    if (name) {
+      map.set(name, {
+        commission: rule.commission_dkk || 0,
+        revenue: rule.revenue_dkk || 0,
+        source: 'pricing_rule',
+      });
+    }
   }
+
+  return map;
 }
 ```
 
-**Ændring 6 - Hovedlogik for timer-beregning:**
+**Fil 2: `date-helpers.ts`**
 
 ```typescript
-const hoursSource = salary?.hours_source || 'shift';
-let totalHours = 0;
+export function getStartOfDay(date: Date): Date { ... }
+export function getStartOfWeek(date: Date): Date { ... }
+export function getStartOfMonth(date: Date): Date { ... }
+export function getPayrollPeriod(date: Date): { start: Date; end: Date } { ... }
+export function countWorkDaysInPeriod(start: Date, end: Date): number { ... }
+```
 
-if (hoursSource === 'timestamp') {
-  // === ALFRED RUD / WILLIAM HOÉ: Brug faktiske stemplinger ===
-  const empTimeStamps = (timeStamps || []).filter(ts => ts.employee_id === staffId);
+**Fil 3: `format-helpers.ts`**
+
+```typescript
+export function formatCurrency(value: number): string { ... }
+export function formatValue(value: number, category: string): string { ... }
+export function formatDisplayName(fullName: string): string { ... }
+```
+
+---
+
+### Fase 2: Frontend Utility Library
+
+Opret `src/lib/calculations/`:
+
+```text
+src/lib/calculations/
+├── index.ts               ← Re-exports
+├── pricing.ts             ← Frontend pricing helpers
+├── vacation-pay.ts        ← Feriepenge-konstanter og beregninger
+├── dates.ts               ← Periode-helpers
+├── hours.ts               ← Timer-beregninger
+└── formatting.ts          ← Formattering
+```
+
+**Fil: `vacation-pay.ts`**
+
+```typescript
+// Central source of truth for vacation pay rates
+export const VACATION_PAY_RATES = {
+  SELLER: 0.125,        // 12.5% for sælgere
+  ASSISTANT: 0.125,     // 12.5% for assistenter
+  STAFF: 0.125,         // 12.5% for stab
+  LEADER: 0.01,         // 1% for teamledere
+} as const;
+
+export function getVacationPayRate(
+  vacationType: 'vacation_pay' | 'vacation_bonus' | null
+): number {
+  if (vacationType === 'vacation_pay') return VACATION_PAY_RATES.SELLER;
+  if (vacationType === 'vacation_bonus') return VACATION_PAY_RATES.LEADER;
+  return 0;
+}
+
+export function calculateVacationPay(
+  commission: number, 
+  rate: number = VACATION_PAY_RATES.SELLER
+): number {
+  return commission * rate;
+}
+```
+
+**Fil: `hours.ts`**
+
+```typescript
+const BREAK_THRESHOLD_MINUTES = 360; // 6 timer
+const BREAK_DURATION_MINUTES = 30;
+
+export function calculateHoursFromShift(
+  startTime: string, 
+  endTime: string,
+  breakMinutes?: number
+): number {
+  const [startH, startM] = startTime.split(":").map(Number);
+  const [endH, endM] = endTime.split(":").map(Number);
   
-  for (const ts of empTimeStamps) {
-    if (ts.clock_in && ts.clock_out) {
-      const clockIn = new Date(ts.clock_in);
-      const clockOut = new Date(ts.clock_out);
-      
-      const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
-      const breakMins = ts.break_minutes || 0;
-      const netMinutes = Math.max(0, totalMinutes - breakMins);
-      
-      totalHours += Math.round((netMinutes / 60) * 100) / 100;
-    }
-  }
-} else {
-  // === JEPPE BUSTER: Brug planlagte vagter ===
-  const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd });
-
-  for (const day of daysInPeriod) {
-    const dateStr = format(day, "yyyy-MM-dd");
-    const jsWeekday = getDay(day);
-    
-    const absenceInfo = absenceDateMap.get(dateStr);
-    
-    // Ferie/fri/no_show = 0 timer
-    if (absenceInfo && absenceInfo.type !== 'sick') {
-      continue;
-    }
-    
-    // Find planlagt vagt for denne dag
-    let scheduledHours = 0;
-    
-    if (individualShiftMap.has(dateStr)) {
-      const shift = individualShiftMap.get(dateStr)!;
-      scheduledHours = calculateHoursFromShift(shift.start, shift.end);
-    } else if (empShiftDays) {
-      const dayShift = empShiftDays.find(d => d.dayOfWeek === jsWeekday);
-      if (dayShift) {
-        scheduledHours = calculateHoursFromShift(dayShift.startTime, dayShift.endTime);
-      }
-    } else if (teamShiftDays) {
-      const dayShift = teamShiftDays.find(d => d.dayOfWeek === jsWeekday);
-      if (dayShift) {
-        scheduledHours = calculateHoursFromShift(dayShift.startTime, dayShift.endTime);
-      }
-    }
-    
-    // Sygdom = normal løn (som om planlagt vagt)
-    // Ingen fravær = normal løn
-    if (scheduledHours > 0) {
-      totalHours += scheduledHours;
-    }
-  }
+  const startMinutes = startH * 60 + (startM || 0);
+  const endMinutes = endH * 60 + (endM || 0);
+  
+  let totalMinutes = endMinutes - startMinutes;
+  if (totalMinutes < 0) totalMinutes += 24 * 60;
+  
+  // Apply break deduction
+  const breakToApply = breakMinutes !== undefined 
+    ? breakMinutes 
+    : (totalMinutes > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0);
+  
+  return Math.round(((totalMinutes - breakToApply) / 60) * 100) / 100;
 }
 ```
 
 ---
 
-## Forventet resultat (denne uge: 2-8. februar)
+### Fase 3: Migration af Edge Functions
 
-### Med `hours_source = 'shift'` (Jeppe Buster):
-- Mandag-fredag: 5 dage × 7 timer = 35 timer
-- Løn: 35 × 200 kr = 7.000 kr
-- Feriepenge: 7.000 × 12,5% = 875 kr
-- **Total: 7.875 kr**
-
-### Med `hours_source = 'timestamp'` (Alfred Rud):
-- Faktiske stemplinger: ~15,3 timer (fra database)
-- Løn: 15,3 × 160 kr = 2.448 kr
-- Feriepenge: 2.448 × 12,5% = 306 kr
-- **Total: ~2.754 kr**
-
-### Med `hours_source = 'timestamp'` (William Hoé):
-- Ingen stemplinger denne uge = 0 timer
-- **Total: 0 kr**
+| Edge Function | Ændring |
+|--------------|---------|
+| `calculate-kpi-values` | Import fra `_shared/`, fjern lokal `fetchFmCommissionMap` |
+| `calculate-kpi-incremental` | Import fra `_shared/`, fjern lokal kopi |
+| `calculate-leaderboard-incremental` | Import fra `_shared/`, fjern lokal kopi |
+| `tv-dashboard-data` | Import fra `_shared/`, fjern lokal `fmPricingMap` |
 
 ---
 
-## Berørte filer
+### Fase 4: Migration af Frontend Komponenter
 
-| Fil | Ændring |
-|-----|---------|
-| Database migration | Tilføj `hours_source` kolonne til `personnel_salaries` |
-| `src/hooks/useStaffHoursCalculation.ts` | Tilføj logik for `timestamp` vs `shift`, sygdoms-håndtering |
+**Høj prioritet (bruger deprecated tabel):**
+- `HeadToHeadComparison.tsx`
+- `RevenueByClient.tsx`
+- `DailyRevenueChart.tsx`
+- `useKpiTest.ts`
+
+**Medium prioritet (duplikeret logik):**
+- `useStaffHoursCalculation.ts`
+- `useAssistantHoursCalculation.ts`
+- `ClientDBTab.tsx`
+- `ClientDBDailyBreakdown.tsx`
+
+**Lav prioritet (formattering):**
+- 33+ filer med `formatCurrency()` duplikering
 
 ---
 
-## Test-scenarier
+## Teknisk Implementeringsplan
 
-1. Vælg "Denne uge" → Jeppe får 7.875 kr (fra vagtplan)
-2. Vælg "Denne uge" → Alfred får ~2.754 kr (fra indstemplinger)
-3. Tilføj sygdom for Jeppe → Han får stadig normal løn
-4. Tilføj ferie for Jeppe → 0 kr for den dag
+### Step 1: Opret shared modules (Backend)
+1. Opret `supabase/functions/_shared/pricing-service.ts`
+2. Opret `supabase/functions/_shared/date-helpers.ts`
+3. Opret `supabase/functions/_shared/format-helpers.ts`
 
+### Step 2: Migrer Edge Functions
+1. Opdater `calculate-kpi-values` til at bruge shared modules
+2. Opdater `calculate-kpi-incremental`
+3. Opdater `calculate-leaderboard-incremental`
+4. Opdater `tv-dashboard-data`
+5. Deploy og test
+
+### Step 3: Opret frontend utility library
+1. Opret `src/lib/calculations/` mappe
+2. Implementer `vacation-pay.ts`
+3. Implementer `hours.ts`
+4. Implementer `dates.ts`
+5. Implementer `formatting.ts`
+
+### Step 4: Migrer frontend komponenter
+1. Opdater hooks der bruger deprecated `product_campaign_overrides`
+2. Erstat hardcoded feriepenge-konstanter
+3. Erstat duplikeret timer-beregning
+4. Erstat duplikeret formattering (lav prioritet)
+
+---
+
+## Forventet Resultat
+
+| Metrik | Før | Efter |
+|--------|-----|-------|
+| Yousee FM omsætning | 0 kr | ~68.400 kr |
+| Pricing implementations | 17+ | 1 central |
+| Vacation pay implementations | 9+ | 1 central |
+| Hours calculation implementations | 6+ | 1 central |
+| Date helper implementations | 26+ | 2 (backend + frontend) |
+| Format implementations | 33+ | 2 (backend + frontend) |
+| Vedligeholdelsestid | Mange timer | Minimal |
+
+---
+
+## Relation til Eksisterende KPI-System
+
+Det nuværende KPI-system (`kpi_definitions`, `kpi_cached_values`, `dashboard_kpis`) er velstruktureret og bør **bevares**. Centraliseringen her handler om de underliggende **beregningsfunktioner** der bruges til at producere KPI-værdierne, ikke om at ændre KPI-arkitekturen.
+
+**Synergi:**
+- Shared pricing service bruges af KPI Edge Functions
+- Shared date helpers bruges af alle periode-beregninger
+- KPI-cache forbliver den primære kilde for dashboard-data
+
+---
+
+## Tidsestimat
+
+| Fase | Estimat |
+|------|---------|
+| Fase 1: Shared Edge Function Modules | 1-2 timer |
+| Fase 2: Frontend Utility Library | 1-2 timer |
+| Fase 3: Migration af Edge Functions | 2-3 timer |
+| Fase 4: Migration af Frontend (høj prioritet) | 2-3 timer |
+| Test og verifikation | 1-2 timer |
+| **Total** | **7-12 timer** |
+
+---
+
+## Anbefaling
+
+Start med **Fase 1 + 3** (Backend) for at løse det akutte Yousee-problem. Dette vil umiddelbart vise korrekt omsætning på alle dashboards. Derefter kan frontend-migreringen (Fase 2 + 4) udføres inkrementelt.
