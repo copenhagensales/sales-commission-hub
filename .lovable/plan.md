@@ -1,55 +1,97 @@
 
-# Fase 4B: Udvidet Frontend Migration - COMPLETED ✓
 
-## Status: Implementeret 2025-02-05
+# Opsætning af Frontend Test Konfiguration
+
+## Problem
+Projektet har unit tests i `src/lib/calculations/` men mangler den nødvendige infrastruktur til at køre dem:
+
+- ❌ Ingen `vitest.config.ts` konfigurationsfil
+- ❌ Ingen `test` script i `package.json`
+- ❌ Ingen `src/test/setup.ts` setup fil
+- ❌ `tsconfig.app.json` mangler `vitest/globals` types
+
+## Løsning
+
+### Step 1: Opret vitest.config.ts
+```typescript
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react-swc";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+  },
+  resolve: {
+    alias: { "@": path.resolve(__dirname, "./src") },
+  },
+});
+```
+
+### Step 2: Opret src/test/setup.ts
+```typescript
+import "@testing-library/jest-dom";
+
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => {},
+  }),
+});
+```
+
+### Step 3: Tilføj test script til package.json
+```json
+"scripts": {
+  "test": "vitest run",
+  "test:watch": "vitest"
+}
+```
+
+### Step 4: Opdater tsconfig.app.json
+Tilføj `"vitest/globals"` til `types` array i `compilerOptions`.
+
+### Step 5: Tilføj test dependencies (devDependencies)
+```json
+"@testing-library/jest-dom": "^6.6.0",
+"@testing-library/react": "^16.0.0",
+"jsdom": "^20.0.3"
+```
 
 ---
 
-## Opsummering af Ændringer
+## Eksisterende Tests der vil blive kørt
 
-### Del 1: Nye utilities tilføjet ✓
-- `roundToDecimals()` tilføjet til `formatting.ts`
-- `STANDARD_MONTH_DAYS` (30) tilføjet til `dates.ts`
-- Begge eksporteres fra `@/lib/calculations`
-
-### Del 2: countWorkDaysInPeriod Migration ✓
-| Fil | Status |
-|-----|--------|
-| `useStaffHoursCalculation.ts` | ✓ Lokal kopi fjernet, bruger central import |
-| `MyProfile.tsx` | ✓ Lokal `countWorkdays()` erstattet med central |
-| `CphSalesDashboard.tsx` | ✓ Lokal kopi fjernet, bruger central import |
-
-### Del 3: Break-logik Centralisering ✓
-| Fil | Status |
-|-----|--------|
-| `EmployeeCommissionHistory.tsx` | ✓ Bruger BREAK_THRESHOLD_MINUTES & BREAK_DURATION_MINUTES |
-| `useDashboardSalesData.ts` | ✓ Bruger centrale konstanter |
-| `DailyReports.tsx` | ✓ Bruger centrale konstanter |
-| `useKpiTest.ts` | ✓ Bruger centrale konstanter |
-
-### Del 4: STANDARD_MONTH_DAYS Migration ✓
-| Fil | Status |
-|-----|--------|
-| `ClientDBTab.tsx` | ✓ Lokal konstant fjernet, importerer fra central |
-
-### Del 5: formatPercentage - SKIPPED
-`StaffSalary.tsx` beholder sin lokale `formatPercentage` da den har specifik null-håndtering (returnerer "-" for null) som adskiller sig fra den centrale version.
+| Fil | Antal Tests | Beskrivelse |
+|-----|-------------|-------------|
+| `hours.test.ts` | ~25 | Break-logik, shift-beregninger, timestamp parsing |
+| `vacation-pay.test.ts` | ~11 | Feriepenge rates og beregninger |
 
 ---
 
-## Resultat
+## Forventet Resultat
+Efter implementering kan tests køres med:
+```bash
+npm run test
+```
 
-| Metrik | Før | Efter |
-|--------|-----|-------|
-| `countWorkDaysInPeriod` kopier | 4 | 1 central ✓ |
-| Break-logik (hardcoded) | 6 filer | 1 central ✓ |
-| `STANDARD_MONTH_DAYS` | 1 lokal | 1 central ✓ |
-| Nye utilities | 0 | 2 (`roundToDecimals`, `STANDARD_MONTH_DAYS`) |
+Output:
+```
+✓ src/lib/calculations/hours.test.ts (25 tests)
+✓ src/lib/calculations/vacation-pay.test.ts (11 tests)
 
----
+Test Files  2 passed
+Tests       36 passed
+```
 
-## Tekniske Bemærkninger
-
-- Alle ændringer er refactoring uden funktionalitetsændringer
-- Break-logik benytter nu konsistent `(rawHours * 60) > BREAK_THRESHOLD_MINUTES` check
-- `countWorkDaysInPeriod` i central library accepterer Date objekter (ikke strings)
