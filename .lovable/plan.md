@@ -1,120 +1,132 @@
 
 
-# Plan: Fix KPI Cache Akkumulerings-Bug
+# Plan: Fix "Glemt adgangskode" Flow
 
 ## Problemanalyse
 
-Jeg har identificeret en **kritisk data-integritetsfejl** i KPI-caching systemet der forårsager massive inflation af provision og salgstal.
+Når brugeren klikker "Glemt adgangskode" på login-siden, bruges Supabase's native `resetPasswordForEmail` flow. Problemet er:
 
-### Root Cause
+1. **Supabase logger automatisk brugeren ind** når de klikker på recovery-linket
+2. **Race condition**: Auth.tsx forsøger at detektere `PASSWORD_RECOVERY` event eller `type=recovery` i URL hash, men dette kan fejle pga. timing
+3. **Resultat**: Brugeren bliver logget ind og redirected til dashboard uden at ændre adgangskode
 
-1. **Watermark-opdatering fejler** - Funktionen `calculate-kpi-incremental` kan ikke opdatere sine watermarks pga. en konflikt mellem partial indexes på `kpi_watermarks` tabellen
-2. **Duplicate constraint fejl** - Logs viser gentagne fejl: `duplicate key value violates unique constraint "unique_watermark_key_null"`
-3. **Samme salg tælles igen og igen** - Fordi watermark sidder fast på 4. februar kl. 18:11, finder hver kørsel de samme ~130 salg som "nye" og tilføjer dem til cachen
+## Løsning
 
-### Data-sammenligning (Gustav Rathleff)
+Erstat Supabase's native recovery flow med det **eksisterende custom token-baserede flow** (`send-password-reset` → `/reset-password`), som allerede fungerer korrekt for admin-initierede resets.
 
-| Metric | Faktisk (DB) | KPI Cache | Inflation |
-|--------|-------------|-----------|-----------|
-| **Provision (lønperiode)** | 41.350 kr | 105.750 kr | +155% |
-| **Salg (lønperiode)** | 13 | 101 | +677% |
-| **Provision (i dag)** | 2.300 kr | 34.500 kr | +1400% |
-| **Salg (i dag)** | 1 | 30 | +2900% |
+### Arkitektur-diagram
 
-## Løsning (2 dele)
+```text
+NUVÆRENDE FLOW (problematisk):
+┌─────────────┐    ┌──────────────────┐    ┌────────────┐
+│ Auth.tsx    │───▶│ Supabase native  │───▶│ Auth.tsx   │
+│ isResetMode │    │ resetPassword-   │    │ Auto-login │
+│             │    │ ForEmail()       │    │ (BUG!)     │
+└─────────────┘    └──────────────────┘    └────────────┘
 
-### Del 1: Fix watermark upsert-logik
+NYT FLOW (robust):
+┌─────────────┐    ┌──────────────────┐    ┌────────────────┐    ┌──────────────┐
+│ Auth.tsx    │───▶│ initiate-        │───▶│ Email med      │───▶│/reset-password│
+│ isResetMode │    │ password-reset   │    │ custom token   │    │(KRÆVER kode) │
+│             │    │ (Edge Function)  │    │                │    │              │
+└─────────────┘    └──────────────────┘    └────────────────┘    └──────────────┘
+```
 
-Problemet er at Supabase's upsert med `onConflict` ikke håndterer NULL-værdier korrekt med partial indexes. Løsningen er at bruge en upsert-strategi der eksplicit håndterer NULL scope_id.
+## Implementering
 
-**Ændringer i `calculate-kpi-incremental/index.ts`:**
+### Del 1: Opret ny Edge Function
+
+Opretter `initiate-password-reset` som slår brugeren op i `employee_master_data` baseret på email og genererer et reset token.
+
+**Fil:** `supabase/functions/initiate-password-reset/index.ts`
 
 ```typescript
-// NUVÆRENDE (fejler):
-async function upsertWatermarks(supabase, watermarks) {
-  for (const wm of watermarks) {
-    await supabase
-      .from("kpi_watermarks")
-      .upsert(wm, { onConflict: "period_type,scope_type,scope_id" });
-  }
+// Lookup employee by email (private_email OR work_email)
+// Generate token, hash it, store in password_reset_tokens
+// Send email via M365 med link til /reset-password?token=xxx
+```
+
+**Vigtige punkter:**
+- Bruger `employee_master_data` til at finde brugerens navn
+- Genbruger token-hashing logik fra `send-password-reset`
+- Sender email via M365 Graph API (eksisterende setup)
+- Returnerer success selv hvis brugeren ikke findes (sikkerhed)
+
+### Del 2: Opdater Auth.tsx
+
+Ændrer `isResetMode` submitlogik til at kalde den nye Edge Function i stedet for `supabase.auth.resetPasswordForEmail`.
+
+**Ændringer i `src/pages/Auth.tsx` (linje ~352-362):**
+
+```typescript
+// FØR:
+} else if (isResetMode) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth`,
+  });
+  // ...
 }
 
-// NY LØSNING - Brug RPC eller direkte UPDATE + INSERT:
-async function upsertWatermarks(supabase, watermarks) {
-  for (const wm of watermarks) {
-    // For NULL scope_id, use direct update/insert pattern
-    if (wm.scope_id === null) {
-      const { error: updateError } = await supabase
-        .from("kpi_watermarks")
-        .update({ 
-          last_processed_at: wm.last_processed_at, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq("period_type", wm.period_type)
-        .eq("scope_type", wm.scope_type)
-        .is("scope_id", null);
-      
-      // If no rows updated, insert
-      if (updateError) {
-        console.log("[upsertWatermarks] Update failed, trying insert");
-      }
-    } else {
-      // Normal upsert for non-null scope_id
-      await supabase
-        .from("kpi_watermarks")
-        .upsert(wm, { onConflict: "period_type,scope_type,scope_id" });
-    }
-  }
+// EFTER:
+} else if (isResetMode) {
+  const { data, error: invokeError } = await supabase.functions.invoke(
+    "initiate-password-reset",
+    { body: { email: email.trim().toLowerCase() } }
+  );
+  
+  if (invokeError) throw invokeError;
+  
+  toast({
+    title: "Email sendt",
+    description: "Hvis din email er registreret, modtager du et link inden for få minutter. Tjek også spam-mappen.",
+  });
+  setIsResetMode(false);
 }
 ```
 
-### Del 2: Genberegn KPI cache fra bunden
+### Del 3: Oprydning i Auth.tsx
 
-Efter fix af upsert-logikken, skal cachen nulstilles og genberegnes:
+Fjerner eller forenkler den eksisterende `PASSWORD_RECOVERY` og `type=recovery` detection, da dette ikke længere er nødvendigt:
 
-1. **Slet korrupte employee-scoped cache værdier:**
-```sql
-DELETE FROM kpi_cached_values 
-WHERE scope_type = 'employee' 
-  AND kpi_slug IN ('sales_count', 'total_commission')
-  AND period_type IN ('today', 'payroll_period');
-```
-
-2. **Nulstil watermarks:**
-```sql
-UPDATE kpi_watermarks 
-SET last_processed_at = '2026-01-15T00:00:00Z'
-WHERE scope_type = 'employee';
-```
-
-3. **Trigger full refresh** via `calculate-kpi-values` funktionen
+- Fjern recovery-detection i `useEffect` (linje 248-260)
+- Behold `onAuthStateChange` listener for andre events
+- Fjern `isNewPasswordMode` state og tilhørende UI (bruger `/reset-password` i stedet)
 
 ## Tekniske detaljer
 
-### Berørte filer
-- `supabase/functions/calculate-kpi-incremental/index.ts` - Fix `upsertWatermarks` funktion
+### Ny Edge Function struktur
 
-### Database ændringer
-- Ingen schema ændringer nødvendige
-- Data-cleanup kræves (engangskørsel)
-
-### Fremtidig forebyggelse
-Tilføj en validerings-check der sammenligner cache mod faktiske tal:
-
-```typescript
-// Add validation before upsert (linje ~465)
-if (Math.abs(existingValue - actualValue) > actualValue * 0.5) {
-  console.warn(`[VALIDATION] Large discrepancy detected for ${empId}: 
-    cached=${existingValue}, actual=${actualValue}`);
-  // Reset to actual value instead of accumulating
-  newValue = actualValue;
-}
+```text
+supabase/functions/initiate-password-reset/
+└── index.ts
 ```
 
-## Implementeringsrækkefølge
+### Database tabeller (eksisterende)
+- `password_reset_tokens` - Gemmer hashed tokens med expiry
+- `employee_master_data` - Lookup af brugerinfo
 
-1. Deploy fix til `calculate-kpi-incremental` edge function
-2. Kør data cleanup SQL
-3. Verificer at watermarks nu opdateres korrekt
-4. Bekræft at Gustav Rathleff's tal matcher database
+### Email-afsendelse
+Genbruger M365 Graph API setup fra `send-password-reset`:
+- Kræver `M365_TENANT_ID`, `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, `M365_SENDER_EMAIL`
+
+### Sikkerhed
+- Returnerer altid "Email sendt" besked for at forhindre user enumeration
+- Token expires efter 24 timer
+- Token kan kun bruges én gang
+
+## Berørte filer
+
+| Fil | Ændring |
+|-----|---------|
+| `supabase/functions/initiate-password-reset/index.ts` | **NY** - Edge Function |
+| `src/pages/Auth.tsx` | Opdater reset-mode submit + fjern recovery detection |
+| `supabase/config.toml` | Auto-opdateret med ny function |
+
+## Test-scenarier
+
+1. Bruger indtaster registreret email → modtager email med link
+2. Bruger klikker link → kommer til `/reset-password` med token
+3. Bruger opretter ny adgangskode → redirectes til login
+4. Bruger logger ind med ny adgangskode → success
+5. Bruger indtaster ukendt email → modtager stadig "Email sendt" (sikkerhed)
 
