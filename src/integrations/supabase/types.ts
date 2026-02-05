@@ -91,6 +91,27 @@ export type Database = {
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "absence_request_v2_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absence_request_v2_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absence_request_v2_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
         ]
       }
       adversus_campaign_mappings: {
