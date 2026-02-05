@@ -1,360 +1,182 @@
 
-# Plan: Centraliseret Beregnings-Arkitektur (Unified Calculation Services)
+# Fase 4: Frontend Migration til Central Calculations Library
 
-## Executive Summary
+## Status Oversigt
 
-En grundig analyse af kodebasen afslører **6 hovedområder** med fragmenteret og duplikeret beregningslogik, hvilket forårsager inkonsistens, vedligeholdelsesproblemer og fejl som Yousee's manglende omsætning. Denne plan foreslår en centraliseret arkitektur med delte services.
-
----
-
-## Identificerede Problemområder
-
-### 1. Provision & Omsætning (17+ steder)
-
-**Problem**: Beregning af commission og revenue sker på 17+ forskellige steder med inkonsistent logik.
-
-| Lokation | Implementering | Problem |
-|----------|----------------|---------|
-| `calculate-kpi-values` (Edge) | `fetchFmCommissionMap()` bruger KUN `product_pricing_rules` | Yousee FM = 0 kr |
-| `calculate-kpi-incremental` (Edge) | Separat version af `fetchFmCommissionMap()` | Inkonsistent |
-| `calculate-leaderboard-incremental` (Edge) | Tredje version | Inkonsistent |
-| `tv-dashboard-data` (Edge) | `fmPricingMap` - fjerde implementering | Inkonsistent |
-| `HeadToHeadComparison.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
-| `RevenueByClient.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
-| `DailyRevenueChart.tsx` | Bruger GAMMEL `product_campaign_overrides` | Deprecated |
-| `EmployeeCommissionHistory.tsx` | Direkte `products.commission_dkk` | Mangler rules |
-
-**Root Cause**: FM-produkter (Yousee) har priser i `products` tabellen, men Edge Functions kigger kun i `product_pricing_rules`.
+| Fase | Status |
+|------|--------|
+| Fase 1: Shared Edge Function Modules | ✅ Komplet |
+| Fase 2: Frontend Utility Library | ✅ Komplet |
+| Fase 3: Migration af Edge Functions | ✅ Komplet |
+| **Fase 4: Migration af Frontend Komponenter** | ❌ I gang |
 
 ---
 
-### 2. Feriepenge-Beregning (9+ steder)
+## Fase 4 - Detaljeret Migrationsplan
 
-**Problem**: Feriepenge-satser er hardcoded på mindst 9 forskellige steder med varierende logik.
+### Del 1: Vacation Pay Migration (8 filer)
 
-| Fil | Konstant | Værdi |
-|-----|----------|-------|
-| `useStaffHoursCalculation.ts` | `VACATION_PAY_RATE` | 0.125 (12.5%) |
-| `useAssistantHoursCalculation.ts` | `ASSISTANT_VACATION_PAY_RATE` | 0.125 (12.5%) |
-| `ClientDBTab.tsx` | `SELLER_VACATION_RATE` | 0.125 (12.5%) |
-| `ClientDBTab.tsx` | `LEADER_VACATION_RATE` | 0.01 (1%) |
-| `ClientDBDailyBreakdown.tsx` | `SELLER_VACATION_RATE` | 0.125 (12.5%) |
-| `Home.tsx` | Inline beregning | 0.125 eller 0.01 |
-| `MyProfile.tsx` | Inline beregning | 0.125 |
-| `RevenueByClient.tsx` | Inline beregning | 0.125 |
-| `useSellerSalariesCached.ts` | Via `salary_types` tabel | Dynamisk lookup |
+Erstat hardcoded vacation pay rates med import fra `@/lib/calculations`:
 
-**Inkonsistens**: Nogle steder bruger hardcoded værdier, andre bruger dynamiske lookups fra `salary_types` tabellen.
-
----
-
-### 3. Timer-Beregning (6+ steder)
-
-**Problem**: Logik for at beregne arbejdstimer fra vagter/stemplinger er duplikeret.
-
-| Fil | Funktion | Logik |
-|-----|----------|-------|
-| `useStaffHoursCalculation.ts` | `calculateHoursFromShift()` | Parser HH:mm, 30 min pause ved >6t |
-| `useAssistantHoursCalculation.ts` | `calculateHoursFromShift()` | Identisk kopi |
-| `useKpiTest.ts` | `calculateHoursFromTimes()` | Lignende men med break_minutes param |
-| `useEffectiveHourlyRate.ts` | Inline beregning | Bruger `differenceInMinutes` |
-| `VagtplanFMContent.tsx` | Inline beregning | Direkte parse af tider |
-| `ShiftOverview.tsx` | Inline beregning | Direkte parse af tider |
-
-**Inkonsistens**: Pausehåndtering varierer mellem funktioner.
+| Fil | Nuværende Kode | Ny Kode |
+|-----|----------------|---------|
+| `useStaffHoursCalculation.ts` | `const VACATION_PAY_RATE = 0.125` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
+| `useAssistantHoursCalculation.ts` | `const ASSISTANT_VACATION_PAY_RATE = 0.125` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
+| `ClientDBTab.tsx` | `const SELLER_VACATION_RATE = 0.125; const LEADER_VACATION_RATE = 0.01` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
+| `ClientDBDailyBreakdown.tsx` | `const SELLER_VACATION_RATE = 0.125` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
+| `Home.tsx` | `if (employee.vacation_type === 'vacation_pay') return 0.125` | `import { getVacationPayRate } from '@/lib/calculations'` |
+| `MyProfile.tsx` | `const vacationPayRate = 0.125` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
+| `RevenueByClient.tsx` | `totalCommission * 0.125` | `import { calculateVacationPay } from '@/lib/calculations'` |
+| `HeroStatusCard.tsx` | `projectedFinal * 0.125` | `import { VACATION_PAY_RATES } from '@/lib/calculations'` |
 
 ---
 
-### 4. Periode-Beregning (26+ steder)
+### Del 2: Hours Calculation Migration (2 filer)
 
-**Problem**: Payroll periode (15.-14.) og andre datoperioder beregnes på mange steder.
+Erstat duplikeret `calculateHoursFromShift()` med central funktion:
 
-| Kategori | Antal steder |
-|----------|--------------|
-| `getPayrollPeriod()` i Edge Functions | 4 |
-| `calculatePayrollPeriod()` i frontend | 5+ |
-| `getDateRange()` funktioner | 10+ |
-| `getStartOfDay/Week/Month` helpers | 15+ |
+| Fil | Nuværende | Ændring |
+|-----|-----------|---------|
+| `useStaffHoursCalculation.ts` | Lokal `calculateHoursFromShift()` (linje 256-275) | Fjern lokal, import fra `@/lib/calculations` |
+| `useAssistantHoursCalculation.ts` | Lokal `calculateHoursFromShift()` (linje 231-250) | Fjern lokal, import fra `@/lib/calculations` |
 
-**Inkonsistens**: Alle Edge Functions har deres egen kopi af dato-helpers.
+Den centrale funktion i `src/lib/calculations/hours.ts` håndterer:
+- Parsing af HH:mm og HH:mm:ss format
+- Overnight shifts (når endTime < startTime)
+- 30-minutters pause ved vagter over 6 timer
+- Afrunding til 2 decimaler
 
 ---
 
-### 5. Formattering (33+ steder)
+### Del 3: Formatting Migration (28 filer - Lav Prioritet)
 
-**Problem**: `formatCurrency()`, `formatValue()`, `formatNumber()` er defineret lokalt i 33+ filer.
+28 filer har lokale `formatCurrency()` funktioner. Disse skal migreres til:
 
 ```typescript
-// Eksempel: Samme funktion i 33+ filer
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("da-DK", { 
-    style: "currency", 
-    currency: "DKK", 
-    maximumFractionDigits: 0 
-  }).format(amount);
+import { formatCurrency } from '@/lib/calculations';
 ```
 
----
+**Højest prioriterede filer** (bruges i payroll/DB beregninger):
+1. `ClientDBTab.tsx`
+2. `ClientDBDailyBreakdown.tsx`
+3. `SellerSalariesTab.tsx`
+4. `CombinedSalaryTab.tsx`
+5. `TeamExpensesTab.tsx`
+6. `DBDailyBreakdown.tsx`
 
-### 6. Arbejdsdage-Beregning (8+ steder)
-
-**Problem**: `countWorkDays()` og lignende funktioner er duplikeret.
-
-| Fil | Funktion |
-|-----|----------|
-| `useStaffHoursCalculation.ts` | `countWorkDaysInPeriod()` |
-| `TeamPerformanceTabs.tsx` | `getWorkDays()`, `getPossibleWorkDays()` |
-| `useEffectiveHourlyRate.ts` | `isWeekend()` check i loop |
-| `PayrollPeriodSelector.tsx` | Inline beregning |
-
----
-
-## Løsningsarkitektur
-
-### Fase 1: Shared Edge Function Modules
-
-Opret centrale moduler i `supabase/functions/_shared/`:
-
-```text
-supabase/functions/_shared/
-├── pricing-service.ts      ← Provision & omsætning
-├── date-helpers.ts         ← Periode-beregninger
-├── format-helpers.ts       ← Formattering
-└── shift-helpers.ts        ← Timer-beregninger (fremtidig)
-```
-
-**Fil 1: `pricing-service.ts`**
-
-```typescript
-// Unified pricing lookup with fallback hierarchy
-export async function getFmPricingMap(supabase: SupabaseClient) {
-  const map = new Map<string, PricingInfo>();
-
-  // 1. Load ALL products with base prices
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, name, commission_dkk, revenue_dkk");
-
-  for (const product of products || []) {
-    if (product.name && (product.commission_dkk || product.revenue_dkk)) {
-      map.set(product.name.toLowerCase(), {
-        commission: product.commission_dkk || 0,
-        revenue: product.revenue_dkk || 0,
-        source: 'product_base',
-      });
-    }
-  }
-
-  // 2. Override with active pricing rules (higher priority)
-  const { data: rules } = await supabase
-    .from("product_pricing_rules")
-    .select("product:products!inner(name), commission_dkk, revenue_dkk")
-    .eq("is_active", true);
-
-  for (const rule of rules || []) {
-    const name = (rule.product as any)?.name?.toLowerCase();
-    if (name) {
-      map.set(name, {
-        commission: rule.commission_dkk || 0,
-        revenue: rule.revenue_dkk || 0,
-        source: 'pricing_rule',
-      });
-    }
-  }
-
-  return map;
-}
-```
-
-**Fil 2: `date-helpers.ts`**
-
-```typescript
-export function getStartOfDay(date: Date): Date { ... }
-export function getStartOfWeek(date: Date): Date { ... }
-export function getStartOfMonth(date: Date): Date { ... }
-export function getPayrollPeriod(date: Date): { start: Date; end: Date } { ... }
-export function countWorkDaysInPeriod(start: Date, end: Date): number { ... }
-```
-
-**Fil 3: `format-helpers.ts`**
-
-```typescript
-export function formatCurrency(value: number): string { ... }
-export function formatValue(value: number, category: string): string { ... }
-export function formatDisplayName(fullName: string): string { ... }
-```
-
----
-
-### Fase 2: Frontend Utility Library
-
-Opret `src/lib/calculations/`:
-
-```text
-src/lib/calculations/
-├── index.ts               ← Re-exports
-├── pricing.ts             ← Frontend pricing helpers
-├── vacation-pay.ts        ← Feriepenge-konstanter og beregninger
-├── dates.ts               ← Periode-helpers
-├── hours.ts               ← Timer-beregninger
-└── formatting.ts          ← Formattering
-```
-
-**Fil: `vacation-pay.ts`**
-
-```typescript
-// Central source of truth for vacation pay rates
-export const VACATION_PAY_RATES = {
-  SELLER: 0.125,        // 12.5% for sælgere
-  ASSISTANT: 0.125,     // 12.5% for assistenter
-  STAFF: 0.125,         // 12.5% for stab
-  LEADER: 0.01,         // 1% for teamledere
-} as const;
-
-export function getVacationPayRate(
-  vacationType: 'vacation_pay' | 'vacation_bonus' | null
-): number {
-  if (vacationType === 'vacation_pay') return VACATION_PAY_RATES.SELLER;
-  if (vacationType === 'vacation_bonus') return VACATION_PAY_RATES.LEADER;
-  return 0;
-}
-
-export function calculateVacationPay(
-  commission: number, 
-  rate: number = VACATION_PAY_RATES.SELLER
-): number {
-  return commission * rate;
-}
-```
-
-**Fil: `hours.ts`**
-
-```typescript
-const BREAK_THRESHOLD_MINUTES = 360; // 6 timer
-const BREAK_DURATION_MINUTES = 30;
-
-export function calculateHoursFromShift(
-  startTime: string, 
-  endTime: string,
-  breakMinutes?: number
-): number {
-  const [startH, startM] = startTime.split(":").map(Number);
-  const [endH, endM] = endTime.split(":").map(Number);
-  
-  const startMinutes = startH * 60 + (startM || 0);
-  const endMinutes = endH * 60 + (endM || 0);
-  
-  let totalMinutes = endMinutes - startMinutes;
-  if (totalMinutes < 0) totalMinutes += 24 * 60;
-  
-  // Apply break deduction
-  const breakToApply = breakMinutes !== undefined 
-    ? breakMinutes 
-    : (totalMinutes > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0);
-  
-  return Math.round(((totalMinutes - breakToApply) / 60) * 100) / 100;
-}
-```
-
----
-
-### Fase 3: Migration af Edge Functions
-
-| Edge Function | Ændring |
-|--------------|---------|
-| `calculate-kpi-values` | Import fra `_shared/`, fjern lokal `fetchFmCommissionMap` |
-| `calculate-kpi-incremental` | Import fra `_shared/`, fjern lokal kopi |
-| `calculate-leaderboard-incremental` | Import fra `_shared/`, fjern lokal kopi |
-| `tv-dashboard-data` | Import fra `_shared/`, fjern lokal `fmPricingMap` |
-
----
-
-### Fase 4: Migration af Frontend Komponenter
-
-**Høj prioritet (bruger deprecated tabel):**
+**Øvrige filer** (kan migreres senere):
 - `HeadToHeadComparison.tsx`
-- `RevenueByClient.tsx`
-- `DailyRevenueChart.tsx`
-- `useKpiTest.ts`
-
-**Medium prioritet (duplikeret logik):**
-- `useStaffHoursCalculation.ts`
-- `useAssistantHoursCalculation.ts`
-- `ClientDBTab.tsx`
-- `ClientDBDailyBreakdown.tsx`
-
-**Lav prioritet (formattering):**
-- 33+ filer med `formatCurrency()` duplikering
-
----
-
-## Teknisk Implementeringsplan
-
-### Step 1: Opret shared modules (Backend)
-1. Opret `supabase/functions/_shared/pricing-service.ts`
-2. Opret `supabase/functions/_shared/date-helpers.ts`
-3. Opret `supabase/functions/_shared/format-helpers.ts`
-
-### Step 2: Migrer Edge Functions
-1. Opdater `calculate-kpi-values` til at bruge shared modules
-2. Opdater `calculate-kpi-incremental`
-3. Opdater `calculate-leaderboard-incremental`
-4. Opdater `tv-dashboard-data`
-5. Deploy og test
-
-### Step 3: Opret frontend utility library
-1. Opret `src/lib/calculations/` mappe
-2. Implementer `vacation-pay.ts`
-3. Implementer `hours.ts`
-4. Implementer `dates.ts`
-5. Implementer `formatting.ts`
-
-### Step 4: Migrer frontend komponenter
-1. Opdater hooks der bruger deprecated `product_campaign_overrides`
-2. Erstat hardcoded feriepenge-konstanter
-3. Erstat duplikeret timer-beregning
-4. Erstat duplikeret formattering (lav prioritet)
+- `DailyCommissionChart.tsx`
+- `HeroPulseWidget.tsx`
+- `EmployeeCommissionHistory.tsx`
+- `LeagueAdminDashboard.tsx`
+- `ChurnCalculator.tsx`
+- `EesyTmDashboard.tsx`
+- `TdcErhvervDashboard.tsx`
+- `UnitedDashboard.tsx`
+- `CsTop20Dashboard.tsx`
+- `SalesDashboard.tsx`
+- `TeamLeaderSalary.tsx`
+- `AssistantSalary.tsx`
+- `GoalProgressRing.tsx`
+- + 13 andre filer
 
 ---
 
-## Forventet Resultat
+## Implementeringsrækkefølge
+
+### Step 1: Vacation Pay (Høj prioritet)
+1. Opdater `useStaffHoursCalculation.ts` - erstat konstant
+2. Opdater `useAssistantHoursCalculation.ts` - erstat konstant
+3. Opdater `ClientDBTab.tsx` - erstat begge konstanter
+4. Opdater `ClientDBDailyBreakdown.tsx` - erstat konstant
+5. Opdater `Home.tsx` - brug `getVacationPayRate()`
+6. Opdater `MyProfile.tsx` - brug konstant
+7. Opdater `RevenueByClient.tsx` - brug `calculateVacationPay()`
+8. Opdater `HeroStatusCard.tsx` - brug konstant
+
+### Step 2: Hours Calculation (Høj prioritet)
+1. Opdater `useStaffHoursCalculation.ts` - fjern lokal funktion, import central
+2. Opdater `useAssistantHoursCalculation.ts` - fjern lokal funktion, import central
+
+### Step 3: Formatting (Lav prioritet - kan gøres inkrementelt)
+1. Start med payroll-relaterede filer (6 stk)
+2. Derefter dashboard-filer efter behov
+
+---
+
+## Tekniske Ændringer
+
+### Eksempel: useStaffHoursCalculation.ts
+
+**Før:**
+```typescript
+const VACATION_PAY_RATE = 0.125; // 12.5%
+
+// ... senere i filen ...
+const vacationPay = baseSalary * VACATION_PAY_RATE;
+
+// ... og lokal funktion ...
+function calculateHoursFromShift(startTime: string, endTime: string): number {
+  // 20 linjer kode
+}
+```
+
+**Efter:**
+```typescript
+import { VACATION_PAY_RATES, calculateHoursFromShift } from '@/lib/calculations';
+
+// ... senere i filen ...
+const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
+
+// Lokal calculateHoursFromShift() funktion FJERNET
+```
+
+### Eksempel: Home.tsx
+
+**Før:**
+```typescript
+const vacationPayRate = useMemo(() => {
+  if (!employee?.vacation_type) return 0;
+  if (employee.vacation_type === 'vacation_pay') return 0.125;
+  if (employee.vacation_type === 'vacation_bonus') return 0.01;
+  return 0;
+}, [employee?.vacation_type]);
+```
+
+**Efter:**
+```typescript
+import { getVacationPayRate } from '@/lib/calculations';
+
+const vacationPayRate = useMemo(() => {
+  return getVacationPayRate(employee?.vacation_type || null);
+}, [employee?.vacation_type]);
+```
+
+---
+
+## Forventet Resultat Efter Fase 4
 
 | Metrik | Før | Efter |
 |--------|-----|-------|
-| Yousee FM omsætning | 0 kr | ~68.400 kr |
-| Pricing implementations | 17+ | 1 central |
-| Vacation pay implementations | 9+ | 1 central |
-| Hours calculation implementations | 6+ | 1 central |
-| Date helper implementations | 26+ | 2 (backend + frontend) |
-| Format implementations | 33+ | 2 (backend + frontend) |
-| Vedligeholdelsestid | Mange timer | Minimal |
+| Vacation pay konstanter | 8 filer | 1 central (`vacation-pay.ts`) |
+| calculateHoursFromShift() | 2 kopier | 1 central (`hours.ts`) |
+| formatCurrency() | 28 filer | 1 central (`formatting.ts`) |
+| Vedligeholdelse | Ændringer i mange filer | Ændringer ét sted |
 
 ---
 
-## Relation til Eksisterende KPI-System
+## Tidsestimat for Fase 4
 
-Det nuværende KPI-system (`kpi_definitions`, `kpi_cached_values`, `dashboard_kpis`) er velstruktureret og bør **bevares**. Centraliseringen her handler om de underliggende **beregningsfunktioner** der bruges til at producere KPI-værdierne, ikke om at ændre KPI-arkitekturen.
-
-**Synergi:**
-- Shared pricing service bruges af KPI Edge Functions
-- Shared date helpers bruges af alle periode-beregninger
-- KPI-cache forbliver den primære kilde for dashboard-data
-
----
-
-## Tidsestimat
-
-| Fase | Estimat |
-|------|---------|
-| Fase 1: Shared Edge Function Modules | 1-2 timer |
-| Fase 2: Frontend Utility Library | 1-2 timer |
-| Fase 3: Migration af Edge Functions | 2-3 timer |
-| Fase 4: Migration af Frontend (høj prioritet) | 2-3 timer |
-| Test og verifikation | 1-2 timer |
-| **Total** | **7-12 timer** |
+| Del | Estimat |
+|-----|---------|
+| Del 1: Vacation Pay (8 filer) | 30-45 min |
+| Del 2: Hours Calculation (2 filer) | 15-20 min |
+| Del 3: Formatting (28 filer) | 1-2 timer (kan gøres inkrementelt) |
+| **Total Fase 4** | **2-3 timer** |
 
 ---
 
 ## Anbefaling
 
-Start med **Fase 1 + 3** (Backend) for at løse det akutte Yousee-problem. Dette vil umiddelbart vise korrekt omsætning på alle dashboards. Derefter kan frontend-migreringen (Fase 2 + 4) udføres inkrementelt.
+Start med **Del 1 + Del 2** (vacation pay + hours) da disse er højest prioritet og direkte påvirker lønberegninger. Formatting (Del 3) kan migreres inkrementelt over tid.
