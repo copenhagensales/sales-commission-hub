@@ -541,17 +541,24 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         }
       });
 
-      // 4. Fetch product campaign overrides
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
+      // 4. Fetch product pricing rules (replaces deprecated product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk")
+        .eq("is_active", true);
       
+      // Build campaign override map: product_id + campaign_mapping_id -> { commission, revenue }
       const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      (productCampaignOverrides || []).forEach(o => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        campaignOverrideMap.set(key, {
-          commission: o.commission_dkk ?? 0,
-          revenue: o.revenue_dkk ?? 0
+      (productPricingRules || []).forEach(rule => {
+        const campaignIds = rule.campaign_mapping_ids || [];
+        campaignIds.forEach((campaignMappingId: string) => {
+          const key = `${rule.product_id}_${campaignMappingId}`;
+          if (!campaignOverrideMap.has(key)) {
+            campaignOverrideMap.set(key, {
+              commission: rule.commission_dkk ?? 0,
+              revenue: rule.revenue_dkk ?? 0
+            });
+          }
         });
       });
 

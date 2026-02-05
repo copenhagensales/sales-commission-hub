@@ -221,17 +221,26 @@ export default function RevenueByClient() {
         campaignIdToMappingId.set(m.adversus_campaign_id, m.id);
       });
 
-      // Get product campaign overrides (for both revenue and commission)
-      const { data: productCampaignOverrides } = await supabase
-        .from("product_campaign_overrides")
-        .select("product_id, campaign_mapping_id, revenue_dkk, commission_dkk");
+      // Get product pricing rules (replaces deprecated product_campaign_overrides)
+      const { data: productPricingRules } = await supabase
+        .from("product_pricing_rules")
+        .select("product_id, campaign_mapping_ids, revenue_dkk, commission_dkk")
+        .eq("is_active", true);
       
+      // Build override maps: product_id + campaign_mapping_id -> value
       const revenueOverrideMap = new Map<string, number>();
       const commissionOverrideMap = new Map<string, number>();
-      productCampaignOverrides?.forEach((o) => {
-        const key = `${o.product_id}_${o.campaign_mapping_id}`;
-        if (o.revenue_dkk !== null) revenueOverrideMap.set(key, o.revenue_dkk);
-        if (o.commission_dkk !== null) commissionOverrideMap.set(key, o.commission_dkk);
+      productPricingRules?.forEach((rule) => {
+        const campaignIds = rule.campaign_mapping_ids || [];
+        campaignIds.forEach((campaignMappingId: string) => {
+          const key = `${rule.product_id}_${campaignMappingId}`;
+          if (rule.revenue_dkk !== null && !revenueOverrideMap.has(key)) {
+            revenueOverrideMap.set(key, rule.revenue_dkk);
+          }
+          if (rule.commission_dkk !== null && !commissionOverrideMap.has(key)) {
+            commissionOverrideMap.set(key, rule.commission_dkk);
+          }
+        });
       });
 
       // Map sale_items to sales

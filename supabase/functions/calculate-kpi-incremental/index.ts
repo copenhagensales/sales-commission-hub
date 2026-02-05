@@ -88,21 +88,73 @@ interface CachedValue {
   calculated_at: string;
 }
 
-// ============= FM COMMISSION MAP =============
+// ============= FM COMMISSION MAP (Unified Pricing Service) =============
+// Implements two-tier fallback: product_pricing_rules -> products.commission_dkk/revenue_dkk
+// This ensures FM products (like Yousee) that don't have pricing rules still get their pricing
 async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, number>> {
-  const { data: rules } = await supabase
-    .from("product_pricing_rules")
-    .select("product_name, commission_dkk")
-    .order("commission_dkk", { ascending: false, nullsFirst: false });
-  
-  const map = new Map<string, number>();
-  for (const rule of (rules || []) as FmPricingRule[]) {
-    const key = rule.product_name?.toLowerCase();
-    if (key && !map.has(key)) {
-      map.set(key, rule.commission_dkk || 0);
+  const fullMap = new Map<string, { commission: number; source: string }>();
+
+  // 1. Load ALL products with base prices FIRST (fallback)
+  const { data: products, error: productsError } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk");
+
+  if (productsError) {
+    console.error("[fetchFmCommissionMap] Error fetching products:", productsError);
+  }
+
+  // Set base prices from products table
+  for (const product of (products || [])) {
+    const key = product.name?.toLowerCase();
+    if (key && product.commission_dkk !== null) {
+      fullMap.set(key, {
+        commission: product.commission_dkk || 0,
+        source: 'product_base',
+      });
     }
   }
-  return map;
+
+  console.log(`[fetchFmCommissionMap] Loaded ${fullMap.size} products with base prices`);
+
+  // 2. Override with active pricing rules (higher priority)
+  const { data: rules, error: rulesError } = await supabase
+    .from("product_pricing_rules")
+    .select(`
+      id,
+      product:products!inner(name),
+      commission_dkk,
+      priority
+    `)
+    .eq("is_active", true)
+    .order("priority", { ascending: false, nullsFirst: true });
+
+  if (rulesError) {
+    console.error("[fetchFmCommissionMap] Error fetching pricing rules:", rulesError);
+  }
+
+  // Track which products have been set by pricing rules
+  const rulesApplied = new Set<string>();
+
+  for (const rule of (rules || [])) {
+    const productData = rule.product as any;
+    const key = productData?.name?.toLowerCase();
+    if (key && !rulesApplied.has(key)) {
+      fullMap.set(key, {
+        commission: rule.commission_dkk || 0,
+        source: 'pricing_rule',
+      });
+      rulesApplied.add(key);
+    }
+  }
+
+  console.log(`[fetchFmCommissionMap] Applied ${rulesApplied.size} pricing rules. Final map size: ${fullMap.size}`);
+  
+  // Return simplified map (just commission values) for backwards compatibility
+  const result = new Map<string, number>();
+  for (const [key, value] of fullMap) {
+    result.set(key, value.commission);
+  }
+  return result;
 }
 
 // ============= MAIN FUNCTION =============

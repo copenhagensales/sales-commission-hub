@@ -173,39 +173,69 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
   return allSales;
 }
 
-// ============= FM COMMISSION MAP HELPER =============
-// Fetches product pricing rules and creates a case-insensitive map of product_name -> commission_dkk
-// Joins with products table to get actual product names (product_name column doesn't exist in product_pricing_rules)
-// Prioritizes highest commission for each product
-async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; price: number }>> {
-  // Join with products table to get the actual product name
-  const { data: rules, error } = await supabase
-    .from("product_pricing_rules")
-    .select(`
-      product:products!inner(name),
-      commission_dkk,
-      revenue_dkk
-    `)
-    .eq("is_active", true)
-    .order("commission_dkk", { ascending: false, nullsFirst: false });
-  
-  if (error) {
-    console.error(`[fetchFmCommissionMap] Error fetching pricing rules:`, error);
+// ============= FM COMMISSION MAP (Unified Pricing Service) =============
+// Implements two-tier fallback: product_pricing_rules -> products.commission_dkk/revenue_dkk
+// This ensures FM products (like Yousee) that don't have pricing rules still get their pricing
+async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; price: number; source: string }>> {
+  const map = new Map<string, { commission: number; price: number; source: string }>();
+
+  // 1. Load ALL products with base prices FIRST (fallback)
+  const { data: products, error: productsError } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk, revenue_dkk");
+
+  if (productsError) {
+    console.error("[fetchFmCommissionMap] Error fetching products:", productsError);
   }
-  
-  const map = new Map<string, { commission: number; price: number }>();
-  for (const rule of (rules || [])) {
-    const productData = rule.product as any;
-    const key = productData?.name?.toLowerCase();
-    if (key && !map.has(key)) {
-      // First occurrence has highest commission due to ordering
+
+  // Set base prices from products table
+  for (const product of (products || [])) {
+    const key = product.name?.toLowerCase();
+    if (key && (product.commission_dkk !== null || product.revenue_dkk !== null)) {
       map.set(key, {
-        commission: rule.commission_dkk || 0,
-        price: rule.revenue_dkk || 0,
+        commission: product.commission_dkk || 0,
+        price: product.revenue_dkk || 0,
+        source: 'product_base',
       });
     }
   }
-  console.log(`[fetchFmCommissionMap] Loaded ${map.size} FM product pricing rules`);
+
+  console.log(`[fetchFmCommissionMap] Loaded ${map.size} products with base prices`);
+
+  // 2. Override with active pricing rules (higher priority)
+  const { data: rules, error: rulesError } = await supabase
+    .from("product_pricing_rules")
+    .select(`
+      id,
+      product:products!inner(name),
+      commission_dkk,
+      revenue_dkk,
+      priority
+    `)
+    .eq("is_active", true)
+    .order("priority", { ascending: false, nullsFirst: true });
+
+  if (rulesError) {
+    console.error("[fetchFmCommissionMap] Error fetching pricing rules:", rulesError);
+  }
+
+  // Track which products have been set by pricing rules
+  const rulesApplied = new Set<string>();
+
+  for (const rule of (rules || [])) {
+    const productData = rule.product as any;
+    const key = productData?.name?.toLowerCase();
+    if (key && !rulesApplied.has(key)) {
+      map.set(key, {
+        commission: rule.commission_dkk || 0,
+        price: rule.revenue_dkk || 0,
+        source: 'pricing_rule',
+      });
+      rulesApplied.add(key);
+    }
+  }
+
+  console.log(`[fetchFmCommissionMap] Applied ${rulesApplied.size} pricing rules. Final map size: ${map.size}`);
   return map;
 }
 
