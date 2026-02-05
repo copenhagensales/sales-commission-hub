@@ -1,70 +1,128 @@
 
-# Plan: Fix "Straksbetaling (ASE)" menu visibility bug
+# Plan: Tilføj straksbetaling-knap med konvertering
 
-## Problemet
-Alexander Godsk har mange ASE-salg med `allows_immediate_payment = true`, men menupunktet vises ikke fordi hook'en `useHasImmediatePaymentSales` har to fejl:
-
-### Fejl 1: Agent ID vs Email (linje 53)
-```typescript
-// NUVÆRENDE (forkert):
-const agentEmails = agentMappings.map(m => m.agent_id);
-// agent_id er en UUID, ikke en email!
-
-// KORREKT:
-// Skal joine med agents-tabellen for at få email
-```
-
-### Fejl 2: Forkert kolonnenavn (linje 75)
-```typescript
-// NUVÆRENDE (forkert):
-.eq("campaign_id", campaignId)
-
-// KORREKT:
-.eq("client_campaign_id", campaignId)
-```
+## Oversigt
+Tilføj en "Tilføj straksbetaling" knap til hver række i tabellen. Når medarbejderen klikker, vises en bekræftelsesdialog. Ved godkendelse opdateres salget med de højere provisions- og omsætningsværdier fra prisreglen.
 
 ---
 
-## Løsning
+## Database-ændring
 
-### Ændringer i `src/hooks/useHasImmediatePaymentSales.ts`
+### Tilføj kolonne til sale_items
+```sql
+ALTER TABLE sale_items ADD COLUMN is_immediate_payment boolean DEFAULT false;
+```
+Dette felt markerer om et salg er konverteret til straksbetaling.
 
-**1. Opdater agent mapping query (linje 46-53):**
+---
+
+## Frontend-ændringer
+
+### 1. Udvid ImmediatePaymentSale interface
+Tilføj felter til at håndtere konvertering:
 ```typescript
-// Hent agent emails via join
-const { data: agentMappings } = await supabase
-  .from("employee_agent_mapping")
-  .select("agent_id, agents(email)")
-  .eq("employee_id", employee.id);
-
-if (!agentMappings || agentMappings.length === 0) return false;
-
-// Udtræk emails fra joined data
-const agentEmails = agentMappings
-  .map(m => (m.agents as any)?.email)
-  .filter(Boolean)
-  .map((e: string) => e.toLowerCase());
+interface ImmediatePaymentSale {
+  id: string;
+  sale_datetime: string;
+  customer_company: string | null;
+  customer_phone: string | null;
+  product_name: string;
+  sale_item_id: string;           // Ny: ID for sale_item
+  matched_pricing_rule_id: string; // Ny: Prisregel ID
+  is_immediate_payment: boolean;   // Ny: Status
+}
 ```
 
-**2. Ret kolonnenavn (linje 75):**
+### 2. Tilføj mutation til konvertering
 ```typescript
-// Ændr fra:
-.eq("campaign_id", campaignId)
-
-// Til:
-.eq("client_campaign_id", campaignId)
+const convertMutation = useMutation({
+  mutationFn: async (sale: ImmediatePaymentSale) => {
+    // 1. Hent prisregel med immediate_payment værdier
+    const { data: rule } = await supabase
+      .from("product_pricing_rules")
+      .select("immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
+      .eq("id", sale.matched_pricing_rule_id)
+      .single();
+    
+    // 2. Opdater sale_item med nye værdier
+    await supabase
+      .from("sale_items")
+      .update({
+        is_immediate_payment: true,
+        mapped_commission: rule.immediate_payment_commission_dkk,
+        mapped_revenue: rule.immediate_payment_revenue_dkk,
+      })
+      .eq("id", sale.sale_item_id);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["immediate-payment-ase-sales"] });
+    toast({ title: "Straksbetaling tilføjet" });
+  },
+});
 ```
+
+### 3. Tilføj knap og bekræftelsesdialog
+Tilføj en ny kolonne "Handling" med en knap pr. række:
+
+```typescript
+<TableHead>Handling</TableHead>
+...
+<TableCell>
+  {sale.is_immediate_payment ? (
+    <Badge variant="success">Aktiveret</Badge>
+  ) : (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm">Tilføj straksbetaling</Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Er du sikker?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ved at tilføje straksbetaling øges din provision for dette salg.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuller</AlertDialogCancel>
+          <AlertDialogAction onClick={() => convertMutation.mutate(sale)}>
+            Bekræft
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )}
+</TableCell>
+```
+
+### 4. Opdater data-hentning
+Inkluder `sale_item_id` og `is_immediate_payment` i query'en.
 
 ---
 
 ## Berørte filer
 
-| Fil | Ændring |
-|-----|---------|
-| `src/hooks/useHasImmediatePaymentSales.ts` | Ret agent email hentning + kolonnenavn |
+| Fil | Handling |
+|-----|----------|
+| Database migration | Tilføj `is_immediate_payment` kolonne |
+| `src/pages/ImmediatePaymentASE.tsx` | Tilføj knap, dialog og mutation |
 
 ---
 
-## Forventet resultat
+## Dataflow
 
-Efter rettelsen vil Alexander Godsk (og alle andre medarbejdere med kvalificerende ASE-salg) se menupunktet "Tilføj straksbetaling (ASE)" under "Mit Hjem".
+```text
+Klik "Tilføj straksbetaling"
+        ↓
+Bekræftelsesdialog vises
+        ↓
+Bekræft klik
+        ↓
+Hent prisregel → immediate_payment_commission_dkk, immediate_payment_revenue_dkk
+        ↓
+Opdater sale_items:
+  - is_immediate_payment = true
+  - mapped_commission = immediate_payment_commission_dkk
+  - mapped_revenue = immediate_payment_revenue_dkk
+        ↓
+Invalidate query → UI opdateres → Badge viser "Aktiveret"
+```
