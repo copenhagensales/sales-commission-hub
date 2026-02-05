@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { downloadExcel } from "@/utils/excelExport";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -12,23 +12,15 @@ export const FieldmarketingExcelExport = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const { data, error } = await supabase
-        .from("fieldmarketing_sales")
-        .select(`
-          id,
-          registered_at,
-          product_name,
-          phone_number,
-          comment,
-          created_at,
-          seller:employee_master_data!seller_id(first_name, last_name),
-          location:location!location_id(name),
-          client:clients!client_id(name)
-        `)
-        .gte("registered_at", "2026-01-15T00:00:00")
-        .order("registered_at", { ascending: false });
-
-      if (error) throw error;
+      const data = await fetchAllRows(
+        "fieldmarketing_sales",
+        `id, registered_at, product_name, phone_number, comment, created_at,
+         seller:employee_master_data!seller_id(first_name, last_name),
+         location:location!location_id(name),
+         client:clients!client_id(name)`,
+        (q) => q.gte("registered_at", "2026-01-15T00:00:00"),
+        { orderBy: "registered_at", ascending: false }
+      );
 
       if (!data || data.length === 0) {
         toast.info("Ingen salg fundet i perioden");
