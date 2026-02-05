@@ -236,22 +236,16 @@ export default function Auth() {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const errorDescription = hashParams.get('error_description');
     const error = hashParams.get('error');
-    const tokenType = hashParams.get('type');
     
     console.log('[Auth] Checking URL hash:', { 
       hasHash: window.location.hash.length > 1,
-      tokenType, 
       hasError: !!error,
       errorDescription 
     });
     
-    // Detect recovery from URL hash (in case PASSWORD_RECOVERY event was missed due to timing)
-    if (tokenType === 'recovery' && !error) {
-      console.log('[Auth] Recovery flow detected from URL hash - showing password form');
-      setIsNewPasswordMode(true);
-      setIsResetMode(false);
-      setExpiredLinkError(false);
-    } else if (error || errorDescription) {
+    // Show expired link error if Supabase returns an error in the URL hash
+    // This can happen if someone clicks an old/expired Supabase recovery link
+    if (error || errorDescription) {
       console.log('[Auth] Error in URL hash - showing expired link message');
       setExpiredLinkError(true);
       setIsResetMode(true);
@@ -259,15 +253,11 @@ export default function Auth() {
       window.history.replaceState(null, '', window.location.pathname);
     }
 
-    // Listen for password recovery event (backup mechanism)
+    // Keep auth state listener for other events (SIGNED_IN, SIGNED_OUT, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       console.log('[Auth] Auth state changed:', event);
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('[Auth] PASSWORD_RECOVERY event received - showing password form');
-        setIsNewPasswordMode(true);
-        setIsResetMode(false);
-        setExpiredLinkError(false);
-      }
+      // Note: PASSWORD_RECOVERY event is no longer used since we now use 
+      // custom token-based reset flow via /reset-password page
     });
 
     return () => subscription.unsubscribe();
@@ -350,13 +340,18 @@ export default function Auth() {
         });
         setIsNewPasswordMode(false);
       } else if (isResetMode) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth`,
-        });
-        if (error) throw error;
+        // Use custom token-based reset flow instead of Supabase native recovery
+        // This prevents the race condition where Supabase auto-logs users in
+        const { data, error: invokeError } = await supabase.functions.invoke(
+          "initiate-password-reset",
+          { body: { email: email.trim().toLowerCase() } }
+        );
+        
+        if (invokeError) throw invokeError;
+        
         toast({
           title: "Email sendt",
-          description: "Tjek din indbakke. Linket udløber efter 1 time og kan kun bruges én gang.",
+          description: "Hvis din email er registreret, modtager du et link inden for få minutter. Tjek også spam-mappen.",
         });
         setIsResetMode(false);
         setExpiredLinkError(false);

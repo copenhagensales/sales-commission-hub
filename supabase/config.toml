@@ -212,3 +212,6 @@ verify_jwt = false
 
 [functions.adversus-lead-check]
 verify_jwt = false
+
+[functions.initiate-password-reset]
+verify_jwt = false
