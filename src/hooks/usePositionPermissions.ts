@@ -36,6 +36,13 @@ const SALARY_PERMISSION_KEYS = [
   'scope_payroll',
 ];
 
+// Permission keys excluded from owner (same as OWNER_EXCLUDED_PERMISSIONS in config)
+const OWNER_EXCLUDED_PERMISSION_KEYS = [
+  'softphone_outbound',
+  'softphone_inbound',
+  'employee_sms',
+];
+
 // Use the shared generateAllPermissions from config
 // For owner, exclude softphone permissions
 const generateAllPermissions = (): PositionPermissions => 
@@ -412,6 +419,10 @@ export function usePermissions() {
       if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
         return false; // Deny salary access for this owner
       }
+      // Deny softphone permissions for owners
+      if (OWNER_EXCLUDED_PERMISSION_KEYS.includes(key)) {
+        return false;
+      }
       return true; // All other permissions granted
     }
     
@@ -438,6 +449,9 @@ export function usePermissions() {
       if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
         return false;
       }
+      if (OWNER_EXCLUDED_PERMISSION_KEYS.includes(key)) {
+        return false;
+      }
       return true;
     }
     return hasPermission(key, "view") || hasPermission(key);
@@ -447,6 +461,9 @@ export function usePermissions() {
     // Owner override: full access EXCEPT salary for excluded owners
     if (isOwner && !isPreviewMode) {
       if (isOwnerExcludedFromSalary && SALARY_PERMISSION_KEYS.includes(key)) {
+        return false;
+      }
+      if (OWNER_EXCLUDED_PERMISSION_KEYS.includes(key)) {
         return false;
       }
       return true;
