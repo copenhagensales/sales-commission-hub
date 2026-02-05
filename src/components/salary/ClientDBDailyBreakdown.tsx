@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -154,12 +155,7 @@ export function ClientDBDailyBreakdown({
 
   const isLoading = salesLoading || bookingsLoading;
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // formatCurrency imported from @/lib/calculations
 
   const formatDate = (date: Date) => {
     const dayName = format(date, "EEEE", { locale: da });

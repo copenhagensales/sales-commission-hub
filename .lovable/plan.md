@@ -1,5 +1,5 @@
 
-# Fase 4: Frontend Migration til Central Calculations Library
+# Central Calculations Library - Migration Complete
 
 ## Status Oversigt
 
@@ -9,76 +9,40 @@
 | Fase 2: Frontend Utility Library | ✅ Komplet |
 | Fase 3: Migration af Edge Functions | ✅ Komplet |
 | Fase 4: Migration af Frontend Komponenter | ✅ Komplet |
-| **Test og Verifikation** | ✅ Komplet |
+| Test og Verifikation | ✅ Komplet |
 
 ---
 
-## Fase 4 - Komplet
+## Migrerede Filer
 
-### Del 1: Vacation Pay Migration (8 filer) ✅
+### Vacation Pay (8 filer) ✅
+- `useStaffHoursCalculation.ts`, `useAssistantHoursCalculation.ts`
+- `ClientDBTab.tsx`, `ClientDBDailyBreakdown.tsx`
+- `Home.tsx`, `MyProfile.tsx`, `RevenueByClient.tsx`, `HeroStatusCard.tsx`
 
-Alle hardcoded vacation pay rates er erstattet med import fra `@/lib/calculations`:
+### Hours Calculation (2 filer) ✅
+- `useStaffHoursCalculation.ts`, `useAssistantHoursCalculation.ts`
 
-| Fil | Status |
-|-----|--------|
-| `useStaffHoursCalculation.ts` | ✅ `VACATION_PAY_RATES.STAFF` |
-| `useAssistantHoursCalculation.ts` | ✅ `VACATION_PAY_RATES.ASSISTANT` |
-| `ClientDBTab.tsx` | ✅ `VACATION_PAY_RATES.SELLER` + `.LEADER` |
-| `ClientDBDailyBreakdown.tsx` | ✅ `VACATION_PAY_RATES.SELLER` |
-| `Home.tsx` | ✅ `getVacationPayRate()` |
-| `MyProfile.tsx` | ✅ `VACATION_PAY_RATES.SELLER` |
-| `RevenueByClient.tsx` | ✅ `calculateVacationPay()` |
-| `HeroStatusCard.tsx` | ✅ `VACATION_PAY_RATES.SELLER` |
-
----
-
-### Del 2: Hours Calculation Migration (2 filer) ✅
-
-Duplikeret `calculateHoursFromShift()` er fjernet og erstattet med central import:
-
-| Fil | Status |
-|-----|--------|
-| `useStaffHoursCalculation.ts` | ✅ Lokal funktion fjernet, importerer fra `@/lib/calculations` |
-| `useAssistantHoursCalculation.ts` | ✅ Lokal funktion fjernet, importerer fra `@/lib/calculations` |
+### Formatting (22+ filer) ✅
+- **Payroll**: `DBOverviewTab`, `DBDailyBreakdown`, `DBTeamDetailCard`, `TeamExpensesTab`, `CombinedSalaryTab`, `TeamLeaderSalary`, `AssistantSalary`, `StaffSalary`, `SellerSalariesTab`, `ClientDBTab`, `ClientDBDailyBreakdown`
+- **Dashboards**: `TdcErhvervDashboard`, `CsTop20Dashboard`, `UnitedDashboard`, `RelatelDashboard`, `EesyTmDashboard`, `SalesDashboard`, `LeagueAdminDashboard`
+- **Components**: `DailyCommissionChart`, `HeadToHeadComparison`, `EmployeeCommissionHistory`, `GoalProgressRing`, `HeroStatusCard`, `HeroPulseWidget`, `LiveScoreboard`, `ChurnCalculator`
+- **Hooks**: `useCelebrationData`
 
 ---
 
-### Del 3: Formatting Migration (28 filer - Lav Prioritet)
-
-Ikke implementeret i denne fase. Kan migreres inkrementelt i fremtiden.
-
----
-
-## Test og Verifikation ✅
-
-36 unit tests bestået:
-- `vacation-pay.test.ts`: 9 tests (rates, getVacationPayRate, calculateVacationPay)
-- `hours.test.ts`: 27 tests (shift beregning, pauser, overnight, timestamps)
-
----
-
-## Resultat
-
-| Metrik | Før | Efter |
-|--------|-----|-------|
-| Vacation pay konstanter | 8+ filer | 1 central (`vacation-pay.ts`) |
-| calculateHoursFromShift() | 2 kopier | 1 central (`hours.ts`) |
-| Edge Function pricing logic | 4+ kopier | 1 central (`pricing-service.ts`) |
-| Vedligeholdelse | Ændringer i mange filer | Ændringer ét sted |
-| Unit tests | 0 | 36 |
-
----
-
-## Central Library Oversigt
-
-### Backend (`supabase/functions/_shared/`)
-- `pricing-service.ts` - Provision & omsætning med fallback hierarki
-- `date-helpers.ts` - Periode-beregninger
-- `format-helpers.ts` - Formattering
+## Central Library
 
 ### Frontend (`src/lib/calculations/`)
 - `vacation-pay.ts` - VACATION_PAY_RATES, getVacationPayRate(), calculateVacationPay()
 - `hours.ts` - calculateHoursFromShift(), parseTimeToMinutes()
-- `dates.ts` - Periode-helpers
-- `formatting.ts` - formatCurrency(), formatNumber()
+- `formatting.ts` - formatCurrency(), formatNumber(), formatPercentage()
 - `index.ts` - Re-exports alle
+
+### Backend (`supabase/functions/_shared/`)
+- `pricing-service.ts` - Provision & omsætning
+- `date-helpers.ts` - Periode-beregninger
+- `format-helpers.ts` - Formattering
+
+### Tests
+- 36 unit tests (vacation-pay + hours)

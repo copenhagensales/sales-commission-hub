@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Zap, TrendingUp, Flame, Rocket, Trophy, Target, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PulseThresholds, getPulseStatus } from "@/hooks/useGamificationConfig";
-import { VACATION_PAY_RATES } from "@/lib/calculations";
+import { VACATION_PAY_RATES, formatCurrency } from "@/lib/calculations";
 import {
   Tooltip,
   TooltipContent,
@@ -86,13 +86,7 @@ export function HeroStatusCard({
   const displayPercent = Math.min(pulsePercent, 100);
   const offset = circumference - (displayPercent / 100) * circumference;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   const getStatusBadge = () => {
     if (progressPercent >= 100) {

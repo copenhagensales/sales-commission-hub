@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -166,8 +167,7 @@ export function TeamExpensesTab() {
 
   const totalAmount = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
+  // formatCurrency imported from @/lib/calculations
 
   return (
     <>

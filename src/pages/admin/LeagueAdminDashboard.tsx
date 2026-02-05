@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/calculations";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -220,7 +221,7 @@ export default function LeagueAdminDashboard() {
 
   const formatCurrency = (amount: number | null) => {
     if (amount === null || amount === undefined) return "0 kr";
-    return new Intl.NumberFormat("da-DK", { style: "decimal" }).format(amount) + " kr";
+    return formatNumber(amount) + " kr";
   };
 
   const getSeasonStatus = () => {

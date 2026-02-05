@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,8 +40,7 @@ export function SellerSalariesTab() {
   const totalCancellations = filteredData.reduce((sum, s) => sum + s.cancellations, 0);
   const totalVacationPay = filteredData.reduce((sum, s) => sum + s.vacationPay, 0);
 
-  const formatCurrency = (amount: number) => 
-    new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
+  // formatCurrency imported from @/lib/calculations
 
   return (
     <Card>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -181,8 +182,7 @@ export function DBOverviewTab() {
 
   const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading;
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
+  // formatCurrency imported from @/lib/calculations
 
   const totals = teamsDB?.reduce(
     (acc, t) => ({

@@ -2,6 +2,7 @@ import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -43,8 +44,8 @@ function calculatePayrollPeriod(): { start: Date; end: Date } {
   }
 }
 
-const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value);
+// formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
+const formatCurrency = formatNumber;
 
 const getInitials = (name: string) => getInitialsFromHook(name);
 

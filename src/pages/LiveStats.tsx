@@ -301,6 +301,7 @@ export default function LiveStats() {
 
   const formatCurrency = (value: number) => {
     // Use space as thousands separator for clarity (27 070 instead of 27.070)
+    // Note: This component uses a specific format different from the standard formatCurrency
     const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value);
     return `${formatted.replace(/\./g, " ")} DKK`;
   };

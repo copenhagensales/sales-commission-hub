@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -362,8 +363,8 @@ export function EmployeeCommissionHistory({
     };
   }, [dailyData]);
 
-  const formatCurrency = (value: number) => 
-    value.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  // formatNumber imported from @/lib/calculations, alias as formatCurrency here for display
+  const formatCurrency = formatNumber;
 
   // Only show days with activity (filter out empty weekends)
   const activeDays = dailyData.filter(d => 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency, formatNumber } from "@/lib/calculations";
 import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle, EyeOff, CalendarIcon } from "lucide-react";
 import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differenceInDays, addDays, format, setHours, setMinutes, isBefore, addHours } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -710,13 +711,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return `${mins}m`;
   };
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("da-DK").format(num);
-  };
-
-  const formatCurrency = (num: number) => {
-    return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(num);
-  };
+  // formatNumber and formatCurrency imported from @/lib/calculations
 
   // Calculate wins per KPI (without revenue)
   const calculateKpiWins = () => {

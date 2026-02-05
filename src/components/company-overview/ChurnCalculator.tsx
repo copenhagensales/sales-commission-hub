@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -146,13 +147,7 @@ export function ChurnCalculator() {
     };
   }, [churnData, targetChurnRate, recruitmentCostPerEmployee]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('da-DK', {
-      style: 'currency',
-      currency: 'DKK',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   if (isLoading) {
     return (
