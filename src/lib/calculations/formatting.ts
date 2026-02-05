@@ -165,3 +165,18 @@ export function formatCompact(value: number): string {
     compactDisplay: 'short',
   }).format(value);
 }
+
+/**
+ * Rounds a number to specified decimal places.
+ * 
+ * @param value - Number to round
+ * @param decimals - Decimal places (default: 2)
+ * @returns Rounded number
+ */
+export function roundToDecimals(value: number, decimals: number = 2): number {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 0;
+  }
+  const factor = Math.pow(10, decimals);
+  return Math.round(value * factor) / factor;
+}

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatNumber } from "@/lib/calculations";
+import { formatNumber, BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -275,8 +275,8 @@ export function EmployeeCommissionHistory({
           const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
           const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
           const rawHours = (endH + endM / 60) - (startH + startM / 60);
-          // Standard 30 min break for shifts over 6 hours
-          const breakMinutes = rawHours > 6 ? 30 : 0;
+          // Use central break constants
+          const breakMinutes = (rawHours * 60) > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0;
           hours = rawHours - (breakMinutes / 60);
           hasPlannedShift = true;
         }

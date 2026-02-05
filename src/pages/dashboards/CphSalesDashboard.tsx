@@ -15,6 +15,7 @@ import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
+import { countWorkDaysInPeriod } from "@/lib/calculations";
 
 // Calculate payroll period (15th to 14th)
 function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
@@ -904,30 +905,18 @@ export default function CphSalesDashboard() {
         if (isVacation) teamAbsences[teamId].vacationMonth += monthDays;
       });
 
-      // Calculate work days in each period (for percentage calculation)
-      const countWorkDaysInPeriod = (start: string, end: string): number => {
-        let count = 0;
-        const current = new Date(start);
-        const endDate = new Date(end);
-        while (current <= endDate) {
-          const dayOfWeek = current.getDay();
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
-          current.setDate(current.getDate() + 1);
-        }
-        return count;
-      };
-
-      const workDaysDay = countWorkDaysInPeriod(todayStr, todayStr); // 1 if weekday, 0 if weekend
-      const workDaysWeek = countWorkDaysInPeriod(weekStart, todayStr);
-      const workDaysMonth = countWorkDaysInPeriod(monthStart, todayStr);
+      // Use central countWorkDaysInPeriod from @/lib/calculations (accepts Date objects)
+      const workDaysDay = countWorkDaysInPeriod(new Date(todayStr), new Date(todayStr)); // 1 if weekday, 0 if weekend
+      const workDaysWeek = countWorkDaysInPeriod(new Date(weekStart), new Date(todayStr));
+      const workDaysMonth = countWorkDaysInPeriod(new Date(monthStart), new Date(todayStr));
       
       // Calculate total work days in the entire week (for forecast)
-      const weekEndStr = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
-      const totalWorkDaysInWeek = countWorkDaysInPeriod(weekStart, weekEndStr);
+      const weekEndStr = format(endOfWeek(new Date(todayStr), { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const totalWorkDaysInWeek = countWorkDaysInPeriod(new Date(weekStart), new Date(weekEndStr));
       
       // Calculate total work days in the entire month (for forecast)
-      const monthEndStr = format(endOfMonth(today), "yyyy-MM-dd");
-      const totalWorkDaysInMonth = countWorkDaysInPeriod(monthStart, monthEndStr);
+      const monthEndStr = format(endOfMonth(new Date(todayStr)), "yyyy-MM-dd");
+      const totalWorkDaysInMonth = countWorkDaysInPeriod(new Date(monthStart), new Date(monthEndStr));
 
       // Return combined data with work days for percentage calculation
       return teams.map(t => ({

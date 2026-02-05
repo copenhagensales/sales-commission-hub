@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/lib/calculations";
+import { formatCurrency, STANDARD_MONTH_DAYS } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -83,7 +83,6 @@ interface TeamSalaryInfo {
 }
 
 const FM_CLIENT_NAMES = ["Eesy FM", "Yousee"];
-const STANDARD_MONTH_DAYS = 30;
 
 export function ClientDBTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));

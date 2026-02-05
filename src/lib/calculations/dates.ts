@@ -173,3 +173,6 @@ export function formatDateRange(
   
   return `${startStr} - ${endStr}`;
 }
+
+/** Standard number of days in a month for proration calculations */
+export const STANDARD_MONTH_DAYS = 30;
