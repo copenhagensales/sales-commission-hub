@@ -71,6 +71,8 @@ interface PricingRule {
   name: string | null;
   is_active: boolean;
   allows_immediate_payment?: boolean;
+  immediate_payment_commission_dkk?: number | null;
+  immediate_payment_revenue_dkk?: number | null;
 }
 
 interface CampaignMapping {
@@ -118,6 +120,12 @@ export function PricingRuleEditor({
   const [allowsImmediatePayment, setAllowsImmediatePayment] = useState(
     existingRule?.allows_immediate_payment ?? false
   );
+  const [immediatePaymentCommission, setImmediatePaymentCommission] = useState(
+    existingRule?.immediate_payment_commission_dkk?.toString() || ""
+  );
+  const [immediatePaymentRevenue, setImmediatePaymentRevenue] = useState(
+    existingRule?.immediate_payment_revenue_dkk?.toString() || ""
+  );
 
   // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
@@ -157,6 +165,12 @@ export function PricingRuleEditor({
         name: name || null,
         is_active: isActive,
         allows_immediate_payment: allowsImmediatePayment,
+        immediate_payment_commission_dkk: allowsImmediatePayment && immediatePaymentCommission 
+          ? parseFloat(immediatePaymentCommission) 
+          : null,
+        immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue 
+          ? parseFloat(immediatePaymentRevenue) 
+          : null,
       };
 
       if (existingRule) {
@@ -455,18 +469,51 @@ export function PricingRuleEditor({
       </div>
 
       {/* Immediate payment toggle */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <Label htmlFor="rule-immediate-payment">💳 Mulighed for straksbetaling</Label>
-          <p className="text-xs text-muted-foreground">
-            Tillad straksbetaling for salg med denne regel
-          </p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Label htmlFor="rule-immediate-payment">💳 Mulighed for straksbetaling</Label>
+            <p className="text-xs text-muted-foreground">
+              Tillad straksbetaling for salg med denne regel
+            </p>
+          </div>
+          <Switch
+            id="rule-immediate-payment"
+            checked={allowsImmediatePayment}
+            onCheckedChange={setAllowsImmediatePayment}
+          />
         </div>
-        <Switch
-          id="rule-immediate-payment"
-          checked={allowsImmediatePayment}
-          onCheckedChange={setAllowsImmediatePayment}
-        />
+
+        {/* Immediate payment pricing fields */}
+        {allowsImmediatePayment && (
+          <div className="bg-muted/30 p-4 rounded-md space-y-3 ml-4 border-l-2 border-primary/20">
+            <Label>💰 Prissætning ved straksbetaling</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="immediate-commission">Provision (kr)</Label>
+                <Input
+                  id="immediate-commission"
+                  type="number"
+                  step="0.01"
+                  value={immediatePaymentCommission}
+                  onChange={(e) => setImmediatePaymentCommission(e.target.value)}
+                  placeholder="f.eks. 500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="immediate-revenue">Omsætning (kr)</Label>
+                <Input
+                  id="immediate-revenue"
+                  type="number"
+                  step="0.01"
+                  value={immediatePaymentRevenue}
+                  onChange={(e) => setImmediatePaymentRevenue(e.target.value)}
+                  placeholder="f.eks. 1000"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Active toggle */}

@@ -6762,6 +6762,8 @@ export type Database = {
           conditions: Json
           created_at: string | null
           id: string
+          immediate_payment_commission_dkk: number | null
+          immediate_payment_revenue_dkk: number | null
           is_active: boolean | null
           name: string | null
           priority: number | null
@@ -6776,6 +6778,8 @@ export type Database = {
           conditions?: Json
           created_at?: string | null
           id?: string
+          immediate_payment_commission_dkk?: number | null
+          immediate_payment_revenue_dkk?: number | null
           is_active?: boolean | null
           name?: string | null
           priority?: number | null
@@ -6790,6 +6794,8 @@ export type Database = {
           conditions?: Json
           created_at?: string | null
           id?: string
+          immediate_payment_commission_dkk?: number | null
+          immediate_payment_revenue_dkk?: number | null
           is_active?: boolean | null
           name?: string | null
           priority?: number | null
