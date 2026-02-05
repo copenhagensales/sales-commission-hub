@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,29 @@ import { MainLayout } from "@/components/layout/MainLayout";
 
 const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
 
+// Calculate payroll period (15th to 14th)
+function getPayrollPeriod(): { start: Date; end: Date } {
+  const today = new Date();
+  const currentDay = today.getDate();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  
+  let start: Date;
+  let end: Date;
+  
+  if (currentDay >= 15) {
+    // Period: 15th of current month to 14th of next month
+    start = new Date(year, month, 15, 0, 0, 0);
+    end = new Date(year, month + 1, 14, 23, 59, 59);
+  } else {
+    // Period: 15th of previous month to 14th of current month
+    start = new Date(year, month - 1, 15, 0, 0, 0);
+    end = new Date(year, month, 14, 23, 59, 59);
+  }
+  
+  return { start, end };
+}
+
 interface ImmediatePaymentSale {
   id: string;
   sale_datetime: string;
@@ -22,8 +46,9 @@ interface ImmediatePaymentSale {
 
 export default function ImmediatePaymentASE() {
   const { user } = useAuth();
-
-  // Get employee's agent emails
+  
+  // Calculate current payroll period
+  const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
   const { data: agentEmails = [] } = useQuery({
     queryKey: ["employee-agent-emails", user?.email],
     queryFn: async () => {
@@ -56,9 +81,9 @@ export default function ImmediatePaymentASE() {
     enabled: !!user?.email,
   });
 
-  // Get ASE sales with immediate payment pricing rules
+  // Get ASE sales with immediate payment pricing rules for current payroll period
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["immediate-payment-ase-sales", agentEmails],
+    queryKey: ["immediate-payment-ase-sales", agentEmails, payrollPeriod.start.toISOString()],
     queryFn: async () => {
       if (agentEmails.length === 0) return [];
 
@@ -72,7 +97,7 @@ export default function ImmediatePaymentASE() {
       
       const campaignIds = aseCampaigns.map(c => c.id);
 
-      // Get sales for this agent with ASE campaigns
+      // Get sales for this agent with ASE campaigns within payroll period
       const { data: salesData } = await supabase
         .from("sales")
         .select(`
@@ -88,6 +113,8 @@ export default function ImmediatePaymentASE() {
           )
         `)
         .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", payrollPeriod.start.toISOString())
+        .lte("sale_datetime", payrollPeriod.end.toISOString())
         .order("sale_datetime", { ascending: false });
 
       if (!salesData) return [];
@@ -143,7 +170,9 @@ export default function ImmediatePaymentASE() {
           <CreditCard className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-2xl font-bold">Tilføj straksbetaling (ASE)</h1>
-            <p className="text-muted-foreground">Se dine ASE-salg med mulighed for straksbetaling</p>
+            <p className="text-muted-foreground">
+              Lønperiode: {format(payrollPeriod.start, "d. MMM", { locale: da })} – {format(payrollPeriod.end, "d. MMM yyyy", { locale: da })}
+            </p>
           </div>
         </div>
 
@@ -151,7 +180,7 @@ export default function ImmediatePaymentASE() {
           <CardHeader>
             <CardTitle>Dine salg med straksbetaling</CardTitle>
             <CardDescription>
-              Salg hvor produktets prisregel tillader straksbetaling
+              Salg med mulighed for straksbetaling i nuværende lønperiode
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,7 +193,7 @@ export default function ImmediatePaymentASE() {
                 <FileX className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="font-medium text-lg">Ingen salg fundet</h3>
                 <p className="text-muted-foreground text-sm max-w-md mt-1">
-                  Du har ingen ASE-salg med mulighed for straksbetaling endnu.
+                  Du har ingen ASE-salg med mulighed for straksbetaling i denne lønperiode.
                 </p>
               </div>
             ) : (
