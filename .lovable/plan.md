@@ -1,105 +1,93 @@
 
-# Plan: Tilføj understøttelse af månedsløn for assistenter
+# Plan: Excel-eksport af Fieldmarketing-salg
 
-## Problembeskrivelse
+## Hvad skal bygges
 
-Johannes Hedebrink har en månedsløn på 40.000 kr, men `useAssistantHoursCalculation` behandler alle værdier som timelønninger. Dette betyder at hans løn beregnes forkert (40.000 kr × timer = astronomisk beløb).
+En eksportfunktion der henter alle fieldmarketing-salg fra 15. januar 2026 til nu og downloader dem som en Excel-fil med alle relevante oplysninger.
 
-## Løsning
+## Excel-fil indhold
 
-Tilføj samme logik som `useStaffHoursCalculation` bruger - med en tærskelværdi på 1.000 kr til at skelne mellem timeløn og månedsløn. For månedslønnede prorateres lønnen baseret på arbejdsdage i perioden.
+| Kolonne | Kilde |
+|---------|-------|
+| Dato | `registered_at` |
+| Sælger | `seller.first_name` + `seller.last_name` |
+| Lokation | `location.name` |
+| Klient | `client.name` |
+| Produkt | `product_name` |
+| Telefonnummer | `phone_number` |
+| Kommentar | `comment` |
+| Oprettet | `created_at` |
 
-## Ændringer i useAssistantHoursCalculation.ts
+## Teknisk implementering
 
-### 1. Tilføj imports og konstant
+### 1. Opret ny eksport-utility
+
+**Ny fil: `src/utils/excelExport.ts`**
 
 ```typescript
-import { startOfMonth, endOfMonth } from "date-fns";
-import { countWorkDaysInPeriod } from "@/lib/calculations";
+import * as XLSX from "xlsx";
 
-const HOURLY_RATE_THRESHOLD = 1000; // Under dette = timeløn, over = månedsløn
-```
-
-### 2. Udvid interface
-
-```typescript
-interface AssistantHoursData {
-  employeeId: string;
-  hourlyRate: number;
-  workedHours: number;
-  baseSalary: number;
-  vacationPay: number;
-  totalSalary: number;
-  isHourlyBased: boolean; // NY: true = timeløn, false = månedsløn
+export function downloadExcel(data: Record<string, unknown>[], filename: string) {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+  XLSX.writeFile(workbook, filename);
 }
 ```
 
-### 3. Tilføj logik til at skelne løntyper
+### 2. Opret eksport-komponent
 
-For hver assistent:
+**Ny fil: `src/components/fieldmarketing/FieldmarketingExcelExport.tsx`**
+
+- Knap med "Eksporter til Excel" i Fieldmarketing Dashboard
+- Henter data fra `fieldmarketing_sales` med dato-filter
+- Formaterer og downloader Excel-fil
+
+### 3. Data-hentning
 
 ```typescript
-const monthlySalary = Number(salary?.monthly_salary) || 0;
-const hourlyRate = Number(salary?.hourly_rate) || 0;
-
-// Brug hourly_rate hvis sat, ellers tjek om monthly_salary er lav (timeløn)
-const effectiveHourlyRate = hourlyRate > 0 
-  ? hourlyRate 
-  : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
-const isHourlyBased = effectiveHourlyRate > 0;
+const { data } = await supabase
+  .from("fieldmarketing_sales")
+  .select(`
+    id,
+    registered_at,
+    product_name,
+    phone_number,
+    comment,
+    created_at,
+    seller:employee_master_data!seller_id(first_name, last_name),
+    location:location!location_id(name),
+    client:clients!client_id(name)
+  `)
+  .gte("registered_at", "2026-01-15T00:00:00")
+  .order("registered_at", { ascending: false });
 ```
 
-### 4. Håndter månedslønnede separat
+### 4. Transformer til Excel-format
 
 ```typescript
-if (!isHourlyBased) {
-  // Proratér månedsløn baseret på arbejdsdage
-  const monthStart = startOfMonth(periodStart);
-  const monthEnd = endOfMonth(periodStart);
-  
-  const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-  const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
-  
-  const prorationFactor = workdaysInMonth > 0 
-    ? workdaysInPeriod / workdaysInMonth 
-    : 1;
-  const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
-  const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
-  
-  result[assistantId] = {
-    employeeId: assistantId,
-    hourlyRate: 0,
-    workedHours: workdaysInPeriod, // Viser arbejdsdage for klarhed
-    baseSalary,
-    vacationPay,
-    totalSalary: baseSalary + vacationPay,
-    isHourlyBased: false,
-  };
-  continue;
-}
-// ... resten af time-baseret beregning
+const excelData = sales.map(sale => ({
+  "Dato": format(new Date(sale.registered_at), "dd-MM-yyyy HH:mm"),
+  "Sælger": `${sale.seller?.first_name} ${sale.seller?.last_name}`,
+  "Lokation": sale.location?.name || "-",
+  "Klient": sale.client?.name || "-",
+  "Produkt": sale.product_name,
+  "Telefonnummer": sale.phone_number,
+  "Kommentar": sale.comment || "",
+  "Oprettet": format(new Date(sale.created_at), "dd-MM-yyyy HH:mm"),
+}));
 ```
 
 ---
 
-## Eksempel på beregning for Johannes (40.000 kr/md)
+## Filer der oprettes/ændres
 
-| Periode | Arbejdsdage i periode | Arbejdsdage i måneden | Proratering | Basisløn | Feriepenge (12,5%) | Total |
-|---------|----------------------|----------------------|-------------|----------|-------------------|-------|
-| 1 dag   | 1                    | 20                   | 1/20        | 2.000 kr | 250 kr            | 2.250 kr |
-| 1 uge   | 5                    | 20                   | 5/20        | 10.000 kr| 1.250 kr          | 11.250 kr |
-| Hel md  | 20                   | 20                   | 20/20       | 40.000 kr| 5.000 kr          | 45.000 kr |
-
----
-
-## Berørte filer
-
-| Fil | Ændring |
-|-----|---------|
-| `src/hooks/useAssistantHoursCalculation.ts` | Tilføj understøttelse af månedsløn med proratering |
+| Fil | Handling |
+|-----|----------|
+| `src/utils/excelExport.ts` | Ny - generisk eksport-utility |
+| `src/components/fieldmarketing/FieldmarketingExcelExport.tsx` | Ny - eksport-komponent |
+| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Tilføj eksport-knap i header |
 
 ## Forventet resultat
 
-- Jeppe Munk (timeløn 180 kr) beregnes som hidtil: timer × 180 kr × 1,125
-- Johannes Hedebrink (månedsløn 40.000 kr) prorateres korrekt baseret på arbejdsdage
-- Begges løn indgår i TDC Erhvervs assistentomkostninger
+Brugeren kan klikke på "Eksporter til Excel" i Fieldmarketing Dashboard og få downloadet en .xlsx fil med alle salg fra 15/1 til nu, inklusiv sælgernavn, dato, lokation og alle andre felter.
