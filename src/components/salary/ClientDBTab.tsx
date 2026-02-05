@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Clock, Briefcase } from "lucide-react";
 import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval } from "date-fns";
 
 /**
@@ -94,6 +95,7 @@ export function ClientDBTab() {
   const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [staffSalariesExpanded, setStaffSalariesExpanded] = useState(false);
   const queryClient = useQueryClient();
 
   const handleSort = (column: SortColumn) => {
@@ -247,25 +249,60 @@ export function ClientDBTab() {
   });
 
   // Fetch staff employee IDs for hours calculation
-  const { data: staffEmployeeIds } = useQuery({
-    queryKey: ["staff-employee-ids-for-client-db"],
+  const { data: staffEmployees } = useQuery({
+    queryKey: ["staff-employees-for-client-db"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("personnel_salaries")
-        .select("employee_id")
+        .select(`
+          employee_id,
+          employee:employee_master_data(first_name, last_name, job_title)
+        `)
         .eq("salary_type", "staff")
         .eq("is_active", true);
       if (error) throw error;
-      return (data || []).map(s => s.employee_id);
+      return data || [];
     },
   });
+
+  const staffEmployeeIds = useMemo(() => 
+    (staffEmployees || []).map(s => s.employee_id), 
+    [staffEmployees]
+  );
 
   // Calculate staff salaries based on hours (for hourly employees)
   const { data: staffHoursData, isLoading: staffHoursLoading } = useStaffHoursCalculation(
     periodStart,
     periodEnd,
-    staffEmployeeIds || []
+    staffEmployeeIds
   );
+
+  // Staff salary list with names for display
+  const staffSalaryList = useMemo(() => {
+    if (!staffHoursData || !staffEmployees) return [];
+    
+    return staffEmployees
+      .map(staff => {
+        const hours = staffHoursData[staff.employee_id];
+        if (!hours) return null;
+        
+        const employee = staff.employee as { first_name: string; last_name: string; job_title: string | null } | null;
+        return {
+          employeeId: staff.employee_id,
+          name: employee ? `${employee.first_name} ${employee.last_name}` : "Ukendt",
+          jobTitle: employee?.job_title || null,
+          hourlyRate: hours.hourlyRate,
+          workedHours: hours.workedHours,
+          baseSalary: hours.baseSalary,
+          vacationPay: hours.vacationPay,
+          totalSalary: hours.totalSalary,
+          isHourlyBased: hours.isHourlyBased,
+          hoursSource: hours.hoursSource,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b!.totalSalary - a!.totalSalary);
+  }, [staffHoursData, staffEmployees]);
 
   // Total staff salary cost (from hours-based calculation)
   const totalStaffSalaryCost = useMemo(() => {
@@ -979,8 +1016,20 @@ export function ClientDBTab() {
                     </TableRow>
                     
                     {/* Staff salaries row (hours-based) */}
-                    <TableRow>
-                      <TableCell className="font-medium">Stabslønninger</TableCell>
+                    <TableRow 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setStaffSalariesExpanded(!staffSalariesExpanded)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {staffSalariesExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          Stabslønninger
+                        </div>
+                      </TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
@@ -994,6 +1043,62 @@ export function ClientDBTab() {
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
+                    
+                    {/* Staff salaries breakdown (expanded) */}
+                    {staffSalariesExpanded && staffSalaryList.map((staff) => (
+                      <TableRow key={staff!.employeeId} className="bg-muted/30">
+                        <TableCell className="pl-10">
+                          <div className="flex flex-col">
+                            <span className="text-sm">{staff!.name}</span>
+                            {staff!.jobTitle && (
+                              <span className="text-xs text-muted-foreground">{staff!.jobTitle}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <div className="flex items-center gap-1">
+                                  {staff!.hoursSource === 'timestamp' ? (
+                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                  ) : (
+                                    <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {staff!.hoursSource === 'timestamp' ? 'Stemplet' : 'Vagt'}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {staff!.hoursSource === 'timestamp' 
+                                  ? 'Beregnet fra faktiske stemplinger' 
+                                  : 'Beregnet fra planlagte vagter'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {staff!.isHourlyBased ? `${staff!.workedHours.toFixed(1)} t` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {staff!.isHourlyBased ? `${formatCurrency(staff!.hourlyRate)}/t` : 'Fast løn'}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {formatCurrency(staff!.baseSalary)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          +{formatCurrency(staff!.vacationPay)}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right text-destructive text-sm">
+                          -{formatCurrency(staff!.totalSalary)}
+                        </TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    ))}
                     
                     {/* Net earnings - final row */}
                     <TableRow className="bg-primary/10 font-bold border-t-2">
