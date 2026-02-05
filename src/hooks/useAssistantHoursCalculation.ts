@@ -41,12 +41,33 @@ export function useAssistantHoursCalculation(
         .in("employee_id", assistantIds);
 
       // 2. Get team info for assistants (to find their team standard shifts)
+      // First try employee_master_data.team_id, then fallback to team_members
       const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id, team_id")
         .in("id", assistantIds);
 
-      const teamIds = [...new Set(employees?.map(e => e.team_id).filter(Boolean))] as string[];
+      // Get team membership from team_members as fallback (for staff who have NULL team_id)
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id")
+        .in("employee_id", assistantIds);
+
+      // Build employee-to-team map with fallback
+      const employeeTeamMap = new Map<string, string>();
+      for (const emp of employees || []) {
+        if (emp.team_id) {
+          employeeTeamMap.set(emp.id, emp.team_id);
+        } else {
+          // Fallback to team_members
+          const membership = teamMemberships?.find(tm => tm.employee_id === emp.id);
+          if (membership?.team_id) {
+            employeeTeamMap.set(emp.id, membership.team_id);
+          }
+        }
+      }
+
+      const teamIds = [...new Set(Array.from(employeeTeamMap.values()))];
 
       // 3. Get employee standard shift assignments → shift_id
       const { data: employeeShiftAssignments } = await supabase
@@ -132,8 +153,9 @@ export function useAssistantHoursCalculation(
         const empShiftId = empShiftAssignment?.shift_id;
         const empShiftDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
 
-        // Get team's default shift
-        const teamShift = teamStandardShifts?.find(s => s.team_id === employee?.team_id);
+        // Get team's default shift (using map that includes team_members fallback)
+        const assistantTeamId = employeeTeamMap.get(assistantId);
+        const teamShift = teamStandardShifts?.find(s => s.team_id === assistantTeamId);
         const teamShiftDays = teamShift?.id ? shiftDaysMap.get(teamShift.id) : undefined;
 
         // Individual shifts by date
