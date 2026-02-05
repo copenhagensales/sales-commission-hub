@@ -597,6 +597,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   Anbefal en ven
                 </NavLink>
               )}
+
+              {/* Straksbetaling (ASE) */}
+              {p.canViewImmediatePaymentAse && (
+                <NavLink
+                  to="/immediate-payment-ase"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/immediate-payment-ase" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Straksbetaling (ASE)
+                </NavLink>
+              )}
             </CollapsibleContent>
           </Collapsible>
 

@@ -95,6 +95,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til at dele referral link og se egne anbefalinger",
         hasEditOption: false,
       },
+      {
+        key: "menu_immediate_payment_ase",
+        label: "Straksbetaling (ASE)",
+        description: "Adgang til at se ASE-salg med mulighed for straksbetaling",
+        hasEditOption: false,
+      },
     ],
   },
 
