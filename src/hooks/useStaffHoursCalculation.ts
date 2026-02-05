@@ -1,20 +1,20 @@
- import { useQuery } from "@tanstack/react-query";
- import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
+import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
  
- interface StaffHoursData {
-   employeeId: string;
-   hourlyRate: number;
-   workedHours: number;
-   baseSalary: number;
-   vacationPay: number; // 12.5%
-   totalSalary: number;
-   isHourlyBased: boolean; // true if calculated from hours, false if fixed monthly
-   hoursSource: 'shift' | 'timestamp'; // which source was used for calculation
- }
- 
- const VACATION_PAY_RATE = 0.125; // 12.5%
- const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, not monthly
+interface StaffHoursData {
+  employeeId: string;
+  hourlyRate: number;
+  workedHours: number;
+  baseSalary: number;
+  vacationPay: number; // 12.5%
+  totalSalary: number;
+  isHourlyBased: boolean; // true if calculated from hours, false if fixed monthly
+  hoursSource: 'shift' | 'timestamp'; // which source was used for calculation
+}
+
+const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, not monthly
  
 /**
  * Count workdays (Mon-Fri) in a period
@@ -161,7 +161,7 @@ function countWorkDaysInPeriod(start: Date, end: Date): number {
           // Prorate: if viewing 1 day, salary = monthly / workdays_in_month
           const prorationFactor = workdaysInMonth > 0 ? workdaysInPeriod / workdaysInMonth : 1;
           const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
-           const vacationPay = baseSalary * VACATION_PAY_RATE;
+           const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
           
            result[staffId] = {
              employeeId: staffId,
@@ -271,8 +271,8 @@ function countWorkDaysInPeriod(start: Date, end: Date): number {
          }
  
          const baseSalary = totalHours * effectiveHourlyRate;
-         const vacationPay = baseSalary * VACATION_PAY_RATE;
-         const totalSalary = baseSalary + vacationPay;
+          const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
+          const totalSalary = baseSalary + vacationPay;
  
          result[staffId] = {
            employeeId: staffId,
@@ -293,26 +293,4 @@ function countWorkDaysInPeriod(start: Date, end: Date): number {
    });
  }
  
- /**
-  * Calculate hours from start_time and end_time strings (HH:mm or HH:mm:ss format).
-  * Applies 30-minute break deduction for shifts over 6 hours.
-  */
- function calculateHoursFromShift(startTime: string, endTime: string): number {
-   const [startH, startM] = startTime.split(":").map(Number);
-   const [endH, endM] = endTime.split(":").map(Number);
- 
-   const startMinutes = startH * 60 + (startM || 0);
-   const endMinutes = endH * 60 + (endM || 0);
- 
-   let totalMinutes = endMinutes - startMinutes;
-   if (totalMinutes < 0) {
-     totalMinutes += 24 * 60;
-   }
- 
-   // Apply 30-minute break for shifts over 6 hours
-   if (totalMinutes > 360) {
-     totalMinutes -= 30;
-   }
- 
-   return Math.round((totalMinutes / 60) * 100) / 100;
- }
+// Note: calculateHoursFromShift is now imported from @/lib/calculations

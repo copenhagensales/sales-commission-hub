@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Clock, Briefcase } from "lucide-react";
+import { VACATION_PAY_RATES } from "@/lib/calculations";
 import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval } from "date-fns";
 
 /**
@@ -80,8 +81,6 @@ interface TeamSalaryInfo {
   assistantId: string | null;
 }
 
-const SELLER_VACATION_RATE = 0.125; // 12.5%
-const LEADER_VACATION_RATE = 0.01; // 1%
 const FM_CLIENT_NAMES = ["Eesy FM", "Yousee"];
 const STANDARD_MONTH_DAYS = 30;
 
@@ -550,7 +549,7 @@ export function ClientDBTab() {
 
       // Calculate seller salary cost
       const commission = salesData.commission;
-      const sellerVacationPay = commission * SELLER_VACATION_RATE;
+      const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
       const sellerSalaryCost = commission + sellerVacationPay;
 
       // Apply cancellation adjustment
@@ -626,9 +625,9 @@ export function ClientDBTab() {
       // Allocate leader salary proportionally by DB before leader
       const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1); // Avoid division by zero
       for (const client of teamClients) {
-        const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
+       const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
         client.leaderAllocation = finalTeamLeaderSalary * dbShare;
-        client.leaderVacationPay = client.leaderAllocation * LEADER_VACATION_RATE;
+        client.leaderVacationPay = client.leaderAllocation * VACATION_PAY_RATES.LEADER;
         client.finalDB = client.dbBeforeLeader - client.leaderAllocation - client.leaderVacationPay;
       }
     }

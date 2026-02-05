@@ -48,6 +48,7 @@ import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
+import { getVacationPayRate } from "@/lib/calculations";
 
 const Home = () => {
   const { user } = useAuth();
@@ -176,12 +177,9 @@ const Home = () => {
     ? Math.round((personalStats?.periodCommission || 0) / targetAmount * 100) 
     : 0;
 
-  // Vacation pay calculation (same logic as useSellerSalariesCached)
+  // Vacation pay calculation using central calculations library
   const vacationPayRate = useMemo(() => {
-    if (!employee?.vacation_type) return 0;
-    if (employee.vacation_type === 'vacation_pay') return 0.125; // 12.5%
-    if (employee.vacation_type === 'vacation_bonus') return 0.01; // 1%
-    return 0;
+    return getVacationPayRate(employee?.vacation_type || null);
   }, [employee?.vacation_type]);
 
   const vacationPay = (personalStats?.periodCommission || 0) * vacationPayRate;

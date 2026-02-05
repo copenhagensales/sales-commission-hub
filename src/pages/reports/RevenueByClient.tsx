@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { calculateVacationPay } from "@/lib/calculations";
 
 // Hard-coded whitelist - ONLY these users can access this report
 const ALLOWED_EMAILS = ["km@copenhagensales.dk", "mg@copenhagensales.dk"];
@@ -407,7 +408,7 @@ export default function RevenueByClient() {
         totalCommission += commission;
       });
 
-      const totalVacationPay = totalCommission * 0.125;
+     const totalVacationPay = calculateVacationPay(totalCommission);
       const locationCosts = locationCostsByClient[clientId] || 0;
       // Earnings = Revenue - Commission - VacationPay - LocationCosts
       const totalEarnings = totalRevenue - totalCommission - totalVacationPay - locationCosts;

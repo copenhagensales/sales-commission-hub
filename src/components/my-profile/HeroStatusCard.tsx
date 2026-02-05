@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Zap, TrendingUp, Flame, Rocket, Trophy, Target, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PulseThresholds, getPulseStatus } from "@/hooks/useGamificationConfig";
+import { VACATION_PAY_RATES } from "@/lib/calculations";
 import {
   Tooltip,
   TooltipContent,
@@ -218,11 +219,11 @@ export function HeroStatusCard({
           {/* Right: Expected */}
           <div className="flex-1 text-center">
             <p className="text-xs text-muted-foreground mb-1">Forventet</p>
-            <p className={cn("text-xl font-bold", willHitGoal ? "text-success" : "text-warning")}>
+           <p className={cn("text-xl font-bold", willHitGoal ? "text-success" : "text-warning")}>
               {Math.round(projectedFinal).toLocaleString("da-DK")} <span className="text-sm font-normal text-muted-foreground">kr</span>
             </p>
             <p className="text-[10px] text-primary/70 font-medium mt-0.5">
-              + {Math.round(projectedFinal * 0.125).toLocaleString("da-DK")} kr. i feriepenge
+              + {Math.round(projectedFinal * VACATION_PAY_RATES.SELLER).toLocaleString("da-DK")} kr. i feriepenge
             </p>
           </div>
         </div>
