@@ -8,6 +8,7 @@ import { CreditCard, Loader2, FileX } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
 
@@ -135,65 +136,67 @@ export default function ImmediatePaymentASE() {
   });
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <CreditCard className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold">Tilføj straksbetaling (ASE)</h1>
-          <p className="text-muted-foreground">Se dine ASE-salg med mulighed for straksbetaling</p>
+    <MainLayout>
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <CreditCard className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Tilføj straksbetaling (ASE)</h1>
+            <p className="text-muted-foreground">Se dine ASE-salg med mulighed for straksbetaling</p>
+          </div>
         </div>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dine salg med straksbetaling</CardTitle>
-          <CardDescription>
-            Salg hvor produktets prisregel tillader straksbetaling
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : sales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileX className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="font-medium text-lg">Ingen salg fundet</h3>
-              <p className="text-muted-foreground text-sm max-w-md mt-1">
-                Du har ingen ASE-salg med mulighed for straksbetaling endnu.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dato</TableHead>
-                  <TableHead>Produkt</TableHead>
-                  <TableHead>Kunde</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell>
-                      {format(new Date(sale.sale_datetime), "d. MMM yyyy", { locale: da })}
-                    </TableCell>
-                    <TableCell>{sale.product_name}</TableCell>
-                    <TableCell>
-                      {sale.customer_company || sale.customer_phone || "Ukendt"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Afventer</Badge>
-                    </TableCell>
+        <Card>
+          <CardHeader>
+            <CardTitle>Dine salg med straksbetaling</CardTitle>
+            <CardDescription>
+              Salg hvor produktets prisregel tillader straksbetaling
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : sales.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileX className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="font-medium text-lg">Ingen salg fundet</h3>
+                <p className="text-muted-foreground text-sm max-w-md mt-1">
+                  Du har ingen ASE-salg med mulighed for straksbetaling endnu.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dato</TableHead>
+                    <TableHead>Produkt</TableHead>
+                    <TableHead>Kunde</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                </TableHeader>
+                <TableBody>
+                  {sales.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell>
+                        {format(new Date(sale.sale_datetime), "d. MMM yyyy", { locale: da })}
+                      </TableCell>
+                      <TableCell>{sale.product_name}</TableCell>
+                      <TableCell>
+                        {sale.customer_company || sale.customer_phone || "Ukendt"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Afventer</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
   );
 }
