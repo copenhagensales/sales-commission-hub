@@ -1,94 +1,69 @@
 
-# Plan: Tilføj understøttelse af månedsløn for assistenter
+# Plan: Tilføj "Mulighed for straksbetaling" checkbox til prisregler
 
-## Problembeskrivelse
+## Oversigt
+Tilføjer en ny checkbox-indstilling "Mulighed for straksbetaling" i prisregel-editoren. Denne vises kun for ASE-produkter og gemmes som et boolean-felt i databasen.
 
-Johannes Hedebrink har en månedsløn på 40.000 kr, men `useAssistantHoursCalculation` behandler alle værdier som timelønninger. Dette betyder at hans løn beregnes forkert (40.000 kr × timer = astronomisk beløb).
+## Database-ændring
 
-## Løsning
-
-Tilføj samme logik som `useStaffHoursCalculation` bruger - med en tærskelværdi på 1.000 kr til at skelne mellem timeløn og månedsløn. For månedslønnede prorateres lønnen baseret på arbejdsdage i perioden.
-
-## Ændringer i useAssistantHoursCalculation.ts
-
-### 1. Tilføj imports og konstant
-
-```typescript
-import { startOfMonth, endOfMonth } from "date-fns";
-import { countWorkDaysInPeriod } from "@/lib/calculations";
-
-const HOURLY_RATE_THRESHOLD = 1000; // Under dette = timeløn, over = månedsløn
+### Ny kolonne i `product_pricing_rules`
+```sql
+ALTER TABLE product_pricing_rules 
+ADD COLUMN allows_immediate_payment BOOLEAN DEFAULT false;
 ```
 
-### 2. Udvid interface
-
-```typescript
-interface AssistantHoursData {
-  employeeId: string;
-  hourlyRate: number;
-  workedHours: number;
-  baseSalary: number;
-  vacationPay: number;
-  totalSalary: number;
-  isHourlyBased: boolean; // NY: true = timeløn, false = månedsløn
-}
-```
-
-### 3. Tilføj logik til at skelne løntyper
-
-For hver assistent:
-
-```typescript
-const monthlySalary = Number(salary?.monthly_salary) || 0;
-const hourlyRate = Number(salary?.hourly_rate) || 0;
-
-// Brug hourly_rate hvis sat, ellers tjek om monthly_salary er lav (timeløn)
-const effectiveHourlyRate = hourlyRate > 0 
-  ? hourlyRate 
-  : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
-const isHourlyBased = effectiveHourlyRate > 0;
-```
-
-### 4. Håndter månedslønnede separat
-
-```typescript
-if (!isHourlyBased) {
-  // Proratér månedsløn baseret på arbejdsdage
-  const monthStart = startOfMonth(periodStart);
-  const monthEnd = endOfMonth(periodStart);
-  
-  const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-  const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
-  
-  const prorationFactor = workdaysInMonth > 0 
-    ? workdaysInPeriod / workdaysInMonth 
-    : 1;
-  const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
-  const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
-  
-  result[assistantId] = {
-    employeeId: assistantId,
-    hourlyRate: 0,
-    workedHours: workdaysInPeriod, // Viser arbejdsdage for klarhed
-    baseSalary,
-    vacationPay,
-    totalSalary: baseSalary + vacationPay,
-    isHourlyBased: false,
-  };
-  continue;
-}
-// ... resten af time-baseret beregning
-```
+Denne kolonne tracker om reglen tillader straksbetaling.
 
 ---
 
-## Eksempel på beregning for Johannes (40.000 kr/md)
+## Frontend-ændringer
 
-| Periode | Arbejdsdage i periode | Arbejdsdage i måneden | Proratering | Basisløn | Feriepenge (12,5%) | Total |
-|---------|----------------------|----------------------|-------------|----------|-------------------|-------|
-| 1 dag   | 1                    | 20                   | 1/20        | 2.000 kr | 250 kr            | 2.250 kr |
-| 1 uge   | 5                    | 20                   | 5/20        | 10.000 kr| 1.250 kr          | 11.250 kr |
-| Hel md  | 20                   | 20                   | 20/20       | 40.000 kr| 5.000 kr          | 45.000 kr |
+### PricingRuleEditor.tsx
+
+**1. Tilføj ny state-variabel:**
+```typescript
+const [allowsImmediatePayment, setAllowsImmediatePayment] = useState(
+  existingRule?.allows_immediate_payment ?? false
+);
+```
+
+**2. Opdater PricingRule interface:**
+```typescript
+interface PricingRule {
+  // ... eksisterende felter
+  allows_immediate_payment?: boolean;
+}
+```
+
+**3. Tilføj ny sektion med checkbox efter "Prissætning":**
+```text
+┌────────────────────────────────────────────────┐
+│ 💳 Mulighed for straksbetaling                │
+│                                                │
+│ ☑ Tillad straksbetaling på denne regel        │
+│                                                │
+│ Hvis slået til, kan kunden betale straks      │
+└────────────────────────────────────────────────┘
+```
+
+UI-koden:
+```tsx
+<div className="flex items-center justify-between">
+  <div className="space-y-1">
+    <Label>Mulighed for straksbetaling</Label>
+    <p className="text-xs text-muted-foreground">
+      Tillad straksbetaling for salg med denne regel
+    </p>
+  </div>
+  <Switch
+    checked={allowsImmediatePayment}
+    onCheckedChange={setAllowsImmediatePayment}
+  />
+</div>
+```
+
+**4. Opdater saveMutation:**
+Inkluder `allows_immediate_payment: allowsImmediatePayment` i `ruleData`-objektet.
 
 ---
 
@@ -96,10 +71,30 @@ if (!isHourlyBased) {
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useAssistantHoursCalculation.ts` | Tilføj understøttelse af månedsløn med proratering |
+| `product_pricing_rules` (database) | Tilføj `allows_immediate_payment` kolonne |
+| `src/components/mg-test/PricingRuleEditor.tsx` | Tilføj switch UI og state |
+
+---
+
+## Placering i UI
+
+Checkboxen placeres mellem "Prissætning" og "Aktiv" toggle:
+
+```text
+💰 Prissætning
+├── Provision (kr): [600]
+└── Omsætning (kr): [1500]
+
+💳 Mulighed for straksbetaling     [Toggle: ☐/☑]
+   Tillad straksbetaling for salg med denne regel
+
+Aktiv                              [Toggle: ☑]
+```
+
+---
 
 ## Forventet resultat
 
-- Jeppe Munk (timeløn 180 kr) beregnes som hidtil: timer × 180 kr × 1,125
-- Johannes Hedebrink (månedsløn 40.000 kr) prorateres korrekt baseret på arbejdsdage
-- Begges løn indgår i TDC Erhvervs assistentomkostninger
+1. Når man opretter/redigerer en prisregel for ASE-produkter (f.eks. "Salg"), vises en ny toggle
+2. Værdien gemmes i databasen og kan læses ved næste redigering
+3. Eksisterende regler får `false` som default-værdi
