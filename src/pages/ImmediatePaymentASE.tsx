@@ -80,6 +80,7 @@ export default function ImmediatePaymentASE() {
           sale_datetime,
           customer_company,
           customer_phone,
+          agent_email,
           sale_items!inner(
             matched_pricing_rule_id,
             product_id,
@@ -93,7 +94,7 @@ export default function ImmediatePaymentASE() {
 
       // Filter to only sales where agent_email matches (case-insensitive)
       const filteredSales = salesData.filter(s => 
-        agentEmails.includes((s as any).agent_email?.toLowerCase?.() || "")
+        agentEmails.includes(s.agent_email?.toLowerCase?.() || "")
       );
 
       // Get pricing rules with allows_immediate_payment = true
