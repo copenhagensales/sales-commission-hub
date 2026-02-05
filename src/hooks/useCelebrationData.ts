@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth } from "date-fns";
+import { formatNumber } from "@/lib/calculations";
 import { useDashboardAggregates } from "./useDashboardAggregates";
 
 export interface CelebrationTriggerData {
@@ -128,23 +129,23 @@ export function replaceCelebrationVariables(
 ): string {
   if (!text || !data) return text || "";
 
-  const formatNumber = (num: number) => num.toLocaleString("da-DK");
-  const formatCurrency = (num: number) => `${num.toLocaleString("da-DK")} kr`;
+  // formatNumber imported from @/lib/calculations
+  const formatCurrencyLocal = (num: number) => `${formatNumber(num)} kr`;
 
   return text
     .replace(/{employee_name}/g, data.employeeName || "Medarbejder")
     .replace(/{sales_count}/g, formatNumber(data.salesCount))
-    .replace(/{commission}/g, formatCurrency(data.commission))
+    .replace(/{commission}/g, formatCurrencyLocal(data.commission))
     .replace(/{metric_value}/g, formatNumber(data.metricValue))
     .replace(/{sales_today}/g, formatNumber(data.salesToday))
     .replace(/{sales_month}/g, formatNumber(data.salesMonth))
     .replace(/{sales_week}/g, formatNumber(data.salesWeek))
     .replace(/{total_sales}/g, formatNumber(data.totalSales))
-    .replace(/{commission_today}/g, formatCurrency(data.commissionToday))
-    .replace(/{commission_month}/g, formatCurrency(data.commissionMonth))
+    .replace(/{commission_today}/g, formatCurrencyLocal(data.commissionToday))
+    .replace(/{commission_month}/g, formatCurrencyLocal(data.commissionMonth))
     .replace(/{goal_progress}/g, `${data.goalProgress}%`)
-    .replace(/{goal_target}/g, formatCurrency(data.goalTarget))
-    .replace(/{goal_remaining}/g, formatCurrency(data.goalRemaining));
+    .replace(/{goal_target}/g, formatCurrencyLocal(data.goalTarget))
+    .replace(/{goal_remaining}/g, formatCurrencyLocal(data.goalRemaining));
 }
 
 /**

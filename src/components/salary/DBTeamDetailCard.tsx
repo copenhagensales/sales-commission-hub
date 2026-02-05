@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -26,8 +27,7 @@ interface DBTeamDetailCardProps {
 }
 
 export function DBTeamDetailCard({ team, onClose }: DBTeamDetailCardProps) {
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
+  // formatCurrency imported from @/lib/calculations
 
   // Calculate if leader uses minimum salary
   const dbBeforeLeader = team.revenue - team.sellerSalaryCosts - team.expenses;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Trophy, Building2, Maximize, Minimize, Lock, Link, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,14 +119,7 @@ export default function SalesDashboard() {
     }
   }, []);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   const allClients = [...(clientStats || [])].sort((a, b) => b.sales_month - a.sales_month);
   const totalSalesToday = allClients.reduce((sum, c) => sum + c.sales_today, 0);

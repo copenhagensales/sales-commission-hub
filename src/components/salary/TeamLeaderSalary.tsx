@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Plus, Search, MoreHorizontal, Trash2, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/calculations";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
@@ -160,13 +161,7 @@ export function TeamLeaderSalary() {
     return name.includes(searchQuery.toLowerCase());
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   const formatPercentage = (rate: number | null) => {
     if (rate === null || rate === 0) return "-";

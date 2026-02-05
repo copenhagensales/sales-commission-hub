@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Zap, TrendingUp, Flame, Rocket, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/calculations";
 import { PulseThresholds, getPulseStatus } from "@/hooks/useGamificationConfig";
 import {
   Tooltip,
@@ -88,13 +89,7 @@ export function HeroPulseWidget({
     return () => clearTimeout(timer);
   }, [Math.round(pulsePercent / 10)]); // Re-trigger on significant changes
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   return (
     <Card

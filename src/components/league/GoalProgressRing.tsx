@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/calculations";
 import {
   Tooltip,
   TooltipContent,
@@ -53,8 +54,7 @@ export function GoalProgressRing({
   
   const status = getStatus();
   
-  const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 }).format(value);
+  // formatCurrency imported from @/lib/calculations
 
   return (
     <TooltipProvider>

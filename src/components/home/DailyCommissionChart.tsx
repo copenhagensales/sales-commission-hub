@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { BarChart, TrendingUp } from "lucide-react";
+import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -66,13 +67,7 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
 
   const motivation = getMotivationalMessage();
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "currency",
-      currency: "DKK",
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // formatCurrency imported from @/lib/calculations
 
   const chartConfig = {
     commission: {

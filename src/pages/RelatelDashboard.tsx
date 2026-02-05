@@ -4,6 +4,7 @@ import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -56,8 +57,8 @@ function calculatePayrollPeriod(): { start: Date; end: Date } {
   }
 }
 
-const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value);
+// formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
+const formatCurrency = formatNumber;
 
 const getInitials = (name: string) => {
   const parts = name.split(" ");

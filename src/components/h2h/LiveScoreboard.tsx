@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { DollarSign, Flame, TrendingUp, Crown } from "lucide-react";
+import { formatNumber } from "@/lib/calculations";
 
 interface LiveScoreboardProps {
   myCommission: number;
@@ -74,9 +75,8 @@ export const LiveScoreboard = ({
     }
   }, [opponentCommission]);
 
-  const formatCurrency = (num: number) => {
-    return new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(num);
-  };
+  // formatNumber imported from @/lib/calculations - alias as formatCurrency
+  const formatCurrency = formatNumber;
 
   const commissionDiff = Math.abs(myCommission - opponentCommission);
 
