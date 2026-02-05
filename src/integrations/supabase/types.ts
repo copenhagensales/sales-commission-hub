@@ -7817,6 +7817,53 @@ export type Database = {
         }
         Relationships: []
       }
+      team_assistant_leaders: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_assistant_leaders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_assistant_leaders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_assistant_leaders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_assistant_leaders_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_client_daily_bonus: {
         Row: {
           bonus_amount: number

@@ -9,8 +9,8 @@ interface TeamDB {
   teamName: string;
   leaderId: string | null;
   leaderName: string;
-  assistantId: string | null;
-  assistantName: string;
+  assistantIds: string[];
+  assistantNames: string[];
   revenue: number;
   sellerSalaryCosts: number;
   leaderSalary: number;
@@ -50,8 +50,8 @@ export function DBTeamDetailCard({ team, onClose }: DBTeamDetailCardProps) {
             <p className="font-medium">{team.leaderName}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Assistent</p>
-            <p className="font-medium">{team.assistantName}</p>
+            <p className="text-sm text-muted-foreground">Assistenter</p>
+            <p className="font-medium">{team.assistantNames.length > 0 ? team.assistantNames.join(", ") : "-"}</p>
           </div>
         </div>
 
@@ -101,10 +101,10 @@ export function DBTeamDetailCard({ team, onClose }: DBTeamDetailCardProps) {
           </div>
 
           {/* Assistant salary */}
-          {team.assistantId && (
+          {team.assistantIds.length > 0 && (
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex justify-between">
-                <span>Assistentløn: {team.assistantName}</span>
+                <span>Assistentløn: {team.assistantNames.join(", ")}</span>
                 <span className="text-destructive font-medium">-{formatCurrency(team.assistantSalary)}</span>
               </div>
             </div>

@@ -19,12 +19,12 @@ import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import { format, isToday, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
+import { useTeamAssistantLeaders, getTeamAssistantIds, useUpdateTeamAssistants } from "@/hooks/useTeamAssistantLeaders";
 interface Team {
   id: string;
   name: string;
   description: string | null;
   team_leader_id: string | null;
-  assistant_team_leader_id: string | null;
 }
 
 interface Employee {
@@ -62,7 +62,7 @@ export function TeamsTab() {
     name: "",
     description: "",
     team_leader_id: "",
-    assistant_team_leader_id: "",
+    assistant_team_leader_ids: [] as string[],
     client_ids: [] as string[],
     employee_ids: [] as string[],
     daily_bonus: {} as Record<string, { amount: number; days: number }>,
@@ -80,6 +80,11 @@ export function TeamsTab() {
       return data as Team[];
     },
   });
+
+  // Fetch team assistant leaders from junction table
+  const { data: teamAssistants = [] } = useTeamAssistantLeaders();
+  
+  const updateTeamAssistantsMutation = useUpdateTeamAssistants();
 
   // Fetch staff employees for team leader selection
   const { data: teamLeaders = [] } = useQuery({
@@ -196,11 +201,21 @@ export function TeamsTab() {
           name: data.name,
           description: data.description || null,
           team_leader_id: data.team_leader_id || null,
-          assistant_team_leader_id: data.assistant_team_leader_id || null,
         })
         .select()
         .single();
       if (teamError) throw teamError;
+
+      // Add assistant team leaders to junction table
+      if (data.assistant_team_leader_ids.length > 0) {
+        const { error: assistantsError } = await supabase
+          .from("team_assistant_leaders")
+          .insert(data.assistant_team_leader_ids.map((employee_id) => ({ 
+            team_id: newTeam.id, 
+            employee_id 
+          })));
+        if (assistantsError) throw assistantsError;
+      }
 
       // Add clients
       if (data.client_ids.length > 0) {
@@ -233,10 +248,21 @@ export function TeamsTab() {
           name: data.name,
           description: data.description || null,
           team_leader_id: data.team_leader_id || null,
-          assistant_team_leader_id: data.assistant_team_leader_id || null,
         })
         .eq("id", data.id);
       if (teamError) throw teamError;
+
+      // Update assistant team leaders in junction table
+      await supabase.from("team_assistant_leaders").delete().eq("team_id", data.id);
+      if (data.assistant_team_leader_ids.length > 0) {
+        const { error: assistantsError } = await supabase
+          .from("team_assistant_leaders")
+          .insert(data.assistant_team_leader_ids.map((employee_id) => ({ 
+            team_id: data.id, 
+            employee_id 
+          })));
+        if (assistantsError) throw assistantsError;
+      }
 
       // Delete existing clients and re-add
       await supabase.from("team_clients").delete().eq("team_id", data.id);
@@ -386,7 +412,7 @@ export function TeamsTab() {
       name: "",
       description: "",
       team_leader_id: "",
-      assistant_team_leader_id: "",
+      assistant_team_leader_ids: [],
       client_ids: [],
       employee_ids: [],
       daily_bonus: {},
@@ -411,7 +437,7 @@ export function TeamsTab() {
       name: team.name,
       description: team.description || "",
       team_leader_id: team.team_leader_id || "",
-      assistant_team_leader_id: team.assistant_team_leader_id || "",
+      assistant_team_leader_ids: getTeamAssistantIds(teamAssistants, team.id),
       client_ids: getTeamClients(team.id),
       employee_ids: getTeamMembers(team.id),
       daily_bonus: getTeamDailyBonus(team.id),
@@ -577,9 +603,11 @@ export function TeamsTab() {
                             : "-"}
                         </TableCell>
                         <TableCell className="py-3">
-                          {team.assistant_team_leader_id && employeeMap[team.assistant_team_leader_id]
-                            ? employeeMap[team.assistant_team_leader_id]
-                            : "-"}
+                          {(() => {
+                            const assistantIds = getTeamAssistantIds(teamAssistants, team.id);
+                            if (assistantIds.length === 0) return "-";
+                            return assistantIds.map(id => employeeMap[id]).filter(Boolean).join(", ") || "-";
+                          })()}
                         </TableCell>
                         <TableCell className="py-3">
                           <div className="flex flex-wrap gap-1.5">
@@ -1157,23 +1185,58 @@ export function TeamsTab() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Ass. Teamleder</Label>
-                      <Select
-                        value={formData.assistant_team_leader_id || "__none__"}
-                        onValueChange={(value) => setFormData({ ...formData, assistant_team_leader_id: value === "__none__" ? "" : value })}
-                      >
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Vælg assisterende teamleder" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Ingen</SelectItem>
-                          {teamLeaders.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.first_name} {emp.last_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-sm font-medium">Ass. Teamledere</Label>
+                      <div className="space-y-2">
+                        {/* Selected assistants */}
+                        {formData.assistant_team_leader_ids.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.assistant_team_leader_ids.map((id) => {
+                              const emp = teamLeaders.find(e => e.id === id);
+                              return emp ? (
+                                <Badge key={id} variant="secondary" className="flex items-center gap-1 pr-1">
+                                  {emp.first_name} {emp.last_name}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4 w-4 hover:bg-transparent"
+                                    onClick={() => setFormData(prev => ({
+                                      ...prev,
+                                      assistant_team_leader_ids: prev.assistant_team_leader_ids.filter(i => i !== id)
+                                    }))}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
+                        {/* Add assistant dropdown */}
+                        <Select
+                          value=""
+                          onValueChange={(value) => {
+                            if (value && !formData.assistant_team_leader_ids.includes(value)) {
+                              setFormData(prev => ({
+                                ...prev,
+                                assistant_team_leader_ids: [...prev.assistant_team_leader_ids, value]
+                              }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Tilføj assisterende teamleder..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teamLeaders
+                              .filter(emp => !formData.assistant_team_leader_ids.includes(emp.id))
+                              .map((emp) => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.first_name} {emp.last_name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>

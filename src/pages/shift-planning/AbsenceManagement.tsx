@@ -66,15 +66,23 @@ export default function AbsenceManagement() {
     queryFn: async () => {
       if (!currentEmployee?.id) return [];
       
-      // Get teams where current user is team_leader or assistant_team_leader
+      // Get teams where current user is team_leader
       const { data: ledTeams, error: teamsError } = await supabase
         .from("teams")
         .select("id")
-        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
+        .eq("team_leader_id", currentEmployee.id);
+      
+      // Also check junction table for assistant roles
+      const { data: assistantTeams } = await supabase
+        .from("team_assistant_leaders")
+        .select("team_id")
+        .eq("employee_id", currentEmployee.id);
       
       if (teamsError) throw teamsError;
       
-      const ledTeamIds = ledTeams?.map(t => t.id) || [];
+      const leaderTeamIds = ledTeams?.map(t => t.id) || [];
+      const assistantTeamIds = assistantTeams?.map(t => t.team_id) || [];
+      const ledTeamIds = [...new Set([...leaderTeamIds, ...assistantTeamIds])];
       if (ledTeamIds.length === 0) return [];
       
       // Get all employees from those teams
