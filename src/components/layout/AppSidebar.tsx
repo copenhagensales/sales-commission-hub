@@ -21,6 +21,7 @@ import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
+import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useTranslation } from "react-i18next";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
@@ -46,8 +47,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
+  const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+  
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals", "/immediate-payment-ase"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -598,8 +601,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 </NavLink>
               )}
 
-              {/* Straksbetaling (ASE) */}
-              {p.canViewImmediatePaymentAse && (
+              {/* Straksbetaling (ASE) - shown dynamically based on qualifying sales */}
+              {hasImmediatePaymentSales && (
                 <NavLink
                   to="/immediate-payment-ase"
                   onClick={handleNavClick}
