@@ -529,20 +529,63 @@ async function upsertWatermarks(
   watermarks: { period_type: string; scope_type: string; scope_id: string | null; last_processed_at: string }[]
 ) {
   for (const wm of watermarks) {
-    const { error } = await supabase
-      .from("kpi_watermarks")
-      .upsert({
-        period_type: wm.period_type,
-        scope_type: wm.scope_type,
-        scope_id: wm.scope_id,
-        last_processed_at: wm.last_processed_at,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "period_type,scope_type,scope_id",
-      });
+    const updatedAt = new Date().toISOString();
+    
+    // Handle NULL scope_id explicitly - Supabase upsert doesn't work with partial indexes on NULL
+    if (wm.scope_id === null) {
+      // First try to update existing row
+      const { data: updateData, error: updateError } = await supabase
+        .from("kpi_watermarks")
+        .update({ 
+          last_processed_at: wm.last_processed_at, 
+          updated_at: updatedAt 
+        })
+        .eq("period_type", wm.period_type)
+        .eq("scope_type", wm.scope_type)
+        .is("scope_id", null)
+        .select();
+      
+      if (updateError) {
+        console.error(`[upsertWatermarks] Update error for ${wm.period_type}:`, updateError);
+      }
+      
+      // If no rows were updated (updateData is empty), insert new row
+      if (!updateData || updateData.length === 0) {
+        const { error: insertError } = await supabase
+          .from("kpi_watermarks")
+          .insert({
+            period_type: wm.period_type,
+            scope_type: wm.scope_type,
+            scope_id: null,
+            last_processed_at: wm.last_processed_at,
+            updated_at: updatedAt,
+          });
+        
+        if (insertError) {
+          console.error(`[upsertWatermarks] Insert error for ${wm.period_type}:`, insertError);
+        } else {
+          console.log(`[upsertWatermarks] Inserted new watermark for ${wm.period_type}`);
+        }
+      } else {
+        console.log(`[upsertWatermarks] Updated watermark for ${wm.period_type} to ${wm.last_processed_at}`);
+      }
+    } else {
+      // Normal upsert for non-null scope_id
+      const { error } = await supabase
+        .from("kpi_watermarks")
+        .upsert({
+          period_type: wm.period_type,
+          scope_type: wm.scope_type,
+          scope_id: wm.scope_id,
+          last_processed_at: wm.last_processed_at,
+          updated_at: updatedAt,
+        }, {
+          onConflict: "period_type,scope_type,scope_id",
+        });
 
-    if (error) {
-      console.error(`[upsertWatermarks] Error upserting watermark for ${wm.period_type}:`, error);
+      if (error) {
+        console.error(`[upsertWatermarks] Error upserting watermark for ${wm.period_type}:`, error);
+      }
     }
   }
 }
