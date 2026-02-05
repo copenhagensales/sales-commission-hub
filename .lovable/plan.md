@@ -1,93 +1,55 @@
 
-# Plan: Excel-eksport af Fieldmarketing-salg
+# Plan: Ret 1.000-rækkers begrænsning i Excel-eksport
 
-## Hvad skal bygges
+## Problem
 
-En eksportfunktion der henter alle fieldmarketing-salg fra 15. januar 2026 til nu og downloader dem som en Excel-fil med alle relevante oplysninger.
+Den nuværende eksport bruger en direkte Supabase-forespørgsel, som er begrænset til 1.000 rækker. Med flere end 1.000 fieldmarketing-salg siden 15/1 får du kun de første 1.000.
 
-## Excel-fil indhold
+## Løsning
 
-| Kolonne | Kilde |
-|---------|-------|
-| Dato | `registered_at` |
-| Sælger | `seller.first_name` + `seller.last_name` |
-| Lokation | `location.name` |
-| Klient | `client.name` |
-| Produkt | `product_name` |
-| Telefonnummer | `phone_number` |
-| Kommentar | `comment` |
-| Oprettet | `created_at` |
+Brug den eksisterende `fetchAllRows` utility der automatisk paginerer og henter alle rækker.
 
-## Teknisk implementering
+## Teknisk ændring
 
-### 1. Opret ny eksport-utility
+**Fil: `src/components/fieldmarketing/FieldmarketingExcelExport.tsx`**
 
-**Ny fil: `src/utils/excelExport.ts`**
-
+### Før (linje 14-30):
 ```typescript
-import * as XLSX from "xlsx";
-
-export function downloadExcel(data: Record<string, unknown>[], filename: string) {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-  XLSX.writeFile(workbook, filename);
-}
-```
-
-### 2. Opret eksport-komponent
-
-**Ny fil: `src/components/fieldmarketing/FieldmarketingExcelExport.tsx`**
-
-- Knap med "Eksporter til Excel" i Fieldmarketing Dashboard
-- Henter data fra `fieldmarketing_sales` med dato-filter
-- Formaterer og downloader Excel-fil
-
-### 3. Data-hentning
-
-```typescript
-const { data } = await supabase
+const { data, error } = await supabase
   .from("fieldmarketing_sales")
-  .select(`
-    id,
-    registered_at,
-    product_name,
-    phone_number,
-    comment,
-    created_at,
-    seller:employee_master_data!seller_id(first_name, last_name),
-    location:location!location_id(name),
-    client:clients!client_id(name)
-  `)
+  .select(`...`)
   .gte("registered_at", "2026-01-15T00:00:00")
   .order("registered_at", { ascending: false });
 ```
 
-### 4. Transformer til Excel-format
-
+### Efter:
 ```typescript
-const excelData = sales.map(sale => ({
-  "Dato": format(new Date(sale.registered_at), "dd-MM-yyyy HH:mm"),
-  "Sælger": `${sale.seller?.first_name} ${sale.seller?.last_name}`,
-  "Lokation": sale.location?.name || "-",
-  "Klient": sale.client?.name || "-",
-  "Produkt": sale.product_name,
-  "Telefonnummer": sale.phone_number,
-  "Kommentar": sale.comment || "",
-  "Oprettet": format(new Date(sale.created_at), "dd-MM-yyyy HH:mm"),
-}));
+import { fetchAllRows } from "@/utils/supabasePagination";
+
+const data = await fetchAllRows(
+  "fieldmarketing_sales",
+  `id, registered_at, product_name, phone_number, comment, created_at,
+   seller:employee_master_data!seller_id(first_name, last_name),
+   location:location!location_id(name),
+   client:clients!client_id(name)`,
+  (q) => q.gte("registered_at", "2026-01-15T00:00:00"),
+  { orderBy: "registered_at", ascending: false }
+);
 ```
 
----
+## Hvordan det virker
 
-## Filer der oprettes/ændres
+`fetchAllRows` utility'en:
+1. Henter data i batches af 500 rækker ad gangen
+2. Fortsætter automatisk indtil alle rækker er hentet
+3. Returnerer det samlede array
 
-| Fil | Handling |
-|-----|----------|
-| `src/utils/excelExport.ts` | Ny - generisk eksport-utility |
-| `src/components/fieldmarketing/FieldmarketingExcelExport.tsx` | Ny - eksport-komponent |
-| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Tilføj eksport-knap i header |
+## Filer der ændres
+
+| Fil | Ændring |
+|-----|---------|
+| `src/components/fieldmarketing/FieldmarketingExcelExport.tsx` | Erstat direkte query med `fetchAllRows` |
 
 ## Forventet resultat
 
-Brugeren kan klikke på "Eksporter til Excel" i Fieldmarketing Dashboard og få downloadet en .xlsx fil med alle salg fra 15/1 til nu, inklusiv sælgernavn, dato, lokation og alle andre felter.
+Excel-eksporten vil nu hente alle salg (uanset antal) fra 15. januar til nu.
