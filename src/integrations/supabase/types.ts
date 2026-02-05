@@ -7216,6 +7216,7 @@ export type Database = {
           adversus_product_title: string | null
           created_at: string | null
           id: string
+          is_immediate_payment: boolean | null
           mapped_commission: number | null
           mapped_revenue: number | null
           matched_pricing_rule_id: string | null
@@ -7231,6 +7232,7 @@ export type Database = {
           adversus_product_title?: string | null
           created_at?: string | null
           id?: string
+          is_immediate_payment?: boolean | null
           mapped_commission?: number | null
           mapped_revenue?: number | null
           matched_pricing_rule_id?: string | null
@@ -7246,6 +7248,7 @@ export type Database = {
           adversus_product_title?: string | null
           created_at?: string | null
           id?: string
+          is_immediate_payment?: boolean | null
           mapped_commission?: number | null
           mapped_revenue?: number | null
           matched_pricing_rule_id?: string | null
