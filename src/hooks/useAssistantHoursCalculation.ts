@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { eachDayOfInterval, format, getDay } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
+import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
+import { VACATION_PAY_RATES, calculateHoursFromShift, countWorkDaysInPeriod } from "@/lib/calculations";
+
+/** Threshold to distinguish hourly rate from monthly salary */
+const HOURLY_RATE_THRESHOLD = 1000;
 
 interface AssistantHoursData {
   employeeId: string;
@@ -10,6 +13,7 @@ interface AssistantHoursData {
   baseSalary: number;
   vacationPay: number; // 12.5%
   totalSalary: number;
+  isHourlyBased: boolean; // true = hourly rate, false = monthly salary
 }
 
 /**
@@ -131,10 +135,19 @@ export function useAssistantHoursCalculation(
 
       for (const assistantId of assistantIds) {
         const salary = salaries?.find(s => s.employee_id === assistantId);
-        // Use hourly_rate if set, otherwise fall back to monthly_salary (legacy)
-        const hourlyRate = Number(salary?.hourly_rate) || Number(salary?.monthly_salary) || 0;
+        const monthlySalary = Number(salary?.monthly_salary) || 0;
+        const hourlyRateFromDb = Number(salary?.hourly_rate) || 0;
         
-        if (hourlyRate === 0) {
+        // Determine if hourly or monthly based:
+        // - Use hourly_rate if explicitly set
+        // - If only monthly_salary, check if it's below threshold (meaning it's actually an hourly rate)
+        const effectiveHourlyRate = hourlyRateFromDb > 0 
+          ? hourlyRateFromDb 
+          : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
+        const isHourlyBased = effectiveHourlyRate > 0;
+        
+        // Handle zero salary case
+        if (monthlySalary === 0 && hourlyRateFromDb === 0) {
           result[assistantId] = {
             employeeId: assistantId,
             hourlyRate: 0,
@@ -142,9 +155,39 @@ export function useAssistantHoursCalculation(
             baseSalary: 0,
             vacationPay: 0,
             totalSalary: 0,
+            isHourlyBased: true,
           };
           continue;
         }
+        
+        // Handle monthly salary (prorate based on workdays)
+        if (!isHourlyBased) {
+          const monthStart = startOfMonth(periodStart);
+          const monthEnd = endOfMonth(periodStart);
+          
+          const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+          const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
+          
+          const prorationFactor = workdaysInMonth > 0 
+            ? workdaysInPeriod / workdaysInMonth 
+            : 1;
+          const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
+          const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
+          
+          result[assistantId] = {
+            employeeId: assistantId,
+            hourlyRate: 0,
+            workedHours: workdaysInPeriod, // Shows workdays for clarity
+            baseSalary,
+            vacationPay,
+            totalSalary: baseSalary + vacationPay,
+            isHourlyBased: false,
+          };
+          continue;
+        }
+        
+        // Hourly-based calculation continues below
+        const hourlyRate = effectiveHourlyRate;
 
         const employee = employees?.find(e => e.id === assistantId);
         
@@ -224,7 +267,7 @@ export function useAssistantHoursCalculation(
           }
         }
 
-       const baseSalary = totalHours * hourlyRate;
+        const baseSalary = totalHours * hourlyRate;
         const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
         const totalSalary = baseSalary + vacationPay;
 
@@ -235,6 +278,7 @@ export function useAssistantHoursCalculation(
           baseSalary,
           vacationPay,
           totalSalary,
+          isHourlyBased: true,
         };
       }
 
