@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
+import { VACATION_PAY_RATES, calculateHoursFromShift, countWorkDaysInPeriod } from "@/lib/calculations";
  
 interface StaffHoursData {
   employeeId: string;
@@ -15,21 +15,6 @@ interface StaffHoursData {
 }
 
 const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, not monthly
- 
-/**
- * Count workdays (Mon-Fri) in a period
- */
-function countWorkDaysInPeriod(start: Date, end: Date): number {
-  let count = 0;
-  const days = eachDayOfInterval({ start, end });
-  for (const day of days) {
-    const dow = getDay(day);
-    if (dow !== 0 && dow !== 6) {
-      count++;
-    }
-  }
-  return count;
-}
 
  /**
   * Hook to calculate staff salary based on actual worked hours (for hourly employees).

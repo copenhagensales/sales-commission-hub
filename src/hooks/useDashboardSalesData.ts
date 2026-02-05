@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, endOfDay, startOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { fetchAllRows, fetchByIds } from "@/utils/supabasePagination";
+import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 
 export interface DashboardEmployeeStats {
   employeeId: string;
@@ -409,7 +410,7 @@ export function useDashboardSalesData({
               const [startH, startM] = shiftForDay.start_time.split(":").map(Number);
               const [endH, endM] = shiftForDay.end_time.split(":").map(Number);
               const rawHours = endH + endM / 60 - (startH + startM / 60);
-              const breakMinutes = rawHours > 6 ? 30 : 0;
+              const breakMinutes = (rawHours * 60) > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0;
               hours = rawHours - breakMinutes / 60;
             }
           }

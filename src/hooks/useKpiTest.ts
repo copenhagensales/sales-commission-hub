@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
+import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 
 export type TestPeriod = "today" | "yesterday" | "this_week" | "this_month" | "last_30_days" | "custom";
 
@@ -1598,8 +1599,8 @@ export function calculateHoursFromTimes(
   // Handle overnight shifts
   if (rawHours < 0) rawHours += 24;
   
-  // Brug eksplicit break_minutes hvis tilgængelig, ellers 30 min fallback for >6t
-  const breakMins = breakMinutes ?? (rawHours > 6 ? 30 : 0);
+  // Use central break constants
+  const breakMins = breakMinutes ?? ((rawHours * 60) > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0);
   
   return Math.max(0, rawHours - breakMins / 60);
 }

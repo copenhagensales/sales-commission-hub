@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
-import { VACATION_PAY_RATES } from "@/lib/calculations";
+import { VACATION_PAY_RATES, countWorkDaysInPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 
@@ -619,39 +619,9 @@ export default function MyProfile() {
       return date.toISOString().split('T')[0];
     };
     
-    // Calculate workdays in period (excluding weekends, but including holidays as paid days)
-    const countWorkdays = (start: Date, end: Date) => {
-      let count = 0;
-      const current = new Date(start);
-      while (current <= end) {
-        const dayOfWeek = current.getDay();
-        // Count weekdays (mon-fri) - holidays on weekdays still count as paid days
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          count++;
-        }
-        current.setDate(current.getDate() + 1);
-      }
-      return count;
-    };
-    
-    // Calculate workdays passed so far in period (including holidays as paid)
-    const countWorkdaysPassed = (start: Date, upTo: Date) => {
-      let count = 0;
-      const current = new Date(start);
-      const endDate = upTo < periodEnd ? upTo : periodEnd;
-      while (current <= endDate) {
-        const dayOfWeek = current.getDay();
-        // Weekdays count as worked/paid (including holidays)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          count++;
-        }
-        current.setDate(current.getDate() + 1);
-      }
-      return count;
-    };
-    
-    const totalWorkdays = countWorkdays(periodStart, periodEnd);
-    const workdaysPassed = countWorkdaysPassed(periodStart, now);
+    // Use central countWorkDaysInPeriod from @/lib/calculations
+    const totalWorkdays = countWorkDaysInPeriod(periodStart, periodEnd);
+    const workdaysPassed = countWorkDaysInPeriod(periodStart, now > periodEnd ? periodEnd : now);
     
     return {
       start: periodStart,
