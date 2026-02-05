@@ -1,114 +1,155 @@
 
-# Tilføj Slet Kontrakt Funktion for Ejere
+
+# Plan: Tilføj understøttelse af flere assisterende teamledere
 
 ## Oversigt
-Giver ejere mulighed for at slette kontrakter direkte fra medarbejderens detaljeside. Dette er nyttigt for at fjerne fejlagtige eller forældede kontrakter.
 
-## Nuværende Tilstand
-- RLS-politikker tillader allerede ejere at slette kontrakter via `is_owner(auth.uid())`
-- Contracts.tsx har slet-funktionalitet, men kun for ikke-underskrevne kontrakter
-- EmployeeDetail.tsx viser kontrakter men har ingen slet-mulighed
-- `isOwner` beregnes i usePermissions men eksporteres ikke
+Denne opgave udvider den nuværende team-struktur til at understøtte flere assisterende teamledere pr. team. I dag kan hvert team kun have én assisterende teamleder (via `assistant_team_leader_id` kolonnen i `teams` tabellen). Med denne ændring kan et team have mange assistenter, og hver assistent kan potentielt være på flere teams.
 
-## Implementeringsplan
-
-### Step 1: Eksportér isOwner fra usePermissions
-Tilføj `isOwner` til return-objektet så komponenter kan tjekke ejer-status.
-
-**Fil:** `src/hooks/usePositionPermissions.ts`
-
-### Step 2: Tilføj Slet-funktionalitet til EmployeeDetail
-Opdater kontrakt-sektionen i EmployeeDetail.tsx:
-
-1. **Import:** Tilføj `Trash2` ikon og `AlertDialog` komponenter
-2. **State:** Tilføj `deleteContractId` state til at holde styr på hvilken kontrakt der skal slettes
-3. **Mutation:** Tilføj `useMutation` til at slette kontrakter (sletter først signaturer, derefter kontrakten)
-4. **UI:** Tilføj slet-knap ved siden af hver kontrakt (kun synlig for ejere)
-5. **Dialog:** Tilføj bekræftelsesdialog før sletning
-
-**Fil:** `src/pages/EmployeeDetail.tsx`
-
-## UI Design
+## Nuværende arkitektur
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  📄 Salgskonsulent kontrakt                                     │
-│  Sendt 12. jan. 2026                                           │
-│                                              [Afventer] [🗑️]   │
-└─────────────────────────────────────────────────────────────────┘
++------------------+
+|      teams       |
++------------------+
+| id               |
+| name             |
+| team_leader_id   |    --> 1 teamleder pr. team
+| assistant_...id  |    --> 1 assistent pr. team (BEGRÆNSNING)
++------------------+
 ```
 
-- Slet-knappen vises kun for ejere
-- Klikker man på slet-knappen åbnes en bekræftelsesdialog
-- Bekræftelsesdialog advarer om at handlingen ikke kan fortrydes
-
-## Bekræftelsesdialog
+## Ny arkitektur
 
 ```text
-┌────────────────────────────────────────┐
-│  Slet kontrakt?                        │
-│                                        │
-│  Er du sikker på at du vil slette      │
-│  denne kontrakt? Handlingen kan ikke   │
-│  fortrydes.                            │
-│                                        │
-│           [Annuller] [Slet]            │
-└────────────────────────────────────────┘
++------------------+         +------------------------+         +------------------+
+|      teams       |         | team_assistant_leaders |         | employee_master  |
++------------------+         +------------------------+         +------------------+
+| id               |<--------| team_id                |-------->| id               |
+| name             |         | employee_id            |         | first_name       |
+| team_leader_id   |         | created_at             |         | last_name        |
+| (assistant...id) |         +------------------------+         +------------------+
++------------------+              Many-to-many
 ```
 
-## Tekniske Detaljer
+## Ændringer
 
-### usePermissions ændring
-```typescript
-return {
-  // ... eksisterende exports
-  isOwner, // NY - tjekker om bruger er ejer
-};
-```
+### 1. Database-ændringer
 
-### Slet-mutation i EmployeeDetail
-```typescript
-const deleteContractMutation = useMutation({
-  mutationFn: async (id: string) => {
-    // Slet signaturer først (foreign key)
-    await supabase
-      .from("contract_signatures")
-      .delete()
-      .eq("contract_id", id);
-    
-    // Derefter slet kontrakt
-    const { error } = await supabase
-      .from("contracts")
-      .delete()
-      .eq("id", id);
-    
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ 
-      queryKey: ["employee-contracts", id] 
-    });
-    toast({ title: "Kontrakt slettet" });
-  }
-});
-```
+**Ny junction-tabel: `team_assistant_leaders`**
+- `team_id` (uuid, FK → teams)
+- `employee_id` (uuid, FK → employee_master_data)
+- `created_at` (timestamp)
+- Primary key: (team_id, employee_id)
 
-## Berørte Filer
+**Migrering af eksisterende data**
+- Alle eksisterende `assistant_team_leader_id` værdier kopieres til den nye junction-tabel
+
+**Bevar kompatibilitet**
+- `teams.assistant_team_leader_id` kolonnen beholdes midlertidigt for at undgå at bryde eksisterende kode
+- Den markeres som deprecated og kan fjernes i en fremtidig migration
+
+---
+
+### 2. UI-ændringer i TeamsTab.tsx
+
+**Nuværende:**
+- Enkelt Select dropdown til "Ass. Teamleder"
+
+**Ny:**
+- Multi-select chip-baseret UI
+- Viser alle valgte assistenter som badges med X-knap til fjernelse
+- Tilføj-knap åbner dropdown til at tilføje flere
+
+---
+
+### 3. Opdatering af berørte komponenter og hooks
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/usePositionPermissions.ts` | Eksportér `isOwner` |
-| `src/pages/EmployeeDetail.tsx` | Tilføj slet-knap, dialog og mutation |
+| `TeamsTab.tsx` | Multi-select UI for assistenter |
+| `DBOverviewTab.tsx` | Summér løn fra alle assistenter |
+| `ClientDBTab.tsx` | Hent alle assistant IDs fra junction |
+| `useAssistantHoursCalculation.ts` | Understøt flere assistenter pr. team |
+| `AbsenceManagement.tsx` | Tjek om bruger er assistent via junction |
+| `DailyReports.tsx` | Tjek team-adgang via junction |
+| `EmployeeMasterData.tsx` | Hent alle team-assistenter |
+| `ClosingShifts.tsx` | Inkluder alle assistenter |
 
-## Sikkerhed
-- RLS-politik `is_owner(auth.uid())` sikrer at kun ejere kan slette kontrakter på database-niveau
-- Frontend-tjek med `isOwner` skjuler knappen for ikke-ejere
-- Bekræftelsesdialog forhindrer utilsigtede sletninger
+---
 
-## Test
-1. Log ind som ejer
-2. Gå til en medarbejders detaljeside
-3. Klik på "Kontrakter" tab
-4. Verificér at slet-knappen vises ved hver kontrakt
-5. Klik slet og bekræft i dialogen
-6. Verificér at kontrakten forsvinder fra listen
+## Tekniske detaljer
+
+### Database migration SQL
+
+```sql
+-- 1. Opret ny junction-tabel
+CREATE TABLE public.team_assistant_leaders (
+  team_id uuid NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES public.employee_master_data(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  PRIMARY KEY (team_id, employee_id)
+);
+
+-- 2. Migrér eksisterende data
+INSERT INTO public.team_assistant_leaders (team_id, employee_id)
+SELECT id, assistant_team_leader_id
+FROM public.teams
+WHERE assistant_team_leader_id IS NOT NULL;
+
+-- 3. Aktiver RLS
+ALTER TABLE public.team_assistant_leaders ENABLE ROW LEVEL SECURITY;
+
+-- 4. RLS policies
+CREATE POLICY "Authenticated users can read" 
+  ON public.team_assistant_leaders FOR SELECT 
+  TO authenticated USING (true);
+
+CREATE POLICY "Team managers can modify"
+  ON public.team_assistant_leaders FOR ALL
+  TO authenticated USING (public.has_edit_permission('tab_employees_teams'));
+```
+
+### Frontend formData struktur
+
+```typescript
+// Fra:
+formData = {
+  assistant_team_leader_id: string
+}
+
+// Til:
+formData = {
+  assistant_team_leader_ids: string[]
+}
+```
+
+### Hooks/queries opdateringer
+
+```typescript
+// Fra: 
+const assistantIds = teams.map(t => t.assistant_team_leader_id).filter(Boolean);
+
+// Til:
+const { data: teamAssistants } = useQuery({
+  queryKey: ["team-assistant-leaders"],
+  queryFn: async () => {
+    const { data } = await supabase.from("team_assistant_leaders").select("*");
+    return data;
+  }
+});
+const assistantIds = [...new Set(teamAssistants?.map(ta => ta.employee_id) || [])];
+```
+
+---
+
+## Implementeringsrækkefølge
+
+1. **Database migration** - Opret junction-tabel med RLS
+2. **Data migration** - Flyt eksisterende assistant-data
+3. **TeamsTab.tsx** - Ny multi-select UI + CRUD
+4. **Hooks** - Opdater alle hooks der bruger assistant IDs
+5. **Rapporter** - Opdater DBOverviewTab og ClientDBTab
+6. **Adgangskontrol** - Opdater AbsenceManagement og DailyReports
+7. **Test** - Verificer at alle flows virker
+
