@@ -56,6 +56,7 @@ export const PERMISSION_KEYS = {
   menu_career_wishes: { label: 'Karriereønsker', section: 'mit_hjem' },
   menu_my_feedback: { label: 'Min feedback', section: 'mit_hjem' },
   menu_refer_a_friend: { label: 'Henvis en ven', section: 'mit_hjem' },
+  menu_immediate_payment_ase: { label: 'Straksbetaling (ASE)', section: 'mit_hjem' },
 
   // ==================== SOME ====================
   menu_some: { label: 'SOME', section: 'some' },

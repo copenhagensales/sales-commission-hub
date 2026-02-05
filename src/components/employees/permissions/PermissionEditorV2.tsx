@@ -117,7 +117,7 @@ const PERMISSION_CATEGORIES: Record<string, { label: string; icon: React.ReactNo
   menu_section_personal: {
     label: "Mit Hjem",
     icon: <Home className="h-4 w-4" />,
-    keys: ['menu_home', 'menu_h2h', 'menu_commission_league', 'menu_league_admin', 'menu_liga_test_board', 'menu_h2h_admin', 'menu_team_h2h', 'menu_messages', 'menu_my_schedule', 'menu_my_profile', 'menu_my_goals', 'menu_my_contracts', 'menu_career_wishes', 'menu_my_feedback', 'menu_refer_friend', 'menu_my_sales', 'menu_my_shifts', 'menu_my_absence', 'menu_my_coaching']
+    keys: ['menu_home', 'menu_h2h', 'menu_commission_league', 'menu_league_admin', 'menu_liga_test_board', 'menu_h2h_admin', 'menu_team_h2h', 'menu_messages', 'menu_my_schedule', 'menu_my_profile', 'menu_my_goals', 'menu_my_contracts', 'menu_career_wishes', 'menu_my_feedback', 'menu_refer_friend', 'menu_immediate_payment_ase', 'menu_my_sales', 'menu_my_shifts', 'menu_my_absence', 'menu_my_coaching']
   },
   menu_section_personale: {
     label: "Personale",
