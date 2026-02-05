@@ -70,6 +70,7 @@ interface PricingRule {
   priority: number;
   name: string | null;
   is_active: boolean;
+  allows_immediate_payment?: boolean;
 }
 
 interface CampaignMapping {
@@ -114,6 +115,9 @@ export function PricingRuleEditor({
     existingRule?.revenue_dkk?.toString() || baseRevenue.toString()
   );
   const [isActive, setIsActive] = useState(existingRule?.is_active ?? true);
+  const [allowsImmediatePayment, setAllowsImmediatePayment] = useState(
+    existingRule?.allows_immediate_payment ?? false
+  );
 
   // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
@@ -152,6 +156,7 @@ export function PricingRuleEditor({
         priority,
         name: name || null,
         is_active: isActive,
+        allows_immediate_payment: allowsImmediatePayment,
       };
 
       if (existingRule) {
@@ -447,6 +452,21 @@ export function PricingRuleEditor({
             />
           </div>
         </div>
+      </div>
+
+      {/* Immediate payment toggle */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <Label htmlFor="rule-immediate-payment">💳 Mulighed for straksbetaling</Label>
+          <p className="text-xs text-muted-foreground">
+            Tillad straksbetaling for salg med denne regel
+          </p>
+        </div>
+        <Switch
+          id="rule-immediate-payment"
+          checked={allowsImmediatePayment}
+          onCheckedChange={setAllowsImmediatePayment}
+        />
       </div>
 
       {/* Active toggle */}

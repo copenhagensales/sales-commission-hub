@@ -6756,6 +6756,7 @@ export type Database = {
       }
       product_pricing_rules: {
         Row: {
+          allows_immediate_payment: boolean | null
           campaign_mapping_ids: string[] | null
           commission_dkk: number
           conditions: Json
@@ -6769,6 +6770,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
           commission_dkk: number
           conditions?: Json
@@ -6782,6 +6784,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
           commission_dkk?: number
           conditions?: Json
