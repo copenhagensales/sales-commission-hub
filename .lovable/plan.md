@@ -1,116 +1,52 @@
 
-# Plan: Fix "Tæl som bisalg" persistence bug
+# Plan: Omdøb Bi-salg til Switch
 
-## Problemresumé
-Indstillingen "Tæl som bisalg" gemmes korrekt i databasen, men vises ikke korrekt i MG Test fordi `counts_as_cross_sale` kolonnen mangler i datahentningen.
-
----
-
-## Root Cause
-Der er 4 steder hvor `counts_as_cross_sale` mangler:
-
-| Sted | Problem |
-|------|---------|
-| RPC-funktion `get_aggregated_product_types` | Kolonnen returneres ikke |
-| TypeScript interface `AggregatedProductRpc` | Felt mangler |
-| Mapping af RPC → `AggregatedProduct` | Værdi overføres ikke |
-| Query for manuelle produkter | Kolonne hentes ikke |
+## Oversigt
+Ændrer "Bi-salg" til "Switch" i Relatel-dashboardet og tilføjer Switch-antal som sekundær info i CS Top 20.
 
 ---
 
-## Løsning
+## Ændringer
 
-### 1. Opdater RPC-funktionen i databasen
+### 1. Relatel Dashboard (RelatelDashboard.tsx)
 
-Tilføj `counts_as_cross_sale` til return type og SELECT:
+Omdøb kolonneoverskriften "Bi-salg" til "Switch" i alle tre leaderboard-tabeller:
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_aggregated_product_types()
-RETURNS TABLE(
-  -- eksisterende kolonner...
-  counts_as_sale boolean,
-  counts_as_cross_sale boolean,  -- NY
-  is_hidden boolean,
-  -- ...
-)
-AS $$
-  SELECT DISTINCT ON (...)
-    -- eksisterende...
-    COALESCE(p.counts_as_sale, true) as counts_as_sale,
-    COALESCE(p.counts_as_cross_sale, false) as counts_as_cross_sale,  -- NY
-    -- ...
-$$;
+| Lokation | Før | Efter |
+|----------|-----|-------|
+| Linje 289 | `Bi-salg` | `Switch` |
+| Linje 352 | `Bi-salg` | `Switch` |
+| Linje 415 | `Bi-salg` | `Switch` |
+
+Tabelvisning efter ændring:
+```text
+┌────┬─────────────┬──────┬────────┬───────────┐
+│ #  │ Navn        │ Salg │ Switch │ Provision │
+├────┼─────────────┼──────┼────────┼───────────┤
+│ 1  │ Jonas J.    │ 72   │ 19     │ 84.375 kr │
+└────┴─────────────┴──────┴────────┴───────────┘
 ```
 
-### 2. Opdater TypeScript interface
+---
 
-I `src/pages/MgTest.tsx` linje 37-50:
+### 2. CS Top 20 Dashboard (CsTop20Dashboard.tsx)
 
-```typescript
-interface AggregatedProductRpc {
-  // ...eksisterende felter
-  counts_as_sale: boolean;
-  counts_as_cross_sale: boolean;  // TILFØJ
-  is_hidden: boolean;
-  // ...
-}
-```
+Tilføj Switch-antal i parentes med lille tekst efter salg-tallet:
 
-### 3. Opdater RPC → AggregatedProduct mapping
+| Før | Efter |
+|-----|-------|
+| `72 salg` | `72 salg (+19 switch)` |
 
-I `src/pages/MgTest.tsx` linje 543-552:
+Switch vises kun hvis der er Switch > 0. Styling er nedtonet (mindre tekst, muted farve) for at holde fokus på salg.
 
-```typescript
-product: item.product_id
-  ? {
-      id: item.product_id,
-      name: item.product_name ?? "",
-      commission_dkk: item.commission_dkk,
-      revenue_dkk: item.revenue_dkk,
-      client_campaign_id: item.product_client_campaign_id,
-      counts_as_sale: item.counts_as_sale ?? true,
-      counts_as_cross_sale: item.counts_as_cross_sale ?? false,  // TILFØJ
-      is_hidden: item.is_hidden ?? false,
-    }
-  : null,
-```
-
-### 4. Opdater manual products query
-
-I `src/pages/MgTest.tsx` linje 392-413:
-
-```typescript
-const { data, error } = await supabase
-  .from("products")
-  .select(`
-    id,
-    name,
-    commission_dkk,
-    revenue_dkk,
-    external_product_code,
-    counts_as_sale,
-    counts_as_cross_sale,  // TILFØJ
-    is_hidden,
-    client_campaign_id,
-    client_campaigns!inner(...)
-  `)
-```
-
-### 5. Opdater manual products mapping
-
-I `src/pages/MgTest.tsx` linje 584-592:
-
-```typescript
-product: {
-  id: p.id,
-  name: p.name,
-  commission_dkk: p.commission_dkk,
-  revenue_dkk: p.revenue_dkk,
-  client_campaign_id: p.client_campaign_id,
-  counts_as_sale: p.counts_as_sale ?? true,
-  counts_as_cross_sale: p.counts_as_cross_sale ?? false,  // TILFØJ
-  is_hidden: p.is_hidden ?? false,
-},
+Ændring i linje 400-404:
+```tsx
+<div className="text-xs text-muted-foreground/80">
+  {sales} salg
+  {seller.crossSaleCount > 0 && (
+    <span className="text-muted-foreground/60"> (+{seller.crossSaleCount} switch)</span>
+  )}
+</div>
 ```
 
 ---
@@ -119,33 +55,29 @@ product: {
 
 | Fil | Ændring |
 |-----|---------|
-| Database migration | Opdater RPC-funktion |
-| `src/pages/MgTest.tsx` | 4 ændringer (interface + query + 2x mapping) |
+| `src/pages/RelatelDashboard.tsx` | Omdøb "Bi-salg" → "Switch" (3 steder) |
+| `src/pages/CsTop20Dashboard.tsx` | Tilføj switch-antal i parentes |
 
 ---
 
-## Dataflow efter fix
+## Eksempelvisning
 
+### Relatel (tabel)
 ```text
-Database: products.counts_as_cross_sale = true
-           ↓
-RPC: get_aggregated_product_types() returnerer counts_as_cross_sale
-           ↓
-MgTest.tsx: AggregatedProductRpc modtager værdien
-           ↓
-Mapping: AggregatedProduct.product.counts_as_cross_sale sættes korrekt
-           ↓
-Dialog: countsAsCrossSale prop har den rigtige værdi
-           ↓
-UI: "Tæl som bisalg" vises korrekt
+Navn             Salg    Switch    Provision
+Jonas Juhl J.    72      19        84.375 kr
+Thorbjørn M.     64      27        70.837 kr
+```
+
+### CS Top 20 (kompakt)
+```text
+Jonas Juhl J.              TDC
+72 salg (+19 switch)       84.375 kr
 ```
 
 ---
 
-## Verificering
-
-Efter implementation:
-1. Åbn et produkt (fx "Switch Contact Center #4")
-2. Verificer at "Tæl som bisalg" er markeret
-3. Luk dialogen og åbn igen
-4. Verificer at indstillingen stadig er markeret
+## Bemærkninger
+- Switch vises kun i parentes på CS Top 20 hvis der er mindst 1 switch
+- Salg forbliver det primære fokuspunkt som ønsket
+- Styling er nedtonet for at undgå visuel støj
