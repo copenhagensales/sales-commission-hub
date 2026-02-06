@@ -13,13 +13,22 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, ChevronDown } from "lucide-react";
+import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
+import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
@@ -73,6 +82,8 @@ interface PricingRule {
   allows_immediate_payment?: boolean;
   immediate_payment_commission_dkk?: number | null;
   immediate_payment_revenue_dkk?: number | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
 }
 
 interface CampaignMapping {
@@ -126,6 +137,19 @@ export function PricingRuleEditor({
   const [immediatePaymentRevenue, setImmediatePaymentRevenue] = useState(
     existingRule?.immediate_payment_revenue_dkk?.toString() || ""
   );
+  
+  // Date validity fields
+  const [effectiveFrom, setEffectiveFrom] = useState<Date>(
+    existingRule?.effective_from ? new Date(existingRule.effective_from) : new Date()
+  );
+  const [effectiveTo, setEffectiveTo] = useState<Date | undefined>(
+    existingRule?.effective_to ? new Date(existingRule.effective_to) : undefined
+  );
+  const [hasEndDate, setHasEndDate] = useState(!!existingRule?.effective_to);
+  const [isRematching, setIsRematching] = useState(false);
+  
+  // Rematch hook
+  const rematchMutation = useRematchPricingRules();
 
   // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
@@ -171,6 +195,8 @@ export function PricingRuleEditor({
         immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue 
           ? parseFloat(immediatePaymentRevenue) 
           : null,
+        effective_from: format(effectiveFrom, "yyyy-MM-dd"),
+        effective_to: hasEndDate && effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null,
       };
 
       if (existingRule) {
@@ -181,17 +207,70 @@ export function PricingRuleEditor({
           .eq("id", existingRule.id);
 
         if (error) throw error;
+        
+        // Log to history
+        await supabase.from("pricing_rule_history").insert({
+          pricing_rule_id: existingRule.id,
+          name: ruleData.name,
+          commission_dkk: ruleData.commission_dkk,
+          revenue_dkk: ruleData.revenue_dkk,
+          conditions: ruleData.conditions,
+          campaign_mapping_ids: ruleData.campaign_mapping_ids,
+          effective_from: ruleData.effective_from,
+          effective_to: ruleData.effective_to,
+          priority: ruleData.priority,
+          is_active: ruleData.is_active,
+          allows_immediate_payment: ruleData.allows_immediate_payment,
+          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
+          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+          change_type: 'update'
+        });
       } else {
         // Create new rule
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("product_pricing_rules")
-          .insert(ruleData);
+          .insert(ruleData)
+          .select("id")
+          .single();
 
         if (error) throw error;
+        
+        // Log to history
+        await supabase.from("pricing_rule_history").insert({
+          pricing_rule_id: data.id,
+          name: ruleData.name,
+          commission_dkk: ruleData.commission_dkk,
+          revenue_dkk: ruleData.revenue_dkk,
+          conditions: ruleData.conditions,
+          campaign_mapping_ids: ruleData.campaign_mapping_ids,
+          effective_from: ruleData.effective_from,
+          effective_to: ruleData.effective_to,
+          priority: ruleData.priority,
+          is_active: ruleData.is_active,
+          allows_immediate_payment: ruleData.allows_immediate_payment,
+          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
+          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+          change_type: 'create'
+        });
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(existingRule ? "Regel opdateret" : "Regel oprettet");
+      
+      // Auto-rematch sale_items for this product
+      setIsRematching(true);
+      try {
+        toast.info("Opdaterer historiske salg...");
+        const result = await rematchMutation.mutateAsync({ productId });
+        if (result.stats.updated > 0) {
+          toast.success(`Opdaterede ${result.stats.updated} salg med nye prisregler`);
+        }
+      } catch {
+        // Error already handled by hook
+      } finally {
+        setIsRematching(false);
+      }
+      
       onSave();
     },
     onError: (error) => {
@@ -516,6 +595,69 @@ export function PricingRuleEditor({
         )}
       </div>
 
+      {/* Date validity */}
+      <div className="space-y-3">
+        <Label>📅 Gyldighedsperiode</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Gyldig fra</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(effectiveFrom, "d. MMM yyyy", { locale: da })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={effectiveFrom}
+                  onSelect={(date) => date && setEffectiveFrom(date)}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="has-end-date"
+                checked={hasEndDate}
+                onCheckedChange={(checked) => {
+                  setHasEndDate(!!checked);
+                  if (!checked) setEffectiveTo(undefined);
+                }}
+              />
+              <Label htmlFor="has-end-date" className="text-sm cursor-pointer">Gyldig til</Label>
+            </div>
+            {hasEndDate && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {effectiveTo ? format(effectiveTo, "d. MMM yyyy", { locale: da }) : "Vælg dato"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={effectiveTo}
+                    onSelect={(date) => date && setEffectiveTo(date)}
+                    initialFocus
+                    className="pointer-events-auto"
+                    disabled={(date) => date <= effectiveFrom}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Reglen gælder fra "Gyldig fra" datoen. Hvis "Gyldig til" er sat, stopper reglen med at matche salg fra denne dato.
+        </p>
+      </div>
+
       {/* Active toggle */}
       <div className="flex items-center justify-between">
         <Label htmlFor="rule-active">Aktiv</Label>
@@ -528,14 +670,17 @@ export function PricingRuleEditor({
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-4 border-t">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={saveMutation.isPending || isRematching}>
           Annuller
         </Button>
         <Button
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || isRematching}
         >
-          {saveMutation.isPending ? "Gemmer..." : "Gem regel"}
+          {(saveMutation.isPending || isRematching) && (
+            <Loader2 className="h-3 w-3 animate-spin mr-2" />
+          )}
+          {isRematching ? "Opdaterer salg..." : saveMutation.isPending ? "Gemmer..." : "Gem regel"}
         </Button>
       </div>
     </div>

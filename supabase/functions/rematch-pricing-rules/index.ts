@@ -27,6 +27,8 @@ interface PricingRule {
   is_active: boolean;
   campaign_mapping_ids?: string[] | null;
   allows_immediate_payment?: boolean | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
 }
 
 function isNumericCondition(value: unknown): value is NumericCondition {
@@ -68,14 +70,15 @@ function determineAseProductId(rawPayloadData: Record<string, unknown> | undefin
 }
 
 /**
- * Match a pricing rule based on rawPayload.data conditions.
+ * Match a pricing rule based on rawPayload.data conditions and date validity.
  * Returns the matching rule with highest priority, or null if no match.
  */
 function matchPricingRule(
   productId: string,
   pricingRulesMap: Map<string, PricingRule[]>,
   rawPayloadData: Record<string, unknown> | undefined,
-  campaignMappingId?: string | null
+  campaignMappingId?: string | null,
+  saleDate?: string | null // ISO date string for date-based filtering
 ): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
@@ -93,11 +96,27 @@ function matchPricingRule(
   // Sort by priority descending (highest first)
   const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
 
+  // Parse sale date for date-based filtering
+  const saleDateObj = saleDate ? new Date(saleDate) : null;
+  const saleDateStr = saleDateObj ? saleDateObj.toISOString().split('T')[0] : null;
+
   const hasConditionalRules = sortedRules.some((r) => r.is_active && Object.keys(r.conditions || {}).length > 0);
   const hasEmptyLeadData = allFields.length === 0;
 
   for (const rule of sortedRules) {
     if (!rule.is_active) continue;
+
+    // Date-based filtering: skip rules outside their validity window
+    if (saleDateStr) {
+      // If rule has effective_from and sale date is before it, skip
+      if (rule.effective_from && saleDateStr < rule.effective_from) {
+        continue;
+      }
+      // If rule has effective_to and sale date is on or after it, skip
+      if (rule.effective_to && saleDateStr >= rule.effective_to) {
+        continue;
+      }
+    }
 
     const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
     const campaignMatches =
@@ -167,12 +186,13 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const source = body.source as string | undefined; // e.g., 'ase'
+    const productId = body.product_id as string | undefined; // NEW: filter by specific product
     const limit = body.limit as number | undefined; // optional limit
     const dryRun = body.dry_run === true;
 
-    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, limit=${limit || "none"}, dry_run=${dryRun}`);
+    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, limit=${limit || "none"}, dry_run=${dryRun}`);
 
-    // Fetch sale_items without matched_pricing_rule_id but WITH product_id
+    // Fetch sale_items - either all for specific product, or unmatched items
     let query = supabase
       .from("sale_items")
       .select(`
@@ -188,12 +208,21 @@ serve(async (req) => {
           id,
           source,
           raw_payload,
-          dialer_campaign_id
+          dialer_campaign_id,
+          sale_datetime
         )
-      `)
-      .is("matched_pricing_rule_id", null)
-      .not("product_id", "is", null)
-      .eq("mapped_commission", 0);  // Only process items that haven't been updated yet
+      `);
+
+    // If product_id is specified, rematch ALL items for that product (for price updates)
+    if (productId) {
+      query = query.eq("product_id", productId);
+    } else {
+      // Otherwise, only process items without matched rule and zero commission
+      query = query
+        .is("matched_pricing_rule_id", null)
+        .not("product_id", "is", null)
+        .eq("mapped_commission", 0);
+    }
 
     if (source) {
       query = query.eq("sales.source", source);
@@ -223,10 +252,10 @@ serve(async (req) => {
       );
     }
 
-    // Fetch all active pricing rules
+    // Fetch all active pricing rules (include effective dates)
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
-      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment")
+      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to")
       .eq("is_active", true);
 
     if (rulesError) {
@@ -311,8 +340,11 @@ serve(async (req) => {
       const campaignId = item.sales?.dialer_campaign_id;
       const campaignMappingId = campaignId ? campaignMappingsMap.get(campaignId) : null;
 
-      // Try to match a pricing rule with the correct product ID
-      const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId);
+      // Get sale date for date-based rule filtering
+      const saleDate = (item.sales as { sale_datetime?: string })?.sale_datetime || null;
+
+      // Try to match a pricing rule with the correct product ID and sale date
+      const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId, saleDate);
 
       if (matchedRule) {
         const qty = item.quantity || 1;

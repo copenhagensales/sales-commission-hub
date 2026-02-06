@@ -182,4 +182,6 @@ export interface PricingRule {
   priority: number;
   is_active: boolean;
   campaign_mapping_ids?: string[] | null;
+  effective_from?: string | null;  // Date string: rule is valid from this date (inclusive)
+  effective_to?: string | null;    // Date string: rule is valid until this date (exclusive), null = no end date
 }
