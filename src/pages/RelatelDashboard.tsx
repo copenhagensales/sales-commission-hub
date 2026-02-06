@@ -286,7 +286,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Bi-salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -349,7 +349,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Bi-salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -412,7 +412,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Bi-salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
