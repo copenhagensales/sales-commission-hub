@@ -71,16 +71,19 @@ export default function ImmediatePaymentASE() {
   // Mutation for converting to immediate payment
   const convertMutation = useMutation({
     mutationFn: async (sale: ImmediatePaymentSale) => {
-      // 1. Get pricing rule with immediate_payment values
+      // 1. Get pricing rule with immediate_payment values and use_rule_name_as_display
       const { data: rule, error: ruleError } = await supabase
         .from("product_pricing_rules")
-        .select("immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
+        .select("immediate_payment_commission_dkk, immediate_payment_revenue_dkk, name, use_rule_name_as_display")
         .eq("id", sale.matched_pricing_rule_id)
         .single();
       
       if (ruleError || !rule) {
         throw new Error("Kunne ikke hente prisregel");
       }
+      
+      // Determine display name: use rule name if configured
+      const displayName = rule.use_rule_name_as_display ? rule.name : null;
       
       // 2. Update sale_item with new values
       const { error: updateError } = await supabase
@@ -89,6 +92,7 @@ export default function ImmediatePaymentASE() {
           is_immediate_payment: true,
           mapped_commission: rule.immediate_payment_commission_dkk,
           mapped_revenue: rule.immediate_payment_revenue_dkk,
+          display_name: displayName,
         })
         .eq("id", sale.sale_item_id);
       
@@ -110,16 +114,19 @@ export default function ImmediatePaymentASE() {
   // Mutation for cancelling immediate payment
   const cancelMutation = useMutation({
     mutationFn: async (sale: ImmediatePaymentSale) => {
-      // 1. Get pricing rule with standard values
+      // 1. Get pricing rule with standard values and use_rule_name_as_display
       const { data: rule, error: ruleError } = await supabase
         .from("product_pricing_rules")
-        .select("commission_dkk, revenue_dkk")
+        .select("commission_dkk, revenue_dkk, name, use_rule_name_as_display")
         .eq("id", sale.matched_pricing_rule_id)
         .single();
       
       if (ruleError || !rule) {
         throw new Error("Kunne ikke hente prisregel");
       }
+      
+      // Determine display name: use rule name if configured (same as non-immediate)
+      const displayName = rule.use_rule_name_as_display ? rule.name : null;
       
       // 2. Update sale_item with standard values
       const { error: updateError } = await supabase
@@ -128,6 +135,7 @@ export default function ImmediatePaymentASE() {
           is_immediate_payment: false,
           mapped_commission: rule.commission_dkk,
           mapped_revenue: rule.revenue_dkk,
+          display_name: displayName,
         })
         .eq("id", sale.sale_item_id);
       

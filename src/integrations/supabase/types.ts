@@ -6840,6 +6840,7 @@ export type Database = {
           product_id: string
           revenue_dkk: number
           updated_at: string | null
+          use_rule_name_as_display: boolean | null
         }
         Insert: {
           allows_immediate_payment?: boolean | null
@@ -6858,6 +6859,7 @@ export type Database = {
           product_id: string
           revenue_dkk: number
           updated_at?: string | null
+          use_rule_name_as_display?: boolean | null
         }
         Update: {
           allows_immediate_payment?: boolean | null
@@ -6876,6 +6878,7 @@ export type Database = {
           product_id?: string
           revenue_dkk?: number
           updated_at?: string | null
+          use_rule_name_as_display?: boolean | null
         }
         Relationships: [
           {
@@ -7289,6 +7292,7 @@ export type Database = {
           adversus_external_id: string | null
           adversus_product_title: string | null
           created_at: string | null
+          display_name: string | null
           id: string
           is_immediate_payment: boolean | null
           mapped_commission: number | null
@@ -7305,6 +7309,7 @@ export type Database = {
           adversus_external_id?: string | null
           adversus_product_title?: string | null
           created_at?: string | null
+          display_name?: string | null
           id?: string
           is_immediate_payment?: boolean | null
           mapped_commission?: number | null
@@ -7321,6 +7326,7 @@ export type Database = {
           adversus_external_id?: string | null
           adversus_product_title?: string | null
           created_at?: string | null
+          display_name?: string | null
           id?: string
           is_immediate_payment?: boolean | null
           mapped_commission?: number | null

@@ -184,4 +184,5 @@ export interface PricingRule {
   campaign_mapping_ids?: string[] | null;
   effective_from?: string | null;  // Date string: rule is valid from this date (inclusive)
   effective_to?: string | null;    // Date string: rule is valid until this date (exclusive), null = no end date
+  use_rule_name_as_display?: boolean;  // If true, use rule name instead of product name in dashboards
 }
