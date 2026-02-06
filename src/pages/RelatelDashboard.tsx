@@ -330,7 +330,7 @@ export default function RelatelDashboard() {
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
                           </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
+                          <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
@@ -393,7 +393,7 @@ export default function RelatelDashboard() {
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
                           </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
+                          <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
@@ -456,7 +456,7 @@ export default function RelatelDashboard() {
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
                           </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
+                          <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
