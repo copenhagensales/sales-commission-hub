@@ -13,6 +13,7 @@ interface LeaderboardEntry {
   avatarUrl: string | null;
   teamName: string | null;
   salesCount: number;
+  crossSaleCount: number;
   commission: number;
   goalTarget: number | null;
 }
@@ -237,10 +238,11 @@ async function calculateLeaderboard(
   fmCommissionMap: Map<string, { commission: number; price: number }>,
   emailToEmployeeId: Map<string, string>,
   countingProductIds: Set<string>,
+  crossSaleProductIds: Set<string>,
   productCommissionMap: Map<string, number>,
   limit: number = 30
 ): Promise<LeaderboardEntry[]> {
-  const agentStats = new Map<string, { sales: number; commission: number; agentName: string }>();
+  const agentStats = new Map<string, { sales: number; crossSales: number; commission: number; agentName: string }>();
   
   // Process telesales
   for (const sale of salesWithItems) {
@@ -249,11 +251,17 @@ async function calculateLeaderboard(
     
     const items = sale.sale_items || [];
     let saleSales = 0;
+    let saleCrossSales = 0;
     let saleCommission = 0;
     
     for (const item of items) {
+      // Count regular sales
       if (!item.product_id || countingProductIds.has(item.product_id)) {
         saleSales += item.quantity || 1;
+      }
+      // Count cross-sales separately
+      if (item.product_id && crossSaleProductIds.has(item.product_id)) {
+        saleCrossSales += item.quantity || 1;
       }
       const itemCommission = (item.mapped_commission && item.mapped_commission > 0)
         ? item.mapped_commission
@@ -265,9 +273,10 @@ async function calculateLeaderboard(
       saleSales = 1;
     }
     
-    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: sale.agent_name || key };
+    const existing = agentStats.get(key) || { sales: 0, crossSales: 0, commission: 0, agentName: sale.agent_name || key };
     agentStats.set(key, {
       sales: existing.sales + saleSales,
+      crossSales: existing.crossSales + saleCrossSales,
       commission: existing.commission + saleCommission,
       agentName: existing.agentName,
     });
@@ -283,9 +292,10 @@ async function calculateLeaderboard(
     const empInfo = employeeMap.get(fmSale.seller_id);
     const key = empInfo?.name?.toLowerCase() || fmSale.seller_id;
     
-    const existing = agentStats.get(key) || { sales: 0, commission: 0, agentName: empInfo?.name || fmSale.seller_id };
+    const existing = agentStats.get(key) || { sales: 0, crossSales: 0, commission: 0, agentName: empInfo?.name || fmSale.seller_id };
     agentStats.set(key, {
       sales: existing.sales + 1,
+      crossSales: existing.crossSales, // FM sales don't have cross-sales
       commission: existing.commission + fmCommission,
       agentName: existing.agentName,
     });
@@ -299,7 +309,7 @@ async function calculateLeaderboard(
   const entries: LeaderboardEntry[] = [];
   
   for (const [agentKey, stats] of agentStats) {
-    if (stats.sales === 0) continue;
+    if (stats.sales === 0 && stats.crossSales === 0) continue;
     
     const employeeId = emailToEmployeeId.get(agentKey) || "";
     const empInfo = employeeId ? employeeMap.get(employeeId) : null;
@@ -314,6 +324,7 @@ async function calculateLeaderboard(
       avatarUrl: empInfo?.avatarUrl || null,
       teamName,
       salesCount: stats.sales,
+      crossSaleCount: stats.crossSales,
       commission: stats.commission,
       goalTarget: null,
     });
@@ -333,6 +344,10 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    // Parse query params for force flag
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "true";
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -346,8 +361,8 @@ Deno.serve(async (req) => {
     // This ensures data freshness while minimizing unnecessary calculations
     const periods: { type: string; start: Date; end: Date }[] = [];
     
-    // Only run on even minutes (0, 2, 4, 6, ...) to achieve 2-minute intervals
-    if (currentMinute % 2 === 0) {
+    // Run on even minutes (0, 2, 4, 6, ...) OR if force flag is set
+    if (force || currentMinute % 2 === 0) {
       periods.push({ type: "today", start: getStartOfDay(now), end: now });
       periods.push({ type: "this_week", start: getStartOfWeek(now), end: now });
       const payroll = getPayrollPeriod(now);
@@ -355,13 +370,26 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[calculate-leaderboard-incremental] Starting... (minute=${currentMinute})`);
-    console.log(`[calculate-leaderboard-incremental] Periods to update: ${periods.map(p => p.type).join(", ")}`);
+    console.log(`[calculate-leaderboard-incremental] Periods to update: ${periods.map(p => p.type).join(", ") || "none (skipping)"}`);
+    
+    // Early exit if no periods to update
+    if (periods.length === 0) {
+      console.log(`[calculate-leaderboard-incremental] Skipping update (odd minute)`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          leaderboards: 0,
+          durationMs: Date.now() - startTime,
+          timestamp: calculatedAt,
+          skipped: true,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     periods.forEach(p => {
       console.log(`[calculate-leaderboard-incremental] ${p.type}: ${p.start.toISOString()} - ${p.end.toISOString()}`);
     });
-
-    // ============= FETCH CORE DATA =============
-    // Determine the widest date range needed (earliest start, latest end)
     const earliestStart = periods.reduce((min, p) => p.start < min ? p.start : min, periods[0].start);
     const latestEnd = periods.reduce((max, p) => p.end > max ? p.end : max, periods[0].end);
     
@@ -437,17 +465,24 @@ Deno.serve(async (req) => {
     let countingProductIds = new Set<string>();
     const productCommissionMap = new Map<string, number>();
     
+    let crossSaleProductIds = new Set<string>();
+    
     if (productIds.length > 0) {
       const { data: products } = await supabase
         .from("products")
-        .select("id, counts_as_sale, commission_dkk")
+        .select("id, counts_as_sale, counts_as_cross_sale, commission_dkk")
         .in("id", productIds);
       
       countingProductIds = new Set(
         (products || []).filter(p => p.counts_as_sale !== false).map(p => p.id)
       );
+      crossSaleProductIds = new Set(
+        (products || []).filter(p => p.counts_as_cross_sale === true).map(p => p.id)
+      );
       (products || []).forEach(p => productCommissionMap.set(p.id, p.commission_dkk || 0));
     }
+    
+    console.log(`[calculate-leaderboard-incremental] Cross-sale products: ${crossSaleProductIds.size}`);    
 
     // ============= FETCH CLIENTS & CAMPAIGNS =============
     const { data: clients } = await supabase.from("clients").select("id, name");
@@ -487,6 +522,7 @@ Deno.serve(async (req) => {
         fmCommissionMap,
         new Map(emailToEmployeeId),
         countingProductIds,
+        crossSaleProductIds,
         productCommissionMap,
         30
       );
@@ -532,6 +568,7 @@ Deno.serve(async (req) => {
           fmCommissionMap,
           new Map(emailToEmployeeId),
           countingProductIds,
+          crossSaleProductIds,
           productCommissionMap,
           30
         );
