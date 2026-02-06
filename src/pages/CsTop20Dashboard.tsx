@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -6,8 +6,10 @@ import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCachedLeaderboards, getInitials as getInitialsFromHook, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, getInitials as getInitialsFromHook, type LeaderboardEntry, type LeaderboardPeriod } from "@/hooks/useCachedLeaderboard";
 import { Trophy, Calendar, Clock } from "lucide-react";
+import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
+import { supabase } from "@/integrations/supabase/client";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -27,22 +29,6 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
     return () => clearInterval(timer);
   }, [enabled, intervalMs]);
 };
-
-// Calculate payroll period (15th to 14th)
-function calculatePayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  if (currentDay >= 15) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 15);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    return { start, end };
-  } else {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const end = new Date(today.getFullYear(), today.getMonth(), 14);
-    return { start, end };
-  }
-}
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
@@ -100,17 +86,151 @@ const getTeamBadgeStyle = (teamName: string | null | undefined): string => {
   return 'bg-slate-500 text-white';
 };
 
+// Hook for fetching custom period leaderboard data directly from database
+function useCustomPeriodLeaderboard(
+  period: PeriodSelection,
+  options: { enabled: boolean; limit: number }
+) {
+  return useQuery({
+    queryKey: ["custom-leaderboard", period.from.toISOString(), period.to.toISOString(), options.limit],
+    queryFn: async (): Promise<LeaderboardEntry[]> => {
+      // Get all sales in the custom period
+      const { data: sales, error } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          agent_email,
+          sale_datetime,
+          sale_items (
+            quantity,
+            employee_commission,
+            products (counts_as_sale)
+          )
+        `)
+        .gte("sale_datetime", period.from.toISOString())
+        .lte("sale_datetime", period.to.toISOString())
+        .order("sale_datetime", { ascending: false });
+      
+      if (error) {
+        console.error("Error fetching custom period sales:", error);
+        return [];
+      }
+
+      // Get agent to employee mapping
+      const agentEmails = [...new Set((sales || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean))];
+      
+      if (agentEmails.length === 0) return [];
+
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, email")
+        .in("email", agentEmails as string[]);
+
+      const agentIds = (agents || []).map(a => a.id);
+
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id, agents(email)")
+        .in("agent_id", agentIds);
+
+      // Get employee details
+      const employeeIds = [...new Set((mappings || []).map(m => m.employee_id))];
+      
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, avatar_url, teams(name)")
+        .in("id", employeeIds);
+
+      // Create email to employee map
+      const emailToEmployee = new Map<string, { id: string; name: string; avatar: string | null; team: string | null }>();
+      (mappings || []).forEach(m => {
+        const agent = (m as any).agents;
+        const emp = (employees || []).find(e => e.id === m.employee_id);
+        if (agent?.email && emp) {
+          emailToEmployee.set(agent.email.toLowerCase(), {
+            id: emp.id,
+            name: `${emp.first_name} ${emp.last_name}`,
+            avatar: emp.avatar_url,
+            team: (emp as any).teams?.name || null,
+          });
+        }
+      });
+
+      // Aggregate by employee
+      const employeeStats = new Map<string, { salesCount: number; commission: number; name: string; avatar: string | null; team: string | null }>();
+      
+      (sales || []).forEach(sale => {
+        const email = sale.agent_email?.toLowerCase();
+        if (!email) return;
+        
+        const emp = emailToEmployee.get(email);
+        if (!emp) return;
+
+        const current = employeeStats.get(emp.id) || { salesCount: 0, commission: 0, name: emp.name, avatar: emp.avatar, team: emp.team };
+        
+        (sale.sale_items || []).forEach((item: any) => {
+          if (item.products?.counts_as_sale !== false) {
+            current.salesCount += item.quantity || 1;
+          }
+          current.commission += item.employee_commission || 0;
+        });
+        
+        employeeStats.set(emp.id, current);
+      });
+
+      // Convert to leaderboard entries
+      const entries: LeaderboardEntry[] = Array.from(employeeStats.entries())
+        .map(([employeeId, stats]) => ({
+          employeeId,
+          employeeName: stats.name,
+          displayName: formatDisplayName(stats.name),
+          avatarUrl: stats.avatar,
+          teamName: stats.team,
+          salesCount: stats.salesCount,
+          commission: stats.commission,
+          goalTarget: null,
+        }))
+        .sort((a, b) => b.commission - a.commission)
+        .slice(0, options.limit);
+
+      return entries;
+    },
+    enabled: options.enabled,
+    staleTime: 60000,
+    refetchInterval: 120000,
+  });
+}
+
+function formatDisplayName(fullName: string): string {
+  const parts = fullName.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+  }
+  return fullName;
+}
+
 export default function CsTop20Dashboard() {
   const tvMode = isTvMode();
-  const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   
   // Auto-reload for TV mode to pick up layout/code changes
   useAutoReload(tvMode);
 
-  // Use cached leaderboards - massively reduces database queries
-  const { sellersToday, sellersWeek, sellersPayroll, isLoading } = useCachedLeaderboards(
+  // Determine if we can use cached data
+  const cachePeriod = mapPeriodTypeToCache(selectedPeriod.type) as LeaderboardPeriod | null;
+  const canUseCache = cachePeriod !== null;
+
+  // Cached leaderboard for standard periods
+  const { data: cachedLeaderboard, isLoading: cachedLoading } = useCachedLeaderboard(
+    cachePeriod || "payroll_period",
     { type: "global" },
-    { enabled: true, limit: 20 }
+    { enabled: canUseCache, limit: 20 }
+  );
+
+  // Custom period leaderboard for non-standard periods
+  const { data: customLeaderboard, isLoading: customLoading } = useCustomPeriodLeaderboard(
+    selectedPeriod,
+    { enabled: !canUseCache, limit: 20 }
   );
 
   // For TV mode, also fetch from edge function as fallback (will be phased out)
@@ -130,31 +250,36 @@ export default function CsTop20Dashboard() {
       }
       return response.json();
     },
-    enabled: tvMode && sellersPayroll.length === 0, // Only use edge function if cache is empty
+    enabled: tvMode && !cachedLeaderboard?.length && !customLeaderboard?.length,
     refetchInterval: 120000,
     staleTime: 60000,
   });
 
-  // Use cached data, fallback to TV data for TV mode
-  const sortedPayrollSellers = useMemo(() => {
-    if (sellersPayroll.length > 0) return sellersPayroll;
-    if (tvMode && tvData?.sellersPayroll) return tvData.sellersPayroll;
+  // Get the active leaderboard data
+  const leaderboardData = useMemo(() => {
+    if (canUseCache && cachedLeaderboard?.length) {
+      return cachedLeaderboard;
+    }
+    if (!canUseCache && customLeaderboard?.length) {
+      return customLeaderboard;
+    }
+    // TV mode fallback - map to selected period
+    if (tvMode && tvData) {
+      if (selectedPeriod.type === "today") return tvData.sellersToday;
+      if (selectedPeriod.type === "this_week") return tvData.sellersWeek;
+      return tvData.sellersPayroll;
+    }
     return [];
-  }, [sellersPayroll, tvMode, tvData]);
+  }, [canUseCache, cachedLeaderboard, customLeaderboard, tvMode, tvData, selectedPeriod.type]);
 
-  const sortedWeeklySellers = useMemo(() => {
-    if (sellersWeek.length > 0) return sellersWeek;
-    if (tvMode && tvData?.sellersWeek) return tvData.sellersWeek;
-    return [];
-  }, [sellersWeek, tvMode, tvData]);
+  const isLoading = canUseCache ? cachedLoading : customLoading;
 
-  const sortedDailySellers = useMemo(() => {
-    if (sellersToday.length > 0) return sellersToday;
-    if (tvMode && tvData?.sellersToday) return tvData.sellersToday;
-    return [];
-  }, [sellersToday, tvMode, tvData]);
-
-  const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
+  const periodLabel = useMemo(() => {
+    if (selectedPeriod.type === "custom") {
+      return `${format(selectedPeriod.from, "d. MMM", { locale: da })} - ${format(selectedPeriod.to, "d. MMM", { locale: da })}`;
+    }
+    return selectedPeriod.label;
+  }, [selectedPeriod]);
 
   // Leaderboard card component - Clean, modern design
   const LeaderboardCard = ({ 
@@ -309,33 +434,25 @@ export default function CsTop20Dashboard() {
       ) : (
         <DashboardHeader 
           title="CS Top 20" 
-          subtitle={`Top 20 på tværs af alle teams • ${periodLabel}`}
+          subtitle={`Top 20 på tværs af alle teams`}
+          rightContent={
+            <DashboardPeriodSelector
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={setSelectedPeriod}
+            />
+          }
         />
       )}
       
       <div className={tvMode 
-        ? 'grid grid-cols-3 gap-5 flex-1 min-h-0' 
-        : 'grid grid-cols-1 gap-6 lg:grid-cols-3 mt-6'
+        ? 'grid grid-cols-1 gap-5 flex-1 min-h-0' 
+        : 'grid grid-cols-1 gap-6 mt-6'
       }>
         <LeaderboardCard 
-          title="Løn Periode" 
+          title={`Top 20 – ${periodLabel}`}
           icon={Trophy}
-          sellers={sortedPayrollSellers}
+          sellers={leaderboardData}
           accentClass="bg-amber-500"
-        />
-        
-        <LeaderboardCard 
-          title="Denne Uge" 
-          icon={Calendar}
-          sellers={sortedWeeklySellers}
-          accentClass="bg-blue-500"
-        />
-        
-        <LeaderboardCard 
-          title="I Dag" 
-          icon={Clock}
-          sellers={sortedDailySellers}
-          accentClass="bg-emerald-500"
         />
       </div>
     </div>

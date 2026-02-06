@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
@@ -12,6 +12,7 @@ import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards } from "@/hooks/useCachedLeaderboard";
 import { useQuery } from "@tanstack/react-query";
+import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -64,6 +65,7 @@ const getCommissionStyle = () => "bg-primary/10 text-primary";
 
 export default function EesyTmDashboard() {
   const tvMode = isTvMode();
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
   
   // Auto-reload for TV mode to pick up layout/code changes
@@ -144,6 +146,13 @@ export default function EesyTmDashboard() {
       <DashboardHeader 
         title="Eesy TM – Overblik" 
         subtitle={`Dag, uge og lønperiode (${periodLabel})`}
+        rightContent={
+          <DashboardPeriodSelector
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            disabled={tvMode}
+          />
+        }
       />
       <div className={tvMode ? 'space-y-3 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
         {/* KPI Cards */}
