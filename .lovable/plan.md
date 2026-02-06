@@ -1,59 +1,124 @@
 
-
-# Plan: Ret historiske sale_items med manglende provision
+# Plan: Implementer Historik-fanen i ProductPricingRulesDialog
 
 ## Opgave
 
-Opdater de **3.679 historiske sale_items** som har `mapped_commission = 0` selvom deres produkter har base-priser.
+Erstat placeholder "Historik kommer snart" med en funktionel historik-visning der viser alle prisændringer for produktet.
+
+---
+
+## Eksisterende data
+
+Tabellen `product_price_history` indeholder allerede:
+- `commission_dkk` og `revenue_dkk` - prisværdier
+- `effective_from` - ikrafttrædelsesdato
+- `is_retroactive` - om ændringen var retroaktiv
+- `applied_at` - hvornår ændringen blev anvendt (NULL = afventer)
+- `created_at` - hvornår ændringen blev oprettet
+- `counts_as_sale` og `counts_as_cross_sale` - salgsklassificering
 
 ---
 
 ## Løsning
 
-### Trin 1: Opdater `rematch-pricing-rules` edge function
+### 1. Tilføj useQuery til at hente historik
 
-Tilføj fallback til produktets base-pris når ingen prisregel matcher:
+Hent historik for det specifikke produkt, sorteret efter oprettelsesdato (nyeste først):
 
-**Ændringer i `supabase/functions/rematch-pricing-rules/index.ts`:**
+```typescript
+const { data: history, isLoading: historyLoading } = useQuery({
+  queryKey: ["product-price-history", productId],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("product_price_history")
+      .select("*")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: false });
 
-1. Hent alle produkter med base-priser ved start
-2. I processeringsloopet: Hvis ingen prisregel matcher, brug produktets `commission_dkk` og `revenue_dkk`
-3. Tilføj statistik for "baseProductFallback" i respons
+    if (error) throw error;
+    return data;
+  },
+  enabled: open,
+});
+```
 
-### Trin 2: Kør funktionen
+### 2. Erstat historik-tab placeholder
 
-Kør edge function uden source-filter for at rette alle historiske data:
+Vis historikdata i en overskuelig liste med:
 
-```json
-{ "dry_run": false }
+| Kolonne | Indhold |
+|---------|---------|
+| Dato | Ikrafttrædelsesdato (effective_from) |
+| Provision | commission_dkk i kr |
+| Omsætning | revenue_dkk i kr |
+| Klassificering | Salg / Bisalg / Ingen |
+| Status | Badge: "Afventer", "Anvendt" eller "Retroaktiv" |
+| Oprettet | created_at formateret |
+
+### 3. UI-design
+
+Hver historik-post vises som et kort med:
+- Hovedvisning: Provision og omsætning
+- Ikrafttrædelsesdato tydeligt vist
+- Status-badge med farve:
+  - Grøn: Anvendt
+  - Orange: Retroaktiv
+  - Blå: Afventer (fremtidig ændring)
+- Klassificeringsikoner (salg/bisalg)
+- Oprettelsestidspunkt i mindre tekst
+
+---
+
+## Visuelt eksempel
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  📅 1. januar 2026                    [Retroaktiv]  │
+│  ──────────────────────────────────────────────────│
+│  💰 Provision: 110 kr    📊 Omsætning: 175 kr       │
+│  ✅ Tæller som salg                                 │
+│                                                     │
+│  Oprettet: 6. feb 2026 kl. 18:15                   │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Teknisk implementation
+
+### Fil der ændres
+
+| Fil | Ændring |
+|-----|---------|
+| `src/components/mg-test/ProductPricingRulesDialog.tsx` | Tilføj query + erstat historik-tab indhold |
+
+### Nye imports
+
+- `Clock` ikon fra lucide-react (for afventende ændringer)
+
+### Interface for historik
+
+```typescript
+interface PriceHistoryEntry {
+  id: string;
+  product_id: string;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+  effective_from: string;
+  is_retroactive: boolean;
+  applied_at: string | null;
+  created_at: string;
+  counts_as_sale: boolean | null;
+  counts_as_cross_sale: boolean | null;
+}
 ```
 
 ---
 
 ## Forventet resultat
 
-| Kategori | Antal | Ny provision |
-|----------|-------|--------------|
-| Partnersalg FF-TRYG | 1.557 | 75 kr |
-| Har Ændret - FF | 703 | 25 kr |
-| Partnersalg FDM-TRYG | 258 | 75 kr |
-| Lead (ASE) | 236 | 65 kr |
-| 5GI (Eesy) | 160 | 300 kr |
-| Andre | 765 | Varierende |
-
----
-
-## Berørte filer
-
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/rematch-pricing-rules/index.ts` | Tilføj fallback til produktets base-pris |
-
----
-
-## Sikkerhed
-
-- Kun opdaterer sale_items med `mapped_commission = 0`
-- `matched_pricing_rule_id` forbliver `NULL` (indikerer base-pris blev brugt)
-- KPI-cache opdateres automatisk efterfølgende
-
+Efter implementering vil historik-fanen vise:
+- Alle prisændringer for produktet i kronologisk rækkefølge
+- Tydelig status for hver ændring
+- Mulighed for at se hvornår priser blev ændret og af hvem (fremtidig udvidelse)
+- Afventende fremtidige ændringer markeret tydeligt
