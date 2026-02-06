@@ -1,53 +1,45 @@
 
-# Plan: Omdøb Bi-salg til Switch
+# Plan: Tilføj RLS Policy for Straksbetaling
 
-## Oversigt
-Ændrer "Bi-salg" til "Switch" i Relatel-dashboardet og tilføjer Switch-antal som sekundær info i CS Top 20.
+## Problem
+Mathias (og andre almindelige medarbejdere) kan ikke tilføje straksbetaling fordi den nuværende RLS policy på `sale_items` tabellen kun tillader **managers** at opdatere rækker.
 
----
+**Nuværende policies på sale_items:**
+- SELECT: Medarbejdere kan se deres egne sale_items ✅
+- UPDATE: Kun managers kan opdatere ❌
 
-## Ændringer
-
-### 1. Relatel Dashboard (RelatelDashboard.tsx)
-
-Omdøb kolonneoverskriften "Bi-salg" til "Switch" i alle tre leaderboard-tabeller:
-
-| Lokation | Før | Efter |
-|----------|-----|-------|
-| Linje 289 | `Bi-salg` | `Switch` |
-| Linje 352 | `Bi-salg` | `Switch` |
-| Linje 415 | `Bi-salg` | `Switch` |
-
-Tabelvisning efter ændring:
-```text
-┌────┬─────────────┬──────┬────────┬───────────┐
-│ #  │ Navn        │ Salg │ Switch │ Provision │
-├────┼─────────────┼──────┼────────┼───────────┤
-│ 1  │ Jonas J.    │ 72   │ 19     │ 84.375 kr │
-└────┴─────────────┴──────┴────────┴───────────┘
-```
+## Løsning
+Tilføj en ny RLS policy der tillader medarbejdere at opdatere deres egne sale_items - men kun for straksbetaling-felterne.
 
 ---
 
-### 2. CS Top 20 Dashboard (CsTop20Dashboard.tsx)
+## Database ændring
 
-Tilføj Switch-antal i parentes med lille tekst efter salg-tallet:
+### Ny RLS Policy
 
-| Før | Efter |
-|-----|-------|
-| `72 salg` | `72 salg (+19 switch)` |
-
-Switch vises kun hvis der er Switch > 0. Styling er nedtonet (mindre tekst, muted farve) for at holde fokus på salg.
-
-Ændring i linje 400-404:
-```tsx
-<div className="text-xs text-muted-foreground/80">
-  {sales} salg
-  {seller.crossSaleCount > 0 && (
-    <span className="text-muted-foreground/60"> (+{seller.crossSaleCount} switch)</span>
-  )}
-</div>
+```sql
+CREATE POLICY "Employees can update own immediate payment"
+ON public.sale_items
+FOR UPDATE
+TO authenticated
+USING (can_view_sale_as_employee(sale_id, auth.uid()))
+WITH CHECK (can_view_sale_as_employee(sale_id, auth.uid()));
 ```
+
+Denne policy:
+1. Bruger den eksisterende `can_view_sale_as_employee()` funktion til at verificere ejerskab
+2. Tillader kun opdatering af sale_items der tilhører medarbejderens egne salg
+3. Fungerer sammen med den eksisterende manager-policy (PERMISSIVE)
+
+---
+
+## Sikkerhedsovervejelser
+
+| Aspekt | Vurdering |
+|--------|-----------|
+| Ejerskabsverifikation | Bruger `can_view_sale_as_employee()` som verificerer via agent email/ID |
+| Risiko for misbrug | Lav - medarbejdere kan kun ændre deres egne salg |
+| Konflikt med manager-policy | Ingen - begge policies er PERMISSIVE, så de kombineres med OR |
 
 ---
 
@@ -55,29 +47,17 @@ Switch vises kun hvis der er Switch > 0. Styling er nedtonet (mindre tekst, mute
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/RelatelDashboard.tsx` | Omdøb "Bi-salg" → "Switch" (3 steder) |
-| `src/pages/CsTop20Dashboard.tsx` | Tilføj switch-antal i parentes |
+| `supabase/migrations/[timestamp]_add_employee_immediate_payment_policy.sql` | Ny migration med RLS policy |
 
 ---
 
-## Eksempelvisning
-
-### Relatel (tabel)
-```text
-Navn             Salg    Switch    Provision
-Jonas Juhl J.    72      19        84.375 kr
-Thorbjørn M.     64      27        70.837 kr
-```
-
-### CS Top 20 (kompakt)
-```text
-Jonas Juhl J.              TDC
-72 salg (+19 switch)       84.375 kr
-```
+## Ingen frontend-ændringer nødvendige
+Koden i `ImmediatePaymentASE.tsx` er allerede korrekt implementeret. Når RLS policyen tilføjes, vil knappen "Tilføj straksbetaling" automatisk fungere for alle medarbejdere.
 
 ---
 
-## Bemærkninger
-- Switch vises kun i parentes på CS Top 20 hvis der er mindst 1 switch
-- Salg forbliver det primære fokuspunkt som ønsket
-- Styling er nedtonet for at undgå visuel støj
+## Test efter implementering
+1. Log ind som Mathias
+2. Gå til Straksbetaling (ASE) siden
+3. Klik "Tilføj straksbetaling" på et afventende salg
+4. Bekræft at salget opdateres til "Aktiveret"
