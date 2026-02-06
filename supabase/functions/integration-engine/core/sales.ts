@@ -71,7 +71,7 @@ function matchPricingRule(
   log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
   rawPayloadData?: Record<string, unknown>, // Support for Enreach/HeroBase data format
   saleDate?: string | null // ISO date string for date-based filtering
-): { commission: number; revenue: number; ruleId: string; ruleName: string } | null {
+): { commission: number; revenue: number; ruleId: string; ruleName: string; displayName: string | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
 
@@ -170,7 +170,8 @@ function matchPricingRule(
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk,
         ruleId: rule.id,
-        ruleName: rule.name
+        ruleName: rule.name,
+        displayName: rule.use_rule_name_as_display ? rule.name : null
       };
     }
 
@@ -187,7 +188,8 @@ function matchPricingRule(
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk,
         ruleId: rule.id,
-        ruleName: rule.name
+        ruleName: rule.name,
+        displayName: rule.use_rule_name_as_display ? rule.name : null
       };
     } else if (conditionKeys.length > 0 && hasEmptyLeadData && !campaignMatches) {
       // Log when a conditional rule fails specifically due to empty lead data (and no campaign fallback)
@@ -275,11 +277,12 @@ function prepareSaleItems(
     let revenue = 0
     let matchedRuleId: string | null = null
     const qty = p.quantity || 1
+    let matchedRule: { commission: number; revenue: number; ruleId: string; ruleName: string; displayName: string | null } | null = null;
 
     if (productId) {
       // First: try to match a pricing rule based on leadResultData (Adversus) or rawPayload.data (Enreach)
       // Pass sale date for date-based rule filtering
-      const matchedRule = matchPricingRule(
+      matchedRule = matchPricingRule(
         productId,
         pricingRulesMap,
         leadResultData,
@@ -303,6 +306,9 @@ function prepareSaleItems(
       }
     }
 
+    // Get display name from matched rule if configured
+    const displayName = matchedRule?.displayName || null;
+
     itemsArray.push({
       sale_id: saleId,
       product_id: productId || null,
@@ -314,6 +320,7 @@ function prepareSaleItems(
       mapped_revenue: revenue,
       needs_mapping: !productId,
       matched_pricing_rule_id: matchedRuleId,
+      display_name: displayName,
     })
   }
 }
@@ -530,7 +537,7 @@ export async function processSales(
   const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult] = await Promise.all([
     supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
     supabase.from("adversus_product_mappings").select("*"),
-    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to").eq("is_active", true),
+    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to, use_rule_name_as_display").eq("is_active", true),
     supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id")
   ]);
 

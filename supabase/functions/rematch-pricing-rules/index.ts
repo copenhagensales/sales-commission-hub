@@ -31,6 +31,7 @@ interface PricingRule {
   effective_to?: string | null;
   immediate_payment_commission_dkk?: number | null;
   immediate_payment_revenue_dkk?: number | null;
+  use_rule_name_as_display?: boolean | null;
 }
 
 function isNumericCondition(value: unknown): value is NumericCondition {
@@ -81,7 +82,7 @@ function matchPricingRule(
   rawPayloadData: Record<string, unknown> | undefined,
   campaignMappingId?: string | null,
   saleDate?: string | null // ISO date string for date-based filtering
-): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null } | null {
+): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null; displayName: string | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
 
@@ -160,6 +161,7 @@ function matchPricingRule(
         allowsImmediatePayment: rule.allows_immediate_payment ?? false,
         immediatePaymentCommission: rule.immediate_payment_commission_dkk ?? null,
         immediatePaymentRevenue: rule.immediate_payment_revenue_dkk ?? null,
+        displayName: rule.use_rule_name_as_display ? rule.name : null,
       };
     }
 
@@ -172,6 +174,7 @@ function matchPricingRule(
         allowsImmediatePayment: rule.allows_immediate_payment ?? false,
         immediatePaymentCommission: rule.immediate_payment_commission_dkk ?? null,
         immediatePaymentRevenue: rule.immediate_payment_revenue_dkk ?? null,
+        displayName: rule.use_rule_name_as_display ? rule.name : null,
       };
     }
   }
@@ -262,7 +265,7 @@ serve(async (req) => {
     // Fetch all active pricing rules (include effective dates and immediate payment rates)
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
-      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
+      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk, use_rule_name_as_display")
       .eq("is_active", true);
 
     if (rulesError) {
@@ -321,7 +324,7 @@ serve(async (req) => {
     }
 
     // Process each sale_item
-    const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean }[] = [];
+    const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean; display_name: string | null }[] = [];
     let matchedCount = 0;
     let noMatchCount = 0;
     let productCorrectedCount = 0;
@@ -370,6 +373,10 @@ serve(async (req) => {
           revenue = matchedRule.revenue * qty;
         }
 
+        // Determine display name: if immediate payment, check for rule name override
+        // Otherwise use the standard display name from rule
+        const displayName = matchedRule.displayName;
+
         updates.push({
           id: item.id,
           product_id: correctProductId,
@@ -377,6 +384,7 @@ serve(async (req) => {
           mapped_commission: commission,
           mapped_revenue: revenue,
           needs_mapping: false,
+          display_name: displayName,
           // NOTE: Do NOT include is_immediate_payment - preserve user's choice
         });
 
@@ -402,6 +410,7 @@ serve(async (req) => {
             mapped_commission: baseProduct.commission_dkk * qty,
             mapped_revenue: baseProduct.revenue_dkk * qty,
             needs_mapping: false,
+            display_name: null, // No rule = no display name override
           });
           baseProductFallbackCount++;
           matchDetails.push({
@@ -421,6 +430,7 @@ serve(async (req) => {
             mapped_commission: 0,
             mapped_revenue: 0,
             needs_mapping: false,
+            display_name: null,
           });
           noMatchCount++;
         } else {
@@ -457,6 +467,7 @@ serve(async (req) => {
               mapped_commission: update.mapped_commission,
               mapped_revenue: update.mapped_revenue,
               needs_mapping: update.needs_mapping,
+              display_name: update.display_name,
             })
             .eq("id", update.id);
 

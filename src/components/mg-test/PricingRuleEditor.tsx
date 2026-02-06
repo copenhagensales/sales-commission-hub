@@ -84,6 +84,7 @@ interface PricingRule {
   immediate_payment_revenue_dkk?: number | null;
   effective_from?: string | null;
   effective_to?: string | null;
+  use_rule_name_as_display?: boolean;
 }
 
 interface CampaignMapping {
@@ -146,6 +147,9 @@ export function PricingRuleEditor({
     existingRule?.effective_to ? new Date(existingRule.effective_to) : undefined
   );
   const [hasEndDate, setHasEndDate] = useState(!!existingRule?.effective_to);
+  const [useRuleNameAsDisplay, setUseRuleNameAsDisplay] = useState(
+    existingRule?.use_rule_name_as_display ?? false
+  );
   const [isRematching, setIsRematching] = useState(false);
   
   // Rematch hook
@@ -197,6 +201,7 @@ export function PricingRuleEditor({
           : null,
         effective_from: format(effectiveFrom, "yyyy-MM-dd"),
         effective_to: hasEndDate && effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null,
+        use_rule_name_as_display: useRuleNameAsDisplay,
       };
 
       if (existingRule) {
@@ -223,6 +228,7 @@ export function PricingRuleEditor({
           allows_immediate_payment: ruleData.allows_immediate_payment,
           immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
           immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+          use_rule_name_as_display: ruleData.use_rule_name_as_display,
           change_type: 'update'
         });
       } else {
@@ -250,6 +256,7 @@ export function PricingRuleEditor({
           allows_immediate_payment: ruleData.allows_immediate_payment,
           immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
           immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+          use_rule_name_as_display: ruleData.use_rule_name_as_display,
           change_type: 'create'
         });
       }
@@ -340,6 +347,18 @@ export function PricingRuleEditor({
             onChange={(e) => setName(e.target.value)}
             placeholder="f.eks. ATL Fuld Tilskud"
           />
+          {name && (
+            <div className="flex items-center gap-2 mt-2">
+              <Checkbox
+                id="use-rule-name"
+                checked={useRuleNameAsDisplay}
+                onCheckedChange={(checked) => setUseRuleNameAsDisplay(!!checked)}
+              />
+              <Label htmlFor="use-rule-name" className="text-sm cursor-pointer">
+                Brug dette navn i dashboards
+              </Label>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="rule-priority">Prioritet</Label>
