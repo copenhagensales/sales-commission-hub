@@ -29,6 +29,8 @@ interface PricingRule {
   allows_immediate_payment?: boolean | null;
   effective_from?: string | null;
   effective_to?: string | null;
+  immediate_payment_commission_dkk?: number | null;
+  immediate_payment_revenue_dkk?: number | null;
 }
 
 function isNumericCondition(value: unknown): value is NumericCondition {
@@ -79,7 +81,7 @@ function matchPricingRule(
   rawPayloadData: Record<string, unknown> | undefined,
   campaignMappingId?: string | null,
   saleDate?: string | null // ISO date string for date-based filtering
-): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean } | null {
+): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
 
@@ -156,6 +158,8 @@ function matchPricingRule(
         ruleId: rule.id,
         ruleName: rule.name,
         allowsImmediatePayment: rule.allows_immediate_payment ?? false,
+        immediatePaymentCommission: rule.immediate_payment_commission_dkk ?? null,
+        immediatePaymentRevenue: rule.immediate_payment_revenue_dkk ?? null,
       };
     }
 
@@ -166,6 +170,8 @@ function matchPricingRule(
         ruleId: rule.id,
         ruleName: rule.name,
         allowsImmediatePayment: rule.allows_immediate_payment ?? false,
+        immediatePaymentCommission: rule.immediate_payment_commission_dkk ?? null,
+        immediatePaymentRevenue: rule.immediate_payment_revenue_dkk ?? null,
       };
     }
   }
@@ -204,6 +210,7 @@ serve(async (req) => {
         mapped_commission,
         mapped_revenue,
         needs_mapping,
+        is_immediate_payment,
         sales!inner (
           id,
           source,
@@ -252,10 +259,10 @@ serve(async (req) => {
       );
     }
 
-    // Fetch all active pricing rules (include effective dates)
+    // Fetch all active pricing rules (include effective dates and immediate payment rates)
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
-      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to")
+      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
       .eq("is_active", true);
 
     if (rulesError) {
@@ -348,8 +355,20 @@ serve(async (req) => {
 
       if (matchedRule) {
         const qty = item.quantity || 1;
-        const commission = matchedRule.commission * qty;
-        const revenue = matchedRule.revenue * qty;
+        const isImmediatePayment = (item as { is_immediate_payment?: boolean }).is_immediate_payment === true;
+        
+        let commission: number;
+        let revenue: number;
+        
+        if (isImmediatePayment && matchedRule.allowsImmediatePayment) {
+          // User has enabled immediate payment - use elevated rates
+          commission = (matchedRule.immediatePaymentCommission ?? matchedRule.commission) * qty;
+          revenue = (matchedRule.immediatePaymentRevenue ?? matchedRule.revenue) * qty;
+        } else {
+          // Standard rates
+          commission = matchedRule.commission * qty;
+          revenue = matchedRule.revenue * qty;
+        }
 
         updates.push({
           id: item.id,
@@ -358,6 +377,7 @@ serve(async (req) => {
           mapped_commission: commission,
           mapped_revenue: revenue,
           needs_mapping: false,
+          // NOTE: Do NOT include is_immediate_payment - preserve user's choice
         });
 
         matchDetails.push({
