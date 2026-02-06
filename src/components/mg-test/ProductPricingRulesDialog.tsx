@@ -634,9 +634,18 @@ export function ProductPricingRulesDialog({
                 </div>
               ) : history && history.length > 0 ? (
                 <div className="space-y-3">
-                  {history.map((entry) => {
+                  {history.map((entry, index) => {
                     const isPending = !entry.applied_at;
                     const isRetroactive = entry.is_retroactive;
+                    
+                    // Find the next entry (previous in time) to show the valid period
+                    const previousEntry = index > 0 ? history[index - 1] : null;
+                    const validUntil = previousEntry 
+                      ? new Date(previousEntry.effective_from)
+                      : null;
+                    
+                    // Check if this is the currently active entry (most recent applied)
+                    const isCurrentlyActive = !isPending && index === history.findIndex(h => h.applied_at);
                     
                     return (
                       <div
@@ -644,15 +653,30 @@ export function ProductPricingRulesDialog({
                         className={`border rounded-lg p-3 ${
                           isPending ? "bg-blue-50/50 border-blue-200" : 
                           isRetroactive ? "bg-orange-50/50 border-orange-200" : 
+                          isCurrentlyActive ? "bg-green-50/30 border-green-200" :
                           "bg-background"
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
-                            </span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                Gældende fra: {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
+                              </span>
+                            </div>
+                            {validUntil && (
+                              <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                <span className="ml-6">
+                                  Til: {format(validUntil, "d. MMMM yyyy", { locale: da })}
+                                </span>
+                              </div>
+                            )}
+                            {isCurrentlyActive && !validUntil && (
+                              <div className="flex items-center gap-2 mt-1 text-sm text-green-600">
+                                <span className="ml-6">Nuværende priser</span>
+                              </div>
+                            )}
                           </div>
                           {isPending ? (
                             <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
@@ -664,10 +688,15 @@ export function ProductPricingRulesDialog({
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               Retroaktiv
                             </Badge>
-                          ) : (
+                          ) : isCurrentlyActive ? (
                             <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Anvendt
+                              Aktiv
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground">
+                              <History className="h-3 w-3 mr-1" />
+                              Tidligere
                             </Badge>
                           )}
                         </div>
