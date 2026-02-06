@@ -634,111 +634,125 @@ export function ProductPricingRulesDialog({
                 </div>
               ) : history && history.length > 0 ? (
                 <div className="space-y-3">
-                  {history.map((entry, index) => {
-                    const isPending = !entry.applied_at;
-                    const isRetroactive = entry.is_retroactive;
+                  {(() => {
+                    // Sort by effective_from ascending to calculate proper validity periods
+                    const sortedByEffectiveDate = [...history].sort(
+                      (a, b) => new Date(a.effective_from).getTime() - new Date(b.effective_from).getTime()
+                    );
                     
-                    // Find the next entry (previous in time) to show the valid period
-                    const previousEntry = index > 0 ? history[index - 1] : null;
-                    const validUntil = previousEntry 
-                      ? new Date(previousEntry.effective_from)
-                      : null;
+                    // Build a map of validity end dates based on effective_from
+                    const validityEndMap = new Map<string, Date>();
+                    for (let i = 0; i < sortedByEffectiveDate.length; i++) {
+                      const current = sortedByEffectiveDate[i];
+                      const next = sortedByEffectiveDate[i + 1];
+                      if (next) {
+                        validityEndMap.set(current.id, new Date(next.effective_from));
+                      }
+                    }
                     
-                    // Check if this is the currently active entry (most recent applied)
-                    const isCurrentlyActive = !isPending && index === history.findIndex(h => h.applied_at);
-                    
-                    return (
-                      <div
-                        key={entry.id}
-                        className={`border rounded-lg p-3 ${
-                          isPending ? "bg-blue-50/50 border-blue-200" : 
-                          isRetroactive ? "bg-orange-50/50 border-orange-200" : 
-                          isCurrentlyActive ? "bg-green-50/30 border-green-200" :
-                          "bg-background"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">
-                                Gældende fra: {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
-                              </span>
-                            </div>
-                            {validUntil && (
-                              <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                <span className="ml-6">
-                                  Til: {format(validUntil, "d. MMMM yyyy", { locale: da })}
+                    // Display in created_at descending order (newest first)
+                    return history.map((entry, index) => {
+                      const isPending = !entry.applied_at;
+                      const isRetroactive = entry.is_retroactive;
+                      
+                      // Get validity end from our map
+                      const validUntil = validityEndMap.get(entry.id);
+                      
+                      // Check if this is the currently active entry (most recent applied)
+                      const isCurrentlyActive = !isPending && index === history.findIndex(h => h.applied_at);
+                      
+                      return (
+                        <div
+                          key={entry.id}
+                          className={`border rounded-lg p-3 ${
+                            isPending ? "bg-blue-50/50 border-blue-200" : 
+                            isRetroactive ? "bg-orange-50/50 border-orange-200" : 
+                            isCurrentlyActive ? "bg-green-50/30 border-green-200" :
+                            "bg-background"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">
+                                  Fra: {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
                                 </span>
                               </div>
+                              {validUntil ? (
+                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                  <span className="ml-6">
+                                    Til: {format(validUntil, "d. MMMM yyyy", { locale: da })}
+                                  </span>
+                                </div>
+                              ) : isCurrentlyActive ? (
+                                <div className="flex items-center gap-2 mt-1 text-sm text-green-600">
+                                  <span className="ml-6">Nuværende priser</span>
+                                </div>
+                              ) : null}
+                            </div>
+                            {isPending ? (
+                              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Afventer
+                              </Badge>
+                            ) : isRetroactive ? (
+                              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Retroaktiv
+                              </Badge>
+                            ) : isCurrentlyActive ? (
+                              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Aktiv
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                <History className="h-3 w-3 mr-1" />
+                                Tidligere
+                              </Badge>
                             )}
-                            {isCurrentlyActive && !validUntil && (
-                              <div className="flex items-center gap-2 mt-1 text-sm text-green-600">
-                                <span className="ml-6">Nuværende priser</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-2">
+                            <div>
+                              <span className="text-xs text-muted-foreground">Provision</span>
+                              <p className="font-medium text-green-600">{entry.commission_dkk ?? 0} kr</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground">Omsætning</span>
+                              <p className="font-medium text-blue-600">{entry.revenue_dkk ?? 0} kr</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-sm">
+                            {entry.counts_as_sale && (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <CheckCircle className="h-3 w-3" />
+                                <span>Salg</span>
+                              </div>
+                            )}
+                            {entry.counts_as_cross_sale && (
+                              <div className="flex items-center gap-1 text-blue-600">
+                                <CheckCircle className="h-3 w-3" />
+                                <span>Bisalg</span>
+                              </div>
+                            )}
+                            {!entry.counts_as_sale && !entry.counts_as_cross_sale && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <XCircle className="h-3 w-3" />
+                                <span>Ingen klassificering</span>
                               </div>
                             )}
                           </div>
-                          {isPending ? (
-                            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Afventer
-                            </Badge>
-                          ) : isRetroactive ? (
-                            <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Retroaktiv
-                            </Badge>
-                          ) : isCurrentlyActive ? (
-                            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Aktiv
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-muted text-muted-foreground">
-                              <History className="h-3 w-3 mr-1" />
-                              Tidligere
-                            </Badge>
-                          )}
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-2">
-                          <div>
-                            <span className="text-xs text-muted-foreground">Provision</span>
-                            <p className="font-medium text-green-600">{entry.commission_dkk ?? 0} kr</p>
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground">Omsætning</span>
-                            <p className="font-medium text-blue-600">{entry.revenue_dkk ?? 0} kr</p>
+                          <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                            Oprettet: {format(new Date(entry.created_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-4 text-sm">
-                          {entry.counts_as_sale && (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <CheckCircle className="h-3 w-3" />
-                              <span>Salg</span>
-                            </div>
-                          )}
-                          {entry.counts_as_cross_sale && (
-                            <div className="flex items-center gap-1 text-blue-600">
-                              <CheckCircle className="h-3 w-3" />
-                              <span>Bisalg</span>
-                            </div>
-                          )}
-                          {!entry.counts_as_sale && !entry.counts_as_cross_sale && (
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <XCircle className="h-3 w-3" />
-                              <span>Ingen klassificering</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                          Oprettet: {format(new Date(entry.created_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
