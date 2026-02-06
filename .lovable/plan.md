@@ -1,51 +1,80 @@
 
 
-# Plan: Gør Switch-kolonnen grøn som Salg-kolonnen
+# Plan: Bevar knap efter aktivering og tilføj annuller-funktion
 
 ## Oversigt
-Ændrer styling på Switch-kolonnen (totalCrossSales) så den bruger samme grønne farve som Salg-kolonnen.
+Ændrer straksbetalingssiden så knappen forbliver synlig efter aktivering og skifter til en rød "Annuller straksbetaling" knap.
 
 ---
 
-## Nuværende styling
+## Nuværende adfærd vs. ønsket adfærd
 
-| Kolonne | Nuværende klasse |
-|---------|------------------|
-| Salg | `text-primary font-semibold` (grøn) |
-| Switch | `text-muted-foreground` (grå) |
-
----
-
-## Ændringer
-
-### RelatelDashboard.tsx
-
-Opdater Switch-cellerne i alle tre tabeller fra grå til grøn:
-
-| Linje | Før | Efter |
-|-------|-----|-------|
-| 333-334 | `text-muted-foreground` | `text-primary font-semibold` |
-| 396-397 | `text-muted-foreground` | `text-primary font-semibold` |
-| 459-460 | `text-muted-foreground` | `text-primary font-semibold` |
+| Status | Nuværende | Ønsket |
+|--------|-----------|--------|
+| Afventer | Grøn "Tilføj straksbetaling" knap | Grøn "Tilføj straksbetaling" knap |
+| Aktiveret | Streg (—) | Rød "Annuller straksbetaling" knap |
 
 ---
 
-## Eksempelvisning efter ændring
+## Ændringer i ImmediatePaymentASE.tsx
+
+### 1. Tilføj ny mutation til annullering
+
+Opretter `cancelMutation` der:
+- Henter original commission og revenue fra prisreglen
+- Sætter `is_immediate_payment` til `false`
+- Nulstiller `mapped_commission` og `mapped_revenue` til standardværdierne
+
+### 2. Opdater handling-kolonnen
+
+Erstat betinget visning med:
+- **Hvis aktiveret**: Rød knap med tekst "Annuller straksbetaling" 
+- **Hvis afventer**: Grøn knap med tekst "Tilføj straksbetaling"
+
+### 3. Tilføj bekræftelsesdialog for annullering
+
+Ny AlertDialog med:
+- Titel: "Annuller straksbetaling?"
+- Beskrivelse: Advarsel om at provision reduceres
+- Rød bekræftelsesknap
+
+---
+
+## Teknisk implementering
 
 ```text
-┌────┬─────────────┬──────┬────────┬───────────┐
-│ #  │ Navn        │ Salg │ Switch │ Provision │
-├────┼─────────────┼──────┼────────┼───────────┤
-│ 1  │ Jonas J.    │  72  │   19   │ 84.375 kr │
-│    │             │ grøn │  grøn  │           │
-└────┴─────────────┴──────┴────────┴───────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Handling-kolonne                                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  if (is_immediate_payment === true)                         │
+│    → Vis rød "Annuller straksbetaling" knap                 │
+│    → AlertDialog med bekræftelse                            │
+│    → cancelMutation opdaterer sale_item                     │
+│                                                             │
+│  else                                                       │
+│    → Vis grøn "Tilføj straksbetaling" knap (uændret)        │
+│    → convertMutation (eksisterende logik)                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Prisregel-felter der bruges
+
+| Felt | Bruges til |
+|------|------------|
+| `commission_dkk` | Standard provision (ved annullering) |
+| `revenue_dkk` | Standard omsætning (ved annullering) |
+| `immediate_payment_commission_dkk` | Forhøjet provision (ved aktivering) |
+| `immediate_payment_revenue_dkk` | Forhøjet omsætning (ved aktivering) |
 
 ---
 
 ## Berørt fil
 
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/RelatelDashboard.tsx` | Skift `text-muted-foreground` til `text-primary font-semibold` på 3 steder |
+| Fil | Ændringer |
+|-----|-----------|
+| `src/pages/ImmediatePaymentASE.tsx` | Tilføj cancelMutation, opdater UI til at vise rød annulleringsknap |
 
