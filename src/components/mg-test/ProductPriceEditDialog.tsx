@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,8 @@ export function ProductPriceEditDialog({
     }
     onOpenChange(isOpen);
   };
+
+  const rematchMutation = useRematchPricingRules();
 
   const updateProductPriceMutation = useMutation({
     mutationFn: async () => {
@@ -119,17 +122,52 @@ export function ProductPriceEditDialog({
 
         if (historyError) throw historyError;
       }
+
+      // Return data needed for background rematch
+      return { 
+        effectiveDateStr: changeType === "retroactive" 
+          ? undefined 
+          : effectiveDate?.toISOString().split("T")[0]
+      };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Close dialog immediately
+      handleOpenChange(false);
+      
+      // Show initial toast
       toast.success(
         changeType === "retroactive"
-          ? "Priser opdateret for alle salg"
-          : `Priser gælder fra ${format(effectiveDate!, "d. MMMM yyyy", { locale: da })}`
+          ? "Priser gemt. Opdaterer salgsdata i baggrunden..."
+          : `Priser gemt. Opdaterer salg fra ${format(effectiveDate!, "d. MMMM yyyy", { locale: da })}...`
       );
+      
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      handleOpenChange(false);
+
+      // Run rematch in background (fire-and-forget)
+      rematchMutation.mutate(
+        { 
+          productId, 
+          effectiveFromDate: data.effectiveDateStr 
+        },
+        {
+          onSuccess: (result) => {
+            if (result.stats.updated > 0) {
+              toast.success(`✓ ${result.stats.updated} salg opdateret med nye priser`);
+            } else {
+              toast.info("Ingen salg blev opdateret (allerede korrekte priser)");
+            }
+            // Invalidate again after rematch completes
+            queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+            queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+          },
+          onError: () => {
+            toast.error("Baggrundsopdatering fejlede - prøv at køre rematch manuelt");
+          }
+        }
+      );
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere priser");
