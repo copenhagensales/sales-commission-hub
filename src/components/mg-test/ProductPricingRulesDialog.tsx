@@ -147,6 +147,22 @@ export function ProductPricingRulesDialog({
     enabled: open,
   });
 
+  // Fetch product creation date for baseline
+  const { data: productInfo } = useQuery({
+    queryKey: ["product-info-for-history", productId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("created_at")
+        .eq("id", productId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
   // Mutation to update base values (commission + revenue)
   const updateBaseValues = useMutation({
     mutationFn: async ({ commission, revenue }: { commission: number; revenue: number }) => {
@@ -650,108 +666,150 @@ export function ProductPricingRulesDialog({
                       }
                     }
                     
+                    // Get the earliest effective_from date for showing original pricing period
+                    const earliestEntry = sortedByEffectiveDate[0];
+                    const originalPricingEndDate = earliestEntry ? new Date(earliestEntry.effective_from) : null;
+                    const productCreatedAt = productInfo?.created_at ? new Date(productInfo.created_at) : null;
+                    
                     // Display in created_at descending order (newest first)
-                    return history.map((entry, index) => {
-                      const isPending = !entry.applied_at;
-                      const isRetroactive = entry.is_retroactive;
-                      
-                      // Get validity end from our map
-                      const validUntil = validityEndMap.get(entry.id);
-                      
-                      // Check if this is the currently active entry (most recent applied)
-                      const isCurrentlyActive = !isPending && index === history.findIndex(h => h.applied_at);
-                      
-                      return (
-                        <div
-                          key={entry.id}
-                          className={`border rounded-lg p-3 ${
-                            isPending ? "bg-blue-50/50 border-blue-200" : 
-                            isRetroactive ? "bg-orange-50/50 border-orange-200" : 
-                            isCurrentlyActive ? "bg-green-50/30 border-green-200" :
-                            "bg-background"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">
-                                  Fra: {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
-                                </span>
+                    return (
+                      <>
+                        {history.map((entry, index) => {
+                          const isPending = !entry.applied_at;
+                          const isRetroactive = entry.is_retroactive;
+                          
+                          // Get validity end from our map
+                          const validUntil = validityEndMap.get(entry.id);
+                          
+                          // Check if this is the currently active entry (most recent applied)
+                          const isCurrentlyActive = !isPending && index === history.findIndex(h => h.applied_at);
+                          
+                          return (
+                            <div
+                              key={entry.id}
+                              className={`border rounded-lg p-3 ${
+                                isPending ? "bg-blue-50/50 border-blue-200" : 
+                                isRetroactive ? "bg-orange-50/50 border-orange-200" : 
+                                isCurrentlyActive ? "bg-green-50/30 border-green-200" :
+                                "bg-background"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">
+                                      Fra: {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
+                                    </span>
+                                  </div>
+                                  {validUntil ? (
+                                    <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                      <span className="ml-6">
+                                        Til: {format(validUntil, "d. MMMM yyyy", { locale: da })}
+                                      </span>
+                                    </div>
+                                  ) : isCurrentlyActive ? (
+                                    <div className="flex items-center gap-2 mt-1 text-sm text-green-600">
+                                      <span className="ml-6">Nuværende priser</span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {isPending ? (
+                                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    Afventer
+                                  </Badge>
+                                ) : isRetroactive ? (
+                                  <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Retroaktiv
+                                  </Badge>
+                                ) : isCurrentlyActive ? (
+                                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Aktiv
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                    <History className="h-3 w-3 mr-1" />
+                                    Tidligere
+                                  </Badge>
+                                )}
                               </div>
-                              {validUntil ? (
-                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                  <span className="ml-6">
-                                    Til: {format(validUntil, "d. MMMM yyyy", { locale: da })}
+
+                              <div className="grid grid-cols-2 gap-4 mb-2">
+                                <div>
+                                  <span className="text-xs text-muted-foreground">Provision</span>
+                                  <p className="font-medium text-green-600">{entry.commission_dkk ?? 0} kr</p>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-muted-foreground">Omsætning</span>
+                                  <p className="font-medium text-blue-600">{entry.revenue_dkk ?? 0} kr</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-sm">
+                                {entry.counts_as_sale && (
+                                  <div className="flex items-center gap-1 text-green-600">
+                                    <CheckCircle className="h-3 w-3" />
+                                    <span>Salg</span>
+                                  </div>
+                                )}
+                                {entry.counts_as_cross_sale && (
+                                  <div className="flex items-center gap-1 text-blue-600">
+                                    <CheckCircle className="h-3 w-3" />
+                                    <span>Bisalg</span>
+                                  </div>
+                                )}
+                                {!entry.counts_as_sale && !entry.counts_as_cross_sale && (
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <XCircle className="h-3 w-3" />
+                                    <span>Ingen klassificering</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                                Oprettet: {format(new Date(entry.created_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Show original product pricing baseline if we have product creation date */}
+                        {productCreatedAt && originalPricingEndDate && (
+                          <div className="border rounded-lg p-3 bg-muted/30 border-dashed">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium text-muted-foreground">
+                                    Fra: {format(productCreatedAt, "d. MMMM yyyy", { locale: da })}
                                   </span>
                                 </div>
-                              ) : isCurrentlyActive ? (
-                                <div className="flex items-center gap-2 mt-1 text-sm text-green-600">
-                                  <span className="ml-6">Nuværende priser</span>
+                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                  <span className="ml-6">
+                                    Til: {format(originalPricingEndDate, "d. MMMM yyyy", { locale: da })}
+                                  </span>
                                 </div>
-                              ) : null}
-                            </div>
-                            {isPending ? (
-                              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Afventer
-                              </Badge>
-                            ) : isRetroactive ? (
-                              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Retroaktiv
-                              </Badge>
-                            ) : isCurrentlyActive ? (
-                              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Aktiv
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-muted text-muted-foreground">
+                              </div>
+                              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30">
                                 <History className="h-3 w-3 mr-1" />
-                                Tidligere
+                                Original
                               </Badge>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4 mb-2">
-                            <div>
-                              <span className="text-xs text-muted-foreground">Provision</span>
-                              <p className="font-medium text-green-600">{entry.commission_dkk ?? 0} kr</p>
                             </div>
-                            <div>
-                              <span className="text-xs text-muted-foreground">Omsætning</span>
-                              <p className="font-medium text-blue-600">{entry.revenue_dkk ?? 0} kr</p>
+
+                            <div className="text-sm text-muted-foreground italic">
+                              Oprindelige priser (før første ændring blev registreret)
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                              Produkt oprettet: {format(productCreatedAt, "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-4 text-sm">
-                            {entry.counts_as_sale && (
-                              <div className="flex items-center gap-1 text-green-600">
-                                <CheckCircle className="h-3 w-3" />
-                                <span>Salg</span>
-                              </div>
-                            )}
-                            {entry.counts_as_cross_sale && (
-                              <div className="flex items-center gap-1 text-blue-600">
-                                <CheckCircle className="h-3 w-3" />
-                                <span>Bisalg</span>
-                              </div>
-                            )}
-                            {!entry.counts_as_sale && !entry.counts_as_cross_sale && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <XCircle className="h-3 w-3" />
-                                <span>Ingen klassificering</span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                            Oprettet: {format(new Date(entry.created_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
-                          </div>
-                        </div>
-                      );
-                    });
+                        )}
+                      </>
+                    );
                   })()}
                 </div>
               ) : (
