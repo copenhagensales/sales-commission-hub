@@ -21,7 +21,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 
@@ -53,6 +53,19 @@ interface PricingRule {
 interface CampaignMapping {
   id: string;
   adversus_campaign_name: string | null;
+}
+
+interface PriceHistoryEntry {
+  id: string;
+  product_id: string;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+  effective_from: string;
+  is_retroactive: boolean;
+  applied_at: string | null;
+  created_at: string;
+  counts_as_sale: boolean | null;
+  counts_as_cross_sale: boolean | null;
 }
 
 export function ProductPricingRulesDialog({
@@ -114,6 +127,22 @@ export function ProductPricingRulesDialog({
 
       if (error) throw error;
       return data as CampaignMapping[];
+    },
+    enabled: open,
+  });
+
+  // Fetch price history for this product
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ["product-price-history", productId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_price_history")
+        .select("*")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as PriceHistoryEntry[];
     },
     enabled: open,
   });
@@ -598,9 +627,97 @@ export function ProductPricingRulesDialog({
 
           {/* Historik Tab */}
           <TabsContent value="historik" className="mt-4">
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <History className="h-12 w-12 mb-4 opacity-50" />
-              <p className="text-sm">Historik kommer snart</p>
+            <div className="space-y-3">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : history && history.length > 0 ? (
+                <div className="space-y-3">
+                  {history.map((entry) => {
+                    const isPending = !entry.applied_at;
+                    const isRetroactive = entry.is_retroactive;
+                    
+                    return (
+                      <div
+                        key={entry.id}
+                        className={`border rounded-lg p-3 ${
+                          isPending ? "bg-blue-50/50 border-blue-200" : 
+                          isRetroactive ? "bg-orange-50/50 border-orange-200" : 
+                          "bg-background"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {format(new Date(entry.effective_from), "d. MMMM yyyy", { locale: da })}
+                            </span>
+                          </div>
+                          {isPending ? (
+                            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Afventer
+                            </Badge>
+                          ) : isRetroactive ? (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Retroaktiv
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Anvendt
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-2">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Provision</span>
+                            <p className="font-medium text-green-600">{entry.commission_dkk ?? 0} kr</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Omsætning</span>
+                            <p className="font-medium text-blue-600">{entry.revenue_dkk ?? 0} kr</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm">
+                          {entry.counts_as_sale && (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Salg</span>
+                            </div>
+                          )}
+                          {entry.counts_as_cross_sale && (
+                            <div className="flex items-center gap-1 text-blue-600">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Bisalg</span>
+                            </div>
+                          )}
+                          {!entry.counts_as_sale && !entry.counts_as_cross_sale && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <XCircle className="h-3 w-3" />
+                              <span>Ingen klassificering</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                          Oprettet: {format(new Date(entry.created_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <History className="h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-sm">Ingen prishistorik endnu</p>
+                  <p className="text-xs mt-1">Historik oprettes når du ændrer basis-indstillinger</p>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
