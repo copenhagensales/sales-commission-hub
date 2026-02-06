@@ -1,111 +1,111 @@
 
-# Plan: Bevar straksbetaling-status ved prisændringer
 
-## Problemet
+# Plan: Brug regelnavn som produktnavn ved match
 
-Når `rematch-pricing-rules` kører i baggrunden efter en prisændring, overskriver den `mapped_commission` og `mapped_revenue` på alle sale_items - også dem hvor brugeren manuelt har aktiveret straksbetaling (`is_immediate_payment = true`).
+## Oversigt
 
-**Resultat**: Brugerens straksbetalingsvalg bliver nulstillet, fordi funktionen ikke respekterer den eksisterende status.
+Tilføj mulighed for at prisregler kan overskrive produktnavnet med deres eget navn, når de matcher et salg. Dette gør det muligt at vise f.eks. "ASE A-kasse Straks" i stedet for det generiske produktnavn "ASE A-kasse".
+
+## Nuværende situation
+
+- `product_pricing_rules.name` indeholder allerede et valgfrit navn
+- `sale_items` gemmer IKKE noget visningsnavn - produktnavnet hentes altid fra `products.name`
+- Når en regel matcher, gemmes kun `matched_pricing_rule_id`
 
 ## Løsning
 
-Opdater `rematch-pricing-rules` edge function til at:
-1. Læse `is_immediate_payment`-status fra hver sale_item
-2. Hvis `is_immediate_payment = true`, bruge `immediate_payment_commission_dkk` og `immediate_payment_revenue_dkk` fra prisreglen i stedet for standard-værdier
-3. Aldrig ændre `is_immediate_payment`-flaget - det er brugerens valg
+### Del 1: Database-ændringer
 
-## Tekniske ændringer
+**Ny kolonne i `product_pricing_rules`:**
 
-### Fil: `supabase/functions/rematch-pricing-rules/index.ts`
+| Kolonne | Type | Default | Beskrivelse |
+|---------|------|---------|-------------|
+| `use_rule_name_as_display` | BOOLEAN | false | Hvis true, bruges regelnavnet i stedet for produktnavnet |
 
-**1. Udvid sale_items query (linje ~198-214)**
+**Ny kolonne i `sale_items`:**
 
-Tilføj `is_immediate_payment` til SELECT:
-```typescript
-.select(`
-  id,
-  sale_id,
-  product_id,
-  quantity,
-  matched_pricing_rule_id,
-  mapped_commission,
-  mapped_revenue,
-  needs_mapping,
-  is_immediate_payment,  // <-- TILFØJ DENNE
-  sales!inner (...)
-`)
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| `display_name` | TEXT | Det navn der vises i dashboards. NULL = brug produktnavn |
+
+### Del 2: Backend-logik
+
+**Integration-engine (`sales.ts`):**
+- Ved matchning, hvis regel har `use_rule_name_as_display = true`, sæt `display_name = rule.name`
+
+**Rematch-pricing-rules (`index.ts`):**
+- Samme logik: Opdater `display_name` baseret på regelindstillingen
+
+```text
+IF matchedRule.useRuleNameAsDisplay AND matchedRule.ruleName THEN
+  display_name = matchedRule.ruleName
+ELSE
+  display_name = NULL (brug produktnavn)
 ```
 
-**2. Udvid PricingRule interface (linje ~19-32)**
+### Del 3: Frontend-ændringer
 
-Tilføj immediate payment felter:
-```typescript
-interface PricingRule {
-  // ... eksisterende felter
-  immediate_payment_commission_dkk?: number | null;
-  immediate_payment_revenue_dkk?: number | null;
-}
+**PricingRuleEditor.tsx:**
+Tilføj checkbox under regelnavnet:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  Navn (valgfri)                                     │
+│  ┌─────────────────────────────────────────────┐    │
+│  │ ASE A-kasse Straks                          │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                     │
+│  ☑️ Brug dette navn i stedet for produktnavnet     │
+│     (Vises i dashboards og rapporter)               │
+└─────────────────────────────────────────────────────┘
 ```
 
-**3. Opdater matchPricingRule return type**
+**ImmediatePaymentASE.tsx:**
+- Ved aktivering af straksbetaling: Opdater også `display_name` hvis reglen har det konfigureret
+- Ved annullering: Nulstil `display_name` til NULL
 
-Inkluder immediate payment værdier i return:
+### Del 4: Dashboards og rapporter
+
+Alle steder der viser produktnavn skal bruge logikken:
 ```typescript
-return {
-  commission: rule.commission_dkk,
-  revenue: rule.revenue_dkk,
-  immediatePaymentCommission: rule.immediate_payment_commission_dkk,
-  immediatePaymentRevenue: rule.immediate_payment_revenue_dkk,
-  // ... rest
-}
+const displayName = saleItem.display_name || product?.name || "Ukendt produkt";
 ```
 
-**4. Opdater processering af sale_items (linje ~324-410)**
+Dette inkluderer:
+- MgTest.tsx (produktkolonnen)
+- DailyReports.tsx
+- Lønoversigter
 
-Bevar straksbetaling:
-```typescript
-const isImmediatePayment = item.is_immediate_payment === true;
+## Implementeringsplan
 
-if (matchedRule) {
-  let commission: number;
-  let revenue: number;
-  
-  if (isImmediatePayment && matchedRule.allowsImmediatePayment) {
-    // Bruger har aktiveret straksbetaling - brug forhøjede satser
-    commission = (matchedRule.immediatePaymentCommission ?? matchedRule.commission) * qty;
-    revenue = (matchedRule.immediatePaymentRevenue ?? matchedRule.revenue) * qty;
-  } else {
-    // Standard satser
-    commission = matchedRule.commission * qty;
-    revenue = matchedRule.revenue * qty;
-  }
-  
-  updates.push({
-    id: item.id,
-    product_id: correctProductId,
-    matched_pricing_rule_id: matchedRule.ruleId,
-    mapped_commission: commission,
-    mapped_revenue: revenue,
-    needs_mapping: false,
-    // VIGTIGT: Inkluder IKKE is_immediate_payment - bevar brugerens valg
-  });
-}
-```
+| Trin | Fil | Ændring |
+|------|-----|---------|
+| 1 | Database migration | Tilføj `use_rule_name_as_display` til `product_pricing_rules` og `display_name` til `sale_items` |
+| 2 | `integration-engine/types.ts` | Tilføj `use_rule_name_as_display` til PricingRule interface |
+| 3 | `integration-engine/core/sales.ts` | Returnér display_name fra matchPricingRule, gem i sale_items |
+| 4 | `rematch-pricing-rules/index.ts` | Opdater display_name ved rematch |
+| 5 | `PricingRuleEditor.tsx` | Tilføj checkbox "Brug dette navn i stedet for produktnavnet" |
+| 6 | `ImmediatePaymentASE.tsx` | Inkluder display_name i mutations |
+| 7 | Dashboards | Opdater til at bruge display_name med fallback |
 
-**5. Udvid pricing rules query (linje ~256-259)**
+## Eksempel på flow
 
-Tilføj immediate payment kolonner:
-```typescript
-.select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
-```
+1. Admin opretter prisregel "ASE Basis Straks" med:
+   - Provision: 500 kr
+   - ☑️ "Brug dette navn i stedet for produktnavnet"
 
-## Sammenfatning
+2. Salg importeres → matcher reglen
 
-| Før | Efter |
-|-----|-------|
-| Rematch overskriver alle sale_items med standard-provision | Rematch respekterer `is_immediate_payment` og bruger korrekte satser |
-| Brugerens straksbetalingsvalg går tabt | Straksbetalingsvalg bevares altid |
+3. `sale_items` får:
+   - `matched_pricing_rule_id: <regel-id>`
+   - `display_name: "ASE Basis Straks"`
+   - `mapped_commission: 500`
 
-## Deploy
+4. Dashboard viser "ASE Basis Straks" i produktkolonnen
 
-Efter ændringerne skal `rematch-pricing-rules` edge function redeployes.
+## Resultat
+
+- Admin kan styre præcist hvad der vises for hvert prisscenarie
+- Straksbetaling kan vise f.eks. "ASE Straks" i stedet for generisk produktnavn
+- Alle dashboards og rapporter viser det korrekte navn automatisk
+
