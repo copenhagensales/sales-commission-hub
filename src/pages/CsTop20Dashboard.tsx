@@ -401,9 +401,6 @@ export default function CsTop20Dashboard() {
                       tvMode ? 'text-slate-500' : 'text-muted-foreground/80'
                     }`}>
                       {sales} salg
-                      {seller.crossSaleCount > 0 && (
-                        <span className={tvMode ? 'text-slate-600' : 'text-muted-foreground/60'}> (+{seller.crossSaleCount} switch)</span>
-                      )}
                     </div>
                   </div>
                   
