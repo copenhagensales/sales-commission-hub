@@ -6659,6 +6659,74 @@ export type Database = {
           },
         ]
       }
+      pricing_rule_history: {
+        Row: {
+          allows_immediate_payment: boolean | null
+          campaign_mapping_ids: string[] | null
+          change_type: string | null
+          changed_at: string | null
+          changed_by: string | null
+          commission_dkk: number | null
+          conditions: Json | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          immediate_payment_commission_dkk: number | null
+          immediate_payment_revenue_dkk: number | null
+          is_active: boolean | null
+          name: string | null
+          pricing_rule_id: string | null
+          priority: number | null
+          revenue_dkk: number | null
+        }
+        Insert: {
+          allows_immediate_payment?: boolean | null
+          campaign_mapping_ids?: string[] | null
+          change_type?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          commission_dkk?: number | null
+          conditions?: Json | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          immediate_payment_commission_dkk?: number | null
+          immediate_payment_revenue_dkk?: number | null
+          is_active?: boolean | null
+          name?: string | null
+          pricing_rule_id?: string | null
+          priority?: number | null
+          revenue_dkk?: number | null
+        }
+        Update: {
+          allows_immediate_payment?: boolean | null
+          campaign_mapping_ids?: string[] | null
+          change_type?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          commission_dkk?: number | null
+          conditions?: Json | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          immediate_payment_commission_dkk?: number | null
+          immediate_payment_revenue_dkk?: number | null
+          is_active?: boolean | null
+          name?: string | null
+          pricing_rule_id?: string | null
+          priority?: number | null
+          revenue_dkk?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_rule_history_pricing_rule_id_fkey"
+            columns: ["pricing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "product_pricing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_campaign_overrides: {
         Row: {
           campaign_mapping_id: string
@@ -6761,6 +6829,8 @@ export type Database = {
           commission_dkk: number
           conditions: Json
           created_at: string | null
+          effective_from: string | null
+          effective_to: string | null
           id: string
           immediate_payment_commission_dkk: number | null
           immediate_payment_revenue_dkk: number | null
@@ -6777,6 +6847,8 @@ export type Database = {
           commission_dkk: number
           conditions?: Json
           created_at?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
           id?: string
           immediate_payment_commission_dkk?: number | null
           immediate_payment_revenue_dkk?: number | null
@@ -6793,6 +6865,8 @@ export type Database = {
           commission_dkk?: number
           conditions?: Json
           created_at?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
           id?: string
           immediate_payment_commission_dkk?: number | null
           immediate_payment_revenue_dkk?: number | null

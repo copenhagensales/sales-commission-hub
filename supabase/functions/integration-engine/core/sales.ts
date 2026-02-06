@@ -59,7 +59,7 @@ function isValidSyncEmail(email: string | null | undefined): boolean {
 }
 
 /**
- * Match a pricing rule based on leadResultData conditions.
+ * Match a pricing rule based on leadResultData conditions and date validity.
  * Supports both Adversus format (leadResultData[]) and Enreach format (rawPayload.data{}).
  * Returns the matching rule with highest priority, or null if no match.
  */
@@ -69,7 +69,8 @@ function matchPricingRule(
   leadResultData: Array<{ id?: number; label: string; value: string }>,
   campaignMappingId?: string | null,
   log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  rawPayloadData?: Record<string, unknown> // NEW: Support for Enreach/HeroBase data format
+  rawPayloadData?: Record<string, unknown>, // Support for Enreach/HeroBase data format
+  saleDate?: string | null // ISO date string for date-based filtering
 ): { commission: number; revenue: number; ruleId: string; ruleName: string } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
@@ -93,6 +94,10 @@ function matchPricingRule(
   // Sort by priority descending (highest first)
   const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
 
+  // Parse sale date for date-based filtering
+  const saleDateObj = saleDate ? new Date(saleDate) : null;
+  const saleDateStr = saleDateObj ? saleDateObj.toISOString().split('T')[0] : null;
+
   // Track if we have conditional rules but empty lead data
   const hasConditionalRules = sortedRules.some(r => r.is_active && Object.keys(r.conditions || {}).length > 0);
   const hasEmptyLeadData = allFields.length === 0;
@@ -103,6 +108,18 @@ function matchPricingRule(
 
   for (const rule of sortedRules) {
     if (!rule.is_active) continue;
+
+    // Date-based filtering: skip rules outside their validity window
+    if (saleDateStr) {
+      // If rule has effective_from and sale date is before it, skip
+      if (rule.effective_from && saleDateStr < rule.effective_from) {
+        continue;
+      }
+      // If rule has effective_to and sale date is on or after it, skip
+      if (rule.effective_to && saleDateStr >= rule.effective_to) {
+        continue;
+      }
+    }
 
     const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
     const campaignMatches = hasCampaignRestriction && campaignMappingId && rule.campaign_mapping_ids!.includes(campaignMappingId);
@@ -261,13 +278,15 @@ function prepareSaleItems(
 
     if (productId) {
       // First: try to match a pricing rule based on leadResultData (Adversus) or rawPayload.data (Enreach)
+      // Pass sale date for date-based rule filtering
       const matchedRule = matchPricingRule(
         productId,
         pricingRulesMap,
         leadResultData,
         campaignMappingId,
         log,
-        rawPayloadData  // Pass Enreach data for condition matching
+        rawPayloadData,  // Pass Enreach data for condition matching
+        sale.saleDate    // Pass sale date for date-based filtering
       );
 
       if (matchedRule) {
@@ -511,7 +530,7 @@ export async function processSales(
   const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult] = await Promise.all([
     supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
     supabase.from("adversus_product_mappings").select("*"),
-    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids").eq("is_active", true),
+    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to").eq("is_active", true),
     supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id")
   ]);
 

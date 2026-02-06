@@ -21,9 +21,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
+import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
 
 interface ProductPricingRulesDialogProps {
   open: boolean;
@@ -85,6 +86,10 @@ export function ProductPricingRulesDialog({
   const [isCreating, setIsCreating] = useState(false);
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState<Date>(new Date());
+  const [isRematching, setIsRematching] = useState(false);
+
+  // Rematch hook for automatic price updates
+  const rematchMutation = useRematchPricingRules();
 
   // Local state for editable base values
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
@@ -247,49 +252,68 @@ export function ProductPricingRulesDialog({
     const commission = parseFloat(localCommission.replace(",", ".")) || 0;
     const revenue = parseFloat(localRevenue.replace(",", ".")) || 0;
     
-    if (isToday || isRetroactive) {
-      // Immediate or retroactive change - update products table directly
-      await updateBaseValues.mutateAsync({ commission, revenue });
-      await updateCountFlags.mutateAsync({ countsAsSale: localCountsAsSale, countsAsCrossSale: localCountsAsCrossSale });
-      
-      // Insert into history
-      await supabase.from("product_price_history").insert({
-        product_id: productId,
-        commission_dkk: commission,
-        revenue_dkk: revenue,
-        counts_as_sale: localCountsAsSale,
-        counts_as_cross_sale: localCountsAsCrossSale,
-        effective_from: format(effectiveDate, "yyyy-MM-dd"),
-        is_retroactive: isRetroactive,
-        applied_at: new Date().toISOString()
-      });
-      
-      if (isRetroactive) {
-        toast.warning("Prisændring gemt med retroaktiv dato");
-      }
-    } else {
-      // Future change - save only in history (pending)
-      const { error } = await supabase.from("product_price_history").insert({
-        product_id: productId,
-        commission_dkk: commission,
-        revenue_dkk: revenue,
-        counts_as_sale: localCountsAsSale,
-        counts_as_cross_sale: localCountsAsCrossSale,
-        effective_from: format(effectiveDate, "yyyy-MM-dd"),
-        is_retroactive: false,
-        applied_at: null
-      });
-      
-      if (error) {
-        toast.error("Kunne ikke gemme planlagt ændring: " + error.message);
-        return;
-      }
-      
-      toast.success(`Ændring planlagt til ${format(effectiveDate, "d. MMMM yyyy", { locale: da })}`);
-    }
+    setIsRematching(true);
     
-    setIsEditingBase(false);
-    setEffectiveDate(new Date());
+    try {
+      if (isToday || isRetroactive) {
+        // Immediate or retroactive change - update products table directly
+        await updateBaseValues.mutateAsync({ commission, revenue });
+        await updateCountFlags.mutateAsync({ countsAsSale: localCountsAsSale, countsAsCrossSale: localCountsAsCrossSale });
+        
+        // Insert into history
+        await supabase.from("product_price_history").insert({
+          product_id: productId,
+          commission_dkk: commission,
+          revenue_dkk: revenue,
+          counts_as_sale: localCountsAsSale,
+          counts_as_cross_sale: localCountsAsCrossSale,
+          effective_from: format(effectiveDate, "yyyy-MM-dd"),
+          is_retroactive: isRetroactive,
+          applied_at: new Date().toISOString()
+        });
+        
+        // Auto-rematch all sale_items for this product
+        toast.info("Opdaterer historiske salg...");
+        const rematchResult = await rematchMutation.mutateAsync({ productId });
+        
+        if (rematchResult.stats.updated > 0) {
+          toast.success(`Opdaterede ${rematchResult.stats.updated} historiske salg med nye priser`);
+        }
+        
+        if (isRetroactive) {
+          toast.warning("Prisændring gemt med retroaktiv dato");
+        }
+      } else {
+        // Future change - save only in history (pending)
+        const { error } = await supabase.from("product_price_history").insert({
+          product_id: productId,
+          commission_dkk: commission,
+          revenue_dkk: revenue,
+          counts_as_sale: localCountsAsSale,
+          counts_as_cross_sale: localCountsAsCrossSale,
+          effective_from: format(effectiveDate, "yyyy-MM-dd"),
+          is_retroactive: false,
+          applied_at: null
+        });
+        
+        if (error) {
+          toast.error("Kunne ikke gemme planlagt ændring: " + error.message);
+          return;
+        }
+        
+        toast.success(`Ændring planlagt til ${format(effectiveDate, "d. MMMM yyyy", { locale: da })}`);
+      }
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ["product-price-history", productId] });
+      queryClient.invalidateQueries({ queryKey: ["sale-items"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-sales"] });
+      
+    } finally {
+      setIsRematching(false);
+      setIsEditingBase(false);
+      setEffectiveDate(new Date());
+    }
   };
 
   const handleCancelEdit = () => {
@@ -529,14 +553,14 @@ export function ProductPricingRulesDialog({
                     <Button
                       size="sm"
                       onClick={handleSaveWithDate}
-                      disabled={updateBaseValues.isPending}
+                      disabled={updateBaseValues.isPending || isRematching}
                     >
-                      {updateBaseValues.isPending && (
+                      {(updateBaseValues.isPending || isRematching) && (
                         <Loader2 className="h-3 w-3 animate-spin mr-2" />
                       )}
-                      Gem ændringer
+                      {isRematching ? "Opdaterer salg..." : "Gem ændringer"}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                    <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isRematching}>
                       Annuller
                     </Button>
                   </div>
