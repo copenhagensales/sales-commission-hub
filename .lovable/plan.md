@@ -1,200 +1,111 @@
 
-# Plan: Automatisk opdatering af historiske salg ved prisændringer + dato-indstillinger på prisregler
+# Plan: Bevar straksbetaling-status ved prisændringer
 
-## Oversigt
+## Problemet
 
-Denne plan implementerer to vigtige forbedringer:
-1. **Automatisk opdatering af historiske sale_items** når produktpriser eller prisregler ændres
-2. **Dato-baserede gyldighed** på prisregler (effective_from/effective_to)
+Når `rematch-pricing-rules` kører i baggrunden efter en prisændring, overskriver den `mapped_commission` og `mapped_revenue` på alle sale_items - også dem hvor brugeren manuelt har aktiveret straksbetaling (`is_immediate_payment = true`).
 
----
+**Resultat**: Brugerens straksbetalingsvalg bliver nulstillet, fordi funktionen ikke respekterer den eksisterende status.
 
-## Nuværende arkitektur
+## Løsning
 
-Systemet har allerede centraliseret data-arkitektur:
+Opdater `rematch-pricing-rules` edge function til at:
+1. Læse `is_immediate_payment`-status fra hver sale_item
+2. Hvis `is_immediate_payment = true`, bruge `immediate_payment_commission_dkk` og `immediate_payment_revenue_dkk` fra prisreglen i stedet for standard-værdier
+3. Aldrig ændre `is_immediate_payment`-flaget - det er brugerens valg
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                   DATA FLOW                                   │
-├──────────────────────────────────────────────────────────────┤
-│  Integration Engine → sale_items (mapped_commission/revenue) │
-│                           ↓                                   │
-│  Dashboard/Løn/Rapporter ← læser direkte fra sale_items      │
-└──────────────────────────────────────────────────────────────┘
-```
+## Tekniske ændringer
 
-**Korrekt observation**: Alle dashboards, løn, dagsrapporter osv. henter data fra `sale_items.mapped_commission` og `sale_items.mapped_revenue`. Så længe disse værdier er opdaterede, vises korrekt data overalt.
+### Fil: `supabase/functions/rematch-pricing-rules/index.ts`
 
----
+**1. Udvid sale_items query (linje ~198-214)**
 
-## Del 1: Automatisk opdatering ved prisændringer
-
-### Hvad sker der i dag?
-1. Når du ændrer en produktpris → gemmes i `products` + `product_price_history`
-2. Historiske `sale_items` beholder deres gamle værdier
-3. `rematch-pricing-rules` edge function skal køres manuelt
-
-### Løsning: Automatisk trigger
-
-Når en prisændring gemmes, kald automatisk `rematch-pricing-rules` for det specifikke produkt.
-
-**Ændringer i ProductPricingRulesDialog.tsx:**
-- Efter vellykket prisændring → kald edge function med `product_id` filter
-- Vis progress/status til brugeren
-
-**Ændringer i PricingRuleEditor.tsx:**
-- Efter gem/opdatering af prisregel → kald edge function for det specifikke produkt
-
----
-
-## Del 2: Dato-baserede prisregler (Gyldighedsperioder)
-
-### Nye kolonner i `product_pricing_rules`
-
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| `effective_from` | DATE | Reglen gælder fra denne dato (inklusiv) |
-| `effective_to` | DATE NULL | Reglen gælder til denne dato (eksklusiv). NULL = ingen slutdato |
-
-### Matchning-logik opdatering
-
-Både `integration-engine/core/sales.ts` og `rematch-pricing-rules/index.ts` opdateres til:
-
-```text
-FOR hver prisregel DO
-  IF regel.effective_from > salg.sale_datetime THEN SKIP
-  IF regel.effective_to IS NOT NULL 
-     AND regel.effective_to <= salg.sale_datetime THEN SKIP
-  ... eksisterende betingelseslogik ...
-END
-```
-
-### Historik for prisregler
-
-Ny tabel: `pricing_rule_history` til at tracke ændringer i prisregler.
-
----
-
-## Implementeringsplan
-
-### Fase 1: Database-ændringer
-
-**Migration 1: Tilføj dato-kolonner til prisregler**
-
-```sql
-ALTER TABLE product_pricing_rules 
-ADD COLUMN effective_from DATE DEFAULT CURRENT_DATE,
-ADD COLUMN effective_to DATE DEFAULT NULL;
-
-COMMENT ON COLUMN product_pricing_rules.effective_from IS 'Reglen gælder fra denne dato (inklusiv)';
-COMMENT ON COLUMN product_pricing_rules.effective_to IS 'Reglen gælder til denne dato (eksklusiv). NULL = ingen slutdato';
-```
-
-**Migration 2: Prisregel-historik tabel**
-
-```sql
-CREATE TABLE pricing_rule_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pricing_rule_id UUID REFERENCES product_pricing_rules(id) ON DELETE CASCADE,
-  commission_dkk NUMERIC,
-  revenue_dkk NUMERIC,
-  conditions JSONB,
-  campaign_mapping_ids UUID[],
-  effective_from DATE,
-  effective_to DATE,
-  priority INTEGER,
-  is_active BOOLEAN,
-  changed_at TIMESTAMPTZ DEFAULT NOW(),
-  changed_by UUID REFERENCES auth.users(id)
-);
-
--- RLS policies
-ALTER TABLE pricing_rule_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated can read" ON pricing_rule_history FOR SELECT TO authenticated USING (true);
-```
-
-### Fase 2: Backend-logik
-
-**Opdater `integration-engine/core/sales.ts`:**
-- `matchPricingRule()` funktionen skal filtrere regler baseret på `effective_from` og `effective_to` vs. `sale.saleDate`
-
-**Opdater `rematch-pricing-rules/index.ts`:**
-- Tilføj `product_id` filter parameter (allerede delvist understøttet via `source`)
-- Tilføj dato-baseret matching logik
-- Understøt `effective_from_date` parameter for at kun opdatere salg efter en bestemt dato
-
-### Fase 3: Frontend-ændringer
-
-**PricingRuleEditor.tsx:**
-- Tilføj dato-picker for "Gyldig fra" (effective_from)
-- Tilføj valgfri dato-picker for "Gyldig til" (effective_to)
-- Ved gem: kald rematch funktion automatisk
-
-**ProductPricingRulesDialog.tsx:**
-- Ved gem af basispris: kald rematch funktion for produktet
-- Vis loading-state og resultat (antal opdaterede salg)
-
-**Ny komponent: PricingRuleHistoryTab.tsx:**
-- Viser historik over regelændringer (ligesom produkthistorik)
-
-### Fase 4: Automatisk rematch-integration
-
-**Ny hook: `useRematchPricingRules.ts`:**
-
+Tilføj `is_immediate_payment` til SELECT:
 ```typescript
-export function useRematchPricingRules() {
-  return useMutation({
-    mutationFn: async ({ 
-      productId, 
-      effectiveFromDate,
-      dryRun = false 
-    }) => {
-      const response = await supabase.functions.invoke(
-        'rematch-pricing-rules',
-        { body: { product_id: productId, effective_from_date, dry_run: dryRun } }
-      );
-      return response.data;
-    }
+.select(`
+  id,
+  sale_id,
+  product_id,
+  quantity,
+  matched_pricing_rule_id,
+  mapped_commission,
+  mapped_revenue,
+  needs_mapping,
+  is_immediate_payment,  // <-- TILFØJ DENNE
+  sales!inner (...)
+`)
+```
+
+**2. Udvid PricingRule interface (linje ~19-32)**
+
+Tilføj immediate payment felter:
+```typescript
+interface PricingRule {
+  // ... eksisterende felter
+  immediate_payment_commission_dkk?: number | null;
+  immediate_payment_revenue_dkk?: number | null;
+}
+```
+
+**3. Opdater matchPricingRule return type**
+
+Inkluder immediate payment værdier i return:
+```typescript
+return {
+  commission: rule.commission_dkk,
+  revenue: rule.revenue_dkk,
+  immediatePaymentCommission: rule.immediate_payment_commission_dkk,
+  immediatePaymentRevenue: rule.immediate_payment_revenue_dkk,
+  // ... rest
+}
+```
+
+**4. Opdater processering af sale_items (linje ~324-410)**
+
+Bevar straksbetaling:
+```typescript
+const isImmediatePayment = item.is_immediate_payment === true;
+
+if (matchedRule) {
+  let commission: number;
+  let revenue: number;
+  
+  if (isImmediatePayment && matchedRule.allowsImmediatePayment) {
+    // Bruger har aktiveret straksbetaling - brug forhøjede satser
+    commission = (matchedRule.immediatePaymentCommission ?? matchedRule.commission) * qty;
+    revenue = (matchedRule.immediatePaymentRevenue ?? matchedRule.revenue) * qty;
+  } else {
+    // Standard satser
+    commission = matchedRule.commission * qty;
+    revenue = matchedRule.revenue * qty;
+  }
+  
+  updates.push({
+    id: item.id,
+    product_id: correctProductId,
+    matched_pricing_rule_id: matchedRule.ruleId,
+    mapped_commission: commission,
+    mapped_revenue: revenue,
+    needs_mapping: false,
+    // VIGTIGT: Inkluder IKKE is_immediate_payment - bevar brugerens valg
   });
 }
 ```
 
----
+**5. Udvid pricing rules query (linje ~256-259)**
 
-## Teknisk oversigt
+Tilføj immediate payment kolonner:
+```typescript
+.select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk")
+```
 
-### Filer der ændres
+## Sammenfatning
 
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/rematch-pricing-rules/index.ts` | Tilføj product_id filter + dato-logik |
-| `supabase/functions/integration-engine/core/sales.ts` | Dato-baseret regel-matching |
-| `supabase/functions/integration-engine/types.ts` | Tilføj effective_from/to til PricingRule type |
-| `src/components/mg-test/PricingRuleEditor.tsx` | Dato-pickers + auto-rematch |
-| `src/components/mg-test/ProductPricingRulesDialog.tsx` | Auto-rematch ved prisændring |
+| Før | Efter |
+|-----|-------|
+| Rematch overskriver alle sale_items med standard-provision | Rematch respekterer `is_immediate_payment` og bruger korrekte satser |
+| Brugerens straksbetalingsvalg går tabt | Straksbetalingsvalg bevares altid |
 
-### Nye filer
+## Deploy
 
-| Fil | Beskrivelse |
-|-----|-------------|
-| `src/hooks/useRematchPricingRules.ts` | Hook til at kalde rematch edge function |
-| `src/components/mg-test/PricingRuleHistoryTab.tsx` | Historik-visning for prisregler |
-
----
-
-## Brugeroplevelse
-
-Efter implementering:
-
-1. **Ændrer du en produktpris** → Systemet opdaterer automatisk alle relaterede sale_items → Alle dashboards viser korrekt data med det samme
-2. **Opretter/ændrer du en prisregel** → Kan vælge gyldighedsdato → Systemet opdaterer kun salg i den relevante periode
-3. **Historik-fanen** → Viser både produktprishistorik OG regelændringshistorik
-
----
-
-## Risiko-håndtering
-
-- **Dry-run mode**: Vis først hvor mange salg der påvirkes før opdatering
-- **Batch-processing**: Opdater i chunks for at undgå timeouts
-- **Reversibility**: Historik-tabeller gør det muligt at se tidligere værdier
-
+Efter ændringerne skal `rematch-pricing-rules` edge function redeployes.
