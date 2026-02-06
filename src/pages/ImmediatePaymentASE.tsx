@@ -86,7 +86,7 @@ export default function ImmediatePaymentASE() {
       const displayName = rule.use_rule_name_as_display ? rule.name : null;
       
       // 2. Update sale_item with new values
-      const { error: updateError } = await supabase
+      const { data: updatedData, error: updateError } = await supabase
         .from("sale_items")
         .update({
           is_immediate_payment: true,
@@ -94,18 +94,53 @@ export default function ImmediatePaymentASE() {
           mapped_revenue: rule.immediate_payment_revenue_dkk,
           display_name: displayName,
         })
-        .eq("id", sale.sale_item_id);
+        .eq("id", sale.sale_item_id)
+        .select("id, is_immediate_payment");
       
       if (updateError) {
-        throw new Error("Kunne ikke opdatere salget");
+        throw new Error("Kunne ikke opdatere salget: " + updateError.message);
       }
+      
+      // Check if update actually happened (RLS may silently block)
+      if (!updatedData || updatedData.length === 0) {
+        throw new Error("Opdateringen blev ikke gemt. Du har muligvis ikke rettigheder til at ændre dette salg.");
+      }
+      
+      if (!updatedData[0].is_immediate_payment) {
+        throw new Error("Straksbetaling blev ikke aktiveret korrekt.");
+      }
+    },
+    onMutate: async (sale) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["immediate-payment-ase-sales"] });
+      
+      // Snapshot the previous value
+      const previousSales = queryClient.getQueryData<ImmediatePaymentSale[]>(["immediate-payment-ase-sales"]);
+      
+      // Optimistically update to the new value
+      if (previousSales) {
+        queryClient.setQueryData<ImmediatePaymentSale[]>(
+          ["immediate-payment-ase-sales"],
+          previousSales.map(s => 
+            s.sale_item_id === sale.sale_item_id 
+              ? { ...s, is_immediate_payment: true } 
+              : s
+          )
+        );
+      }
+      
+      return { previousSales };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["immediate-payment-ase-sales"] });
       toast({ title: "Straksbetaling tilføjet", description: "Salget er nu konverteret til straksbetaling." });
       setConvertingSaleId(null);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _sale, context) => {
+      // Rollback to the previous value on error
+      if (context?.previousSales) {
+        queryClient.setQueryData(["immediate-payment-ase-sales"], context.previousSales);
+      }
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
       setConvertingSaleId(null);
     },
@@ -129,7 +164,7 @@ export default function ImmediatePaymentASE() {
       const displayName = rule.use_rule_name_as_display ? rule.name : null;
       
       // 2. Update sale_item with standard values
-      const { error: updateError } = await supabase
+      const { data: updatedData, error: updateError } = await supabase
         .from("sale_items")
         .update({
           is_immediate_payment: false,
@@ -137,18 +172,49 @@ export default function ImmediatePaymentASE() {
           mapped_revenue: rule.revenue_dkk,
           display_name: displayName,
         })
-        .eq("id", sale.sale_item_id);
+        .eq("id", sale.sale_item_id)
+        .select("id, is_immediate_payment");
       
       if (updateError) {
-        throw new Error("Kunne ikke annullere straksbetaling");
+        throw new Error("Kunne ikke annullere straksbetaling: " + updateError.message);
       }
+      
+      // Check if update actually happened (RLS may silently block)
+      if (!updatedData || updatedData.length === 0) {
+        throw new Error("Opdateringen blev ikke gemt. Du har muligvis ikke rettigheder til at ændre dette salg.");
+      }
+    },
+    onMutate: async (sale) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["immediate-payment-ase-sales"] });
+      
+      // Snapshot the previous value
+      const previousSales = queryClient.getQueryData<ImmediatePaymentSale[]>(["immediate-payment-ase-sales"]);
+      
+      // Optimistically update to the new value
+      if (previousSales) {
+        queryClient.setQueryData<ImmediatePaymentSale[]>(
+          ["immediate-payment-ase-sales"],
+          previousSales.map(s => 
+            s.sale_item_id === sale.sale_item_id 
+              ? { ...s, is_immediate_payment: false } 
+              : s
+          )
+        );
+      }
+      
+      return { previousSales };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["immediate-payment-ase-sales"] });
       toast({ title: "Straksbetaling annulleret", description: "Salget er nu tilbageført til standard provision." });
       setConvertingSaleId(null);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _sale, context) => {
+      // Rollback to the previous value on error
+      if (context?.previousSales) {
+        queryClient.setQueryData(["immediate-payment-ase-sales"], context.previousSales);
+      }
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
       setConvertingSaleId(null);
     },
