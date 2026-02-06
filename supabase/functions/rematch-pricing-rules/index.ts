@@ -375,19 +375,6 @@ serve(async (req) => {
       // Get sale date for date-based rule filtering
       const saleDate = (item.sales as { sale_datetime?: string })?.sale_datetime || null;
 
-      // Debug: Log a sample of what's being matched
-      if (matchDetails.length < 3) {
-        console.log(`[rematch-pricing-rules] DEBUG Sample item ${item.id}:`, {
-          akasseSalg: rawPayloadData?.['A-kasse salg'],
-          akasseType: rawPayloadData?.['A-kasse type'],
-          dækningssum: rawPayloadData?.['Dækningssum'],
-          forening: rawPayloadData?.['Forening'],
-          productId: correctProductId,
-          hasRules: pricingRulesMap.has(correctProductId),
-          rulesCount: pricingRulesMap.get(correctProductId)?.length || 0
-        });
-      }
-
       // Try to match a pricing rule with the correct product ID and sale date
       const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId, saleDate);
 
