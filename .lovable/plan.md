@@ -1,74 +1,78 @@
 
-
-# Plan: Bevar knap efter aktivering og tilføj annuller-funktion
+# Plan: Vis regelnavn i stedet for produktnavn
 
 ## Oversigt
-Ændrer straksbetalingssiden så knappen forbliver synlig efter aktivering og skifter til en rød "Annuller straksbetaling" knap.
+Ændrer "Produkt"-kolonnen til at vise prisreglens navn i stedet for produktnavnet.
 
 ---
 
-## Nuværende adfærd vs. ønsket adfærd
+## Dataopdatering
 
-| Status | Nuværende | Ønsket |
-|--------|-----------|--------|
-| Afventer | Grøn "Tilføj straksbetaling" knap | Grøn "Tilføj straksbetaling" knap |
-| Aktiveret | Streg (—) | Rød "Annuller straksbetaling" knap |
+### Nuværende vs. ønsket visning
+
+| Kolonne | Nuværende data | Ønsket data |
+|---------|----------------|-------------|
+| Produkt | `products.name` = "Salg" | `product_pricing_rules.name` = "A-kasse uden straksbetaling" |
 
 ---
 
 ## Ændringer i ImmediatePaymentASE.tsx
 
-### 1. Tilføj ny mutation til annullering
+### 1. Opdater interface (linje 52-61)
 
-Opretter `cancelMutation` der:
-- Henter original commission og revenue fra prisreglen
-- Sætter `is_immediate_payment` til `false`
-- Nulstiller `mapped_commission` og `mapped_revenue` til standardværdierne
+Tilføj nyt felt til at gemme regelnavnet:
 
-### 2. Opdater handling-kolonnen
-
-Erstat betinget visning med:
-- **Hvis aktiveret**: Rød knap med tekst "Annuller straksbetaling" 
-- **Hvis afventer**: Grøn knap med tekst "Tilføj straksbetaling"
-
-### 3. Tilføj bekræftelsesdialog for annullering
-
-Ny AlertDialog med:
-- Titel: "Annuller straksbetaling?"
-- Beskrivelse: Advarsel om at provision reduceres
-- Rød bekræftelsesknap
-
----
-
-## Teknisk implementering
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Handling-kolonne                                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  if (is_immediate_payment === true)                         │
-│    → Vis rød "Annuller straksbetaling" knap                 │
-│    → AlertDialog med bekræftelse                            │
-│    → cancelMutation opdaterer sale_item                     │
-│                                                             │
-│  else                                                       │
-│    → Vis grøn "Tilføj straksbetaling" knap (uændret)        │
-│    → convertMutation (eksisterende logik)                   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```typescript
+interface ImmediatePaymentSale {
+  // ... eksisterende felter
+  rule_name: string;  // NYT: Regelnavnet fra product_pricing_rules
+}
 ```
 
+### 2. Opdater query til at hente regelnavn (linje 233-238)
+
+Udvid forespørgslen til at inkludere `name` fra prisregler:
+
+```typescript
+const { data: pricingRules } = await supabase
+  .from("product_pricing_rules")
+  .select("id, name")  // Tilføj name
+  .in("id", pricingRuleIds)
+  .eq("allows_immediate_payment", true);
+```
+
+### 3. Gem regelnavn i resultatet (linje 244-261)
+
+Opdater til at bruge regelnavnet fra Map:
+
+```typescript
+const immediatePaymentRules = new Map(
+  pricingRules.map(r => [r.id, r.name])
+);
+
+// I loop:
+rule_name: immediatePaymentRules.get(matchingItem.matched_pricing_rule_id) || "Ukendt regel",
+```
+
+### 4. Opdater tabel-header og celle (linje 306, 318)
+
+| Før | Efter |
+|-----|-------|
+| `<TableHead>Produkt</TableHead>` | `<TableHead>Regel</TableHead>` |
+| `{sale.product_name}` | `{sale.rule_name}` |
+
 ---
 
-## Prisregel-felter der bruges
+## Eksempel på visning efter ændring
 
-| Felt | Bruges til |
-|------|------------|
-| `commission_dkk` | Standard provision (ved annullering) |
-| `revenue_dkk` | Standard omsætning (ved annullering) |
-| `immediate_payment_commission_dkk` | Forhøjet provision (ved aktivering) |
-| `immediate_payment_revenue_dkk` | Forhøjet omsætning (ved aktivering) |
+```text
+┌─────────────┬──────────────────────────────────────┬──────────┬───────────┬─────────────────────────┐
+│ Dato        │ Regel                                │ Kunde    │ Status    │ Handling                │
+├─────────────┼──────────────────────────────────────┼──────────┼───────────┼─────────────────────────┤
+│ 6. feb 2026 │ A-kasse uden straksbetaling          │ Firma A  │ Afventer  │ [Tilføj straksbetaling] │
+│ 5. feb 2026 │ A-kasse uden straksbetaling over ... │ Firma B  │ Aktiveret │ [Annuller straksbetaling]│
+└─────────────┴──────────────────────────────────────┴──────────┴───────────┴─────────────────────────┘
+```
 
 ---
 
@@ -76,5 +80,4 @@ Ny AlertDialog med:
 
 | Fil | Ændringer |
 |-----|-----------|
-| `src/pages/ImmediatePaymentASE.tsx` | Tilføj cancelMutation, opdater UI til at vise rød annulleringsknap |
-
+| `src/pages/ImmediatePaymentASE.tsx` | Tilføj `rule_name` til interface, opdater query, vis regelnavn i tabel |
