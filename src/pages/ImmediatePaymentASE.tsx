@@ -54,7 +54,7 @@ interface ImmediatePaymentSale {
   sale_datetime: string;
   customer_company: string | null;
   customer_phone: string | null;
-  product_name: string;
+  rule_name: string;
   sale_item_id: string;
   matched_pricing_rule_id: string;
   is_immediate_payment: boolean;
@@ -232,12 +232,13 @@ export default function ImmediatePaymentASE() {
 
       const { data: pricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("id")
+        .select("id, name")
         .in("id", pricingRuleIds)
         .eq("allows_immediate_payment", true);
 
       if (!pricingRules || pricingRules.length === 0) return [];
 
+      const immediatePaymentRules = new Map(pricingRules.map(r => [r.id, r.name]));
       const immediatePaymentRuleIds = new Set(pricingRules.map(r => r.id));
 
       // Filter sales to only those with immediate payment rules
@@ -252,7 +253,7 @@ export default function ImmediatePaymentASE() {
             sale_datetime: sale.sale_datetime,
             customer_company: sale.customer_company,
             customer_phone: sale.customer_phone,
-            product_name: (matchingItem as any).products?.name || "Ukendt produkt",
+            rule_name: immediatePaymentRules.get((matchingItem as any).matched_pricing_rule_id) || "Ukendt regel",
             sale_item_id: (matchingItem as any).id,
             matched_pricing_rule_id: (matchingItem as any).matched_pricing_rule_id,
             is_immediate_payment: (matchingItem as any).is_immediate_payment || false,
@@ -303,7 +304,7 @@ export default function ImmediatePaymentASE() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Dato</TableHead>
-                    <TableHead>Produkt</TableHead>
+                    <TableHead>Regel</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Handling</TableHead>
@@ -315,7 +316,7 @@ export default function ImmediatePaymentASE() {
                       <TableCell>
                         {format(new Date(sale.sale_datetime), "d. MMM yyyy", { locale: da })}
                       </TableCell>
-                      <TableCell>{sale.product_name}</TableCell>
+                      <TableCell>{sale.rule_name}</TableCell>
                       <TableCell>
                         {sale.customer_company || sale.customer_phone || "Ukendt"}
                       </TableCell>
