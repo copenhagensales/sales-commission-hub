@@ -86,6 +86,7 @@ export default function ImmediatePaymentASE() {
       const displayName = rule.use_rule_name_as_display ? rule.name : null;
       
       // 2. Update sale_item with new values
+      console.log("[ImmediatePayment] Updating sale_item:", sale.sale_item_id, "to is_immediate_payment: true");
       const { data: updatedData, error: updateError } = await supabase
         .from("sale_items")
         .update({
@@ -97,18 +98,25 @@ export default function ImmediatePaymentASE() {
         .eq("id", sale.sale_item_id)
         .select("id, is_immediate_payment");
       
+      console.log("[ImmediatePayment] Update result:", { updatedData, updateError });
+      
       if (updateError) {
+        console.error("[ImmediatePayment] Update error:", updateError);
         throw new Error("Kunne ikke opdatere salget: " + updateError.message);
       }
       
       // Check if update actually happened (RLS may silently block)
       if (!updatedData || updatedData.length === 0) {
+        console.error("[ImmediatePayment] No rows updated - RLS may have blocked");
         throw new Error("Opdateringen blev ikke gemt. Du har muligvis ikke rettigheder til at ændre dette salg.");
       }
       
       if (!updatedData[0].is_immediate_payment) {
+        console.error("[ImmediatePayment] Update succeeded but value is wrong:", updatedData[0]);
         throw new Error("Straksbetaling blev ikke aktiveret korrekt.");
       }
+      
+      console.log("[ImmediatePayment] Update successful:", updatedData[0]);
     },
     onMutate: async (sale) => {
       // Cancel any outgoing refetches so they don't overwrite our optimistic update

@@ -433,7 +433,31 @@ async function processSalesBatch(
   }
 
   try {
+    // Preserve is_immediate_payment values for existing sale_items before deleting
+    let preservedImmediatePaymentMap = new Map<string, { isImmediatePayment: boolean; commission: number; revenue: number; displayName: string | null }>()
+    
     if (existingSaleIds.length > 0) {
+      // First, fetch existing sale_items with is_immediate_payment = true
+      const { data: existingItems } = await supabase
+        .from("sale_items")
+        .select("sale_id, product_id, is_immediate_payment, mapped_commission, mapped_revenue, display_name")
+        .in("sale_id", existingSaleIds)
+        .eq("is_immediate_payment", true)
+      
+      if (existingItems && existingItems.length > 0) {
+        log("INFO", `Preserving ${existingItems.length} sale_items with is_immediate_payment=true`)
+        for (const item of existingItems) {
+          // Key by sale_id + product_id to match after reinsertion
+          const key = `${item.sale_id}:${item.product_id}`
+          preservedImmediatePaymentMap.set(key, {
+            isImmediatePayment: item.is_immediate_payment,
+            commission: item.mapped_commission,
+            revenue: item.mapped_revenue,
+            displayName: item.display_name
+          })
+        }
+      }
+      
       await supabase.from("sale_items").delete().in("sale_id", existingSaleIds)
     }
     if (allSalesData.length > 0) {
@@ -464,6 +488,19 @@ async function processSalesBatch(
       }
     }
     if (saleItemsToInsert.length > 0) {
+      // Restore is_immediate_payment for matching items
+      for (const item of saleItemsToInsert) {
+        const key = `${item.sale_id}:${item.product_id}`
+        const preserved = preservedImmediatePaymentMap.get(key)
+        if (preserved) {
+          item.is_immediate_payment = preserved.isImmediatePayment
+          item.mapped_commission = preserved.commission
+          item.mapped_revenue = preserved.revenue
+          item.display_name = preserved.displayName
+          log("INFO", `Restored is_immediate_payment for sale_item ${item.sale_id}:${item.product_id}`)
+        }
+      }
+      
       const { error: itemsError } = await supabase.from("sale_items").insert(saleItemsToInsert)
       if (itemsError) throw itemsError
     }
