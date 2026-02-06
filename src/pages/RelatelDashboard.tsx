@@ -164,6 +164,14 @@ export default function RelatelDashboard() {
   const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
   const payrollSales = getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
 
+  // Calculate total switch (cross-sales) from leaderboard data
+  const todaySwitch = useMemo(() => 
+    cachedSellersToday.reduce((sum, s) => sum + (s.crossSaleCount || 0), 0), [cachedSellersToday]);
+  const weekSwitch = useMemo(() => 
+    cachedSellersWeek.reduce((sum, s) => sum + (s.crossSaleCount || 0), 0), [cachedSellersWeek]);
+  const payrollSwitch = useMemo(() => 
+    cachedSellersPayroll.reduce((sum, s) => sum + (s.crossSaleCount || 0), 0), [cachedSellersPayroll]);
+
   // Hours now come from cached KPIs instead of useDashboardSalesData
   const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
 
@@ -198,6 +206,9 @@ export default function RelatelDashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-primary">
                 {todaySales}
+                {todaySwitch > 0 && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">(+{todaySwitch} switch)</span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
             </CardContent>
@@ -211,6 +222,9 @@ export default function RelatelDashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-primary">
                 {weekSales}
+                {weekSwitch > 0 && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">(+{weekSwitch} switch)</span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
             </CardContent>
@@ -237,6 +251,9 @@ export default function RelatelDashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-primary">
                 {payrollSales}
+                {payrollSwitch > 0 && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">(+{payrollSwitch} switch)</span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
             </CardContent>
@@ -286,6 +303,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -311,9 +329,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                            {totalCrossSales > 0 && (
-                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
-                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -348,6 +366,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -373,9 +392,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                            {totalCrossSales > 0 && (
-                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
-                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -410,6 +429,7 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -435,9 +455,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                            {totalCrossSales > 0 && (
-                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
-                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
