@@ -262,7 +262,21 @@ function prepareSaleItems(
   const leadResultData = (sale.rawPayload?.leadResultData as Array<{ id?: number; label: string; value: string }>) || [];
   
   // Extract rawPayload.data (Enreach/HeroBase format) for pricing rule matching
-  const rawPayloadData = sale.rawPayload?.data as Record<string, unknown> | undefined;
+  let rawPayloadData = sale.rawPayload?.data as Record<string, unknown> | undefined;
+  
+  // Data enrichment: Add default Dækningssum for lønsikring sales if missing
+  // This ensures sales with "Fagforening med lønsikring" match the higher commission rules
+  if (rawPayloadData) {
+    const forening = rawPayloadData['Forening'] as string | undefined;
+    const dækningssum = rawPayloadData['Dækningssum'] as string | undefined;
+    
+    // ONLY enrich if Forening = "Fagforening med lønsikring" AND Dækningssum is missing
+    // Sales with "Ase Lønmodtager" should NOT be enriched - they match the general rule
+    if (!dækningssum && forening === 'Fagforening med lønsikring') {
+      rawPayloadData['Dækningssum'] = '6000';  // Assume over 6000 for lønsikring -> 800/1400 kr rules
+      log?.("INFO", `Enriched Dækningssum=6000 for lønsikring sale (Forening="${forening}")`);
+    }
+  }
   
   // Get campaign mapping ID for this sale
   const campaignMappingId = sale.campaignId ? campaignMappingsMap.get(sale.campaignId) : null;
