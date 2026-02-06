@@ -11,6 +11,7 @@ export interface LeaderboardEntry {
   avatarUrl: string | null;
   teamName: string | null;
   salesCount: number;
+  crossSaleCount: number;
   commission: number;
   goalTarget: number | null;
 }

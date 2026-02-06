@@ -187,6 +187,7 @@ function useCustomPeriodLeaderboard(
           avatarUrl: stats.avatar,
           teamName: stats.team,
           salesCount: stats.salesCount,
+          crossSaleCount: 0,
           commission: stats.commission,
           goalTarget: null,
         }))

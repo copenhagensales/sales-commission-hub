@@ -37,6 +37,7 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
 interface MappedSellerData {
   name: string;
   totalSales: number;
+  totalCrossSales: number;
   totalCommission: number;
   avatarUrl: string | null;
   employeeId: string;
@@ -129,6 +130,7 @@ export default function RelatelDashboard() {
   const mapCachedToSeller = (entry: LeaderboardEntry): MappedSellerData => ({
     name: entry.employeeName,
     totalSales: entry.salesCount,
+    totalCrossSales: entry.crossSaleCount || 0,
     totalCommission: entry.commission,
     avatarUrl: entry.avatarUrl,
     employeeId: entry.employeeId,
@@ -284,12 +286,13 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Bi-salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedPayrollSellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
+                      const { name, totalSales, totalCrossSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -309,6 +312,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -343,12 +349,13 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Bi-salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedWeeklySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
+                      const { name, totalSales, totalCrossSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -368,6 +375,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -402,12 +412,13 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Bi-salg</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedDailySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
+                      const { name, totalSales, totalCrossSales, totalCommission, avatarUrl } = seller;
                       
                       return (
                         <TableRow key={name} className="border-b border-border/30">
@@ -427,6 +438,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
+                          </TableCell>
+                          <TableCell className="text-right py-2 text-muted-foreground">
+                            {totalCrossSales}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
