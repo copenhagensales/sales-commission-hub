@@ -9086,6 +9086,7 @@ export type Database = {
           client_id: string
           client_name: string
           commission_dkk: number
+          counts_as_cross_sale: boolean
           counts_as_sale: boolean
           is_hidden: boolean
           product_client_campaign_id: string

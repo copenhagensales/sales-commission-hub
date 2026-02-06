@@ -43,6 +43,7 @@ interface AggregatedProductRpc {
   revenue_dkk: number | null;
   product_client_campaign_id: string | null;
   counts_as_sale: boolean;
+  counts_as_cross_sale: boolean;
   is_hidden: boolean;
   client_id: string | null;
   client_name: string | null;
@@ -398,6 +399,7 @@ export default function MgTest() {
           revenue_dkk,
           external_product_code,
           counts_as_sale,
+          counts_as_cross_sale,
           is_hidden,
           client_campaign_id,
           client_campaigns!inner(
@@ -548,6 +550,7 @@ export default function MgTest() {
                   revenue_dkk: item.revenue_dkk,
                   client_campaign_id: item.product_client_campaign_id,
                   counts_as_sale: item.counts_as_sale ?? true,
+                  counts_as_cross_sale: item.counts_as_cross_sale ?? false,
                   is_hidden: item.is_hidden ?? false,
                 }
               : null,
@@ -588,6 +591,7 @@ export default function MgTest() {
               revenue_dkk: p.revenue_dkk,
               client_campaign_id: p.client_campaign_id,
               counts_as_sale: p.counts_as_sale ?? true,
+              counts_as_cross_sale: p.counts_as_cross_sale ?? false,
               is_hidden: p.is_hidden ?? false,
             },
             campaignId: clientId,
