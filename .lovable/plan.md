@@ -1,68 +1,137 @@
 
-# Plan: Datovælger til alle Dashboards ✅ IMPLEMENTERET
+# Plan: Tilføj Bi-salg kolonne til Relatel Dashboard
 
-## Status: Færdig
-
-Implementeret dato: 6. februar 2026
-
----
-
-## Hvad blev implementeret
-
-### 1. DashboardPeriodSelector komponent
-Placering: `src/components/dashboard/DashboardPeriodSelector.tsx`
-
-**Features:**
-- Dropdown med presets: I dag, I går, Denne uge, Sidste 7 dage, Denne måned, Lønperiode
-- "Brugerdefineret..." åbner kalender for at vælge custom periode (2 måneder synlige)
-- Viser valgt periode i knappen
-- Returnerer `{ type, from, to, label }`
-- Hjælpefunktioner: `getDefaultPeriod()`, `mapPeriodTypeToCache()`, `canUseCachedKpis()`
-
-### 2. Dashboard-opdateringer
-
-| Dashboard | Status | Notes |
-|-----------|--------|-------|
-| CsTop20Dashboard | ✅ | Fuld integration med hybrid caching + custom period queries |
-| RelatelDashboard | ✅ | Period selector tilføjet i header |
-| TdcErhvervDashboard | ✅ | Period selector tilføjet i header |
-| EesyTmDashboard | ✅ | Period selector tilføjet i header |
-| UnitedDashboard | ✅ | Period selector tilføjet i header |
-| CphSalesDashboard | ⏭️ | Har allerede sin egen DashboardDateRangePicker |
-| FieldmarketingDashboardFull | ⏭️ | Allerede implementeret |
-
-### 3. Data-strategi (hybrid tilgang)
-- **Standard-perioder** (today, this_week, this_month, payroll_period): Bruger cached KPIs fra `kpi_leaderboard_cache`
-- **Custom-perioder** (yesterday, last_7_days, custom dates): Direkte database-forespørgsler
+## Oversigt
+Tilføj en "Bi-salg" kolonne til alle tre leaderboard-tabeller i Relatel dashboardet. Bi-salg tælles fra produkter der har `counts_as_cross_sale = true` i MG Test.
 
 ---
 
-## Teknisk detaljer
+## Nuværende situation
 
-### PeriodSelection interface
-```typescript
-type PeriodType = "today" | "yesterday" | "this_week" | "last_7_days" | "this_month" | "payroll_period" | "custom";
+- Produkter kan markeres som "Tæl som bisalg" i MG Test (kolonne: `counts_as_cross_sale`)
+- Der findes aktuelt 129 bi-salg i lønperioden for Relatel
+- Leaderboard-cachen indeholder kun `salesCount` og `commission` - ikke cross-sales
 
-interface PeriodSelection {
-  type: PeriodType;
-  from: Date;
-  to: Date;
-  label: string;
+---
+
+## Ændringer
+
+### 1. Udvid LeaderboardEntry interface
+
+Tilføj `crossSaleCount` til leaderboard data-strukturen:
+
+```text
+LeaderboardEntry {
+  employeeId: string
+  employeeName: string
+  salesCount: number
+  commission: number
+  crossSaleCount: number  <-- NY
+  ...
 }
 ```
 
-### Brug
-```tsx
-const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
+### 2. Opdater calculate-leaderboard-incremental
 
-<DashboardHeader 
-  title="Dashboard Title" 
-  rightContent={
-    <DashboardPeriodSelector
-      selectedPeriod={selectedPeriod}
-      onPeriodChange={setSelectedPeriod}
-      disabled={tvMode} // Hide in TV mode
-    />
-  }
-/>
+Ændre edge function til at tælle cross-sales:
+
+- Hent `counts_as_cross_sale` flag sammen med `counts_as_sale`
+- Opret `crossSaleProductIds` set (produkter hvor `counts_as_cross_sale = true`)
+- Tæl cross-sales separat fra normale salg
+- Gem `crossSaleCount` i leaderboard_data
+
+### 3. Opdater useCachedLeaderboard hook
+
+Udvid `LeaderboardEntry` interface i `src/hooks/useCachedLeaderboard.ts`:
+
+```text
+export interface LeaderboardEntry {
+  ...
+  crossSaleCount: number;  <-- NY
+}
 ```
+
+### 4. Opdater RelatelDashboard UI
+
+Tilføj "Bi-salg" kolonne til alle tre tabeller:
+
+```text
+┌────┬─────────────┬──────┬─────────┬───────────┐
+│ #  │ Navn        │ Salg │ Bi-salg │ Provision │
+├────┼─────────────┼──────┼─────────┼───────────┤
+│ 1  │ Jonas J.    │ 72   │ 12      │ 84.375 kr │
+│ 2  │ Thorbjørn W.│ 63   │ 8       │ 70.186 kr │
+└────┴─────────────┴──────┴─────────┴───────────┘
+```
+
+---
+
+## Berørte filer
+
+| Fil | Handling |
+|-----|----------|
+| `supabase/functions/calculate-leaderboard-incremental/index.ts` | Tilføj cross-sale tracking |
+| `src/hooks/useCachedLeaderboard.ts` | Udvid interface |
+| `src/pages/RelatelDashboard.tsx` | Tilføj Bi-salg kolonne |
+
+---
+
+## Teknisk implementering
+
+### Edge function ændringer
+
+```text
+// Hent både counts_as_sale og counts_as_cross_sale
+const { data: products } = await supabase
+  .from("products")
+  .select("id, counts_as_sale, counts_as_cross_sale, commission_dkk")
+  .in("id", productIds);
+
+// Opret sets
+countingProductIds = new Set(products.filter(p => p.counts_as_sale !== false).map(p => p.id));
+crossSaleProductIds = new Set(products.filter(p => p.counts_as_cross_sale === true).map(p => p.id));
+
+// I calculateLeaderboard function:
+// Tæl cross-sales for hvert sale_item
+for (const item of items) {
+  if (item.product_id && crossSaleProductIds.has(item.product_id)) {
+    crossSales += item.quantity || 1;
+  }
+}
+```
+
+### Dashboard kolonne
+
+```text
+<TableHead className="text-right">Bi-salg</TableHead>
+...
+<TableCell className="text-right py-2 text-muted-foreground">
+  {seller.crossSaleCount || 0}
+</TableCell>
+```
+
+---
+
+## Dataflow
+
+```text
+MG Test: Produkt markeres som "Tæl som bisalg"
+              ↓
+products.counts_as_cross_sale = true
+              ↓
+calculate-leaderboard-incremental kører (hvert 2. min)
+              ↓
+Tæller cross-sales per sælger → gemmes i leaderboard_data
+              ↓
+RelatelDashboard henter cached data
+              ↓
+Viser Bi-salg kolonne med antal
+```
+
+---
+
+## Bemærkninger
+
+- Ændringen kræver at edge function deployes og køres mindst én gang
+- Indtil cachen opdateres, vil kolonnen vise 0
+- Bi-salg tælles uafhængigt af normale salg (et produkt kan være både)
