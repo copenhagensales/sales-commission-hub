@@ -1,137 +1,151 @@
 
-# Plan: Tilføj Bi-salg kolonne til Relatel Dashboard
+# Plan: Fix "Tæl som bisalg" persistence bug
 
-## Oversigt
-Tilføj en "Bi-salg" kolonne til alle tre leaderboard-tabeller i Relatel dashboardet. Bi-salg tælles fra produkter der har `counts_as_cross_sale = true` i MG Test.
-
----
-
-## Nuværende situation
-
-- Produkter kan markeres som "Tæl som bisalg" i MG Test (kolonne: `counts_as_cross_sale`)
-- Der findes aktuelt 129 bi-salg i lønperioden for Relatel
-- Leaderboard-cachen indeholder kun `salesCount` og `commission` - ikke cross-sales
+## Problemresumé
+Indstillingen "Tæl som bisalg" gemmes korrekt i databasen, men vises ikke korrekt i MG Test fordi `counts_as_cross_sale` kolonnen mangler i datahentningen.
 
 ---
 
-## Ændringer
+## Root Cause
+Der er 4 steder hvor `counts_as_cross_sale` mangler:
 
-### 1. Udvid LeaderboardEntry interface
+| Sted | Problem |
+|------|---------|
+| RPC-funktion `get_aggregated_product_types` | Kolonnen returneres ikke |
+| TypeScript interface `AggregatedProductRpc` | Felt mangler |
+| Mapping af RPC → `AggregatedProduct` | Værdi overføres ikke |
+| Query for manuelle produkter | Kolonne hentes ikke |
 
-Tilføj `crossSaleCount` til leaderboard data-strukturen:
+---
 
-```text
-LeaderboardEntry {
-  employeeId: string
-  employeeName: string
-  salesCount: number
-  commission: number
-  crossSaleCount: number  <-- NY
-  ...
+## Løsning
+
+### 1. Opdater RPC-funktionen i databasen
+
+Tilføj `counts_as_cross_sale` til return type og SELECT:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_aggregated_product_types()
+RETURNS TABLE(
+  -- eksisterende kolonner...
+  counts_as_sale boolean,
+  counts_as_cross_sale boolean,  -- NY
+  is_hidden boolean,
+  -- ...
+)
+AS $$
+  SELECT DISTINCT ON (...)
+    -- eksisterende...
+    COALESCE(p.counts_as_sale, true) as counts_as_sale,
+    COALESCE(p.counts_as_cross_sale, false) as counts_as_cross_sale,  -- NY
+    -- ...
+$$;
+```
+
+### 2. Opdater TypeScript interface
+
+I `src/pages/MgTest.tsx` linje 37-50:
+
+```typescript
+interface AggregatedProductRpc {
+  // ...eksisterende felter
+  counts_as_sale: boolean;
+  counts_as_cross_sale: boolean;  // TILFØJ
+  is_hidden: boolean;
+  // ...
 }
 ```
 
-### 2. Opdater calculate-leaderboard-incremental
+### 3. Opdater RPC → AggregatedProduct mapping
 
-Ændre edge function til at tælle cross-sales:
+I `src/pages/MgTest.tsx` linje 543-552:
 
-- Hent `counts_as_cross_sale` flag sammen med `counts_as_sale`
-- Opret `crossSaleProductIds` set (produkter hvor `counts_as_cross_sale = true`)
-- Tæl cross-sales separat fra normale salg
-- Gem `crossSaleCount` i leaderboard_data
-
-### 3. Opdater useCachedLeaderboard hook
-
-Udvid `LeaderboardEntry` interface i `src/hooks/useCachedLeaderboard.ts`:
-
-```text
-export interface LeaderboardEntry {
-  ...
-  crossSaleCount: number;  <-- NY
-}
+```typescript
+product: item.product_id
+  ? {
+      id: item.product_id,
+      name: item.product_name ?? "",
+      commission_dkk: item.commission_dkk,
+      revenue_dkk: item.revenue_dkk,
+      client_campaign_id: item.product_client_campaign_id,
+      counts_as_sale: item.counts_as_sale ?? true,
+      counts_as_cross_sale: item.counts_as_cross_sale ?? false,  // TILFØJ
+      is_hidden: item.is_hidden ?? false,
+    }
+  : null,
 ```
 
-### 4. Opdater RelatelDashboard UI
+### 4. Opdater manual products query
 
-Tilføj "Bi-salg" kolonne til alle tre tabeller:
+I `src/pages/MgTest.tsx` linje 392-413:
 
-```text
-┌────┬─────────────┬──────┬─────────┬───────────┐
-│ #  │ Navn        │ Salg │ Bi-salg │ Provision │
-├────┼─────────────┼──────┼─────────┼───────────┤
-│ 1  │ Jonas J.    │ 72   │ 12      │ 84.375 kr │
-│ 2  │ Thorbjørn W.│ 63   │ 8       │ 70.186 kr │
-└────┴─────────────┴──────┴─────────┴───────────┘
+```typescript
+const { data, error } = await supabase
+  .from("products")
+  .select(`
+    id,
+    name,
+    commission_dkk,
+    revenue_dkk,
+    external_product_code,
+    counts_as_sale,
+    counts_as_cross_sale,  // TILFØJ
+    is_hidden,
+    client_campaign_id,
+    client_campaigns!inner(...)
+  `)
+```
+
+### 5. Opdater manual products mapping
+
+I `src/pages/MgTest.tsx` linje 584-592:
+
+```typescript
+product: {
+  id: p.id,
+  name: p.name,
+  commission_dkk: p.commission_dkk,
+  revenue_dkk: p.revenue_dkk,
+  client_campaign_id: p.client_campaign_id,
+  counts_as_sale: p.counts_as_sale ?? true,
+  counts_as_cross_sale: p.counts_as_cross_sale ?? false,  // TILFØJ
+  is_hidden: p.is_hidden ?? false,
+},
 ```
 
 ---
 
 ## Berørte filer
 
-| Fil | Handling |
-|-----|----------|
-| `supabase/functions/calculate-leaderboard-incremental/index.ts` | Tilføj cross-sale tracking |
-| `src/hooks/useCachedLeaderboard.ts` | Udvid interface |
-| `src/pages/RelatelDashboard.tsx` | Tilføj Bi-salg kolonne |
+| Fil | Ændring |
+|-----|---------|
+| Database migration | Opdater RPC-funktion |
+| `src/pages/MgTest.tsx` | 4 ændringer (interface + query + 2x mapping) |
 
 ---
 
-## Teknisk implementering
-
-### Edge function ændringer
+## Dataflow efter fix
 
 ```text
-// Hent både counts_as_sale og counts_as_cross_sale
-const { data: products } = await supabase
-  .from("products")
-  .select("id, counts_as_sale, counts_as_cross_sale, commission_dkk")
-  .in("id", productIds);
-
-// Opret sets
-countingProductIds = new Set(products.filter(p => p.counts_as_sale !== false).map(p => p.id));
-crossSaleProductIds = new Set(products.filter(p => p.counts_as_cross_sale === true).map(p => p.id));
-
-// I calculateLeaderboard function:
-// Tæl cross-sales for hvert sale_item
-for (const item of items) {
-  if (item.product_id && crossSaleProductIds.has(item.product_id)) {
-    crossSales += item.quantity || 1;
-  }
-}
-```
-
-### Dashboard kolonne
-
-```text
-<TableHead className="text-right">Bi-salg</TableHead>
-...
-<TableCell className="text-right py-2 text-muted-foreground">
-  {seller.crossSaleCount || 0}
-</TableCell>
+Database: products.counts_as_cross_sale = true
+           ↓
+RPC: get_aggregated_product_types() returnerer counts_as_cross_sale
+           ↓
+MgTest.tsx: AggregatedProductRpc modtager værdien
+           ↓
+Mapping: AggregatedProduct.product.counts_as_cross_sale sættes korrekt
+           ↓
+Dialog: countsAsCrossSale prop har den rigtige værdi
+           ↓
+UI: "Tæl som bisalg" vises korrekt
 ```
 
 ---
 
-## Dataflow
+## Verificering
 
-```text
-MG Test: Produkt markeres som "Tæl som bisalg"
-              ↓
-products.counts_as_cross_sale = true
-              ↓
-calculate-leaderboard-incremental kører (hvert 2. min)
-              ↓
-Tæller cross-sales per sælger → gemmes i leaderboard_data
-              ↓
-RelatelDashboard henter cached data
-              ↓
-Viser Bi-salg kolonne med antal
-```
-
----
-
-## Bemærkninger
-
-- Ændringen kræver at edge function deployes og køres mindst én gang
-- Indtil cachen opdateres, vil kolonnen vise 0
-- Bi-salg tælles uafhængigt af normale salg (et produkt kan være både)
+Efter implementation:
+1. Åbn et produkt (fx "Switch Contact Center #4")
+2. Verificer at "Tæl som bisalg" er markeret
+3. Luk dialogen og åbn igen
+4. Verificer at indstillingen stadig er markeret
