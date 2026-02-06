@@ -286,7 +286,6 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -312,9 +311,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
-                            {totalCrossSales}
+                            {totalCrossSales > 0 && (
+                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -349,7 +348,6 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -375,9 +373,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
-                            {totalCrossSales}
+                            {totalCrossSales > 0 && (
+                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
@@ -412,7 +410,6 @@ export default function RelatelDashboard() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Navn</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Switch</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -438,9 +435,9 @@ export default function RelatelDashboard() {
                           </TableCell>
                           <TableCell className="text-right py-2 text-primary font-semibold">
                             {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-muted-foreground">
-                            {totalCrossSales}
+                            {totalCrossSales > 0 && (
+                              <span className="text-muted-foreground/60 font-normal text-xs ml-1">(+{totalCrossSales})</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right py-2">
                             <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
