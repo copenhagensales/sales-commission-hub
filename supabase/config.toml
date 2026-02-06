@@ -215,3 +215,6 @@ verify_jwt = false
 
 [functions.initiate-password-reset]
 verify_jwt = false
+
+[functions.rematch-pricing-rules]
+verify_jwt = false
