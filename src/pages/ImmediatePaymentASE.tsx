@@ -107,6 +107,45 @@ export default function ImmediatePaymentASE() {
     },
   });
 
+  // Mutation for cancelling immediate payment
+  const cancelMutation = useMutation({
+    mutationFn: async (sale: ImmediatePaymentSale) => {
+      // 1. Get pricing rule with standard values
+      const { data: rule, error: ruleError } = await supabase
+        .from("product_pricing_rules")
+        .select("commission_dkk, revenue_dkk")
+        .eq("id", sale.matched_pricing_rule_id)
+        .single();
+      
+      if (ruleError || !rule) {
+        throw new Error("Kunne ikke hente prisregel");
+      }
+      
+      // 2. Update sale_item with standard values
+      const { error: updateError } = await supabase
+        .from("sale_items")
+        .update({
+          is_immediate_payment: false,
+          mapped_commission: rule.commission_dkk,
+          mapped_revenue: rule.revenue_dkk,
+        })
+        .eq("id", sale.sale_item_id);
+      
+      if (updateError) {
+        throw new Error("Kunne ikke annullere straksbetaling");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["immediate-payment-ase-sales"] });
+      toast({ title: "Straksbetaling annulleret", description: "Salget er nu tilbageført til standard provision." });
+      setConvertingSaleId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      setConvertingSaleId(null);
+    },
+  });
+
   const { data: agentEmails = [] } = useQuery({
     queryKey: ["employee-agent-emails", user?.email],
     queryFn: async () => {
@@ -289,7 +328,40 @@ export default function ImmediatePaymentASE() {
                       </TableCell>
                       <TableCell>
                         {sale.is_immediate_payment ? (
-                          <span className="text-muted-foreground text-sm">—</span>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                disabled={cancelMutation.isPending && convertingSaleId === sale.sale_item_id}
+                              >
+                                {cancelMutation.isPending && convertingSaleId === sale.sale_item_id 
+                                  ? "Behandler..." 
+                                  : "Annuller straksbetaling"}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Annuller straksbetaling?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Ved at annullere straksbetaling reduceres din provision for dette salg 
+                                  til standardsatsen.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Behold straksbetaling</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => {
+                                    setConvertingSaleId(sale.sale_item_id);
+                                    cancelMutation.mutate(sale);
+                                  }}
+                                >
+                                  Annuller straksbetaling
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         ) : (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -306,8 +378,7 @@ export default function ImmediatePaymentASE() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Er du sikker?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Ved at tilføje straksbetaling øges din provision for dette salg. 
-                                  Denne handling kan ikke fortrydes.
+                                  Ved at tilføje straksbetaling øges din provision for dette salg.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
