@@ -192,7 +192,8 @@ serve(async (req) => {
         )
       `)
       .is("matched_pricing_rule_id", null)
-      .not("product_id", "is", null);
+      .not("product_id", "is", null)
+      .eq("mapped_commission", 0);  // Only process items that haven't been updated yet
 
     if (source) {
       query = query.eq("sales.source", source);
@@ -245,6 +246,27 @@ serve(async (req) => {
 
     console.log(`[rematch-pricing-rules] Loaded ${pricingRules?.length || 0} active pricing rules for ${pricingRulesMap.size} products`);
 
+    // Fetch all products with base prices for fallback
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("id, name, commission_dkk, revenue_dkk");
+
+    if (productsError) {
+      console.error("[rematch-pricing-rules] Error fetching products:", productsError);
+    }
+
+    const productsMap = new Map<string, { commission_dkk: number; revenue_dkk: number }>();
+    if (products) {
+      for (const product of products) {
+        productsMap.set(product.id, {
+          commission_dkk: product.commission_dkk || 0,
+          revenue_dkk: product.revenue_dkk || 0,
+        });
+      }
+    }
+
+    console.log(`[rematch-pricing-rules] Loaded ${productsMap.size} products with base prices for fallback`);
+
     // Get unique campaign IDs and fetch their mapping IDs
     const campaignIds = [...new Set(saleItems.map((si) => si.sales?.dialer_campaign_id).filter(Boolean))];
     const campaignMappingsMap = new Map<string, string>();
@@ -267,6 +289,7 @@ serve(async (req) => {
     let matchedCount = 0;
     let noMatchCount = 0;
     let productCorrectedCount = 0;
+    let baseProductFallbackCount = 0;
     const matchDetails: { saleItemId: string; productId: string; originalProductId: string; ruleName: string; commission: number; revenue: number }[] = [];
 
     for (const item of saleItems) {
@@ -315,23 +338,46 @@ serve(async (req) => {
         });
 
         matchedCount++;
-      } else if (productWasCorrected) {
-        // Product was corrected but no pricing rule matched - still update product_id
-        updates.push({
-          id: item.id,
-          product_id: correctProductId,
-          matched_pricing_rule_id: null,
-          mapped_commission: 0,
-          mapped_revenue: 0,
-          needs_mapping: false,
-        });
-        noMatchCount++;
       } else {
-        noMatchCount++;
+        // No pricing rule matched - fallback to product base price
+        const baseProduct = productsMap.get(correctProductId);
+        if (baseProduct && (baseProduct.commission_dkk > 0 || baseProduct.revenue_dkk > 0)) {
+          const qty = item.quantity || 1;
+          updates.push({
+            id: item.id,
+            product_id: correctProductId,
+            matched_pricing_rule_id: null,
+            mapped_commission: baseProduct.commission_dkk * qty,
+            mapped_revenue: baseProduct.revenue_dkk * qty,
+            needs_mapping: false,
+          });
+          baseProductFallbackCount++;
+          matchDetails.push({
+            saleItemId: item.id,
+            productId: correctProductId,
+            originalProductId: originalProductId || "null",
+            ruleName: "BASE_PRODUCT_PRICE",
+            commission: baseProduct.commission_dkk * qty,
+            revenue: baseProduct.revenue_dkk * qty,
+          });
+        } else if (productWasCorrected) {
+          // Product was corrected but no base price - still update product_id
+          updates.push({
+            id: item.id,
+            product_id: correctProductId,
+            matched_pricing_rule_id: null,
+            mapped_commission: 0,
+            mapped_revenue: 0,
+            needs_mapping: false,
+          });
+          noMatchCount++;
+        } else {
+          noMatchCount++;
+        }
       }
     }
 
-    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}`);
+    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, Base fallback: ${baseProductFallbackCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}`);
 
     // Log sample matches
     if (matchDetails.length > 0) {
@@ -389,6 +435,7 @@ serve(async (req) => {
         stats: {
           total: saleItems.length,
           matched: matchedCount,
+          baseProductFallback: baseProductFallbackCount,
           noMatch: noMatchCount,
           productsCorrected: productCorrectedCount,
           updated: dryRun ? 0 : updates.length,
