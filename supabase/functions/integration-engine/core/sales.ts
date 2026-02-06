@@ -264,17 +264,24 @@ function prepareSaleItems(
   // Extract rawPayload.data (Enreach/HeroBase format) for pricing rule matching
   let rawPayloadData = sale.rawPayload?.data as Record<string, unknown> | undefined;
   
-  // Data enrichment: Add default Dækningssum for lønsikring sales if missing
-  // This ensures sales with "Fagforening med lønsikring" match the higher commission rules
+  // Data enrichment: Add default Dækningssum for ASE sales if missing
+  // This ensures pricing rules with Dækningssum conditions can match
   if (rawPayloadData) {
-    const forening = rawPayloadData['Forening'] as string | undefined;
     const dækningssum = rawPayloadData['Dækningssum'] as string | undefined;
+    const forening = rawPayloadData['Forening'] as string | undefined;
+    const akasseSalg = rawPayloadData['A-kasse salg'] as string | undefined;
     
-    // ONLY enrich if Forening = "Fagforening med lønsikring" AND Dækningssum is missing
-    // Sales with "Ase Lønmodtager" should NOT be enriched - they match the general rule
-    if (!dækningssum && forening === 'Fagforening med lønsikring') {
-      rawPayloadData['Dækningssum'] = '6000';  // Assume over 6000 for lønsikring -> 800/1400 kr rules
-      log?.("INFO", `Enriched Dækningssum=6000 for lønsikring sale (Forening="${forening}")`);
+    // Only enrich if Dækningssum is missing and it's an A-kasse sale
+    if (!dækningssum && akasseSalg === 'Ja') {
+      // If "Fagforening med lønsikring" -> they have insurance -> assume over 6000
+      // Otherwise (Ase Lønmodtager or missing) -> no insurance -> set to 0 (under 6000)
+      if (forening === 'Fagforening med lønsikring') {
+        rawPayloadData['Dækningssum'] = '6000';  // Over 6000 -> 800/1400 kr rules
+        log?.("INFO", `Enriched Dækningssum=6000 for lønsikring sale`);
+      } else {
+        rawPayloadData['Dækningssum'] = '0';  // Under 6000 -> 600/1200 kr rules
+        log?.("INFO", `Enriched Dækningssum=0 for non-lønsikring sale`);
+      }
     }
   }
   
