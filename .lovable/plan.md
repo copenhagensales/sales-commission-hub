@@ -1,109 +1,92 @@
 
-# Plan: Ret prisregel-matching for korrekt provisionsberegning
+# Plan: Tilføj ATP + Barsel (381 kr) som teamomkostning per medarbejder
 
-## Problemanalyse
+## Baggrund
+Lønarten "ATP + Barsel" eksisterer allerede i `salary_types` tabellen med et beløb på 381 kr per FTE per måned. Denne omkostning skal nu medregnes automatisk som en teamudgift i "DB per Klient" rapporten, baseret på antallet af medarbejdere i hvert team (inklusiv sælgere, assisterende teamledere og teamleder).
 
-Alexander Godsk Callesens 50 salg fordeler sig således:
+## Nuværende team-struktur (fra database)
+| Team           | Sælgere | Assistenter | Leder | Total FTE |
+|----------------|---------|-------------|-------|-----------|
+| Eesy TM        | 16      | 1           | 1     | 18        |
+| Fieldmarketing | 34      | 1           | 1     | 36        |
+| Relatel        | 11      | 1           | 1     | 13        |
+| Stab           | 15      | 1           | 1     | 17        |
+| TDC Erhverv    | 19      | 2           | 1     | 22        |
+| United         | 17      | 1           | 1     | 19        |
 
-| Salgskombination | Antal | Nuværende provision | Korrekt provision | Difference |
-|------------------|------:|--------------------:|------------------:|----------:|
-| Lønsikring + Dækningssum 6000 + Straks | 25 | 25.000 kr (1.000/stk) | **35.000 kr** (1.400/stk) | +10.000 kr |
-| Ase Lønmodtager (INGEN lønsikring) + Straks | 9 | 9.000 kr | 9.000 kr | ✅ Korrekt |
-| Lønsikring + Dækningssum 6000 + Standard | 7+1 | 3.200 kr (400/stk) | **6.400 kr** (800/stk) | +3.200 kr |
-| Ase Lønmodtager (INGEN lønsikring) + Standard | 3+1 | 1.600 kr | 1.600 kr | ✅ Korrekt |
-| Ung under uddannelse + Ase Lønmodtager | 2 | 600 kr (300/stk) | **1.200 kr** (600/stk) | +600 kr |
-| Ukendt forening + Straks | 1 | 1.000 kr | 1.000 kr | 0 |
+## Løsning
 
-**Samlet difference: +13.800 kr**
-- Nuværende total: 41.400 kr
-- Korrekt total: **55.200 kr**
-- Med feriepenge (12,5%): **62.100 kr**
-
-## Årsag til fejlen
-
-1. **Alle prisregler har prioritet 0** - Den generelle "A-kasse uden straksbetaling" regel (400/1.000 kr) matcher før de specifikke lønsikring-regler
-2. **"Ung med FF" reglen matcher forkert** - Den kræver "Forening = Ase Lønmodtager" men burde matche alle Ung-salg med 600 kr
-
-## Vigtig observation
-
-Salg med **"Forening = Ase Lønmodtager"** (uden lønsikring) skal IKKE beriges med Dækningssum. Disse salg matcher korrekt den generelle 400/1.000 kr regel, da de ikke har lønsikring.
-
-Kun salg med **"Forening = Fagforening med lønsikring"** har lønsikring og skal matche de højere regler.
-
----
-
-## Teknisk løsning
-
-### Trin 1: Opdater prisregel-prioriteter
-
-```text
-┌────────────────────────────────────────────────────┬──────────┬────────────────────┐
-│ Regel                                              │ Prioritet│ Provision          │
-├────────────────────────────────────────────────────┼──────────┼────────────────────┤
-│ A-kasse over 6000 lønsikring (Dækningssum >= 6000) │    10    │ 800 / 1.400 straks │
-│ A-kasse under 6000 lønsikring (Dækningssum <= 5999)│    10    │ 600 / 1.200 straks │
-│ Ung Under Uddannelse med FF                        │    10    │ 600 kr             │
-│ Ung Under Uddannelse uden FF                       │     5    │ 300 kr             │
-│ A-kasse uden straksbetaling (generel fallback)     │     1    │ 400 / 1.000 straks │
-└────────────────────────────────────────────────────┴──────────┴────────────────────┘
-```
-
-### Trin 2: Ret "Ung med FF" reglen
-
-Den nuværende betingelse `Forening = Ase Lønmodtager` giver ikke mening for "med FF". 
-
-Enten:
-- Fjern Forening-betingelsen helt fra "Ung med FF" (så alle Ung-salg får 600 kr)
-- Eller ret til korrekt Forening hvis der er forskel
-
-### Trin 3: Berig data KUN for lønsikring-salg
-
-I `integration-engine` og `rematch-pricing-rules`:
+### 1. Hent ATP + Barsel beløb fra salary_types
+Tilføj en ny query i `ClientDBTab.tsx` der henter den aktive "ATP + Barsel" lønart:
 
 ```typescript
-// Berig IKKUN salg med lønsikring
-if (rawPayloadData) {
-  const forening = rawPayloadData['Forening'] as string | undefined;
-  const dækningssum = rawPayloadData['Dækningssum'] as string | undefined;
-  
-  // KUN berig hvis Forening = "Fagforening med lønsikring" og Dækningssum mangler
-  if (!dækningssum && forening === 'Fagforening med lønsikring') {
-    rawPayloadData['Dækningssum'] = '6000';  // Antag over 6000 for lønsikring
-    log("INFO", `Enriched Dækningssum=6000 for lønsikring sale`);
-  }
-  // INGEN ændring for "Ase Lønmodtager" - de skal matche generel regel
-}
+const { data: atpBarsselRate } = useQuery({
+  queryKey: ["atp-barsel-rate"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("salary_types")
+      .select("amount")
+      .ilike("name", "ATP + Barsel")
+      .eq("is_active", true)
+      .single();
+    return data?.amount || 381;
+  },
+});
 ```
 
-### Trin 4: Kør rematch
+### 2. Hent team-medlemstal (FTE per team)
+Tilføj en query til at tælle medarbejdere per team (sælgere + assistenter + leder):
 
-Trigger `rematch-pricing-rules` for at genberegne alle sale_items i lønperioden.
+```typescript
+const { data: teamMemberCounts } = useQuery({
+  queryKey: ["team-member-counts"],
+  queryFn: async () => {
+    // Hent sælgere fra team_members
+    // Hent assistenter fra team_assistant_leaders
+    // Tilføj 1 for teamleder hvor team_leader_id IS NOT NULL
+    // Return Map<teamId, totalCount>
+  },
+});
+```
 
----
+### 3. Beregn ATP + Barsel per team med proratering
+I den eksisterende `clientDBData` beregning, beregn udgiften per team:
 
-## Filer der skal ændres
+```
+atpBarsselCost = (teamMemberCount × 381 kr) × (periodeDage / 30)
+```
 
-1. **Database migration** - Opdater prioriteter på 5 prisregler
-2. **Database migration** - Ret "Ung med FF" reglen (fjern/ret Forening-betingelse)
-3. `supabase/functions/integration-engine/core/sales.ts` - Berigelse af Dækningssum KUN for lønsikring
-4. `supabase/functions/rematch-pricing-rules/index.ts` - Samme berigelseslogik
+Denne omkostning fordeles proportionelt på klienter baseret på omsætningsandel (samme logik som assistentløn).
 
----
+### 4. Tilføj kolonne i UI
+I tabellen tilføjes en ny kolonne "ATP/B" efter "Lederløn" kolonnen for at vise den fordelte ATP + Barsel omkostning per klient.
 
-## Forventet resultat
+### 5. Opdater totaler
+`totals.atpBarsel` tilføjes og fratrækkes i `finalDB` beregningen samt i "Samlet Team DB" rækken.
 
-For Alexander Godsk Callesen (15/1 - 14/2 2026):
+## Tekniske ændringer
 
-| Type | Antal | Efter rettelse |
-|------|------:|---------------:|
-| Lønsikring straks (1.400 kr) | 25 | 35.000 kr |
-| Lønsikring standard (800 kr) | 8 | 6.400 kr |
-| Ase Lønmodtager straks (1.000 kr) | 10 | 10.000 kr |
-| Ase Lønmodtager standard (400 kr) | 4 | 1.600 kr |
-| Ung med FF (600 kr) | 2 | 1.200 kr |
-| Ukendt (1.000 kr) | 1 | 1.000 kr |
-| **Total provision** | 50 | **55.200 kr** |
-| **+ Feriepenge (12,5%)** | | 6.900 kr |
-| **Total udbetaling** | | **62.100 kr** |
+**Filer der skal ændres:**
+- `src/components/salary/ClientDBTab.tsx`:
+  - Tilføj queries for ATP/Barsel-sats og team-medlemstal
+  - Udvid `ClientDBData` interface med `atpBarsselAllocation: number`
+  - Tilføj beregningslogik i `clientDBData` useMemo
+  - Tilføj ny tabel-kolonne i UI
+  - Opdater totals og netEarnings beregninger
 
-**Provisionsstigning: +13.800 kr (+33%)**
+**Beregningsflow:**
+1. For hvert team: `teamAtpCost = memberCount × 381 × prorationFactor`
+2. For hver klient i team: `atpBarsselAllocation = teamAtpCost × (clientRevenue / teamTotalRevenue)`
+3. `finalDB = dbBeforeLeader - leaderAllocation - leaderVacationPay - atpBarsselAllocation`
+
+## Validering
+Med beløbet 381 kr per FTE per måned:
+- Eesy TM (18 FTE): 6.858 kr/måned
+- Fieldmarketing (36 FTE): 13.716 kr/måned  
+- TDC Erhverv (22 FTE): 8.382 kr/måned
+- etc.
+
+Disse beløb vil prorateres automatisk for kortere perioder (daglig, ugentlig, etc.) ligesom eksisterende omkostninger.
+
+## Parallelle ændringer
+Der kræves ingen database-ændringer, da beløbet allerede findes i `salary_types` tabellen og team-medlemsdata allerede er tilgængelig via `team_members`, `team_assistant_leaders` og `teams` tabellerne.
