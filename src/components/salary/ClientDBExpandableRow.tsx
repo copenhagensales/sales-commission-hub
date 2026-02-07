@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronDown, ChevronRight, Calendar, TrendingUp, TrendingDown } from "lucide-react";
@@ -63,22 +62,25 @@ export function ClientDBExpandableRow({
   const dbProgressValue = Math.min(Math.max(client.dbPercent, 0), 50) * 2;
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+    <Fragment>
       <TableRow className={cn(
         "transition-colors",
         isExpanded && "bg-muted/30"
       )}>
         {/* Expand button */}
         <TableCell className="w-10 p-2">
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
         </TableCell>
 
         {/* Client name */}
@@ -174,7 +176,7 @@ export function ClientDBExpandableRow({
       </TableRow>
 
       {/* Expanded cost details */}
-      <CollapsibleContent asChild>
+      {isExpanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/30">
           <TableCell></TableCell>
           <TableCell colSpan={8} className="py-3">
@@ -225,7 +227,7 @@ export function ClientDBExpandableRow({
             </div>
           </TableCell>
         </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+    </Fragment>
   );
 }
