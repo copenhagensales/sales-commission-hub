@@ -81,6 +81,9 @@ interface ClientDBData {
   dbPercent: number;
   fteCount: number;
   revenuePerFTE: number;
+  // Calculated deduction amounts
+  sickPayAmount: number;
+  cancellationRevenueDeduction: number;
 }
 
 interface TeamSalaryInfo {
@@ -606,6 +609,10 @@ export function ClientDBTab() {
       const adjustedRevenue = salesData.revenue * cancellationFactor;
       const adjustedSellerCost = sellerCostWithSickPay * cancellationFactor;
 
+      // Calculate deduction amounts for display
+      const sickPayAmount = sellerSalaryCost * (sickPayPercent / 100);
+      const cancellationRevenueDeduction = salesData.revenue * (cancellationPercent / 100);
+
       const basisDB = adjustedRevenue - adjustedSellerCost - locationCosts;
       const fteCount = teamId ? (teamMemberCounts?.[teamId] || 0) : 0;
 
@@ -634,6 +641,8 @@ export function ClientDBTab() {
         dbPercent: 0,
         fteCount,
         revenuePerFTE: fteCount > 0 ? adjustedRevenue / fteCount : 0,
+        sickPayAmount,
+        cancellationRevenueDeduction,
       };
 
       clientDataList.push(clientData);
