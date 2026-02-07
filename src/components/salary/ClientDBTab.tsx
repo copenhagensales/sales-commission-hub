@@ -9,9 +9,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Clock, Briefcase } from "lucide-react";
+import { TrendingUp, TrendingDown, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Clock, Briefcase, Users } from "lucide-react";
 import { VACATION_PAY_RATES } from "@/lib/calculations";
-import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval } from "date-fns";
+import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval, subMonths, subWeeks, subDays } from "date-fns";
 
 /**
  * Convert JavaScript getDay (0=Sunday) to booked_days format (0=Monday, 6=Sunday)
@@ -25,11 +25,12 @@ import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
+import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
-type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "atpBarsselAllocation" | "cancellationPercent" | "finalDB";
+type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "atpBarsselAllocation" | "cancellationPercent" | "finalDB" | "dbPercent" | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
@@ -76,6 +77,9 @@ interface ClientDBData {
   leaderVacationPay: number; // 1% of leader allocation
   atpBarsselAllocation: number; // ATP + Barsel per employee allocation
   finalDB: number;
+  dbPercent: number; // DB% = (finalDB / adjustedRevenue) * 100
+  fteCount: number; // Number of FTEs for this client
+  revenuePerFTE: number; // Revenue per FTE
 }
 
 interface TeamSalaryInfo {
@@ -414,6 +418,13 @@ export function ClientDBTab() {
     allAssistantIds
   );
 
+  // Fetch previous period comparison data for trend analysis
+  const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
+    periodStart,
+    periodEnd,
+    periodMode
+  );
+
   // Determine if we should use KPI cache
   const kpiPeriodType = mapPeriodModeToKpiPeriod(periodMode, periodStart);
   const useKpiCache = !!kpiPeriodType;
@@ -618,6 +629,9 @@ export function ClientDBTab() {
       // Basis DB (before team allocations)
       const basisDB = adjustedRevenue - adjustedSellerCost - locationCosts;
 
+      // Get FTE count for this client's team
+      const fteCount = teamId ? (teamMemberCounts?.[teamId] || 0) : 0;
+
       const clientData: ClientDBData = {
         clientId: client.id,
         clientName: client.name,
@@ -639,6 +653,9 @@ export function ClientDBTab() {
         leaderVacationPay: 0, // Calculated later
         atpBarsselAllocation: 0, // Calculated later
         finalDB: basisDB, // Updated later
+        dbPercent: 0, // Calculated after finalDB
+        fteCount,
+        revenuePerFTE: fteCount > 0 ? adjustedRevenue / fteCount : 0,
       };
 
       clientDataList.push(clientData);
@@ -704,11 +721,15 @@ export function ClientDBTab() {
       }
     }
 
-    // Clients without team: finalDB = basisDB
+    // Calculate DB% for all clients (after finalDB is set)
     for (const client of clientDataList) {
       if (!client.teamId) {
         client.finalDB = client.basisDB;
       }
+      // Calculate DB% = (finalDB / adjustedRevenue) * 100
+      client.dbPercent = client.adjustedRevenue > 0 
+        ? (client.finalDB / client.adjustedRevenue) * 100 
+        : 0;
     }
 
     return clientDataList;
@@ -762,6 +783,14 @@ export function ClientDBTab() {
           aVal = a.cancellationPercent;
           bVal = b.cancellationPercent;
           break;
+        case "dbPercent":
+          aVal = a.dbPercent;
+          bVal = b.dbPercent;
+          break;
+        case "revenuePerFTE":
+          aVal = a.revenuePerFTE;
+          bVal = b.revenuePerFTE;
+          break;
         case "finalDB":
         default:
           aVal = a.finalDB;
@@ -783,6 +812,17 @@ export function ClientDBTab() {
 
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
+  // Helper to calculate and format trend percentage
+  const getTrendInfo = (current: number, previous: number): { change: number; isPositive: boolean; label: string } | null => {
+    if (!previous || previous === 0) return null;
+    const change = ((current - previous) / previous) * 100;
+    return {
+      change,
+      isPositive: change >= 0,
+      label: `${change >= 0 ? '+' : ''}${change.toFixed(0)}%`,
+    };
+  };
+
   // Calculate totals and final earnings
   const stabExpenseAmount = stabExpenses || 0;
   
@@ -797,15 +837,22 @@ export function ClientDBTab() {
         leaderAllocation: acc.leaderAllocation + c.leaderAllocation + c.leaderVacationPay,
         atpBarsselAllocation: acc.atpBarsselAllocation + c.atpBarsselAllocation,
         finalDB: acc.finalDB + c.finalDB,
+        fteCount: acc.fteCount + c.fteCount,
       }),
-      { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, atpBarsselAllocation: 0, finalDB: 0 }
+      { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, atpBarsselAllocation: 0, finalDB: 0, fteCount: 0 }
     );
     
     // Total overhead = stab expenses + staff salaries (hours-based)
     const totalOverhead = stabExpenseAmount + totalStaffSalaryCost;
     
+    // Calculate total DB% and Revenue per FTE
+    const dbPercent = base.revenue > 0 ? (base.finalDB / base.revenue) * 100 : 0;
+    const revenuePerFTE = base.fteCount > 0 ? base.revenue / base.fteCount : 0;
+    
     return {
       ...base,
+      dbPercent,
+      revenuePerFTE,
       stabExpenses: stabExpenseAmount,
       staffSalaries: totalStaffSalaryCost,
       totalOverhead,
@@ -965,19 +1012,48 @@ export function ClientDBTab() {
                       <SortIcon column="finalDB" />
                     </div>
                   </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("dbPercent")}
+                  >
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
+                          DB%
+                          <SortIcon column="dbPercent" />
+                        </TooltipTrigger>
+                        <TooltipContent>Dækningsbidrag i procent af omsætning</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("revenuePerFTE")}
+                  >
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
+                          <Users className="h-3 w-3 mr-1" />
+                          Oms/FTE
+                          <SortIcon column="revenuePerFTE" />
+                        </TooltipTrigger>
+                        <TooltipContent>Omsætning per medarbejder (FTE)</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : sortedClientDBData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       Ingen data for denne periode
                     </TableCell>
                   </TableRow>
@@ -990,7 +1066,36 @@ export function ClientDBTab() {
                           {client.teamName || "Ikke tildelt"}
                         </TableCell>
                         <TableCell className="text-right">{client.sales}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(client.adjustedRevenue)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {formatCurrency(client.adjustedRevenue)}
+                            {(() => {
+                              const prevData = previousPeriodData?.[client.clientId];
+                              const trend = prevData ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue) : null;
+                              if (!trend) return null;
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={cn(
+                                        "text-xs flex items-center",
+                                        trend.isPositive ? "text-primary" : "text-destructive"
+                                      )}>
+                                        {trend.isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{trend.label} vs. {previousPeriodLabel}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatCurrency(prevData?.previousRevenue || 0)} → {formatCurrency(client.adjustedRevenue)}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })()}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right text-destructive">
                           -{formatCurrency(client.adjustedSellerCost)}
                         </TableCell>
@@ -1045,6 +1150,17 @@ export function ClientDBTab() {
                         >
                           {formatCurrency(client.finalDB)}
                         </TableCell>
+                        <TableCell 
+                          className={cn(
+                            "text-right font-medium",
+                            client.dbPercent >= 20 ? "text-primary" : client.dbPercent >= 0 ? "text-muted-foreground" : "text-destructive"
+                          )}
+                        >
+                          {formatPercent(client.dbPercent)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {client.fteCount > 0 ? formatCurrency(client.revenuePerFTE) : "-"}
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -1088,6 +1204,17 @@ export function ClientDBTab() {
                       >
                         {formatCurrency(totals.finalDB)}
                       </TableCell>
+                      <TableCell 
+                        className={cn(
+                          "text-right font-medium",
+                          totals.dbPercent >= 20 ? "text-primary" : totals.dbPercent >= 0 ? "text-muted-foreground" : "text-destructive"
+                        )}
+                      >
+                        {formatPercent(totals.dbPercent)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {totals.fteCount > 0 ? formatCurrency(totals.revenuePerFTE) : "-"}
+                      </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                     
@@ -1106,6 +1233,8 @@ export function ClientDBTab() {
                       <TableCell className="text-right text-destructive font-medium">
                         -{formatCurrency(totals.stabExpenses)}
                       </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                     
@@ -1136,6 +1265,8 @@ export function ClientDBTab() {
                       <TableCell className="text-right text-destructive font-medium">
                         -{formatCurrency(totals.staffSalaries)}
                       </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                     
@@ -1193,6 +1324,8 @@ export function ClientDBTab() {
                           -{formatCurrency(staff!.totalSalary)}
                         </TableCell>
                         <TableCell></TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
                       </TableRow>
                     ))}
                     
@@ -1216,6 +1349,8 @@ export function ClientDBTab() {
                       >
                         {formatCurrency(totals.netEarnings)}
                       </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   </>
