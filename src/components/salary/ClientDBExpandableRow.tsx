@@ -69,7 +69,7 @@ export function ClientDBExpandableRow({
         isExpanded && "bg-muted/30"
       )}>
         {/* Expand button */}
-        <TableCell className="w-8 p-2">
+        <TableCell className="w-10 p-2">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="icon" className="h-6 w-6">
               {isExpanded ? (
@@ -82,18 +82,18 @@ export function ClientDBExpandableRow({
         </TableCell>
 
         {/* Client name */}
-        <TableCell className="font-medium">{client.clientName}</TableCell>
+        <TableCell className="font-medium min-w-[140px]">{client.clientName}</TableCell>
 
         {/* Team */}
-        <TableCell className="text-muted-foreground text-sm">
+        <TableCell className="text-muted-foreground text-sm min-w-[100px]">
           {client.teamName || "—"}
         </TableCell>
 
         {/* Sales */}
-        <TableCell className="text-right tabular-nums">{client.sales}</TableCell>
+        <TableCell className="text-right tabular-nums w-[70px]">{client.sales}</TableCell>
 
         {/* Revenue with trend */}
-        <TableCell className="text-right">
+        <TableCell className="text-right w-[120px]">
           <div className="flex items-center justify-end gap-1">
             <span className="tabular-nums">{formatCurrency(client.adjustedRevenue)}</span>
             {trend && (
@@ -124,21 +124,21 @@ export function ClientDBExpandableRow({
         </TableCell>
 
         {/* Total costs (grouped) */}
-        <TableCell className="text-right text-destructive tabular-nums">
+        <TableCell className="text-right text-destructive tabular-nums w-[120px]">
           -{formatCurrency(totalCosts)}
         </TableCell>
 
         {/* Final DB */}
         <TableCell className={cn(
-          "text-right font-semibold tabular-nums",
+          "text-right font-semibold tabular-nums w-[110px]",
           client.finalDB >= 0 ? "text-primary" : "text-destructive"
         )}>
           {formatCurrency(client.finalDB)}
         </TableCell>
 
         {/* DB% with mini progress */}
-        <TableCell>
-          <div className="flex items-center gap-2 justify-end min-w-[100px]">
+        <TableCell className="w-[140px]">
+          <div className="flex items-center gap-2 justify-end">
             <Progress 
               value={dbProgressValue} 
               className={cn(
@@ -160,7 +160,7 @@ export function ClientDBExpandableRow({
         </TableCell>
 
         {/* Actions */}
-        <TableCell>
+        <TableCell className="w-12">
           <Button
             variant="ghost"
             size="icon"
