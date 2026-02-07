@@ -1,92 +1,58 @@
 
-# Plan: Tilføj ATP + Barsel (381 kr) som teamomkostning per medarbejder
+# Plan: Proratér ATP + Barsel baseret på arbejdsdage
 
 ## Baggrund
-Lønarten "ATP + Barsel" eksisterer allerede i `salary_types` tabellen med et beløb på 381 kr per FTE per måned. Denne omkostning skal nu medregnes automatisk som en teamudgift i "DB per Klient" rapporten, baseret på antallet af medarbejdere i hvert team (inklusiv sælgere, assisterende teamledere og teamleder).
-
-## Nuværende team-struktur (fra database)
-| Team           | Sælgere | Assistenter | Leder | Total FTE |
-|----------------|---------|-------------|-------|-----------|
-| Eesy TM        | 16      | 1           | 1     | 18        |
-| Fieldmarketing | 34      | 1           | 1     | 36        |
-| Relatel        | 11      | 1           | 1     | 13        |
-| Stab           | 15      | 1           | 1     | 17        |
-| TDC Erhverv    | 19      | 2           | 1     | 22        |
-| United         | 17      | 1           | 1     | 19        |
+ATP + Barsel (381 kr/medarbejder/md) vises i øjeblikket som det fulde månedsbeløb uanset periode. For konsistens med andre udgifter skal det prorateres baseret på **arbejdsdage**, så 1 dag viser ~1/22 af det månedlige beløb.
 
 ## Løsning
 
-### 1. Hent ATP + Barsel beløb fra salary_types
-Tilføj en ny query i `ClientDBTab.tsx` der henter den aktive "ATP + Barsel" lønart:
+### Beregningslogik
+I stedet for:
+```
+teamAtpBarsselCost = teamMemberCount × 381 kr (fuldt beløb)
+```
 
+Ændres til:
+```
+workdaysInPeriod = antal arbejdsdage (man-fre) i den valgte periode
+workdaysInMonth ≈ 22 (standard arbejdsdage per måned)
+teamAtpBarsselCost = teamMemberCount × 381 kr × (workdaysInPeriod / workdaysInMonth)
+```
+
+### Eksempel
+- **1 dag**: 18 medarbejdere × 381 kr × (1/22) = **312 kr** (i stedet for 6.858 kr)
+- **1 uge (5 dage)**: 18 medarbejdere × 381 kr × (5/22) = **1.559 kr**
+- **1 måned (22 dage)**: 18 medarbejdere × 381 kr × (22/22) = **6.858 kr** (fuldt beløb)
+
+### Tekniske ændringer
+
+**Fil:** `src/components/salary/ClientDBTab.tsx`
+
+1. **Import `countWorkDaysInPeriod`** fra `@/lib/calculations/dates`
+
+2. **Beregn arbejdsdage i perioden:**
 ```typescript
-const { data: atpBarsselRate } = useQuery({
-  queryKey: ["atp-barsel-rate"],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("salary_types")
-      .select("amount")
-      .ilike("name", "ATP + Barsel")
-      .eq("is_active", true)
-      .single();
-    return data?.amount || 381;
-  },
-});
+const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+const WORKDAYS_PER_MONTH = 22;
+const atpProrationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
 ```
 
-### 2. Hent team-medlemstal (FTE per team)
-Tilføj en query til at tælle medarbejdere per team (sælgere + assistenter + leder):
-
+3. **Opdater ATP/Barsel beregningen:**
 ```typescript
-const { data: teamMemberCounts } = useQuery({
-  queryKey: ["team-member-counts"],
-  queryFn: async () => {
-    // Hent sælgere fra team_members
-    // Hent assistenter fra team_assistant_leaders
-    // Tilføj 1 for teamleder hvor team_leader_id IS NOT NULL
-    // Return Map<teamId, totalCount>
-  },
-});
+// Linje 668-670 ændres fra:
+const teamAtpBarsselCost = teamMemberCount * atpRate;
+
+// Til:
+const teamAtpBarsselCost = teamMemberCount * atpRate * atpProrationFactor;
 ```
 
-### 3. Beregn ATP + Barsel per team med proratering
-I den eksisterende `clientDBData` beregning, beregn udgiften per team:
-
-```
-atpBarsselCost = (teamMemberCount × 381 kr) × (periodeDage / 30)
+4. **Opdater kommentar:**
+```typescript
+// Calculate ATP + Barsel cost for this team (prorated by workdays in period)
 ```
 
-Denne omkostning fordeles proportionelt på klienter baseret på omsætningsandel (samme logik som assistentløn).
-
-### 4. Tilføj kolonne i UI
-I tabellen tilføjes en ny kolonne "ATP/B" efter "Lederløn" kolonnen for at vise den fordelte ATP + Barsel omkostning per klient.
-
-### 5. Opdater totaler
-`totals.atpBarsel` tilføjes og fratrækkes i `finalDB` beregningen samt i "Samlet Team DB" rækken.
-
-## Tekniske ændringer
-
-**Filer der skal ændres:**
-- `src/components/salary/ClientDBTab.tsx`:
-  - Tilføj queries for ATP/Barsel-sats og team-medlemstal
-  - Udvid `ClientDBData` interface med `atpBarsselAllocation: number`
-  - Tilføj beregningslogik i `clientDBData` useMemo
-  - Tilføj ny tabel-kolonne i UI
-  - Opdater totals og netEarnings beregninger
-
-**Beregningsflow:**
-1. For hvert team: `teamAtpCost = memberCount × 381 × prorationFactor`
-2. For hver klient i team: `atpBarsselAllocation = teamAtpCost × (clientRevenue / teamTotalRevenue)`
-3. `finalDB = dbBeforeLeader - leaderAllocation - leaderVacationPay - atpBarsselAllocation`
-
-## Validering
-Med beløbet 381 kr per FTE per måned:
-- Eesy TM (18 FTE): 6.858 kr/måned
-- Fieldmarketing (36 FTE): 13.716 kr/måned  
-- TDC Erhverv (22 FTE): 8.382 kr/måned
-- etc.
-
-Disse beløb vil prorateres automatisk for kortere perioder (daglig, ugentlig, etc.) ligesom eksisterende omkostninger.
-
-## Parallelle ændringer
-Der kræves ingen database-ændringer, da beløbet allerede findes i `salary_types` tabellen og team-medlemsdata allerede er tilgængelig via `team_members`, `team_assistant_leaders` og `teams` tabellerne.
+## Fordele
+- Konsistent visning på tværs af alle perioder
+- 1 dag viser den faktiske daglige omkostning
+- Fulde månedsperioder viser stadig det samlede beløb
+- Bruger arbejdsdage (man-fre) som giver mere præcis fordeling
