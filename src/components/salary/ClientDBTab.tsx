@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
-type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "cancellationPercent" | "finalDB";
+type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "atpBarsselAllocation" | "cancellationPercent" | "finalDB";
 type SortDirection = "asc" | "desc";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
@@ -73,6 +73,7 @@ interface ClientDBData {
   dbBeforeLeader: number;
   leaderAllocation: number;
   leaderVacationPay: number; // 1% of leader allocation
+  atpBarsselAllocation: number; // ATP + Barsel per employee allocation
   finalDB: number;
 }
 
@@ -313,6 +314,55 @@ export function ClientDBTab() {
   // Fetch team assistant leaders from junction table
   const { data: teamAssistants = [] } = useTeamAssistantLeaders();
 
+  // Fetch ATP + Barsel rate from salary_types
+  const { data: atpBarsselRate } = useQuery({
+    queryKey: ["atp-barsel-rate"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("amount")
+        .ilike("name", "%ATP%Barsel%")
+        .eq("is_active", true)
+        .single();
+      if (error) console.warn("ATP + Barsel rate not found, using default 381");
+      return Number(data?.amount) || 381;
+    },
+  });
+
+  // Fetch team member counts (sellers + assistants + leader)
+  const { data: teamMemberCounts } = useQuery({
+    queryKey: ["team-member-counts"],
+    queryFn: async () => {
+      // Fetch teams with leader info
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, team_leader_id");
+
+      // Fetch seller counts per team
+      const { data: members } = await supabase
+        .from("team_members")
+        .select("team_id");
+
+      // Fetch assistant counts per team
+      const { data: assistants } = await supabase
+        .from("team_assistant_leaders")
+        .select("team_id");
+
+      const counts: Record<string, number> = {};
+      for (const team of teams || []) {
+        // Count sellers
+        const sellerCount = (members || []).filter(m => m.team_id === team.id).length;
+        // Count assistants
+        const assistantCount = (assistants || []).filter(a => a.team_id === team.id).length;
+        // Add 1 for leader if exists
+        const hasLeader = !!team.team_leader_id;
+        
+        counts[team.id] = sellerCount + assistantCount + (hasLeader ? 1 : 0);
+      }
+      return counts;
+    },
+  });
+
   // Fetch team salary info (leaders only - assistants now from junction table)
   const { data: teamSalaries } = useQuery({
     queryKey: ["team-salaries-for-client-db"],
@@ -503,7 +553,7 @@ export function ClientDBTab() {
 
     // Calculate location costs per client from bookings (daily iteration, matching ClientDBDailyBreakdown)
     const locationCostsMap = new Map<string, number>();
-    const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd });
+    const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
 
     for (const booking of bookings || []) {
       if (!booking.client_id) continue;
@@ -513,7 +563,7 @@ export function ClientDBTab() {
       const bookedDays = (booking.booked_days as number[]) || [];
       const dailyRate = booking.daily_rate_override || (booking.location as any)?.daily_rate || 0;
       
-      for (const day of daysInPeriod) {
+      for (const day of periodDaysArray) {
         const dayIndex = getBookedDayIndex(day);
         
         // Only add cost if:
@@ -579,6 +629,7 @@ export function ClientDBTab() {
         dbBeforeLeader: 0, // Calculated later
         leaderAllocation: 0, // Calculated later
         leaderVacationPay: 0, // Calculated later
+        atpBarsselAllocation: 0, // Calculated later
         finalDB: basisDB, // Updated later
       };
 
@@ -592,6 +643,11 @@ export function ClientDBTab() {
     }
 
     // Calculate team allocations
+    // Calculate proration factor once for all teams
+    const daysInPeriodCount = periodDaysArray.length;
+    const prorationFactor = daysInPeriodCount / STANDARD_MONTH_DAYS;
+    const atpRate = atpBarsselRate || 381;
+
     for (const [teamId, teamClients] of Object.entries(clientsByTeam)) {
       const teamInfo = teamSalaries[teamId];
       if (!teamInfo) continue;
@@ -609,11 +665,16 @@ export function ClientDBTab() {
         totalAssistantSalary += assistantData?.totalSalary || 0;
       }
 
-      // Allocate assistant salary proportionally by revenue
+      // Calculate ATP + Barsel cost for this team
+      const teamMemberCount = teamMemberCounts?.[teamId] || 0;
+      const teamAtpBarsselCost = teamMemberCount * atpRate * prorationFactor;
+
+      // Allocate assistant salary and ATP/Barsel proportionally by revenue
       for (const client of teamClients) {
         const revenueShare = client.adjustedRevenue / teamTotalRevenue;
         client.assistantAllocation = totalAssistantSalary * revenueShare;
-        client.dbBeforeLeader = client.basisDB - client.assistantAllocation;
+        client.atpBarsselAllocation = teamAtpBarsselCost * revenueShare;
+        client.dbBeforeLeader = client.basisDB - client.assistantAllocation - client.atpBarsselAllocation;
       }
 
       // Calculate team-level leader salary with prorated minimum
@@ -621,8 +682,6 @@ export function ClientDBTab() {
       const calculatedLeaderSalary = teamTotalDBBeforeLeader * (teamInfo.percentageRate / 100);
       
       // Prorate minimum salary based on period length
-      const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd }).length;
-      const prorationFactor = daysInPeriod / STANDARD_MONTH_DAYS;
       const proratedMinimumSalary = teamInfo.minimumSalary * prorationFactor;
       const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
 
@@ -644,7 +703,7 @@ export function ClientDBTab() {
     }
 
     return clientDataList;
-  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, periodStart, periodEnd]);
+  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, periodStart, periodEnd, teamMemberCounts, atpBarsselRate]);
 
   // Sorted client data
   const sortedClientDBData = useMemo(() => {
@@ -686,6 +745,10 @@ export function ClientDBTab() {
           aVal = a.leaderAllocation + a.leaderVacationPay;
           bVal = b.leaderAllocation + b.leaderVacationPay;
           break;
+        case "atpBarsselAllocation":
+          aVal = a.atpBarsselAllocation;
+          bVal = b.atpBarsselAllocation;
+          break;
         case "cancellationPercent":
           aVal = a.cancellationPercent;
           bVal = b.cancellationPercent;
@@ -723,9 +786,10 @@ export function ClientDBTab() {
         locationCosts: acc.locationCosts + c.locationCosts,
         assistantAllocation: acc.assistantAllocation + c.assistantAllocation,
         leaderAllocation: acc.leaderAllocation + c.leaderAllocation + c.leaderVacationPay,
+        atpBarsselAllocation: acc.atpBarsselAllocation + c.atpBarsselAllocation,
         finalDB: acc.finalDB + c.finalDB,
       }),
-      { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, finalDB: 0 }
+      { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, atpBarsselAllocation: 0, finalDB: 0 }
     );
     
     // Total overhead = stab expenses + staff salaries (hours-based)
@@ -862,6 +926,20 @@ export function ClientDBTab() {
                   </TableHead>
                   <TableHead 
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("atpBarsselAllocation")}
+                  >
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
+                          ATP/B
+                          <SortIcon column="atpBarsselAllocation" />
+                        </TooltipTrigger>
+                        <TooltipContent>ATP + Barsel (381 kr/FTE/måned) prorateret</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("cancellationPercent")}
                   >
                     <div className="flex items-center gap-1 justify-end">
@@ -884,13 +962,13 @@ export function ClientDBTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : sortedClientDBData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       Ingen data for denne periode
                     </TableCell>
                   </TableRow>
@@ -916,6 +994,11 @@ export function ClientDBTab() {
                         <TableCell className="text-right text-destructive">
                           {client.leaderAllocation > 0 
                             ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right text-destructive">
+                          {client.atpBarsselAllocation > 0 
+                            ? `-${formatCurrency(client.atpBarsselAllocation)}` 
                             : "-"}
                         </TableCell>
                         <TableCell className="text-right">
@@ -984,6 +1067,9 @@ export function ClientDBTab() {
                       <TableCell className="text-right text-destructive">
                         -{formatCurrency(totals.leaderAllocation)}
                       </TableCell>
+                      <TableCell className="text-right text-destructive">
+                        -{formatCurrency(totals.atpBarsselAllocation)}
+                      </TableCell>
                       <TableCell></TableCell>
                       <TableCell 
                         className={cn(
@@ -999,6 +1085,7 @@ export function ClientDBTab() {
                     {/* Stab expenses row */}
                     <TableRow className="border-t-2">
                       <TableCell className="font-medium">Stab-udgifter</TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
@@ -1028,6 +1115,7 @@ export function ClientDBTab() {
                           Stabslønninger
                         </div>
                       </TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
@@ -1091,6 +1179,7 @@ export function ClientDBTab() {
                           +{formatCurrency(staff!.vacationPay)}
                         </TableCell>
                         <TableCell></TableCell>
+                        <TableCell></TableCell>
                         <TableCell className="text-right text-destructive text-sm">
                           -{formatCurrency(staff!.totalSalary)}
                         </TableCell>
@@ -1101,6 +1190,7 @@ export function ClientDBTab() {
                     {/* Net earnings - final row */}
                     <TableRow className="bg-primary/10 font-bold border-t-2">
                       <TableCell>Samlet Indtjening</TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
