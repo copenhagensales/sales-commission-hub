@@ -665,9 +665,9 @@ export function ClientDBTab() {
         totalAssistantSalary += assistantData?.totalSalary || 0;
       }
 
-      // Calculate ATP + Barsel cost for this team
+      // Calculate ATP + Barsel cost for this team (fixed monthly amount per employee, not prorated)
       const teamMemberCount = teamMemberCounts?.[teamId] || 0;
-      const teamAtpBarsselCost = teamMemberCount * atpRate * prorationFactor;
+      const teamAtpBarsselCost = teamMemberCount * atpRate;
 
       // Allocate assistant salary and ATP/Barsel proportionally by revenue
       for (const client of teamClients) {
