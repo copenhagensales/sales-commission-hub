@@ -1,111 +1,78 @@
 
-# UI/UX Forbedring af Lonstyring-siden
+
+# UI/UX Forbedring af DB per Klient-rapporten
 
 ## Nuvaerende problemer
 
-### 1. For mange tabs pa samme niveau (8 stk)
-Den flade struktur med 8 top-level tabs er overvældende:
-- Lonarter
-- Personale lon (med 3 nested sub-tabs)
-- Saelgerloninger
-- Teamomkostninger
-- DB Oversigt
-- DB per klient
-- Samlet
-- Nye medarbejdere
+### 1. For mange kolonner (13+ kolonner)
+Tabellen har alt for mange kolonner, der vises samtidigt:
+- Klient, Team, Salg, Omsaetning, Saelgerlon, Centre/Boder, Assist.lon, Lederlon, ATP/B, Annul.%, Final DB, DB%, Oms/FTE
+
+Dette skaber:
+- Horisontalt scroll
+- Svaert at sammenligne tal
+- Uoverskuelig datapraesentation
 
 ### 2. Manglende visuel hierarki
-Alle tabs ser ens ud uden kategorisering eller gruppering.
+Alle data vises pa samme niveau uden gruppering. Omkostningskolonner (rod tekst) blandes med nogletal (gron/neutral).
 
-### 3. Nested tabs i "Personale lon"
-Skaber forvirring med tabs-i-tabs (Teamledere, Assistenter, Stabsloninger).
+### 3. Ingen KPI-oversigt
+Brugeren skal gennemlaese hele tabellen for at fa et overblik over performancen.
 
-### 4. Ingen hurtig oversigt
-Brugeren skal navigere rundt for at fa et overblik over lonsituationen.
+### 4. Footer-sektion er uoverskuelig
+Subtotal, Stab-udgifter og Stabsloninger er separate raekker i tabellen i stedet for at vaere visuelt adskilt.
 
 ---
 
 ## Foreslaaet losning
 
-### Ny struktur med 3 hovedkategorier
+### 1. KPI Dashboard oeverst
+Tilfoej en kompakt KPI-sektion med de vigtigste nogletal:
 
-Erstatter 8 flade tabs med en grupperet struktur:
+```text
++---------------+  +---------------+  +---------------+  +---------------+
+| Total Oms.    |  | Total DB      |  | DB%           |  | Netto Indtj.  |
+| 291.970 kr    |  | 77.763 kr     |  | 26,6%         |  | 52.000 kr     |
++---------------+  +---------------+  +---------------+  +---------------+
+```
+
+### 2. Komprimeret tabel med grupperede omkostninger
+Reducer kolonner fra 13+ til 8 ved at:
+- Kombinere alle omkostninger (Saelgerlon, Centre/Boder, Assist.lon, Lederlon, ATP/B) til en enkelt "Omkostninger" kolonne
+- Fjerne individuelle omkostningskolonner fra hovedvisningen
+- Tilfoeje en expand/collapse funktion til at se omkostningsdetaljer
+
+**Ny tabelstruktur:**
+
+| Klient | Team | Salg | Omsaetning | Omkostninger | Final DB | DB% | Detaljer |
+|--------|------|------|------------|--------------|----------|-----|----------|
+
+Klik pa "Detaljer" eller udvid raekken for at se:
+- Saelgerlon, Lokation, Assist.lon, Lederlon, ATP/B, Annul.%
+
+### 3. Visuelt adskilt footer
+Flytter summary-sektionen ud af tabellen og ind i et separat card-layout:
 
 ```text
 +--------------------------------------------------+
-|                   LONGUIDE                       |
-|  [Opsaetning]   [Lonberegning]   [Rapporter]    |
+|  SAMLET OVERSIGT                                 |
++--------------------------------------------------+
+| Team DB:     77.763 kr                           |
+| - Stab-udg:  -8.500 kr                           |
+| - Stab-lon:  -17.263 kr                          |
++--------------------------------------------------+
+| NETTO:       52.000 kr                    +26.6% |
 +--------------------------------------------------+
 ```
 
-**Kategori 1: Opsaetning (Administration)**
-- Lonarter (salary type definitions)
-- Personale lon (Teamledere, Assistenter, Stab - som cards, ikke tabs)
-- Teamomkostninger
-- Nye medarbejdere
+### 4. Collapsible tabelfunktionalitet
+Hovedtabellen viser kun kunder med aktivitet som standard. Kunder med 0 salg/omsaetning kan skjules/vises via en toggle.
 
-**Kategori 2: Lonberegning (Operationelt)**
-- Saelgerloninger (provision-beregning)
-- Samlet lonoversigt
-
-**Kategori 3: Rapporter (Analyse/CFO)**
-- DB Oversigt (team-niveau)
-- DB per klient (med trends, DB%, Waterfall)
-
----
-
-### Dashboard med KPI-oversigt
-
-Tilfojer en kort oversigtssektion oven pa tabs:
-
-```text
-+-------------+  +-------------+  +-------------+  +-------------+
-| Total Lon   |  | Sælgere     |  | DB Total    |  | DB%         |
-| 1.234.567 kr|  | 45 aktive   |  | 456.789 kr  |  | 24.5%       |
-+-------------+  +-------------+  +-------------+  +-------------+
-```
-
----
-
-### Personale-sektion redesign
-
-Erstat nested tabs med et card-grid layout:
-
-```text
-+-----------------------------+  +-----------------------------+
-|  Teamledere                 |  |  Assistenter                |
-|  [Icon] 8 aktive            |  |  [Icon] 12 aktive           |
-|  Senest tilfojet: Jan D.    |  |  Senest tilfojet: Maria S.  |
-|  [Se alle ->]               |  |  [Se alle ->]               |
-+-----------------------------+  +-----------------------------+
-
-+-----------------------------+
-|  Stabsloninger              |
-|  [Icon] 5 aktive            |
-|  Senest tilfojet: Peter K.  |
-|  [Se alle ->]               |
-+-----------------------------+
-```
-
-Klik pa "Se alle" aabner en modal/sheet med den fulde tabel.
-
----
-
-### Visual improvements
-
-1. **Farvekodning af kategorier**
-   - Opsaetning: Neutral (gray icons)
-   - Lonberegning: Primary color (blue/green)
-   - Rapporter: Accent color (purple/orange)
-
-2. **Bedre tab-styling**
-   - Storre tabs med ikoner
-   - Aktiv tab med tydeligere markering
-   - Gruppering med subtle separators
-
-3. **Responsive forbedringer**
-   - Dropdown-navigation pa mobile i stedet for wrapping tabs
-   - Collapsible KPI-sektion
+### 5. Forbedret farvekodning
+- **Gron** for positive DB-vaerdier og hoj DB%
+- **Rodt** for negative vaerdier
+- **Gra** for neutrale/tomme vaerdier
+- Progressbar til DB% for hurtig visuel sammenligning
 
 ---
 
@@ -115,37 +82,38 @@ Klik pa "Se alle" aabner en modal/sheet med den fulde tabel.
 
 | Fil | Formal |
 |-----|--------|
-| `src/components/salary/SalaryDashboardKPIs.tsx` | KPI-oversigt med totaler |
-| `src/components/salary/PersonnelOverviewCards.tsx` | Card-grid for personale |
-| `src/components/salary/CategoryTabs.tsx` | Grupperet tab-komponent |
+| `src/components/salary/ClientDBKPIs.tsx` | KPI-oversigt for rapporten |
+| `src/components/salary/ClientDBSummaryCard.tsx` | Ny footer med samlet indtjening |
+| `src/components/salary/ClientDBExpandableRow.tsx` | Udvidelig raekke med omkostningsdetaljer |
 
 ### Aendringer i eksisterende filer
 
 | Fil | Aendring |
 |-----|----------|
-| `src/pages/SalaryTypes.tsx` | Ny struktur med 3 kategorier + KPI-header |
-| `src/components/salary/PersonnelSalaryTab.tsx` | Erstat nested tabs med cards |
+| `src/components/salary/ClientDBTab.tsx` | Integration af nye komponenter, reduceret kolonneantal |
 
 ### Implementation steps
 
-1. **Opret KPI-oversigtskomponent** med nogletal fra existing hooks
-2. **Opret kategoriseret tab-struktur** med 3 hovedgrupper
-3. **Redesign PersonnelSalaryTab** til card-baseret layout med modals
-4. **Tilfoej ikoner og farvekodning** til alle tabs
-5. **Mobile dropdown-navigation** for small screens
+1. **Opret ClientDBKPIs** - KPI-cards oeverst med Total Oms., Total DB, DB% og Netto Indtjening
+2. **Opret ClientDBExpandableRow** - Collapsible raekke-komponent med omkostningsdetaljer
+3. **Opret ClientDBSummaryCard** - Visuelt adskilt summary-sektion
+4. **Refaktor ClientDBTab** - Reducer tabel til 8 kolonner, integrer nye komponenter
+5. **Tilfoej hide-zero toggle** - Mulighed for at skjule kunder uden aktivitet
 
 ---
 
 ## Forventet resultat
 
 **For:**
-- 8 uoverskuelige tabs
-- Tabs-i-tabs forvirring
+- 13+ kolonner - horisontalt scroll
 - Ingen hurtig oversigt
-- Ensartet udseende
+- Footer blandet ind i tabel
+- Alle omkostninger vises individuelt
 
 **Efter:**
-- 3 logiske kategorier
-- Flat navigation med cards til sub-sektioner
+- 8 kolonner med expand-for-detaljer
 - KPI-dashboard med nogletal
-- Visuel differentiering mellem omrader
+- Visuelt adskilt summary-sektion
+- Kompakt tabel med detaljer on-demand
+- Toggle til at skjule inaktive kunder
+
