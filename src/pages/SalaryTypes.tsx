@@ -1,13 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SalaryTypesTab } from "@/components/salary/SalaryTypesTab";
-import { PersonnelSalaryTab } from "@/components/salary/PersonnelSalaryTab";
-import { SellerSalariesTab } from "@/components/salary/SellerSalariesTab";
-import { TeamExpensesTab } from "@/components/salary/TeamExpensesTab";
-import { DBOverviewTab } from "@/components/salary/DBOverviewTab";
-import { ClientDBTab } from "@/components/salary/ClientDBTab";
-import { CombinedSalaryTab } from "@/components/salary/CombinedSalaryTab";
-import { NewEmployeesTab } from "@/components/salary/NewEmployeesTab";
+import { SalaryDashboardKPIs } from "@/components/salary/SalaryDashboardKPIs";
+import { CategoryTabs } from "@/components/salary/CategoryTabs";
 import { Receipt } from "lucide-react";
 
 export default function SalaryTypes() {
@@ -22,50 +15,11 @@ export default function SalaryTypes() {
           </div>
         </div>
 
-        <Tabs defaultValue="salary-types">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="salary-types">Lønarter</TabsTrigger>
-            <TabsTrigger value="all-salaries">Personale løn</TabsTrigger>
-            <TabsTrigger value="seller-salaries">Sælgerlønninger</TabsTrigger>
-            <TabsTrigger value="team-expenses">Teamomkostninger</TabsTrigger>
-            <TabsTrigger value="db-overview">DB Oversigt</TabsTrigger>
-            <TabsTrigger value="client-db">DB per klient</TabsTrigger>
-            <TabsTrigger value="combined">Samlet</TabsTrigger>
-            <TabsTrigger value="new-employees">Nye medarbejdere</TabsTrigger>
-          </TabsList>
+        {/* KPI Dashboard */}
+        <SalaryDashboardKPIs />
 
-          <TabsContent value="salary-types" className="mt-4">
-            <SalaryTypesTab />
-          </TabsContent>
-
-          <TabsContent value="all-salaries" className="mt-4">
-            <PersonnelSalaryTab />
-          </TabsContent>
-
-          <TabsContent value="seller-salaries" className="mt-4">
-            <SellerSalariesTab />
-          </TabsContent>
-
-          <TabsContent value="team-expenses" className="mt-4">
-            <TeamExpensesTab />
-          </TabsContent>
-
-          <TabsContent value="db-overview" className="mt-4">
-            <DBOverviewTab />
-          </TabsContent>
-
-          <TabsContent value="client-db" className="mt-4">
-            <ClientDBTab />
-          </TabsContent>
-
-          <TabsContent value="combined" className="mt-4">
-            <CombinedSalaryTab />
-          </TabsContent>
-
-          <TabsContent value="new-employees" className="mt-4">
-            <NewEmployeesTab />
-          </TabsContent>
-        </Tabs>
+        {/* Categorized Tabs */}
+        <CategoryTabs />
       </div>
     </MainLayout>
   );
