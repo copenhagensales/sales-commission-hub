@@ -1,58 +1,151 @@
 
-# Plan: Proratér ATP + Barsel baseret på arbejdsdage
+# UI/UX Forbedring af Lonstyring-siden
 
-## Baggrund
-ATP + Barsel (381 kr/medarbejder/md) vises i øjeblikket som det fulde månedsbeløb uanset periode. For konsistens med andre udgifter skal det prorateres baseret på **arbejdsdage**, så 1 dag viser ~1/22 af det månedlige beløb.
+## Nuvaerende problemer
 
-## Løsning
+### 1. For mange tabs pa samme niveau (8 stk)
+Den flade struktur med 8 top-level tabs er overvældende:
+- Lonarter
+- Personale lon (med 3 nested sub-tabs)
+- Saelgerloninger
+- Teamomkostninger
+- DB Oversigt
+- DB per klient
+- Samlet
+- Nye medarbejdere
 
-### Beregningslogik
-I stedet for:
-```
-teamAtpBarsselCost = teamMemberCount × 381 kr (fuldt beløb)
-```
+### 2. Manglende visuel hierarki
+Alle tabs ser ens ud uden kategorisering eller gruppering.
 
-Ændres til:
-```
-workdaysInPeriod = antal arbejdsdage (man-fre) i den valgte periode
-workdaysInMonth ≈ 22 (standard arbejdsdage per måned)
-teamAtpBarsselCost = teamMemberCount × 381 kr × (workdaysInPeriod / workdaysInMonth)
-```
+### 3. Nested tabs i "Personale lon"
+Skaber forvirring med tabs-i-tabs (Teamledere, Assistenter, Stabsloninger).
 
-### Eksempel
-- **1 dag**: 18 medarbejdere × 381 kr × (1/22) = **312 kr** (i stedet for 6.858 kr)
-- **1 uge (5 dage)**: 18 medarbejdere × 381 kr × (5/22) = **1.559 kr**
-- **1 måned (22 dage)**: 18 medarbejdere × 381 kr × (22/22) = **6.858 kr** (fuldt beløb)
+### 4. Ingen hurtig oversigt
+Brugeren skal navigere rundt for at fa et overblik over lonsituationen.
 
-### Tekniske ændringer
+---
 
-**Fil:** `src/components/salary/ClientDBTab.tsx`
+## Foreslaaet losning
 
-1. **Import `countWorkDaysInPeriod`** fra `@/lib/calculations/dates`
+### Ny struktur med 3 hovedkategorier
 
-2. **Beregn arbejdsdage i perioden:**
-```typescript
-const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-const WORKDAYS_PER_MONTH = 22;
-const atpProrationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
-```
+Erstatter 8 flade tabs med en grupperet struktur:
 
-3. **Opdater ATP/Barsel beregningen:**
-```typescript
-// Linje 668-670 ændres fra:
-const teamAtpBarsselCost = teamMemberCount * atpRate;
-
-// Til:
-const teamAtpBarsselCost = teamMemberCount * atpRate * atpProrationFactor;
+```text
++--------------------------------------------------+
+|                   LONGUIDE                       |
+|  [Opsaetning]   [Lonberegning]   [Rapporter]    |
++--------------------------------------------------+
 ```
 
-4. **Opdater kommentar:**
-```typescript
-// Calculate ATP + Barsel cost for this team (prorated by workdays in period)
+**Kategori 1: Opsaetning (Administration)**
+- Lonarter (salary type definitions)
+- Personale lon (Teamledere, Assistenter, Stab - som cards, ikke tabs)
+- Teamomkostninger
+- Nye medarbejdere
+
+**Kategori 2: Lonberegning (Operationelt)**
+- Saelgerloninger (provision-beregning)
+- Samlet lonoversigt
+
+**Kategori 3: Rapporter (Analyse/CFO)**
+- DB Oversigt (team-niveau)
+- DB per klient (med trends, DB%, Waterfall)
+
+---
+
+### Dashboard med KPI-oversigt
+
+Tilfojer en kort oversigtssektion oven pa tabs:
+
+```text
++-------------+  +-------------+  +-------------+  +-------------+
+| Total Lon   |  | Sælgere     |  | DB Total    |  | DB%         |
+| 1.234.567 kr|  | 45 aktive   |  | 456.789 kr  |  | 24.5%       |
++-------------+  +-------------+  +-------------+  +-------------+
 ```
 
-## Fordele
-- Konsistent visning på tværs af alle perioder
-- 1 dag viser den faktiske daglige omkostning
-- Fulde månedsperioder viser stadig det samlede beløb
-- Bruger arbejdsdage (man-fre) som giver mere præcis fordeling
+---
+
+### Personale-sektion redesign
+
+Erstat nested tabs med et card-grid layout:
+
+```text
++-----------------------------+  +-----------------------------+
+|  Teamledere                 |  |  Assistenter                |
+|  [Icon] 8 aktive            |  |  [Icon] 12 aktive           |
+|  Senest tilfojet: Jan D.    |  |  Senest tilfojet: Maria S.  |
+|  [Se alle ->]               |  |  [Se alle ->]               |
++-----------------------------+  +-----------------------------+
+
++-----------------------------+
+|  Stabsloninger              |
+|  [Icon] 5 aktive            |
+|  Senest tilfojet: Peter K.  |
+|  [Se alle ->]               |
++-----------------------------+
+```
+
+Klik pa "Se alle" aabner en modal/sheet med den fulde tabel.
+
+---
+
+### Visual improvements
+
+1. **Farvekodning af kategorier**
+   - Opsaetning: Neutral (gray icons)
+   - Lonberegning: Primary color (blue/green)
+   - Rapporter: Accent color (purple/orange)
+
+2. **Bedre tab-styling**
+   - Storre tabs med ikoner
+   - Aktiv tab med tydeligere markering
+   - Gruppering med subtle separators
+
+3. **Responsive forbedringer**
+   - Dropdown-navigation pa mobile i stedet for wrapping tabs
+   - Collapsible KPI-sektion
+
+---
+
+## Teknisk implementering
+
+### Nye filer
+
+| Fil | Formal |
+|-----|--------|
+| `src/components/salary/SalaryDashboardKPIs.tsx` | KPI-oversigt med totaler |
+| `src/components/salary/PersonnelOverviewCards.tsx` | Card-grid for personale |
+| `src/components/salary/CategoryTabs.tsx` | Grupperet tab-komponent |
+
+### Aendringer i eksisterende filer
+
+| Fil | Aendring |
+|-----|----------|
+| `src/pages/SalaryTypes.tsx` | Ny struktur med 3 kategorier + KPI-header |
+| `src/components/salary/PersonnelSalaryTab.tsx` | Erstat nested tabs med cards |
+
+### Implementation steps
+
+1. **Opret KPI-oversigtskomponent** med nogletal fra existing hooks
+2. **Opret kategoriseret tab-struktur** med 3 hovedgrupper
+3. **Redesign PersonnelSalaryTab** til card-baseret layout med modals
+4. **Tilfoej ikoner og farvekodning** til alle tabs
+5. **Mobile dropdown-navigation** for small screens
+
+---
+
+## Forventet resultat
+
+**For:**
+- 8 uoverskuelige tabs
+- Tabs-i-tabs forvirring
+- Ingen hurtig oversigt
+- Ensartet udseende
+
+**Efter:**
+- 3 logiske kategorier
+- Flat navigation med cards til sub-sektioner
+- KPI-dashboard med nogletal
+- Visuel differentiering mellem omrader
