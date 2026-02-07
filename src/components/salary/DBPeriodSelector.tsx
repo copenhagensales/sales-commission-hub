@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,7 @@ export function DBPeriodSelector({
   onPresetLabelChange,
 }: DBPeriodSelectorProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: periodStart,
     to: periodEnd,
@@ -65,6 +66,7 @@ export function DBPeriodSelector({
 
   const presets = useMemo(() => {
     const now = new Date();
+    const yesterday = subDays(now, 1);
     const currentPayroll = getPayrollPeriod(now);
     const prevPayroll = getPayrollPeriod(subMonths(now, 1));
     const thisMonth = { start: startOfMonth(now), end: endOfMonth(now) };
@@ -73,6 +75,7 @@ export function DBPeriodSelector({
       end: endOfMonth(subMonths(now, 1)),
     };
     const today = { start: startOfDay(now), end: endOfDay(now) };
+    const yesterdayPeriod = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
     const thisWeek = { 
       start: startOfWeek(now, { weekStartsOn: 1 }), 
       end: endOfWeek(now, { weekStartsOn: 1 }) 
@@ -80,6 +83,7 @@ export function DBPeriodSelector({
 
     return [
       { label: "I dag", mode: "day" as PeriodMode, ...today },
+      { label: "I går", mode: "day" as PeriodMode, ...yesterdayPeriod },
       { label: "Denne uge", mode: "week" as PeriodMode, ...thisWeek },
       { label: "Denne lønperiode", mode: "payroll" as PeriodMode, ...currentPayroll },
       { label: "Forrige lønperiode", mode: "payroll" as PeriodMode, ...prevPayroll },
@@ -131,9 +135,13 @@ export function DBPeriodSelector({
   };
 
   const handleCustomSelect = () => {
-    onModeChange("custom");
-    onPresetLabelChange?.("Brugerdefineret");
-    setCalendarOpen(true);
+    setDropdownOpen(false);
+    // Small delay to let dropdown close before opening calendar
+    setTimeout(() => {
+      onModeChange("custom");
+      onPresetLabelChange?.("Brugerdefineret");
+      setCalendarOpen(true);
+    }, 100);
   };
 
   const handleDateRangeSelect = (range: DateRange | undefined) => {
@@ -206,8 +214,8 @@ export function DBPeriodSelector({
         <ChevronRight className="h-4 w-4" />
       </Button>
 
-      {/* Preset dropdown + custom picker */}
-      <DropdownMenu>
+      {/* Preset dropdown */}
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1">
             <CalendarIcon className="h-4 w-4" />
@@ -215,7 +223,7 @@ export function DBPeriodSelector({
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="bg-popover z-50">
           {presets.map((preset) => (
             <DropdownMenuItem
               key={preset.label}
@@ -225,41 +233,39 @@ export function DBPeriodSelector({
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  handleCustomSelect();
-                }}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Brugerdefineret...
-              </DropdownMenuItem>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end" side="left">
-              <Calendar
-                mode="range"
-                defaultMonth={periodStart}
-                selected={dateRange}
-                onSelect={handleDateRangeSelect}
-                numberOfMonths={2}
-                locale={da}
-                className={cn("p-3 pointer-events-auto")}
-              />
-              <div className="border-t p-3 flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={() => setCalendarOpen(false)}
-                  disabled={!dateRange?.from || !dateRange?.to}
-                >
-                  Anvend
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <DropdownMenuItem onClick={handleCustomSelect}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            Brugerdefineret...
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Separate calendar popover for custom date range */}
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <PopoverTrigger asChild>
+          <span className="sr-only">Åbn kalender</span>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 z-50" align="end" sideOffset={8}>
+          <Calendar
+            mode="range"
+            defaultMonth={periodStart}
+            selected={dateRange}
+            onSelect={handleDateRangeSelect}
+            numberOfMonths={2}
+            locale={da}
+            className={cn("p-3 pointer-events-auto")}
+          />
+          <div className="border-t p-3 flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => setCalendarOpen(false)}
+              disabled={!dateRange?.from || !dateRange?.to}
+            >
+              Anvend
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
