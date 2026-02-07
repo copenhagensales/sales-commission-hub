@@ -845,12 +845,12 @@ export function ClientDBTab() {
           />
 
           <div className="rounded-md border overflow-x-auto">
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="min-w-[140px] cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("clientName")}
                   >
                     <div className="flex items-center gap-1">
@@ -859,7 +859,7 @@ export function ClientDBTab() {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="min-w-[100px] cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("teamName")}
                   >
                     <div className="flex items-center gap-1">
@@ -868,7 +868,7 @@ export function ClientDBTab() {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="w-[70px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("sales")}
                   >
                     <div className="flex items-center gap-1 justify-end">
@@ -877,7 +877,7 @@ export function ClientDBTab() {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("revenue")}
                   >
                     <div className="flex items-center gap-1 justify-end">
@@ -886,7 +886,7 @@ export function ClientDBTab() {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("costs")}
                   >
                     <TooltipProvider>
@@ -900,7 +900,7 @@ export function ClientDBTab() {
                     </TooltipProvider>
                   </TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="w-[110px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("finalDB")}
                   >
                     <div className="flex items-center gap-1 justify-end">
@@ -909,7 +909,7 @@ export function ClientDBTab() {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="w-[140px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("dbPercent")}
                   >
                     <div className="flex items-center gap-1 justify-end">
@@ -917,7 +917,7 @@ export function ClientDBTab() {
                       <SortIcon column="dbPercent" />
                     </div>
                   </TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
