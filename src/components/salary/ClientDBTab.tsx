@@ -6,12 +6,12 @@ import { countWorkDaysInPeriod } from "@/lib/calculations/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, HelpCircle, Pencil, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Clock, Briefcase, Users } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { TrendingUp, HelpCircle, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { VACATION_PAY_RATES } from "@/lib/calculations";
-import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, isSameWeek, eachDayOfInterval, subMonths, subWeeks, subDays } from "date-fns";
+import { startOfMonth, endOfMonth, parseISO, isSameDay, isSameWeek, eachDayOfInterval } from "date-fns";
 
 /**
  * Convert JavaScript getDay (0=Sunday) to booked_days format (0=Monday, 6=Sunday)
@@ -22,6 +22,9 @@ function getBookedDayIndex(date: Date): number {
 }
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
+import { ClientDBKPIs } from "./ClientDBKPIs";
+import { ClientDBExpandableRow } from "./ClientDBExpandableRow";
+import { ClientDBSummaryCard } from "./ClientDBSummaryCard";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
@@ -30,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
-type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "sellerCost" | "locationCosts" | "assistantAllocation" | "leaderAllocation" | "atpBarsselAllocation" | "cancellationPercent" | "finalDB" | "dbPercent" | "revenuePerFTE";
+type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "costs" | "finalDB" | "dbPercent";
 type SortDirection = "asc" | "desc";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
@@ -40,19 +43,16 @@ function mapPeriodModeToKpiPeriod(mode: PeriodMode, periodStart: Date): KpiPerio
   const now = new Date();
   switch (mode) {
     case "day":
-      // Only use cache if it's today
       return isSameDay(periodStart, now) ? "today" : null;
     case "week":
-      // Only use cache if it's this week
       return isSameWeek(periodStart, now, { weekStartsOn: 1 }) ? "this_week" : null;
     case "month":
-      // Only use cache if it's this month
       return periodStart.getMonth() === now.getMonth() && 
              periodStart.getFullYear() === now.getFullYear() ? "this_month" : null;
     case "payroll":
       return "payroll_period";
     default:
-      return null; // Custom → fallback to direct query
+      return null;
   }
 }
 
@@ -64,9 +64,9 @@ interface ClientDBData {
   sales: number;
   revenue: number;
   commission: number;
-  sellerVacationPay: number; // 12.5% of commission
-  sellerSalaryCost: number; // commission + vacation pay
-  locationCosts: number; // From bookings (FM clients)
+  sellerVacationPay: number;
+  sellerSalaryCost: number;
+  locationCosts: number;
   cancellationPercent: number;
   adjustedRevenue: number;
   adjustedSellerCost: number;
@@ -74,19 +74,18 @@ interface ClientDBData {
   assistantAllocation: number;
   dbBeforeLeader: number;
   leaderAllocation: number;
-  leaderVacationPay: number; // 1% of leader allocation
-  atpBarsselAllocation: number; // ATP + Barsel per employee allocation
+  leaderVacationPay: number;
+  atpBarsselAllocation: number;
   finalDB: number;
-  dbPercent: number; // DB% = (finalDB / adjustedRevenue) * 100
-  fteCount: number; // Number of FTEs for this client
-  revenuePerFTE: number; // Revenue per FTE
+  dbPercent: number;
+  fteCount: number;
+  revenuePerFTE: number;
 }
 
 interface TeamSalaryInfo {
   teamId: string;
   percentageRate: number;
   minimumSalary: number;
-  // assistantId removed - now fetched from team_assistant_leaders junction table
 }
 
 const FM_CLIENT_NAMES = ["Eesy FM", "Yousee"];
@@ -101,7 +100,7 @@ export function ClientDBTab() {
   const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [staffSalariesExpanded, setStaffSalariesExpanded] = useState(false);
+  const [hideZeroClients, setHideZeroClients] = useState(true);
   const queryClient = useQueryClient();
 
   const handleSort = (column: SortColumn) => {
@@ -140,7 +139,6 @@ export function ClientDBTab() {
     }
 
     try {
-      // Check if record exists
       const { data: existing } = await supabase
         .from("client_adjustment_percents")
         .select("id")
@@ -148,19 +146,15 @@ export function ClientDBTab() {
         .single();
 
       if (existing) {
-        // Update existing
         const { error } = await supabase
           .from("client_adjustment_percents")
           .update({ cancellation_percent: newValue })
           .eq("client_id", clientId);
-
         if (error) throw error;
       } else {
-        // Insert new
         const { error } = await supabase
           .from("client_adjustment_percents")
           .insert({ client_id: clientId, cancellation_percent: newValue });
-
         if (error) throw error;
       }
 
@@ -218,7 +212,7 @@ export function ClientDBTab() {
     },
   });
 
-  // Fetch Stab team expenses (administrative costs)
+  // Fetch Stab team expenses
   const STAB_TEAM_ID = "09012ce9-e307-4f6d-a51e-f72af7200d74";
   const { data: stabExpenses } = useQuery({
     queryKey: ["stab-expenses", periodStart.toISOString(), periodEnd.toISOString(), periodMode],
@@ -230,10 +224,7 @@ export function ClientDBTab() {
       
       if (error) throw error;
       
-      // Calculate total Stab expenses for the period
-      // For "month" and "payroll" modes, show full monthly amount without proration
       const isFullPeriod = periodMode === "month" || periodMode === "payroll";
-      
       let totalStabExpenses = 0;
       const WORKDAYS_PER_MONTH = 22;
       const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
@@ -242,14 +233,11 @@ export function ClientDBTab() {
         if (expense.is_recurring || expense.all_days) {
           const monthlyAmount = Number(expense.amount) || 0;
           if (isFullPeriod) {
-            // Full period: show complete monthly amount
             totalStabExpenses += monthlyAmount;
           } else {
-            // Partial period: prorate by workdays
             totalStabExpenses += (monthlyAmount / WORKDAYS_PER_MONTH) * workdaysInPeriod;
           }
         } else {
-          // Specific date expense - check if within period
           const expenseDate = new Date(expense.expense_date);
           if (expenseDate >= periodStart && expenseDate <= periodEnd) {
             totalStabExpenses += Number(expense.amount) || 0;
@@ -283,7 +271,7 @@ export function ClientDBTab() {
     [staffEmployees]
   );
 
-  // Calculate staff salaries based on hours (for hourly employees)
+  // Calculate staff salaries based on hours
   const { data: staffHoursData, isLoading: staffHoursLoading } = useStaffHoursCalculation(
     periodStart,
     periodEnd,
@@ -313,11 +301,17 @@ export function ClientDBTab() {
           hoursSource: hours.hoursSource,
         };
       })
-      .filter(Boolean)
-      .sort((a, b) => b!.totalSalary - a!.totalSalary);
+      .filter(Boolean) as {
+        employeeId: string;
+        name: string;
+        jobTitle: string | null;
+        workedHours: number;
+        totalSalary: number;
+        isHourlyBased: boolean;
+      }[];
   }, [staffHoursData, staffEmployees]);
 
-  // Total staff salary cost (from hours-based calculation)
+  // Total staff salary cost
   const totalStaffSalaryCost = useMemo(() => {
     if (!staffHoursData) return 0;
     return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
@@ -326,7 +320,7 @@ export function ClientDBTab() {
   // Fetch team assistant leaders from junction table
   const { data: teamAssistants = [] } = useTeamAssistantLeaders();
 
-  // Fetch ATP + Barsel rate from salary_types
+  // Fetch ATP + Barsel rate
   const { data: atpBarsselRate } = useQuery({
     queryKey: ["atp-barsel-rate"],
     queryFn: async () => {
@@ -341,41 +335,34 @@ export function ClientDBTab() {
     },
   });
 
-  // Fetch team member counts (sellers + assistants + leader)
+  // Fetch team member counts
   const { data: teamMemberCounts } = useQuery({
     queryKey: ["team-member-counts"],
     queryFn: async () => {
-      // Fetch teams with leader info
       const { data: teams } = await supabase
         .from("teams")
         .select("id, team_leader_id");
 
-      // Fetch seller counts per team
       const { data: members } = await supabase
         .from("team_members")
         .select("team_id");
 
-      // Fetch assistant counts per team
       const { data: assistants } = await supabase
         .from("team_assistant_leaders")
         .select("team_id");
 
       const counts: Record<string, number> = {};
       for (const team of teams || []) {
-        // Count sellers
         const sellerCount = (members || []).filter(m => m.team_id === team.id).length;
-        // Count assistants
         const assistantCount = (assistants || []).filter(a => a.team_id === team.id).length;
-        // Add 1 for leader if exists
         const hasLeader = !!team.team_leader_id;
-        
         counts[team.id] = sellerCount + assistantCount + (hasLeader ? 1 : 0);
       }
       return counts;
     },
   });
 
-  // Fetch team salary info (leaders only - assistants now from junction table)
+  // Fetch team salary info
   const { data: teamSalaries } = useQuery({
     queryKey: ["team-salaries-for-client-db"],
     queryFn: async () => {
@@ -395,7 +382,6 @@ export function ClientDBTab() {
       const result: Record<string, TeamSalaryInfo> = {};
       for (const team of teams || []) {
         const leader = leaderSalaries?.find(l => l.employee_id === team.team_leader_id);
-        
         result[team.id] = {
           teamId: team.id,
           percentageRate: Number(leader?.percentage_rate) || 0,
@@ -406,7 +392,7 @@ export function ClientDBTab() {
     },
   });
 
-  // Get all assistant IDs for hours calculation from junction table
+  // Get all assistant IDs for hours calculation
   const allAssistantIds = useMemo(() => {
     return getAllAssistantIds(teamAssistants);
   }, [teamAssistants]);
@@ -418,7 +404,7 @@ export function ClientDBTab() {
     allAssistantIds
   );
 
-  // Fetch previous period comparison data for trend analysis
+  // Fetch previous period comparison data
   const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
     periodStart,
     periodEnd,
@@ -429,7 +415,7 @@ export function ClientDBTab() {
   const kpiPeriodType = mapPeriodModeToKpiPeriod(periodMode, periodStart);
   const useKpiCache = !!kpiPeriodType;
 
-  // Fetch KPI-cached sales data per client (for standard periods)
+  // Fetch KPI-cached sales data per client
   const { data: kpiClientData, isLoading: kpiLoading } = useQuery({
     queryKey: ["kpi-client-sales", kpiPeriodType],
     queryFn: async () => {
@@ -442,7 +428,6 @@ export function ClientDBTab() {
 
       if (error) throw error;
 
-      // Group by client_id (scope_id)
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       
       for (const row of data || []) {
@@ -476,7 +461,6 @@ export function ClientDBTab() {
   const { data: salesByClientDirect, isLoading: directSalesLoading } = useQuery({
     queryKey: ["sales-by-client-direct", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
-      // Fetch telesales
       const { data: telesalesData, error: telesalesError } = await supabase
         .from("sales")
         .select(`
@@ -490,30 +474,22 @@ export function ClientDBTab() {
       
       if (telesalesError) throw telesalesError;
 
-      // Fetch fieldmarketing sales
       const { data: fmSalesData, error: fmError } = await supabase
         .from("fieldmarketing_sales")
-        .select(`
-          id,
-          client_id,
-          product_name
-        `)
+        .select(`id, client_id, product_name`)
         .gte("registered_at", periodStart.toISOString())
         .lte("registered_at", periodEnd.toISOString());
       
       if (fmError) throw fmError;
 
-      // Fetch products to get commission/revenue for FM sales
       const { data: products } = await supabase
         .from("products")
         .select("id, name, commission_dkk, revenue_dkk");
       
       const productsByName = new Map(products?.map(p => [p.name?.toLowerCase(), p]) || []);
 
-      // Group by client
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       
-      // Process telesales
       for (const sale of telesalesData || []) {
         const clientId = (sale.client_campaigns as any)?.client_id;
         if (!clientId) continue;
@@ -531,7 +507,6 @@ export function ClientDBTab() {
         }
       }
 
-      // Process fieldmarketing sales (each row = 1 sale)
       for (const fmSale of fmSalesData || []) {
         const clientId = fmSale.client_id;
         if (!clientId) continue;
@@ -540,10 +515,8 @@ export function ClientDBTab() {
           byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
         }
 
-        // Each FM sale counts as 1
         byClient[clientId].sales += 1;
         
-        // Try to match product by name for commission/revenue
         const product = productsByName.get(fmSale.product_name?.toLowerCase());
         if (product) {
           byClient[clientId].commission += Number(product.commission_dkk) || 0;
@@ -556,7 +529,7 @@ export function ClientDBTab() {
     enabled: !useKpiCache && clientsWithTeams !== undefined,
   });
 
-  // Merge data sources: prefer KPI cache, fallback to direct query
+  // Merge data sources
   const salesByClient = useMemo(() => {
     if (useKpiCache && kpiClientData) {
       return kpiClientData;
@@ -570,7 +543,7 @@ export function ClientDBTab() {
 
     const adjustmentMap = new Map(adjustmentPercents?.map(a => [a.client_id, a]) || []);
 
-    // Calculate location costs per client from bookings (daily iteration, matching ClientDBDailyBreakdown)
+    // Calculate location costs per client from bookings
     const locationCostsMap = new Map<string, number>();
     const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
 
@@ -584,10 +557,6 @@ export function ClientDBTab() {
       
       for (const day of periodDaysArray) {
         const dayIndex = getBookedDayIndex(day);
-        
-        // Only add cost if:
-        // 1. The day falls within the booking interval
-        // 2. The day matches one of the booked weekdays
         if (day >= bookingStart && day <= bookingEnd && bookedDays.includes(dayIndex)) {
           locationCostsMap.set(
             booking.client_id,
@@ -597,10 +566,7 @@ export function ClientDBTab() {
       }
     }
 
-    // Build client data
     const clientDataList: ClientDBData[] = [];
-    
-    // Group clients by team for allocation calculations
     const clientsByTeam: Record<string, ClientDBData[]> = {};
 
     for (const client of clientsWithTeams) {
@@ -612,24 +578,18 @@ export function ClientDBTab() {
       const adjustment = adjustmentMap.get(client.id);
       const cancellationPercent = Number(adjustment?.cancellation_percent) || 0;
       
-      // Only include location costs for FM clients
       const isFMClient = FM_CLIENT_NAMES.includes(client.name);
       const locationCosts = isFMClient ? (locationCostsMap.get(client.id) || 0) : 0;
 
-      // Calculate seller salary cost
       const commission = salesData.commission;
       const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
       const sellerSalaryCost = commission + sellerVacationPay;
 
-      // Apply cancellation adjustment
       const cancellationFactor = 1 - (cancellationPercent / 100);
       const adjustedRevenue = salesData.revenue * cancellationFactor;
       const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
 
-      // Basis DB (before team allocations)
       const basisDB = adjustedRevenue - adjustedSellerCost - locationCosts;
-
-      // Get FTE count for this client's team
       const fteCount = teamId ? (teamMemberCounts?.[teamId] || 0) : 0;
 
       const clientData: ClientDBData = {
@@ -647,20 +607,19 @@ export function ClientDBTab() {
         adjustedRevenue,
         adjustedSellerCost,
         basisDB,
-        assistantAllocation: 0, // Calculated later
-        dbBeforeLeader: 0, // Calculated later
-        leaderAllocation: 0, // Calculated later
-        leaderVacationPay: 0, // Calculated later
-        atpBarsselAllocation: 0, // Calculated later
-        finalDB: basisDB, // Updated later
-        dbPercent: 0, // Calculated after finalDB
+        assistantAllocation: 0,
+        dbBeforeLeader: 0,
+        leaderAllocation: 0,
+        leaderVacationPay: 0,
+        atpBarsselAllocation: 0,
+        finalDB: basisDB,
+        dbPercent: 0,
         fteCount,
         revenuePerFTE: fteCount > 0 ? adjustedRevenue / fteCount : 0,
       };
 
       clientDataList.push(clientData);
 
-      // Group by team for allocation
       if (teamId) {
         if (!clientsByTeam[teamId]) clientsByTeam[teamId] = [];
         clientsByTeam[teamId].push(clientData);
@@ -668,7 +627,6 @@ export function ClientDBTab() {
     }
 
     // Calculate team allocations
-    // Calculate proration factor based on workdays (Mon-Fri) for consistent display
     const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
     const WORKDAYS_PER_MONTH = 22;
     const prorationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
@@ -678,24 +636,19 @@ export function ClientDBTab() {
       const teamInfo = teamSalaries[teamId];
       if (!teamInfo) continue;
 
-      // Total team adjusted revenue for proportional allocation
       const teamTotalRevenue = teamClients.reduce((sum, c) => sum + c.adjustedRevenue, 0);
       if (teamTotalRevenue === 0) continue;
 
-      // Get all assistant IDs for this team from junction table
       const teamAssistantIds = getTeamAssistantIds(teamAssistants, teamId);
-      // Sum salary for all assistants
       let totalAssistantSalary = 0;
       for (const aId of teamAssistantIds) {
         const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
         totalAssistantSalary += assistantData?.totalSalary || 0;
       }
 
-      // Calculate ATP + Barsel cost for this team (prorated by workdays in period)
       const teamMemberCount = teamMemberCounts?.[teamId] || 0;
       const teamAtpBarsselCost = teamMemberCount * atpRate * prorationFactor;
 
-      // Allocate assistant salary and ATP/Barsel proportionally by revenue
       for (const client of teamClients) {
         const revenueShare = client.adjustedRevenue / teamTotalRevenue;
         client.assistantAllocation = totalAssistantSalary * revenueShare;
@@ -703,30 +656,25 @@ export function ClientDBTab() {
         client.dbBeforeLeader = client.basisDB - client.assistantAllocation - client.atpBarsselAllocation;
       }
 
-      // Calculate team-level leader salary with prorated minimum
       const teamTotalDBBeforeLeader = teamClients.reduce((sum, c) => sum + c.dbBeforeLeader, 0);
       const calculatedLeaderSalary = teamTotalDBBeforeLeader * (teamInfo.percentageRate / 100);
-      
-      // Prorate minimum salary based on period length
       const proratedMinimumSalary = teamInfo.minimumSalary * prorationFactor;
       const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
 
-      // Allocate leader salary proportionally by DB before leader
-      const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1); // Avoid division by zero
+      const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1);
       for (const client of teamClients) {
-       const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
+        const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
         client.leaderAllocation = finalTeamLeaderSalary * dbShare;
         client.leaderVacationPay = client.leaderAllocation * VACATION_PAY_RATES.LEADER;
         client.finalDB = client.dbBeforeLeader - client.leaderAllocation - client.leaderVacationPay;
       }
     }
 
-    // Calculate DB% for all clients (after finalDB is set)
+    // Calculate DB%
     for (const client of clientDataList) {
       if (!client.teamId) {
         client.finalDB = client.basisDB;
       }
-      // Calculate DB% = (finalDB / adjustedRevenue) * 100
       client.dbPercent = client.adjustedRevenue > 0 
         ? (client.finalDB / client.adjustedRevenue) * 100 
         : 0;
@@ -735,10 +683,17 @@ export function ClientDBTab() {
     return clientDataList;
   }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, periodStart, periodEnd, teamMemberCounts, atpBarsselRate]);
 
-  // Sorted client data
-  const sortedClientDBData = useMemo(() => {
-    const sorted = [...clientDBData];
-    sorted.sort((a, b) => {
+  // Filtered and sorted client data
+  const filteredAndSortedData = useMemo(() => {
+    let data = [...clientDBData];
+    
+    // Filter out zero-activity clients if toggle is on
+    if (hideZeroClients) {
+      data = data.filter(c => c.sales > 0 || c.revenue > 0);
+    }
+    
+    // Sort
+    data.sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
       
@@ -759,37 +714,13 @@ export function ClientDBTab() {
           aVal = a.adjustedRevenue;
           bVal = b.adjustedRevenue;
           break;
-        case "sellerCost":
-          aVal = a.adjustedSellerCost;
-          bVal = b.adjustedSellerCost;
-          break;
-        case "locationCosts":
-          aVal = a.locationCosts;
-          bVal = b.locationCosts;
-          break;
-        case "assistantAllocation":
-          aVal = a.assistantAllocation;
-          bVal = b.assistantAllocation;
-          break;
-        case "leaderAllocation":
-          aVal = a.leaderAllocation + a.leaderVacationPay;
-          bVal = b.leaderAllocation + b.leaderVacationPay;
-          break;
-        case "atpBarsselAllocation":
-          aVal = a.atpBarsselAllocation;
-          bVal = b.atpBarsselAllocation;
-          break;
-        case "cancellationPercent":
-          aVal = a.cancellationPercent;
-          bVal = b.cancellationPercent;
+        case "costs":
+          aVal = a.adjustedSellerCost + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
+          bVal = b.adjustedSellerCost + b.locationCosts + b.assistantAllocation + b.leaderAllocation + b.leaderVacationPay + b.atpBarsselAllocation;
           break;
         case "dbPercent":
           aVal = a.dbPercent;
           bVal = b.dbPercent;
-          break;
-        case "revenuePerFTE":
-          aVal = a.revenuePerFTE;
-          bVal = b.revenuePerFTE;
           break;
         case "finalDB":
         default:
@@ -803,27 +734,24 @@ export function ClientDBTab() {
       }
       return sortDirection === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
-    return sorted;
-  }, [clientDBData, sortColumn, sortDirection]);
+    return data;
+  }, [clientDBData, sortColumn, sortDirection, hideZeroClients]);
 
   const isLoading = (useKpiCache ? kpiLoading : directSalesLoading) || assistantHoursLoading || staffHoursLoading;
 
-  // formatCurrency imported from @/lib/calculations
-
-  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-
-  // Helper to calculate and format trend percentage
-  const getTrendInfo = (current: number, previous: number): { change: number; isPositive: boolean; label: string } | null => {
+  // Helper to calculate trend
+  const getTrendInfo = (current: number, previous: number): { change: number; isPositive: boolean; label: string; previousValue: number } | null => {
     if (!previous || previous === 0) return null;
     const change = ((current - previous) / previous) * 100;
     return {
       change,
       isPositive: change >= 0,
       label: `${change >= 0 ? '+' : ''}${change.toFixed(0)}%`,
+      previousValue: previous,
     };
   };
 
-  // Calculate totals and final earnings
+  // Calculate totals
   const stabExpenseAmount = stabExpenses || 0;
   
   const totals = useMemo(() => {
@@ -842,10 +770,7 @@ export function ClientDBTab() {
       { sales: 0, revenue: 0, sellerSalaryCost: 0, locationCosts: 0, assistantAllocation: 0, leaderAllocation: 0, atpBarsselAllocation: 0, finalDB: 0, fteCount: 0 }
     );
     
-    // Total overhead = stab expenses + staff salaries (hours-based)
     const totalOverhead = stabExpenseAmount + totalStaffSalaryCost;
-    
-    // Calculate total DB% and Revenue per FTE
     const dbPercent = base.revenue > 0 ? (base.finalDB / base.revenue) * 100 : 0;
     const revenuePerFTE = base.fteCount > 0 ? base.revenue / base.fteCount : 0;
     
@@ -860,8 +785,19 @@ export function ClientDBTab() {
     };
   }, [clientDBData, stabExpenseAmount, totalStaffSalaryCost]);
 
+  const hiddenCount = clientDBData.length - filteredAndSortedData.length;
+
   return (
     <div className="space-y-4">
+      {/* KPI Dashboard */}
+      <ClientDBKPIs
+        totalRevenue={totals.revenue}
+        totalDB={totals.finalDB}
+        dbPercent={totals.dbPercent}
+        netEarnings={totals.netEarnings}
+        isLoading={isLoading}
+      />
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex items-center gap-3">
@@ -874,13 +810,27 @@ export function ClientDBTab() {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-sm">
+                    <strong>Omkostninger</strong> = Sælgerløn + Centre/Boder + Assist.løn + Lederløn + ATP/B<br/>
                     <strong>Sælgerløn</strong> = provision + 12,5% feriepenge<br/>
-                    <strong>Lederløn</strong> = proportionel andel + 1% feriepenge<br/>
-                    <strong>Assist.løn</strong> = fordelt efter omsætningsandel
+                    Klik på en række for at se omkostningsdetaljer
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          </div>
+          
+          {/* Hide zero toggle */}
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-zero"
+              checked={hideZeroClients}
+              onCheckedChange={setHideZeroClients}
+            />
+            <Label htmlFor="hide-zero" className="text-sm text-muted-foreground flex items-center gap-1.5">
+              {hideZeroClients ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              Skjul inaktive
+              {hiddenCount > 0 && <span className="text-xs">({hiddenCount})</span>}
+            </Label>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -898,6 +848,7 @@ export function ClientDBTab() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("clientName")}
@@ -936,72 +887,17 @@ export function ClientDBTab() {
                   </TableHead>
                   <TableHead 
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("sellerCost")}
+                    onClick={() => handleSort("costs")}
                   >
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          Sælgerløn*
-                          <SortIcon column="sellerCost" />
+                          Omkostninger
+                          <SortIcon column="costs" />
                         </TooltipTrigger>
-                        <TooltipContent>Provision + 12,5% feriepenge (efter annullering)</TooltipContent>
+                        <TooltipContent>Samlet: Sælger + Lokation + Assist. + Leder + ATP</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("locationCosts")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Centre/Boder
-                      <SortIcon column="locationCosts" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("assistantAllocation")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Assist.løn
-                      <SortIcon column="assistantAllocation" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("leaderAllocation")}
-                  >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          Lederløn**
-                          <SortIcon column="leaderAllocation" />
-                        </TooltipTrigger>
-                        <TooltipContent>Proportionel andel + 1% feriepenge</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("atpBarsselAllocation")}
-                  >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          ATP/B
-                          <SortIcon column="atpBarsselAllocation" />
-                        </TooltipTrigger>
-                        <TooltipContent>ATP + Barsel (381 kr/FTE/måned) prorateret</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("cancellationPercent")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Annul. %
-                      <SortIcon column="cancellationPercent" />
-                    </div>
                   </TableHead>
                   <TableHead 
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
@@ -1016,30 +912,10 @@ export function ClientDBTab() {
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleSort("dbPercent")}
                   >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          DB%
-                          <SortIcon column="dbPercent" />
-                        </TooltipTrigger>
-                        <TooltipContent>Dækningsbidrag i procent af omsætning</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead 
-                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("revenuePerFTE")}
-                  >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          <Users className="h-3 w-3 mr-1" />
-                          Oms/FTE
-                          <SortIcon column="revenuePerFTE" />
-                        </TooltipTrigger>
-                        <TooltipContent>Omsætning per medarbejder (FTE)</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <div className="flex items-center gap-1 justify-end">
+                      DB%
+                      <SortIcon column="dbPercent" />
+                    </div>
                   </TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -1047,325 +923,89 @@ export function ClientDBTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
-                ) : sortedClientDBData.length === 0 ? (
+                ) : filteredAndSortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
-                      Ingen data for denne periode
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      {hideZeroClients && clientDBData.length > 0 
+                        ? "Alle klienter er skjult (ingen aktivitet)"
+                        : "Ingen data for denne periode"
+                      }
                     </TableCell>
                   </TableRow>
                 ) : (
-                  <>
-                    {sortedClientDBData.map((client) => (
-                      <TableRow key={client.clientId}>
-                        <TableCell className="font-medium">{client.clientName}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {client.teamName || "Ikke tildelt"}
-                        </TableCell>
-                        <TableCell className="text-right">{client.sales}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {formatCurrency(client.adjustedRevenue)}
-                            {(() => {
-                              const prevData = previousPeriodData?.[client.clientId];
-                              const trend = prevData ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue) : null;
-                              if (!trend) return null;
-                              return (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className={cn(
-                                        "text-xs flex items-center",
-                                        trend.isPositive ? "text-primary" : "text-destructive"
-                                      )}>
-                                        {trend.isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{trend.label} vs. {previousPeriodLabel}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {formatCurrency(prevData?.previousRevenue || 0)} → {formatCurrency(client.adjustedRevenue)}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            })()}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          -{formatCurrency(client.adjustedSellerCost)}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {client.locationCosts > 0 ? `-${formatCurrency(client.locationCosts)}` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {client.assistantAllocation > 0 ? `-${formatCurrency(client.assistantAllocation)}` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {client.leaderAllocation > 0 
-                            ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {client.atpBarsselAllocation > 0 
-                            ? `-${formatCurrency(client.atpBarsselAllocation)}` 
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {editingClientId === client.clientId ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <Input
-                                type="number"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(e, client.clientId)}
-                                onBlur={() => handleSaveCancellationPercent(client.clientId)}
-                                className="w-20 h-7 text-right text-sm"
-                                min={0}
-                                max={100}
-                                step={0.1}
-                                autoFocus
-                              />
-                              <span className="text-muted-foreground">%</span>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleEditClick(client.clientId, client.cancellationPercent)}
-                              className="group inline-flex items-center gap-1 hover:text-primary transition-colors text-muted-foreground"
-                            >
-                              {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "-"}
-                              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                          )}
-                        </TableCell>
-                        <TableCell 
-                          className={cn(
-                            "text-right font-medium",
-                            client.finalDB >= 0 ? "text-primary" : "text-destructive"
-                          )}
-                        >
-                          {formatCurrency(client.finalDB)}
-                        </TableCell>
-                        <TableCell 
-                          className={cn(
-                            "text-right font-medium",
-                            client.dbPercent >= 20 ? "text-primary" : client.dbPercent >= 0 ? "text-muted-foreground" : "text-destructive"
-                          )}
-                        >
-                          {formatPercent(client.dbPercent)}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {client.fteCount > 0 ? formatCurrency(client.revenuePerFTE) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setSelectedClientForDaily({ id: client.clientId, name: client.clientName })}
-                            title="Vis daglig breakdown"
-                          >
-                            <Calendar className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {/* Subtotal - Teams DB */}
-                    <TableRow className="bg-muted/50 font-medium">
-                      <TableCell>Samlet Team DB</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right">{totals.sales}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
-                      <TableCell className="text-right text-destructive">
-                        -{formatCurrency(totals.sellerSalaryCost)}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        {totals.locationCosts > 0 ? `-${formatCurrency(totals.locationCosts)}` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        -{formatCurrency(totals.assistantAllocation)}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        -{formatCurrency(totals.leaderAllocation)}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        -{formatCurrency(totals.atpBarsselAllocation)}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell 
-                        className={cn(
-                          "text-right font-medium",
-                          totals.finalDB >= 0 ? "text-primary" : "text-destructive"
-                        )}
-                      >
-                        {formatCurrency(totals.finalDB)}
-                      </TableCell>
-                      <TableCell 
-                        className={cn(
-                          "text-right font-medium",
-                          totals.dbPercent >= 20 ? "text-primary" : totals.dbPercent >= 0 ? "text-muted-foreground" : "text-destructive"
-                        )}
-                      >
-                        {formatPercent(totals.dbPercent)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {totals.fteCount > 0 ? formatCurrency(totals.revenuePerFTE) : "-"}
-                      </TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
+                  filteredAndSortedData.map((client) => {
+                    const prevData = previousPeriodData?.[client.clientId];
+                    const trend = prevData ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue) : null;
                     
-                    {/* Stab expenses row */}
-                    <TableRow className="border-t-2">
-                      <TableCell className="font-medium">Stab-udgifter</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right text-destructive font-medium">
-                        -{formatCurrency(totals.stabExpenses)}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                    
-                    {/* Staff salaries row (hours-based) */}
-                    <TableRow 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setStaffSalariesExpanded(!staffSalariesExpanded)}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {staffSalariesExpanded ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          Stabslønninger
-                        </div>
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right text-destructive font-medium">
-                        -{formatCurrency(totals.staffSalaries)}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                    
-                    {/* Staff salaries breakdown (expanded) */}
-                    {staffSalariesExpanded && staffSalaryList.map((staff) => (
-                      <TableRow key={staff!.employeeId} className="bg-muted/30">
-                        <TableCell className="pl-10">
-                          <div className="flex flex-col">
-                            <span className="text-sm">{staff!.name}</span>
-                            {staff!.jobTitle && (
-                              <span className="text-xs text-muted-foreground">{staff!.jobTitle}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <div className="flex items-center gap-1">
-                                  {staff!.hoursSource === 'timestamp' ? (
-                                    <Clock className="h-3 w-3 text-muted-foreground" />
-                                  ) : (
-                                    <Briefcase className="h-3 w-3 text-muted-foreground" />
-                                  )}
-                                  <span className="text-xs text-muted-foreground">
-                                    {staff!.hoursSource === 'timestamp' ? 'Stemplet' : 'Vagt'}
-                                  </span>
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {staff!.hoursSource === 'timestamp' 
-                                  ? 'Beregnet fra faktiske stemplinger' 
-                                  : 'Beregnet fra planlagte vagter'}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {staff!.isHourlyBased ? `${staff!.workedHours.toFixed(1)} t` : '-'}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {staff!.isHourlyBased ? `${formatCurrency(staff!.hourlyRate)}/t` : 'Fast løn'}
-                        </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {formatCurrency(staff!.baseSalary)}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          +{formatCurrency(staff!.vacationPay)}
-                        </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right text-destructive text-sm">
-                          -{formatCurrency(staff!.totalSalary)}
-                        </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    ))}
-                    
-                    {/* Net earnings - final row */}
-                    <TableRow className="bg-primary/10 font-bold border-t-2">
-                      <TableCell>Samlet Indtjening</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell 
-                        className={cn(
-                          "text-right font-bold text-lg",
-                          totals.netEarnings >= 0 ? "text-primary" : "text-destructive"
-                        )}
-                      >
-                        {formatCurrency(totals.netEarnings)}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </>
+                    return (
+                      <ClientDBExpandableRow
+                        key={client.clientId}
+                        client={client}
+                        trend={trend}
+                        previousPeriodLabel={previousPeriodLabel}
+                        onEditCancellation={handleEditClick}
+                        onShowDaily={setSelectedClientForDaily}
+                      />
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
-          
-          <p className="text-xs text-muted-foreground">
-            *Sælgerløn = provision + 12,5% feriepenge | **Lederløn = proportionel andel + 1% feriepenge
-          </p>
+
+          {/* Summary Card */}
+          <ClientDBSummaryCard
+            teamDB={totals.finalDB}
+            stabExpenses={totals.stabExpenses}
+            staffSalaries={totals.staffSalaries}
+            netEarnings={totals.netEarnings}
+            staffSalaryList={staffSalaryList}
+          />
         </CardContent>
       </Card>
 
-      {/* Daily breakdown panel */}
+      {/* Inline edit modal for cancellation percent */}
+      {editingClientId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingClientId(null)}>
+          <Card className="p-4 w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3">Rediger annulleringsprocent</h3>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, editingClientId)}
+                className="flex-1"
+                min={0}
+                max={100}
+                step={0.1}
+                autoFocus
+              />
+              <span className="text-muted-foreground">%</span>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button 
+                onClick={() => setEditingClientId(null)}
+                className="flex-1 px-3 py-2 text-sm border rounded-md hover:bg-muted"
+              >
+                Annuller
+              </button>
+              <button 
+                onClick={() => handleSaveCancellationPercent(editingClientId)}
+                className="flex-1 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              >
+                Gem
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Daily breakdown modal */}
       {selectedClientForDaily && (
         <ClientDBDailyBreakdown
           clientId={selectedClientForDaily.id}
