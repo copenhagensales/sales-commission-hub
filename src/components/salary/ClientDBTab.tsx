@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, STANDARD_MONTH_DAYS } from "@/lib/calculations";
+import { countWorkDaysInPeriod } from "@/lib/calculations/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -665,9 +666,12 @@ export function ClientDBTab() {
         totalAssistantSalary += assistantData?.totalSalary || 0;
       }
 
-      // Calculate ATP + Barsel cost for this team (fixed monthly amount per employee, not prorated)
+      // Calculate ATP + Barsel cost for this team (prorated by workdays in period)
       const teamMemberCount = teamMemberCounts?.[teamId] || 0;
-      const teamAtpBarsselCost = teamMemberCount * atpRate;
+      const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+      const WORKDAYS_PER_MONTH = 22;
+      const atpProrationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
+      const teamAtpBarsselCost = teamMemberCount * atpRate * atpProrationFactor;
 
       // Allocate assistant salary and ATP/Barsel proportionally by revenue
       for (const client of teamClients) {
