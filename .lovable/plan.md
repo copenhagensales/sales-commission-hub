@@ -1,119 +1,82 @@
 
 
-# UI/UX Forbedring af DB per Klient-rapporten
+# UI Forbedring: Tabel-kolonne Alignment i DB per Klient
 
-## Nuvaerende problemer
+## Problem
 
-### 1. For mange kolonner (13+ kolonner)
-Tabellen har alt for mange kolonner, der vises samtidigt:
-- Klient, Team, Salg, Omsaetning, Saelgerlon, Centre/Boder, Assist.lon, Lederlon, ATP/B, Annul.%, Final DB, DB%, Oms/FTE
+Tabellen har følgende layoutproblemer:
+1. **Kolonnebredder er ikke konsistente** - data og headers flugter ikke
+2. **Expand-knap tager plads** men er ikke synkroniseret med kolonnebredder
+3. **Progress-bar og DB%** har forskellige bredder per række
+4. **Manglende faste kolonnebredder** - tabellen justerer dynamisk baseret på indhold
 
-Dette skaber:
-- Horisontalt scroll
-- Svaert at sammenligne tal
-- Uoverskuelig datapraesentation
+## Løsning
 
-### 2. Manglende visuel hierarki
-Alle data vises pa samme niveau uden gruppering. Omkostningskolonner (rod tekst) blandes med nogletal (gron/neutral).
+Tilføj eksplicitte kolonnebredder til tabellen så alt flugter korrekt:
 
-### 3. Ingen KPI-oversigt
-Brugeren skal gennemlaese hele tabellen for at fa et overblik over performancen.
+### Ændringer i ClientDBTab.tsx (TableHeader)
 
-### 4. Footer-sektion er uoverskuelig
-Subtotal, Stab-udgifter og Stabsloninger er separate raekker i tabellen i stedet for at vaere visuelt adskilt.
+| Kolonne | Nuværende | Ny bredde |
+|---------|-----------|-----------|
+| Expand-knap | `w-8` | `w-10` (fast) |
+| Klient | Auto | `min-w-[140px]` |
+| Team | Auto | `min-w-[100px]` |
+| Salg | Auto | `w-[70px] text-right` |
+| Omsætning | Auto | `w-[120px] text-right` |
+| Omkostninger | Auto | `w-[120px] text-right` |
+| Final DB | Auto | `w-[110px] text-right` |
+| DB% | Auto | `w-[140px]` |
+| Actions | `w-10` | `w-12` (fast) |
 
----
+### Ændringer i ClientDBExpandableRow.tsx
 
-## Foreslaaet losning
+Matcher kolonnebredder fra header:
 
-### 1. KPI Dashboard oeverst
-Tilfoej en kompakt KPI-sektion med de vigtigste nogletal:
+```tsx
+// Expand button
+<TableCell className="w-10 p-2">
 
-```text
-+---------------+  +---------------+  +---------------+  +---------------+
-| Total Oms.    |  | Total DB      |  | DB%           |  | Netto Indtj.  |
-| 291.970 kr    |  | 77.763 kr     |  | 26,6%         |  | 52.000 kr     |
-+---------------+  +---------------+  +---------------+  +---------------+
+// Client name
+<TableCell className="font-medium min-w-[140px]">
+
+// Team
+<TableCell className="text-muted-foreground text-sm min-w-[100px]">
+
+// Sales
+<TableCell className="text-right tabular-nums w-[70px]">
+
+// Revenue
+<TableCell className="text-right w-[120px]">
+
+// Costs
+<TableCell className="text-right text-destructive tabular-nums w-[120px]">
+
+// Final DB
+<TableCell className="text-right font-semibold tabular-nums w-[110px]">
+
+// DB% with progress
+<TableCell className="w-[140px]">
+
+// Actions
+<TableCell className="w-12">
 ```
 
-### 2. Komprimeret tabel med grupperede omkostninger
-Reducer kolonner fra 13+ til 8 ved at:
-- Kombinere alle omkostninger (Saelgerlon, Centre/Boder, Assist.lon, Lederlon, ATP/B) til en enkelt "Omkostninger" kolonne
-- Fjerne individuelle omkostningskolonner fra hovedvisningen
-- Tilfoeje en expand/collapse funktion til at se omkostningsdetaljer
+### Ekstra forbedringer
 
-**Ny tabelstruktur:**
+1. **Tilføj `table-fixed` layout** til Table-komponenten for at håndhæve faste kolonnebredder
+2. **Konsistent padding** på alle celler
+3. **Bedre DB% layout** med fast bredde på progress-bar container
 
-| Klient | Team | Salg | Omsaetning | Omkostninger | Final DB | DB% | Detaljer |
-|--------|------|------|------------|--------------|----------|-----|----------|
+## Filer der ændres
 
-Klik pa "Detaljer" eller udvid raekken for at se:
-- Saelgerlon, Lokation, Assist.lon, Lederlon, ATP/B, Annul.%
-
-### 3. Visuelt adskilt footer
-Flytter summary-sektionen ud af tabellen og ind i et separat card-layout:
-
-```text
-+--------------------------------------------------+
-|  SAMLET OVERSIGT                                 |
-+--------------------------------------------------+
-| Team DB:     77.763 kr                           |
-| - Stab-udg:  -8.500 kr                           |
-| - Stab-lon:  -17.263 kr                          |
-+--------------------------------------------------+
-| NETTO:       52.000 kr                    +26.6% |
-+--------------------------------------------------+
-```
-
-### 4. Collapsible tabelfunktionalitet
-Hovedtabellen viser kun kunder med aktivitet som standard. Kunder med 0 salg/omsaetning kan skjules/vises via en toggle.
-
-### 5. Forbedret farvekodning
-- **Gron** for positive DB-vaerdier og hoj DB%
-- **Rodt** for negative vaerdier
-- **Gra** for neutrale/tomme vaerdier
-- Progressbar til DB% for hurtig visuel sammenligning
-
----
-
-## Teknisk implementering
-
-### Nye filer
-
-| Fil | Formal |
-|-----|--------|
-| `src/components/salary/ClientDBKPIs.tsx` | KPI-oversigt for rapporten |
-| `src/components/salary/ClientDBSummaryCard.tsx` | Ny footer med samlet indtjening |
-| `src/components/salary/ClientDBExpandableRow.tsx` | Udvidelig raekke med omkostningsdetaljer |
-
-### Aendringer i eksisterende filer
-
-| Fil | Aendring |
-|-----|----------|
-| `src/components/salary/ClientDBTab.tsx` | Integration af nye komponenter, reduceret kolonneantal |
-
-### Implementation steps
-
-1. **Opret ClientDBKPIs** - KPI-cards oeverst med Total Oms., Total DB, DB% og Netto Indtjening
-2. **Opret ClientDBExpandableRow** - Collapsible raekke-komponent med omkostningsdetaljer
-3. **Opret ClientDBSummaryCard** - Visuelt adskilt summary-sektion
-4. **Refaktor ClientDBTab** - Reducer tabel til 8 kolonner, integrer nye komponenter
-5. **Tilfoej hide-zero toggle** - Mulighed for at skjule kunder uden aktivitet
-
----
+| Fil | Ændring |
+|-----|---------|
+| `src/components/salary/ClientDBTab.tsx` | Opdater TableHeader med faste bredder |
+| `src/components/salary/ClientDBExpandableRow.tsx` | Match kolonnebredder fra header |
 
 ## Forventet resultat
 
-**For:**
-- 13+ kolonner - horisontalt scroll
-- Ingen hurtig oversigt
-- Footer blandet ind i tabel
-- Alle omkostninger vises individuelt
-
-**Efter:**
-- 8 kolonner med expand-for-detaljer
-- KPI-dashboard med nogletal
-- Visuelt adskilt summary-sektion
-- Kompakt tabel med detaljer on-demand
-- Toggle til at skjule inaktive kunder
+- Alle kolonner flugter perfekt mellem header og data-rækker
+- Ensartet udseende uanset indholdsbredde
+- Professionelt og overskueligt tabel-layout
 
