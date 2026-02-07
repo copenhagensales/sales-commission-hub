@@ -644,9 +644,10 @@ export function ClientDBTab() {
     }
 
     // Calculate team allocations
-    // Calculate proration factor once for all teams
-    const daysInPeriodCount = periodDaysArray.length;
-    const prorationFactor = daysInPeriodCount / STANDARD_MONTH_DAYS;
+    // Calculate proration factor based on workdays (Mon-Fri) for consistent display
+    const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+    const WORKDAYS_PER_MONTH = 22;
+    const prorationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
     const atpRate = atpBarsselRate || 381;
 
     for (const [teamId, teamClients] of Object.entries(clientsByTeam)) {
@@ -668,10 +669,7 @@ export function ClientDBTab() {
 
       // Calculate ATP + Barsel cost for this team (prorated by workdays in period)
       const teamMemberCount = teamMemberCounts?.[teamId] || 0;
-      const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-      const WORKDAYS_PER_MONTH = 22;
-      const atpProrationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
-      const teamAtpBarsselCost = teamMemberCount * atpRate * atpProrationFactor;
+      const teamAtpBarsselCost = teamMemberCount * atpRate * prorationFactor;
 
       // Allocate assistant salary and ATP/Barsel proportionally by revenue
       for (const client of teamClients) {
