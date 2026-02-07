@@ -1,150 +1,126 @@
 
-# Sygelønsprocent per Klient — Implementeringsplan
+# Vis Fradragsbeløb for Sygeløn og Annullering
 
 ## Formål
 
-Tilføj en redigerbar **"Sygeløn %"** per klient i DB per Klient-rapporten. Denne procent øger provisionsomkostningen for at afspejle, at sælgere modtager løn under sygdom.
+Tilføj visning af de faktiske kronebeløb, der fratrækkes/tillægges via annullerings- og sygelønsprocenten i den udvidede rækkevisning i DB per Klient-rapporten. Dette giver et klarere overblik end kun at se procenterne.
 
-**Eksempel:** 
-- Provision + feriepenge: 562.500 kr
-- Sygefraværsprocent: 3%
-- Justeret omkostning: 579.375 kr (sælgerløn × 1,03)
+## Beregningslogik
 
-## Oversigt
+Baseret på den nuværende kode beregnes følgende:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  DB per Klient - Expanded Row                                                   │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  Sælgerløn    Centre/Boder   Assist.løn   Lederløn   ATP/Barsel                 │
-│  -604.766 kr      —          -19.125 kr  -150.636 kr  -1.905 kr                 │
-│                                                                                 │
-│  Annul. %      Sygeløn % (NY!)                                                  │
-│    10.0%         3.0%                                                           │
-└─────────────────────────────────────────────────────────────────────────────────┘
+Eksempel: TDC Erhverv
+─────────────────────────────────────
+Provision:             500.000 kr
++ Feriepenge (12,5%):   62.500 kr
+= Sælgerløn (basis):   562.500 kr
+
+Sygeløn 3%:           + 16.875 kr  ← Ekstra omkostning
+= Sælgerløn m/syge:    579.375 kr
+
+Annullering 10%:      - 57.938 kr  ← Fratrukket pga. annullering
+= Justeret sælgerløn:  521.437 kr
+```
+
+**Sygeløn-tillæg:** `sellerSalaryCost × sickPayPercent / 100`
+
+**Annullerings-fradrag (på omsætning):** `revenue × cancellationPercent / 100`
+
+**Annullerings-fradrag (på sælgerløn):** `sellerCostWithSickPay × cancellationPercent / 100`
+
+## UI-ændringer
+
+### Nuværende visning (expanded row)
+
+```text
+Annul. %      Sygeløn %
+  10.0%         3.0%
+```
+
+### Ny visning med beløb
+
+```text
+Annul. %           Sygeløn %
+  10.0%              3.0%
+(-57.938 kr oms.)  (+16.875 kr)
+```
+
+Alternativt kan det vises som separate felter:
+
+```text
+Annul. %     Annul. fradrag     Sygeløn %     Sygeløn tillæg
+  10.0%        -57.938 kr         3.0%         +16.875 kr
 ```
 
 ## Teknisk Implementering
 
-### 1. Database: Tilføj kolonne til eksisterende tabel
+### 1. Udvid ClientDBData interface
 
-Tilføj `sick_pay_percent` til `client_adjustment_percents`:
-
-| Kolonne | Type | Standard |
-|---------|------|----------|
-| sick_pay_percent | numeric | 0 |
-
-Dette matcher den eksisterende struktur med `cancellation_percent` og `deduction_percent`.
-
-### 2. Frontend: Udvid query til at inkludere sygeløn
-
-I `ClientDBTab.tsx`, tilføj `sick_pay_percent` til den eksisterende query:
+Tilføj to nye felter til at holde de beregnede beløb:
 
 ```typescript
-// Linje 191-199 - Udvid SELECT
-const { data: adjustmentPercents } = useQuery({
-  queryKey: ["client-adjustment-percents"],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("client_adjustment_percents")
-      .select("client_id, cancellation_percent, deduction_percent, sick_pay_percent"); // Tilføj sick_pay_percent
-    if (error) throw error;
-    return data;
-  },
-});
+interface ClientDBData {
+  // ... eksisterende felter
+  sickPayAmount: number;           // Ekstra omkostning fra sygeløn (positiv)
+  cancellationRevenueDeduction: number;  // Fradrag i omsætning (positiv)
+  cancellationCostDeduction: number;     // Fradrag i sælgerløn (positiv)
+}
 ```
 
-### 3. Beregningslogik: Øg sælgerløn med sygeløn
+### 2. Beregn beløbene i ClientDBTab.tsx
 
-Opdater beregningen i `useMemo` (omkring linje 584-590):
+I `useMemo`-beregningen, tilføj:
 
 ```typescript
-// Nuværende:
-const sellerSalaryCost = commission + sellerVacationPay;
-const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
+// Beregn sygeløn-tillæg (ekstra omkostning)
+const sickPayAmount = sellerSalaryCost * (sickPayPercent / 100);
 
-// Nyt - med sygefraværsprocent:
-const sickPayPercent = Number(adjustment?.sick_pay_percent) || 0;
-const sickPayFactor = 1 + (sickPayPercent / 100);
-
-const sellerSalaryCost = commission + sellerVacationPay;
-const sellerCostWithSickPay = sellerSalaryCost * sickPayFactor;
-const adjustedSellerCost = sellerCostWithSickPay * cancellationFactor;
+// Beregn annullerings-fradrag
+const cancellationRevenueDeduction = salesData.revenue * (cancellationPercent / 100);
+const cancellationCostDeduction = sellerCostWithSickPay * (cancellationPercent / 100);
 ```
 
-**Rækkefølge:** Sygeløn tilføjes først (øger basis), derefter reduceres med annulleringsprocent.
-
-### 4. Save-funktion: Spejl eksisterende logik
-
-Tilføj `handleSaveSickPayPercent` som kopi af `handleSaveCancellationPercent`:
-
-```typescript
-const handleSaveSickPayPercent = async (clientId: string) => {
-  const newValue = parseFloat(editValue);
-  if (isNaN(newValue) || newValue < 0 || newValue > 100) {
-    toast.error("Ugyldig værdi. Indtast et tal mellem 0 og 100.");
-    return;
-  }
-
-  try {
-    const { data: existing } = await supabase
-      .from("client_adjustment_percents")
-      .select("id")
-      .eq("client_id", clientId)
-      .single();
-
-    if (existing) {
-      await supabase
-        .from("client_adjustment_percents")
-        .update({ sick_pay_percent: newValue })
-        .eq("client_id", clientId);
-    } else {
-      await supabase
-        .from("client_adjustment_percents")
-        .insert({ client_id: clientId, sick_pay_percent: newValue });
-    }
-
-    toast.success("Sygefraværsprocent opdateret");
-    queryClient.invalidateQueries({ queryKey: ["client-adjustment-percents"] });
-    setEditingClientId(null);
-  } catch (error) {
-    toast.error("Kunne ikke opdatere sygefraværsprocent");
-  }
-};
-```
-
-### 5. UI: Vis og rediger i expanded row
-
-**Udvid interface `ClientDBRowData`:**
+### 3. Udvid ClientDBRowData interface
 
 ```typescript
 interface ClientDBRowData {
   // ... eksisterende felter
-  sickPayPercent: number;  // NY
+  sickPayAmount: number;
+  cancellationRevenueDeduction: number;
 }
 ```
 
-**Udvid props:**
+### 4. Opdater ClientDBExpandableRow UI
 
-```typescript
-interface ClientDBExpandableRowProps {
-  // ... eksisterende
-  onEditSickPay: (clientId: string, currentValue: number) => void; // NY
-}
-```
-
-**Tilføj felt i expanded row grid (ved siden af Annul. %):**
+I expanded row-sektionen, vis beløbene under procenterne:
 
 ```typescript
 <div>
-  <button
-    onClick={() => onEditSickPay(client.clientId, client.sickPayPercent)}
-    className="text-left hover:text-primary transition-colors"
-  >
+  <button onClick={() => onEditCancellation(...)}>
+    <p className="text-muted-foreground text-xs mb-0.5">Annul. %</p>
+    <p className="font-medium">
+      {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "—"}
+    </p>
+    {client.cancellationRevenueDeduction > 0 && (
+      <p className="text-xs text-destructive">
+        -{formatCurrency(client.cancellationRevenueDeduction)} oms.
+      </p>
+    )}
+  </button>
+</div>
+
+<div>
+  <button onClick={() => onEditSickPay(...)}>
     <p className="text-muted-foreground text-xs mb-0.5">Sygeløn %</p>
     <p className="font-medium">
       {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "—"}
     </p>
+    {client.sickPayAmount > 0 && (
+      <p className="text-xs text-muted-foreground">
+        +{formatCurrency(client.sickPayAmount)}
+      </p>
+    )}
   </button>
 </div>
 ```
@@ -153,25 +129,22 @@ interface ClientDBExpandableRowProps {
 
 | Fil | Ændring |
 |-----|---------|
-| Migration (ny) | Tilføj `sick_pay_percent` kolonne |
-| `ClientDBTab.tsx` | Query, beregning, save-funktion, state |
-| `ClientDBExpandableRow.tsx` | Interface, props, UI-felt |
+| `src/components/salary/ClientDBTab.tsx` | Beregn og tilføj beløb til data-objektet |
+| `src/components/salary/ClientDBExpandableRow.tsx` | Vis beløb under procenterne i UI |
 
-## Beregningseksempel
-
-For TDC Erhverv med 10% annullering og 3% sygeløn:
+## Visuel opsummering
 
 ```text
-Provision:             500.000 kr
-+ Feriepenge (12,5%):   62.500 kr
-= Sælgerløn:           562.500 kr
-
-× Sygeløn (1,03):      579.375 kr  ← +16.875 kr ekstra
-× Annullering (0,90):  521.437 kr  ← efter 10% reduktion
-
-Samlet effekt: Sygeløn øger basis, annullering reducerer totalen
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  DB per Klient - Expanded Row                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Sælgerløn    Centre/Boder   Assist.løn   Lederløn   ATP/Barsel                 │
+│  -604.766 kr      —          -19.125 kr  -150.636 kr  -1.905 kr                 │
+│                                                                                 │
+│  Annul. %              Sygeløn %                                                │
+│    10.0%                 3.0%                                                   │
+│  (-50.000 kr oms.)     (+18.141 kr)                                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Dialog til redigering
-
-Genbruger den eksisterende dialog-logik med state til at tracke om vi redigerer `cancellation` eller `sickPay`, så samme input-felt kan bruges.
+Dette giver brugeren et klart overblik over den faktiske økonomiske effekt af begge justeringer.
