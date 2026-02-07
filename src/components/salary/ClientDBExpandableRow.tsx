@@ -23,6 +23,9 @@ interface ClientDBRowData {
   sickPayPercent: number;
   finalDB: number;
   dbPercent: number;
+  // Calculated deduction amounts
+  sickPayAmount: number;
+  cancellationRevenueDeduction: number;
 }
 
 interface TrendInfo {
@@ -225,6 +228,11 @@ export function ClientDBExpandableRow({
                   <p className="font-medium">
                     {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "—"}
                   </p>
+                  {client.cancellationRevenueDeduction > 0 && (
+                    <p className="text-xs text-destructive">
+                      -{formatCurrency(client.cancellationRevenueDeduction)} oms.
+                    </p>
+                  )}
                 </button>
               </div>
               <div>
@@ -236,6 +244,11 @@ export function ClientDBExpandableRow({
                   <p className="font-medium">
                     {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "—"}
                   </p>
+                  {client.sickPayAmount > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      +{formatCurrency(client.sickPayAmount)}
+                    </p>
+                  )}
                 </button>
               </div>
             </div>
