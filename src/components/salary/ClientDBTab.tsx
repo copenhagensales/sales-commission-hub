@@ -68,6 +68,7 @@ interface ClientDBData {
   sellerSalaryCost: number;
   locationCosts: number;
   cancellationPercent: number;
+  sickPayPercent: number;
   adjustedRevenue: number;
   adjustedSellerCost: number;
   basisDB: number;
@@ -96,6 +97,7 @@ export function ClientDBTab() {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [selectedPresetLabel, setSelectedPresetLabel] = useState<string | undefined>("Denne måned");
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<"cancellation" | "sickPay">("cancellation");
   const [editValue, setEditValue] = useState<string>("");
   const [selectedClientForDaily, setSelectedClientForDaily] = useState<{ id: string; name: string } | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
@@ -126,17 +128,28 @@ export function ClientDBTab() {
     setPeriodEnd(end);
   };
 
-  const handleEditClick = (clientId: string, currentValue: number) => {
+  const handleEditCancellationClick = (clientId: string, currentValue: number) => {
     setEditingClientId(clientId);
+    setEditingType("cancellation");
     setEditValue(currentValue.toString());
   };
 
-  const handleSaveCancellationPercent = async (clientId: string) => {
+  const handleEditSickPayClick = (clientId: string, currentValue: number) => {
+    setEditingClientId(clientId);
+    setEditingType("sickPay");
+    setEditValue(currentValue.toString());
+  };
+
+  const handleSaveAdjustmentPercent = async (clientId: string) => {
     const newValue = parseFloat(editValue);
     if (isNaN(newValue) || newValue < 0 || newValue > 100) {
       toast.error("Ugyldig værdi. Indtast et tal mellem 0 og 100.");
       return;
     }
+
+    const columnName = editingType === "cancellation" ? "cancellation_percent" : "sick_pay_percent";
+    const successMessage = editingType === "cancellation" ? "Annulleringsprocent opdateret" : "Sygefraværsprocent opdateret";
+    const errorMessage = editingType === "cancellation" ? "Kunne ikke opdatere annulleringsprocent" : "Kunne ikke opdatere sygefraværsprocent";
 
     try {
       const { data: existing } = await supabase
@@ -148,28 +161,28 @@ export function ClientDBTab() {
       if (existing) {
         const { error } = await supabase
           .from("client_adjustment_percents")
-          .update({ cancellation_percent: newValue })
+          .update({ [columnName]: newValue })
           .eq("client_id", clientId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("client_adjustment_percents")
-          .insert({ client_id: clientId, cancellation_percent: newValue });
+          .insert({ client_id: clientId, [columnName]: newValue });
         if (error) throw error;
       }
 
-      toast.success("Annulleringsprocent opdateret");
+      toast.success(successMessage);
       queryClient.invalidateQueries({ queryKey: ["client-adjustment-percents"] });
       setEditingClientId(null);
     } catch (error) {
-      console.error("Error updating cancellation percent:", error);
-      toast.error("Kunne ikke opdatere annulleringsprocent");
+      console.error(`Error updating ${columnName}:`, error);
+      toast.error(errorMessage);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, clientId: string) => {
     if (e.key === "Enter") {
-      handleSaveCancellationPercent(clientId);
+      handleSaveAdjustmentPercent(clientId);
     } else if (e.key === "Escape") {
       setEditingClientId(null);
     }
@@ -193,7 +206,7 @@ export function ClientDBTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_adjustment_percents")
-        .select("client_id, cancellation_percent, deduction_percent");
+        .select("client_id, cancellation_percent, deduction_percent, sick_pay_percent");
       if (error) throw error;
       return data;
     },
@@ -577,6 +590,7 @@ export function ClientDBTab() {
       const salesData = salesByClient[client.id] || { sales: 0, commission: 0, revenue: 0 };
       const adjustment = adjustmentMap.get(client.id);
       const cancellationPercent = Number(adjustment?.cancellation_percent) || 0;
+      const sickPayPercent = Number(adjustment?.sick_pay_percent) || 0;
       
       const isFMClient = FM_CLIENT_NAMES.includes(client.name);
       const locationCosts = isFMClient ? (locationCostsMap.get(client.id) || 0) : 0;
@@ -585,9 +599,12 @@ export function ClientDBTab() {
       const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
       const sellerSalaryCost = commission + sellerVacationPay;
 
+      // Apply sick pay factor first (increases base cost), then cancellation factor (reduces)
+      const sickPayFactor = 1 + (sickPayPercent / 100);
+      const sellerCostWithSickPay = sellerSalaryCost * sickPayFactor;
       const cancellationFactor = 1 - (cancellationPercent / 100);
       const adjustedRevenue = salesData.revenue * cancellationFactor;
-      const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
+      const adjustedSellerCost = sellerCostWithSickPay * cancellationFactor;
 
       const basisDB = adjustedRevenue - adjustedSellerCost - locationCosts;
       const fteCount = teamId ? (teamMemberCounts?.[teamId] || 0) : 0;
@@ -604,6 +621,7 @@ export function ClientDBTab() {
         sellerSalaryCost,
         locationCosts,
         cancellationPercent,
+        sickPayPercent,
         adjustedRevenue,
         adjustedSellerCost,
         basisDB,
@@ -941,13 +959,14 @@ export function ClientDBTab() {
                     const prevData = previousPeriodData?.[client.clientId];
                     const trend = prevData ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue) : null;
                     
-                    return (
+                      return (
                       <ClientDBExpandableRow
                         key={client.clientId}
                         client={client}
                         trend={trend}
                         previousPeriodLabel={previousPeriodLabel}
-                        onEditCancellation={handleEditClick}
+                        onEditCancellation={handleEditCancellationClick}
+                        onEditSickPay={handleEditSickPayClick}
                         onShowDaily={setSelectedClientForDaily}
                       />
                     );
@@ -968,11 +987,13 @@ export function ClientDBTab() {
         </CardContent>
       </Card>
 
-      {/* Inline edit modal for cancellation percent */}
+      {/* Inline edit modal for adjustment percent */}
       {editingClientId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingClientId(null)}>
           <Card className="p-4 w-80" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold mb-3">Rediger annulleringsprocent</h3>
+            <h3 className="font-semibold mb-3">
+              {editingType === "cancellation" ? "Rediger annulleringsprocent" : "Rediger sygefraværsprocent"}
+            </h3>
             <div className="flex items-center gap-2">
               <Input
                 type="number"
@@ -995,7 +1016,7 @@ export function ClientDBTab() {
                 Annuller
               </button>
               <button 
-                onClick={() => handleSaveCancellationPercent(editingClientId)}
+                onClick={() => handleSaveAdjustmentPercent(editingClientId)}
                 className="flex-1 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
               >
                 Gem

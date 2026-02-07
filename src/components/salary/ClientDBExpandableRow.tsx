@@ -20,6 +20,7 @@ interface ClientDBRowData {
   leaderVacationPay: number;
   atpBarsselAllocation: number;
   cancellationPercent: number;
+  sickPayPercent: number;
   finalDB: number;
   dbPercent: number;
 }
@@ -36,6 +37,7 @@ interface ClientDBExpandableRowProps {
   trend?: TrendInfo | null;
   previousPeriodLabel?: string;
   onEditCancellation: (clientId: string, currentValue: number) => void;
+  onEditSickPay: (clientId: string, currentValue: number) => void;
   onShowDaily: (client: { id: string; name: string }) => void;
 }
 
@@ -44,6 +46,7 @@ export function ClientDBExpandableRow({
   trend,
   previousPeriodLabel,
   onEditCancellation,
+  onEditSickPay,
   onShowDaily,
 }: ClientDBExpandableRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -221,6 +224,17 @@ export function ClientDBExpandableRow({
                   <p className="text-muted-foreground text-xs mb-0.5">Annul. %</p>
                   <p className="font-medium">
                     {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "—"}
+                  </p>
+                </button>
+              </div>
+              <div>
+                <button
+                  onClick={() => onEditSickPay(client.clientId, client.sickPayPercent)}
+                  className="text-left hover:text-primary transition-colors"
+                >
+                  <p className="text-muted-foreground text-xs mb-0.5">Sygeløn %</p>
+                  <p className="font-medium">
+                    {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "—"}
                   </p>
                 </button>
               </div>

@@ -1357,6 +1357,7 @@ export type Database = {
           created_at: string
           deduction_percent: number
           id: string
+          sick_pay_percent: number | null
           updated_at: string
         }
         Insert: {
@@ -1365,6 +1366,7 @@ export type Database = {
           created_at?: string
           deduction_percent?: number
           id?: string
+          sick_pay_percent?: number | null
           updated_at?: string
         }
         Update: {
@@ -1373,6 +1375,7 @@ export type Database = {
           created_at?: string
           deduction_percent?: number
           id?: string
+          sick_pay_percent?: number | null
           updated_at?: string
         }
         Relationships: [
