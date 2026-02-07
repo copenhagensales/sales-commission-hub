@@ -217,7 +217,7 @@ export function ClientDBTab() {
   // Fetch Stab team expenses (administrative costs)
   const STAB_TEAM_ID = "09012ce9-e307-4f6d-a51e-f72af7200d74";
   const { data: stabExpenses } = useQuery({
-    queryKey: ["stab-expenses", periodStart.toISOString(), periodEnd.toISOString()],
+    queryKey: ["stab-expenses", periodStart.toISOString(), periodEnd.toISOString(), periodMode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("team_expenses")
@@ -227,16 +227,23 @@ export function ClientDBTab() {
       if (error) throw error;
       
       // Calculate total Stab expenses for the period
-      // For recurring/all_days expenses, prorate to selected period
+      // For "month" and "payroll" modes, show full monthly amount without proration
+      const isFullPeriod = periodMode === "month" || periodMode === "payroll";
+      
       let totalStabExpenses = 0;
-      const daysInMonth = 30; // Simplified
-      const periodDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const WORKDAYS_PER_MONTH = 22;
+      const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
       
       for (const expense of data || []) {
         if (expense.is_recurring || expense.all_days) {
-          // Prorate monthly expenses to selected period
           const monthlyAmount = Number(expense.amount) || 0;
-          totalStabExpenses += (monthlyAmount / daysInMonth) * periodDays;
+          if (isFullPeriod) {
+            // Full period: show complete monthly amount
+            totalStabExpenses += monthlyAmount;
+          } else {
+            // Partial period: prorate by workdays
+            totalStabExpenses += (monthlyAmount / WORKDAYS_PER_MONTH) * workdaysInPeriod;
+          }
         } else {
           // Specific date expense - check if within period
           const expenseDate = new Date(expense.expense_date);
