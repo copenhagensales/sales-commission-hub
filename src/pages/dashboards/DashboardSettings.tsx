@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target, LayoutGrid, Monitor, Shield } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -499,7 +499,7 @@ const DashboardSettings = () => {
   };
 
   return (
-    <MainLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Indstilling dashboard</h1>
@@ -1757,7 +1757,7 @@ const DashboardSettings = () => {
           />
         )}
       </div>
-    </MainLayout>
+    </DashboardLayout>
   );
 };
 
