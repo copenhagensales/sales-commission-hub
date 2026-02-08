@@ -112,7 +112,7 @@ export default function MarketsContent() {
         .from("teams")
         .select("id")
         .ilike("name", "%fieldmarketing%")
-        .single();
+        .maybeSingle();
       
       if (!team) return [];
       

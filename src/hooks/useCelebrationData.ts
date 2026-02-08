@@ -67,7 +67,7 @@ export function useCelebrationData({
         .eq("client_id", dashboardConfig.clientId)
         .eq("month", currentMonth)
         .eq("year", currentYear)
-        .single();
+        .maybeSingle();
 
       if (data) {
         const target = data.sales_target || 0;

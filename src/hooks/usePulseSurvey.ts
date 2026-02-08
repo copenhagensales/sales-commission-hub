@@ -33,7 +33,7 @@ export function useActivePulseSurvey() {
         .eq('year', year)
         .eq('month', month)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       return data;
@@ -56,7 +56,7 @@ export function useHasCompletedSurvey(surveyId?: string) {
         .from('employee_master_data')
         .select('id')
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .single();
+        .maybeSingle();
 
       if (!employee) return false;
 
@@ -65,7 +65,7 @@ export function useHasCompletedSurvey(surveyId?: string) {
         .select('id')
         .eq('survey_id', surveyId)
         .eq('employee_id', employee.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       return !!data;
@@ -109,7 +109,7 @@ export function useSubmitPulseSurvey() {
         .from('employee_master_data')
         .select('id, team_id, team:teams(name)')
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .single();
+        .maybeSingle();
 
       // Insert anonymous response with team_id
       const { error: responseError } = await supabase

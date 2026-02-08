@@ -902,7 +902,7 @@ export const useWidgetKpiData = (widgets: Array<{
                 .from("dashboard_kpis")
                 .select("formula, decimal_places, multiplier, symbol, symbol_position, kpi_type")
                 .eq("id", formulaId)
-                .single();
+                .maybeSingle();
               
               if (formulaError || !formulaData?.formula) {
                 console.error(`Formula not found: ${formulaId}`, formulaError);

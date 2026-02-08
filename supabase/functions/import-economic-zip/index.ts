@@ -111,8 +111,6 @@ function parseExcel(buffer: ArrayBuffer): { kontoPlanData: Record<string, string
   let kontoPlanData: Record<string, string>[] = [];
   let posteringData: Record<string, string>[] = [];
 
-  console.log(`Excel sheets found: ${sheetsFound.join(", ")}`);
-
   for (const sheetName of sheetsFound) {
     const sheet = workbook.Sheets[sheetName];
     const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { 
@@ -120,20 +118,16 @@ function parseExcel(buffer: ArrayBuffer): { kontoPlanData: Record<string, string
       defval: "" 
     });
 
-    console.log(`Sheet "${sheetName}": ${rows.length} rows`);
-
     const lowerName = sheetName.toLowerCase();
     
     // Match sheet names to data types
     if (lowerName === "konto" || lowerName === "kontoplan" || lowerName.includes("konto")) {
       if (kontoPlanData.length === 0) {
         kontoPlanData = rows;
-        console.log(`→ Matched "${sheetName}" as Kontoplan: ${rows.length} rows`);
       }
     } else if (lowerName === "postering" || lowerName === "posteringer" || lowerName.includes("postering")) {
       if (posteringData.length === 0) {
         posteringData = rows;
-        console.log(`→ Matched "${sheetName}" as Posteringer: ${rows.length} rows`);
       }
     }
   }
@@ -159,7 +153,6 @@ function parseExcel(buffer: ArrayBuffer): { kontoPlanData: Record<string, string
       
       if (hasPostColumns) {
         posteringData = rows;
-        console.log(`→ Using first sheet "${sheetsFound[0]}" as Posteringer (detected by columns): ${rows.length} rows`);
       }
     }
   }
@@ -194,8 +187,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Processing import ${importId} from ${storagePath}`);
-
     // Update status to processing
     await supabase
       .from("economic_imports")
@@ -217,7 +208,6 @@ Deno.serve(async (req) => {
 
     // Check if Excel or ZIP
     if (isExcelFile(storagePath)) {
-      console.log("Detected Excel file, parsing directly...");
       const buffer = await fileData.arrayBuffer();
       const result = parseExcel(buffer);
       kontoPlanData = result.kontoPlanData;
@@ -225,7 +215,6 @@ Deno.serve(async (req) => {
       filesFound.push(...result.sheetsFound.map(s => `${s} (sheet)`));
     } else {
       // ZIP file processing
-      console.log("Detected ZIP file, extracting...");
       const zip = new JSZip();
       const zipContent = await zip.loadAsync(await fileData.arrayBuffer());
 
@@ -242,24 +231,17 @@ Deno.serve(async (req) => {
         const text = decodeContent(content);
         const rows = parseCSV(text);
 
-        console.log(`Parsed ${filename}: ${rows.length} rows`);
-
         // Extract base filename (handle nested paths like "folder/Konto.csv")
         const baseName = filename.split('/').pop()?.toLowerCase() || '';
         
         // Use exact filename matching to avoid conflicts
         if (baseName === "konto.csv") {
           kontoPlanData = rows;
-          console.log(`→ Matched as Kontoplan: ${rows.length} rows`);
         } else if (baseName === "postering.csv") {
           posteringData = rows;
-          console.log(`→ Matched as Posteringer: ${rows.length} rows`);
         }
       }
     }
-
-    console.log(`Found files/sheets: ${filesFound.join(", ")}`);
-    console.log(`Konto rows: ${kontoPlanData.length}, Postering rows: ${posteringData.length}`);
 
     // Import Kontoplan first (due to foreign key)
     let kontoPlanCount = 0;
@@ -375,8 +357,6 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error("Failed to update import status:", updateError);
     }
-
-    console.log(`Import complete: ${kontoPlanCount} konti, ${posteringCount} posteringer in ${processingTime}ms`);
 
     return new Response(
       JSON.stringify({

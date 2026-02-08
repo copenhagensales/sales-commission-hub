@@ -246,15 +246,15 @@ export function useMyReferralCode() {
         .from('employee_master_data')
         .select('referral_code, first_name, last_name')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error || !data) {
         // Try by email as fallback
         const { data: dataByEmail, error: errorByEmail } = await supabase
           .from('employee_master_data')
           .select('referral_code, first_name, last_name')
           .eq('private_email', user.email)
-          .single();
+          .maybeSingle();
 
         if (errorByEmail) throw errorByEmail;
         return dataByEmail;

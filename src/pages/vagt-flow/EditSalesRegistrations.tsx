@@ -128,33 +128,30 @@ export default function EditSalesRegistrations() {
     },
   });
 
-  // Fetch all sales
+  // Fetch all sales from centralized sales table with source = 'fieldmarketing'
   const { data: sales, isLoading: loadingSales } = useQuery({
     queryKey: ["fm-sales-edit", dateRange.from, dateRange.to],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
           id,
-          seller_id,
-          location_id,
-          client_id,
-          product_name,
-          phone_number,
-          comment,
-          registered_at,
+          sale_datetime,
+          customer_phone,
+          raw_payload,
           created_at
         `)
-        .gte("registered_at", `${dateRange.from}T00:00:00`)
-        .lte("registered_at", `${dateRange.to}T23:59:59`)
-        .order("registered_at", { ascending: false });
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${dateRange.from}T00:00:00`)
+        .lte("sale_datetime", `${dateRange.to}T23:59:59`)
+        .order("sale_datetime", { ascending: false });
 
       if (error) throw error;
       
-      // Fetch related data separately
-      const sellerIds = [...new Set(data?.map(s => s.seller_id).filter(Boolean))] as string[];
-      const locationIds = [...new Set(data?.map(s => s.location_id).filter(Boolean))] as string[];
-      const clientIds = [...new Set(data?.map(s => s.client_id).filter(Boolean))] as string[];
+      // Extract unique IDs from raw_payload
+      const sellerIds = [...new Set(data?.map(s => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
+      const locationIds = [...new Set(data?.map(s => (s.raw_payload as any)?.fm_location_id).filter(Boolean))] as string[];
+      const clientIds = [...new Set(data?.map(s => (s.raw_payload as any)?.fm_client_id).filter(Boolean))] as string[];
       
       const [sellersRes, locationsRes, clientsRes] = await Promise.all([
         sellerIds.length > 0 
@@ -172,12 +169,27 @@ export default function EditSalesRegistrations() {
       const locationsMap = new Map((locationsRes.data || []).map(l => [l.id, l]));
       const clientsMap = new Map((clientsRes.data || []).map(c => [c.id, c]));
       
-      return (data || []).map(sale => ({
-        ...sale,
-        seller: sale.seller_id ? sellersMap.get(sale.seller_id) || null : null,
-        location: sale.location_id ? locationsMap.get(sale.location_id) || null : null,
-        client: sale.client_id ? clientsMap.get(sale.client_id) || null : null,
-      })) as SaleRecord[];
+      // Transform sales table data to SaleRecord interface
+      return (data || []).map(sale => {
+        const payload = sale.raw_payload as any || {};
+        const sellerId = payload.fm_seller_id || "";
+        const locationId = payload.fm_location_id || "";
+        const clientId = payload.fm_client_id || "";
+        return {
+          id: sale.id,
+          seller_id: sellerId,
+          location_id: locationId,
+          client_id: clientId,
+          product_name: payload.fm_product_name || null,
+          phone_number: sale.customer_phone || null,
+          comment: payload.fm_comment || null,
+          registered_at: sale.sale_datetime,
+          created_at: sale.created_at,
+          seller: sellerId ? sellersMap.get(sellerId) || null : null,
+          location: locationId ? locationsMap.get(locationId) || null : null,
+          client: clientId ? clientsMap.get(clientId) || null : null,
+        };
+      }) as SaleRecord[];
     },
   });
 
@@ -227,19 +239,31 @@ export default function EditSalesRegistrations() {
     },
   });
 
-  // Update sale mutation
+  // Update sale mutation - now uses centralized sales table with raw_payload
   const updateSale = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: EditFormData }) => {
-      const updateData: Record<string, unknown> = {
-        product_name: updates.product_name,
-        phone_number: updates.phone_number,
-        comment: updates.comment || null,
-        registered_at: updates.registered_at,
-        location_id: updates.location_id || null,
-        client_id: updates.client_id || null,
+      // Get existing raw_payload first
+      const { data: existing } = await supabase
+        .from("sales")
+        .select("raw_payload")
+        .eq("id", id)
+        .maybeSingle();
+      
+      const existingPayload = (existing?.raw_payload as any) || {};
+      
+      const updateData = {
+        sale_datetime: updates.registered_at,
+        customer_phone: updates.phone_number || null,
+        raw_payload: {
+          ...existingPayload,
+          fm_product_name: updates.product_name,
+          fm_comment: updates.comment || null,
+          fm_location_id: updates.location_id || null,
+          fm_client_id: updates.client_id || null,
+        },
       };
       const { error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .update(updateData)
         .eq("id", id);
       if (error) throw error;
@@ -247,6 +271,7 @@ export default function EditSalesRegistrations() {
     onSuccess: () => {
       toast.success("Salgsregistrering opdateret");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
       setEditDialog({ open: false, sale: null });
     },
     onError: (error: Error) => {
@@ -254,11 +279,11 @@ export default function EditSalesRegistrations() {
     },
   });
 
-  // Delete sale mutation
+  // Delete sale mutation - now uses centralized sales table
   const deleteSale = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .delete()
         .eq("id", id);
       if (error) throw error;
@@ -266,13 +291,14 @@ export default function EditSalesRegistrations() {
     onSuccess: () => {
       toast.success("Salgsregistrering slettet");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
     },
     onError: (error: Error) => {
       toast.error(`Kunne ikke slette: ${error.message}`);
     },
   });
 
-  // Update group mutation - updates all sales in a group
+  // Update group mutation - updates all sales in a group (now uses centralized sales table)
   const updateGroup = useMutation({
     mutationFn: async ({ 
       updates, 
@@ -293,44 +319,76 @@ export default function EditSalesRegistrations() {
       // Items to create (new items)
       const toCreate = items.filter(item => !item.id && !item.toDelete);
       
-      // Delete marked items
+      // Delete marked items from centralized sales table
       if (toDelete.length > 0) {
         const { error } = await supabase
-          .from("fieldmarketing_sales")
+          .from("sales")
           .delete()
           .in("id", toDelete.map(i => i.id!));
         if (error) throw error;
       }
       
-      // Update existing items (product, phone, comment) + group fields
+      // Update existing items (product, phone, comment) + group fields via raw_payload
       for (const item of toUpdate) {
+        // Get existing raw_payload
+        const { data: existing } = await supabase
+          .from("sales")
+          .select("raw_payload")
+          .eq("id", item.id!)
+          .maybeSingle();
+        
+        const existingPayload = (existing?.raw_payload as any) || {};
+        
         const { error } = await supabase
-          .from("fieldmarketing_sales")
+          .from("sales")
           .update({
-            product_name: item.product_name,
-            phone_number: item.phone_number || null,
-            comment: item.comment || null,
-            seller_id: updates.seller_id || undefined,
-            location_id: updates.location_id || undefined,
-            client_id: updates.client_id || undefined,
+            customer_phone: item.phone_number || null,
+            raw_payload: {
+              ...existingPayload,
+              fm_product_name: item.product_name,
+              fm_comment: item.comment || null,
+              fm_seller_id: updates.seller_id || existingPayload.fm_seller_id,
+              fm_location_id: updates.location_id || existingPayload.fm_location_id,
+              fm_client_id: updates.client_id || existingPayload.fm_client_id,
+            },
           })
           .eq("id", item.id!);
         if (error) throw error;
       }
       
-      // Create new items
+      // Create new items via centralized sales table
       if (toCreate.length > 0) {
+        // Get employee name for agent_name
+        const sellerId = updates.seller_id || firstSale?.seller_id;
+        let agentName: string | null = null;
+        if (sellerId) {
+          const { data: employee } = await supabase
+            .from("employee_master_data")
+            .select("first_name, last_name")
+            .eq("id", sellerId)
+            .maybeSingle();
+          if (employee) {
+            agentName = `${employee.first_name} ${employee.last_name}`;
+          }
+        }
+        
         const newSales = toCreate.map(item => ({
-          seller_id: updates.seller_id || firstSale?.seller_id,
-          location_id: updates.location_id || firstSale?.location_id,
-          client_id: updates.client_id || firstSale?.client_id,
-          product_name: item.product_name,
-          phone_number: item.phone_number || null,
-          comment: item.comment || null,
-          registered_at: baseDate.toISOString(),
+          source: 'fieldmarketing' as const,
+          integration_type: 'manual' as const,
+          sale_datetime: baseDate.toISOString(),
+          customer_phone: item.phone_number || null,
+          agent_name: agentName,
+          validation_status: 'pending',
+          raw_payload: {
+            fm_seller_id: updates.seller_id || firstSale?.seller_id,
+            fm_location_id: updates.location_id || firstSale?.location_id,
+            fm_client_id: updates.client_id || firstSale?.client_id,
+            fm_product_name: item.product_name,
+            fm_comment: item.comment || null,
+          },
         }));
         const { error } = await supabase
-          .from("fieldmarketing_sales")
+          .from("sales")
           .insert(newSales);
         if (error) throw error;
       }
@@ -338,6 +396,7 @@ export default function EditSalesRegistrations() {
     onSuccess: () => {
       toast.success("Salgsgruppe opdateret");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
       setGroupEditDialog({ open: false, group: null });
     },
     onError: (error: Error) => {
@@ -345,12 +404,12 @@ export default function EditSalesRegistrations() {
     },
   });
 
-  // Delete group mutation - deletes all sales in a group
+  // Delete group mutation - deletes all sales in a group (now uses centralized sales table)
   const deleteGroup = useMutation({
     mutationFn: async (group: GroupedSales) => {
       const saleIds = group.sales.map(s => s.id);
       const { error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .delete()
         .in("id", saleIds);
       if (error) throw error;
@@ -358,6 +417,7 @@ export default function EditSalesRegistrations() {
     onSuccess: () => {
       toast.success("Salgsgruppe slettet");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
       setDeleteGroupDialog({ open: false, group: null });
     },
     onError: (error: Error) => {
