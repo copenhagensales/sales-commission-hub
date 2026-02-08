@@ -479,7 +479,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-2">
             <div 
               onClick={() => navigate("/")} 
-              className="flex items-center justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              className="flex items-center justify-center px-2 py-2 ml-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>
