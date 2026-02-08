@@ -115,6 +115,7 @@ import {
   EconomicExpenses,
   EconomicBudget,
   EconomicMapping,
+  Cancellations,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -393,6 +394,7 @@ export const routes: RouteConfig[] = [
 
   // Salary
   { path: "/salary/types", component: SalaryTypes, access: "role", positionPermission: "menu_salary_types" },
+  { path: "/salary/cancellations", component: Cancellations, access: "role", positionPermission: "menu_cancellations" },
 
   // TDC Opsummering
   { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },

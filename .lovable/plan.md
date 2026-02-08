@@ -1,10 +1,12 @@
 
-# Plan: Annulleringer-side under Løn-menuen
+# Plan: Annulleringer-side under Løn-menuen ✅ FULDFØRT
+
+## Status: Implementeret
 
 ## Oversigt
 Denne plan implementerer en ny side kaldet "Annulleringer" under Løn-menuen med to faner:
-1. **Manuelle annulleringer** - Søg salg frem per kunde og marker dem som annulleret
-2. **Upload/match annulleringer** - Upload Excel-fil med annulleringer og match dem mod eksisterende salg
+1. **Manuelle annulleringer** - Søg salg frem per kunde og marker dem som annulleret ✅
+2. **Upload/match annulleringer** - Upload Excel-fil med annulleringer og match dem mod eksisterende salg ✅
 
 ---
 

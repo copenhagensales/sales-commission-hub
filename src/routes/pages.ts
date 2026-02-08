@@ -168,3 +168,6 @@ export const EconomicBudget = lazyPage(() => import("@/pages/economic/EconomicBu
 export const EconomicMapping = lazyPage(() => import("@/pages/economic/EconomicMapping"));
 
 export const ImmediatePaymentASE = lazyPage(() => import("@/pages/ImmediatePaymentASE"));
+
+// Salary pages
+export const Cancellations = lazyPage(() => import("@/pages/salary/Cancellations"));
