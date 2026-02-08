@@ -64,7 +64,7 @@ export function useEmployeeDashboards() {
         .from("employee_master_data")
         .select("id")
         .eq("auth_user_id", user.id)
-        .single();
+        .maybeSingle();
 
       // Fallback: try by email
       if (!employee) {
@@ -72,7 +72,7 @@ export function useEmployeeDashboards() {
           .from("employee_master_data")
           .select("id")
           .eq("private_email", user.email)
-          .single();
+          .maybeSingle();
         employee = employeeByEmail;
       }
 

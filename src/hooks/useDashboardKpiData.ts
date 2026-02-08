@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears } from "date-fns";
 
 interface DateRange {
@@ -179,26 +180,18 @@ export const useDashboardKpiData = () => {
           }
           
           if (campaignIds.length > 0) {
-            // Fetch sales with sale_items to count properly (like TeamOverview)
-            const { data: salesData, error } = await supabase
-              .from("sales")
-              .select(`
-                id,
-                sale_items (
-                  quantity,
-                  products (
-                    counts_as_sale
-                  )
-                )
-              `)
-              .in("client_campaign_id", campaignIds)
-              .gte("sale_datetime", startISO)
-              .lte("sale_datetime", endISO);
-            
-            if (error) throw error;
+            // Fetch sales with sale_items using pagination to handle >1000 rows
+            const salesData = await fetchAllRows<any>(
+              "sales",
+              `id, sale_items(quantity, products(counts_as_sale))`,
+              (q) => q.in("client_campaign_id", campaignIds)
+                      .gte("sale_datetime", startISO)
+                      .lte("sale_datetime", endISO),
+              { orderBy: "sale_datetime", ascending: false }
+            );
             
             // Count sales from sale_items where counts_as_sale !== false
-            (salesData || []).forEach((sale: any) => {
+            salesData.forEach((sale: any) => {
               (sale.sale_items || []).forEach((item: any) => {
                 const countsAsSale = item.products?.counts_as_sale !== false;
                 if (countsAsSale) {

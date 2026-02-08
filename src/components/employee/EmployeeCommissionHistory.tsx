@@ -52,7 +52,7 @@ export function EmployeeCommissionHistory({
         .from("team_members")
         .select("team_id")
         .eq("employee_id", employeeId)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!employeeId,
@@ -67,7 +67,7 @@ export function EmployeeCommissionHistory({
         .select("id, start_time, end_time, hours_source")
         .eq("team_id", teamMembership!.team_id)
         .eq("is_active", true)
-        .single();
+        .maybeSingle();
       
       if (!shift) return null;
       

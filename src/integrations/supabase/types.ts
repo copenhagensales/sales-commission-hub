@@ -9222,6 +9222,34 @@ export type Database = {
         }
         Relationships: []
       }
+      mv_daily_sales_stats: {
+        Row: {
+          agent_email: string | null
+          client_campaign_id: string | null
+          client_id: string | null
+          sale_date: string | null
+          sale_row_count: number | null
+          total_commission: number | null
+          total_quantity: number | null
+          total_revenue: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posteringer_enriched: {
         Row: {
           beloeb_dkk: number | null
