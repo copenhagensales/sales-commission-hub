@@ -63,7 +63,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
-  const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards") || location.pathname === "/tdc-opsummering");
+  // Dashboard state removed - dashboards are now in separate environment
   const [someOpen, setSomeOpen] = useState(
     ["/some", "/extra-work"].includes(location.pathname)
   );
@@ -1212,115 +1212,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           )}
 
 
-          {/* Dashboards menu - Show only if user has permission for any dashboard */}
-          {(p.canViewDashboardCphSales || p.canViewDashboardFieldmarketing || p.canViewDashboardEesyTm || 
-            p.canViewDashboardTdcErhverv || p.canViewDashboardRelatel || p.canViewDashboardUnited || 
-            p.canViewDashboardDesign || p.canViewDashboardSettings || p.canViewTdcOpsummering) && (
-            <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                (location.pathname.startsWith("/dashboards") || location.pathname === "/tdc-opsummering") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Monitor className="h-5 w-5" />
-                  Dashboards
-                </div>
-                {dashboardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewDashboardCphSales && (
-                  <NavLink to="/dashboards/cph-sales" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/cph-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Dagsboard CPH Sales
-                  </NavLink>
-                )}
-                {p.canViewDashboardCsTop20 && (
-                  <NavLink to="/dashboards/cs-top-20" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/cs-top-20" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    CS Top 20
-                  </NavLink>
-                )}
-                {p.canViewDashboardFieldmarketing && (
-                  <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/fieldmarketing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Fieldmarketing
-                  </NavLink>
-                )}
-                {p.canViewDashboardEesyTm && (
-                  <NavLink to="/dashboards/eesy-tm" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/eesy-tm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Eesy TM
-                  </NavLink>
-                )}
-                {p.canViewDashboardTdcErhverv && (
-                  <NavLink to="/dashboards/tdc-erhverv" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/tdc-erhverv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    TDC Erhverv
-                  </NavLink>
-                )}
-                {p.canViewDashboardRelatel && (
-                  <NavLink to="/dashboards/relatel" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/relatel" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Relatel
-                  </NavLink>
-                )}
-                {p.canViewDashboardUnited && (
-                  <NavLink to="/dashboards/united" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/united" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    United
-                  </NavLink>
-                )}
-                {p.canViewDashboardDesign && (
-                  <NavLink to="/dashboards/design" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/design" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Palette className="h-4 w-4" />
-                    Design dashboard
-                  </NavLink>
-                )}
-                {p.canViewDashboardSettings && (
-                  <NavLink to="/dashboards/settings" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/dashboards/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Settings className="h-4 w-4" />
-                    Indstilling dashboard
-                  </NavLink>
-                )}
-                {p.canViewTdcOpsummering && (
-                  <NavLink to="/tdc-opsummering" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/tdc-opsummering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <FileText className="h-4 w-4" />
-                    TDC Opsummering
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {/* Dashboards menu REMOVED - dashboards are now accessed via EnvironmentSwitcher in a separate environment */}
 
           {/* Code of Conduct for Salgskonsulent */}
           {isSalgskonsulent && (

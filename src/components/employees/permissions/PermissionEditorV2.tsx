@@ -152,7 +152,7 @@ const PERMISSION_CATEGORIES: Record<string, { label: string; icon: React.ReactNo
   menu_section_dashboards: {
     label: "Dashboards",
     icon: <BarChart3 className="h-4 w-4" />,
-    keys: ['menu_dashboard_cph_sales', 'menu_dashboard_cs_top_20', 'menu_dashboard_fieldmarketing', 'menu_dashboard_eesy_tm', 'menu_dashboard_tdc_erhverv', 'menu_dashboard_relatel', 'menu_dashboard_mg_test', 'menu_dashboard_united', 'menu_dashboard_design', 'menu_dashboard_settings']
+    keys: [] // Administreres i dashboard-miljøet
   },
   menu_section_onboarding: {
     label: "Onboarding",
