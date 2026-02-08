@@ -196,15 +196,17 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
     });
   });
 
-  // === FIELDMARKETING ===
+  // === FIELDMARKETING (from unified sales table) ===
   let fmQuery = supabase
-    .from("fieldmarketing_sales")
+    .from("sales")
     .select("id", { count: "exact" })
-    .gte("registered_at", `${startStr}T00:00:00`)
-    .lte("registered_at", `${endStr}T23:59:59`);
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${startStr}T00:00:00`)
+    .lte("sale_datetime", `${endStr}T23:59:59`);
   
   if (clientId) {
-    fmQuery = fmQuery.eq("client_id", clientId);
+    // Filter by client via raw_payload->>'fm_client_id'
+    fmQuery = fmQuery.contains("raw_payload", { fm_client_id: clientId });
   }
   
   const { count: fmCount } = await fmQuery;
@@ -343,21 +345,23 @@ async function testTotalCommission(start: Date, end: Date, clientId?: string): P
     }
   });
 
+  // FM from unified sales table
   let fmQuery = supabase
-    .from("fieldmarketing_sales")
-    .select("id, product_name")
-    .gte("registered_at", `${startStr}T00:00:00`)
-    .lte("registered_at", `${endStr}T23:59:59`);
+    .from("sales")
+    .select("id, raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${startStr}T00:00:00`)
+    .lte("sale_datetime", `${endStr}T23:59:59`);
   
   if (clientId) {
-    fmQuery = fmQuery.eq("client_id", clientId);
+    fmQuery = fmQuery.contains("raw_payload", { fm_client_id: clientId });
   }
   
   const { data: fmSales } = await fmQuery;
   
   let fmCommission = 0;
   (fmSales || []).forEach((sale: any) => {
-    const productName = (sale.product_name || "").toLowerCase();
+    const productName = (sale.raw_payload?.fm_product_name || "").toLowerCase();
     fmCommission += productCommissionMap.get(productName) || 0;
   });
 
@@ -489,21 +493,23 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
     }
   });
 
+  // FM from unified sales table
   let fmQuery = supabase
-    .from("fieldmarketing_sales")
-    .select("id, product_name")
-    .gte("registered_at", `${startStr}T00:00:00`)
-    .lte("registered_at", `${endStr}T23:59:59`);
+    .from("sales")
+    .select("id, raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${startStr}T00:00:00`)
+    .lte("sale_datetime", `${endStr}T23:59:59`);
   
   if (clientId) {
-    fmQuery = fmQuery.eq("client_id", clientId);
+    fmQuery = fmQuery.contains("raw_payload", { fm_client_id: clientId });
   }
   
   const { data: fmSales } = await fmQuery;
   
   let fmRevenue = 0;
   (fmSales || []).forEach((sale: any) => {
-    const productName = (sale.product_name || "").toLowerCase();
+    const productName = (sale.raw_payload?.fm_product_name || "").toLowerCase();
     fmRevenue += productRevenueMap.get(productName) || 0;
   });
 

@@ -111,24 +111,38 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
       const { data: monthSales, error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
-          seller_id,
-          product_name,
-          seller:employee_master_data!seller_id(first_name, last_name)
+          agent_name,
+          raw_payload,
+          sale_datetime
         `)
-        .eq("client_id", clientId)
-        .gte("registered_at", monthStart);
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_client_id: clientId })
+        .gte("sale_datetime", monthStart);
       
       if (error) throw error;
 
+      // We need to fetch employee names separately
+      const sellerIds = [...new Set((monthSales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
+      const { data: employeeData } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", sellerIds.length > 0 ? sellerIds : ["_"]);
+      
+      const employeeMap = new Map((employeeData || []).map(e => [e.id, e]));
+      
       // Group by seller
       const sellerStats: Record<string, { name: string; count: number; commission: number }> = {};
       (monthSales || []).forEach((sale: any) => {
-        const sellerId = sale.seller_id;
-        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
-        const commission = productCommissions?.[sale.product_name] || 0;
+        const rawPayload = sale.raw_payload as any;
+        const sellerId = rawPayload?.fm_seller_id;
+        const employee = employeeMap.get(sellerId);
+        const sellerName = employee ? `${employee.first_name} ${employee.last_name}` : (sale.agent_name || "Ukendt");
+        const productName = rawPayload?.fm_product_name;
+        const commission = productCommissions?.[productName] || 0;
         
+        if (!sellerId) return;
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, count: 0, commission: 0 };
         }
@@ -147,25 +161,39 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
     queryKey: ["fieldmarketing-day-sellers", clientId, productCommissions, dayStart],
     queryFn: async () => {
       const { data: daySales, error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
-          seller_id,
-          product_name,
-          seller:employee_master_data!seller_id(first_name, last_name)
+          agent_name,
+          raw_payload,
+          sale_datetime
         `)
-        .eq("client_id", clientId)
-        .gte("registered_at", dayStart)
-        .lte("registered_at", dayEnd);
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_client_id: clientId })
+        .gte("sale_datetime", dayStart)
+        .lte("sale_datetime", dayEnd);
       
       if (error) throw error;
+
+      // Fetch employee names
+      const sellerIds = [...new Set((daySales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
+      const { data: employeeData } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", sellerIds.length > 0 ? sellerIds : ["_"]);
+      
+      const employeeMap = new Map((employeeData || []).map(e => [e.id, e]));
 
       // Group by seller
       const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
       (daySales || []).forEach((sale: any) => {
-        const sellerId = sale.seller_id;
-        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
-        const commission = productCommissions?.[sale.product_name] || 0;
+        const rawPayload = sale.raw_payload as any;
+        const sellerId = rawPayload?.fm_seller_id;
+        const employee = employeeMap.get(sellerId);
+        const sellerName = employee ? `${employee.first_name} ${employee.last_name}` : (sale.agent_name || "Ukendt");
+        const productName = rawPayload?.fm_product_name;
+        const commission = productCommissions?.[productName] || 0;
         
+        if (!sellerId) return;
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, sales: 0, commission: 0 };
         }

@@ -251,12 +251,13 @@ export default function RevenueByClient() {
         saleItemsBySaleId[si.sale_id].push(si);
       });
 
-      // Get FM sales
+      // Get FM sales from unified sales table
       const { data: fmSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, registered_at, product_name, client_id, clients(id, name)")
-        .gte("registered_at", `${startDateStr}T00:00:00`)
-        .lte("registered_at", `${endDateStr}T23:59:59`);
+        .from("sales")
+        .select("id, sale_datetime, raw_payload")
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startDateStr}T00:00:00`)
+        .lte("sale_datetime", `${endDateStr}T23:59:59`);
 
       // Get products for FM revenue and commission lookup
       const { data: products } = await supabase
@@ -320,18 +321,19 @@ export default function RevenueByClient() {
         revenueByClientAndDate[clientId][saleDate].commission += saleCommission;
       });
 
-      // Process FM sales
+      // Process FM sales (from unified sales table)
       fmSales?.forEach((sale) => {
-        const clientId = sale.client_id;
-        const clientName = (sale.clients as any)?.name || "Ukendt FM";
+        const rawPayload = sale.raw_payload as any;
+        const clientId = rawPayload?.fm_client_id;
+        const clientName = clients?.find(c => c.id === clientId)?.name || "Ukendt FM";
         if (!clientId) return;
         
         // Apply client filter
         if (selectedClientId !== "all" && clientId !== selectedClientId) return;
 
         clientNames[clientId] = clientName;
-        const saleDate = format(parseISO(sale.registered_at), "yyyy-MM-dd");
-        const productName = (sale.product_name || "").toLowerCase();
+        const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
+        const productName = (rawPayload?.fm_product_name || "").toLowerCase();
         const revenue = productRevenueMap.get(productName) || 0;
         const commission = productCommissionMap.get(productName) || 0;
 

@@ -487,13 +487,22 @@ export function ClientDBTab() {
         { orderBy: "sale_datetime", ascending: false }
       );
 
-      const fmSalesData = await fetchAllRows<any>(
-        "fieldmarketing_sales",
-        `id, client_id, product_name`,
-        (q) => q.gte("registered_at", periodStart.toISOString())
-                .lte("registered_at", periodEnd.toISOString()),
-        { orderBy: "registered_at", ascending: false }
+      // Fetch FM sales from unified sales table
+      const rawFmSalesData = await fetchAllRows<any>(
+        "sales",
+        `id, raw_payload, sale_datetime`,
+        (q) => q.eq("source", "fieldmarketing")
+                .gte("sale_datetime", periodStart.toISOString())
+                .lte("sale_datetime", periodEnd.toISOString()),
+        { orderBy: "sale_datetime", ascending: false }
       );
+      
+      // Transform to expected format
+      const fmSalesData = (rawFmSalesData || []).map((s: any) => ({
+        id: s.id,
+        client_id: (s.raw_payload as any)?.fm_client_id,
+        product_name: (s.raw_payload as any)?.fm_product_name,
+      }));
 
       const { data: products } = await supabase
         .from("products")

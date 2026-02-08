@@ -734,27 +734,30 @@ export default function MyProfile() {
         }
       }
 
-      // Also check fieldmarketing_sales (for fieldmarketing employees)
+      // Also check fieldmarketing from unified sales table (for fieldmarketing employees)
       const { data: fmPeriodSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, product_name, registered_at")
-        .eq("seller_id", employee.id)
-        .gte("registered_at", periodStart)
-        .lte("registered_at", periodEnd);
+        .from("sales")
+        .select("id, raw_payload, sale_datetime")
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_seller_id: employee.id })
+        .gte("sale_datetime", periodStart)
+        .lte("sale_datetime", periodEnd);
       
       // Use fmPeriodSales for daily breakdown instead of separate month query
       
       const { data: fmTodaySales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, product_name")
-        .eq("seller_id", employee.id)
-        .gte("registered_at", todayStart)
-        .lte("registered_at", todayEnd);
+        .from("sales")
+        .select("id, raw_payload")
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_seller_id: employee.id })
+        .gte("sale_datetime", todayStart)
+        .lte("sale_datetime", todayEnd);
       
       // Fetch products to get commission values for fieldmarketing sales
       const allFmSales = [...(fmPeriodSales || []), ...(fmTodaySales || [])];
       if (allFmSales.length > 0) {
-        const allProductNames = allFmSales.map(s => s.product_name).filter(Boolean);
+        // Extract product names from raw_payload
+        const allProductNames = allFmSales.map(s => (s.raw_payload as any)?.fm_product_name).filter(Boolean);
         const uniqueProductNames = [...new Set(allProductNames)];
         
         if (uniqueProductNames.length > 0) {
@@ -769,18 +772,21 @@ export default function MyProfile() {
           
           // Add fieldmarketing commission for period
           periodCommission += fmPeriodSales?.reduce((total, sale) => {
-            return total + (productCommissionMap.get(sale.product_name) || 0);
+            const productName = (sale.raw_payload as any)?.fm_product_name;
+            return total + (productCommissionMap.get(productName) || 0);
           }, 0) || 0;
           
           // Add fieldmarketing commission for today
           todayCommission += fmTodaySales?.reduce((total, sale) => {
-            return total + (productCommissionMap.get(sale.product_name) || 0);
+            const productName = (sale.raw_payload as any)?.fm_product_name;
+            return total + (productCommissionMap.get(productName) || 0);
           }, 0) || 0;
           
           // Build daily commission map for fieldmarketing from period sales
           fmPeriodSales?.forEach(sale => {
-            const dateKey = sale.registered_at.split('T')[0];
-            const saleCommission = productCommissionMap.get(sale.product_name) || 0;
+            const dateKey = sale.sale_datetime.split('T')[0];
+            const productName = (sale.raw_payload as any)?.fm_product_name;
+            const saleCommission = productCommissionMap.get(productName) || 0;
             dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
           });
         }

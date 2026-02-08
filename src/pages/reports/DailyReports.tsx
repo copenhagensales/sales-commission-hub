@@ -670,26 +670,34 @@ export default function DailyReports() {
         }
       });
 
-      // Fetch fieldmarketing sales (linked directly to employee via seller_id)
+      // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
       let fmSalesQuery = supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
           id,
-          seller_id,
-          registered_at,
-          product_name,
-          client_id
+          agent_name,
+          sale_datetime,
+          raw_payload,
+          client_campaign_id
         `)
-        .in("seller_id", employeeIds)
-        .gte("registered_at", `${startStr}T00:00:00`)
-        .lte("registered_at", `${endStr}T23:59:59`);
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`);
       
-      // Filter by client if selected
-      if (selectedClient !== "all") {
-        fmSalesQuery = fmSalesQuery.eq("client_id", selectedClient);
-      }
+      const { data: rawFmSalesData } = await fmSalesQuery;
       
-      const { data: fmSalesData } = await fmSalesQuery;
+      // Filter by employeeIds using raw_payload fm_seller_id
+      const fmSalesData = (rawFmSalesData || []).filter(sale => {
+        const sellerId = (sale.raw_payload as any)?.fm_seller_id;
+        return sellerId && employeeIds.includes(sellerId);
+      }).filter(sale => {
+        // Filter by client if selected
+        if (selectedClient !== "all") {
+          const clientId = (sale.raw_payload as any)?.fm_client_id;
+          return clientId === selectedClient;
+        }
+        return true;
+      });
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
       
@@ -823,10 +831,11 @@ export default function DailyReports() {
               })
             : [];
 
-          // Fieldmarketing sales via seller_id
+          // Fieldmarketing sales via raw_payload->>'fm_seller_id' (now uses sale_datetime)
           const empFmSales = (fmSalesData || []).filter((s: any) => {
-            const saleDate = s.registered_at;
-            return s.seller_id === empId && saleDate >= dayStart && saleDate <= dayEnd;
+            const saleDate = s.sale_datetime;
+            const sellerId = (s.raw_payload as any)?.fm_seller_id;
+            return sellerId === empId && saleDate >= dayStart && saleDate <= dayEnd;
           });
 
           // Count regular sales using sale_items with counts_as_sale (same as KPI)
@@ -859,15 +868,17 @@ export default function DailyReports() {
             });
           });
 
-          // Add fieldmarketing sales - match commission and revenue by product_name
+          // Add fieldmarketing sales - match commission and revenue by product_name from raw_payload
           empFmSales.forEach((sale: any) => {
             salesCount += 1;
-            const productName = (sale.product_name || "").toLowerCase();
+            const rawPayload = sale.raw_payload as any;
+            const productName = (rawPayload?.fm_product_name || "").toLowerCase();
             commission += productCommissionMap.get(productName) || 0;
             revenue += productRevenueMap.get(productName) || 0;
-            // FM sales have client_id directly on the record
-            if (sale.client_id) {
-              dayClientIds.add(sale.client_id);
+            // FM sales have client_id in raw_payload
+            const clientId = rawPayload?.fm_client_id;
+            if (clientId) {
+              dayClientIds.add(clientId);
             }
           });
 

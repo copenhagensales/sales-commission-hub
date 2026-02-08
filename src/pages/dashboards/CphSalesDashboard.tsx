@@ -822,26 +822,30 @@ export default function CphSalesDashboard() {
       });
 
       // ============ FIELDMARKETING SALES INTEGRATION ============
-      // Fetch FM sales for the month and add to team totals
+      // Fetch FM sales from unified sales table for the month and add to team totals
       const { data: fmSalesData } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, seller_id, client_id, registered_at")
-        .gte("registered_at", `${monthStart}T00:00:00`)
-        .lte("registered_at", `${todayStr}T23:59:59`);
+        .from("sales")
+        .select("id, agent_name, raw_payload, sale_datetime")
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${monthStart}T00:00:00`)
+        .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-      // Build seller_id -> team_id map (seller_id is the employee_id)
+      // Build seller_id -> team_id map (seller_id from raw_payload is the employee_id)
       (fmSalesData || []).forEach((fmSale: any) => {
-        const teamId = employeeToTeam[fmSale.seller_id];
+        const rawPayload = fmSale.raw_payload as any;
+        const sellerId = rawPayload?.fm_seller_id;
+        const clientId = rawPayload?.fm_client_id;
+        const teamId = employeeToTeam[sellerId];
         if (!teamId || !teamSales[teamId]) return;
         
-        const saleDate = fmSale.registered_at?.split("T")[0];
+        const saleDate = fmSale.sale_datetime?.split("T")[0];
         if (!saleDate) return;
         
         // Month (always add)
         teamSales[teamId].month += 1;
         
-        // Find client name for this FM sale via client_id
-        const fmClientInfo = teamToClients[teamId]?.find(c => c.clientId === fmSale.client_id);
+        // Find client name for this FM sale via client_id from raw_payload
+        const fmClientInfo = teamToClients[teamId]?.find(c => c.clientId === clientId);
         if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
           teamClientSales[teamId][fmClientInfo.clientName].month += 1;
         }
