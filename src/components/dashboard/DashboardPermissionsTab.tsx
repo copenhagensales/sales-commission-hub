@@ -1,21 +1,20 @@
-import { Loader2, Shield, Info, LayoutDashboard, User, Users, UsersRound, UserX, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, Shield, Info, LayoutDashboard, ChevronDown, ChevronRight, Check } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { DASHBOARD_LIST } from "@/config/dashboards";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   useTeamDashboardPermissions,
   useTeamsWithLeaders,
@@ -24,19 +23,26 @@ import {
 } from "@/hooks/useTeamDashboardPermissions";
 import { cn } from "@/lib/utils";
 
-// Icons for access levels
-const accessLevelIcons: Record<DashboardAccessLevel, typeof User> = {
-  none: UserX,
-  team_leader: User,
-  leadership: Users,
-  all: UsersRound,
+// Access level configurations
+const accessLevels: { value: DashboardAccessLevel; label: string; shortLabel: string; description: string }[] = [
+  { value: 'none', label: 'Ingen', shortLabel: '—', description: 'Ingen adgang' },
+  { value: 'team_leader', label: 'TL', shortLabel: 'TL', description: 'Kun teamleder' },
+  { value: 'leadership', label: 'Ledelse', shortLabel: 'Led.', description: 'Teamleder + assisterende' },
+  { value: 'all', label: 'Alle', shortLabel: 'Alle', description: 'Hele teamet' },
+];
+
+const accessLevelStyles: Record<DashboardAccessLevel, string> = {
+  none: "bg-muted text-muted-foreground hover:bg-muted/80",
+  team_leader: "bg-blue-500/20 text-blue-400 border-blue-500/50 hover:bg-blue-500/30",
+  leadership: "bg-orange-500/20 text-orange-400 border-orange-500/50 hover:bg-orange-500/30",
+  all: "bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30",
 };
 
-const accessLevelColors: Record<DashboardAccessLevel, string> = {
-  none: "text-muted-foreground",
-  team_leader: "text-blue-500",
-  leadership: "text-orange-500",
-  all: "text-green-500",
+const accessLevelActiveStyles: Record<DashboardAccessLevel, string> = {
+  none: "bg-muted text-muted-foreground ring-2 ring-muted-foreground/50",
+  team_leader: "bg-blue-500 text-white ring-2 ring-blue-400",
+  leadership: "bg-orange-500 text-white ring-2 ring-orange-400",
+  all: "bg-green-500 text-white ring-2 ring-green-400",
 };
 
 export function DashboardPermissionsTab() {
@@ -44,7 +50,9 @@ export function DashboardPermissionsTab() {
   const { data: teams = [], isLoading: teamsLoading } = useTeamsWithLeaders();
   const { data: permissions = [], isLoading: permissionsLoading } = useTeamDashboardPermissions();
   const updatePermission = useUpdateTeamDashboardPermission();
-  const [expandedDashboards, setExpandedDashboards] = useState<Set<string>>(new Set(DASHBOARD_LIST.map(d => d.slug)));
+  const [expandedDashboards, setExpandedDashboards] = useState<Set<string>>(
+    new Set(DASHBOARD_LIST.slice(0, 3).map(d => d.slug)) // Expand first 3 by default
+  );
 
   const isLoading = teamsLoading || permissionsLoading;
 
@@ -56,9 +64,14 @@ export function DashboardPermissionsTab() {
     return perm?.access_level ?? 'none';
   };
 
-  // Count how many teams have access to a dashboard
-  const getAccessCount = (dashboardSlug: string): number => {
-    return permissions.filter(p => p.dashboard_slug === dashboardSlug && p.access_level !== 'none').length;
+  // Count teams with each access level for a dashboard
+  const getAccessSummary = (dashboardSlug: string) => {
+    const counts = { none: 0, team_leader: 0, leadership: 0, all: 0 };
+    teams.forEach(team => {
+      const level = getPermission(team.id, dashboardSlug);
+      counts[level]++;
+    });
+    return counts;
   };
 
   // Handle permission change
@@ -72,8 +85,8 @@ export function DashboardPermissionsTab() {
       {
         onSuccess: () => {
           toast({
-            title: "Rettighed opdateret",
-            description: "Dashboard-rettigheden er blevet gemt.",
+            title: "Gemt",
+            description: "Rettigheden er opdateret.",
           });
         },
         onError: (error) => {
@@ -88,6 +101,19 @@ export function DashboardPermissionsTab() {
     );
   };
 
+  // Set all teams to a specific level for a dashboard
+  const setAllTeams = (dashboardSlug: string, level: DashboardAccessLevel) => {
+    teams.forEach(team => {
+      if (getPermission(team.id, dashboardSlug) !== level) {
+        updatePermission.mutate({ teamId: team.id, dashboardSlug, accessLevel: level });
+      }
+    });
+    toast({
+      title: "Alle teams opdateret",
+      description: `Alle teams sat til "${accessLevels.find(l => l.value === level)?.label}"`,
+    });
+  };
+
   const toggleDashboard = (slug: string) => {
     setExpandedDashboards(prev => {
       const next = new Set(prev);
@@ -99,6 +125,9 @@ export function DashboardPermissionsTab() {
       return next;
     });
   };
+
+  const expandAll = () => setExpandedDashboards(new Set(DASHBOARD_LIST.map(d => d.slug)));
+  const collapseAll = () => setExpandedDashboards(new Set());
 
   if (isLoading) {
     return (
@@ -121,108 +150,170 @@ export function DashboardPermissionsTab() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Dashboard Rettigheder
-        </CardTitle>
-        <CardDescription>
-          Tildel adgang til dashboards for hvert team
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Dashboard Rettigheder
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Klik på knapperne for at ændre adgang
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={expandAll}>
+              Udvid alle
+            </Button>
+            <Button variant="ghost" size="sm" onClick={collapseAll}>
+              Luk alle
+            </Button>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {/* Info banner about owner access */}
-        <Alert className="mb-4">
+      <CardContent className="space-y-2 pt-0">
+        {/* Info banner */}
+        <Alert className="mb-4 py-2">
           <Info className="h-4 w-4" />
-          <AlertDescription>
+          <AlertDescription className="text-sm">
             Ejere har altid fuld adgang til alle dashboards.
           </AlertDescription>
         </Alert>
 
-        {/* Dashboard sections as collapsible rows */}
-        <div className="space-y-1">
+        {/* Legend */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4 pb-2 border-b">
+          <span className="font-medium">Niveauer:</span>
+          {accessLevels.map(level => (
+            <span key={level.value} className="flex items-center gap-1">
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                level.value === 'none' && "bg-muted-foreground",
+                level.value === 'team_leader' && "bg-blue-500",
+                level.value === 'leadership' && "bg-orange-500",
+                level.value === 'all' && "bg-green-500",
+              )} />
+              {level.description}
+            </span>
+          ))}
+        </div>
+
+        {/* Dashboard sections */}
+        <div className="space-y-2">
           {DASHBOARD_LIST.map((dashboard) => {
             const isExpanded = expandedDashboards.has(dashboard.slug);
-            const accessCount = getAccessCount(dashboard.slug);
+            const summary = getAccessSummary(dashboard.slug);
+            const hasAccess = summary.team_leader + summary.leadership + summary.all;
 
             return (
               <Collapsible
                 key={dashboard.slug}
                 open={isExpanded}
                 onOpenChange={() => toggleDashboard(dashboard.slug)}
+                className="border rounded-lg overflow-hidden"
               >
-                {/* Dashboard header row */}
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                {/* Dashboard header */}
+                <div className="flex items-center bg-muted/30">
+                  <CollapsibleTrigger className="flex-1 flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <LayoutDashboard className="h-4 w-4 text-primary" />
+                    <span className="font-medium">{dashboard.name}</span>
+                    
+                    {/* Access summary badges */}
+                    <div className="flex items-center gap-1 ml-auto mr-2">
+                      {hasAccess > 0 ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">
+                          {hasAccess} teams
+                        </span>
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          Ingen adgang
+                        </span>
                       )}
-                      <LayoutDashboard className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{dashboard.name}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {accessCount} {accessCount === 1 ? 'team' : 'teams'} har adgang
-                    </span>
+                  </CollapsibleTrigger>
+                  
+                  {/* Quick actions */}
+                  <div className="flex items-center gap-1 pr-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAllTeams(dashboard.slug, 'all');
+                          }}
+                        >
+                          Alle ✓
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Giv alle teams adgang</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 text-xs text-muted-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAllTeams(dashboard.slug, 'none');
+                          }}
+                        >
+                          Nulstil
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Fjern al adgang</TooltipContent>
+                    </Tooltip>
                   </div>
-                </CollapsibleTrigger>
+                </div>
 
-                {/* Team permission rows */}
+                {/* Team rows */}
                 <CollapsibleContent>
-                  <div className="ml-7 mt-1 space-y-0.5">
+                  <div className="divide-y divide-border/50">
                     {teams.map((team) => {
                       const currentLevel = getPermission(team.id, dashboard.slug);
-                      const IconComponent = accessLevelIcons[currentLevel];
-                      const iconColor = accessLevelColors[currentLevel];
 
                       return (
                         <div
                           key={team.id}
-                          className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/50 transition-colors"
+                          className="flex items-center justify-between py-2 px-4 hover:bg-accent/30 transition-colors"
                         >
-                          <div className="flex items-center gap-2">
-                            <IconComponent className={cn("h-4 w-4", iconColor)} />
-                            <span className="text-sm">{team.name}</span>
-                          </div>
+                          <span className="text-sm font-medium min-w-[120px]">{team.name}</span>
 
-                          <Select
-                            value={currentLevel}
-                            onValueChange={(value) => 
-                              handlePermissionChange(team.id, dashboard.slug, value as DashboardAccessLevel)
-                            }
-                            disabled={updatePermission.isPending}
-                          >
-                            <SelectTrigger className="w-[160px] h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">
-                                <div className="flex items-center gap-2">
-                                  <UserX className="h-3.5 w-3.5 text-muted-foreground" />
-                                  <span>Ingen adgang</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="team_leader">
-                                <div className="flex items-center gap-2">
-                                  <User className="h-3.5 w-3.5 text-blue-500" />
-                                  <span>Kun teamleder</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="leadership">
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-3.5 w-3.5 text-orange-500" />
-                                  <span>Ledelse</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="all">
-                                <div className="flex items-center gap-2">
-                                  <UsersRound className="h-3.5 w-3.5 text-green-500" />
-                                  <span>Hele teamet</span>
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {/* Access level toggle buttons */}
+                          <div className="flex items-center gap-1">
+                            {accessLevels.map(level => {
+                              const isActive = currentLevel === level.value;
+                              return (
+                                <Tooltip key={level.value}>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      onClick={() => handlePermissionChange(team.id, dashboard.slug, level.value)}
+                                      disabled={updatePermission.isPending}
+                                      className={cn(
+                                        "px-3 py-1 text-xs font-medium rounded-md border transition-all",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                                        isActive 
+                                          ? accessLevelActiveStyles[level.value]
+                                          : cn(accessLevelStyles[level.value], "border-transparent")
+                                      )}
+                                    >
+                                      {isActive && <Check className="h-3 w-3 inline mr-1" />}
+                                      {level.label}
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    {level.description}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })}
