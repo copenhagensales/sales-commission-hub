@@ -606,16 +606,8 @@ export function usePermissions() {
     canEditReferrals: canEdit("menu_referrals"),
     // Boards menu
     canViewBoardsSales: hasPermission("menu_boards_sales"),
-    // Dashboards menu
-    canViewDashboardCphSales: canView("menu_dashboard_cph_sales"),
-    canViewDashboardCsTop20: canView("menu_dashboard_cs_top_20"),
-    canViewDashboardFieldmarketing: canView("menu_dashboard_fieldmarketing"),
-    canViewDashboardEesyTm: canView("menu_dashboard_eesy_tm"),
-    canViewDashboardTdcErhverv: canView("menu_dashboard_tdc_erhverv"),
-    canViewDashboardRelatel: canView("menu_dashboard_relatel"),
-    canViewDashboardUnited: canView("menu_dashboard_united"),
-    canViewDashboardDesign: canView("menu_dashboard_design"),
-    canViewDashboardSettings: canView("menu_dashboard_settings"),
+    // Dashboards menu - only general environment access
+    // Individual dashboard access is managed via team_dashboard_permissions
     canViewDashboards: canView("menu_dashboards"),
     // Personal menu (Mit Hjem)
     canViewHome: hasPermission("menu_home"),

@@ -118,7 +118,7 @@ export const PERMISSION_KEYS = {
   menu_team_overview: { label: 'Team overblik', section: 'mg', parent: 'menu_section_mg' },
   menu_tdc_erhverv: { label: 'TDC Erhverv', section: 'mg', parent: 'menu_section_mg' },
   menu_tdc_erhverv_dashboard: { label: 'TDC Erhverv Dashboard', section: 'mg', parent: 'menu_section_mg' },
-  menu_tdc_opsummering: { label: 'TDC Opsummering', section: 'mg', parent: 'menu_section_mg' },
+  menu_tdc_opsummering: { label: 'TDC Opsummering', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_relatel_dashboard: { label: 'Relatel Dashboard', section: 'mg', parent: 'menu_section_mg' },
   menu_codan: { label: 'Codan', section: 'mg', parent: 'menu_section_mg' },
   menu_mg_test: { label: 'MG Test', section: 'mg', parent: 'menu_section_mg' },
@@ -182,24 +182,9 @@ export const PERMISSION_KEYS = {
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
 
   // ==================== DASHBOARDS (under menu_section_dashboards) ====================
+  // NOTE: Individual dashboard permissions are managed via team_dashboard_permissions table
+  // in the dashboard environment. Only the general environment access is controlled here.
   menu_dashboards: { label: 'Dashboards (generelt)', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_cph_sales: { label: 'CPH Salg', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_cs_top_20: { label: 'CS Top 20', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_fieldmarketing: { label: 'Fieldmarketing', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_eesy_tm: { label: 'Eesy TM', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_tdc_erhverv: { label: 'TDC Erhverv', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_relatel: { label: 'Relatel', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_tryg: { label: 'Tryg Dashboard', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_ase: { label: 'ASE Dashboard', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_test: { label: 'MG Test', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_united: { label: 'United', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_design: { label: 'Design', section: 'dashboards', parent: 'menu_section_dashboards' },
-  menu_dashboard_settings: { label: 'Indstillinger', section: 'dashboards', parent: 'menu_section_dashboards' },
-
-  // Dashboard Settings Tabs
-  tab_dashboard_widgets: { label: 'Fane: Widgets', section: 'dashboards', parent: 'menu_dashboard_settings' },
-  tab_dashboard_kpis: { label: 'Fane: KPIer', section: 'dashboards', parent: 'menu_dashboard_settings' },
-  tab_dashboard_designs: { label: 'Fane: Designs', section: 'dashboards', parent: 'menu_dashboard_settings' },
 
   // ==================== REPORTS (under menu_section_reports) ====================
   menu_reports_admin: { label: 'Admin rapporter', section: 'reports', parent: 'menu_section_reports' },
