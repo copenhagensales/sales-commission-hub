@@ -1,5 +1,5 @@
 import { Loader2, Shield, Info, LayoutDashboard, ChevronDown, ChevronRight, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   useTeamDashboardPermissions,
   useTeamsWithLeaders,
   useUpdateTeamDashboardPermission,
+  useSeedMissingDashboardPermissions,
   type DashboardAccessLevel,
 } from "@/hooks/useTeamDashboardPermissions";
 import { cn } from "@/lib/utils";
@@ -50,11 +51,21 @@ export function DashboardPermissionsTab() {
   const { data: teams = [], isLoading: teamsLoading } = useTeamsWithLeaders();
   const { data: permissions = [], isLoading: permissionsLoading } = useTeamDashboardPermissions();
   const updatePermission = useUpdateTeamDashboardPermission();
+  const seedMissingPermissions = useSeedMissingDashboardPermissions();
+  const hasSeeded = useRef(false);
   const [expandedDashboards, setExpandedDashboards] = useState<Set<string>>(
     new Set(DASHBOARD_LIST.slice(0, 3).map(d => d.slug)) // Expand first 3 by default
   );
 
   const isLoading = teamsLoading || permissionsLoading;
+
+  // Auto-seed manglende permissions når data er loaded
+  useEffect(() => {
+    if (!isLoading && teams.length > 0 && !hasSeeded.current) {
+      hasSeeded.current = true;
+      seedMissingPermissions.mutate({ teams, existingPermissions: permissions });
+    }
+  }, [isLoading, teams, permissions]);
 
   // Get current permission for a team/dashboard combination
   const getPermission = (teamId: string, dashboardSlug: string): DashboardAccessLevel => {

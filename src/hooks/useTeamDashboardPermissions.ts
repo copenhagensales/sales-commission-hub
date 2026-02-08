@@ -102,6 +102,65 @@ export function useUpdateTeamDashboardPermission() {
   });
 }
 
+// Auto-seed manglende dashboard permissions
+export function useSeedMissingDashboardPermissions() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      teams, 
+      existingPermissions 
+    }: { 
+      teams: Team[]; 
+      existingPermissions: TeamDashboardPermission[];
+    }) => {
+      // Build a set of existing combinations
+      const existingCombos = new Set(
+        existingPermissions.map(p => `${p.team_id}:${p.dashboard_slug}`)
+      );
+      
+      // Find missing combinations
+      const missingPermissions: { team_id: string; dashboard_slug: string; access_level: DashboardAccessLevel }[] = [];
+      
+      for (const team of teams) {
+        for (const dashboard of DASHBOARD_LIST) {
+          const combo = `${team.id}:${dashboard.slug}`;
+          if (!existingCombos.has(combo)) {
+            missingPermissions.push({
+              team_id: team.id,
+              dashboard_slug: dashboard.slug,
+              access_level: 'none',
+            });
+          }
+        }
+      }
+      
+      if (missingPermissions.length === 0) return 0;
+      
+      // Insert in batches
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < missingPermissions.length; i += BATCH_SIZE) {
+        const batch = missingPermissions.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from("team_dashboard_permissions")
+          .upsert(batch, { onConflict: 'team_id,dashboard_slug', ignoreDuplicates: true });
+        
+        if (error) throw error;
+      }
+      
+      return missingPermissions.length;
+    },
+    onSuccess: (count) => {
+      if (count > 0) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["team-dashboard-permissions"],
+          refetchType: 'all' 
+        });
+      }
+    },
+  });
+}
+
 // Hent brugerens tilgængelige dashboards
 export function useAccessibleDashboards() {
   const { user } = useAuth();

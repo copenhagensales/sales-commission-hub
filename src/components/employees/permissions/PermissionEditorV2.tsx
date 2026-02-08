@@ -69,13 +69,20 @@ import { toast } from "sonner";
 import {
   usePagePermissions,
   useRoleDefinitions,
-  permissionKeyLabels,
   type PagePermission,
   type RoleDefinition,
   type Visibility
 } from "@/hooks/useUnifiedPermissions";
 import { cn } from "@/lib/utils";
 import { PermissionRowWithChildren } from "./PermissionRowWithChildren";
+import { 
+  permissionKeyLabels, 
+  PERMISSION_HIERARCHY as CONFIG_HIERARCHY,
+  PERMISSION_CATEGORIES as CONFIG_CATEGORIES,
+  getPermissionTypeFromKey,
+  getAllPermissionKeys,
+  SECTION_ICONS
+} from "@/config/permissionKeys";
 import { buildCategoryTree } from "./permissionGroups";
 
 type PermissionType = 'page' | 'tab' | 'action';
@@ -112,123 +119,23 @@ const colorMap: Record<string, string> = {
   gray: "bg-muted text-muted-foreground",
 };
 
-// Category definitions with icons and labels
-const PERMISSION_CATEGORIES: Record<string, { label: string; icon: React.ReactNode; keys: string[] }> = {
-  menu_section_personal: {
-    label: "Mit Hjem",
-    icon: <Home className="h-4 w-4" />,
-    keys: ['menu_home', 'menu_h2h', 'menu_commission_league', 'menu_league_admin', 'menu_liga_test_board', 'menu_h2h_admin', 'menu_team_h2h', 'menu_messages', 'menu_my_schedule', 'menu_my_profile', 'menu_my_goals', 'menu_my_contracts', 'menu_career_wishes', 'menu_my_feedback', 'menu_refer_friend', 'menu_immediate_payment_ase', 'menu_my_sales', 'menu_my_shifts', 'menu_my_absence', 'menu_my_coaching']
-  },
-  menu_section_personale: {
-    label: "Personale",
-    icon: <Users className="h-4 w-4" />,
-    keys: ['menu_dashboard', 'menu_employees', 'menu_teams', 'menu_permissions', 'menu_login_log', 'menu_upcoming_starts', 'tab_employees_all', 'tab_employees_staff', 'tab_employees_teams', 'tab_employees_positions', 'tab_employees_permissions', 'tab_employees_dialer_mapping']
-  },
-  menu_section_ledelse: {
-    label: "Ledelse",
-    icon: <Crown className="h-4 w-4" />,
-    keys: ['menu_company_overview', 'menu_contracts', 'menu_career_wishes_overview', 'menu_email_templates_ledelse', 'menu_security_dashboard']
-  },
-  menu_section_vagtplan: {
-    label: "Vagtplan",
-    icon: <Calendar className="h-4 w-4" />,
-    keys: ['menu_shift_overview', 'menu_absence', 'menu_time_tracking', 'menu_time_stamp', 'menu_closing_shifts']
-  },
-  menu_section_fieldmarketing: {
-    label: "Fieldmarketing",
-    icon: <Briefcase className="h-4 w-4" />,
-    keys: ['menu_fm_overview', 'menu_fm_booking', 'menu_fm_vehicles', 'menu_fm_dashboard', 'menu_fm_sales_registration', 'menu_fm_billing', 'menu_fm_travel_expenses', 'menu_fm_edit_sales', 'menu_fm_time_off', 'menu_fm_book_week', 'menu_fm_bookings', 'menu_fm_locations', 'menu_fm_vagtplan_fm', 'tab_fm_book_week', 'tab_fm_bookings', 'tab_fm_locations', 'tab_fm_vagtplan', 'tab_fm_eesy', 'tab_fm_yousee']
-  },
-  menu_section_mg: {
-    label: "MG",
-    icon: <BarChart3 className="h-4 w-4" />,
-    keys: ['menu_team_overview', 'menu_tdc_erhverv', 'menu_tdc_erhverv_dashboard', 'menu_tdc_opsummering', 'menu_relatel_dashboard', 'menu_tryg_dashboard', 'menu_ase_dashboard', 'menu_codan', 'menu_mg_test', 'menu_mg_test_dashboard', 'menu_dialer_data', 'menu_calls_data', 'menu_adversus_data', 'tab_mg_salary_schemes', 'tab_mg_relatel_status', 'tab_mg_relatel_events']
-  },
-  menu_section_rekruttering: {
-    label: "Rekruttering",
-    icon: <Users className="h-4 w-4" />,
-    keys: ['menu_recruitment_dashboard', 'menu_candidates', 'menu_upcoming_interviews', 'menu_winback', 'menu_upcoming_hires', 'menu_messages_recruitment', 'menu_sms_templates', 'menu_email_templates_recruitment', 'menu_referrals', 'tab_winback_ghostet', 'tab_winback_takket_nej', 'tab_winback_kundeservice']
-  },
-  menu_section_dashboards: {
-    label: "Dashboards",
-    icon: <BarChart3 className="h-4 w-4" />,
-    keys: [] // Administreres i dashboard-miljøet
-  },
-  menu_section_onboarding: {
-    label: "Onboarding",
-    icon: <GraduationCap className="h-4 w-4" />,
-    keys: ['menu_onboarding_overview', 'menu_onboarding_kursus', 'menu_onboarding_ramp', 'menu_onboarding_leader', 'menu_onboarding_drills', 'menu_onboarding_admin', 'menu_coaching_templates', 'tab_onboarding_overview', 'tab_onboarding_ramp', 'tab_onboarding_leader', 'tab_onboarding_drills', 'tab_onboarding_template', 'tab_onboarding_admin']
-  },
-  menu_section_reports: {
-    label: "Rapporter",
-    icon: <FileBarChart className="h-4 w-4" />,
-    keys: ['menu_reports_admin', 'menu_reports_daily', 'menu_reports_management', 'menu_reports_employee']
-  },
-  menu_section_some: {
-    label: "SOME",
-    icon: <Video className="h-4 w-4" />,
-    keys: ['menu_some', 'menu_extra_work']
-  },
-  menu_section_sales_system: {
-    label: "Salg & System",
-    icon: <ShoppingCart className="h-4 w-4" />,
-    keys: ['menu_sales', 'menu_logics', 'menu_live_stats', 'menu_settings', 'menu_leaderboard']
-  },
-  menu_section_salary: {
-    label: "Løn",
-    icon: <Briefcase className="h-4 w-4" />,
-    keys: ['menu_payroll', 'menu_salary_types']
-  },
-  menu_section_admin: {
-    label: "Admin",
-    icon: <Wrench className="h-4 w-4" />,
-    keys: ['menu_kpi_definitions']
-  },
-  menu_section_test: {
-    label: "Test",
-    icon: <Wrench className="h-4 w-4" />,
-    keys: ['menu_car_quiz_admin', 'menu_coc_admin', 'menu_pulse_survey']
-  },
-  softphone_section: {
-    label: "Softphone & SMS",
-    icon: <Phone className="h-4 w-4" />,
-    keys: ['softphone_outbound', 'softphone_inbound', 'employee_sms']
-  },
-  messages_section: {
-    label: "Beskeder",
-    icon: <FileText className="h-4 w-4" />,
-    keys: ['tab_messages_all', 'tab_messages_sms', 'tab_messages_email', 'tab_messages_call', 'tab_messages_sent']
-  }
-};
+// Build PERMISSION_CATEGORIES with icons from config
+const PERMISSION_CATEGORIES: Record<string, { label: string; icon: React.ReactNode; keys: string[] }> = {};
 
-// ===== PERMISSION HIERARCHY =====
-const PERMISSION_HIERARCHY: Record<string, string | null> = {
-  menu_section_personal: null,
-  menu_section_personale: null,
-  menu_section_ledelse: null,
-  menu_section_test: null,
-  menu_section_mg: null,
-  menu_section_vagtplan: null,
-  menu_section_fieldmarketing: null,
-  menu_section_rekruttering: null,
-  menu_section_boards: null,
-  menu_section_salary: null,
-  menu_section_dashboards: null,
-  menu_section_onboarding: null,
-  menu_section_reports: null,
-  menu_section_admin: null,
-  menu_section_some: null,
-  menu_section_sales_system: null,
-  menu_section_spil: null,
-};
+Object.entries(CONFIG_CATEGORIES).forEach(([key, config]) => {
+  const IconComponent = SECTION_ICONS[key];
+  PERMISSION_CATEGORIES[key] = {
+    label: config.label,
+    icon: IconComponent ? <IconComponent className="h-4 w-4" /> : <Folder className="h-4 w-4" />,
+    keys: config.keys,
+  };
+});
 
-const getPermissionTypeFromKey = (key: string): PermissionType => {
-  if (key.startsWith('tab_')) return 'tab';
-  if (key.startsWith('action_')) return 'action';
-  return 'page';
-};
+// Use hierarchy from central config
+const PERMISSION_HIERARCHY = CONFIG_HIERARCHY;
 
-const ALL_PERMISSION_KEYS = Object.keys(permissionKeyLabels);
+// Get all permission keys from central config
+const ALL_PERMISSION_KEYS = getAllPermissionKeys();
 
 interface PermissionWithChildren {
   id: string;
