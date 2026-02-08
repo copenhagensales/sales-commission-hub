@@ -4,8 +4,8 @@ import { LayoutDashboard, Monitor, LogOut, Home, Settings, PanelLeft } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -26,13 +26,10 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canView, isLoading } = useUnifiedPermissions();
-
-  // Filter dashboards based on permissions
-  const accessibleDashboards = DASHBOARD_LIST.filter(dashboard => {
-    if (!dashboard.permissionKey) return true;
-    return canView(dashboard.permissionKey);
-  });
+  const { canView } = useUnifiedPermissions();
+  
+  // Team-based dashboard permissions (replaces role-based)
+  const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
 
   const handleLogout = async () => {
     queryClient.clear();
