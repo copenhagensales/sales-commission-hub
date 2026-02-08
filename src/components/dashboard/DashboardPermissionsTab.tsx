@@ -1,8 +1,7 @@
+import { Loader2, Shield, Info, LayoutDashboard, User, Users, UsersRound, UserX, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { Loader2, Shield, Info, LayoutDashboard, User, Users, UsersRound, UserX } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import {
@@ -13,23 +12,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   useTeamDashboardPermissions,
   useTeamsWithLeaders,
   useUpdateTeamDashboardPermission,
-  accessLevelLabels,
   type DashboardAccessLevel,
 } from "@/hooks/useTeamDashboardPermissions";
+import { cn } from "@/lib/utils";
 
-// Badge colors and icons for access levels
-const accessLevelConfig: Record<DashboardAccessLevel, { 
-  variant: "default" | "secondary" | "destructive" | "outline"; 
-  className: string;
-  icon: typeof User;
-}> = {
-  none: { variant: "secondary", className: "bg-muted text-muted-foreground", icon: UserX },
-  team_leader: { variant: "default", className: "bg-blue-500/15 text-blue-700 border-blue-200", icon: User },
-  leadership: { variant: "default", className: "bg-orange-500/15 text-orange-700 border-orange-200", icon: Users },
-  all: { variant: "default", className: "bg-green-500/15 text-green-700 border-green-200", icon: UsersRound },
+// Icons for access levels
+const accessLevelIcons: Record<DashboardAccessLevel, typeof User> = {
+  none: UserX,
+  team_leader: User,
+  leadership: Users,
+  all: UsersRound,
+};
+
+const accessLevelColors: Record<DashboardAccessLevel, string> = {
+  none: "text-muted-foreground",
+  team_leader: "text-blue-500",
+  leadership: "text-orange-500",
+  all: "text-green-500",
 };
 
 export function DashboardPermissionsTab() {
@@ -37,6 +44,7 @@ export function DashboardPermissionsTab() {
   const { data: teams = [], isLoading: teamsLoading } = useTeamsWithLeaders();
   const { data: permissions = [], isLoading: permissionsLoading } = useTeamDashboardPermissions();
   const updatePermission = useUpdateTeamDashboardPermission();
+  const [expandedDashboards, setExpandedDashboards] = useState<Set<string>>(new Set(DASHBOARD_LIST.map(d => d.slug)));
 
   const isLoading = teamsLoading || permissionsLoading;
 
@@ -46,6 +54,11 @@ export function DashboardPermissionsTab() {
       p => p.team_id === teamId && p.dashboard_slug === dashboardSlug
     );
     return perm?.access_level ?? 'none';
+  };
+
+  // Count how many teams have access to a dashboard
+  const getAccessCount = (dashboardSlug: string): number => {
+    return permissions.filter(p => p.dashboard_slug === dashboardSlug && p.access_level !== 'none').length;
   };
 
   // Handle permission change
@@ -75,6 +88,18 @@ export function DashboardPermissionsTab() {
     );
   };
 
+  const toggleDashboard = (slug: string) => {
+    setExpandedDashboards(prev => {
+      const next = new Set(prev);
+      if (next.has(slug)) {
+        next.delete(slug);
+      } else {
+        next.add(slug);
+      }
+      return next;
+    });
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -95,7 +120,7 @@ export function DashboardPermissionsTab() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Shield className="h-5 w-5" />
           Dashboard Rettigheder
@@ -104,94 +129,109 @@ export function DashboardPermissionsTab() {
           Tildel adgang til dashboards for hvert team
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-2">
         {/* Info banner about owner access */}
-        <Alert>
+        <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Ejere har altid fuld adgang til alle dashboards uanset disse indstillinger.
+            Ejere har altid fuld adgang til alle dashboards.
           </AlertDescription>
         </Alert>
 
-        {/* Dashboard sections */}
-        {DASHBOARD_LIST.map((dashboard) => (
-          <div key={dashboard.slug} className="space-y-4">
-            {/* Dashboard header */}
-            <div className="flex items-center gap-2 border-b pb-2">
-              <LayoutDashboard className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-lg">{dashboard.name}</h3>
-            </div>
+        {/* Dashboard sections as collapsible rows */}
+        <div className="space-y-1">
+          {DASHBOARD_LIST.map((dashboard) => {
+            const isExpanded = expandedDashboards.has(dashboard.slug);
+            const accessCount = getAccessCount(dashboard.slug);
 
-            {/* Team grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teams.map((team) => {
-                const currentLevel = getPermission(team.id, dashboard.slug);
-                const config = accessLevelConfig[currentLevel];
-                const IconComponent = config.icon;
-
-                return (
-                  <div
-                    key={team.id}
-                    className="p-4 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
-                  >
-                    <div className="flex flex-col gap-3">
-                      {/* Team name */}
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{team.name}</span>
-                        <Badge 
-                          variant={config.variant}
-                          className={config.className}
-                        >
-                          <IconComponent className="h-3 w-3 mr-1" />
-                          {currentLevel === 'none' ? 'Ingen' : currentLevel === 'all' ? 'Alle' : currentLevel === 'team_leader' ? 'TL' : 'Ledelse'}
-                        </Badge>
-                      </div>
-
-                      {/* Access level select */}
-                      <Select
-                        value={currentLevel}
-                        onValueChange={(value) => 
-                          handlePermissionChange(team.id, dashboard.slug, value as DashboardAccessLevel)
-                        }
-                        disabled={updatePermission.isPending}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Vælg adgangsniveau..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">
-                            <div className="flex items-center gap-2">
-                              <UserX className="h-4 w-4 text-muted-foreground" />
-                              <span>Ingen adgang</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="team_leader">
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-blue-600" />
-                              <span>Kun teamleder</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="leadership">
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-orange-600" />
-                              <span>Ledelse (TL + ATL)</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="all">
-                            <div className="flex items-center gap-2">
-                              <UsersRound className="h-4 w-4 text-green-600" />
-                              <span>Hele teamet</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+            return (
+              <Collapsible
+                key={dashboard.slug}
+                open={isExpanded}
+                onOpenChange={() => toggleDashboard(dashboard.slug)}
+              >
+                {/* Dashboard header row */}
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <LayoutDashboard className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{dashboard.name}</span>
                     </div>
+                    <span className="text-sm text-muted-foreground">
+                      {accessCount} {accessCount === 1 ? 'team' : 'teams'} har adgang
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                </CollapsibleTrigger>
+
+                {/* Team permission rows */}
+                <CollapsibleContent>
+                  <div className="ml-7 mt-1 space-y-0.5">
+                    {teams.map((team) => {
+                      const currentLevel = getPermission(team.id, dashboard.slug);
+                      const IconComponent = accessLevelIcons[currentLevel];
+                      const iconColor = accessLevelColors[currentLevel];
+
+                      return (
+                        <div
+                          key={team.id}
+                          className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <IconComponent className={cn("h-4 w-4", iconColor)} />
+                            <span className="text-sm">{team.name}</span>
+                          </div>
+
+                          <Select
+                            value={currentLevel}
+                            onValueChange={(value) => 
+                              handlePermissionChange(team.id, dashboard.slug, value as DashboardAccessLevel)
+                            }
+                            disabled={updatePermission.isPending}
+                          >
+                            <SelectTrigger className="w-[160px] h-8 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                <div className="flex items-center gap-2">
+                                  <UserX className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span>Ingen adgang</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="team_leader">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-3.5 w-3.5 text-blue-500" />
+                                  <span>Kun teamleder</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="leadership">
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-3.5 w-3.5 text-orange-500" />
+                                  <span>Ledelse</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="all">
+                                <div className="flex items-center gap-2">
+                                  <UsersRound className="h-3.5 w-3.5 text-green-500" />
+                                  <span>Hele teamet</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
 
         {teams.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
