@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { DASHBOARD_LIST } from "@/config/dashboards";
-import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
 
 export type AppMode = "main" | "dashboard";
 
@@ -22,14 +21,11 @@ const STORAGE_KEY = "app-mode-preference";
 export function AppModeProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { canView } = useUnifiedPermissions();
   
-  // Determine which dashboards user can access
-  const accessibleDashboards = DASHBOARD_LIST.filter(d => 
-    !d.permissionKey || canView(d.permissionKey)
-  );
+  // Team-based dashboard permissions (replaces role-based)
+  const { data: accessibleDashboards = [] } = useAccessibleDashboards();
   
-  const canAccessDashboards = accessibleDashboards.length > 0 && canView("menu_section_dashboards");
+  const canAccessDashboards = accessibleDashboards.length > 0;
   const canAccessMainSystem = true; // All authenticated users can access main system
   const firstAvailableDashboard = accessibleDashboards[0]?.path || null;
   

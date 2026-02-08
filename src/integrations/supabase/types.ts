@@ -8197,6 +8197,41 @@ export type Database = {
           },
         ]
       }
+      team_dashboard_permissions: {
+        Row: {
+          access_level: string
+          created_at: string | null
+          dashboard_slug: string
+          id: string
+          team_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_level?: string
+          created_at?: string | null
+          dashboard_slug: string
+          id?: string
+          team_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_level?: string
+          created_at?: string | null
+          dashboard_slug?: string
+          id?: string
+          team_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_dashboard_permissions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_expenses: {
         Row: {
           all_days: boolean | null
