@@ -124,12 +124,13 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         revenueByDay[saleDate] = (revenueByDay[saleDate] || 0) + saleRevenue;
       });
 
-      // Get fieldmarketing sales revenue
+      // Get fieldmarketing sales revenue from unified sales table
       const { data: fmSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("registered_at, product_name, client_id")
-        .gte("registered_at", `${startDateStr}T00:00:00`)
-        .lte("registered_at", `${todayStr}T23:59:59`);
+        .from("sales")
+        .select("id, sale_datetime, raw_payload")
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startDateStr}T00:00:00`)
+        .lte("sale_datetime", `${todayStr}T23:59:59`);
 
       // Get products for FM revenue lookup
       const { data: products } = await supabase
@@ -143,8 +144,8 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
 
       // Add FM revenue
       fmSales?.forEach((sale) => {
-        const saleDate = format(parseISO(sale.registered_at), "yyyy-MM-dd");
-        const productName = (sale.product_name || "").toLowerCase();
+        const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
+        const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
         const revenue = productRevenueMap.get(productName) || 0;
         revenueByDay[saleDate] = (revenueByDay[saleDate] || 0) + revenue;
       });
