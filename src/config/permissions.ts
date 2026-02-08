@@ -101,6 +101,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til at se ASE-salg med mulighed for straksbetaling",
         hasEditOption: false,
       },
+      {
+        key: "menu_tdc_opsummering",
+        label: "TDC Opsummering",
+        description: "Adgang til TDC opsummeringsværktøj",
+        hasEditOption: false,
+      },
     ],
   },
 
@@ -557,6 +563,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
 
   // ==================== DASHBOARDS MENU ====================
+  // NOTE: Individual dashboard permissions are now managed via team_dashboard_permissions
+  // in the dashboard environment (DashboardPermissionsTab). Only general access is here.
   {
     key: "menu_dashboards",
     label: "Dashboards menu",
@@ -565,103 +573,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       {
         key: "menu_dashboards",
         label: "Dashboards (generelt)",
-        description: "Generel adgang til dashboards menu",
+        description: "Generel adgang til dashboards miljøet",
         hasEditOption: false,
       },
-      {
-        key: "menu_dashboard_cph_sales",
-        label: "CPH Sales Dashboard",
-        description: "Adgang til CPH Sales dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_fieldmarketing",
-        label: "Fieldmarketing Dashboard",
-        description: "Adgang til Fieldmarketing dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_eesy_tm",
-        label: "Eesy TM Dashboard",
-        description: "Adgang til Eesy TM dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_tdc_erhverv",
-        label: "TDC Erhverv Dashboard",
-        description: "Adgang til TDC Erhverv dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_relatel",
-        label: "Relatel Dashboard",
-        description: "Adgang til Relatel dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_tryg",
-        label: "Tryg Dashboard",
-        description: "Adgang til Tryg dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_ase",
-        label: "ASE Dashboard",
-        description: "Adgang til ASE dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_test",
-        label: "Test Dashboard",
-        description: "Adgang til Test dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_tdc_opsummering",
-        label: "TDC Opsummering",
-        description: "Adgang til TDC opsummeringsværktøj",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_united",
-        label: "United Dashboard",
-        description: "Adgang til United dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_cs_top_20",
-        label: "CS Top 20 Dashboard",
-        description: "Adgang til CS Top 20 dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_mg_test",
-        label: "MG Test Dashboard",
-        description: "Adgang til MG Test dashboard",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_dashboard_design",
-        label: "Design Dashboard",
-        description: "Adgang til design dashboard",
-        hasEditOption: true,
-      },
-      {
-        key: "menu_dashboard_settings",
-        label: "Dashboard Indstillinger",
-        description: "Adgang til dashboard indstillinger",
-        hasEditOption: true,
-      },
-    ],
-  },
-  {
-    key: "tabs_dashboard_settings",
-    label: "Dashboard Indstillinger faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_dashboard_widgets", label: "Widgets", description: "Adgang til widgets fane", hasEditOption: true },
-      { key: "tab_dashboard_kpis", label: "KPI'er", description: "Adgang til KPI'er fane", hasEditOption: true },
-      { key: "tab_dashboard_designs", label: "Designs", description: "Adgang til designs fane", hasEditOption: true },
     ],
   },
 

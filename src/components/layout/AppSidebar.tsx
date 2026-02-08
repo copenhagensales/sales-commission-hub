@@ -53,7 +53,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals", "/immediate-payment-ase"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals", "/immediate-payment-ase", "/tdc-opsummering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -641,6 +641,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 >
                   <CreditCard className="h-4 w-4" />
                   Straksbetaling (ASE)
+                </NavLink>
+              )}
+
+              {/* TDC Opsummering */}
+              {p.canViewTdcOpsummering && (
+                <NavLink
+                  to="/tdc-opsummering"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/tdc-opsummering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  TDC Opsummering
                 </NavLink>
               )}
             </CollapsibleContent>
