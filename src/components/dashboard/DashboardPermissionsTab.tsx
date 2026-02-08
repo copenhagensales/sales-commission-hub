@@ -102,16 +102,30 @@ export function DashboardPermissionsTab() {
   };
 
   // Set all teams to a specific level for a dashboard
-  const setAllTeams = (dashboardSlug: string, level: DashboardAccessLevel) => {
-    teams.forEach(team => {
-      if (getPermission(team.id, dashboardSlug) !== level) {
-        updatePermission.mutate({ teamId: team.id, dashboardSlug, accessLevel: level });
-      }
-    });
-    toast({
-      title: "Alle teams opdateret",
-      description: `Alle teams sat til "${accessLevels.find(l => l.value === level)?.label}"`,
-    });
+  const setAllTeams = async (dashboardSlug: string, level: DashboardAccessLevel) => {
+    const teamsToUpdate = teams.filter(
+      team => getPermission(team.id, dashboardSlug) !== level
+    );
+    
+    if (teamsToUpdate.length === 0) return;
+    
+    try {
+      await Promise.all(
+        teamsToUpdate.map(team => 
+          updatePermission.mutateAsync({ teamId: team.id, dashboardSlug, accessLevel: level })
+        )
+      );
+      toast({
+        title: "Alle teams opdateret",
+        description: `${teamsToUpdate.length} teams sat til "${accessLevels.find(l => l.value === level)?.label}"`,
+      });
+    } catch (error) {
+      toast({
+        title: "Fejl",
+        description: "Nogle rettigheder kunne ikke opdateres",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleDashboard = (slug: string) => {
