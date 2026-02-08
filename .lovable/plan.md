@@ -1,643 +1,464 @@
 
-# Masterplan: Komplet Optimering + Langsigtet Skalerbarhed
+# Komplet Optimeringsplan: FM Migration, Console.log Cleanup & .single() Audit
 
-## Executive Summary
+## Samlet Overblik
 
-Denne masterplan kombinerer **akutte databasefixes**, **kodeoptimeringer** og **langsigtet skalering** for at håndtere vækst fra nuværende ~17.000 salg til 500.000+ salg over de næste 3 år.
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  SAMLET OVERBLIK                                                                │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  DATABASE CLEANUP                       │ FORVENTET GEVINST                     │
-│  ───────────────────────────────────────┼─────────────────────────────────────  │
-│  Login events deduplication             │ 222 MB → ~2 MB (-99%)                 │
-│  kpi_cached_values VACUUM               │ 261 MB → ~5 MB (-98%)                 │
-│  Log retention (30 dage)                │ ~60 MB frigivet                       │
-│  Drop ubrugte indekser                  │ ~8 MB frigivet                        │
-│                                                                                 │
-│  KODE OPTIMERING                        │                                       │
-│  ───────────────────────────────────────┼─────────────────────────────────────  │
-│  FM Migration (15 filer)                │ Unified queries, -100% duplikering    │
-│  TV Edge Function konsolidering         │ 2.642 LOC → ~800 LOC (-70%)           │
-│  Pagination fixes (3 kritiske filer)    │ Skalerer til 100k+ salg               │
-│  .single() → .maybeSingle() audit       │ -80% crash risiko (60 filer)          │
-│  Console.log cleanup (edge functions)   │ 3.220 matches i 82 filer              │
-│                                                                                 │
-│  LANGSIGTET SKALERING                   │                                       │
-│  ───────────────────────────────────────┼─────────────────────────────────────  │
-│  Cursor-based pagination utility        │ Konstant performance ved vækst        │
-│  Materialized views                     │ Server-side aggregering               │
-│  Automatisk log retention cron          │ Forebygger bloat                      │
-│                                                                                 │
-│  SAMLET RESULTAT                                                                │
-│  ───────────────────────────────────────────────────────────────────────────    │
-│  Database: 864 MB → ~150 MB (-83%)                                              │
-│  Skalerer til: 500.000+ salg over 3 år                                          │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+| Opgave | Omfang | Handling |
+|--------|--------|----------|
+| FM Migration | 54 steder i 15 filer | Migrér fra `fieldmarketing_sales` → `sales` WHERE `source = 'fieldmarketing'` |
+| Console.log Cleanup | ~247 kritiske i edge functions | Fjern debug logs, behold kun errors |
+| .single() Audit | 610 matches i 60 filer | Erstat risikable med `.maybeSingle()` |
 
 ---
 
-## Nuværende Database Status
+## FASE 1: FM Migration (54 steder i 15 filer)
 
-| Tabel | Størrelse | Rækker | Problem |
-|-------|-----------|--------|---------|
-| kpi_cached_values | 261 MB | 2.094 | Ekstrem bloat (125 KB/række!) |
-| login_events | 222 MB | 440.136 | 99%+ duplikater |
-| sales | 43 MB | 17.414 | OK - aktiv data |
-| integration_logs | 30 MB | 38.494 | Ingen retention policy |
-| adversus_events | 24 MB | 20.871 | 15% dead tuples, ingen retention |
-| kpi_leaderboard_cache | 17 MB | 76 | Mulig bloat |
-| sale_items | 15 MB | 17.838 | 14% dead tuples |
-| dialer_calls | 9 MB | 12.350 | OK nu (tidligere tom med bloat) |
-| kpi_watermarks | 5 MB | 2 | 2.5 MB per række! |
-| integration_debug_log | 3 MB | 3 | 1 MB per række! |
+### 1.1 Edge Functions (3 filer, 12 steder)
 
-**Total database størrelse: 864 MB**
+**`supabase/functions/calculate-kpi-values/index.ts`** (9 steder)
 
----
+| Linje | Nuværende | Ny Query |
+|-------|-----------|----------|
+| 437-441 | `from("fieldmarketing_sales").select("id, product_name, seller_id...")` | `from("sales").select("id, raw_payload, agent_name...").eq("source", "fieldmarketing")` |
+| 987-991 | `fetchFmSalesForPeriod` funktion | Opdatér til `sales` tabel med mapping |
+| 1628-1632 | FM count query | `.eq("source", "fieldmarketing")` |
+| 1662-1666 | FM commission query | Brug `raw_payload->>'fm_product_name'` |
+| 1703-1707 | FM revenue query | Brug `raw_payload` |
+| 2060-2065 | Client-scoped FM count | Tilføj `source` filter |
+| 2096-2101 | Client-scoped FM commission | Brug `raw_payload` |
+| 2138-2143 | Client-scoped FM revenue | Brug `raw_payload` |
 
-## FASE 1: Akut Database Cleanup (SQL Migrations)
-
-### 1.1 Login Events Deduplication (KRITISK - 222 MB → ~2 MB)
-
-```sql
--- Dedupliker: behold kun første login per bruger per dag
-WITH duplicates AS (
-  SELECT id, ROW_NUMBER() OVER (
-    PARTITION BY user_id, DATE(logged_in_at) 
-    ORDER BY logged_in_at ASC
-  ) as rn
-  FROM login_events
-)
-DELETE FROM login_events WHERE id IN (SELECT id FROM duplicates WHERE rn > 1);
-
--- Tilføj unik constraint for fremtidig beskyttelse
-CREATE UNIQUE INDEX IF NOT EXISTS idx_login_events_user_session_unique 
-ON login_events(user_id, session_id);
-```
-
-**Forventet resultat:** 440.136 → ~5.000 rækker
-
-### 1.2 VACUUM Bloated Tabeller (280 MB → ~12 MB)
-
-```sql
--- VACUUM FULL for tabeller med ekstrem bloat
-VACUUM FULL kpi_cached_values;
-VACUUM FULL kpi_leaderboard_cache;
-VACUUM FULL kpi_watermarks;
-VACUUM FULL integration_debug_log;
-
--- Standard VACUUM for tabeller med dead tuples
-VACUUM ANALYZE sale_items;
-VACUUM ANALYZE adversus_events;
-VACUUM ANALYZE role_page_permissions;
-```
-
-### 1.3 Log Retention Policies (55 MB frigivet)
-
-```sql
--- Oprydning nu
-DELETE FROM integration_logs WHERE created_at < NOW() - INTERVAL '30 days';
-DELETE FROM adversus_events WHERE timestamp < NOW() - INTERVAL '30 days';
-
--- Opret automatisk cleanup cron job
-SELECT cron.schedule(
-  'cleanup-old-logs',
-  '0 4 * * *',
-  $$
-    DELETE FROM login_events WHERE logged_in_at < NOW() - INTERVAL '30 days';
-    DELETE FROM integration_logs WHERE created_at < NOW() - INTERVAL '30 days';
-    DELETE FROM adversus_events WHERE timestamp < NOW() - INTERVAL '30 days';
-    DELETE FROM cron.job_run_details WHERE end_time < NOW() - INTERVAL '7 days';
-  $$
-);
-```
-
-### 1.4 Drop Ubrugte Indekser (8 MB frigivet)
-
-| Index | Størrelse | Scans | Handling |
-|-------|-----------|-------|----------|
-| idx_sale_items_product_aggregation | 2.2 MB | 0 | DROP |
-| adversus_events_external_id_key | 2.1 MB | 0 | DROP |
-| idx_sales_adversus_external_id | 1.8 MB | 0 | DROP |
-
-```sql
-DROP INDEX IF EXISTS idx_sale_items_product_aggregation;
-DROP INDEX IF EXISTS adversus_events_external_id_key;
-DROP INDEX IF EXISTS idx_sales_adversus_external_id;
-```
-
-### 1.5 Drop Tomme Tabeller
-
-Følgende tabeller er bekræftet tomme og kan fjernes:
-
-| Tabel | Rækker | Handling |
-|-------|--------|----------|
-| communication_log | 0 | DROP |
-| head_to_head_battles | 0 | DROP |
-| employee_absence | 0 | DROP |
-| time_off_request | 0 | DROP |
-| weekly_goals | 0 | DROP |
-| team_sales_goals | 0 | DROP |
-| scheduled_team_changes | 0 | DROP |
-| trusted_ip_ranges | 0 | DROP |
-| failed_login_attempts | 0 | DROP |
-| h2h_employee_stats | 0 | DROP |
-| fixed_costs | 0 | DROP |
-| transactions | 0 | DROP |
-| performance_reviews | 0 | DROP |
-| time_entry | 0 | DROP |
-| applications | 0 | DROP |
-| booking_diet | 0 | DROP |
-| extra_work | 0 | DROP |
-| mileage_report | 0 | DROP |
-
----
-
-## FASE 2: Pagination Fixes (Kritiske for Skalering)
-
-### 2.1 Filer der Mangler Pagination
-
-| Fil | Problem | Nuværende | Løsning |
-|-----|---------|-----------|---------|
-| `src/components/salary/ClientDBTab.tsx` linje 480-498 | Direct fetch uden pagination | ~17k sales | Brug fetchAllRows |
-| `src/hooks/useDashboardKpiData.ts` linje 183-196 | Ingen pagination | ~17k sales | Brug fetchAllRows |
-| `src/hooks/useKpiTest.ts` | REST API uden pagination | ~17k sales | Tilføj pagination |
-
-### 2.2 Implementering
-
-**ClientDBTab.tsx:**
+**Field Mapping (fra useFieldmarketingSales.ts):**
 ```typescript
-// FRA (linje 480-490):
-const { data: telesalesData } = await supabase
-  .from("sales")
-  .select(`...`)
-  .gte("sale_datetime", periodStart.toISOString());
-
-// TIL:
-import { fetchAllRows } from "@/utils/supabasePagination";
-
-const telesalesData = await fetchAllRows<any>(
-  "sales",
-  `id, client_campaign_id, client_campaigns!inner(client_id), 
-   sale_items(quantity, mapped_commission, mapped_revenue)`,
-  (q) => q.gte("sale_datetime", periodStart.toISOString())
-          .lte("sale_datetime", periodEnd.toISOString()),
-  { orderBy: "sale_datetime", ascending: false }
-);
-```
-
-### 2.3 Ny Cursor-Based Pagination Utility
-
-Tilføj til `src/utils/supabasePagination.ts`:
-
-```typescript
-export async function fetchAllRowsCursor<T = unknown>(
-  table: string,
-  select: string,
-  filters?: (query: any) => any,
-  options: {
-    pageSize?: number;
-    cursorColumn?: string;
-    maxRows?: number;
-  } = {}
-): Promise<T[]> {
-  const { pageSize = 500, cursorColumn = "id", maxRows } = options;
-  const allData: T[] = [];
-  let lastCursor: string | null = null;
-
-  while (true) {
-    if (maxRows && allData.length >= maxRows) break;
-
-    let query = supabase
-      .from(table)
-      .select(select)
-      .order(cursorColumn, { ascending: true })
-      .limit(pageSize);
-
-    if (lastCursor) {
-      query = query.gt(cursorColumn, lastCursor);
-    }
-    if (filters) {
-      query = filters(query);
-    }
-
-    const { data, error } = await query;
-    if (error || !data || data.length === 0) break;
-
-    allData.push(...(data as T[]));
-    lastCursor = (data[data.length - 1] as any)[cursorColumn];
-    if (data.length < pageSize) break;
-  }
-
-  return allData;
-}
-```
-
----
-
-## FASE 3: FM Migration Fuldførelse
-
-### 3.1 Filer der Bruger Legacy fieldmarketing_sales Tabel (15 filer)
-
-**Edge Functions (3 filer):**
-| Fil | Antal steder |
-|-----|--------------|
-| `supabase/functions/calculate-kpi-values/index.ts` | 9 |
-| `supabase/functions/parse-expense-formula/index.ts` | 1 |
-| `supabase/functions/league-calculate-standings/index.ts` | 1 |
-
-**Frontend (12 filer):**
-| Fil | Kompleksitet | Antal steder |
-|-----|--------------|--------------|
-| `src/pages/vagt-flow/EditSalesRegistrations.tsx` | Høj (CRUD) | 8 |
-| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Medium | 2 |
-| `src/pages/vagt-flow/FieldmarketingDashboard.tsx` | Medium (via hook) | - |
-| `src/components/employee/EmployeeCommissionHistory.tsx` | Medium | 1 |
-| `src/pages/dashboards/CphSalesDashboard.tsx` | Lav | 1 |
-| `src/components/salary/ClientDBTab.tsx` | Lav | 1 |
-| `src/components/dashboard/DailyRevenueChart.tsx` | Lav | 1 |
-| `src/pages/reports/DailyReports.tsx` | Medium | 2 |
-| `src/pages/reports/RevenueByClient.tsx` | Lav | 1 |
-| `src/hooks/useKpiTest.ts` | Høj | 3 |
-| `src/pages/MyProfile.tsx` | Lav | 2 |
-
-### 3.2 Migrationsstrategi
-
-```typescript
-// FRA:
-supabase.from("fieldmarketing_sales")
-  .select("seller_id, product_name, registered_at")
-
-// TIL:
-supabase.from("sales")
-  .select("id, agent_name, normalized_data, sale_datetime")
-  .eq("source", "fieldmarketing")
-
-// Field Mapping:
-// seller_id → normalized_data->>'seller_id' ELLER agent_name
-// product_name → normalized_data->>'product_name'
+// seller_id → raw_payload->>'fm_seller_id' ELLER agent_name
+// product_name → raw_payload->>'fm_product_name'
 // registered_at → sale_datetime
-// client_id → via client_campaign_id join
+// client_id → raw_payload->>'fm_client_id' ELLER via client_campaign_id
+// location_id → raw_payload->>'fm_location_id'
+// comment → raw_payload->>'fm_comment'
 ```
+
+**`supabase/functions/parse-expense-formula/index.ts`** (1 sted)
+
+| Linje | Handling |
+|-------|----------|
+| 307-312 | Opdatér query til `sales` med `source = 'fieldmarketing'`, brug `raw_payload` for location_id |
+
+**`supabase/functions/league-calculate-standings/index.ts`** (1 sted)
+
+| Linje | Handling |
+|-------|----------|
+| 211-215 | Opdatér FM sales query til `sales` tabel med korrekt mapping |
+
+### 1.2 Frontend - Hooks (3 filer, 10 steder)
+
+**`src/hooks/useKpiTest.ts`** (6 steder)
+
+| Linje | Funktion | Handling |
+|-------|----------|----------|
+| 200-210 | `testSalesCount` FM query | Brug `sales` med `source = 'fieldmarketing'` |
+| 346-356 | `testTotalCommission` FM query | Opdatér med `raw_payload` mapping |
+| 492-502 | `testTotalRevenue` FM query | Opdatér med `raw_payload` mapping |
+
+**`src/components/kpi/FormulaLiveTest.tsx`** (2 steder)
+
+| Linje | Handling |
+|-------|----------|
+| 428-432 | FM sales URL fetch | Opdatér REST URL til `sales?source=eq.fieldmarketing` |
+| 627-630 | FM revenue fetch | Samme opdatering |
+
+**`src/hooks/useFieldmarketingSales.ts`** - ALLEREDE MIGRERET ✓
+
+Denne fil bruger allerede den korrekte tilgang med `sales` tabel og `source = 'fieldmarketing'`.
+
+### 1.3 Frontend - Komponenter & Pages (9 filer, 31 steder)
+
+**`src/pages/vagt-flow/EditSalesRegistrations.tsx`** (8 steder - KOMPLEKS CRUD)
+
+| Linje | Handling |
+|-------|----------|
+| 135-150 | Fetch sales query | Opdatér til `sales` med `source = 'fieldmarketing'` |
+| 241-244 | Update mutation | Opdatér til `sales` tabel med `raw_payload` |
+| 260-263 | Delete mutation | Opdatér til `sales` tabel |
+| 298-301 | Group delete | Opdatér til `sales` tabel |
+| 307-318 | Group update | Opdatér til `sales` tabel med `raw_payload` |
+| 332-335 | Group insert | Brug eksisterende `useCreateFieldmarketingSale` hook |
+
+**Bemærk:** Denne fil kræver særlig omhu da den håndterer CRUD operationer. Skal bruge eksisterende `useCreateFieldmarketingSale` hook der allerede skriver til `sales` tabellen.
+
+**`src/pages/dashboards/FieldmarketingDashboardFull.tsx`** (2 steder)
+
+| Linje | Handling |
+|-------|----------|
+| 107-116 | Period sellers query | Opdatér til `sales` med `source` filter |
+| 146-154 | Today sellers query | Opdatér til `sales` med `source` filter |
+
+**`src/components/employee/EmployeeCommissionHistory.tsx`** (1 sted)
+
+| Linje | Handling |
+|-------|----------|
+| 185-188 | FM sales query | Opdatér til `sales` tabel |
+
+**`src/components/dashboard/DailyRevenueChart.tsx`** (1 sted)
+
+| Linje | Handling |
+|-------|----------|
+| 128-132 | FM sales revenue query | Opdatér til `sales` med `raw_payload` |
+
+**`src/pages/dashboards/CphSalesDashboard.tsx`** (1 sted - allerede delvist migreret via hooks)
+
+Bruger `useFieldmarketingSalesStats` som allerede er migreret.
+
+**`src/components/salary/ClientDBTab.tsx`** (1 sted)
+
+Bruger allerede `useFieldmarketingSales` hook - ingen ændring nødvendig.
+
+**`src/pages/reports/DailyReports.tsx`** (2 steder)
+
+| Handling |
+|----------|
+| Opdatér FM queries til `sales` tabel |
+
+**`src/pages/reports/RevenueByClient.tsx`** (1 sted)
+
+| Handling |
+|----------|
+| Opdatér FM query til `sales` tabel |
+
+**`src/pages/MyProfile.tsx`** (2 steder)
+
+| Handling |
+|----------|
+| Opdatér FM queries til `sales` tabel |
 
 ---
 
-## FASE 4: TV Edge Function Konsolidering
+## FASE 2: Console.log Cleanup (247+ kritiske i edge functions)
 
-### 4.1 Problem: 2.642 Linjer med Massive Duplikering
-
-`tv-dashboard-data/index.ts` har 5 næsten identiske handlers:
-
-| Handler | Linjer | Funktion |
-|---------|--------|----------|
-| handleEesyTmData | 211 | Eesy TV dashboard |
-| handleTdcErhvervData | 303 | TDC Erhverv TV |
-| handleRelatelData | 244 | Relatel TV |
-| handleCsTop20Data | 473 | CS Top 20 |
-| handleCelebrationData | 163 | Celebration overlay |
-
-Plus **50+ console.log statements** som kører ved hvert request.
-
-### 4.2 Løsning: Unified Dashboard Engine
-
-```typescript
-interface DashboardConfig {
-  clientId: string;
-  includeGoals: boolean;
-  includeHours: boolean;
-  includeCelebration: boolean;
-}
-
-const DASHBOARDS: Record<string, DashboardConfig> = {
-  "eesy-tm": { clientId: "81993a7b-...", includeGoals: true, includeHours: true, includeCelebration: true },
-  "tdc-erhverv": { clientId: "20744525-...", includeGoals: true, includeHours: true, includeCelebration: true },
-  "relatel": { clientId: "0ff8476d-...", includeGoals: true, includeHours: false, includeCelebration: true },
-};
-
-// Shared helpers
-async function fetchSalesForPeriods(supabase, clientId, periods) { ... }
-async function resolveEmployees(supabase, sales) { ... }
-function calculateStats(sales, employees, config) { ... }
-
-// Én generisk handler erstatter 5 duplikerede
-async function fetchDashboardData(supabase, dashboardId, periods) {
-  const config = DASHBOARDS[dashboardId];
-  const sales = await fetchSalesForPeriods(supabase, config.clientId, periods);
-  const employees = await resolveEmployees(supabase, sales);
-  return calculateStats(sales, employees, config);
-}
-```
-
-**Forventet resultat:** 2.642 → ~800 linjer (-70%)
-
-### 4.3 Cache Forbedring
-
-```typescript
-// Øg fra 15s til 30s - TV boards behøver ikke real-time
-const CACHE_TTL_MS = 30000;
-```
-
----
-
-## FASE 5: .single() → .maybeSingle() Audit
-
-### 5.1 Omfang
-- **630 matches i 60 filer** bruger `.single()`
-- Mange af disse er sikre (efter INSERT med RETURNING)
-- Men mange er risikable (SELECT med WHERE der kan returnere 0 rækker)
-
-### 5.2 Højprioritets Filer
-
-| Fil | Risiko | Steder | Beskrivelse |
-|-----|--------|--------|-------------|
-| `src/hooks/useKpiTest.ts` | Høj | 6 | KPI test queries |
-| `src/hooks/useDashboardKpiData.ts` | Høj | 3 | Dashboard data |
-| `src/hooks/useEmployeeDashboards.ts` | Medium | 4 | Employee lookups |
-| `src/hooks/useReferrals.ts` | Medium | 5 | Referral queries |
-| `src/pages/vagt-flow/Billing.tsx` | Medium | 1 | Team lookup |
-| `src/pages/vagt-flow/Bookings.tsx` | Medium | 1 | Team lookup |
-| `src/components/salary/ClientDBTab.tsx` | Medium | 2 | Client DB queries |
-
-### 5.3 Fix Pattern
-
-```typescript
-// RISIKABELT:
-const { data, error } = await supabase
-  .from("employee_master_data")
-  .select("...")
-  .eq("id", userId)
-  .single(); // Crash hvis bruger ikke findes!
-
-// SIKKERT:
-const { data, error } = await supabase
-  .from("employee_master_data")
-  .select("...")
-  .eq("id", userId)
-  .maybeSingle();
-
-if (!data) {
-  // Håndter manglende data
-}
-```
-
----
-
-## FASE 6: Console.log Cleanup i Edge Functions
-
-### 6.1 Omfang
-- **3.220 matches i 82 filer**
-
-### 6.2 Prioriterede Edge Functions
+### 2.1 Prioriterede Edge Functions
 
 | Fil | Matches | Handling |
 |-----|---------|----------|
-| `tv-dashboard-data/index.ts` | 50+ | Fjern alle undtagen errors |
-| `enreach-manage-webhooks/index.ts` | 40+ | Fjern debug logs |
-| `calculate-kpi-values/index.ts` | 30+ | Behold kun kritiske |
-| `integration-engine/` | 20+ | Brug makeLogger() |
+| `enreach-manage-webhooks/index.ts` | ~50 | Fjern alle debug logs, behold kun errors |
+| `calculate-kpi-values/index.ts` | ~35 | Fjern debug logs, behold kritiske metrics |
+| `sync-adversus/index.ts` | ~30 | Fjern verbose logging |
+| `integration-engine/*.ts` | ~25 | Brug eksisterende `makeLogger()` |
+| `parse-expense-formula/index.ts` | ~15 | Fjern context dumps |
+| `import-economic-zip/index.ts` | ~15 | Reducer til progress logs |
+| `tv-dashboard-data/index.ts` | ~50 | Allerede delvist cleaned i forrige iteration |
 
-### 6.3 Pattern
+### 2.2 Cleanup Pattern
 
 ```typescript
-// Fjern alle debug logs:
+// FJERN alle disse:
 console.log("...");
+console.log("Fetching...");
+console.log("Found X items");
+console.log("Processing...");
 
-// Behold kun:
+// BEHOLD kun:
 console.error("Error:", error);
 
-// Brug struktureret logging hvor nødvendigt:
-log("INFO", `Processed ${count} sales`);
+// BRUG struktureret logging hvor nødvendigt:
+// I integration-engine:
+const log = makeLogger({ function: "name", context: {} });
+log("INFO", "message", data);
+```
+
+### 2.3 Specifik Cleanup for enreach-manage-webhooks
+
+```typescript
+// Linje 43-52: FJERN
+console.log("=== ENREACH WEBHOOK MANAGER START ===");
+console.log("Raw request body:", ...);
+console.log("Parsed parameters:");
+
+// Linje 55-56: BEHOLD (fejlhåndtering)
+console.log("ERROR: Missing required parameters"); // Omdøb til console.error
+
+// Linje 62-74: FJERN (verbose debugging)
+console.log("Fetching integration details...");
+
+// osv. for alle 50+ matches
 ```
 
 ---
 
-## FASE 7: Cron Job Optimering
+## FASE 3: .single() → .maybeSingle() Audit (610 matches i 60 filer)
 
-### 7.1 Nuværende Jobs (20 aktive)
+### 3.1 Risikovurdering
 
-| Job | Frekvens | Status |
-|-----|----------|--------|
-| calculate-kpi-incremental | Hvert minut | 60 kørsler/time - OK |
-| calculate-leaderboard-incremental | Hvert minut | 60 kørsler/time - OK |
-| dialer-*-sync (5 stk) | Hver 5. min | 12 kørsler/time hver - OK |
-| process-scheduled-emails | Hvert minut | 60 kørsler/time - OK |
-| adversus-sync-nightly | Kl 00-06 | **LEGACY - KAN DEPRECERES** |
+| Kategori | Mønster | Risiko | Handling |
+|----------|---------|--------|----------|
+| SIKKER | `.insert(...).select().single()` | Lav | Behold (INSERT garanterer 1 række) |
+| SIKKER | `.update(...).select().single()` | Lav | Behold (UPDATE returnerer opdateret række) |
+| RISIKABEL | `.select().eq("id", x).single()` | Høj | Erstat med `.maybeSingle()` |
+| RISIKABEL | `.select().eq("auth_user_id", x).single()` | Høj | Erstat med `.maybeSingle()` |
 
-### 7.2 Legacy Cron Job Deprecation
+### 3.2 Prioriterede Filer (Høj Risiko)
 
-```sql
--- Fjern legacy adversus-sync-nightly (erstattet af integration-engine)
-SELECT cron.unschedule('adversus-sync-nightly');
-```
+**Hooks (20 filer, ~150 matches)**
 
----
+| Fil | Matches | Kritiske |
+|-----|---------|----------|
+| `useKpiTest.ts` | 6 | 6 (SELECT queries) |
+| `useDashboardKpiData.ts` | 3 | 1 (formula lookup) |
+| `useKpiFormulas.ts` | 4 | 2 (SELECT by id) |
+| `usePulseSurvey.ts` | 6 | 4 (SELECT queries) |
+| `useReferrals.ts` | 5 | 2 (SELECT queries) |
+| `useTimeStamps.ts` | 4 | 1 (SELECT by id) |
+| `useShiftPlanning.ts` | 8 | 3 (SELECT queries) |
+| `useSomeContent.ts` | 4 | 2 (upsert handling) |
+| `useCelebrationData.ts` | 1 | 1 (month lookup) |
+| `useFieldmarketingSales.ts` | 1 | 1 (employee lookup) |
+| `useSystemRoles.ts` | 1 | 0 (INSERT) |
+| `useKpiDefinitions.ts` | 4 | 2 (SELECT queries) |
 
-## FASE 8: Materialized Views (Langsigtet)
+**Pages (23 filer, ~100 matches)**
 
-### 8.1 Daglige Aggregater
+| Fil | Matches | Kritiske |
+|-----|---------|----------|
+| `MyGoals.tsx` | 2 | 2 (employee lookup) |
+| `PulseSurvey.tsx` | 1 | 1 (employee lookup) |
+| `CareerWishes.tsx` | 1 | 1 (employee lookup) |
+| `RolePreview.tsx` | 2 | 2 (SELECT queries) |
+| `ClosingShifts.tsx` | 1 | 1 (config lookup) |
+| `ContractSign.tsx` | 1 | 1 (contract lookup) |
+| `EmployeeMasterData.tsx` | 1 | 1 (config lookup) |
+| `LeagueAdminDashboard.tsx` | 4 | 3 (SELECT queries) |
+| `EconomicUpload.tsx` | 2 | 1 (SELECT query) |
+| `TvBoardLogin.tsx` | 1 | 1 (access code lookup) |
+| `TvBoardView.tsx` | 1 | 1 (access code lookup) |
+| `Billing.tsx` | 1 | 1 (team lookup) |
+| `Bookings.tsx` | 1 | 1 (team lookup) |
+| `BookingsContent.tsx` | 1 | 1 (team lookup) |
+| `MarketsContent.tsx` | 1 | 1 (team lookup) |
+| `BookWeekContent.tsx` | 1 | 1 (team lookup) |
+| `CandidateDetail.tsx` | 2 | 1 (SELECT query) |
+| `UpcomingStarts.tsx` | 1 | 0 (INSERT) |
+| `Settings.tsx` | 1 | 0 (INSERT) |
+| `TvBoardAdmin.tsx` | 1 | 0 (INSERT) |
 
-```sql
-CREATE MATERIALIZED VIEW mv_daily_sales_stats AS
-SELECT 
-  DATE(sale_datetime) as sale_date,
-  client_campaign_id,
-  agent_email,
-  COUNT(*) as sales_count,
-  SUM(si.mapped_commission) as total_commission,
-  SUM(si.mapped_revenue) as total_revenue
-FROM sales s
-JOIN sale_items si ON si.sale_id = s.id
-GROUP BY DATE(sale_datetime), client_campaign_id, agent_email
-WITH DATA;
+**Komponenter (17 filer, ~90 matches)**
 
-CREATE UNIQUE INDEX idx_daily_agg_unique 
-ON mv_daily_sales_stats(sale_date, client_campaign_id, agent_email);
+| Fil | Matches | Kritiske |
+|-----|---------|----------|
+| `StaffEmployeesTab.tsx` | 1 | 1 (config lookup) |
+| `AddMemberDialog.tsx` | 1 | 1 (cohort lookup) |
+| `EditBookingDialog.tsx` | 1 | 1 (team lookup) |
+| `CallModal.tsx` | 1 | 1 (call status lookup) |
+| `PricingRuleEditor.tsx` | 1 | 0 (INSERT) |
+| `SalesFeed.tsx` | 1 | 1 (realtime single fetch) |
+| `NewCandidateDialog.tsx` | 1 | 0 (INSERT) |
+| `TeamsTab.tsx` | 1 | 0 (INSERT) |
+| `SendContractDialog.tsx` | 1 | 0 (INSERT) |
+| `HeadToHeadComparison.tsx` | 1 | 1 (employee lookup) |
+| `H2HPerformanceDashboard.tsx` | 1 | 1 (stats lookup) |
+| `ProductPricingRulesDialog.tsx` | 1 | 1 (created_at lookup) |
+| `H2HMatchHistory.tsx` | 1 | 1 (stats lookup) |
+| `ClientDBTab.tsx` | 2 | 2 (lookups) |
+| `H2HPlayerStats.tsx` | 1 | 1 (stats lookup) |
+| `TeamStandardShifts.tsx` | 1 | 0 (INSERT) |
 
--- Refresh hver time
-SELECT cron.schedule('refresh-daily-stats', '0 * * * *', $$
-  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_sales_stats;
-$$);
+### 3.3 Fix Pattern
+
+```typescript
+// RISIKABEL (SELECT med WHERE - kan returnere 0 rækker):
+const { data, error } = await supabase
+  .from("employee_master_data")
+  .select("*")
+  .eq("auth_user_id", userId)
+  .single(); // ❌ Crash hvis ikke fundet!
+
+// SIKKER:
+const { data, error } = await supabase
+  .from("employee_master_data")
+  .select("*")
+  .eq("auth_user_id", userId)
+  .maybeSingle(); // ✅ Returnerer null hvis ikke fundet
+
+if (!data) {
+  // Håndter manglende data
+  return null;
+}
 ```
 
 ---
 
 ## IMPLEMENTERINGSRÆKKEFØLGE
 
-### Dag 1-2: Database Cleanup (FASE 1)
+### Dag 1: FM Migration - Edge Functions (Fase 1.1)
 
-| Prioritet | Handling | Gevinst |
-|-----------|----------|---------|
-| 1 | Dedupliker login_events | 220 MB |
-| 2 | VACUUM kpi_cached_values | 255 MB |
-| 3 | VACUUM andre bloated tabeller | 15 MB |
-| 4 | Log retention oprydning | 55 MB |
-| 5 | Drop ubrugte indekser | 8 MB |
-| 6 | Opret cleanup cron job | Forebyggelse |
+| Prioritet | Fil | Ændringer |
+|-----------|-----|-----------|
+| 1 | `calculate-kpi-values/index.ts` | 9 steder - opdatér alle FM queries |
+| 2 | `parse-expense-formula/index.ts` | 1 sted |
+| 3 | `league-calculate-standings/index.ts` | 1 sted |
 
-### Dag 3: Pagination Fixes (FASE 2)
+### Dag 2: FM Migration - Frontend Hooks (Fase 1.2)
 
-| Prioritet | Fil | Ændring |
+| Prioritet | Fil | Ændringer |
+|-----------|-----|-----------|
+| 4 | `useKpiTest.ts` | 6 steder |
+| 5 | `FormulaLiveTest.tsx` | 2 steder |
+
+### Dag 3: FM Migration - Frontend Pages (Fase 1.3)
+
+| Prioritet | Fil | Ændringer |
+|-----------|-----|-----------|
+| 6 | `EditSalesRegistrations.tsx` | 8 steder (CRUD - kompleks) |
+| 7 | `FieldmarketingDashboardFull.tsx` | 2 steder |
+| 8 | `EmployeeCommissionHistory.tsx` | 1 sted |
+| 9 | `DailyRevenueChart.tsx` | 1 sted |
+| 10 | `DailyReports.tsx` | 2 steder |
+| 11 | `RevenueByClient.tsx` | 1 sted |
+| 12 | `MyProfile.tsx` | 2 steder |
+
+### Dag 4: Console.log Cleanup (Fase 2)
+
+| Prioritet | Fil | Matches |
 |-----------|-----|---------|
-| 7 | `src/utils/supabasePagination.ts` | Tilføj fetchAllRowsCursor |
-| 8 | `src/components/salary/ClientDBTab.tsx` | Brug fetchAllRows |
-| 9 | `src/hooks/useDashboardKpiData.ts` | Brug fetchAllRows |
-| 10 | `src/hooks/useKpiTest.ts` | Tilføj pagination |
+| 13 | `enreach-manage-webhooks/index.ts` | ~50 |
+| 14 | `calculate-kpi-values/index.ts` | ~35 |
+| 15 | `sync-adversus/index.ts` | ~30 |
+| 16 | `integration-engine/*.ts` | ~25 |
+| 17 | `parse-expense-formula/index.ts` | ~15 |
+| 18 | `import-economic-zip/index.ts` | ~15 |
 
-### Dag 4-7: FM Migration (FASE 3)
+### Dag 5: .single() Audit (Fase 3)
 
-| Prioritet | Filer | Ændring |
-|-----------|-------|---------|
-| 11 | 3 edge functions | Migrér FM queries til sales tabel |
-| 12 | `EditSalesRegistrations.tsx` | Kompleks CRUD migration |
-| 13 | 11 andre frontend filer | Migrér FM queries |
-
-### Dag 8-10: TV Edge Function Refactor (FASE 4)
-
-| Prioritet | Handling |
-|-----------|----------|
-| 14 | Opret shared helpers |
-| 15 | Opret DASHBOARDS config objekt |
-| 16 | Konsolidér 5 handlers til 1 generisk |
-| 17 | Fjern 50+ console.logs |
-
-### Dag 11-12: Stabilitet (FASE 5-6)
-
-| Prioritet | Handling |
-|-----------|----------|
-| 18 | .single() → .maybeSingle() audit (prioriterede filer) |
-| 19 | Console.log cleanup i edge functions |
-
-### Dag 13-15: Langsigtet Setup (FASE 7-8)
-
-| Prioritet | Handling |
-|-----------|----------|
-| 20 | Deprecer adversus-sync-nightly cron |
-| 21 | Opret mv_daily_sales_stats materialized view |
-| 22 | Opret refresh cron job |
-| 23 | Drop tomme tabeller |
+| Prioritet | Kategori | Filer | Kritiske Changes |
+|-----------|----------|-------|------------------|
+| 19 | Hooks (højrisiko) | 12 filer | ~25 ændringer |
+| 20 | Pages (højrisiko) | 17 filer | ~20 ændringer |
+| 21 | Komponenter | 15 filer | ~15 ændringer |
 
 ---
 
 ## FILER DER ÆNDRES
 
-### Database Migrations (SQL)
+### Edge Functions (6 filer)
 
-| Handling | Beskrivelse |
-|----------|-------------|
-| Dedupliker login_events | DELETE duplikater + unik constraint |
-| VACUUM tabeller | kpi_cached_values, leaderboard, watermarks |
-| Drop ubrugte indekser | 3 indekser |
-| Opret cleanup cron job | Automatisk log retention |
-| Drop tomme tabeller | 18+ tabeller |
-| Opret materialized view | mv_daily_sales_stats |
-| Deprecer cron job | adversus-sync-nightly |
+| Fil | FM Migration | Console.log | Total Ændringer |
+|-----|--------------|-------------|-----------------|
+| `calculate-kpi-values/index.ts` | 9 steder | ~35 logs | 44 |
+| `parse-expense-formula/index.ts` | 1 sted | ~15 logs | 16 |
+| `league-calculate-standings/index.ts` | 1 sted | ~5 logs | 6 |
+| `enreach-manage-webhooks/index.ts` | - | ~50 logs | 50 |
+| `sync-adversus/index.ts` | - | ~30 logs | 30 |
+| `import-economic-zip/index.ts` | - | ~15 logs | 15 |
 
-### Edge Functions (4 filer)
+### Frontend - Hooks (12 filer)
 
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/tv-dashboard-data/index.ts` | Konsolidér handlers, fjern console.logs |
-| `supabase/functions/calculate-kpi-values/index.ts` | FM migration |
-| `supabase/functions/parse-expense-formula/index.ts` | FM migration |
-| `supabase/functions/league-calculate-standings/index.ts` | FM migration |
+| Fil | FM Migration | .single() Audit |
+|-----|--------------|-----------------|
+| `useKpiTest.ts` | 6 steder | 6 |
+| `useKpiFormulas.ts` | - | 2 |
+| `usePulseSurvey.ts` | - | 4 |
+| `useReferrals.ts` | - | 2 |
+| `useTimeStamps.ts` | - | 1 |
+| `useShiftPlanning.ts` | - | 3 |
+| `useSomeContent.ts` | - | 2 |
+| `useCelebrationData.ts` | - | 1 |
+| `useFieldmarketingSales.ts` | - | 1 |
+| `useSystemRoles.ts` | - | 0 |
+| `useKpiDefinitions.ts` | - | 2 |
+| `useDashboardKpiData.ts` | - | 1 |
 
-### Frontend - Pagination (4 filer)
+### Frontend - Pages & Komponenter (25 filer)
 
-| Fil | Ændring |
-|-----|---------|
-| `src/utils/supabasePagination.ts` | Tilføj fetchAllRowsCursor |
-| `src/components/salary/ClientDBTab.tsx` | Brug fetchAllRows |
-| `src/hooks/useDashboardKpiData.ts` | Brug fetchAllRows |
-| `src/hooks/useKpiTest.ts` | Tilføj pagination |
-
-### Frontend - FM Migration (12 filer)
-
-| Fil | Kompleksitet |
-|-----|--------------|
-| `src/pages/vagt-flow/EditSalesRegistrations.tsx` | Høj (CRUD) |
-| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Medium |
-| `src/pages/vagt-flow/FieldmarketingDashboard.tsx` | Medium |
-| `src/components/employee/EmployeeCommissionHistory.tsx` | Medium |
-| `src/pages/dashboards/CphSalesDashboard.tsx` | Lav |
-| `src/components/salary/ClientDBTab.tsx` | Lav |
-| `src/components/dashboard/DailyRevenueChart.tsx` | Lav |
-| `src/pages/reports/DailyReports.tsx` | Medium |
-| `src/pages/reports/RevenueByClient.tsx` | Lav |
-| `src/hooks/useKpiTest.ts` | Høj |
-| `src/pages/MyProfile.tsx` | Lav |
-| `src/hooks/useFieldmarketingSales.ts` | Medium (hook) |
-
-### Frontend - .single() Audit (7 prioriterede filer)
-
-| Fil | Steder |
-|-----|--------|
-| `src/hooks/useKpiTest.ts` | 6 |
-| `src/hooks/useDashboardKpiData.ts` | 3 |
-| `src/hooks/useEmployeeDashboards.ts` | 4 |
-| `src/hooks/useReferrals.ts` | 5 |
-| `src/pages/vagt-flow/Billing.tsx` | 1 |
-| `src/pages/vagt-flow/Bookings.tsx` | 1 |
-| `src/components/salary/ClientDBTab.tsx` | 2 |
+| Fil | FM Migration | .single() Audit |
+|-----|--------------|-----------------|
+| `EditSalesRegistrations.tsx` | 8 steder | - |
+| `FieldmarketingDashboardFull.tsx` | 2 steder | - |
+| `FormulaLiveTest.tsx` | 2 steder | - |
+| `EmployeeCommissionHistory.tsx` | 1 sted | - |
+| `DailyRevenueChart.tsx` | 1 sted | - |
+| `DailyReports.tsx` | 2 steder | - |
+| `RevenueByClient.tsx` | 1 sted | - |
+| `MyProfile.tsx` | 2 steder | - |
+| `MyGoals.tsx` | - | 2 |
+| `PulseSurvey.tsx` | - | 1 |
+| `CareerWishes.tsx` | - | 1 |
+| `RolePreview.tsx` | - | 2 |
+| `Billing.tsx` | - | 1 |
+| `Bookings.tsx` | - | 1 |
+| `TvBoardLogin.tsx` | - | 1 |
+| `TvBoardView.tsx` | - | 1 |
+| `LeagueAdminDashboard.tsx` | - | 3 |
+| Andre (8 filer) | - | 8 |
 
 ---
 
-## FORVENTET SAMLET RESULTAT
-
-### Umiddelbart (Efter Fase 1-6)
+## FORVENTET RESULTAT
 
 | Metrik | Før | Efter | Forbedring |
 |--------|-----|-------|------------|
-| Database størrelse | 864 MB | ~150 MB | **-83%** |
-| login_events | 440.136 rækker | ~5.000 | -99% |
-| kpi_cached_values | 261 MB | ~5 MB | -98% |
-| tv-dashboard-data LOC | 2.642 | ~800 | -70% |
-| FM kode duplikering | 15 filer | 0 | -100% |
-| .single() crash risiko | 60 filer | ~10 | -83% |
-| Pagination-begrænsede queries | 3 kritiske | 0 | -100% |
-| Edge function console.logs | 3.220 | ~100 | -97% |
-
-### Langsigtet (1-3 år)
-
-| Metrik | Uden plan | Med plan |
-|--------|-----------|----------|
-| DB ved 100k salg | ~3 GB | ~300 MB |
-| DB ved 500k salg | ~15 GB | ~800 MB (+ cold storage) |
-| Query tid (dashboard) | 5-10s | <2s |
-| Log bloat | Ukontrolleret | Max 50 MB |
-| Data retention | Manuel | Automatisk (GDPR-compliant) |
+| FM kode duplikering | 54 steder i 15 filer | 0 (unified) | -100% |
+| fieldmarketing_sales dependencies | 15 filer | 0 | -100% |
+| Console.log i edge functions | ~247 kritiske | ~20 (kun errors) | -92% |
+| .single() crash risiko | 60+ filer, ~60 kritiske | ~10 (sikre patterns) | -83% |
+| Edge function log overhead | Høj | Minimal | Bedre performance |
+| Runtime crashes (0 rækker) | Mulige | Forebygget | Stabil app |
 
 ---
 
 ## TEKNISKE NOTER
 
-### Vækstprojektion
+### FM Migration - Data Mapping Reference
 
-```text
-Måned        │ Salg/md  │ Kumulativ  │ Vækstfaktor
-─────────────────────────────────────────────────
-Jan 2025     │ 273      │ 273        │ Baseline
-Jan 2026     │ 5.992    │ 17.414     │ 22x YoY
-Jan 2027     │ ~15.000  │ ~100.000   │ Projekteret
-Jan 2028     │ ~40.000  │ ~350.000   │ Projekteret
-Jan 2029     │ ~60.000  │ ~600.000   │ Projekteret
+Fra `useFieldmarketingSales.ts` (allerede implementeret):
+
+```typescript
+// FM_CLIENT_CAMPAIGN_MAP for korrekt mapping
+const FM_CLIENT_CAMPAIGN_MAP: Record<string, string> = {
+  "9a92ea4c-6404-4b58-be08-065e7552d552": "c527b6a1-2aaa-42c9-a290-4933675c3800", // Eesy FM → Eesy gaden
+  "5011a7cd-bf07-4838-a63f-55a12c604b40": "743980b0-1a1e-411e-a952-ec7f52681a54", // YouSee → Yousee gaden
+};
+
+// Transformation fra sales til FieldmarketingSale interface:
+{
+  id: s.id,
+  seller_id: s.raw_payload?.fm_seller_id || "",
+  location_id: s.raw_payload?.fm_location_id || "",
+  client_id: s.raw_payload?.fm_client_id || "",
+  product_name: s.raw_payload?.fm_product_name || "",
+  phone_number: s.customer_phone || "",
+  comment: s.raw_payload?.fm_comment || null,
+  registered_at: s.sale_datetime,
+  validation_status: s.validation_status || "pending",
+}
 ```
 
-### Realtime Tabeller (Ingen ændringer)
+### Console.log - makeLogger Pattern
 
-Følgende tabeller har realtime aktiveret og skal bevares:
-- `sales`, `candidates`, `call_records`, `communication_logs`
-- `chat_messages`, `chat_conversation_members`, `chat_message_reactions`
-- `league_qualification_standings`
+Fra `integration-engine/utils/logging.ts`:
 
-### Aktive Indekser (Bevar)
+```typescript
+export function makeLogger(context: Record<string, unknown>) {
+  return (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => {
+    console.log(JSON.stringify({ type, msg, data, context, timestamp: new Date().toISOString() }))
+  }
+}
+```
 
-Disse indekser har høj aktivitet og skal bevares:
-- `idx_sale_items_sale_covering` (1.86B scans)
-- `idx_sale_items_sale_id` (10.16B scans)
-- `sales_pkey` (102M scans)
-- `idx_sales_datetime` (8.6M scans)
+Brug dette pattern i alle edge functions for struktureret logging.
+
+### .single() - Sikre vs Risikable Patterns
+
+```typescript
+// ✅ SIKKER - INSERT garanterer 1 række
+.insert({ ... }).select().single()
+
+// ✅ SIKKER - UPDATE med eksisterende id
+.update({ ... }).eq("id", knownId).select().single()
+
+// ❌ RISIKABEL - SELECT kan returnere 0 rækker
+.select().eq("auth_user_id", userId).single()
+
+// ❌ RISIKABEL - Lookup by email/name
+.select().ilike("name", "%fieldmarketing%").single()
+
+// ❌ RISIKABEL - Config lookup der måske ikke findes
+.select().eq("team_id", teamId).single()
+```
