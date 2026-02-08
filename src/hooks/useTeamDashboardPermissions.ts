@@ -90,8 +90,14 @@ export function useUpdateTeamDashboardPermission() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["team-dashboard-permissions"] });
-      queryClient.invalidateQueries({ queryKey: ["accessible-dashboards"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["team-dashboard-permissions"],
+        refetchType: 'all' 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["accessible-dashboards"],
+        refetchType: 'all'
+      });
     },
   });
 }
@@ -197,7 +203,8 @@ export function useAccessibleDashboards() {
       return accessibleDashboards;
     },
     enabled: !!user && !unifiedLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutter
+    staleTime: 30 * 1000, // 30 sekunder
+    refetchOnMount: true,
   });
 }
 
