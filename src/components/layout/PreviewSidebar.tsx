@@ -16,6 +16,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface PreviewSidebarProps {
   isMobile?: boolean;
   onNavigate?: () => void;
+  isCollapsed?: boolean;
+  onToggle?: () => void;
 }
 
 // Map permission keys to menu items (aligned with PositionsTab.tsx)
@@ -108,7 +110,7 @@ const ECONOMIC_ITEMS = {
   menu_economic_upload: { name: "Import", href: "/admin/economic-upload", icon: Database },
 };
 
-export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarProps) {
+export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = false, onToggle }: PreviewSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { previewPermissions } = useRolePreview();
