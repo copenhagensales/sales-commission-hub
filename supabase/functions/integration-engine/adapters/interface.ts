@@ -10,4 +10,6 @@ export interface DialerAdapter {
   // GDPR-Compliant call data extraction - only IDs and metadata, no personal Lead data
   fetchCalls?(days: number): Promise<StandardCall[]>;
   fetchCallsRange?(range: DateRange): Promise<StandardCall[]>;
+  // Lightweight raw sales fetch for field sampling (skips lead enrichment)
+  fetchSalesRaw?(limit?: number): Promise<Record<string, unknown>[]>;
 }

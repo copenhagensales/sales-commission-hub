@@ -65,29 +65,41 @@ export async function fetchSampleFields(
       integration.config
     )
 
-    // Fetch recent sales to extract field structure
-    log("INFO", `Fetching sales data from ${integration.provider} API...`)
-    const sales = await adapter.fetchSales(7) // Get last 7 days of data
+    // Use lightweight fetchSalesRaw if available (fast path - ~2-3 seconds)
+    // Otherwise fall back to fetchSales (slow path - ~30 seconds)
+    let rawPayloads: Record<string, unknown>[] = []
+    let leadCount = 0
 
-    if (!sales || sales.length === 0) {
-      log("INFO", "No sales found in the last 7 days")
+    if (adapter.fetchSalesRaw) {
+      log("INFO", `Using fast fetchSalesRaw from ${integration.provider} API...`)
+      rawPayloads = await adapter.fetchSalesRaw(20)
+      leadCount = rawPayloads.length
+      log("INFO", `Fast path: Retrieved ${leadCount} raw records`)
+    } else {
+      log("INFO", `Fallback: Fetching full sales data from ${integration.provider} API...`)
+      const sales = await adapter.fetchSales(7)
+      leadCount = sales.length
+      rawPayloads = sales.slice(0, 10).map(s => s.rawPayload as Record<string, unknown>).filter(Boolean)
+      log("INFO", `Slow path: Retrieved ${leadCount} sales, using ${rawPayloads.length} for field extraction`)
+    }
+
+    if (rawPayloads.length === 0) {
+      log("INFO", "No data found in the last 7 days")
       return {
         success: true,
         fields: [],
         leadCount: 0,
-        message: `No sales found in the last 7 days for ${integration.name}`,
+        message: `No data found in the last 7 days for ${integration.name}`,
       }
     }
 
-    log("INFO", `Found ${sales.length} sales, extracting field structure...`)
+    log("INFO", `Extracting field structure from ${rawPayloads.length} records...`)
 
     // Extract all unique fields from the raw payloads
     const fieldsMap = new Map<string, SampleField>()
 
-    for (const sale of sales.slice(0, 10)) { // Sample from first 10 sales
-      const rawPayload = sale.rawPayload as Record<string, unknown> | undefined
+    for (const rawPayload of rawPayloads.slice(0, 10)) {
       if (!rawPayload) continue
-
       // Extract fields recursively
       extractFields(rawPayload, "", fieldsMap)
     }
@@ -101,7 +113,7 @@ export async function fetchSampleFields(
     return {
       success: true,
       fields,
-      leadCount: sales.length,
+      leadCount,
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)

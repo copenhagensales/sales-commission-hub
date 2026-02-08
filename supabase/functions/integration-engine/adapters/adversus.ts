@@ -104,6 +104,26 @@ export class AdversusAdapter implements DialerAdapter {
     }));
   }
 
+  /**
+   * Lightweight raw sales fetch for field sampling.
+   * Skips lead enrichment (buildLeadDataMap) to be fast (~2-3 seconds vs ~30 seconds).
+   */
+  async fetchSalesRaw(limit: number = 20): Promise<Record<string, unknown>[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    
+    const filterStr = encodeURIComponent(JSON.stringify({ 
+      created: { $gt: startDate.toISOString() } 
+    }));
+    
+    // Fetch only one page with the specified limit - no lead enrichment
+    const data = await this.get(`/orders?filters=${filterStr}&pageSize=${limit}`);
+    const orders = data.orders || [];
+    
+    console.log(`[Adversus] fetchSalesRaw: Retrieved ${orders.length} raw orders (limit: ${limit})`);
+    return orders;
+  }
+
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);

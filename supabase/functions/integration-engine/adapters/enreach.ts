@@ -229,6 +229,37 @@ export class EnreachAdapter implements DialerAdapter {
     return this.lastDebugData;
   }
 
+  /**
+   * Lightweight raw sales fetch for field sampling.
+   * Skips complex filtering and pagination to be fast (~2-3 seconds).
+   */
+  async fetchSalesRaw(limit: number = 20): Promise<Record<string, unknown>[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7);
+    const modifiedFrom = cutoffDate.toISOString().split("T")[0];
+    
+    // Simple fetch with limit - no complex filtering or pagination
+    const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&take=${limit}`;
+    
+    try {
+      const data = await this.get(endpoint);
+      let leads: Record<string, unknown>[] = [];
+      
+      if (Array.isArray(data)) {
+        leads = data as Record<string, unknown>[];
+      } else if (data && typeof data === "object") {
+        const wrapper = data as Record<string, unknown>;
+        leads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as Record<string, unknown>[];
+      }
+      
+      console.log(`[EnreachAdapter] fetchSalesRaw: Retrieved ${leads.length} raw leads (limit: ${limit})`);
+      return leads.slice(0, limit);
+    } catch (error) {
+      console.error("[EnreachAdapter] Error in fetchSalesRaw:", error);
+      return [];
+    }
+  }
+
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
       // IMPORTANTE: Limitar días para evitar OOM. Máximo 7 días por llamada.
