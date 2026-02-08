@@ -290,7 +290,7 @@ export default function CphSalesDashboard() {
     staleTime: 30000,
   });
 
-  // Fetch fieldmarketing sales for today (Eesy FM, YouSee FM)
+  // Fetch fieldmarketing sales for today (Eesy FM, YouSee FM) from unified sales table
   const { data: fmTodaySales = [] } = useQuery({
     queryKey: ["cph-dashboard-fm-sales", todayStr],
     queryFn: async () => {
@@ -298,17 +298,41 @@ export default function CphSalesDashboard() {
       const endOfDay = `${todayStr}T23:59:59`;
       
       const { data, error } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
-          id, product_name, registered_at, seller_id,
-          client:clients!client_id(id, name, logo_url),
-          seller:employee_master_data!seller_id(first_name, last_name)
+          id, agent_name, normalized_data, sale_datetime, client_campaign_id
         `)
-        .gte("registered_at", startOfDay)
-        .lte("registered_at", endOfDay);
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", startOfDay)
+        .lte("sale_datetime", endOfDay);
       
       if (error) throw error;
-      return data || [];
+      
+      // Get client info for FM sales via client_campaign_id
+      const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))];
+      let fmClientMap: Record<string, { name: string; logo_url: string | null }> = {};
+      
+      if (campaignIds.length > 0) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id, name, client_id, clients(id, name, logo_url)")
+          .in("id", campaignIds);
+        
+        for (const c of campaigns || []) {
+          const clientData = c.clients as any;
+          if (clientData) {
+            fmClientMap[c.id] = { name: clientData.name, logo_url: clientData.logo_url };
+          }
+        }
+      }
+      
+      // Map FM sales to include client info
+      return (data || []).map(sale => ({
+        ...sale,
+        _clientName: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.name : null,
+        _clientLogo: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.logo_url : null,
+        _sellerName: sale.agent_name || (sale.normalized_data as any)?.seller_name || null,
+      }));
     },
     enabled: !tvMode,
     refetchInterval: 60000,
@@ -378,15 +402,15 @@ export default function CphSalesDashboard() {
         );
       }
       
-      // Fetch FM sales for period
+      // Fetch FM sales for period from unified sales table
       const { data: fmSales } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select(`
-          id, product_name, registered_at, seller_id,
-          client:clients!client_id(id, name, logo_url)
+          id, agent_name, normalized_data, sale_datetime, client_campaign_id
         `)
-        .gte("registered_at", startOfPeriod)
-        .lte("registered_at", endOfPeriod);
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", startOfPeriod)
+        .lte("sale_datetime", endOfPeriod);
       
       // Calculate sales by client
       const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
@@ -411,10 +435,11 @@ export default function CphSalesDashboard() {
         }
       }
       
-      // FM sales
+      // FM sales - use _clientName from mapped data
       for (const fmSale of (fmSales || [])) {
-        const clientName = (fmSale.client as any)?.name;
-        const clientLogo = (fmSale.client as any)?.logo_url;
+        // FM sales now come from unified sales table with normalized client info
+        const clientName = (fmSale as any)._clientName || (fmSale as any).normalized_data?.client_name;
+        const clientLogo = (fmSale as any)._clientLogo;
         if (clientName) {
           if (!salesByClient[clientName]) {
             salesByClient[clientName] = { count: 0, logoUrl: clientLogo || null };
@@ -1023,12 +1048,11 @@ export default function CphSalesDashboard() {
       }
     }
     
-    // FM sellers
+    // FM sellers - use _sellerName from mapped data
     for (const fmSale of fmTodaySales) {
-      const seller = fmSale.seller as any;
-      if (seller?.first_name && seller?.last_name) {
-        const sellerName = `${seller.first_name} ${seller.last_name}`.toLowerCase();
-        sellersWithSales.add(sellerName);
+      const sellerName = (fmSale as any)._sellerName;
+      if (sellerName) {
+        sellersWithSales.add(sellerName.toLowerCase());
       }
     }
     
@@ -1113,9 +1137,9 @@ export default function CphSalesDashboard() {
   const getSalesByClientWithLogos = (): Record<string, { count: number; logoUrl: string | null }> => {
     const byClient = calculateSalesByClient(knownClientSales);
     
-    // Add FM sales to client counts
+    // Add FM sales to client counts - use _clientName from mapped data
     for (const fmSale of fmTodaySales) {
-      const clientName = (fmSale.client as any)?.name;
+      const clientName = (fmSale as any)._clientName;
       if (clientName) {
         byClient[clientName] = (byClient[clientName] || 0) + 1;
       }
@@ -1125,10 +1149,10 @@ export default function CphSalesDashboard() {
     const result: Record<string, { count: number; logoUrl: string | null }> = {};
     for (const [client, count] of Object.entries(byClient)) {
       // Check for FM client logo if not in regular clientLogos
-      const fmClientLogo = fmTodaySales.find(s => (s.client as any)?.name === client)?.client as any;
+      const fmClientLogo = fmTodaySales.find(s => (s as any)._clientName === client)?._clientLogo;
       result[client] = { 
         count, 
-        logoUrl: clientLogos[client] || fmClientLogo?.logo_url || null 
+        logoUrl: clientLogos[client] || fmClientLogo || null 
       };
     }
     return result;

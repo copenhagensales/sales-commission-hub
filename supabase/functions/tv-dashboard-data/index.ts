@@ -285,18 +285,19 @@ Deno.serve(async (req) => {
     const sales = salesWithItems || [];
     console.log(`Found ${sales.length} sales with items`);
 
-    // Fetch fieldmarketing_sales for today (Yousee, Eesy FM, etc.)
-    // NOTE: fieldmarketing_sales has NO FK relation to sale_items, so we fetch directly
+    // Fetch fieldmarketing sales for today from unified sales table
+    // NOTE: We now use the sales table with source='fieldmarketing'
     const { data: fmSalesData, error: fmError } = await supabase
-      .from("fieldmarketing_sales")
+      .from("sales")
       .select(`
         id,
-        client_id,
-        seller_id,
-        registered_at
+        client_campaign_id,
+        agent_name,
+        sale_datetime
       `)
-      .gte("registered_at", startOfDay)
-      .lte("registered_at", endOfDay);
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", startOfDay)
+      .lte("sale_datetime", endOfDay);
 
     if (fmError) {
       console.error("Fieldmarketing sales error:", fmError);
@@ -1343,7 +1344,7 @@ async function handleCelebrationData(
       .eq("client_id", clientId)
       .eq("month", currentMonth)
       .eq("year", currentYear)
-      .single();
+      .maybeSingle();
 
     if (goalData) {
       goalTarget = goalData.sales_target || 0;
@@ -2258,25 +2259,28 @@ async function handleCsTop20Data(
     }
   }
 
-  // ============= FETCH FM SALES =============
+  // ============= FETCH FM SALES (from unified sales table) =============
   // Fetch FM sales for all three periods
   const { data: fmSalesToday } = await supabase
-    .from("fieldmarketing_sales")
-    .select("id, seller_id, product_name, registered_at")
-    .gte("registered_at", `${todayStr}T00:00:00`)
-    .lte("registered_at", `${todayStr}T23:59:59`);
+    .from("sales")
+    .select("id, agent_name, normalized_data, sale_datetime")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${todayStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
 
   const { data: fmSalesWeek } = await supabase
-    .from("fieldmarketing_sales")
-    .select("id, seller_id, product_name, registered_at")
-    .gte("registered_at", `${weekStartStr}T00:00:00`)
-    .lte("registered_at", `${todayStr}T23:59:59`);
+    .from("sales")
+    .select("id, agent_name, normalized_data, sale_datetime")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
 
   const { data: fmSalesPayroll } = await supabase
-    .from("fieldmarketing_sales")
-    .select("id, seller_id, product_name, registered_at")
-    .gte("registered_at", `${payrollStartStr}T00:00:00`)
-    .lte("registered_at", `${todayStr}T23:59:59`);
+    .from("sales")
+    .select("id, agent_name, normalized_data, sale_datetime")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`);
 
   console.log(`[CsTop20Data] FM sales: today=${(fmSalesToday || []).length}, week=${(fmSalesWeek || []).length}, payroll=${(fmSalesPayroll || []).length}`);
 

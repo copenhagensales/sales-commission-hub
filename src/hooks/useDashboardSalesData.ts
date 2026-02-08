@@ -301,19 +301,20 @@ export function useDashboardSalesData({
         }
       }
 
-      // Step 5: Fetch fieldmarketing sales
-      let fmQuery = supabase
-        .from("fieldmarketing_sales")
-        .select("id, seller_id, registered_at, product_name, client_id")
-        .in("seller_id", employeeIds)
-        .gte("registered_at", `${startStr}T00:00:00`)
-        .lte("registered_at", `${endStr}T23:59:59`);
-
+      // Step 5: Fetch fieldmarketing sales from unified sales table
+      const fmFilters: Record<string, string> = {
+        source: "fieldmarketing",
+      };
       if (resolvedClientId) {
-        fmQuery = fmQuery.eq("client_id", resolvedClientId);
+        fmFilters.client_id = resolvedClientId;
       }
-
-      const { data: fmSalesData } = await fmQuery;
+      
+      const { data: fmSalesData } = await supabase
+        .from("sales")
+        .select("id, agent_name, normalized_data, sale_datetime, client_campaign_id")
+        .match(fmFilters)
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`);
 
       // Fetch campaign mappings for dialer_campaign_id resolution
       const { data: campaignMappings } = await supabase

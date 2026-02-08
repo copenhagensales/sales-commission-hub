@@ -52,7 +52,7 @@ export function useSomeContent(weekStartDate: string) {
       const { data, error } = await supabase
         .from("some_default_goals")
         .select("*")
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data as DefaultGoals;
     },
