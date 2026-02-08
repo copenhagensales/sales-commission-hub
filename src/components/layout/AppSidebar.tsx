@@ -30,9 +30,11 @@ type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: stri
 interface AppSidebarProps {
   isMobile?: boolean;
   onNavigate?: () => void;
+  isCollapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
+export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, onToggle }: AppSidebarProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
@@ -384,7 +386,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
   const sidebarClasses = isMobile 
     ? "h-full w-full bg-sidebar overflow-y-auto" 
-    : "fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";
+    : cn(
+        "fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar overflow-y-auto transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-0 -translate-x-full opacity-0" : "w-64 translate-x-0 opacity-100"
+      );
 
   // Wait for permissions to load
   if (p.isLoading) {
@@ -476,17 +481,35 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
         {!isMobile && (
-          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-2">
+          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3 relative">
             <div 
               onClick={() => navigate("/")} 
-              className="flex items-center justify-center px-2 py-2 ml-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>
-            <EnvironmentSwitcher compact />
+            
+            {/* Collapse button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggle}
+              className="absolute right-2 h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-200"
+              title="Skjul sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </Button>
           </div>
         )}
-        <nav className="flex-1 space-y-1 p-4 pt-6">
+        
+        {/* Environment Switcher - below header */}
+        {!isMobile && (
+          <div className="px-4 py-3 border-b border-sidebar-border/50">
+            <EnvironmentSwitcher compact className="w-full justify-center" />
+          </div>
+        )}
+        
+        <nav className="flex-1 space-y-1 p-4 pt-4">
           {/* Mit Hjem (My Home) menu */}
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
