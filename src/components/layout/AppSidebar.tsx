@@ -481,31 +481,42 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
         {!isMobile && (
-          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3 relative">
+          <div className="flex h-16 items-center border-b border-sidebar-border px-2">
+            {/* Dashboard button - same style as DashboardSidebar home button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <EnvironmentSwitcher compact />
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Gå til dashboards</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            {/* Centered logo */}
             <div 
               onClick={() => navigate("/")} 
-              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              className="flex-1 flex justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>
             
             {/* Collapse button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              className="absolute right-2 h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-200"
-              title="Skjul sidebar"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        
-        {/* Environment Switcher - below header */}
-        {!isMobile && (
-          <div className="px-4 py-3 border-b border-sidebar-border/50">
-            <EnvironmentSwitcher compact className="w-full justify-center" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onToggle}
+                  className="h-9 w-9 shrink-0 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border transition-all duration-200"
+                  title="Skjul sidebar"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Skjul sidebar</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
         
