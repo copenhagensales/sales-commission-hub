@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Monitor, LogOut, Home, Settings } from "lucide-react";
+import { LayoutDashboard, Monitor, LogOut, Home, Settings, PanelLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,9 +17,11 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 interface DashboardSidebarProps {
   isMobile?: boolean;
   onNavigate?: () => void;
+  isCollapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSidebarProps) {
+export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = false, onToggle }: DashboardSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -61,14 +63,17 @@ export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSide
 
   const sidebarClasses = isMobile 
     ? "h-full w-full bg-sidebar overflow-y-auto" 
-    : "fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";
+    : cn(
+        "fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar overflow-y-auto transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-0 -translate-x-full opacity-0" : "w-64 translate-x-0 opacity-100"
+      );
 
   if (isLoading) {
     return (
       <aside className={sidebarClasses}>
         <div className="flex h-full flex-col">
           {!isMobile && (
-            <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+            <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
               <div className="flex items-center px-3 py-2 rounded-lg">
                 <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
               </div>
@@ -85,30 +90,49 @@ export function DashboardSidebar({ isMobile = false, onNavigate }: DashboardSide
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
-        {/* Logo and Home Button */}
+        {/* Header with centered logo and collapse button */}
         {!isMobile && (
-          <div className="flex h-16 items-center border-b border-sidebar-border px-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={handleGoToMain}
-                  className="h-9 w-9 shrink-0 bg-sidebar-accent/50 hover:bg-primary hover:text-primary-foreground border-sidebar-border"
-                >
-                  <Home className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Gå til hovedsystem</p>
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-3">
+            {/* Spacer for symmetry */}
+            <div className="w-9" />
+            
+            {/* Centered logo */}
             <div 
               onClick={() => navigate(accessibleDashboards[0]?.path || "/home")} 
-              className="flex-1 flex justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              className="flex items-center justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>
+            
+            {/* Collapse button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={onToggle}
+                  className="h-9 w-9 text-sidebar-foreground hover:bg-sidebar-accent/50"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Skjul sidebar</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {/* Hovedsystem button - Desktop only */}
+        {!isMobile && (
+          <div className="px-4 pt-4">
+            <Button 
+              onClick={handleGoToMain}
+              className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+            >
+              <Home className="h-4 w-4" />
+              Hovedsystem
+            </Button>
           </div>
         )}
 
