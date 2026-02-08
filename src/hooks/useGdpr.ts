@@ -134,7 +134,7 @@ export function useRequestDataExport() {
         .eq("employee_id", employeeData)
         .eq("request_type", "export")
         .eq("status", "pending")
-        .single();
+        .maybeSingle();
 
       if (existing) {
         throw new Error("Du har allerede en afventende eksportanmodning");
@@ -173,7 +173,7 @@ export function useRequestDataDeletion() {
         .eq("employee_id", employeeData)
         .eq("request_type", "deletion")
         .eq("status", "pending")
-        .single();
+        .maybeSingle();
 
       if (existing) {
         throw new Error("Du har allerede en afventende sletteanmodning");

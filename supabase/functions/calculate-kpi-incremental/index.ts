@@ -235,13 +235,14 @@ Deno.serve(async (req) => {
 
     console.log(`[calculate-kpi-incremental] Found ${(newSales || []).length} new telesales since watermark`);
 
-    // ============= FETCH NEW FM SALES =============
+    // ============= FETCH NEW FM SALES (from unified sales table) =============
     const { data: newFmSales, error: fmError } = await supabase
-      .from("fieldmarketing_sales")
-      .select("id, product_name, seller_id, registered_at, created_at")
+      .from("sales")
+      .select("id, normalized_data, agent_name, sale_datetime, created_at")
+      .eq("source", "fieldmarketing")
       .gt("created_at", olderWatermark)
-      .gte("registered_at", payrollPeriod.start.toISOString())
-      .lte("registered_at", payrollPeriod.end.toISOString())
+      .gte("sale_datetime", payrollPeriod.start.toISOString())
+      .lte("sale_datetime", payrollPeriod.end.toISOString())
       .order("created_at", { ascending: true });
 
     if (fmError) {

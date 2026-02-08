@@ -202,11 +202,12 @@ async function fetchFmSalesForPeriod(
   
   while (hasMore) {
     const { data, error } = await supabase
-      .from("fieldmarketing_sales")
-      .select("id, product_name, seller_id, client_id, registered_at")
-      .gte("registered_at", startStr)
-      .lte("registered_at", endStr)
-      .order("registered_at", { ascending: true })
+      .from("sales")
+      .select("id, normalized_data, agent_name, client_campaign_id, sale_datetime")
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .order("sale_datetime", { ascending: true })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     
     if (error) {
