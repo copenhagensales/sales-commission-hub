@@ -122,7 +122,7 @@ export function useTimeStamps() {
       return data as TimeStamp | null;
     },
     enabled: !!employeeId,
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Reduced from 30s to 60s
   });
 
   // Get today's time stamps

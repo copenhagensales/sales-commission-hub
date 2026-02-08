@@ -9,7 +9,26 @@ import { RolePreviewProvider } from "@/contexts/RolePreviewContext";
 import { TwilioDeviceProvider } from "@/contexts/TwilioDeviceContext";
 import { SessionTimeoutProvider } from "@/contexts/SessionTimeoutContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute - reduce unnecessary refetches
+      gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
+      retry: (failureCount, error) => {
+        // Stop retry on auth errors
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("JWT") || errorMessage.includes("auth") || errorMessage.includes("401")) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      refetchOnWindowFocus: false, // Reduce DB load
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 // Error Boundary to catch rendering errors
 interface ErrorBoundaryState {

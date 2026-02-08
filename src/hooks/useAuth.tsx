@@ -47,7 +47,8 @@ export function useAuth() {
   }, [user?.email]);
 
   const logLoginEvent = useCallback((currentSession: Session) => {
-    const sessionKey = `${currentSession.user.id}-${currentSession.access_token.substring(0, 20)}`;
+    // Use LAST 20 chars of token (unique signature) instead of first 20 (always same JWT header)
+    const sessionKey = `${currentSession.user.id}-${currentSession.access_token.slice(-20)}`;
     
     // Only log once per unique session
     if (loggedSessionsRef.current.has(sessionKey)) {
@@ -83,11 +84,13 @@ export function useAuth() {
             user_id: currentSession.user.id,
             user_email: currentSession.user.email,
             user_name: userName,
-            session_id: currentSession.access_token.substring(0, 20),
+            session_id: currentSession.access_token.slice(-20),
           },
-        }).catch(err => console.warn("Login logging failed (non-blocking):", err));
+        }).catch(err => {
+          if (import.meta.env.DEV) console.warn("Login logging failed (non-blocking):", err);
+        });
       } catch (error) {
-        console.warn("Failed to prepare login event (non-blocking):", error);
+        if (import.meta.env.DEV) console.warn("Failed to prepare login event (non-blocking):", error);
       }
     })();
   }, []);
@@ -100,7 +103,7 @@ export function useAuth() {
       (event, session) => {
         // Catch failed token refreshes early - clear stale tokens
         if (event === 'TOKEN_REFRESHED' && !session) {
-          console.warn("[useAuth] Token refresh failed - clearing stored session");
+          if (import.meta.env.DEV) console.warn("[useAuth] Token refresh failed - clearing stored session");
           localStorage.removeItem(AUTH_TOKEN_KEY);
         }
         
@@ -108,8 +111,8 @@ export function useAuth() {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Log login event for new sessions
-        if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+        // Log login event ONLY for actual sign-ins (not token refreshes)
+        if (session && event === "SIGNED_IN") {
           logLoginEvent(session);
         }
         
@@ -128,7 +131,7 @@ export function useAuth() {
     const sessionTimeout = setTimeout(() => {
       // If getSession takes too long, stop loading to prevent infinite hang
       setLoading(false);
-      console.warn("Auth session check timed out after 5s");
+      if (import.meta.env.DEV) console.warn("Auth session check timed out after 5s");
     }, 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -137,19 +140,20 @@ export function useAuth() {
       setUser(session?.user ?? null);
       setLoading(false);
       
+      // NOTE: Don't call logLoginEvent here - onAuthStateChange SIGNED_IN handles it
+      // This prevents duplicate logging on every page load
       if (session?.user?.email) {
-        logLoginEvent(session);
         setTimeout(() => {
           checkMustChangePassword(session.user.email);
         }, 0);
       }
     }).catch((error) => {
       clearTimeout(sessionTimeout);
-      console.error("Auth session check failed:", error);
+      if (import.meta.env.DEV) console.error("Auth session check failed:", error);
       
       // If Auth service is unreachable, clear stored tokens to prevent retry loops
       if (error.message === "Failed to fetch" || error.name === "AuthRetryableFetchError") {
-        console.warn("Auth service unreachable - clearing stored session to prevent retry loop");
+        if (import.meta.env.DEV) console.warn("Auth service unreachable - clearing stored session to prevent retry loop");
         localStorage.removeItem(AUTH_TOKEN_KEY);
       }
       
@@ -162,12 +166,12 @@ export function useAuth() {
           // Check if we actually have a valid session now
           supabase.auth.getSession().then(({ data: { session } }) => {
             if (!session && stillHasToken) {
-              console.warn("[useAuth] Stale token detected after timeout - clearing");
+              if (import.meta.env.DEV) console.warn("[useAuth] Stale token detected after timeout - clearing");
               localStorage.removeItem(AUTH_TOKEN_KEY);
             }
           }).catch(() => {
             // On error, clear the token
-            console.warn("[useAuth] Session check failed after timeout - clearing token");
+            if (import.meta.env.DEV) console.warn("[useAuth] Session check failed after timeout - clearing token");
             localStorage.removeItem(AUTH_TOKEN_KEY);
           });
         }
