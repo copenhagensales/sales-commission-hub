@@ -2728,6 +2728,51 @@ export type Database = {
         }
         Relationships: []
       }
+      data_field_definitions: {
+        Row: {
+          category: string
+          created_at: string
+          data_type: string
+          description: string | null
+          display_name: string
+          field_key: string
+          id: string
+          is_hidden: boolean
+          is_pii: boolean
+          is_required: boolean
+          retention_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          data_type?: string
+          description?: string | null
+          display_name: string
+          field_key: string
+          id?: string
+          is_hidden?: boolean
+          is_pii?: boolean
+          is_required?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          data_type?: string
+          description?: string | null
+          display_name?: string
+          field_key?: string
+          id?: string
+          is_hidden?: boolean
+          is_pii?: boolean
+          is_required?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deactivation_reminder_config: {
         Row: {
           created_at: string
@@ -5445,6 +5490,57 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_field_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          integration_id: string
+          is_excluded: boolean
+          sample_value: string | null
+          source_field_path: string
+          target_field_id: string | null
+          transform_rule: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integration_id: string
+          is_excluded?: boolean
+          sample_value?: string | null
+          source_field_path: string
+          target_field_id?: string | null
+          transform_rule?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integration_id?: string
+          is_excluded?: boolean
+          sample_value?: string | null
+          source_field_path?: string
+          target_field_id?: string | null
+          transform_rule?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_field_mappings_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_field_mappings_target_field_id_fkey"
+            columns: ["target_field_id"]
+            isOneToOne: false
+            referencedRelation: "data_field_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_logs: {
         Row: {
           created_at: string
@@ -7439,6 +7535,7 @@ export type Database = {
           dialer_campaign_id: string | null
           id: string
           integration_type: string | null
+          normalized_data: Json | null
           raw_payload: Json | null
           sale_datetime: string
           source: string | null
@@ -7460,6 +7557,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          normalized_data?: Json | null
           raw_payload?: Json | null
           sale_datetime?: string
           source?: string | null
@@ -7481,6 +7579,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          normalized_data?: Json | null
           raw_payload?: Json | null
           sale_datetime?: string
           source?: string | null

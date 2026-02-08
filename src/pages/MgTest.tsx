@@ -25,6 +25,7 @@ import {
 import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 // ProductCampaignOverrides removed - functionality merged into pricing rules
 import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
+import { DataMappingTab } from "@/components/mg-test/DataMappingTab";
 import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 
 interface InspectorField {
@@ -2086,6 +2087,7 @@ export default function MgTest() {
             <TabsTrigger value="employee-mapping">{t("mgTest.tabEmployee")}</TabsTrigger>
             <TabsTrigger value="customers">{t("mgTest.tabCustomers")}</TabsTrigger>
             <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
+            <TabsTrigger value="datamapping">Datamapping</TabsTrigger>
           </TabsList>
 
           <TabsContent value="product" className="space-y-4">
@@ -3113,6 +3115,11 @@ export default function MgTest() {
           {/* Client Sales Overview Tab */}
           <TabsContent value="client-sales">
             <ClientSalesOverviewContent />
+          </TabsContent>
+
+          {/* Datamapping Tab */}
+          <TabsContent value="datamapping">
+            <DataMappingTab />
           </TabsContent>
         </Tabs>
       </div>
