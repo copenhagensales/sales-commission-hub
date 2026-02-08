@@ -1,468 +1,219 @@
 
-# Plan: Datamapping-fane i MG Test - Komplet Implementering (Alle Faser)
+
+# Plan: Opret Feltmappings for Alle 5 Integrationer
 
 ## Oversigt
-Denne plan implementerer en ny "Datamapping" fane i MG Test-siden med komplet integration til backend og frontend. Datamapping fungerer som et **normaliseringslag** der standardiserer rådata fra alle API'er (Adversus, Enreach/HeroBase) til ensartede feltnavne, med GDPR-compliance og automatisk sletning.
+Baseret på analyse af alle 5 integrationer og deres faktiske raw_payload data vil jeg oprette komplette feltmappings. Der er **ingen eksisterende mappings** for nogen integration endnu.
 
 ---
 
-## Hvad der vil blive bygget
+## Integrationer og Feltstruktur
 
-### Fase 1: Database + Frontend UI
+### 1. Lovablecph (Adversus)
+**ID:** `26fac751-c2d8-4b5b-a6df-e33a32e3c6e7`
 
-#### Database-tabeller
+| Kilde-sti | Standard felt | Bemærkning |
+|-----------|---------------|------------|
+| `leadResultData[Kontakt nummer]` | phone_number | Kundetelefon |
+| `leadResultData[OPP nr]` | opp_number | OPP-nummer |
+| `leadResultData[Omstilling]` | - | Ekskluderes (internt flag) |
+| `ownedBy` | agent_external_id | Adversus bruger-ID |
+| `lines[0].title` | product_name | Produktnavn |
+| `lines[0].quantity` | product_quantity | Antal |
+| `lines[0].unitPrice` | product_price | Enhedspris |
+| `closedTime` | sale_datetime | Salgstidspunkt |
+| `leadId` | lead_id | Lead ID |
+| `campaignId` | campaign_id | Kampagne ID |
+| `state` | sale_status | Closure status |
 
-**1. `data_field_definitions` - Standard Feltdefinitioner**
+### 2. Relatel_CPHSALES (Adversus)
+**ID:** `657c2050-1faa-4233-a964-900fb9e7b8c6`
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid | Primaer noegle |
-| field_key | text | Intern noegle, UNIQUE (f.eks. "phone_number") |
-| display_name | text | Visningsnavn (f.eks. "Telefonnummer") |
-| category | text | Kategori: customer, sale, employee, campaign, product |
-| data_type | text | Type: string, number, date, boolean |
-| is_pii | boolean | Persoenfoelsomt (GDPR) - default false |
-| is_required | boolean | Obligatorisk felt - default false |
-| is_hidden | boolean | Skjult i UI - default false |
-| retention_days | integer | Dage foer sletning (null = aldrig, 0 = straks) |
-| description | text | Valgfri beskrivelse af feltet |
-| created_at / updated_at | timestamptz | Tidsstempler |
+| Kilde-sti | Standard felt | Bemærkning |
+|-----------|---------------|------------|
+| `leadResultData[Sales ID]` | opp_number | Bruges som OPP-reference |
+| `leadResultData[Bindingsperiode]` | subscription_type | Bindingsperiode |
+| `leadResultData[Tilskud]` | coverage_amount | **Bruges i pricing rules!** |
+| `leadResultData[Tilfredshedsgaranti - Switch]` | - | Produktspecifikt |
+| `leadResultData[Tilfredshedsgaranti - MBB]` | - | Produktspecifikt |
+| `ownedBy` | agent_external_id | Adversus bruger-ID |
+| `lines[0].title` | product_name | Produktnavn |
+| `lines[0].quantity` | product_quantity | Antal |
+| `lines[0].totalPrice` | product_price | Total pris |
+| `closedTime` | sale_datetime | Salgstidspunkt |
+| `leadId` | lead_id | Lead ID |
+| `campaignId` | campaign_id | Kampagne ID |
+| `state` | sale_status | Closure status |
 
-**2. `integration_field_mappings` - API-to-Standard Mapping**
+### 3. ASE (Enreach/HeroBase)
+**ID:** `a76cf63a-4b02-4d99-b6b5-20a8e4552ba5`
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid | Primaer noegle |
-| integration_id | uuid | FK til dialer_integrations |
-| source_field_path | text | Sti i API-data (f.eks. "lead.phone") |
-| target_field_id | uuid | FK til data_field_definitions (null hvis ekskluderet) |
-| is_excluded | boolean | Ignorer dette felt helt |
-| transform_rule | jsonb | Valgfri transformering |
-| sample_value | text | Sidste sample-vaerdi fra API |
-| created_at / updated_at | timestamptz | Tidsstempler |
+| Kilde-sti | Standard felt | Bemærkning |
+|-----------|---------------|------------|
+| `data.Fornavn` | customer_name | Kombineres med efternavn via transform |
+| `data.Efternavn` | - | Del af customer_name transform |
+| `data.Email` | customer_email | Kunde email |
+| `data.Telefon` | phone_number | Kundetelefon |
+| `data.Adresse` | - | Ekskluderes (PII ikke nødvendig) |
+| `data.Postnummer` | customer_zip | Postnummer |
+| `data.Forening` | association_type | **Bruges i pricing rules!** |
+| `data.Dækningssum` | coverage_amount | **Bruges i pricing rules!** |
+| `data.Dækningsperiode` | subscription_type | Abonnementsperiode |
+| `data.A-kasse salg` | - | Nyt felt: akasse_sale **Bruges i pricing rules!** |
+| `data.A-kasse type` | - | Nyt felt: akasse_type **Bruges i pricing rules!** |
+| `data.Lønsikring` | - | Nyt felt: lonsikring_type |
+| `data.Medlemsnummer` | - | Nyt felt: member_number |
+| `data.Nuværende a-kasse` | - | Nyt felt: current_akasse |
+| `data.OPP` | opp_number | OPP-nummer |
+| `firstProcessedByUser.orgCode` | agent_email | Sælger email |
+| `firstProcessedTime` | sale_datetime | Salgstidspunkt |
+| `campaign.code` | campaign_name | Kampagnenavn |
+| `campaign.uniqueId` | campaign_id | Kampagne ID |
+| `uniqueId` | lead_id | Lead ID |
+| `closure` | sale_status | Closure status |
+| `data.ASE-id` | - | Ekskluderes (internt ID) |
+| `data.Intern Kommentar` | - | Ekskluderes (intern note) |
 
-#### Frontend-komponenter
+### 4. Eesy (Enreach/HeroBase)
+**ID:** `d79b9632-1cac-4744-ab30-7768e580c794`
 
-| Fil | Beskrivelse |
-|-----|-------------|
-| `src/components/mg-test/DataMappingTab.tsx` | Hovedkomponent med to sektioner |
-| `src/components/mg-test/FieldDefinitionsManager.tsx` | CRUD for standard feltdefinitioner |
-| `src/components/mg-test/IntegrationMappingEditor.tsx` | Mapping-interface pr. integration |
-| `src/components/mg-test/FieldDefinitionDialog.tsx` | Dialog til opret/rediger felt |
+| Kilde-sti | Standard felt | Bemærkning |
+|-----------|---------------|------------|
+| `data.Forename` | customer_name | Kombineres med Lastname |
+| `data.Lastname` | - | Del af customer_name |
+| `data.Email` | customer_email | Kunde email |
+| `data.SUBSCRIBER_ID` | phone_number | Telefonnummer |
+| `data.Abonnement1` | subscription_type | Valgt abonnement |
+| `data.Antal abonnementer` | product_quantity | Antal |
+| `data.Kampagne` | campaign_name | Kampagnenavn |
+| `data.LeadType` | lead_type | Lead type |
+| `data.SurveyLeverandør` | - | Ekskluderes |
+| `firstProcessedByUser.orgCode` | agent_email | Sælger email |
+| `firstProcessedTime` | sale_datetime | Salgstidspunkt |
+| `campaign.uniqueId` | campaign_id | Kampagne ID |
+| `uniqueId` | lead_id | Lead ID |
+| `closure` | sale_status | Closure status |
+| `data.Bemærkninger:` | - | Ekskluderes (noter) |
+| `customData.CSID` | external_reference | CS ID reference |
 
-#### Pre-populerede Feltdefinitioner
+### 5. Tryg (Enreach/HeroBase)
+**ID:** `a5068f85-da1c-43e1-8e57-92cc5c4749f1`
 
-| field_key | display_name | category | is_pii |
-|-----------|--------------|----------|--------|
-| phone_number | Telefonnummer | customer | true |
-| customer_name | Kundenavn | customer | true |
-| customer_email | Kunde email | customer | true |
-| agent_email | Saelger email | employee | true |
-| agent_name | Saelger navn | employee | true |
-| sale_datetime | Salgstidspunkt | sale | false |
-| opp_number | OPP-nummer | sale | false |
-| campaign_id | Kampagne ID | campaign | false |
-| product_name | Produktnavn | product | false |
-| product_price | Enhedspris | product | false |
+| Kilde-sti | Standard felt | Bemærkning |
+|-----------|---------------|------------|
+| `data.Navn1` | customer_name | Kombineres med Navn2 |
+| `data.Navn2` | - | Del af customer_name (efternavn) |
+| `data.Telefon1` | phone_number | Primær telefon |
+| `data.Telefon2` | - | Sekundær (ekskluderes) |
+| `data.Telefon3` | - | Tertiær (ekskluderes) |
+| `data.Adresse` | customer_address | Adresse |
+| `data.By` | customer_city | By |
+| `data.Postnummer` | customer_zip | Postnummer |
+| `data.Mødedato` | - | Nyt felt: meeting_date |
+| `data.Resultat` | sale_status | Resultat |
+| `data.Notater` | - | Ekskluderes (noter) |
+| `data.SerioID` | external_reference | Serio ID |
+| `firstProcessedByUser.orgCode` | agent_email | Sælger email |
+| `firstProcessedTime` | sale_datetime | Salgstidspunkt |
+| `campaign.code` | campaign_name | Kampagnenavn |
+| `campaign.uniqueId` | campaign_id | Kampagne ID |
+| `uniqueId` | lead_id | Lead ID |
+| `closure` | sale_status | Closure status |
 
 ---
 
-### Fase 2: Frontend Optimering - Normaliserede Data
+## Nye Field Definitions
 
-#### Database-udvidelse
+Følgende standardfelter mangler i systemet og oprettes:
 
-**Ny kolonne i `sales` tabellen:**
+| field_key | display_name | category | is_pii | Beskrivelse |
+|-----------|--------------|----------|--------|-------------|
+| akasse_sale | A-kasse salg | sale | false | Flag for A-kasse salg (Ja/Nej) |
+| akasse_type | A-kasse type | sale | false | Type af A-kasse |
+| lonsikring_type | Lønsikring type | sale | false | Type af lønsikring |
+| member_number | Medlemsnummer | customer | true | ASE medlemsnummer |
+| current_akasse | Nuværende A-kasse | customer | false | Kundens nuværende A-kasse |
+| meeting_date | Mødedato | sale | false | Tryg mødebooking dato |
 
+---
+
+## Database-ændringer
+
+### 1. Opret 6 nye field definitions
 ```sql
-ALTER TABLE sales ADD COLUMN normalized_data jsonb DEFAULT NULL;
+INSERT INTO data_field_definitions (field_key, display_name, category, data_type, is_pii)
+VALUES 
+  ('akasse_sale', 'A-kasse salg', 'sale', 'string', false),
+  ('akasse_type', 'A-kasse type', 'sale', 'string', false),
+  ('lonsikring_type', 'Lønsikring type', 'sale', 'string', false),
+  ('member_number', 'Medlemsnummer', 'customer', 'string', true),
+  ('current_akasse', 'Nuværende A-kasse', 'customer', 'string', false),
+  ('meeting_date', 'Mødedato', 'sale', 'date', false);
 ```
 
-Denne kolonne gemmer normaliserede data baseret på datamapping-konfigurationen:
+### 2. Indsæt integration_field_mappings
+Ca. 60+ mappings fordelt på de 5 integrationer:
+- **Lovablecph:** 11 mappings
+- **Relatel_CPHSALES:** 12 mappings  
+- **ASE:** 18 mappings
+- **Eesy:** 14 mappings
+- **Tryg:** 13 mappings
 
+---
+
+## Transform Rules
+
+Følgende felter kræver transform rules for at kombinere data:
+
+| Integration | Transform | Beskrivelse |
+|-------------|-----------|-------------|
+| ASE | `data.Fornavn` + `data.Efternavn` → customer_name | Kombiner for- og efternavn |
+| Eesy | `data.Forename` + `data.Lastname` → customer_name | Kombiner for- og efternavn |
+| Tryg | `data.Navn1` + `data.Navn2` → customer_name | Kombiner for- og efternavn |
+
+Transform rule format:
 ```json
 {
-  "phone_number": "45123456",
-  "customer_name": "Firma ApS",
-  "agent_email": "saelger@cph-sales.dk",
-  "opp_number": "OPP12345",
-  "coverage_amount": "6000",
-  "association_type": "Fagforening med lønsikring"
-}
-```
-
-#### Frontend-forbedringer
-
-**Ny hook: `useNormalizedSalesData.ts`**
-
-```typescript
-// Abstrakt hook der kan vaelge mellem raw_payload og normalized_data
-export function useNormalizedSalesData(saleIds: string[]) {
-  // Returnerer normaliserede data hvis tilgængelig
-  // Falder tilbage til raw_payload parsing hvis ikke
-}
-```
-
-**Fordele:**
-- Dashboards og rapporter kan bruge ensartede feltnavne
-- Ingen parsing af dialer-specifik data i frontend
-- Hurtigere queries (direkte adgang til normaliserede felter)
-
----
-
-### Fase 3: Backend Integration
-
-#### Ny utility-funktion: `applyDataMappings()`
-
-Placeres i `supabase/functions/integration-engine/core/mappings.ts`:
-
-```typescript
-export async function applyDataMappings(
-  supabase: SupabaseClient,
-  integrationId: string,
-  rawData: Record<string, unknown>,
-  log: LogFn
-): Promise<{
-  normalizedData: Record<string, unknown>;
-  piiFields: string[];
-  excludedFields: string[];
-  retentionRules: Map<string, number>;
-}> {
-  // 1. Hent field definitions og mappings for denne integration
-  // 2. Gennemløb rawData og match mod source_field_path
-  // 3. Transformer til target_field_key
-  // 4. Marker PII-felter
-  // 5. Ekskluder markerede felter
-  // 6. Returner normaliseret objekt + metadata
-}
-```
-
-#### Adapter-integration
-
-Opdater `adversus.ts` og `enreach.ts` adapters:
-
-```typescript
-// I fetchSales() metoden, efter rå data er hentet:
-
-// Hent datamapping for denne integration
-const mappings = await getIntegrationFieldMappings(supabase, integrationId);
-
-// Anvend mappings på hver sale
-for (const rawSale of rawSales) {
-  const { normalizedData, excludedFields } = applyDataMappings(
-    integrationId,
-    rawSale,
-    mappings
-  );
-  
-  // Fjern ekskluderede felter fra rawPayload
-  for (const field of excludedFields) {
-    delete rawSale[field];
-  }
-  
-  // Tilføj normalizedData til StandardSale
-  sale.normalizedData = normalizedData;
-}
-```
-
-#### `core/sales.ts` opdatering
-
-Gem normaliserede data til sales-tabellen:
-
-```typescript
-// I processSalesBatch():
-const saleData = {
-  // ... eksisterende felter
-  raw_payload: sale.rawPayload,
-  normalized_data: sale.normalizedData || null,  // NY
-};
-```
-
-#### Pricing Rule Matching forbedring
-
-Opdater `matchPricingRule()` til at prioritere normaliserede feltnavne:
-
-```typescript
-function matchPricingRule(
-  productId: string,
-  pricingRulesMap: Map<string, PricingRule[]>,
-  leadResultData: Array<{ label: string; value: string }>,
-  campaignMappingId?: string | null,
-  log?: LogFn,
-  rawPayloadData?: Record<string, unknown>,
-  normalizedData?: Record<string, unknown>,  // NY PARAMETER
-  saleDate?: string | null
-) {
-  // Prioriter normalized_data hvis tilgængelig
-  const dataSource = normalizedData || rawPayloadData;
-  
-  // Resten af matching-logikken forbliver den samme
-  // Nu med ensartede feltnavne på tværs af alle integrationer
+  "type": "concat",
+  "fields": ["data.Fornavn", "data.Efternavn"],
+  "separator": " "
 }
 ```
 
 ---
 
-### Fase 4: GDPR Scheduler (Automatisk Sletning)
+## Pricing Rule Felter (Kritiske)
 
-#### Ny Edge Function: `gdpr-data-cleanup`
+Disse felter bruges aktivt i jeres pricing rules og skal mappes korrekt:
 
-```typescript
-// supabase/functions/gdpr-data-cleanup/index.ts
-
-// Kører dagligt via pg_cron
-// 1. Hent alle felter med retention_days > 0
-// 2. Find sales hvor sale_datetime + retention_days < nu
-// 3. For hvert felt: nullify i normalized_data og raw_payload
-// 4. Log til audit trail
-```
-
-#### Cron Job Setup
-
-```sql
-SELECT cron.schedule(
-  'gdpr-cleanup-daily',
-  '0 3 * * *',  -- Kører kl. 03:00 hver dag
-  $$
-  SELECT net.http_post(
-    url:='https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/gdpr-data-cleanup',
-    headers:='{"Authorization": "Bearer ..."}'::jsonb
-  );
-  $$
-);
-```
-
----
-
-## Dataflow (Komplet)
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            INTEGRATION ENGINE                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Adversus/Enreach API                                                       │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌──────────────────┐                                                       │
-│  │ Adapter          │  Henter rå data fra dialer                            │
-│  │ (adversus.ts)    │                                                       │
-│  └────────┬─────────┘                                                       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ applyDataMappings()                                    [NY]     │       │
-│  ├──────────────────────────────────────────────────────────────────┤       │
-│  │ 1. Læs integration_field_mappings for denne integration         │       │
-│  │ 2. Match source_field_path mod raw data                         │       │
-│  │ 3. Transformer til target_field_key                             │       │
-│  │ 4. Marker PII-felter                                            │       │
-│  │ 5. Ekskluder markerede felter (is_excluded = true)              │       │
-│  │ 6. Håndter retention_days = 0 (gem aldrig)                      │       │
-│  └────────┬─────────────────────────────────────────────────────────┘       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                       │
-│  │ StandardSale     │  Nu med normalizedData objekt                         │
-│  │ + normalizedData │                                                       │
-│  └────────┬─────────┘                                                       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                       │
-│  │ core/sales.ts    │  Eksisterende processeringslogik                      │
-│  │                  │  (produktmapping, pricing rules, sælger-match)        │
-│  └────────┬─────────┘                                                       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ matchPricingRule()                               [OPDATERET]    │       │
-│  │ Bruger normalized_data (ensartede feltnavne)                    │       │
-│  │ Fallback til raw_payload for backward compatibility             │       │
-│  └────────┬─────────────────────────────────────────────────────────┘       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                       │
-│  │ sales tabel      │  raw_payload + normalized_data (ny kolonne)           │
-│  │ sale_items       │                                                       │
-│  └──────────────────┘                                                       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              FRONTEND                                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ useSalesAggregates / useDashboardSalesData                      │       │
-│  │ (UÆNDRET - fortsætter med at virke)                             │       │
-│  └──────────────────────────────────────────────────────────────────┘       │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ useNormalizedSalesData                                 [NY]     │       │
-│  │ - Læser normalized_data hvis tilgængelig                        │       │
-│  │ - Fallback til raw_payload parsing                              │       │
-│  │ - Ensartede feltnavne i hele frontend                           │       │
-│  └──────────────────────────────────────────────────────────────────┘       │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ Dashboards & Rapporter                                          │       │
-│  │ - Kan query på normalized_data jsonb direkte                    │       │
-│  │ - F.eks: WHERE normalized_data->>'opp_number' = 'OPP123'        │       │
-│  └──────────────────────────────────────────────────────────────────┘       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            GDPR SCHEDULER                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  pg_cron (dagligt kl. 03:00)                                                │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │ gdpr-data-cleanup edge function                        [NY]     │       │
-│  │                                                                  │       │
-│  │ 1. Hent felter med retention_days > 0                           │       │
-│  │ 2. Find sales hvor sale_datetime + retention_days < nu          │       │
-│  │ 3. For hvert PII-felt:                                          │       │
-│  │    - Sæt til null i normalized_data                             │       │
-│  │    - Sæt til null i raw_payload                                 │       │
-│  │ 4. Log til audit trail                                          │       │
-│  └──────────────────────────────────────────────────────────────────┘       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Integration med Eksisterende Systemer
-
-### Produktmapping (Produkt-fanen) - UÆNDRET
-- `adversus_product_mappings` tabel fortsætter uændret
-- `products` tabel med pricing rules forbliver autoritativ
-- Datamapping standardiserer produktdata FØR matching
-
-### Sælger-merge (Medarbejder-fanen) - UÆNDRET
-- `master_employee` og `employee_identity` tabeller forbliver autoritative
-- `employee_agent_mapping` bruges fortsat
-- Datamapping sikrer `agent_email` ekstraheres konsistent
-
-### Kampagnemapping (Kampagne-fanen) - UÆNDRET
-- `adversus_campaign_mappings` tabel forbliver autoritativ
-- `reference_extraction_config` kan fremover referere til datamapping-felter
-
-### Pricing Rules - FORBEDRET
-- `matchPricingRule()` bruger nu normalized_data
-- Ensartede feltnavne på tværs af alle integrationer
-- F.eks.: "Dækningssum" fra Enreach og "coverage_amount" fra Adversus → begge mappes til `coverage_amount`
-
----
-
-## Visuel Struktur (Datamapping-fane)
-
-```text
-+--------------------------------------------------------------------------------------+
-| [Produkt] [Kampagne] [Medarbejder] [Kunder] [Client Sales] [Datamapping]             |
-+--------------------------------------------------------------------------------------+
-|                                                                                      |
-|  +--------------------------------------------------------------------------------+  |
-|  | Standard Feltdefinitioner                                    [+ Nyt felt]      |  |
-|  +--------------------------------------------------------------------------------+  |
-|  | Felt           | Kategori | Type   | PII | Skjult | Retention | Oblig. | Handl.|  |
-|  +----------------+----------+--------+-----+--------+-----------+--------+-------+  |
-|  | telefonnummer  | Kunde    | string | X   |        | 365 dage  | X      | [..] |  |
-|  | kundenavn      | Kunde    | string | X   |        | 365 dage  |        | [..] |  |
-|  | agent_email    | Medarb.  | string | X   |        | -         | X      | [..] |  |
-|  | opp_nummer     | Salg     | string |     |        | -         |        | [..] |  |
-|  | cpr_nummer     | Kunde    | string | X   | X      | 0 (straks)|        | [..] |  |
-|  +--------------------------------------------------------------------------------+  |
-|                                                                                      |
-|  +--------------------------------------------------------------------------------+  |
-|  | API Feltmapping                                                                |  |
-|  | +------------------------------------+                                         |  |
-|  | | Valg integration: [Lovablecph  v]  |  [Hent sample-felter]                   |  |
-|  | +------------------------------------+                                         |  |
-|  |                                                                                |  |
-|  | API-felt (kilde)           |   | Standard felt     | Ekskluder? | Preview     |  |
-|  +----------------------------+---+-------------------+------------+-------------+  |
-|  | lead.phone                 | > | telefonnummer v   | [ ]        | "45123456"  |  |
-|  | lead.company               | > | kundenavn v       | [ ]        | "Firma ApS" |  |
-|  | ownedBy.email              | > | agent_email v     | [ ]        | "aa@cph.dk" |  |
-|  | leadResultData.OPP         | > | opp_nummer v      | [ ]        | "OPP123"    |  |
-|  | leadResultData.cprNumber   | > | [Ingen] v         | [X] Ignorer| "xxxxxx"    |  |
-|  |                                                                                |  |
-|  |                                           [Gem mapping]                        |  |
-|  +--------------------------------------------------------------------------------+  |
-|                                                                                      |
-+--------------------------------------------------------------------------------------+
-```
+| Pricing Rule Condition | Kilde (API) | Standard Felt |
+|------------------------|-------------|---------------|
+| `Tilskud` | `leadResultData[Tilskud]` (Relatel) | coverage_amount |
+| `Dækningssum` | `data.Dækningssum` (ASE) | coverage_amount |
+| `A-kasse salg` | `data.A-kasse salg` (ASE) | akasse_sale |
+| `A-kasse type` | `data.A-kasse type` (ASE) | akasse_type |
 
 ---
 
 ## Implementeringsrækkefølge
 
-### Fase 1: Database + Frontend UI
-1. Opret `data_field_definitions` tabel med RLS
-2. Opret `integration_field_mappings` tabel med RLS + FK
-3. Indsæt standard feltdefinitioner (seed data)
-4. Opret frontend-komponenter (DataMappingTab, FieldDefinitionsManager, etc.)
-5. Tilføj "Datamapping" tab til MgTest.tsx
-
-### Fase 2: Frontend Optimering
-6. Tilføj `normalized_data` kolonne til `sales` tabel
-7. Opret `useNormalizedSalesData` hook
-8. Opdater relevante dashboards til at bruge normaliserede data
-
-### Fase 3: Backend Integration
-9. Implementer `applyDataMappings()` utility funktion
-10. Opdater Adversus og Enreach adapters til at bruge datamappings
-11. Opdater `core/sales.ts` til at gemme normalized_data
-12. Opdater `matchPricingRule()` til at prioritere normalized_data
-
-### Fase 4: GDPR Scheduler
-13. Opret `gdpr-data-cleanup` edge function
-14. Setup pg_cron job til daglig kørsel
-15. Implementer audit logging
+1. **Database migration:** Opret 6 nye field definitions
+2. **Lovablecph mappings:** 11 mappings for Adversus-format
+3. **Relatel mappings:** 12 mappings for Adversus-format
+4. **ASE mappings:** 18 mappings for Enreach-format
+5. **Eesy mappings:** 14 mappings for Enreach-format  
+6. **Tryg mappings:** 13 mappings for Enreach-format
 
 ---
 
-## Nye filer der oprettes
+## Resultat
 
-| Fil | Beskrivelse |
-|-----|-------------|
-| `src/components/mg-test/DataMappingTab.tsx` | Hovedkomponent |
-| `src/components/mg-test/FieldDefinitionsManager.tsx` | CRUD for feltdefinitioner |
-| `src/components/mg-test/IntegrationMappingEditor.tsx` | Mapping pr. integration |
-| `src/components/mg-test/FieldDefinitionDialog.tsx` | Dialog til opret/rediger |
-| `src/hooks/useNormalizedSalesData.ts` | Hook til normaliserede data |
-| `supabase/functions/gdpr-data-cleanup/index.ts` | GDPR scheduler |
-| `supabase/functions/integration-engine/core/normalize.ts` | applyDataMappings() |
+Efter implementering:
+- Alle 5 integrationer har komplette feltmappings
+- Pricing rules kan bruge normaliserede feltnavne
+- GDPR-felter er korrekt markeret som PII
+- Interne noter og unødvendige felter er ekskluderet
+- Transform rules håndterer navn-kombinationer
 
-## Filer der modificeres
+Du kan derefter justere mappings direkte i Datamapping-fanen efter behov.
 
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/MgTest.tsx` | Tilføj Datamapping tab (ved linje 2088) |
-| `supabase/functions/integration-engine/adapters/adversus.ts` | Kald applyDataMappings() |
-| `supabase/functions/integration-engine/adapters/enreach.ts` | Kald applyDataMappings() |
-| `supabase/functions/integration-engine/core/sales.ts` | Gem normalized_data, opdater matchPricingRule() |
-| `supabase/functions/integration-engine/types.ts` | Tilføj normalizedData til StandardSale |
-
----
-
-## Backward Compatibility
-
-- **100% backward compatible**: Alle eksisterende systemer fortsætter med at virke
-- Datamapping er **opt-in** per integration
-- `raw_payload` gemmes **altid** som backup
-- Eksisterende pricing rules og feltnavne virker fortsat
-- Frontend-queries behøver ikke ændres med det samme
-
----
-
-## Estimeret Omfang
-- 2 nye database-tabeller + 1 ny kolonne + RLS policies + seed data
-- 5 nye React-komponenter + 1 hook
-- 1 ny edge function (GDPR scheduler)
-- 1 ny utility fil (normalize.ts)
-- 5 fil-modifikationer
-- 1 cron job setup
