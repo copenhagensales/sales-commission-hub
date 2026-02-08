@@ -71,6 +71,7 @@ import {
   EesyTmDashboard,
   UnitedDashboard,
   CsTop20Dashboard,
+  DashboardHome,
   FieldmarketingDashboardFull,
   CphSalesDashboard,
   DashboardSettings,
@@ -296,6 +297,9 @@ export const routes: RouteConfig[] = [
 
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "protected" },
+
+  // Dashboard Landing Page
+  { path: "/dashboards", component: DashboardHome, access: "protected" },
 
   // Team Dashboards (full screen, no sidebar) - with role-based permissions
   {

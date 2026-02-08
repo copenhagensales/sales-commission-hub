@@ -95,7 +95,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
             
             {/* Centered logo */}
             <div 
-              onClick={() => navigate(accessibleDashboards[0]?.path || "/home")} 
+              onClick={() => navigate("/dashboards")} 
               className="flex items-center justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
@@ -151,6 +151,24 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
+          {/* Home Link */}
+          <NavLink
+            to="/dashboards"
+            end
+            onClick={handleNavClick}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all border-l-4 mb-2",
+                isActive
+                  ? "bg-primary/15 text-primary border-primary"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent hover:border-sidebar-accent"
+              )
+            }
+          >
+            <Home className="h-4 w-4" />
+            Oversigt
+          </NavLink>
+
           {/* Section Header */}
           <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Dashboards
