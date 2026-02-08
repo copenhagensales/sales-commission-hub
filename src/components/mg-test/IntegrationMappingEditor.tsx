@@ -44,6 +44,7 @@ interface SampleField {
   fieldId: string;
   label: string;
   sampleValue: string;
+  path: string;
 }
 
 export function IntegrationMappingEditor() {

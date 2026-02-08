@@ -1,58 +1,208 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getAdapter } from "../adapters/registry.ts"
+import { LogFn } from "../utils/index.ts"
 
+interface SampleField {
+  fieldId: string
+  label: string
+  sampleValue: string
+  path: string
+}
+
+/**
+ * Fetches sample fields from an integration's API to help with field mapping.
+ * This function retrieves recent sales/leads data and extracts all available fields.
+ */
 export async function fetchSampleFields(
   supabase: SupabaseClient,
-  source: string | undefined,
-  campaignId: string
-) {
-  const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY")
-  const { data: integrations, error: intError } = await supabase
+  integrationId: string | undefined,
+  log: LogFn
+): Promise<{
+  success: boolean
+  fields: SampleField[]
+  leadCount: number
+  message?: string
+}> {
+  if (!integrationId) {
+    return { success: false, fields: [], leadCount: 0, message: "No integration ID provided" }
+  }
+
+  log("INFO", `Fetching sample fields for integration: ${integrationId}`)
+
+  // Get the integration details
+  const { data: integration, error: intError } = await supabase
     .from("dialer_integrations")
     .select("*")
-    .eq("provider", source || "adversus")
-    .eq("is_active", true)
-    .limit(1)
-  if (intError) throw intError
-  if (!integrations || integrations.length === 0) {
-    return { success: false, fields: [], leadCount: 0, message: "No active integration found" }
+    .eq("id", integrationId)
+    .single()
+
+  if (intError || !integration) {
+    log("ERROR", `Integration not found: ${integrationId}`, { error: intError?.message })
+    return { success: false, fields: [], leadCount: 0, message: "Integration not found" }
   }
-  const integration = integrations[0]
-  const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
+
+  log("INFO", `Found integration: ${integration.name} (${integration.provider})`)
+
+  // Get decrypted credentials
+  const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY")
+  const { data: credentials, error: credError } = await supabase.rpc("get_dialer_credentials", {
     p_integration_id: integration.id,
     p_encryption_key: encryptionKey,
   })
-  const adapter = getAdapter("adversus", credentials, integration.name, integration.api_url, integration.config)
-  const leads = await (adapter as any).fetchLeadsForCampaign?.(campaignId, 100)
-  if (!leads || leads.length === 0) {
+
+  if (credError) {
+    log("ERROR", `Failed to get credentials: ${credError.message}`)
+    return { success: false, fields: [], leadCount: 0, message: "Failed to get credentials" }
+  }
+
+  try {
+    // Get the adapter for this integration
+    const adapter = getAdapter(
+      integration.provider,
+      credentials,
+      integration.name,
+      integration.api_url,
+      integration.config
+    )
+
+    // Fetch recent sales to extract field structure
+    log("INFO", `Fetching sales data from ${integration.provider} API...`)
+    const sales = await adapter.fetchSales(7) // Get last 7 days of data
+
+    if (!sales || sales.length === 0) {
+      log("INFO", "No sales found in the last 7 days")
+      return {
+        success: true,
+        fields: [],
+        leadCount: 0,
+        message: `No sales found in the last 7 days for ${integration.name}`,
+      }
+    }
+
+    log("INFO", `Found ${sales.length} sales, extracting field structure...`)
+
+    // Extract all unique fields from the raw payloads
+    const fieldsMap = new Map<string, SampleField>()
+
+    for (const sale of sales.slice(0, 10)) { // Sample from first 10 sales
+      const rawPayload = sale.rawPayload as Record<string, unknown> | undefined
+      if (!rawPayload) continue
+
+      // Extract fields recursively
+      extractFields(rawPayload, "", fieldsMap)
+    }
+
+    // Convert to array and sort
+    const fields = Array.from(fieldsMap.values())
+      .sort((a, b) => a.path.localeCompare(b.path))
+
+    log("INFO", `Extracted ${fields.length} unique fields`)
+
     return {
       success: true,
-      fields: [],
-      leadCount: 0,
-      message: `No leads found for campaign ${campaignId}`,
+      fields,
+      leadCount: sales.length,
     }
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    log("ERROR", `Failed to fetch sample fields: ${errMsg}`)
+    return { success: false, fields: [], leadCount: 0, message: errMsg }
   }
-  const fields: { fieldId: string; label: string; sampleValue: string }[] = []
-  const sampleLead = leads.find((l: any) => l.resultData && l.resultData.length > 0) || leads[0]
-  const resultData = sampleLead?.resultData || []
-  if (Array.isArray(resultData)) {
-    for (const field of resultData) {
-      if (field.id !== undefined) {
-        fields.push({
-          fieldId: `result_${field.id}`,
-          label: `Field ${field.id}`,
-          sampleValue:
-            field.value !== null && field.value !== undefined ? String(field.value) : "(empty)",
+}
+
+/**
+ * Recursively extracts fields from a nested object
+ */
+function extractFields(
+  obj: Record<string, unknown>,
+  parentPath: string,
+  fieldsMap: Map<string, SampleField>
+): void {
+  for (const [key, value] of Object.entries(obj)) {
+    const path = parentPath ? `${parentPath}.${key}` : key
+
+    if (value === null || value === undefined) {
+      // Still add the field but with empty value
+      if (!fieldsMap.has(path)) {
+        fieldsMap.set(path, {
+          fieldId: path,
+          label: formatLabel(key),
+          sampleValue: "(empty)",
+          path,
+        })
+      }
+    } else if (Array.isArray(value)) {
+      // For arrays, check if it's an array of objects (like resultData)
+      if (value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
+        // Check if it's a label/value array structure (common in Adversus)
+        const firstItem = value[0] as Record<string, unknown>
+        if ("label" in firstItem && "value" in firstItem) {
+          // Handle Adversus-style resultData: [{id, label, value}, ...]
+          for (const item of value) {
+            const typedItem = item as { id?: number; label?: string; value?: unknown }
+            if (typedItem.label) {
+              const itemPath = `${path}[${typedItem.label}]`
+              if (!fieldsMap.has(itemPath)) {
+                fieldsMap.set(itemPath, {
+                  fieldId: itemPath,
+                  label: String(typedItem.label),
+                  sampleValue: formatValue(typedItem.value),
+                  path: itemPath,
+                })
+              }
+            }
+          }
+        } else {
+          // Regular array of objects - recurse into first item
+          extractFields(firstItem as Record<string, unknown>, `${path}[0]`, fieldsMap)
+        }
+      } else if (value.length > 0) {
+        // Array of primitives
+        if (!fieldsMap.has(path)) {
+          fieldsMap.set(path, {
+            fieldId: path,
+            label: formatLabel(key),
+            sampleValue: formatValue(value[0]),
+            path,
+          })
+        }
+      }
+    } else if (typeof value === "object") {
+      // Recurse into nested objects
+      extractFields(value as Record<string, unknown>, path, fieldsMap)
+    } else {
+      // Primitive value
+      if (!fieldsMap.has(path)) {
+        fieldsMap.set(path, {
+          fieldId: path,
+          label: formatLabel(key),
+          sampleValue: formatValue(value),
+          path,
         })
       }
     }
   }
-  fields.sort((a, b) => a.fieldId.localeCompare(b.fieldId))
-  return {
-    success: true,
-    fields,
-    leadCount: leads.length,
-    sampleLeadId: sampleLead?.id,
-  }
 }
 
+/**
+ * Format a field key into a readable label
+ */
+function formatLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, " $1") // Add space before capitals
+    .replace(/[_-]/g, " ") // Replace underscores/hyphens with spaces
+    .replace(/\s+/g, " ") // Normalize spaces
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase()) // Capitalize first letter
+}
+
+/**
+ * Format a value for display
+ */
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "(empty)"
+  if (typeof value === "string") return value.slice(0, 100) // Truncate long strings
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (value instanceof Date) return value.toISOString()
+  return JSON.stringify(value).slice(0, 100)
+}
