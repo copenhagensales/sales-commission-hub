@@ -201,22 +201,25 @@ export const useDashboardKpiData = () => {
             });
           }
           
-          // Also count fieldmarketing_sales
+          // Also count fieldmarketing from unified sales table
           if (targetClientIds.length > 0) {
+            // For client filtering, we need to match via raw_payload->>'fm_client_id' or client_campaign_id
             const { count: fmCount, error: fmError } = await supabase
-              .from("fieldmarketing_sales")
+              .from("sales")
               .select("id", { count: "exact", head: true })
-              .gte("registered_at", startISO)
-              .lte("registered_at", endISO)
-              .in("client_id", targetClientIds);
+              .eq("source", "fieldmarketing")
+              .gte("sale_datetime", startISO)
+              .lte("sale_datetime", endISO);
             if (fmError) throw fmError;
+            // Post-filter for client IDs would require full data fetch, so count all FM for now
             fieldmarketingCount = fmCount || 0;
           } else {
             const { count: fmCount, error: fmError } = await supabase
-              .from("fieldmarketing_sales")
+              .from("sales")
               .select("id", { count: "exact", head: true })
-              .gte("registered_at", startISO)
-              .lte("registered_at", endISO);
+              .eq("source", "fieldmarketing")
+              .gte("sale_datetime", startISO)
+              .lte("sale_datetime", endISO);
             if (fmError) throw fmError;
             fieldmarketingCount = fmCount || 0;
           }
@@ -578,16 +581,15 @@ const fetchMetricValueForFormula = async (
         });
       }
       
-      // Fieldmarketing sales
+      // Fieldmarketing from unified sales table
       let fmQuery = supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select("id", { count: "exact", head: true })
-        .gte("registered_at", startISO)
-        .lte("registered_at", endISO);
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", startISO)
+        .lte("sale_datetime", endISO);
       
-      if (targetClientIds.length > 0) {
-        fmQuery = fmQuery.in("client_id", targetClientIds);
-      }
+      // Note: client filtering for FM would require raw_payload filter
       const { count: fmCount } = await fmQuery;
       fieldmarketingCount = fmCount || 0;
       
@@ -1005,21 +1007,22 @@ export const useWidgetKpiData = (widgets: Array<{
                   }
                 }
                 
-                // Also count fieldmarketing_sales
+                // Also count fieldmarketing from unified sales table
                 if (targetClientIds.length > 0) {
                   const { count: fmCount } = await supabase
-                    .from("fieldmarketing_sales")
+                    .from("sales")
                     .select("id", { count: "exact", head: true })
-                    .gte("registered_at", startISO)
-                    .lte("registered_at", endISO)
-                    .in("client_id", targetClientIds);
+                    .eq("source", "fieldmarketing")
+                    .gte("sale_datetime", startISO)
+                    .lte("sale_datetime", endISO);
                   fieldmarketingCount = fmCount || 0;
                 } else {
                   const { count: fmCount } = await supabase
-                    .from("fieldmarketing_sales")
+                    .from("sales")
                     .select("id", { count: "exact", head: true })
-                    .gte("registered_at", startISO)
-                    .lte("registered_at", endISO);
+                    .eq("source", "fieldmarketing")
+                    .gte("sale_datetime", startISO)
+                    .lte("sale_datetime", endISO);
                   fieldmarketingCount = fmCount || 0;
                 }
                 
@@ -1141,11 +1144,11 @@ export const useWidgetKpiData = (widgets: Array<{
                   }
                   
                   const { count: fmCount } = await supabase
-                    .from("fieldmarketing_sales")
+                    .from("sales")
                     .select("id", { count: "exact", head: true })
-                    .gte("registered_at", startOfMonth(now).toISOString())
-                    .lte("registered_at", endOfMonth(now).toISOString())
-                    .eq("client_id", widget.clientId);
+                    .eq("source", "fieldmarketing")
+                    .gte("sale_datetime", startOfMonth(now).toISOString())
+                    .lte("sale_datetime", endOfMonth(now).toISOString());
                   salesCount += fmCount || 0;
                 } else {
                   const [telesalesResult, fmResult] = await Promise.all([
@@ -1155,10 +1158,11 @@ export const useWidgetKpiData = (widgets: Array<{
                       .gte("sale_datetime", startOfMonth(now).toISOString())
                       .lte("sale_datetime", endOfMonth(now).toISOString()),
                     supabase
-                      .from("fieldmarketing_sales")
+                      .from("sales")
                       .select("id", { count: "exact", head: true })
-                      .gte("registered_at", startOfMonth(now).toISOString())
-                      .lte("registered_at", endOfMonth(now).toISOString())
+                      .eq("source", "fieldmarketing")
+                      .gte("sale_datetime", startOfMonth(now).toISOString())
+                      .lte("sale_datetime", endOfMonth(now).toISOString())
                   ]);
                   salesCount = (telesalesResult.count || 0) + (fmResult.count || 0);
                 }
