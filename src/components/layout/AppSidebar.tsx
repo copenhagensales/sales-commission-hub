@@ -1,4 +1,5 @@
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, PanelLeft, XCircle } from "lucide-react";
+import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -475,13 +476,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
         {!isMobile && (
-          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-2">
+          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-2">
             <div 
               onClick={() => navigate("/")} 
               className="flex items-center justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
               <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             </div>
+            <EnvironmentSwitcher compact />
           </div>
         )}
         <nav className="flex-1 space-y-1 p-4 pt-6">
