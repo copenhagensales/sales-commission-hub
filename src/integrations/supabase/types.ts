@@ -789,6 +789,64 @@ export type Database = {
           },
         ]
       }
+      cancellation_imports: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          file_name: string
+          file_size_bytes: number | null
+          id: string
+          rows_matched: number | null
+          rows_processed: number | null
+          status: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          file_name: string
+          file_size_bytes?: number | null
+          id?: string
+          rows_matched?: number | null
+          rows_processed?: number | null
+          status?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          file_name?: string
+          file_size_bytes?: number | null
+          id?: string
+          rows_matched?: number | null
+          rows_processed?: number | null
+          status?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_imports_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_imports_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_imports_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           applied_position: string | null
