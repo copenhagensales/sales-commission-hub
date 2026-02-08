@@ -46,6 +46,17 @@ interface FmSale {
   seller_id: string | null;
 }
 
+// FM sale from unified sales table
+interface FmSaleFromSales {
+  id: string;
+  sale_datetime: string;
+  raw_payload: {
+    fm_product_name?: string;
+    fm_seller_id?: string;
+    fm_client_id?: string;
+  } | null;
+}
+
 interface FmPricingRule {
   product: { name: string };
   commission_dkk: number | null;
@@ -121,7 +132,6 @@ async function fetchAllSaleItems(
     }
   }
   
-  console.log(`[fetchAllSaleItems] Fetched ${allItems.length} items from ${saleIds.length} sales in ${Math.ceil(saleIds.length / BATCH_SIZE)} batches`);
   return allItems;
 }
 
@@ -169,7 +179,6 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
     }
   }
   
-  console.log(`[fetchAllSalesWithItemsForEmployeeKpi] Fetched ${allSales.length} sales in ${page || 1} page(s) for period ${startStr} to ${endStr}`);
   return allSales;
 }
 
@@ -184,9 +193,7 @@ async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<strin
     .from("products")
     .select("id, name, commission_dkk, revenue_dkk");
 
-  if (productsError) {
-    console.error("[fetchFmCommissionMap] Error fetching products:", productsError);
-  }
+  if (productsError) return map;
 
   // Set base prices from products table
   for (const product of (products || [])) {
@@ -199,8 +206,6 @@ async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<strin
       });
     }
   }
-
-  console.log(`[fetchFmCommissionMap] Loaded ${map.size} products with base prices`);
 
   // 2. Override with active pricing rules (higher priority)
   const { data: rules, error: rulesError } = await supabase
@@ -215,9 +220,7 @@ async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<strin
     .eq("is_active", true)
     .order("priority", { ascending: false, nullsFirst: true });
 
-  if (rulesError) {
-    console.error("[fetchFmCommissionMap] Error fetching pricing rules:", rulesError);
-  }
+  if (rulesError) return map;
 
   // Track which products have been set by pricing rules
   const rulesApplied = new Set<string>();
@@ -235,7 +238,6 @@ async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<strin
     }
   }
 
-  console.log(`[fetchFmCommissionMap] Applied ${rulesApplied.size} pricing rules. Final map size: ${map.size}`);
   return map;
 }
 
@@ -432,15 +434,23 @@ Deno.serve(async (req) => {
     payrollPeriodDates.end.toISOString()
   );
   
-  // Fetch FM sales for employee-scoped calculations
-  // Use seller_id (not seller_email) to match FM sales to employees
-  const { data: allPeriodFmSales } = await supabase
-    .from("fieldmarketing_sales")
-    .select("id, product_name, seller_id, client_id, registered_at")
-    .gte("registered_at", payrollPeriodDates.start.toISOString())
-    .lte("registered_at", payrollPeriodDates.end.toISOString());
+  // Fetch FM sales for employee-scoped calculations from unified sales table
+  // Use raw_payload.fm_seller_id to match FM sales to employees
+  const { data: allPeriodFmSalesRaw } = await supabase
+    .from("sales")
+    .select("id, sale_datetime, raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", payrollPeriodDates.start.toISOString())
+    .lte("sale_datetime", payrollPeriodDates.end.toISOString());
   
-  console.log(`[Employee-scoped] Loaded ${(allPeriodSales || []).length} telesales, ${(allPeriodFmSales || []).length} FM sales for payroll period`);
+  // Transform to expected format
+  const allPeriodFmSales = (allPeriodFmSalesRaw || []).map((s: any) => ({
+    id: s.id,
+    product_name: s.raw_payload?.fm_product_name || null,
+    seller_id: s.raw_payload?.fm_seller_id || null,
+    client_id: s.raw_payload?.fm_client_id || null,
+    registered_at: s.sale_datetime,
+  }));
   
   // Fetch products for counts_as_sale check
   const allProductIds = [...new Set((allPeriodSales || []).flatMap((s: any) => 
@@ -537,11 +547,8 @@ Deno.serve(async (req) => {
     }
   }
   
-  console.log(`Calculated employee-scoped KPIs for ${(activeEmployees || []).length} employees`);
-  
   // === PARTIAL SAVE: Upsert employee-scoped KPIs immediately to avoid losing data on timeout ===
   if (cachedValues.length > 0) {
-    console.log(`[Partial Save] Upserting ${cachedValues.length} employee-scoped KPIs...`);
     const { error: partialUpsertError } = await supabase
       .from("kpi_cached_values")
       .upsert(cachedValues, {
@@ -550,8 +557,6 @@ Deno.serve(async (req) => {
     
     if (partialUpsertError) {
       console.error("[Partial Save] Error upserting employee KPIs:", partialUpsertError);
-    } else {
-      console.log(`[Partial Save] Successfully saved ${cachedValues.length} employee-scoped KPIs`);
     }
   }
 
@@ -612,10 +617,10 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Add FM commission for team members
+    // Add FM commission for team members (match by seller_id)
     for (const fmSale of (allPeriodFmSales || [])) {
-      const sellerEmail = (fmSale as any).seller_email?.toLowerCase();
-      if (sellerEmail && teamAgentEmails.includes(sellerEmail)) {
+      const sellerId = (fmSale as any).seller_id;
+      if (sellerId && memberIds.includes(sellerId)) {
         const fmPricing = fmCommissionMap.get((fmSale as any).product_name?.toLowerCase());
         teamCommission += fmPricing?.commission || 0;
       }
@@ -632,8 +637,6 @@ Deno.serve(async (req) => {
       calculated_at: calculatedAt,
     });
   }
-  
-  console.log(`Calculated team-scoped commission for ${(teamGoals || []).length} teams with goals`);
 
   // ============= LIGA POSITION KPIs =============
   console.log("Calculating liga position KPIs...");
@@ -977,7 +980,7 @@ async function fetchAllSalesWithItems(
   return allSales;
 }
 
-// Fetch FM sales for a date range
+// Fetch FM sales for a date range from unified sales table
 async function fetchFmSalesForPeriod(
   supabase: SupabaseClient,
   startStr: string,
@@ -985,13 +988,14 @@ async function fetchFmSalesForPeriod(
   clientId?: string
 ): Promise<FmSale[]> {
   let query = supabase
-    .from("fieldmarketing_sales")
-    .select("id, product_name, seller_id, client_id")
-    .gte("registered_at", startStr)
-    .lte("registered_at", endStr);
+    .from("sales")
+    .select("id, sale_datetime, raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
   
   if (clientId) {
-    query = query.eq("client_id", clientId);
+    query = query.contains("raw_payload", { fm_client_id: clientId });
   }
   
   const { data, error } = await query;
@@ -1001,7 +1005,13 @@ async function fetchFmSalesForPeriod(
     return [];
   }
   
-  return (data || []) as FmSale[];
+  // Transform to FmSale format
+  return (data || []).map((s: any) => ({
+    id: s.id,
+    product_name: s.raw_payload?.fm_product_name || null,
+    seller_id: s.raw_payload?.fm_seller_id || null,
+    client_id: s.raw_payload?.fm_client_id || null,
+  }));
 }
 
 async function calculateGlobalLeaderboard(
@@ -1625,11 +1635,13 @@ async function calculateSalesCount(
     }
   }
 
+  // FM count from unified sales table
   const { count: fmCount } = await supabase
-    .from("fieldmarketing_sales")
+    .from("sales")
     .select("*", { count: "exact", head: true })
-    .gte("registered_at", startStr)
-    .lte("registered_at", endStr);
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
 
   return count + (fmCount || 0);
 }
@@ -1658,20 +1670,21 @@ async function calculateTotalCommission(
     return sum + (item.mapped_commission || 0) * (item.quantity || 1);
   }, 0);
 
-  // FM commission from fieldmarketing_sales
+  // FM commission from unified sales table
   const { data: fmSales } = await supabase
-    .from("fieldmarketing_sales")
-    .select("product_name")
-    .gte("registered_at", startStr)
-    .lte("registered_at", endStr);
+    .from("sales")
+    .select("raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
 
   let fmCommission = 0;
   for (const sale of (fmSales || [])) {
-    const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+    const productName = (sale as any).raw_payload?.fm_product_name;
+    const pricing = fmCommissionMap.get(productName?.toLowerCase());
     fmCommission += pricing?.commission || 0;
   }
 
-  console.log(`[TotalCommission] Telesales: ${telesalesCommission}, FM: ${fmCommission}`);
   return telesalesCommission + fmCommission;
 }
 
@@ -1699,20 +1712,21 @@ async function calculateTotalRevenue(
     return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
   }, 0);
 
-  // FM revenue from fieldmarketing_sales using price_dkk
+  // FM revenue from unified sales table
   const { data: fmSales } = await supabase
-    .from("fieldmarketing_sales")
-    .select("product_name")
-    .gte("registered_at", startStr)
-    .lte("registered_at", endStr);
+    .from("sales")
+    .select("raw_payload")
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", startStr)
+    .lte("sale_datetime", endStr);
 
   let fmRevenue = 0;
   for (const sale of (fmSales || [])) {
-    const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+    const productName = (sale as any).raw_payload?.fm_product_name;
+    const pricing = fmCommissionMap.get(productName?.toLowerCase());
     fmRevenue += pricing?.price || 0;
   }
 
-  console.log(`[TotalRevenue] Telesales: ${telesalesRevenue}, FM: ${fmRevenue}`);
   return telesalesRevenue + fmRevenue;
 }
 

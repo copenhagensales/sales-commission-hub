@@ -304,14 +304,16 @@ serve(async (req) => {
     const teamSalesCount = salesData?.length || 0;
     const teamRevenue = salesData?.reduce((sum, s) => sum + (s.amount || 0), 0) || 0;
 
-    // Get fieldmarketing sales
+    // Get fieldmarketing sales from unified sales table
     const { data: fmSalesData } = await supabase
-      .from("fieldmarketing_sales")
-      .select("id, quantity, amount, location_id")
-      .gte("sale_date", startDateStr)
-      .lte("sale_date", endDateStr);
+      .from("sales")
+      .select("id, sale_datetime, raw_payload")
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", `${startDateStr}T00:00:00`)
+      .lte("sale_datetime", `${endDateStr}T23:59:59`);
 
-    const fmSalesCount = fmSalesData?.reduce((sum, s) => sum + (s.quantity || 1), 0) || 0;
+    // Transform and count FM sales
+    const fmSalesCount = (fmSalesData || []).reduce((sum, s: any) => sum + 1, 0);
 
     // Build employee details with sales
     const employeeDetails: EmployeeDetail[] = (teamEmployees || []).map(emp => {

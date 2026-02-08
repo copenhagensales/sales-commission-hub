@@ -105,23 +105,29 @@ const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: C
       const periodEnd = dateRange?.to?.toISOString() || defaultPayrollPeriod.end.toISOString();
       
       const { data: periodSales, error } = await supabase
-        .from("fieldmarketing_sales")
-        .select(`
-          seller_id,
-          product_name,
-          seller:employee_master_data!seller_id(first_name, last_name)
-        `)
-        .eq("client_id", clientId)
-        .gte("registered_at", periodStart)
-        .lte("registered_at", periodEnd);
+        .from("sales")
+        .select(`id, sale_datetime, raw_payload`)
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_client_id: clientId })
+        .gte("sale_datetime", periodStart)
+        .lte("sale_datetime", periodEnd);
       
       if (error) throw error;
 
+      // Fetch seller info separately
+      const sellerIds = [...new Set((periodSales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
+      const { data: sellers } = sellerIds.length > 0 
+        ? await supabase.from("employee_master_data").select("id, first_name, last_name").in("id", sellerIds)
+        : { data: [] };
+      const sellerMap = new Map((sellers || []).map(s => [s.id, s]));
+
       const sellerStats: Record<string, { name: string; count: number; commission: number }> = {};
       (periodSales || []).forEach((sale: any) => {
-        const sellerId = sale.seller_id;
-        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
-        const commission = productCommissions?.[sale.product_name] || 0;
+        const sellerId = sale.raw_payload?.fm_seller_id;
+        const seller = sellerMap.get(sellerId);
+        const sellerName = seller ? `${seller.first_name} ${seller.last_name}` : "Ukendt";
+        const productName = sale.raw_payload?.fm_product_name;
+        const commission = productCommissions?.[productName] || 0;
         
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, count: 0, commission: 0 };
@@ -144,22 +150,28 @@ const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: C
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       
       const { data: todaySales, error } = await supabase
-        .from("fieldmarketing_sales")
-        .select(`
-          seller_id,
-          product_name,
-          seller:employee_master_data!seller_id(first_name, last_name)
-        `)
-        .eq("client_id", clientId)
-        .gte("registered_at", todayStart);
+        .from("sales")
+        .select(`id, sale_datetime, raw_payload`)
+        .eq("source", "fieldmarketing")
+        .contains("raw_payload", { fm_client_id: clientId })
+        .gte("sale_datetime", todayStart);
       
       if (error) throw error;
 
+      // Fetch seller info separately
+      const sellerIds = [...new Set((todaySales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
+      const { data: sellers } = sellerIds.length > 0 
+        ? await supabase.from("employee_master_data").select("id, first_name, last_name").in("id", sellerIds)
+        : { data: [] };
+      const sellerMap = new Map((sellers || []).map(s => [s.id, s]));
+
       const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
       (todaySales || []).forEach((sale: any) => {
-        const sellerId = sale.seller_id;
-        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
-        const commission = productCommissions?.[sale.product_name] || 0;
+        const sellerId = sale.raw_payload?.fm_seller_id;
+        const seller = sellerMap.get(sellerId);
+        const sellerName = seller ? `${seller.first_name} ${seller.last_name}` : "Ukendt";
+        const productName = sale.raw_payload?.fm_product_name;
+        const commission = productCommissions?.[productName] || 0;
         
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, sales: 0, commission: 0 };

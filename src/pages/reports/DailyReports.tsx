@@ -42,12 +42,14 @@ async function fetchEmployeesWithClientActivity(clientId: string): Promise<strin
   const salesData: { agent_name: string }[] = await salesRes.json();
   const agentEmails = [...new Set(salesData.map(s => s.agent_name).filter(Boolean))];
   
-  // Get FM seller IDs for this client  
+  // Get FM seller IDs for this client from unified sales table
   const fmRes = await fetch(
-    `${supabaseUrl}/rest/v1/fieldmarketing_sales?select=seller_id&client_id=eq.${clientId}`,
+    `${supabaseUrl}/rest/v1/sales?select=raw_payload&source=eq.fieldmarketing`,
     { headers }
   );
-  const fmData: { seller_id: string }[] = await fmRes.json();
+  const fmData: { raw_payload: { fm_seller_id: string; fm_client_id: string } }[] = await fmRes.json();
+  const fmDataFiltered = fmData.filter(d => d.raw_payload?.fm_client_id === clientId);
+  const fmEmployeeIds = fmDataFiltered.map(s => s.raw_payload?.fm_seller_id).filter(Boolean);
   
   // Get all agent mappings with agent email info
   const mappingsRes = await fetch(
@@ -61,7 +63,6 @@ async function fetchEmployeesWithClientActivity(clientId: string): Promise<strin
     .filter(m => m.agents?.email && agentEmails.includes(m.agents.email))
     .map(m => m.employee_id);
   
-  const fmEmployeeIds = fmData.map(s => s.seller_id);
   return [...new Set([...employeeIdsFromSales, ...fmEmployeeIds])];
 }
 
@@ -334,16 +335,19 @@ export default function DailyReports() {
             .filter(Boolean)
         )] as string[];
         
-        // ALSO fetch seller_ids from fieldmarketing_sales for this client
+        // ALSO fetch seller_ids from unified sales table for this client
         const { data: fmSellersForClient } = await supabase
-          .from("fieldmarketing_sales")
-          .select("seller_id")
-          .eq("client_id", selectedClient)
-          .gte("registered_at", `${startStr}T00:00:00`)
-          .lte("registered_at", `${endStr}T23:59:59`);
+          .from("sales")
+          .select("raw_payload")
+          .eq("source", "fieldmarketing")
+          .gte("sale_datetime", `${startStr}T00:00:00`)
+          .lte("sale_datetime", `${endStr}T23:59:59`);
         
         const fmEmployeeIds = [...new Set(
-          (fmSellersForClient || []).map(s => s.seller_id).filter(Boolean)
+          (fmSellersForClient || [])
+            .filter((s: any) => s.raw_payload?.fm_client_id === selectedClient)
+            .map((s: any) => s.raw_payload?.fm_seller_id)
+            .filter(Boolean)
         )] as string[];
         
         console.log("[DailyReport] Client sales agent emails:", agentEmails);

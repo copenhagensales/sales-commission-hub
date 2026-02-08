@@ -207,19 +207,25 @@ Deno.serve(async (req) => {
     const sales = allSales;
     console.log(`[league-calculate-standings] Found ${sales.length} telesales in period (paginated)`);
 
-    // 6b. Get fieldmarketing sales in the qualification period
-    // Use correct column names: seller_id, product_name, registered_at (not seller_email, product_id, sale_date)
-    const { data: fmSales, error: fmSalesError } = await supabase
-      .from("fieldmarketing_sales")
-      .select("id, seller_id, product_name, registered_at")
-      .gte("registered_at", `${sourceStart.split('T')[0]}T00:00:00`)
-      .lte("registered_at", `${sourceEnd.split('T')[0]}T23:59:59`);
+    // 6b. Get fieldmarketing sales in the qualification period from unified sales table
+    const { data: fmSalesRaw, error: fmSalesError } = await supabase
+      .from("sales")
+      .select("id, sale_datetime, raw_payload")
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", sourceStart)
+      .lte("sale_datetime", sourceEnd);
 
     if (fmSalesError) {
       console.error("[league-calculate-standings] Failed to fetch fieldmarketing sales:", fmSalesError);
     }
-
-    console.log(`[league-calculate-standings] Found ${fmSales?.length || 0} fieldmarketing sales in period`);
+    
+    // Transform to expected format
+    const fmSales = (fmSalesRaw || []).map((s: any) => ({
+      id: s.id,
+      seller_id: s.raw_payload?.fm_seller_id || null,
+      product_name: s.raw_payload?.fm_product_name || null,
+      registered_at: s.sale_datetime,
+    }));
 
     // Build product commission map by name (same logic as DailyReports)
     // Get all products and campaign overrides
