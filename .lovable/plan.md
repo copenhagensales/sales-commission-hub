@@ -1,370 +1,238 @@
 
-# Komplet Optimeringsplan: EditSalesRegistrations.tsx, Console.log Cleanup & .single() Audit
+# Grundig Plan: Dashboard-miljø Fuldstændig Adskillelse
 
-## Samlet Overblik
+## Overblik
 
-| Opgave | Omfang | Handling |
-|--------|--------|----------|
-| EditSalesRegistrations.tsx Migration | 1 kompleks CRUD-fil | Migrér fra `fieldmarketing_sales` → `sales` WHERE `source = 'fieldmarketing'` |
-| Console.log Cleanup | ~3.000 matches i 81 filer | Fjern debug logs fra edge functions, behold kun errors |
-| .single() → .maybeSingle() Audit | 610 matches i 60 filer | Erstat risikable SELECT queries med `.maybeSingle()` |
+Denne plan adskiller dashboard-miljøet fuldstændigt fra hovedsystemet, så de fungerer som to selvstændige miljøer med separate rettigheder, navigation og layouts.
 
 ---
 
-## FASE 1: EditSalesRegistrations.tsx FM Migration (KOMPLEKS CRUD)
+## Rettigheds-arkitektur
 
-### 1.1 Fil: `src/pages/vagt-flow/EditSalesRegistrations.tsx` (1.075 linjer)
+### Ny to-lags rettighedsstruktur
 
-**Kritiske ændringspunkter:**
+| Lag | Rettighed | Administreres hvor | Beskrivelse |
+|-----|-----------|-------------------|-------------|
+| **Hovedsystem** | `menu_section_dashboards` | PermissionEditorV2 | Én enkelt on/off switch for dashboard-miljø adgang |
+| **Dashboard-miljø** | `menu_dashboard_*` | DashboardPermissionsTab | Individuelle dashboard-rettigheder |
 
-| Linje | Nuværende | Ny Query |
-|-------|-----------|----------|
-| 135-150 | `from("fieldmarketing_sales").select(...)` | `from("sales").select(...).eq("source", "fieldmarketing")` |
-| 241-244 | `from("fieldmarketing_sales").update(...)` | `from("sales").update(...)` med `raw_payload` mapping |
-| 260-263 | `from("fieldmarketing_sales").delete(...)` | `from("sales").delete(...)` |
-| 298-301 | Group delete `from("fieldmarketing_sales")` | `from("sales")` |
-| 307-318 | Group update `from("fieldmarketing_sales")` | `from("sales")` med `raw_payload` |
-| 332-335 | Group insert `from("fieldmarketing_sales")` | Brug `from("sales")` med FM struktur |
+**Brugeroplevelse:**
+1. Administrator i hovedsystemet giver en rolle adgang til "Dashboards" (on/off)
+2. Administrator i dashboard-miljøet under "Indstillinger → Rettigheder" bestemmer hvilke specifikke dashboards rollen kan se
 
-**Datamodel Transformation:**
+---
+
+## Fase 1: Fjern Dashboard-sektionen fra Hovedsystemets Sidebar
+
+### Fil: `src/components/layout/AppSidebar.tsx`
+
+**1.1 Fjern state variable (linje 66):**
+```typescript
+// FJERN denne linje:
+const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards") || location.pathname === "/tdc-opsummering");
+```
+
+**1.2 Fjern hele Dashboard Collapsible (linje 1214-1323):**
+Fjern hele denne sektion med ~110 linjer:
+- Collapsible wrapper med condition check
+- Alle individuelle dashboard NavLinks (CPH Sales, CS Top 20, Fieldmarketing, etc.)
+- TDC Opsummering link
+
+Brugere i hovedsystemet vil nu kun kunne skifte til dashboard-miljøet via EnvironmentSwitcher.
+
+---
+
+## Fase 2: Forenkl Permission Editor - Fjern Dashboard-børn
+
+### Fil: `src/components/employees/permissions/PermissionEditorV2.tsx`
+
+**2.1 Opdater PERMISSION_CATEGORIES (linje 152-156):**
 
 ```typescript
-// NUVÆRENDE Interface (SaleRecord):
-interface SaleRecord {
-  id: string;
-  seller_id: string;
-  location_id: string | null;
-  client_id: string | null;
-  product_name: string | null;
-  phone_number: string | null;
-  comment: string | null;
-  registered_at: string;
-  ...
+// NUVÆRENDE (med alle dashboard-børn):
+menu_section_dashboards: {
+  label: "Dashboards",
+  icon: <BarChart3 className="h-4 w-4" />,
+  keys: ['menu_dashboard_cph_sales', 'menu_dashboard_cs_top_20', 'menu_dashboard_fieldmarketing', 
+         'menu_dashboard_eesy_tm', 'menu_dashboard_tdc_erhverv', 'menu_dashboard_relatel', 
+         'menu_dashboard_mg_test', 'menu_dashboard_united', 'menu_dashboard_design', 
+         'menu_dashboard_settings']
 }
 
-// NY Query fra `sales` tabel:
-// Felter mappes via raw_payload:
-// - seller_id → raw_payload->>'fm_seller_id' ELLER agent_name
-// - location_id → raw_payload->>'fm_location_id'
-// - client_id → raw_payload->>'fm_client_id'
-// - product_name → raw_payload->>'fm_product_name'
-// - phone_number → customer_phone
-// - comment → raw_payload->>'fm_comment'
-// - registered_at → sale_datetime
-```
-
-**Særlige hensyn:**
-- Filen håndterer CRUD operationer (Create, Read, Update, Delete)
-- INSERT operationer skal bruge `sales` tabellen med korrekt `source = 'fieldmarketing'`
-- UPDATE skal opdatere `raw_payload` JSON felter
-- Eksisterende `useCreateFieldmarketingSale` hook kan genbruges da den allerede skriver til `sales`
-
----
-
-## FASE 2: Console.log Cleanup (3.000+ matches i 81 filer)
-
-### 2.1 Prioriterede Edge Functions
-
-| Fil | Matches | Handling |
-|-----|---------|----------|
-| `sync-adversus/index.ts` (2.119 LOC) | ~70+ | Fjern verbose debug, behold errors |
-| `import-economic-zip/index.ts` (422 LOC) | ~20+ | Fjern sheet parsing logs |
-| `enreach-manage-webhooks/index.ts` | ~50+ | Allerede delvist cleaned |
-| `calculate-kpi-values/index.ts` | ~35+ | Allerede delvist cleaned |
-| `calculate-kpi-incremental/index.ts` | ~15 | Behold kritiske watermark logs |
-| `zapier-webhook/index.ts` | ~3 | Fjern verbose |
-| `sync-contracts-to-sharepoint/index.ts` | ~8 | Fjern upload logs |
-| `process-scheduled-emails/index.ts` | ~6 | Behold progress logs |
-| `delete-auth-user/index.ts` | ~1 | Behold |
-| `end-call/index.ts` | ~3 | Behold error handling |
-
-### 2.2 sync-adversus Cleanup (STOR FIL - 2.119 LOC)
-
-Specifik analyse af console.log statements:
-
-| Linje | Type | Handling |
-|-------|------|----------|
-| 122-148 | `console.log('No campaign name...')` etc | FJERN - debug matching |
-| 210-217 | `console.log('Matched outcome...')` | FJERN - verbose |
-| 318-323 | `console.warn('Could not fetch lead')` | BEHOLD - error |
-| 386 | `console.warn('Error while extracting OPP nr')` | BEHOLD - error |
-| 451 | `console.warn('Error fetching sales')` | BEHOLD - error |
-| 457 | `console.log('Starting Adversus sync...')` | FJERN - verbose |
-| 490-525 | Debug fetch products logs | FJERN |
-| 538-569 | Debug fetch campaigns logs | FJERN |
-| 605-616 | Debug fetch sales logs | FJERN |
-| 651-680 | TDC October sync logs | FJERN |
-
-**Pattern for cleanup:**
-
-```typescript
-// FJERN alle disse:
-console.log('Starting...')
-console.log('Fetching...')
-console.log('Found X items')
-console.log(`Page ${page}: Got...`)
-
-// BEHOLD kun:
-console.error('Error:', error)
-console.warn('Could not fetch...', err)
-
-// BRUG struktureret logging for kritisk info:
-// (integration-engine pattern)
-const log = makeLogger({ function: "sync-adversus" });
-log("ERROR", "Failed to fetch lead", { leadId, error });
-```
-
-### 2.3 import-economic-zip Cleanup
-
-| Linje | Log | Handling |
-|-------|-----|----------|
-| 114 | `console.log(\`Excel sheets found: ...\`)` | FJERN |
-| 123 | `console.log(\`Sheet "${sheetName}": ${rows.length} rows\`)` | FJERN |
-| 131-136 | Matched sheet logs | FJERN |
-| 162 | Using first sheet log | FJERN |
-| 197 | `console.log(\`Processing import...\`)` | FJERN |
-| 220-228 | File type detection logs | FJERN |
-| 245 | Parsed CSV logs | FJERN |
-
----
-
-## FASE 3: .single() → .maybeSingle() Audit (610 matches i 60 filer)
-
-### 3.1 Risikovurdering Matrix
-
-| Kategori | Mønster | Risiko | Handling |
-|----------|---------|--------|----------|
-| SIKKER | `.insert(...).select().single()` | Lav | BEHOLD - INSERT garanterer 1 række |
-| SIKKER | `.update(...).eq("id", x).select().single()` | Lav | BEHOLD - UPDATE med kendt ID |
-| RISIKABEL | `.select().eq("auth_user_id", x).single()` | HØJ | ERSTAT med `.maybeSingle()` |
-| RISIKABEL | `.select().ilike("name", "%...%").single()` | HØJ | ERSTAT med `.maybeSingle()` |
-| RISIKABEL | `.select().eq("team_id", x).single()` | HØJ | ERSTAT med `.maybeSingle()` |
-
-### 3.2 Prioriterede Filer - Hooks (20 filer)
-
-| Fil | Total | Kritiske | Handling |
-|-----|-------|----------|----------|
-| `useKpiFormulas.ts` | 2 | 1 | Linje 54-58: SELECT by id → `.maybeSingle()` |
-| `usePulseSurvey.ts` | 6 | 4 | Linjer 30-36, 55-59, 63-68, 108-112 |
-| `useReferrals.ts` | 5 | 2 | Linjer 245-249, 253-257 (employee lookup) |
-| `useTimeStamps.ts` | 4 | 1 | Allerede fixed (bruger maybeSingle) |
-| `useShiftPlanning.ts` | 8 | 3 | Linjer 140, 167, 330 (CREATE/UPDATE - sikre) |
-| `useCelebrationData.ts` | 1 | 1 | Month lookup |
-| `useFieldmarketingSales.ts` | 1 | 1 | Employee lookup |
-| `useKpiDefinitions.ts` | 4 | 2 | SELECT queries |
-| `useDashboardKpiData.ts` | 3 | 1 | Linje 903-905 (formula lookup) |
-| `useIntegrationDebugLog.ts` | 1 | 1 | Linje 55-57 |
-| `useEmployeeDashboards.ts` | 4 | 2 | Linje 209 (SELECT by id) |
-| `useSomeContent.ts` | 4 | 2 | Linjer 94-96, 111-113 (upsert) |
-
-### 3.3 Prioriterede Filer - Pages (23 filer)
-
-| Fil | Kritiske | Linje | Problem |
-|-----|----------|-------|---------|
-| `Billing.tsx` | 1 | 57-61 | `.ilike("name", "%fieldmarketing%").single()` |
-| `Bookings.tsx` | 1 | Similar team lookup |
-| `BookingsContent.tsx` | 1 | Team lookup |
-| `MarketsContent.tsx` | 1 | Team lookup |
-| `BookWeekContent.tsx` | 1 | Team lookup |
-| `MyGoals.tsx` | 2 | Employee lookup |
-| `PulseSurvey.tsx` | 1 | Employee lookup |
-| `CareerWishes.tsx` | 1 | Employee lookup |
-| `RolePreview.tsx` | 2 | SELECT queries |
-| `TvBoardLogin.tsx` | 1 | Access code lookup |
-| `TvBoardView.tsx` | 1 | Access code lookup |
-| `LeagueAdminDashboard.tsx` | 3 | SELECT queries |
-| `ContractSign.tsx` | 1 | Contract lookup |
-| `ClosingShifts.tsx` | 1 | Config lookup |
-| `EmployeeMasterData.tsx` | 1 | Config lookup |
-| `EconomicUpload.tsx` | 1 | SELECT query |
-| `CandidateDetail.tsx` | 1 | SELECT query |
-
-### 3.4 Prioriterede Filer - Komponenter (17 filer)
-
-| Fil | Kritiske | Problem |
-|-----|----------|---------|
-| `ClientDBTab.tsx` | 2 | Linjer 161-163, 347-350 (lookups) |
-| `ProductPricingRulesDialog.tsx` | 1 | Linje 161-163 (created_at lookup) |
-| `H2HMatchHistory.tsx` | 1 | Stats lookup |
-| `H2HPerformanceDashboard.tsx` | 1 | Stats lookup |
-| `H2HPlayerStats.tsx` | 1 | Stats lookup |
-| `HeadToHeadComparison.tsx` | 1 | Employee lookup |
-| `StaffEmployeesTab.tsx` | 1 | Config lookup |
-| `AddMemberDialog.tsx` | 1 | Cohort lookup |
-| `EditBookingDialog.tsx` | 1 | Team lookup |
-| `CallModal.tsx` | 1 | Call status lookup |
-| `SalesFeed.tsx` | 1 | Realtime single fetch |
-
-### 3.5 Fix Pattern
-
-```typescript
-// RISIKABEL (SELECT kan returnere 0 rækker):
-const { data: team } = await supabase
-  .from("teams")
-  .select("id")
-  .ilike("name", "%fieldmarketing%")
-  .single(); // ❌ Crash hvis ikke fundet!
-
-// SIKKER:
-const { data: team } = await supabase
-  .from("teams")
-  .select("id")
-  .ilike("name", "%fieldmarketing%")
-  .maybeSingle(); // ✅ Returnerer null hvis ikke fundet
-
-if (!team) {
-  // Håndter manglende data gracefully
-  return [];
+// NY (ingen børn - én enkelt toggle):
+menu_section_dashboards: {
+  label: "Dashboards",
+  icon: <BarChart3 className="h-4 w-4" />,
+  keys: [] // Administreres i dashboard-miljøet
 }
 ```
 
----
-
-## IMPLEMENTERINGSRÆKKEFØLGE
-
-### Dag 1: EditSalesRegistrations.tsx Migration
-
-| Prioritet | Handling | Kompleksitet |
-|-----------|----------|--------------|
-| 1 | Opdatér fetch query (linje 135-150) | Medium |
-| 2 | Opdatér update mutation (linje 241-244) | Høj |
-| 3 | Opdatér delete mutation (linje 260-263) | Lav |
-| 4 | Opdatér group delete (linje 298-301) | Lav |
-| 5 | Opdatér group update (linje 307-318) | Høj |
-| 6 | Opdatér group insert (linje 332-335) | Medium |
-| 7 | Test CRUD operationer grundigt | Kritisk |
-
-### Dag 2: Console.log Cleanup - Edge Functions
-
-| Prioritet | Fil | Matches |
-|-----------|-----|---------|
-| 8 | `sync-adversus/index.ts` | ~70 |
-| 9 | `import-economic-zip/index.ts` | ~20 |
-| 10 | `zapier-webhook/index.ts` | ~3 |
-| 11 | `sync-contracts-to-sharepoint/index.ts` | ~8 |
-| 12 | Andre mindre filer | ~50 |
-
-### Dag 3-4: .single() Audit - Hooks
-
-| Prioritet | Fil | Ændringer |
-|-----------|-----|-----------|
-| 13 | `useKpiFormulas.ts` | 1 |
-| 14 | `usePulseSurvey.ts` | 4 |
-| 15 | `useReferrals.ts` | 2 |
-| 16 | `useCelebrationData.ts` | 1 |
-| 17 | `useFieldmarketingSales.ts` | 1 |
-| 18 | `useKpiDefinitions.ts` | 2 |
-| 19 | `useDashboardKpiData.ts` | 1 |
-| 20 | `useIntegrationDebugLog.ts` | 1 |
-| 21 | `useEmployeeDashboards.ts` | 2 |
-| 22 | `useSomeContent.ts` | 2 |
-
-### Dag 5: .single() Audit - Pages & Komponenter
-
-| Prioritet | Kategori | Filer | Ændringer |
-|-----------|----------|-------|-----------|
-| 23 | Pages (højrisiko) | `Billing.tsx`, `Bookings.tsx`, 5 andre | ~10 |
-| 24 | Pages (medium) | `MyGoals.tsx`, `PulseSurvey.tsx`, 8 andre | ~12 |
-| 25 | Komponenter | `ClientDBTab.tsx`, H2H filer, 10 andre | ~15 |
+**Resultat:** Dashboard-sektionen i PermissionEditorV2 viser nu kun én toggle for "Dashboards" i stedet for alle individuelle dashboards.
 
 ---
 
-## FILER DER ÆNDRES
+## Fase 3: Opdater Legacy Permission Editor
 
-### EditSalesRegistrations.tsx (1 fil, 6 ændringer)
+### Fil: `src/components/employees/PermissionsTab.tsx`
 
-| Linje | Ændring |
-|-------|---------|
-| 135-150 | Fetch query → `sales` med source filter |
-| 241-244 | Update → `sales` med raw_payload |
-| 260-263 | Delete → `sales` |
-| 298-301 | Group delete → `sales` |
-| 307-318 | Group update → `sales` med raw_payload |
-| 332-335 | Group insert → `sales` |
+**3.1 Opdater sectionChildren (linje 260-264):**
 
-### Edge Functions - Console.log (8 filer, ~150 ændringer)
+```typescript
+// NUVÆRENDE:
+menu_section_dashboards: [
+  'menu_dashboard_cph_sales', 'menu_dashboard_cs_top_20', 'menu_dashboard_fieldmarketing',
+  'menu_dashboard_eesy_tm', 'menu_dashboard_tdc_erhverv', 'menu_dashboard_relatel',
+  'menu_dashboard_united', 'menu_dashboard_design', 'menu_dashboard_settings'
+]
 
-| Fil | Fjernes | Beholdes |
-|-----|---------|----------|
-| `sync-adversus/index.ts` | ~65 | ~5 errors |
-| `import-economic-zip/index.ts` | ~18 | ~2 errors |
-| `zapier-webhook/index.ts` | ~2 | ~1 error |
-| `sync-contracts-to-sharepoint/index.ts` | ~6 | ~2 errors |
-| `process-scheduled-emails/index.ts` | ~4 | ~2 progress |
-| `delete-auth-user/index.ts` | 0 | ~1 |
-| `end-call/index.ts` | ~1 | ~2 errors |
-| Andre | ~20 | ~5 |
-
-### Hooks - .single() Audit (12 filer, ~17 ændringer)
-
-| Fil | Ændringer |
-|-----|-----------|
-| `useKpiFormulas.ts` | 1 |
-| `usePulseSurvey.ts` | 4 |
-| `useReferrals.ts` | 2 |
-| `useCelebrationData.ts` | 1 |
-| `useFieldmarketingSales.ts` | 1 |
-| `useKpiDefinitions.ts` | 2 |
-| `useDashboardKpiData.ts` | 1 |
-| `useIntegrationDebugLog.ts` | 1 |
-| `useEmployeeDashboards.ts` | 2 |
-| `useSomeContent.ts` | 2 |
-
-### Pages - .single() Audit (17 filer, ~22 ændringer)
-
-| Fil | Ændringer |
-|-----|-----------|
-| `Billing.tsx` | 1 |
-| `Bookings.tsx` | 1 |
-| `BookingsContent.tsx` | 1 |
-| `MarketsContent.tsx` | 1 |
-| `BookWeekContent.tsx` | 1 |
-| `MyGoals.tsx` | 2 |
-| `PulseSurvey.tsx` | 1 |
-| Andre 10 filer | ~14 |
-
-### Komponenter - .single() Audit (11 filer, ~12 ændringer)
-
-| Fil | Ændringer |
-|-----|-----------|
-| `ClientDBTab.tsx` | 2 |
-| `ProductPricingRulesDialog.tsx` | 1 |
-| H2H filer (4 stk) | 4 |
-| Andre 5 filer | 5 |
+// NY:
+menu_section_dashboards: [] // Administreres i dashboard-miljøet
+```
 
 ---
 
-## FORVENTET RESULTAT
+## Fase 4: Ret DashboardSettings Layout
 
-| Metrik | Før | Efter | Forbedring |
-|--------|-----|-------|------------|
-| `fieldmarketing_sales` dependencies | 1 fil | 0 | -100% |
-| Console.log i edge functions | ~3.000 | ~100 | -97% |
-| .single() crash risiko | 60 filer | ~10 | -83% |
-| Edge function log overhead | Høj | Minimal | Bedre performance |
-| Runtime crashes (0 rækker) | Mulige | Forebygget | Stabil app |
+### Fil: `src/pages/dashboards/DashboardSettings.tsx`
+
+**4.1 Ændr import (linje 4):**
+```typescript
+// NUVÆRENDE:
+import { MainLayout } from "@/components/layout/MainLayout";
+
+// NY:
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+```
+
+**4.2 Ændr layout wrapper (linje 501-503):**
+```typescript
+// NUVÆRENDE:
+return (
+  <MainLayout>
+    ...
+  </MainLayout>
+);
+
+// NY:
+return (
+  <DashboardLayout>
+    ...
+  </DashboardLayout>
+);
+```
+
+**Resultat:** DashboardSettings vises nu med DashboardSidebar i stedet for hovedsystemets sidebar.
 
 ---
 
-## TEST PLAN
+## Fase 5: Verificer Eksisterende Komponenter
 
-### EditSalesRegistrations.tsx Test
+### 5.1 AppModeContext - Allerede korrekt (ingen ændringer)
+Filen `src/contexts/AppModeContext.tsx` (linje 32) har allerede korrekt logik:
+```typescript
+const canAccessDashboards = accessibleDashboards.length > 0 && canView("menu_section_dashboards");
+```
 
-1. **Read:** Verificer at salg vises korrekt med ny query
-2. **Update:** Opdater et salg og verificer data gemmes i `raw_payload`
-3. **Delete:** Slet et salg og verificer det er væk
-4. **Group Update:** Opdater en gruppe og verificer alle ændres
-5. **Group Delete:** Slet en gruppe og verificer alle er væk
-6. **Group Insert:** Tilføj nyt salg til gruppe
+Dette sikrer at:
+1. Brugeren har `menu_section_dashboards` rettighed (sat i hovedsystemet)
+2. Brugeren har mindst ét specifikt dashboard aktiveret (sat i dashboard-miljøet)
 
-### Console.log Cleanup Test
+Begge betingelser skal være opfyldt for at se EnvironmentSwitcher-knappen.
 
-1. Verificer edge functions stadig kører korrekt
-2. Tjek at errors stadig logges
-3. Verificer log output er reduceret i Supabase logs
+### 5.2 DashboardSidebar - Allerede korrekt (ingen ændringer)
+Filen `src/components/layout/DashboardSidebar.tsx` filtrerer allerede dashboards baseret på permissions.
 
-### .single() Audit Test
+### 5.3 DashboardPermissionsTab - Allerede korrekt (ingen ændringer)
+Filen `src/components/dashboard/DashboardPermissionsTab.tsx` håndterer allerede individuelle dashboard-rettigheder.
 
-1. Test hver ændret fil med edge case: lookup der returnerer 0 rækker
-2. Verificer at UI håndterer null/undefined gracefully
-3. Ingen runtime crashes ved manglende data
+---
+
+## Teknisk Oversigt
+
+### Filer der ændres
+
+| Fil | Ændring | Linjer |
+|-----|---------|--------|
+| `src/components/layout/AppSidebar.tsx` | Fjern dashboard-sektion | ~110 linjer fjernes |
+| `src/components/employees/permissions/PermissionEditorV2.tsx` | Tøm dashboard keys array | 1-2 linjer |
+| `src/components/employees/PermissionsTab.tsx` | Tøm dashboard children array | 1-2 linjer |
+| `src/pages/dashboards/DashboardSettings.tsx` | Skift layout wrapper | 2 linjer |
+
+### Filer der forbliver uændrede
+- `src/contexts/AppModeContext.tsx` - Allerede korrekt logik
+- `src/components/layout/DashboardSidebar.tsx` - Allerede korrekt
+- `src/components/layout/DashboardLayout.tsx` - Allerede korrekt
+- `src/components/dashboard/DashboardPermissionsTab.tsx` - Allerede korrekt
+- `src/config/dashboards.ts` - Allerede korrekt
+
+---
+
+## Forventet Resultat
+
+### Hovedsystem (`/home`, `/employees`, etc.)
+- Ingen dashboard-links i sidebaren
+- EnvironmentSwitcher-knap viser mulighed for at skifte til dashboards (hvis bruger har adgang)
+- PermissionEditor viser kun én "Dashboards" toggle
+
+### Dashboard-miljø (`/dashboards/*`)
+- DashboardSidebar med alle tilgængelige dashboards
+- Home-knap for at vende tilbage til hovedsystemet
+- Konsistent layout med sidebar på alle dashboard-sider
+- "Indstillinger → Rettigheder" tab til granulær dashboard-adgang
+
+### Rettigheds-flow
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                      HOVEDSYSTEM                                │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  PermissionEditorV2                                       │  │
+│  │  ┌─────────────────────────────────────────────────────┐  │  │
+│  │  │  [✓] Dashboards  ← Én enkelt toggle                 │  │  │
+│  │  │      (giver adgang til hele dashboard-miljøet)      │  │  │
+│  │  └─────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼ EnvironmentSwitcher
+┌─────────────────────────────────────────────────────────────────┐
+│                    DASHBOARD-MILJØ                              │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Indstillinger → Rettigheder (DashboardPermissionsTab)    │  │
+│  │  ┌─────────────────────────────────────────────────────┐  │  │
+│  │  │  Vælg rolle: [Teamleder ▼]                          │  │  │
+│  │  │                                                     │  │  │
+│  │  │  [✓] CPH Sales                                      │  │  │
+│  │  │  [✓] CS Top 20                                      │  │  │
+│  │  │  [ ] Fieldmarketing                                 │  │  │
+│  │  │  [✓] TDC Erhverv                                    │  │  │
+│  │  │  [ ] Relatel                                        │  │  │
+│  │  │  ...                                                │  │  │
+│  │  └─────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Test Plan
+
+### 1. Verificer Hovedsystem
+- [ ] Dashboards vises IKKE i AppSidebar
+- [ ] PermissionEditor viser kun én "Dashboards" toggle
+- [ ] EnvironmentSwitcher vises kun hvis bruger har `menu_section_dashboards` OG mindst ét dashboard
+
+### 2. Verificer Dashboard-miljø
+- [ ] DashboardSettings vises med DashboardSidebar (ikke MainLayout)
+- [ ] Alle dashboards bruger DashboardLayout
+- [ ] DashboardPermissionsTab fungerer korrekt
+
+### 3. Verificer Rettigheder
+- [ ] Bruger UDEN `menu_section_dashboards` kan ikke tilgå dashboards
+- [ ] Bruger MED `menu_section_dashboards` men UDEN individuelle dashboards ser tom sidebar
+- [ ] Bruger MED begge rettigheder ser kun de dashboards de har adgang til
+
+### 4. Verificer Navigation
+- [ ] Home-knap i dashboard-miljø navigerer til `/home`
+- [ ] EnvironmentSwitcher skifter korrekt mellem miljøer
+- [ ] URL'er fungerer korrekt (`/dashboards/cph-sales`, etc.)
