@@ -95,7 +95,7 @@ export default function BookWeekContent() {
         .from("teams")
         .select("id")
         .ilike("name", "%fieldmarketing%")
-        .single();
+        .maybeSingle();
       
       if (teamError || !team) return [];
       

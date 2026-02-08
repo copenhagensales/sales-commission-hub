@@ -215,7 +215,7 @@ export function useCreateFieldmarketingSale() {
           .from("employee_master_data")
           .select("first_name, last_name, work_email")
           .eq("id", sale.seller_id)
-          .single();
+          .maybeSingle();
 
         // Map client_id to client_campaign_id
         const clientCampaignId = FM_CLIENT_CAMPAIGN_MAP[sale.client_id] || null;

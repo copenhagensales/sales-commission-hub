@@ -119,7 +119,6 @@ function findMatchingProduct(
   products: Product[]
 ): Product | null {
   if (!campaignName) {
-    console.log('No campaign name provided for matching')
     return null
   }
   const campaignLower = campaignName.toLowerCase()
@@ -135,7 +134,6 @@ function findMatchingProduct(
   }
   
   if (!productPrefix) {
-    console.log(`No product prefix found for campaign: ${campaignName}`)
     return null
   }
   
@@ -143,7 +141,6 @@ function findMatchingProduct(
   const matchingProducts = products.filter(p => p.code.startsWith(productPrefix!))
   
   if (matchingProducts.length === 0) {
-    console.log(`No products found with prefix: ${productPrefix}`)
     return null
   }
   
@@ -207,13 +204,11 @@ function findMatchingProduct(
     }
     
     if (bestMatch && bestScore > 5) {
-      console.log(`Matched outcome "${outcomeName}" to product "${bestMatch.name}" (score: ${bestScore})`)
       return bestMatch
     }
   }
   
   // Return the first matching product as fallback
-  console.log(`Using first product with prefix ${productPrefix}: ${matchingProducts[0].name}`)
   return matchingProducts[0]
 }
 
@@ -454,8 +449,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('Starting Adversus sync...')
-
     // Parse request body for date range or debug action
     let startDate: string | null = null
     let endDate: string | null = null
@@ -487,8 +480,6 @@ Deno.serve(async (req) => {
         searchFilter = `&filters=${encodeURIComponent(JSON.stringify({ title: { $c: body.filter } }))}`
       }
       
-      console.log(`Debug: Fetching Adversus products... filter: ${searchFilter}`)
-      
       // Fetch multiple pages to get all products
       let allProducts: unknown[] = []
       let page = 1
@@ -496,7 +487,6 @@ Deno.serve(async (req) => {
       
       while (page <= 10) { // Max 10 pages = 1000 products
         const url = `${baseUrl}/products?pageSize=${pageSize}&page=${page}${searchFilter}`
-        console.log(`Fetching page ${page}: ${url}`)
         
         const productsResponse = await fetch(url, {
           headers: {
@@ -512,17 +502,15 @@ Deno.serve(async (req) => {
           if (products.length === 0) break
           
           allProducts = [...allProducts, ...products]
-          console.log(`Page ${page}: Got ${products.length} products, total: ${allProducts.length}`)
           
           if (products.length < pageSize) break // Last page
           page++
         } else {
-          console.error(`Failed to fetch page ${page}:`, await productsResponse.text())
+          console.error(`Failed to fetch products page ${page}:`, await productsResponse.text())
           break
         }
       }
       
-      console.log(`Total Adversus products fetched: ${allProducts.length}`)
       return new Response(
         JSON.stringify({ products: allProducts, total: allProducts.length }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -534,8 +522,6 @@ Deno.serve(async (req) => {
       let filterName = ''
       const body = requestBody || {}
       filterName = body.filter || ''
-      
-      console.log(`Debug: Fetching Adversus campaigns... filter: ${filterName}`)
       
       const campaignsResponse = await fetch(`${baseUrl}/campaigns`, {
         headers: {
@@ -566,7 +552,6 @@ Deno.serve(async (req) => {
           resultFields: c.resultFields || []
         }))
         
-        console.log(`Found ${campaigns.length} campaigns matching "${filterName}"`)
         return new Response(
           JSON.stringify({ campaigns, total: campaigns.length }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -602,8 +587,6 @@ Deno.serve(async (req) => {
       const filterStr = encodeURIComponent(JSON.stringify(filters))
       const url = `${baseUrl}/sales?pageSize=100&filters=${filterStr}`
       
-      console.log(`Debug: Fetching Adversus sales... URL: ${url}`)
-      
       const salesResponse = await fetch(url, {
         headers: {
           'Authorization': `Basic ${authHeader}`,
@@ -612,7 +595,6 @@ Deno.serve(async (req) => {
       })
       
       const responseText = await salesResponse.text()
-      console.log(`Sales response status: ${salesResponse.status}, body length: ${responseText.length}`)
       
       if (salesResponse.ok) {
         const salesData = JSON.parse(responseText)

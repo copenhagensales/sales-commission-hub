@@ -58,7 +58,7 @@ export default function VagtBilling() {
         .from("teams")
         .select("id")
         .ilike("name", "%fieldmarketing%")
-        .single();
+        .maybeSingle();
       
       if (!team) return [];
       
