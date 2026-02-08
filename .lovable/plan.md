@@ -1,150 +1,139 @@
 
-# Vis Fradragsbeløb for Sygeløn og Annullering
+# Plan: Annulleringer-side under Løn-menuen
 
-## Formål
+## Oversigt
+Denne plan implementerer en ny side kaldet "Annulleringer" under Løn-menuen med to faner:
+1. **Manuelle annulleringer** - Søg salg frem per kunde og marker dem som annulleret
+2. **Upload/match annulleringer** - Upload Excel-fil med annulleringer og match dem mod eksisterende salg
 
-Tilføj visning af de faktiske kronebeløb, der fratrækkes/tillægges via annullerings- og sygelønsprocenten i den udvidede rækkevisning i DB per Klient-rapporten. Dette giver et klarere overblik end kun at se procenterne.
+---
 
-## Beregningslogik
+## Hvad der vil blive bygget
 
-Baseret på den nuværende kode beregnes følgende:
+### Fane 1: Manuelle annulleringer
+- Dropdown til at vælge kunde (henter alle kunder fra `clients` tabellen)
+- Dato-filter for at indsnævre søgningen
+- Søgefelt til at finde specifikke salg (telefonnummer, sælger, virksomhed)
+- Tabel med salg der viser:
+  - Salgsdato
+  - Sælger
+  - Kunde/telefon
+  - Nuværende status
+  - Annuller-knap
+- Ved klik på "Annuller" opdateres `validation_status` til "cancelled" i `sales` tabellen
 
-```text
-Eksempel: TDC Erhverv
-─────────────────────────────────────
-Provision:             500.000 kr
-+ Feriepenge (12,5%):   62.500 kr
-= Sælgerløn (basis):   562.500 kr
+### Fane 2: Upload/match annulleringer
+- Drag-and-drop zone til Excel-upload (xlsx format)
+- Automatisk kolonnemapping-interface (lignende ExcelFieldMatcher)
+- Preview af matchede rækker før import
+- Bulk-opdatering af salg til "cancelled" status
+- Historik over tidligere uploads
 
-Sygeløn 3%:           + 16.875 kr  ← Ekstra omkostning
-= Sælgerløn m/syge:    579.375 kr
+---
 
-Annullering 10%:      - 57.938 kr  ← Fratrukket pga. annullering
-= Justeret sælgerløn:  521.437 kr
-```
+## Tekniske detaljer
 
-**Sygeløn-tillæg:** `sellerSalaryCost × sickPayPercent / 100`
+### Nye filer der oprettes
 
-**Annullerings-fradrag (på omsætning):** `revenue × cancellationPercent / 100`
+| Fil | Beskrivelse |
+|-----|-------------|
+| `src/pages/salary/Cancellations.tsx` | Hovedsiden med fane-struktur |
+| `src/components/cancellations/ManualCancellationsTab.tsx` | Fane til manuel annullering |
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Fane til upload/match |
+| `src/components/cancellations/CancellationHistoryTable.tsx` | Tabel over upload-historik |
 
-**Annullerings-fradrag (på sælgerløn):** `sellerCostWithSickPay × cancellationPercent / 100`
-
-## UI-ændringer
-
-### Nuværende visning (expanded row)
-
-```text
-Annul. %      Sygeløn %
-  10.0%         3.0%
-```
-
-### Ny visning med beløb
-
-```text
-Annul. %           Sygeløn %
-  10.0%              3.0%
-(-57.938 kr oms.)  (+16.875 kr)
-```
-
-Alternativt kan det vises som separate felter:
-
-```text
-Annul. %     Annul. fradrag     Sygeløn %     Sygeløn tillæg
-  10.0%        -57.938 kr         3.0%         +16.875 kr
-```
-
-## Teknisk Implementering
-
-### 1. Udvid ClientDBData interface
-
-Tilføj to nye felter til at holde de beregnede beløb:
-
-```typescript
-interface ClientDBData {
-  // ... eksisterende felter
-  sickPayAmount: number;           // Ekstra omkostning fra sygeløn (positiv)
-  cancellationRevenueDeduction: number;  // Fradrag i omsætning (positiv)
-  cancellationCostDeduction: number;     // Fradrag i sælgerløn (positiv)
-}
-```
-
-### 2. Beregn beløbene i ClientDBTab.tsx
-
-I `useMemo`-beregningen, tilføj:
-
-```typescript
-// Beregn sygeløn-tillæg (ekstra omkostning)
-const sickPayAmount = sellerSalaryCost * (sickPayPercent / 100);
-
-// Beregn annullerings-fradrag
-const cancellationRevenueDeduction = salesData.revenue * (cancellationPercent / 100);
-const cancellationCostDeduction = sellerCostWithSickPay * (cancellationPercent / 100);
-```
-
-### 3. Udvid ClientDBRowData interface
-
-```typescript
-interface ClientDBRowData {
-  // ... eksisterende felter
-  sickPayAmount: number;
-  cancellationRevenueDeduction: number;
-}
-```
-
-### 4. Opdater ClientDBExpandableRow UI
-
-I expanded row-sektionen, vis beløbene under procenterne:
-
-```typescript
-<div>
-  <button onClick={() => onEditCancellation(...)}>
-    <p className="text-muted-foreground text-xs mb-0.5">Annul. %</p>
-    <p className="font-medium">
-      {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "—"}
-    </p>
-    {client.cancellationRevenueDeduction > 0 && (
-      <p className="text-xs text-destructive">
-        -{formatCurrency(client.cancellationRevenueDeduction)} oms.
-      </p>
-    )}
-  </button>
-</div>
-
-<div>
-  <button onClick={() => onEditSickPay(...)}>
-    <p className="text-muted-foreground text-xs mb-0.5">Sygeløn %</p>
-    <p className="font-medium">
-      {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "—"}
-    </p>
-    {client.sickPayAmount > 0 && (
-      <p className="text-xs text-muted-foreground">
-        +{formatCurrency(client.sickPayAmount)}
-      </p>
-    )}
-  </button>
-</div>
-```
-
-## Berørte filer
+### Filer der modificeres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Beregn og tilføj beløb til data-objektet |
-| `src/components/salary/ClientDBExpandableRow.tsx` | Vis beløb under procenterne i UI |
+| `src/routes/pages.ts` | Tilføj lazy-load export for Cancellations |
+| `src/routes/config.tsx` | Tilføj route `/salary/cancellations` |
+| `src/components/layout/AppSidebar.tsx` | Tilføj menupunkt "Annulleringer" under Løn |
+| `src/hooks/usePositionPermissions.ts` | Tilføj `canViewCancellations` permission |
 
-## Visuel opsummering
+### Database-ændringer
+
+Der oprettes en ny tabel til at spore annullerings-uploads:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  DB per Klient - Expanded Row                                                   │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  Sælgerløn    Centre/Boder   Assist.løn   Lederløn   ATP/Barsel                 │
-│  -604.766 kr      —          -19.125 kr  -150.636 kr  -1.905 kr                 │
-│                                                                                 │
-│  Annul. %              Sygeløn %                                                │
-│    10.0%                 3.0%                                                   │
-│  (-50.000 kr oms.)     (+18.141 kr)                                             │
-└─────────────────────────────────────────────────────────────────────────────────┘
++--------------------------------+
+|   cancellation_imports         |
++--------------------------------+
+| id (uuid, PK)                  |
+| created_at (timestamptz)       |
+| uploaded_by (uuid, FK users)   |
+| file_name (text)               |
+| file_size_bytes (integer)      |
+| status (text)                  |
+| rows_processed (integer)       |
+| rows_matched (integer)         |
+| error_message (text)           |
++--------------------------------+
 ```
 
-Dette giver brugeren et klart overblik over den faktiske økonomiske effekt af begge justeringer.
+Der oprettes også en permission i `role_page_permissions`:
+- `menu_cancellations` - styrer adgang til Annulleringer-siden
+
+### Implementerings-flow
+
+1. **Route & Navigation**
+   - Tilføj `/salary/cancellations` route
+   - Tilføj menupunkt i sidebar under Løn
+   - Permission-gate via `menu_cancellations`
+
+2. **Manuel annullering**
+   - Hent kunder fra `clients` tabel
+   - Søg salg via Supabase query med filtre
+   - Update `validation_status = 'cancelled'` ved klik
+
+3. **Upload/match**
+   - Brug react-dropzone til fil-upload
+   - Parse Excel med xlsx-biblioteket
+   - Match mod salg baseret på kundedata (telefon, opp-nummer, etc.)
+   - Vis preview og bekræft før bulk-opdatering
+
+---
+
+## Visuel struktur
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│ Annulleringer                                           │
+│ Administrer manuelle og bulk-annulleringer af salg      │
+├─────────────────────────────────────────────────────────┤
+│ [Manuelle annulleringer] [Upload/match annulleringer]   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Manuelle annulleringer-fane:                          │
+│  ┌─────────────┐ ┌─────────────┐ ┌────────────────┐    │
+│  │ Vælg kunde ▼│ │ Dato filter │ │ 🔍 Søg...     │    │
+│  └─────────────┘ └─────────────┘ └────────────────┘    │
+│                                                         │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ Dato       │ Sælger    │ Kunde    │ Status │ ⚡   │ │
+│  │ 08/02/2026 │ Kasper M. │ Firma A  │ pending│ 🗑️   │ │
+│  │ 07/02/2026 │ Maria L.  │ Firma B  │ pending│ 🗑️   │ │
+│  └───────────────────────────────────────────────────┘ │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Afhængigheder
+- Eksisterende `clients` og `sales` tabeller
+- react-dropzone (allerede installeret)
+- xlsx bibliotek (allerede installeret)
+- Radix UI Tabs komponenter
+
+## Risici og håndtering
+- **Mange salg**: Pagination implementeres for at undgå performance-problemer
+- **Forkert matching**: Preview-step før bulk-opdatering sikrer brugeren kan verificere
+
+---
+
+## Estimeret omfang
+- 4 nye komponenter
+- 4 fil-modifikationer
+- 1 database-migration
+- 1 permission-record
