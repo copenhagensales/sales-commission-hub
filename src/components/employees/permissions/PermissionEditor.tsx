@@ -306,10 +306,13 @@ export function PermissionEditor() {
     permission_type?: PermissionType;
   })[];
 
-  // Group permissions by role
+  // Group permissions by role - ONLY include keys defined in permissionKeys.ts
   const permissionsByRole = extendedPermissions.reduce((acc, p) => {
     if (!acc[p.role_key]) acc[p.role_key] = [];
-    acc[p.role_key].push(p);
+    // FILTER: Only include permissions that are defined in permissionKeys.ts
+    if (ALL_PERMISSION_KEYS.includes(p.permission_key as any)) {
+      acc[p.role_key].push(p);
+    }
     return acc;
   }, {} as Record<string, typeof extendedPermissions>);
 

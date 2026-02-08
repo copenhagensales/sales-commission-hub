@@ -141,17 +141,9 @@ const permissionIconMap: Record<string, React.ReactNode> = {
   menu_section_salary: <CreditCard className="h-4 w-4" />,
   menu_salary_types: <FileText className="h-4 w-4" />,
   
-  // DASHBOARDS
+  // DASHBOARDS (individuelle dashboards administreres i dashboard-miljøet)
   menu_section_dashboards: <Monitor className="h-4 w-4" />,
-  menu_dashboard_cph_sales: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_cs_top_20: <Trophy className="h-4 w-4" />,
-  menu_dashboard_fieldmarketing: <Car className="h-4 w-4" />,
-  menu_dashboard_eesy_tm: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_tdc_erhverv: <Phone className="h-4 w-4" />,
-  menu_dashboard_relatel: <BarChart3 className="h-4 w-4" />,
-  menu_dashboard_united: <Building2 className="h-4 w-4" />,
-  menu_dashboard_design: <Settings className="h-4 w-4" />,
-  menu_dashboard_settings: <Settings className="h-4 w-4" />,
+  menu_dashboards: <Monitor className="h-4 w-4" />,
   
   // TEST
   menu_section_test: <FlaskConical className="h-4 w-4" />,
