@@ -11,8 +11,8 @@ const corsHeaders = {
 const MAINTENANCE_MODE = false;
 
 // ============= IN-MEMORY CACHE =============
-// Cache results for 15 seconds to reduce database load while keeping TV in sync
-const CACHE_TTL_MS = 15000;
+// Cache results for 30 seconds to reduce database load while keeping TV in sync
+const CACHE_TTL_MS = 30000;
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 function getCached<T>(key: string): T | null {

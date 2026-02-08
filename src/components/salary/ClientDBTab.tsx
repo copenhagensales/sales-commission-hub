@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { formatCurrency, STANDARD_MONTH_DAYS } from "@/lib/calculations";
 import { countWorkDaysInPeriod } from "@/lib/calculations/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -477,26 +478,22 @@ export function ClientDBTab() {
   const { data: salesByClientDirect, isLoading: directSalesLoading } = useQuery({
     queryKey: ["sales-by-client-direct", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
-      const { data: telesalesData, error: telesalesError } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          client_campaign_id,
-          client_campaigns!inner(client_id),
-          sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))
-        `)
-        .gte("sale_datetime", periodStart.toISOString())
-        .lte("sale_datetime", periodEnd.toISOString());
-      
-      if (telesalesError) throw telesalesError;
+      // Use paginated fetch to handle >1000 rows
+      const telesalesData = await fetchAllRows<any>(
+        "sales",
+        `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
+        (q) => q.gte("sale_datetime", periodStart.toISOString())
+                .lte("sale_datetime", periodEnd.toISOString()),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
-      const { data: fmSalesData, error: fmError } = await supabase
-        .from("fieldmarketing_sales")
-        .select(`id, client_id, product_name`)
-        .gte("registered_at", periodStart.toISOString())
-        .lte("registered_at", periodEnd.toISOString());
-      
-      if (fmError) throw fmError;
+      const fmSalesData = await fetchAllRows<any>(
+        "fieldmarketing_sales",
+        `id, client_id, product_name`,
+        (q) => q.gte("registered_at", periodStart.toISOString())
+                .lte("registered_at", periodEnd.toISOString()),
+        { orderBy: "registered_at", ascending: false }
+      );
 
       const { data: products } = await supabase
         .from("products")

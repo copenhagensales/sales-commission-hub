@@ -189,3 +189,71 @@ export async function fetchByIds<T = unknown>(
 
   return allData;
 }
+
+/**
+ * Cursor-based pagination for better performance on large datasets.
+ * Uses WHERE id > last_id instead of OFFSET for constant query time.
+ * 
+ * @example
+ * const sales = await fetchAllRowsCursor<Sale>(
+ *   "sales",
+ *   "id, agent_email, sale_datetime",
+ *   (query) => query.gte("sale_datetime", startDate),
+ *   { cursorColumn: "id", pageSize: 500 }
+ * );
+ */
+export async function fetchAllRowsCursor<T = unknown>(
+  table: string,
+  select: string,
+  filters?: (query: any) => any,
+  options: {
+    pageSize?: number;
+    cursorColumn?: string;
+    maxRows?: number;
+  } = {}
+): Promise<T[]> {
+  const { pageSize = 500, cursorColumn = "id", maxRows } = options;
+  const allData: T[] = [];
+  let lastCursor: string | null = null;
+
+  while (true) {
+    if (maxRows && allData.length >= maxRows) {
+      console.log(`[fetchAllRowsCursor] Reached maxRows limit of ${maxRows}`);
+      break;
+    }
+
+    let query = (supabase as any)
+      .from(table)
+      .select(select)
+      .order(cursorColumn, { ascending: true })
+      .limit(pageSize);
+
+    if (lastCursor) {
+      query = query.gt(cursorColumn, lastCursor);
+    }
+
+    if (filters) {
+      query = filters(query);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`[fetchAllRowsCursor] Error on ${table}:`, error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) break;
+
+    allData.push(...(data as T[]));
+    lastCursor = (data[data.length - 1] as any)[cursorColumn];
+
+    if (data.length < pageSize) break;
+  }
+
+  if (allData.length > 1000) {
+    console.log(`[fetchAllRowsCursor] Fetched ${allData.length} rows from ${table} (cursor-paginated)`);
+  }
+
+  return allData;
+}
