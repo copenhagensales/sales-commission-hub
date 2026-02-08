@@ -69,10 +69,8 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
   };
   
   const switchToDashboard = () => {
-    if (firstAvailableDashboard) {
-      setMode("dashboard");
-      navigate(firstAvailableDashboard);
-    }
+    setMode("dashboard");
+    navigate("/dashboards");
   };
   
   return (
