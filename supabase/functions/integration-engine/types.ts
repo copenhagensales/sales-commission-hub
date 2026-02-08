@@ -99,6 +99,10 @@ export interface StandardSale {
   products: StandardProduct[];
   // Complete raw JSON payload from dialer for debugging/auditing
   rawPayload?: Record<string, unknown>;
+  // Normalized data after applying field mappings (new)
+  normalizedData?: Record<string, unknown> | null;
+  // PII fields present in normalized data (for GDPR tracking)
+  piiFields?: string[];
   metadata?: Record<string, unknown>;
 }
 

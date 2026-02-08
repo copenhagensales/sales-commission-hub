@@ -1,6 +1,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk } from "../utils/batch.ts"
+import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
@@ -434,6 +435,7 @@ async function processSalesBatch(
         source: sale.dialerName,
         integration_type: sale.integrationType,
         raw_payload: sale.rawPayload || null,
+        normalized_data: sale.normalizedData || null,
         updated_at: new Date().toISOString(),
       }
       
@@ -591,18 +593,54 @@ export async function processSales(
 
   await ensureCampaignMappings(supabase, filteredSales, log)
   
-  // Fetch products, product mappings, pricing rules, and campaign mappings in parallel
-  const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult] = await Promise.all([
+  // Fetch products, product mappings, pricing rules, campaign mappings, and check for active data mappings in parallel
+  const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult, integrationsResult] = await Promise.all([
     supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
     supabase.from("adversus_product_mappings").select("*"),
     supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to, use_rule_name_as_display").eq("is_active", true),
-    supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id")
+    supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id"),
+    supabase.from("dialer_integrations").select("id, name").eq("is_active", true)
   ]);
 
   const dbProducts = productsResult.data;
   const dbMappings = mappingsResult.data;
   const pricingRules = pricingRulesResult.data;
   const campaignMappings = campaignMappingsResult.data;
+  const dialerIntegrations = integrationsResult.data || [];
+
+  // Build integration lookup map by name for data mappings
+  const integrationByName = new Map<string, string>();
+  for (const int of dialerIntegrations) {
+    integrationByName.set(int.name.toLowerCase(), int.id);
+  }
+
+  // Apply data mappings to sales if configured
+  let normalizedCount = 0;
+  for (const sale of filteredSales) {
+    // Try to find integration ID by dialer name
+    const integrationId = integrationByName.get(sale.dialerName.toLowerCase());
+    if (integrationId) {
+      try {
+        // Check if this integration has active mappings configured
+        const hasMappings = await hasActiveMappings(supabase, integrationId);
+        if (hasMappings && sale.rawPayload) {
+          const result = await applyDataMappings(supabase, integrationId, sale.rawPayload, log);
+          if (Object.keys(result.normalizedData).length > 0) {
+            sale.normalizedData = result.normalizedData;
+            sale.piiFields = result.piiFields;
+            normalizedCount++;
+          }
+        }
+      } catch (err) {
+        // Non-fatal: log and continue without normalization
+        log("WARN", `Data mapping failed for sale ${sale.externalId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+  
+  if (normalizedCount > 0) {
+    log("INFO", `Applied data mappings to ${normalizedCount} sales`);
+  }
 
   const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]))
   const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]))
