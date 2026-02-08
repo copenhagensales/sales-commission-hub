@@ -28,7 +28,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to, maxRecords } = body;
+    const { source, action, actions, days = 3, campaignId, integration_id, integrationId, background = false, from, to, maxRecords } = body;
     
     // Balanced limit: 50 records per sync to handle backlog while preventing CPU timeout
     const effectiveMaxRecords = maxRecords ?? 50;
@@ -37,7 +37,9 @@ serve(async (req) => {
 
     // Handle fetch-sample-fields action
     if (action === "fetch-sample-fields") {
-      const result = await fetchSampleFields(supabase, source, campaignId);
+      // Support both integrationId (from frontend) and integration_id
+      const effectiveIntegrationId = integrationId || integration_id;
+      const result = await fetchSampleFields(supabase, effectiveIntegrationId, log);
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
