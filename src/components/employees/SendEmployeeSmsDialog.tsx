@@ -67,7 +67,7 @@ export function SendEmployeeSmsDialog({ open, onOpenChange, employee }: SendEmpl
       return data as SmsMessage[];
     },
     enabled: open && !!employee.id,
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced from 5s - realtime handles instant updates
   });
 
   // Subscribe to realtime updates

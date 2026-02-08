@@ -79,7 +79,7 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
       return data as SmsMessage[];
     },
     enabled: open && !!normalizedPhone,
-    refetchInterval: 5000, // Fallback polling every 5s while dialog is open
+    refetchInterval: 15000, // Fallback polling every 15s while dialog is open (realtime handles instant updates)
   });
 
   // Subscribe to realtime updates

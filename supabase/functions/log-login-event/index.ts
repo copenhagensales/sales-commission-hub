@@ -26,6 +26,23 @@ serve(async (req) => {
       );
     }
 
+    // Database-level duplicate check - prevents logging same session twice
+    if (session_id) {
+      const { data: existing } = await supabaseClient
+        .from("login_events")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+      if (existing) {
+        return new Response(
+          JSON.stringify({ success: true, duplicate: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Get IP address from headers
     const ip_address = req.headers.get("x-forwarded-for")?.split(",")[0] || 
                        req.headers.get("cf-connecting-ip") ||

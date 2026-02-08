@@ -26,15 +26,17 @@ export function RoleProtectedRoute({
   // Using isReady prevents premature redirects during browser refresh
   const isLoading = authLoading || !isReady;
   
-  // Debug logging
-  console.log("RoleProtectedRoute DEBUG:", {
-    userEmail: user?.email,
-    positionPermission,
-    position: position?.name,
-    permissions,
-    isLoading,
-    isReady,
-  });
+  // Debug logging - only in development
+  if (import.meta.env.DEV) {
+    console.log("RoleProtectedRoute DEBUG:", {
+      userEmail: user?.email,
+      positionPermission,
+      position: position?.name,
+      permissions,
+      isLoading,
+      isReady,
+    });
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -59,31 +61,33 @@ export function RoleProtectedRoute({
 
   // User must have a position defined
   if (!position) {
-    console.log("RoleProtectedRoute: DENIED - no position found for user");
+    if (import.meta.env.DEV) console.log("RoleProtectedRoute: DENIED - no position found for user");
     return <Navigate to="/home" replace />;
   }
 
   // If no specific permission required, grant access (authenticated route)
   if (!positionPermission) {
-    console.log("RoleProtectedRoute: GRANTED - no specific permission required");
+    if (import.meta.env.DEV) console.log("RoleProtectedRoute: GRANTED - no specific permission required");
     return <>{children}</>;
   }
 
   // Check position permission
   const hasAccess = canView(positionPermission);
   
-  console.log("RoleProtectedRoute ACCESS CHECK:", {
-    positionPermission,
-    hasAccess,
-    permissionValue: permissions[positionPermission],
-  });
+  if (import.meta.env.DEV) {
+    console.log("RoleProtectedRoute ACCESS CHECK:", {
+      positionPermission,
+      hasAccess,
+      permissionValue: permissions[positionPermission],
+    });
+  }
   
   if (hasAccess) {
-    console.log("RoleProtectedRoute: GRANTED via position permission");
+    if (import.meta.env.DEV) console.log("RoleProtectedRoute: GRANTED via position permission");
     return <>{children}</>;
   }
 
-  console.log("RoleProtectedRoute: DENIED - permission not granted");
+  if (import.meta.env.DEV) console.log("RoleProtectedRoute: DENIED - permission not granted");
   return <Navigate to="/home" replace />;
 }
 
@@ -169,7 +173,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Handle database error/timeout - show retry option with countdown
   // If on a basic page, allow limited access instead of blocking
   if (isError) {
-    console.log("ProtectedRoute: Database error - showing retry option (NOT deactivated!)");
+    if (import.meta.env.DEV) console.log("ProtectedRoute: Database error - showing retry option (NOT deactivated!)");
     
     // For basic pages, allow access with warning banner
     if (isBasicPage && position) {
@@ -208,7 +212,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Only if NO error and NO position = genuinely deactivated user
   if (!position) {
-    console.log("ProtectedRoute: User deactivated - signing out");
+    if (import.meta.env.DEV) console.log("ProtectedRoute: User deactivated - signing out");
     // Sign out deactivated users
     handleLogout();
     return (
