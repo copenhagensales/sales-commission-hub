@@ -54,11 +54,16 @@ import { toast } from "sonner";
 import { 
   usePagePermissions, 
   useRoleDefinitions,
-  permissionKeyLabels,
   type PagePermission,
   type RoleDefinition,
   type Visibility
 } from "@/hooks/useUnifiedPermissions";
+import {
+  permissionKeyLabels,
+  PERMISSION_HIERARCHY,
+  getPermissionTypeFromKey,
+  getAllPermissionKeys,
+} from "@/config/permissionKeys";
 
 type PermissionType = 'page' | 'tab' | 'action';
 
@@ -94,220 +99,8 @@ const colorMap: Record<string, string> = {
   gray: "bg-muted text-muted-foreground",
 };
 
-// ===== PERMISSION HIERARCHY =====
-// Maps each permission key to its parent key (null = top-level)
-const PERMISSION_HIERARCHY: Record<string, string | null> = {
-  // ===== SEKTIONER (top-level) =====
-  menu_section_personal: null,
-  menu_section_personale: null,
-  menu_section_ledelse: null,
-  menu_section_test: null,
-  menu_section_mg: null,
-  menu_section_vagtplan: null,
-  menu_section_fieldmarketing: null,
-  menu_section_rekruttering: null,
-  menu_section_boards: null,
-  menu_section_salary: null,
-  menu_section_dashboards: null,
-  menu_section_onboarding: null,
-  menu_section_reports: null,
-  menu_section_admin: null,
-  menu_section_some: null,
-  menu_section_sales_system: null,
-  
-  // ===== MIT HJEM (under menu_section_personal) =====
-  menu_home: 'menu_section_personal',
-  menu_h2h: 'menu_section_personal',
-  menu_commission_league: 'menu_section_personal',
-  menu_league_admin: 'menu_commission_league',
-  menu_liga_test_board: 'menu_commission_league',
-  menu_h2h_admin: 'menu_commission_league',
-  menu_team_h2h: 'menu_commission_league',
-  menu_messages: 'menu_section_personal',
-  menu_my_schedule: 'menu_section_personal',
-  menu_my_profile: 'menu_section_personal',
-  menu_my_goals: 'menu_section_personal',
-  menu_my_contracts: 'menu_section_personal',
-  menu_career_wishes: 'menu_section_personal',
-  menu_my_feedback: 'menu_section_personal',
-  menu_refer_friend: 'menu_section_personal',
-  
-  // ===== PERSONALE (under menu_section_personale) =====
-  menu_dashboard: 'menu_section_personale',
-  menu_employees: 'menu_section_personale',
-  menu_teams: 'menu_section_personale',
-  menu_permissions: 'menu_section_personale',
-  menu_login_log: 'menu_section_personale',
-  menu_upcoming_starts: 'menu_section_personale',
-  
-  // ===== LEDELSE (under menu_section_ledelse) =====
-  menu_company_overview: 'menu_section_ledelse',
-  menu_contracts: 'menu_section_ledelse',
-  menu_career_wishes_overview: 'menu_section_ledelse',
-  menu_email_templates_ledelse: 'menu_section_ledelse',
-  menu_security_dashboard: 'menu_section_ledelse',
-  
-  // ===== VAGTPLAN (under menu_section_vagtplan) =====
-  menu_shift_overview: 'menu_section_vagtplan',
-  menu_absence: 'menu_section_vagtplan',
-  menu_time_tracking: 'menu_section_vagtplan',
-  menu_time_stamp: 'menu_section_vagtplan',
-  menu_closing_shifts: 'menu_section_vagtplan',
-  
-  // ===== MG (under menu_section_mg) =====
-  menu_team_overview: 'menu_section_mg',
-  menu_tdc_erhverv: 'menu_section_mg',
-  menu_tdc_erhverv_dashboard: 'menu_section_mg',
-  menu_relatel_dashboard: 'menu_section_mg',
-  menu_tryg_dashboard: 'menu_section_mg',
-  menu_ase_dashboard: 'menu_section_mg',
-  menu_codan: 'menu_section_mg',
-  menu_mg_test: 'menu_section_mg',
-  menu_mg_test_dashboard: 'menu_section_mg',
-  menu_dialer_data: 'menu_section_mg',
-  menu_calls_data: 'menu_section_mg',
-  menu_adversus_data: 'menu_section_mg',
-  
-  // ===== TEST (under menu_section_test) =====
-  menu_car_quiz_admin: 'menu_section_test',
-  menu_coc_admin: 'menu_section_test',
-  menu_pulse_survey: 'menu_section_test',
-  
-  // ===== REKRUTTERING (under menu_section_rekruttering) =====
-  menu_recruitment_dashboard: 'menu_section_rekruttering',
-  menu_candidates: 'menu_section_rekruttering',
-  menu_upcoming_interviews: 'menu_section_rekruttering',
-  menu_winback: 'menu_section_rekruttering',
-  menu_upcoming_hires: 'menu_section_rekruttering',
-  menu_messages_recruitment: 'menu_section_rekruttering',
-  menu_sms_templates: 'menu_section_rekruttering',
-  menu_email_templates_recruitment: 'menu_section_rekruttering',
-  menu_referrals: 'menu_section_rekruttering',
-  
-  // ===== LØN (under menu_section_salary) =====
-  menu_payroll: 'menu_section_salary',
-  menu_salary_types: 'menu_section_salary',
-  
-  // ===== SOME (under menu_section_some) =====
-  menu_some: 'menu_section_some',
-  menu_extra_work: 'menu_section_some',
-  
-  // ===== DASHBOARDS (under menu_section_dashboards) =====
-  menu_dashboard_cph_sales: 'menu_section_dashboards',
-  menu_dashboard_cs_top_20: 'menu_section_dashboards',
-  menu_dashboard_fieldmarketing: 'menu_section_dashboards',
-  menu_dashboard_fm_goals: 'menu_section_dashboards',
-  menu_dashboard_eesy_tm: 'menu_section_dashboards',
-  menu_dashboard_tdc_erhverv: 'menu_section_dashboards',
-  menu_dashboard_tdc_goals: 'menu_section_dashboards',
-  menu_dashboard_relatel: 'menu_section_dashboards',
-  menu_dashboard_tryg: 'menu_section_dashboards',
-  menu_dashboard_ase: 'menu_section_dashboards',
-  menu_dashboard_mg_test: 'menu_section_dashboards',
-  menu_dashboard_united: 'menu_section_dashboards',
-  menu_dashboard_design: 'menu_section_dashboards',
-  menu_dashboard_settings: 'menu_section_dashboards',
-  
-  // ===== REPORTS (under menu_section_reports) =====
-  menu_reports_admin: 'menu_section_reports',
-  menu_reports_daily: 'menu_section_reports',
-  menu_reports_management: 'menu_section_reports',
-  menu_reports_employee: 'menu_section_reports',
-  
-  // ===== ONBOARDING (under menu_section_onboarding) =====
-  menu_onboarding_overview: 'menu_section_onboarding',
-  menu_onboarding_kursus: 'menu_section_onboarding',
-  menu_onboarding_ramp: 'menu_section_onboarding',
-  menu_onboarding_leader: 'menu_section_onboarding',
-  menu_onboarding_drills: 'menu_section_onboarding',
-  menu_onboarding_admin: 'menu_section_onboarding',
-  menu_coaching_templates: 'menu_section_onboarding',
-  
-  // ===== ADMIN (under menu_section_admin) =====
-  menu_kpi_definitions: 'menu_section_admin',
-  
-  // ===== FIELDMARKETING (under menu_section_fieldmarketing) =====
-  menu_fm_overview: 'menu_section_fieldmarketing',
-  menu_fm_booking: 'menu_section_fieldmarketing',
-  menu_fm_vehicles: 'menu_section_fieldmarketing',
-  menu_fm_dashboard: 'menu_section_fieldmarketing',
-  menu_fm_sales_registration: 'menu_section_fieldmarketing',
-  menu_fm_billing: 'menu_section_fieldmarketing',
-  menu_fm_travel_expenses: 'menu_section_fieldmarketing',
-  menu_fm_edit_sales: 'menu_section_fieldmarketing',
-  menu_fm_time_off: 'menu_section_fieldmarketing',
-  menu_fm_book_week: 'menu_section_fieldmarketing',
-  menu_fm_bookings: 'menu_section_fieldmarketing',
-  menu_fm_locations: 'menu_section_fieldmarketing',
-  menu_fm_vagtplan_fm: 'menu_section_fieldmarketing',
-  
-  // ===== SALG & SYSTEM (under menu_section_sales_system) =====
-  menu_sales: 'menu_section_sales_system',
-  menu_logics: 'menu_section_sales_system',
-  menu_live_stats: 'menu_section_sales_system',
-  menu_settings: 'menu_section_sales_system',
-  
-  // Legacy/andre
-  menu_leaderboard: null,
-  menu_my_sales: 'menu_section_personal',
-  menu_my_shifts: 'menu_section_personal',
-  menu_my_absence: 'menu_section_personal',
-  menu_my_coaching: 'menu_section_personal',
-  
-  // ===== TAB PERMISSIONS =====
-  // EmployeeMasterData tabs
-  tab_employees_all: 'menu_employees',
-  tab_employees_staff: 'menu_employees',
-  tab_employees_teams: 'menu_employees',
-  tab_employees_positions: 'menu_employees',
-  tab_employees_permissions: 'menu_employees',
-  tab_employees_dialer_mapping: 'menu_employees',
-  
-  // OnboardingDashboard tabs
-  tab_onboarding_overview: 'menu_onboarding_overview',
-  tab_onboarding_ramp: 'menu_onboarding_overview',
-  tab_onboarding_leader: 'menu_onboarding_overview',
-  tab_onboarding_drills: 'menu_onboarding_overview',
-  tab_onboarding_template: 'menu_onboarding_overview',
-  tab_onboarding_admin: 'menu_onboarding_overview',
-  
-  // MgTestPage tabs
-  tab_mg_salary_schemes: 'menu_mg_test',
-  tab_mg_relatel_status: 'menu_mg_test',
-  tab_mg_relatel_events: 'menu_mg_test',
-  
-  // Winback tabs
-  tab_winback_ghostet: 'menu_winback',
-  tab_winback_takket_nej: 'menu_winback',
-  tab_winback_kundeservice: 'menu_winback',
-  
-  // Messages tabs
-  tab_messages_all: 'menu_messages',
-  tab_messages_sms: 'menu_messages',
-  tab_messages_email: 'menu_messages',
-  tab_messages_call: 'menu_messages',
-  tab_messages_sent: 'menu_messages',
-  
-  // FieldmarketingDashboardFull tabs
-  tab_fm_eesy: 'menu_fm_dashboard',
-  tab_fm_yousee: 'menu_fm_dashboard',
-  
-  // BookingManagement tabs
-  tab_fm_book_week: 'menu_fm_booking',
-  tab_fm_bookings: 'menu_fm_booking',
-  tab_fm_locations: 'menu_fm_booking',
-  tab_fm_vagtplan: 'menu_fm_booking',
-};
-
-// Derive permission type from key
-const getPermissionTypeFromKey = (key: string): PermissionType => {
-  if (key.startsWith('tab_')) return 'tab';
-  if (key.startsWith('action_')) return 'action';
-  return 'page';
-};
-
-// Get all permission keys from permissionKeyLabels
-const ALL_PERMISSION_KEYS = Object.keys(permissionKeyLabels);
+// Get all permission keys from central config
+const ALL_PERMISSION_KEYS = getAllPermissionKeys();
 
 // Recursive permission row component for multi-level hierarchy
 interface PermissionWithChildren {
