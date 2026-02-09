@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutGrid, Maximize2, Minimize2, Home } from "lucide-react";
+import { LayoutGrid, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,7 +12,7 @@ import { ScreenResolutionIndicator } from "./ScreenResolutionIndicator";
 import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useTvBoardContext } from "@/contexts/TvBoardContext";
-import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
 import {
   Tooltip,
   TooltipContent,
@@ -34,21 +34,14 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   const isTvBoardMode = !!overrideSlug;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const { canView } = useUnifiedPermissions();
+  
+  // Use team-based dashboard permissions instead of role-based permissions
+  const { data: accessibleDashboards = [] } = useAccessibleDashboards();
 
   const currentDashboardSlug = useMemo(() => {
     const dashboard = DASHBOARD_LIST.find(d => d.path === location.pathname);
     return dashboard?.slug || null;
   }, [location.pathname]);
-
-  // Filter dashboards based on user permissions
-  const accessibleDashboards = useMemo(() => {
-    return DASHBOARD_LIST.filter(dashboard => {
-      // If no permissionKey, show to all
-      if (!dashboard.permissionKey) return true;
-      return canView(dashboard.permissionKey);
-    });
-  }, [canView]);
 
   const handleFullscreenChange = useCallback(() => {
     const isCurrentlyFullscreen = !!document.fullscreenElement;
