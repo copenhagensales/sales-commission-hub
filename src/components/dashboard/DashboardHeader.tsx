@@ -13,6 +13,7 @@ import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useTvBoardContext } from "@/contexts/TvBoardContext";
 import { useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   Tooltip,
   TooltipContent,
@@ -37,6 +38,9 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   
   // Use team-based dashboard permissions instead of role-based permissions
   const { data: accessibleDashboards = [] } = useAccessibleDashboards();
+  const { isOwner, isTeamleder } = useUnifiedPermissions();
+  const canCreateTvLink = isOwner || isTeamleder;
+
 
   const currentDashboardSlug = useMemo(() => {
     const dashboard = DASHBOARD_LIST.find(d => d.path === location.pathname);
@@ -146,7 +150,8 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
             </DropdownMenu>
 
             {/* TV Link Generator */}
-            {currentDashboardSlug && (
+            {/* TV Link Generator - only for leadership */}
+            {currentDashboardSlug && canCreateTvLink && (
               <TvBoardQuickGenerator dashboardSlug={currentDashboardSlug} />
             )}
 
