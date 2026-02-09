@@ -195,7 +195,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
           ))}
 
           {/* Administration Section */}
-          {(canView("menu_tv_board_admin") || canView("menu_dashboard_settings")) && (
+          {(canView("menu_tv_board_admin") || canView("menu_dashboard_admin")) && (
             <>
               <div className="px-3 py-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Administration
@@ -219,7 +219,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
                 </NavLink>
               )}
 
-              {canView("menu_dashboard_settings") && (
+              {canView("menu_dashboard_admin") && (
                 <NavLink
                   to="/dashboards/settings"
                   onClick={handleNavClick}

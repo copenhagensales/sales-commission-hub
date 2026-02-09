@@ -16,6 +16,7 @@ import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeader
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
 import { countWorkDaysInPeriod } from "@/lib/calculations";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 // Calculate payroll period (15th to 14th)
 function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
@@ -95,6 +96,9 @@ const isTvMode = () => {
 };
 
 export default function CphSalesDashboard() {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cph-sales");
+  
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   const tvMode = isTvMode();

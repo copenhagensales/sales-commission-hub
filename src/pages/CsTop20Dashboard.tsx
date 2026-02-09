@@ -10,6 +10,7 @@ import { useCachedLeaderboard, getInitials as getInitialsFromHook, type Leaderbo
 import { Trophy, Calendar, Clock } from "lucide-react";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
 import { supabase } from "@/integrations/supabase/client";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -211,6 +212,9 @@ function formatDisplayName(fullName: string): string {
 }
 
 export default function CsTop20Dashboard() {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20");
+  
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   

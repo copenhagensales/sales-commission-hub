@@ -44,6 +44,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
@@ -386,6 +387,9 @@ const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: C
 };
 
 const FieldmarketingDashboardFull = () => {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView: hasDashboardAccess, isLoading: accessLoading } = useRequireDashboardAccess("fieldmarketing");
+  
   const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
   
   // Date range state - default to payroll period (15th to 14th)
@@ -425,7 +429,7 @@ const FieldmarketingDashboardFull = () => {
     },
   });
 
-  if (permissionsLoading) {
+  if (permissionsLoading || accessLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-12">
@@ -433,6 +437,11 @@ const FieldmarketingDashboardFull = () => {
         </div>
       </DashboardLayout>
     );
+  }
+
+  // Access check handled by hook - this is extra safety
+  if (!hasDashboardAccess) {
+    return null;
   }
 
   if (visibleTabs.length === 0) {

@@ -13,6 +13,7 @@ import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards } from "@/hooks/useCachedLeaderboard";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -64,6 +65,9 @@ const getInitials = (name: string) => {
 const getCommissionStyle = () => "bg-primary/10 text-primary";
 
 export default function EesyTmDashboard() {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm");
+  
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
