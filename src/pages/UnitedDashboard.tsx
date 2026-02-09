@@ -11,6 +11,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -88,6 +89,9 @@ const getClientColor = (index: number) => {
 };
 
 export default function UnitedDashboard() {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("united");
+  
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);

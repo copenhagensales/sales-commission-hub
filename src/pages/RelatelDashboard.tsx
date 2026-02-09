@@ -13,6 +13,7 @@ import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
+import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -74,6 +75,9 @@ const getInitials = (name: string) => {
 const getCommissionStyle = () => "bg-primary/10 text-primary";
 
 export default function RelatelDashboard() {
+  // Runtime access check - redirects if user doesn't have team-based permission
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("relatel");
+  
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);

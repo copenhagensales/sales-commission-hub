@@ -185,6 +185,9 @@ export const PERMISSION_KEYS = {
   // NOTE: Individual dashboard permissions are managed via team_dashboard_permissions table
   // in the dashboard environment. Only the general environment access is controlled here.
   menu_dashboards: { label: 'Dashboards (generelt)', section: 'dashboards', parent: 'menu_section_dashboards' },
+  menu_dashboard_admin: { label: 'Dashboard Administration', section: 'dashboards', parent: 'menu_section_dashboards' },
+  menu_tv_board_admin: { label: 'TV Board Administration', section: 'dashboards', parent: 'menu_section_dashboards' },
+  menu_dashboard_settings: { label: 'Dashboard Indstillinger', section: 'dashboards', parent: 'menu_section_dashboards' },
 
   // ==================== REPORTS (under menu_section_reports) ====================
   menu_reports_admin: { label: 'Admin rapporter', section: 'reports', parent: 'menu_section_reports' },

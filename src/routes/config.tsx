@@ -301,52 +301,18 @@ export const routes: RouteConfig[] = [
   // Dashboard Landing Page
   { path: "/dashboards", component: DashboardHome, access: "protected" },
 
-  // Team Dashboards (full screen, no sidebar) - with role-based permissions
-  {
-    path: "/dashboards/cph-sales",
-    component: CphSalesDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_cph_sales",
-  },
-  {
-    path: "/dashboards/fieldmarketing",
-    component: FieldmarketingDashboardFull,
-    access: "role",
-    positionPermission: "menu_dashboard_fieldmarketing",
-  },
-  {
-    path: "/dashboards/tdc-erhverv",
-    component: TdcErhvervDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_tdc_erhverv",
-  },
-  {
-    path: "/dashboards/relatel",
-    component: RelatelDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_relatel",
-  },
-  {
-    path: "/dashboards/eesy-tm",
-    component: EesyTmDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_eesy_tm",
-  },
-  { path: "/dashboards/united", component: UnitedDashboard, access: "role", positionPermission: "menu_dashboard_united" },
-  { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "role", positionPermission: "menu_dashboard_cs_top_20" },
+  // Team Dashboards - access controlled at runtime via useRequireDashboardAccess hook
+  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "protected" },
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "protected" },
+  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "protected" },
+  { path: "/dashboards/relatel", component: RelatelDashboard, access: "protected" },
+  { path: "/dashboards/eesy-tm", component: EesyTmDashboard, access: "protected" },
+  { path: "/dashboards/united", component: UnitedDashboard, access: "protected" },
+  { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
 
-  {
-    path: "/dashboards/settings",
-    component: DashboardSettings,
-    access: "role",
-    positionPermission: "menu_dashboard_settings",
-  },
-  {
-    path: "/dashboards/design",
-    component: DesignDashboard,
-    access: "role",
-    positionPermission: "menu_dashboard_design",
-  },
+  // Dashboard Admin pages - restricted to those with dashboard admin permission
+  { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },
+  { path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboard_admin" },
 
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
