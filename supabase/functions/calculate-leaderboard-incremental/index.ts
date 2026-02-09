@@ -201,9 +201,10 @@ async function fetchFmSalesForPeriod(
   let hasMore = true;
   
   while (hasMore) {
+    // Fetch raw_payload to extract fm_seller_id and fm_product_name
     const { data, error } = await supabase
       .from("sales")
-      .select("id, normalized_data, agent_name, client_campaign_id, sale_datetime")
+      .select("id, raw_payload, agent_name, client_campaign_id, sale_datetime")
       .eq("source", "fieldmarketing")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
@@ -217,7 +218,18 @@ async function fetchFmSalesForPeriod(
     }
     
     if (data && data.length > 0) {
-      allFmSales.push(...(data as (FmSale & { registered_at: string })[]));
+      // Map raw_payload fields to FmSale structure
+      const mappedSales = data.map((sale: any) => {
+        const rawPayload = sale.raw_payload || {};
+        return {
+          id: sale.id,
+          product_name: rawPayload.fm_product_name || null,
+          client_id: rawPayload.fm_client_id || null,
+          seller_id: rawPayload.fm_seller_id || null,
+          registered_at: sale.sale_datetime,
+        };
+      });
+      allFmSales.push(...mappedSales);
       hasMore = data.length === PAGE_SIZE;
       page++;
     } else {
