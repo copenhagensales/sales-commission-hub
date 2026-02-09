@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BarChart, TrendingUp } from "lucide-react";
+import { BarChart } from "lucide-react";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,7 +13,6 @@ import {
   XAxis,
   YAxis,
   ReferenceLine,
-  ResponsiveContainer,
   Cell,
 } from "recharts";
 import { DailyCommissionEntry } from "@/hooks/usePersonalWeeklyStats";
@@ -57,17 +56,15 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
       return { emoji: "🔥", text: "Du er på en streak!" };
     }
     if (todayData && todayData.commission > average) {
-      return { emoji: "💪", text: "Stærk dag så langt!" };
+      return { emoji: "💪", text: "Stærk dag!" };
     }
     if (daysAboveAverage >= workdayData.length / 2) {
-      return { emoji: "📈", text: `${daysAboveAverage} dage over gennemsnittet!` };
+      return { emoji: "📈", text: `${daysAboveAverage} dage over snit` };
     }
     return { emoji: "💡", text: "Tid til comeback!" };
   };
 
   const motivation = getMotivationalMessage();
-
-  // formatCurrency imported from @/lib/calculations
 
   const chartConfig = {
     commission: {
@@ -90,14 +87,14 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
   if (workdayData.length === 0) {
     return (
       <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+        <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base font-semibold">
             <BarChart className="w-4 h-4 text-primary" />
             Dine seneste 10 dage
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
+        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+          <p className="text-xs md:text-sm text-muted-foreground">
             Ingen salgsdata tilgængelig endnu.
           </p>
         </CardContent>
@@ -107,29 +104,31 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
 
   return (
     <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <BarChart className="w-4 h-4 text-primary" />
-            Dine seneste 10 dage
+      <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
+            <BarChart className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+            <span className="hidden sm:inline">Dine seneste 10 dage</span>
+            <span className="sm:hidden">Seneste 10 dage</span>
           </CardTitle>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
             Snit: {formatCurrency(average)}/dag
           </span>
         </div>
       </CardHeader>
-      <CardContent className="pb-3">
-        <ChartContainer config={chartConfig} className="h-[140px] w-full">
+      <CardContent className="pb-3 md:pb-4 px-2 md:px-6">
+        <ChartContainer config={chartConfig} className="h-[120px] md:h-[140px] w-full">
           <RechartsBarChart
             data={workdayData}
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            margin={{ top: 8, right: 4, left: -24, bottom: 0 }}
           >
             <XAxis
               dataKey="dayName"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: 9 }}
               tickMargin={4}
+              interval={0}
             />
             <YAxis hide />
             <ReferenceLine
@@ -154,7 +153,7 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
                 />
               }
             />
-            <Bar dataKey="commission" radius={[4, 4, 0, 0]} maxBarSize={32}>
+            <Bar dataKey="commission" radius={[3, 3, 0, 0]} maxBarSize={28}>
               {workdayData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
               ))}
@@ -162,10 +161,10 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
           </RechartsBarChart>
         </ChartContainer>
 
-        {/* Motivational feedback */}
-        <div className="mt-3 flex items-center gap-2 text-sm">
-          <span>{motivation.emoji}</span>
-          <span className="text-muted-foreground">{motivation.text}</span>
+        {/* Motivational feedback - larger emoji on mobile */}
+        <div className="mt-2 md:mt-3 flex items-center justify-center md:justify-start gap-2 text-sm">
+          <span className="text-lg md:text-base">{motivation.emoji}</span>
+          <span className="text-xs md:text-sm text-muted-foreground">{motivation.text}</span>
         </div>
       </CardContent>
     </Card>

@@ -85,20 +85,20 @@ export function CompactLeagueView() {
 
   return (
     <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Trophy className="w-4 h-4 text-yellow-500" />
+          <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
+            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500" />
             Din liga-position
           </CardTitle>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
             <Users className="w-3 h-3" />
             <span>{enrollmentCount} tilmeldt</span>
           </div>
         </div>
       </CardHeader>
       
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 md:space-y-3 px-3 md:px-6 pb-3 md:pb-6">
         {visibleStandings.length > 0 && (
           <div className="space-y-1">
             {visibleStandings.map((standing, index) => {
@@ -109,26 +109,26 @@ export function CompactLeagueView() {
               return (
                 <div 
                   key={standing.id} 
-                  className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-sm ${
+                  className={`flex items-center justify-between py-2 md:py-1.5 px-2 md:px-2 rounded-lg text-xs md:text-sm ${
                     isMe 
                       ? "bg-primary/10 border border-primary/20 font-medium" 
                       : "text-muted-foreground"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {medal ? (
-                      <span className="text-base w-5 text-center">{medal}</span>
+                      <span className="text-sm md:text-base w-5 text-center flex-shrink-0">{medal}</span>
                     ) : (
-                      <span className="text-xs font-medium w-5 text-center">
+                      <span className="text-[10px] md:text-xs font-medium w-5 text-center flex-shrink-0">
                         #{rank}
                       </span>
                     )}
-                    <span className={isMe ? "text-foreground" : ""}>
+                    <span className={`truncate ${isMe ? "text-foreground" : ""}`}>
                       {formatPlayerName(standing.employee)}
                       {isMe && <span className="text-primary ml-1">(dig)</span>}
                     </span>
                   </div>
-                  <span className={`tabular-nums ${isMe ? "text-foreground" : ""}`}>
+                  <span className={`tabular-nums flex-shrink-0 ml-2 ${isMe ? "text-foreground" : ""}`}>
                     {formatProvision(standing.current_provision || 0)}
                   </span>
                 </div>
@@ -138,7 +138,7 @@ export function CompactLeagueView() {
         )}
 
         <Link to="/commission-league">
-          <Button variant="outline" size="sm" className="w-full gap-2 mt-2">
+          <Button variant="outline" size="sm" className="w-full gap-2 mt-1 md:mt-2 h-10 md:h-9 text-xs md:text-sm">
             Se fuld liga
             <ArrowRight className="w-3 h-3" />
           </Button>
