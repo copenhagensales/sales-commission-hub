@@ -1,96 +1,136 @@
 
-# Plan: Løs Dashboard-Rettighedsproblemer
+# Plan: Forbedret Dashboard-Rettighedsstyring
 
-## Identificerede Problemer
+## Problemanalyse
 
-### Problem 1: Manglende Dashboard-Nøgler i Databasen
-Auto-seeding funktionen i `PermissionEditor.tsx` (linje 432) kører kun når en rolle har **0 rettigheder**. Da "medarbejder" og andre roller allerede har mange rettigheder, seedes de nyligt tilføjede nøgler (`menu_tv_board_admin`, `menu_dashboard_settings`) aldrig.
+Der er **to separate systemer** til at styre dashboard-adgang, som skaber forvirring:
 
-**Hvad mangler i databasen:**
-- `menu_tv_board_admin` - defineret i permissionKeys.ts men mangler for alle roller
-- `menu_dashboard_settings` - defineret i permissionKeys.ts men mangler for alle roller
+| System | Placering | Hvad det styrer |
+|--------|-----------|-----------------|
+| **Permission Editor** | `/employees?tab=permissions` | Generel adgang til dashboard-sektionen (`menu_dashboards`, `menu_dashboard_admin`) |
+| **Team Dashboard Permissions** | `/dashboards/settings` → Rettigheder | Specifikke dashboards per team (cph-sales, eesy-tm, etc.) |
 
-### Problem 2: "Alle"-kolonnen er kun et Label
-Kolonnerne "Alle", "Team", "Kun egen" i tabelhovedet er kun tekst-labels uden onClick-funktionalitet. De viser hvilken synlighed (visibility) der er valgt, men brugeren forventer måske en bulk-handling.
+### Hvorfor medarbejdere ikke ser Dashboard-knappen
+Knappen "Dashboards" i sidebaren (via `EnvironmentSwitcher`) vises kun hvis brugeren har adgang til mindst ét dashboard. Dette afgøres af:
 
-## Løsning
+1. Brugerens **team-medlemskab** (via `team_members` tabel)
+2. **Team Dashboard Permissions** hvor det pågældende team har `access_level = 'all'`
 
-### Trin 1: Database-migration - Seed Manglende Dashboard-Nøgler
-Indsæt de manglende permission-nøgler for alle eksisterende roller.
+**Hvis medarbejderen ikke er medlem af et team med dashboard-adgang, ser de ikke knappen.**
 
-```sql
--- Seed menu_tv_board_admin for alle roller
-INSERT INTO role_page_permissions (role_key, permission_key, parent_key, permission_type, can_view, can_edit, visibility)
-SELECT DISTINCT 
-  rpp.role_key,
-  'menu_tv_board_admin',
-  'menu_section_dashboards',
-  'page',
-  CASE WHEN rpp.role_key = 'ejer' THEN true ELSE false END,
-  CASE WHEN rpp.role_key = 'ejer' THEN true ELSE false END,
-  CASE WHEN rpp.role_key = 'ejer' THEN 'all' ELSE 'self' END
-FROM role_page_permissions rpp
-WHERE NOT EXISTS (
-  SELECT 1 FROM role_page_permissions 
-  WHERE role_key = rpp.role_key AND permission_key = 'menu_tv_board_admin'
-)
-GROUP BY rpp.role_key
-ON CONFLICT (role_key, permission_key) DO NOTHING;
+---
 
--- Seed menu_dashboard_settings for alle roller
-INSERT INTO role_page_permissions (role_key, permission_key, parent_key, permission_type, can_view, can_edit, visibility)
-SELECT DISTINCT 
-  rpp.role_key,
-  'menu_dashboard_settings',
-  'menu_section_dashboards',
-  'page',
-  CASE WHEN rpp.role_key = 'ejer' THEN true ELSE false END,
-  CASE WHEN rpp.role_key = 'ejer' THEN true ELSE false END,
-  CASE WHEN rpp.role_key = 'ejer' THEN 'all' ELSE 'self' END
-FROM role_page_permissions rpp
-WHERE NOT EXISTS (
-  SELECT 1 FROM role_page_permissions 
-  WHERE role_key = rpp.role_key AND permission_key = 'menu_dashboard_settings'
-)
-GROUP BY rpp.role_key
-ON CONFLICT (role_key, permission_key) DO NOTHING;
+## Løsning: Integrer Dashboard-Vælger i Permission Editor
+
+### Arkitektur-ændring
+Tilføj en ny komponent `DashboardRolePermissionsEditor` til Permission Editor, der viser:
+- Liste over alle 9 dashboards fra `DASHBOARD_LIST`
+- Checkboxes for hvert dashboard per rolle
+- Gemmer som rolle-baseret config i en ny tabel
+
+### Database-ændring
+Ny tabel: `role_dashboard_permissions`
+
+```text
+┌─────────────────────────────────────────────────┐
+│              role_dashboard_permissions          │
+├─────────────────────────────────────────────────┤
+│ id             UUID (PK)                        │
+│ role_key       TEXT (FK → role_definitions)    │
+│ dashboard_slug TEXT                             │
+│ can_view       BOOLEAN                          │
+│ created_at     TIMESTAMPTZ                      │
+│ updated_at     TIMESTAMPTZ                      │
+└─────────────────────────────────────────────────┘
 ```
 
-### Trin 2: Forbedre Auto-seeding Logik
-Opdater `PermissionEditor.tsx` så den synkroniserer manglende nøgler - ikke kun seeder når rollen har 0 rettigheder.
+### Ændret Adgangslogik
+1. Behold eksisterende team-baseret system i `/dashboards/settings`
+2. Tilføj rolle-baseret adgang som **supplement**
+3. En bruger har adgang til et dashboard hvis:
+   - **ENTEN** deres team har adgang (team_dashboard_permissions)
+   - **ELLER** deres rolle har adgang (role_dashboard_permissions)
 
-**Ændring i useEffect (linje 429-436):**
-```typescript
-useEffect(() => {
-  if (selectedRole && !permissionsLoading) {
-    const existingKeys = permissionsByRole[selectedRole]?.map(p => p.permission_key) || [];
-    const missingKeys = ALL_PERMISSION_KEYS.filter(key => !existingKeys.includes(key));
-    
-    // Seed manglende nøgler - ikke kun når rolePermissionCount === 0
-    if (missingKeys.length > 0) {
-      seedPermissionsForRole(selectedRole);
-    }
-  }
-}, [selectedRole, permissionsLoading]);
-```
+---
 
-### Trin 3: (Valgfrit) Tilføj "Sæt alle"-knap til Tabellens Header
-Tilføj klikbare kolonne-headers der kan bulk-opdatere:
+## Implementeringsplan
+
+### Trin 1: Database
+- Opret `role_dashboard_permissions` tabel
+- Seed default permissions for alle roller (alle dashboards = false undtagen ejer)
+
+### Trin 2: Backend Hook
+- Opret `useRoleDashboardPermissions` hook
+- Udvid `useAccessibleDashboards` til at inkludere rolle-baserede dashboards
+
+### Trin 3: Permission Editor UI
+- Tilføj ny sektion "Dashboard Adgang" i `PermissionsTab.tsx`
+- Vis alle 9 dashboards med checkboxes per rolle
+- Tillad multi-select (vælg dashboard 1, 2, 4 som ønsket)
+
+### Trin 4: Test
+- Verificer at medarbejdere nu ser Dashboard-knappen
+- Verificer at de kun ser de specifikke dashboards de har adgang til
+
+---
+
+## Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/employees/permissions/PermissionEditor.tsx` | Gør "Alle"/"Team"/"Kun egen" headers klikbare for bulk-opdatering |
+| `supabase/migrations/` | Ny tabel `role_dashboard_permissions` |
+| `src/hooks/useRoleDashboardPermissions.ts` | Nyt hook til rolle-dashboard permissions |
+| `src/hooks/useTeamDashboardPermissions.ts` | Udvid `useAccessibleDashboards` |
+| `src/components/employees/PermissionsTab.tsx` | Tilføj dashboard-vælger UI |
+| `src/components/employees/permissions/RoleDashboardEditor.tsx` | Ny komponent med dashboard checkboxes |
 
-## Forventet Resultat
-1. **Alle 4 dashboard-rettigheder** (`menu_dashboards`, `menu_dashboard_admin`, `menu_tv_board_admin`, `menu_dashboard_settings`) vil vises i Permission Editor
-2. **Auto-synkronisering** vil sikre at nye nøgler automatisk tilføjes når roller vælges
-3. **(Valgfrit)** Bulk-handlinger vil være tilgængelige via kolonne-headers
+---
+
+## UI-skitse: Dashboard-vælger i Permission Editor
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Dashboards                                                   │
+│ Vælg hvilke dashboards denne rolle har adgang til           │
+├─────────────────────────────────────────────────────────────┤
+│ ☑ CPH Sales              ☐ Fieldmarketing     ☑ Eesy TM     │
+│ ☑ TDC Erhverv            ☐ Relatel            ☐ MG Test     │
+│ ☐ United                 ☐ Test Dashboard     ☐ CS Top 20   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Tekniske Detaljer
 
-### Filer der ændres:
+### Ny tabel RLS
+```sql
+CREATE POLICY "Owners can manage role dashboard permissions"
+  ON role_dashboard_permissions
+  USING (public.is_owner());
+```
 
-| Fil | Ændring |
-|-----|---------|
-| `supabase/migrations/` | Ny migration for at seede manglende permission-nøgler |
-| `src/components/employees/permissions/PermissionEditor.tsx` | Forbedre auto-seeding logik (linje 429-436) |
+### Udvidet useAccessibleDashboards
+```typescript
+// Eksisterende team-baseret logik...
+const teamDashboards = // ...existing code...
+
+// NY: Rolle-baseret logik
+const { data: rolePerms } = await supabase
+  .from("role_dashboard_permissions")
+  .select("dashboard_slug")
+  .eq("role_key", userRole)
+  .eq("can_view", true);
+
+const roleDashboards = DASHBOARD_LIST.filter(d => 
+  rolePerms?.some(p => p.dashboard_slug === d.slug)
+);
+
+// Kombiner begge
+return [...new Set([...teamDashboards, ...roleDashboards])];
+```
+
+### Forventet Resultat
+- Administratorer kan vælge specifikke dashboards per rolle direkte i Permission Editor
+- Medarbejdere ser Dashboard-knappen når de har mindst ét dashboard
+- Både team-baseret OG rolle-baseret adgang fungerer side om side
