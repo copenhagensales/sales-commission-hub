@@ -464,9 +464,14 @@ const SalesRegistration = () => {
       
       setComment("");
       setProductSelections([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving sales:", error);
-      toast.error("Kunne ikke gemme salg");
+      const message = error?.message || "Ukendt fejl";
+      if (message.includes("row-level security") || message.includes("RLS")) {
+        toast.error("Du har ikke rettigheder til at registrere salg. Kontakt din leder.");
+      } else {
+        toast.error(`Kunne ikke gemme salg: ${message}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
