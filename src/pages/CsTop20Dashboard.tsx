@@ -343,8 +343,8 @@ export default function CsTop20Dashboard() {
               return (
                 <div 
                   key={seller.employeeId || name} 
-                  className={`flex items-center gap-3 transition-all duration-150 ${
-                    tvMode ? 'px-3 py-2.5' : 'px-4 py-3 hover:bg-muted/40'
+                  className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
+                    tvMode ? 'px-3 py-2.5' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
                   } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
@@ -352,14 +352,14 @@ export default function CsTop20Dashboard() {
                   }`}
                 >
                   {/* Rank */}
-                  <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-7' : 'w-8'}`}>
+                  <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-7' : 'w-6 sm:w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-lg" : "text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-lg" : "text-base sm:text-xl"}>{rankBadge}</span>
                     ) : (
                       <span className={`tabular-nums ${
                         tvMode 
                           ? 'text-sm text-slate-500' 
-                          : 'text-sm text-muted-foreground/70'
+                          : 'text-xs sm:text-sm text-muted-foreground/70'
                       }`}>
                         {index + 1}
                       </span>
@@ -367,7 +367,7 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-9 w-9' : 'h-10 w-10'} ${
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-9 w-9' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
                     index === 0 
                       ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
                       : index < 3 
@@ -385,23 +385,23 @@ export default function CsTop20Dashboard() {
                   </Avatar>
                   
                   {/* Name & Sales & Team */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`font-medium truncate ${
-                        tvMode ? 'text-sm text-white' : 'text-sm text-foreground'
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                      <span className={`font-medium truncate max-w-[80px] sm:max-w-none ${
+                        tvMode ? 'text-sm text-white' : 'text-xs sm:text-sm text-foreground'
                       }`}>
                         {displayName}
                       </span>
                       {(() => {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName)}`}>
+                          <span className={`flex-shrink-0 rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
                         ) : null;
                       })()}
                     </div>
-                    <div className={`text-xs ${
+                    <div className={`text-[10px] sm:text-xs ${
                       tvMode ? 'text-slate-500' : 'text-muted-foreground/80'
                     }`}>
                       {sales} salg
@@ -409,12 +409,12 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Commission - Clean, neutral styling */}
-                  <div className={`rounded-full font-semibold tabular-nums ${
+                  <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
                       ? 'bg-slate-700/80 text-white px-3 py-1.5 text-sm' 
-                      : 'bg-primary/10 text-primary px-3 py-1.5 text-sm'
+                      : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
-                    {formatCurrency(commission)} kr
+                    {formatCurrency(commission)}
                   </div>
                 </div>
               );
