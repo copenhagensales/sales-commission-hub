@@ -490,7 +490,6 @@ const Home = () => {
           progressPercent={progressPercent}
           hasGoal={hasGoal}
           vacationPay={vacationPay}
-          onLogout={handleLogout}
           isEnrolledInLeague={isEnrolledInLeague}
         />
 

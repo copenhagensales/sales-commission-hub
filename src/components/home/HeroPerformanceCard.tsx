@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { TrendingUp, Target, LogOut, ArrowRight, Trophy } from "lucide-react";
+import { TrendingUp, Target, ArrowRight, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,6 @@ interface HeroPerformanceCardProps {
   targetAmount: number;
   progressPercent: number;
   hasGoal: boolean;
-  onLogout: () => void;
   isEnrolledInLeague?: boolean;
   vacationPay?: number;
 }
@@ -21,7 +20,6 @@ export function HeroPerformanceCard({
   targetAmount,
   progressPercent,
   hasGoal,
-  onLogout,
   isEnrolledInLeague = true,
   vacationPay = 0,
 }: HeroPerformanceCardProps) {
@@ -185,25 +183,14 @@ export function HeroPerformanceCard({
       <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-accent/10 rounded-full blur-3xl" />
       
       <div className="relative z-10 p-5 md:p-8">
-        {/* Header with greeting and logout */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">
-              {performanceEmoji} {getGreeting()}, {firstName}!
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              {motivationalMessage}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLogout}
-            className="gap-1.5 shrink-0 text-muted-foreground hover:text-foreground -mt-1 -mr-2"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden md:inline text-sm">Log ud</span>
-          </Button>
+        {/* Header with greeting */}
+        <div className="mb-6">
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">
+            {performanceEmoji} {getGreeting()}, {firstName}!
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {motivationalMessage}
+          </p>
         </div>
 
         {/* Main content: Progress ring + Stats */}
