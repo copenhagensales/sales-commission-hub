@@ -1,101 +1,85 @@
 
-# Plan: Fix Dashboard Navigation Between Accessible Dashboards
+# Mobil UI/UX Optimering af Home-siden
 
-## Problemanalyse
+## Nuværende udfordringer
+Baseret på analysen af den aktuelle mobile visning:
 
-Mathias har adgang til to dashboards (TDC Erhverv + CS Top 20), men får fejl når han prøver at skifte mellem dem.
+1. **Hero-kortet fylder meget** - Den cirkulære progress-ring og tekst tager meget plads på små skærme
+2. **Grid-layout på mobil** - Liga og daglig kommission stables korrekt, men graferne fylder meget vertikalt
+3. **Chart-højde er fast** - 140px er fint, men kan føles trangt på mobil med mange bars
+4. **Team & Fællesskab-sektionen** - Begivenheder har mange knapper, der kan være svære at trykke på mobil
+5. **Manglende mobile-first polish** - Spacing, fontstørrelser og touch-targets kan optimeres
 
-### Årsagen
-Når Mathias navigerer fra `/dashboards/tdc-erhverv` til `/dashboards/cs-top-20`:
+## Foreslåede forbedringer
 
-1. Den nye dashboard-komponent mountes med `useRequireDashboardAccess("cs-top-20")`
-2. `useAccessibleDashboards()` har **allerede cached data** fra forrige dashboard
-3. Queryen returnerer `isLoading: false` med cached data
-4. `useEffect` i `useRequireDashboardAccess` kører og ser `!isLoading && !canView`
-5. Der vises fejl-toast og redirect sker
+### 1. Kompakt Hero-kort på mobil
+- Reducer progress-ring størrelse fra 140px til **100px på mobil**
+- Brug **horisontalt layout** på mobil med ring til venstre og stats til højre
+- Mindre padding (p-4 i stedet for p-5) på mobil
+- Kortere motivationsbesked på mobil
 
-### Teknisk årsag
-`useEffect` i `useRequireDashboardAccess` har ikke `dashboardSlug` som dependency, hvilket betyder:
-- Effekten kører ved HVER mount
-- Den sammenligner mod et potentielt stale `canView` resultat
-- Navigation mellem to tilgængelige dashboards udløser falsk "ingen adgang" fejl
+### 2. Forbedret graf-visning
+- Større touch-targets på bars i grafen
+- Bedre læsbare dagsnavne (forkortet på mobil)
+- Motivationsbesked med større emoji for bedre synlighed
 
----
+### 3. Touch-optimerede begivenheder
+- Større klikbare områder på events (min-height: 48px)
+- Mere kompakte action-knapper med swipe-gesture support (fremtidig)
+- Tydeligere separator mellem events
 
-## Løsning
+### 4. Liga-visning polish
+- Kompaktere ranking med bedre kontrast
+- Større touch-target på "Se fuld liga" knap
 
-### Tilgang 1: Tilføj stabilitet med refs og slug-dependency
+### 5. Generelle mobile forbedringer
+- Reducer vertical spacing (gap-4 → gap-3 på mobil)
+- Ensartede border-radius
+- Bedre kontrast på muted tekst
+- Smooth scroll-oplevelse
 
-Opdater `useRequireDashboardAccess` til at:
-1. Tracke det aktuelle `dashboardSlug` via ref
-2. Kun redirect når slug er stabil OG data matcher
-3. Nulstille redirect-logik ved slug-ændring
+## Tekniske ændringer
 
-### Ændringer
-
-**Fil: `src/hooks/useRequireDashboardAccess.ts`**
-
-```typescript
-import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCanViewDashboard, useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
-import { toast } from "sonner";
-
-export function useRequireDashboardAccess(dashboardSlug: string) {
-  const navigate = useNavigate();
-  const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
-  const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
-
-  // Track the slug to detect navigation between dashboards
-  const currentSlugRef = useRef(dashboardSlug);
-  const hasRedirectedRef = useRef(false);
-
-  // Reset redirect flag when slug changes (user navigated to new dashboard)
-  useEffect(() => {
-    if (currentSlugRef.current !== dashboardSlug) {
-      currentSlugRef.current = dashboardSlug;
-      hasRedirectedRef.current = false;
-    }
-  }, [dashboardSlug]);
-
-  const isLoading = canViewLoading || accessLoading;
-
-  useEffect(() => {
-    // Don't redirect if already redirected for this slug
-    if (hasRedirectedRef.current) return;
-    
-    // Only redirect after data is fully loaded and we confirm no access
-    if (!isLoading && !canView) {
-      hasRedirectedRef.current = true;
-      toast.error("Du har ikke adgang til dette dashboard");
-      
-      if (accessibleDashboards.length > 0) {
-        navigate(accessibleDashboards[0].path, { replace: true });
-      } else {
-        navigate("/dashboards", { replace: true });
-      }
-    }
-  }, [isLoading, canView, navigate, accessibleDashboards, dashboardSlug]);
-
-  return { canView, isLoading };
-}
+### `src/components/home/HeroPerformanceCard.tsx`
+```text
+- Dynamisk ring-størrelse: 100px på mobil, 140px på desktop
+- Horisontalt layout på mobil med flexbox
+- Mindre padding og kompaktere typography
+- Responsiv CTA-knap størrelse
 ```
 
----
+### `src/components/home/DailyCommissionChart.tsx`
+```text
+- Tilpas chart margins for mobil
+- Større motivations-emoji
+- Kompaktere header
+```
 
-## Forventet resultat
+### `src/components/home/CompactLeagueView.tsx`
+```text
+- Bedre spacing i ranking-liste
+- Større touch-targets
+- Mere synlig "dig" markering
+```
 
-| Scenario | Før | Efter |
-|----------|-----|-------|
-| Mathias navigerer TDC → CS Top 20 | ❌ "Ingen adgang" toast, redirect | ✅ Smooth navigation |
-| Bruger uden adgang åbner dashboard | ✅ Redirect virker | ✅ Redirect virker |
-| Reload på dashboard man har adgang til | ✅ Dashboard vises | ✅ Dashboard vises |
+### `src/pages/Home.tsx`
+```text
+- Responsiv grid-gap (gap-3 på mobil, gap-4 på tablet+)
+- Bedre padding i Team & Fællesskab sektion
+- Touch-optimerede event-kort
+- Mere kompakte celebration badges
+```
 
----
+### `src/components/home/StickyPerformanceBar.tsx`
+```text
+- Subtil gradient baggrund for bedre synlighed
+- Animeret indgang
+```
 
-## Implementeringsplan
+## Resultat
+En mere "native-app-agtig" oplevelse på mobil med:
+- Hurtigere visuel scanning
+- Bedre touch-interaktion
+- Mere poleret og moderne udseende
+- Bedre udnyttelse af skærmplads
 
-| Trin | Fil | Handling |
-|------|-----|----------|
-| 1 | `src/hooks/useRequireDashboardAccess.ts` | Tilføj refs til at tracke slug og redirect-status |
-| 2 | Test | Verificer navigation mellem TDC Erhverv og CS Top 20 |
