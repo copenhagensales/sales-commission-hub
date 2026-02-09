@@ -481,7 +481,7 @@ const Home = () => {
         periodCommission={personalStats?.periodCommission || 0}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4 md:p-8 space-y-6">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-3 md:p-8 space-y-3 md:space-y-6">
         {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
         <HeroPerformanceCard
           firstName={firstName}
@@ -494,7 +494,7 @@ const Home = () => {
         />
 
         {/* ZONE 2: League + Recognitions side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {/* Compact League View */}
           <CompactLeagueView />
 
@@ -539,30 +539,30 @@ const Home = () => {
 
         {/* ZONE 3: Team & Community - Full Width */}
         <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Users className="w-4 h-4 text-primary" />
+          <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
+              <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
               Team & Fællesskab
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 md:space-y-4 px-3 md:px-6 pb-3 md:pb-6">
             {/* New Employees */}
             {newEmployees.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Gift className="w-4 h-4 text-primary" />
+                <p className="text-xs md:text-sm font-medium flex items-center gap-1.5 md:gap-2">
+                  <Gift className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
                   Velkommen til nye kolleger
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 md:gap-2">
                   {newEmployees.map((emp) => (
                     <Badge 
                       key={emp.id} 
                       variant="secondary"
-                      className="px-3 py-1.5 bg-primary/10 text-primary border-0"
+                      className="px-2 md:px-3 py-1 md:py-1.5 bg-primary/10 text-primary border-0 text-xs"
                     >
                       {emp.first_name} {emp.last_name}
                       {(emp.teams as { name: string } | null)?.name && (
-                        <span className="ml-1 opacity-70">({(emp.teams as { name: string }).name})</span>
+                        <span className="ml-1 opacity-70 hidden sm:inline">({(emp.teams as { name: string }).name})</span>
                       )}
                     </Badge>
                   ))}
@@ -573,13 +573,13 @@ const Home = () => {
             {/* Upcoming Events */}
             <div className="pt-3 border-t">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" />
+                <p className="text-xs md:text-sm font-medium flex items-center gap-1.5 md:gap-2">
+                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
                   Kommende begivenheder
                 </p>
                 <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
                       <Plus className="w-4 h-4" />
                     </Button>
                   </DialogTrigger>
@@ -685,33 +685,33 @@ const Home = () => {
                   </DialogContent>
                 </Dialog>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5 md:space-y-2">
                 {companyEvents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">Ingen kommende begivenheder</p>
+                  <p className="text-xs md:text-sm text-muted-foreground text-center py-4">Ingen kommende begivenheder</p>
                 ) : (
                   companyEvents.slice(0, 3).map((event) => {
                     const attendees = getEventAttendees(event.id);
                     const myStatus = getMyAttendance(event.id);
                     
                     return (
-                      <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 group">
-                        <div className="text-center min-w-[40px]">
-                          <div className="text-xl font-bold text-primary">
+                      <div key={event.id} className="flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg bg-muted/50 group min-h-[52px] md:min-h-0">
+                        <div className="text-center min-w-[36px] md:min-w-[40px]">
+                          <div className="text-lg md:text-xl font-bold text-primary">
                             {format(parseISO(event.event_date), "d")}
                           </div>
-                          <div className="text-[10px] text-muted-foreground uppercase">
+                          <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase">
                             {format(parseISO(event.event_date), "MMM", { locale: da })}
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p 
-                            className="font-medium text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
+                            className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
                             onClick={() => setSelectedEventForDetail(event.id)}
                           >
                             {event.title}
                           </p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-muted-foreground truncate">
+                          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
                               {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
                               {event.event_time && event.location && " - "}
                               {event.location}
@@ -719,8 +719,8 @@ const Home = () => {
                             {attendees.length > 0 && (
                               <HoverCard>
                                 <HoverCardTrigger asChild>
-                                  <Badge variant="outline" className="cursor-pointer gap-1 text-xs px-1.5 py-0">
-                                    <Users className="w-3 h-3" />
+                                  <Badge variant="outline" className="cursor-pointer gap-0.5 text-[10px] md:text-xs px-1 md:px-1.5 py-0">
+                                    <Users className="w-2.5 h-2.5 md:w-3 md:h-3" />
                                     {attendees.length}
                                   </Badge>
                                 </HoverCardTrigger>
@@ -745,11 +745,11 @@ const Home = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
                           <Button
                             variant={myStatus === 'attending' ? "default" : "ghost"}
                             size="sm"
-                            className={`h-7 w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
+                            className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
                             onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
                             disabled={toggleAttendanceMutation.isPending}
                           >
@@ -758,7 +758,7 @@ const Home = () => {
                           <Button
                             variant={myStatus === 'not_attending' ? "default" : "ghost"}
                             size="sm"
-                            className={`h-7 w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
+                            className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
                             onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
                             disabled={toggleAttendanceMutation.isPending}
                           >
@@ -767,7 +767,7 @@ const Home = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 md:h-7 md:w-7 p-0 hidden sm:flex"
                             onClick={() => setSelectedEventForDetail(event.id)}
                             title="Læs mere"
                           >
@@ -776,7 +776,7 @@ const Home = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
                             onClick={() => deleteEventMutation.mutate(event.id)}
                           >
                             <Trash2 className="w-3 h-3 text-destructive" />
@@ -808,20 +808,20 @@ const Home = () => {
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
-                  <div className="flex flex-wrap gap-2">
+                <CardContent className="pt-0 px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex flex-wrap gap-1.5 md:gap-2">
                     {upcomingCelebrations.map((celebration, idx) => (
                       <div 
                         key={idx}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm"
+                        className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg bg-muted/50 text-xs md:text-sm"
                       >
                         {celebration.type === 'birthday' ? (
-                          <Cake className="w-4 h-4 text-primary" />
+                          <Cake className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
                         ) : (
-                          <Award className="w-4 h-4 text-warning" />
+                          <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-warning" />
                         )}
                         <span className="font-medium">{celebration.name}</span>
-                        <span className="text-muted-foreground">•</span>
+                        <span className="text-muted-foreground hidden sm:inline">•</span>
                         <span className="text-muted-foreground">
                           {formatCelebrationDate(celebration.date, celebration.isToday)}
                         </span>
