@@ -164,7 +164,7 @@ export function useSeedMissingDashboardPermissions() {
 // Hent brugerens tilgængelige dashboards
 export function useAccessibleDashboards() {
   const { user } = useAuth();
-  const { isOwner, isLoading: unifiedLoading } = useUnifiedPermissions();
+  const { isOwner, isReady } = useUnifiedPermissions();
   const { data: assistantRelations } = useTeamAssistantLeaders();
   
   return useQuery({
@@ -261,21 +261,27 @@ export function useAccessibleDashboards() {
       
       return accessibleDashboards;
     },
-    enabled: !!user && !unifiedLoading,
+    enabled: !!user && isReady,
     staleTime: 30 * 1000, // 30 sekunder
     refetchOnMount: true,
   });
 }
 
 // Check om bruger kan se et specifikt dashboard
-export function useCanViewDashboard(dashboardSlug: string): boolean {
+export function useCanViewDashboard(dashboardSlug: string): { canView: boolean; isLoading: boolean } {
   const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
-  const { isOwner } = useUnifiedPermissions();
+  const { isOwner, isReady } = useUnifiedPermissions();
+  
+  // Ikke klar endnu - vent på at permissions er loaded
+  if (!isReady || isLoading) {
+    return { canView: false, isLoading: true };
+  }
   
   // HARDKODET: Ejere har altid fuld adgang
-  if (isOwner) return true;
+  if (isOwner) {
+    return { canView: true, isLoading: false };
+  }
   
-  if (isLoading) return false;
-  
-  return accessibleDashboards.some(d => d.slug === dashboardSlug);
+  const canView = accessibleDashboards.some(d => d.slug === dashboardSlug);
+  return { canView, isLoading: false };
 }
