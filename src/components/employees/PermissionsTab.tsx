@@ -249,7 +249,12 @@ const sectionChildren: Record<string, string[]> = {
     'menu_dialer_data', 'menu_calls_data', 'menu_adversus_data', 'menu_payroll'
   ],
   menu_section_salary: ['menu_payroll', 'menu_salary_types'],
-  menu_section_dashboards: [], // Administreres i dashboard-miljøet
+  menu_section_dashboards: [
+    'menu_dashboards',
+    'menu_dashboard_admin',
+    'menu_tv_board_admin',
+    'menu_dashboard_settings'
+  ],
   menu_section_test: ['menu_car_quiz_admin', 'menu_coc_admin', 'menu_pulse_survey'],
   menu_section_rekruttering: [
     'menu_recruitment_dashboard', 'menu_candidates', 'menu_upcoming_interviews',
