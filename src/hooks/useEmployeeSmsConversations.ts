@@ -51,7 +51,7 @@ export function useEmployeeSmsConversations() {
     queryFn: async () => {
       if (!currentEmployee?.id) return [];
 
-      // Fetch all SMS with employee context where current user is sender
+      // Fetch all SMS with employee context where current user is sender OR target
       const { data: smsLogs, error } = await supabase
         .from("communication_logs")
         .select(`
@@ -66,7 +66,7 @@ export function useEmployeeSmsConversations() {
         `)
         .eq("type", "sms")
         .eq("context_type", "employee")
-        .eq("sender_employee_id", currentEmployee.id)
+        .or(`sender_employee_id.eq.${currentEmployee.id},target_employee_id.eq.${currentEmployee.id}`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
