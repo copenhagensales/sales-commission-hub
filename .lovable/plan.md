@@ -1,114 +1,36 @@
 
-# Plan: Synkronisér Dashboard-rettigheder med Database
+# Plan: Vis Dashboard-rettigheder i Permission Editor
 
-## Problemanalyse
-
-### Nuværende Situation
-
-| Problem | Konsekvens |
-|---------|------------|
-| `menu_dashboards` findes kun i `permissionKeys.ts`, **IKKE** i databasen | Medarbejdere kan ikke se dashboard-miljøet i sidebaren |
-| `menu_dashboard_admin` mangler i databasen | Ejere kan tilgå settings (via hardcode), men kan ikke delegere admin-adgang til andre |
-| Legacy keys (`menu_dashboard`, `menu_fm_dashboard`, etc.) fylder databasen | Forvirrende og potentielt konfliktende med det nye system |
-
-### Hvorfor Ejere Kan Se Settings (Men Andre Ikke Kan)
-Ejere har en **hardcoded bypass** i `usePositionPermissions.ts` (linje 446-458):
+## Problem Identificeret
+`PermissionsTab.tsx` (linje 252) har en **tom array** for `menu_section_dashboards`:
 ```typescript
-if (isOwner && !isPreviewMode) {
-  return true; // Alle rettigheder for ejere
-}
+menu_section_dashboards: [], // Administreres i dashboard-miljøet
 ```
 
-Dette giver ejere adgang til `/dashboards/settings`, men andre roller blokeres fordi `menu_dashboard_admin` ikke findes i `role_page_permissions`.
+Dette forhindrer UI'et i at vise dashboard-relaterede rettigheder (`menu_dashboards`, `menu_dashboard_admin`, etc.) selvom de eksisterer i databasen og er defineret i `permissionKeys.ts`.
 
----
+## Løsning
+Opdater `sectionChildren` i `PermissionsTab.tsx` til at inkludere de korrekte dashboard-rettigheder:
 
-## Løsning: Seed Manglende Rettigheder + Oprydning
-
-### Fase 1: Tilføj Manglende Dashboard-rettigheder til Databasen
-
-Indsæt `menu_dashboards` og `menu_dashboard_admin` for alle roller:
-
-```sql
--- Seed menu_dashboards for alle roller (standard: can_view = true for adgang til miljøet)
-INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
-VALUES 
-  ('ejer', 'menu_dashboards', true, true, 'all'),
-  ('teamleder', 'menu_dashboards', true, false, 'team'),
-  ('rekruttering', 'menu_dashboards', true, false, 'team'),
-  ('fm_leder', 'menu_dashboards', true, false, 'team'),
-  ('assisterende_teamleder_fm', 'menu_dashboards', true, false, 'team'),
-  ('assisterendetm', 'menu_dashboards', true, false, 'team'),
-  ('medarbejder', 'menu_dashboards', true, false, 'self'),
-  ('fm_medarbejder_', 'menu_dashboards', true, false, 'self'),
-  ('some', 'menu_dashboards', true, false, 'self'),
-  ('backoffice', 'menu_dashboards', false, false, 'self')
-ON CONFLICT (role_key, permission_key) DO NOTHING;
-
--- Seed menu_dashboard_admin (kun ejere som standard)
-INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
-VALUES 
-  ('ejer', 'menu_dashboard_admin', true, true, 'all'),
-  ('teamleder', 'menu_dashboard_admin', false, false, 'team'),
-  ('rekruttering', 'menu_dashboard_admin', false, false, 'team'),
-  ('fm_leder', 'menu_dashboard_admin', false, false, 'team'),
-  ('assisterende_teamleder_fm', 'menu_dashboard_admin', false, false, 'team'),
-  ('assisterendetm', 'menu_dashboard_admin', false, false, 'team'),
-  ('medarbejder', 'menu_dashboard_admin', false, false, 'self'),
-  ('fm_medarbejder_', 'menu_dashboard_admin', false, false, 'self'),
-  ('some', 'menu_dashboard_admin', false, false, 'self'),
-  ('backoffice', 'menu_dashboard_admin', false, false, 'self')
-ON CONFLICT (role_key, permission_key) DO NOTHING;
+```typescript
+menu_section_dashboards: [
+  'menu_dashboards',
+  'menu_dashboard_admin',
+  'menu_tv_board_admin',
+  'menu_dashboard_settings'
+],
 ```
 
-### Fase 2: Ryd Op i Legacy Dashboard Keys
+## Fil der Ændres
 
-Slet forældede dashboard-relaterede keys der ikke er defineret i `permissionKeys.ts`:
-
-```sql
--- Fjern legacy dashboard keys (de nye: menu_dashboards, menu_dashboard_admin beholdes)
-DELETE FROM role_page_permissions 
-WHERE permission_key IN (
-  'menu_dashboard',          -- gammel generisk key
-  'menu_fm_dashboard',       -- gammel
-  'menu_mg_test_dashboard',  -- gammel
-  'menu_relatel_dashboard',  -- gammel
-  'menu_tdc_erhverv_dashboard', -- gammel
-  'menu_recruitment_dashboard', -- gammel (til rekruttering, ikke dashboards)
-  'menu_security_dashboard',  -- separat sektion
-  'menu_ase_dashboard',      -- gammel
-  'menu_test_dashboard',     -- gammel
-  'menu_tryg_dashboard'      -- gammel
-);
-```
-
----
+| Fil | Ændring |
+|-----|---------|
+| `src/components/employees/PermissionsTab.tsx` (linje 252) | Tilføj dashboard children keys |
 
 ## Forventet Resultat
+- **Dashboards-sektionen** vil vise 4 rettigheder i stedet for 0
+- **Administratorer** kan nu se og redigere dashboard-adgang for alle roller
+- **Medarbejder-rollen** vil vise den eksisterende `menu_dashboards: can_view = true` toggle
 
-### Efter Implementering
-
-| Bruger | Dashboard-miljø | Dashboard-indstillinger |
-|--------|-----------------|-------------------------|
-| Ejer | ✅ Fuld adgang | ✅ Kan administrere |
-| Teamleder | ✅ Via sidebar | ❌ (medmindre tildelt) |
-| Medarbejder | ✅ Via sidebar | ❌ |
-
-### I Permission Editor
-
-Dashboards-sektionen vil vise:
-- **menu_dashboards**: Kontrollerer adgang til selve dashboard-miljøet
-- **menu_dashboard_admin**: Kontrollerer adgang til Dashboard Indstillinger
-
-Administratorer kan nu tildele `menu_dashboard_admin` til andre roller via Permission Editor, så de også kan administrere dashboard-rettigheder.
-
----
-
-## Filer/Database der Ændres
-
-| Ressource | Ændring |
-|-----------|---------|
-| **Database: role_page_permissions** | Indsæt 20 nye rækker (10 for hver key) |
-| **Database: role_page_permissions** | Slet ~30-50 legacy dashboard rækker |
-
-Ingen kodeændringer er nødvendige - kun database-synkronisering.
+## Tekniske Detaljer
+Ændringen synkroniserer `sectionChildren` med den centrale `permissionKeys.ts` konfiguration, som allerede definerer disse børn-rettigheder under `menu_section_dashboards` via `parent`-feltet.
