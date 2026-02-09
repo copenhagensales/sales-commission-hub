@@ -1,158 +1,72 @@
 
-
-# Plan: Fix Dashboard Access Race Condition
+# Plan: Fix Dashboard Navigation Between Accessible Dashboards
 
 ## Problemanalyse
 
-Der er et timing/race condition problem i dashboard-adgangssystemet som forhindrer medarbejdere i at se deres tildelte dashboards.
+Mathias har adgang til to dashboards (TDC Erhverv + CS Top 20), men får fejl når han prøver at skifte mellem dem.
 
-### Hvad går galt
+### Årsagen
+Når Mathias navigerer fra `/dashboards/tdc-erhverv` til `/dashboards/cs-top-20`:
 
-1. Brugeren (f.eks. Matias) navigerer til `/dashboards/tdc-erhverv`
-2. `useRequireDashboardAccess("tdc-erhverv")` køres
-3. Den kalder `useCanViewDashboard` og `useAccessibleDashboards` separat
-4. Pga. timing-forskelle returnerer `useCanViewDashboard` `false` FØR dataen er klar
-5. `useRequireDashboardAccess` ser `isLoading: false` og `canView: false`
-6. Den viser toast "Du har ikke adgang" og redirecter til `/dashboards`
+1. Den nye dashboard-komponent mountes med `useRequireDashboardAccess("cs-top-20")`
+2. `useAccessibleDashboards()` har **allerede cached data** fra forrige dashboard
+3. Queryen returnerer `isLoading: false` med cached data
+4. `useEffect` i `useRequireDashboardAccess` kører og ser `!isLoading && !canView`
+5. Der vises fejl-toast og redirect sker
 
 ### Teknisk årsag
-
-I `useCanViewDashboard` (linje 271-281):
-```typescript
-export function useCanViewDashboard(dashboardSlug: string): boolean {
-  const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
-  const { isOwner } = useUnifiedPermissions();
-  
-  if (isOwner) return true;
-  if (isLoading) return false;  // ← Problemet!
-  
-  return accessibleDashboards.some(d => d.slug === dashboardSlug);
-}
-```
-
-Når `isLoading` er `true`, returneres `false` i stedet for at indikere "ukendt tilstand". 
-
-I `useAccessibleDashboards` (linje 264):
-```typescript
-enabled: !!user && !unifiedLoading
-```
-
-Queryen afhænger af `unifiedLoading` fra `useUnifiedPermissions`, men bruger ikke `isReady`. Det betyder queryen kan køre mens `isOwner` stadig har sin default værdi.
+`useEffect` i `useRequireDashboardAccess` har ikke `dashboardSlug` som dependency, hvilket betyder:
+- Effekten kører ved HVER mount
+- Den sammenligner mod et potentielt stale `canView` resultat
+- Navigation mellem to tilgængelige dashboards udløser falsk "ingen adgang" fejl
 
 ---
 
 ## Løsning
 
-### Ændring 1: `useCanViewDashboard` skal returnere et objekt med loading state
+### Tilgang 1: Tilføj stabilitet med refs og slug-dependency
 
-Fra:
-```typescript
-export function useCanViewDashboard(dashboardSlug: string): boolean
-```
+Opdater `useRequireDashboardAccess` til at:
+1. Tracke det aktuelle `dashboardSlug` via ref
+2. Kun redirect når slug er stabil OG data matcher
+3. Nulstille redirect-logik ved slug-ændring
 
-Til:
-```typescript
-export function useCanViewDashboard(dashboardSlug: string): { canView: boolean; isLoading: boolean }
-```
+### Ændringer
 
-### Ændring 2: Brug `isReady` i stedet for `isLoading` i `useAccessibleDashboards`
-
-Sikre at queryen IKKE kører før `useUnifiedPermissions` er fuldt klar:
+**Fil: `src/hooks/useRequireDashboardAccess.ts`**
 
 ```typescript
-const { isOwner, isLoading: unifiedLoading, isReady } = useUnifiedPermissions();
-// ...
-enabled: !!user && isReady,  // ← Brug isReady i stedet for !unifiedLoading
-```
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCanViewDashboard, useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
+import { toast } from "sonner";
 
-### Ændring 3: Opdater `useRequireDashboardAccess` til at håndtere begge loading states
-
-```typescript
-export function useRequireDashboardAccess(dashboardSlug: string) {
-  const navigate = useNavigate();
-  const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
-  const { isLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
-
-  // Kombiner begge loading states
-  const isFullyLoaded = !canViewLoading && !isLoading;
-
-  useEffect(() => {
-    if (isFullyLoaded && !canView) {
-      toast.error("Du har ikke adgang til dette dashboard");
-      // ... redirect logic
-    }
-  }, [isFullyLoaded, canView, navigate, accessibleDashboards]);
-
-  return { canView, isLoading: !isFullyLoaded };
-}
-```
-
----
-
-## Filer der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| `src/hooks/useTeamDashboardPermissions.ts` | Opdater `useCanViewDashboard` til at returnere objekt med loading state; Brug `isReady` i `useAccessibleDashboards` |
-| `src/hooks/useRequireDashboardAccess.ts` | Håndter nye return type fra `useCanViewDashboard` |
-| `src/hooks/useUnifiedPermissions.ts` | Eksporter `isReady` (allerede eksporteret, men verificer) |
-
----
-
-## Teknisk Implementation
-
-### useTeamDashboardPermissions.ts
-
-```typescript
-// Opdater useAccessibleDashboards (linje 165-268)
-export function useAccessibleDashboards() {
-  const { user } = useAuth();
-  const { isOwner, isReady } = useUnifiedPermissions();  // ← Brug isReady
-  const { data: assistantRelations } = useTeamAssistantLeaders();
-  
-  return useQuery({
-    queryKey: ["accessible-dashboards", user?.id, isOwner],
-    queryFn: async () => {
-      // ... eksisterende queryFn
-    },
-    enabled: !!user && isReady,  // ← Vent på isReady
-    staleTime: 30 * 1000,
-    refetchOnMount: true,
-  });
-}
-
-// Opdater useCanViewDashboard (linje 270-281)
-export function useCanViewDashboard(dashboardSlug: string): { canView: boolean; isLoading: boolean } {
-  const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
-  const { isOwner, isReady } = useUnifiedPermissions();
-  
-  // Ikke klar endnu
-  if (!isReady || isLoading) {
-    return { canView: false, isLoading: true };
-  }
-  
-  // Ejere har altid adgang
-  if (isOwner) {
-    return { canView: true, isLoading: false };
-  }
-  
-  const canView = accessibleDashboards.some(d => d.slug === dashboardSlug);
-  return { canView, isLoading: false };
-}
-```
-
-### useRequireDashboardAccess.ts
-
-```typescript
 export function useRequireDashboardAccess(dashboardSlug: string) {
   const navigate = useNavigate();
   const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
   const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
 
+  // Track the slug to detect navigation between dashboards
+  const currentSlugRef = useRef(dashboardSlug);
+  const hasRedirectedRef = useRef(false);
+
+  // Reset redirect flag when slug changes (user navigated to new dashboard)
+  useEffect(() => {
+    if (currentSlugRef.current !== dashboardSlug) {
+      currentSlugRef.current = dashboardSlug;
+      hasRedirectedRef.current = false;
+    }
+  }, [dashboardSlug]);
+
   const isLoading = canViewLoading || accessLoading;
 
   useEffect(() => {
+    // Don't redirect if already redirected for this slug
+    if (hasRedirectedRef.current) return;
+    
+    // Only redirect after data is fully loaded and we confirm no access
     if (!isLoading && !canView) {
+      hasRedirectedRef.current = true;
       toast.error("Du har ikke adgang til dette dashboard");
       
       if (accessibleDashboards.length > 0) {
@@ -161,7 +75,7 @@ export function useRequireDashboardAccess(dashboardSlug: string) {
         navigate("/dashboards", { replace: true });
       }
     }
-  }, [isLoading, canView, navigate, accessibleDashboards]);
+  }, [isLoading, canView, navigate, accessibleDashboards, dashboardSlug]);
 
   return { canView, isLoading };
 }
@@ -171,8 +85,17 @@ export function useRequireDashboardAccess(dashboardSlug: string) {
 
 ## Forventet resultat
 
-- Medarbejdere som Matias ser nu korrekt deres tildelte dashboards (TDC Erhverv, CS Top 20)
-- Ingen falske "Du har ikke adgang" toasts
-- Loading spinner vises korrekt mens data indlæses
-- Ejere har stadig fuld adgang til alle dashboards
+| Scenario | Før | Efter |
+|----------|-----|-------|
+| Mathias navigerer TDC → CS Top 20 | ❌ "Ingen adgang" toast, redirect | ✅ Smooth navigation |
+| Bruger uden adgang åbner dashboard | ✅ Redirect virker | ✅ Redirect virker |
+| Reload på dashboard man har adgang til | ✅ Dashboard vises | ✅ Dashboard vises |
 
+---
+
+## Implementeringsplan
+
+| Trin | Fil | Handling |
+|------|-----|----------|
+| 1 | `src/hooks/useRequireDashboardAccess.ts` | Tilføj refs til at tracke slug og redirect-status |
+| 2 | Test | Verificer navigation mellem TDC Erhverv og CS Top 20 |
