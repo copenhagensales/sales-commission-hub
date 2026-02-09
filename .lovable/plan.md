@@ -1,76 +1,175 @@
 
-# Plan: Fjern Dashboard-rettigheder fra Permission Editor (Komplet Oprydning)
+
+# Plan: Dashboard-adgang for Medarbejdere - Komplet Fix
 
 ## Problemanalyse
 
-Du kan stadig se dashboard-rettigheder fordi:
+### Identificerede Problemer
 
-| Problem | Årsag |
-|---------|-------|
-| **99 database-rækker** | `role_page_permissions` indeholder stadig `menu_dashboard_*` og `tab_dashboard_*` entries |
-| **Ingen frontend-filter** | `PermissionEditor.tsx` viser ALLE permissions fra databasen uden at filtrere mod `permissionKeys.ts` |
-| **Gamle ikon-mappings** | `PermissionsTab.tsx` har stadig dashboard-ikoner i `permissionIconMap` (linje 144-154) |
+| Problem | Årsag | Konsekvens |
+|---------|-------|------------|
+| **Medarbejdere kan ikke se dashboards** | Dashboard-routes bruger slettede permission keys (f.eks. `menu_dashboard_eesy_tm`) | Selv når team-rettigheder er sat til 'all', blokerer rute-beskyttelsen adgang |
+| **Kan ikke vælge hvilke dashboards** | DashboardSettings siden kræver `menu_dashboard_settings` - som er slettet | Administratorer (undtagen ejer-hardcode) kan ikke tilgå rettighedssiden |
+| **Inkonsistens mellem systemer** | Team-baseret adgang (`team_dashboard_permissions`) er implementeret, men routes bruger stadig rolle-baseret (`positionPermission`) | De to systemer modarbejder hinanden |
+
+### Oscar Belcher's Situation
+
+```text
+Oscar Belcher (Rekruttering)
+├── Team: Stab
+├── team_dashboard_permissions:
+│   └── cs-top-20 = 'all' ✓ (burde have adgang)
+│
+└── PROBLEM: Route /dashboards/cs-top-20 
+    ├── positionPermission: "menu_dashboard_cs_top_20"
+    └── Denne key eksisterer IKKE i databasen ❌
+```
 
 ---
 
-## Løsning
+## Løsning: Skift til Team-baseret Routing
 
-### Fase 1: Database-oprydning
+### Arkitektur-ændring
 
-Slet de uønskede rækker fra `role_page_permissions`:
+```text
+NUVÆRENDE (BRUDT):
+┌─────────────────────────────────────────────────────────────────┐
+│ routes/config.tsx                                               │
+│ ├── positionPermission: "menu_dashboard_*" ❌ (slettet)         │
+│ └── Blokerer adgang selvom team-permission er sat              │
+└─────────────────────────────────────────────────────────────────┘
 
-```sql
-DELETE FROM role_page_permissions 
-WHERE permission_key LIKE 'menu_dashboard_%'
-   OR permission_key LIKE 'tab_dashboard_%';
+NY ARKITEKTUR:
+┌─────────────────────────────────────────────────────────────────┐
+│ Dashboard Routes                                                │
+│ ├── access: "protected" (kun kræver login)                     │
+│ └── Runtime-check i komponenten via useCanViewDashboard()      │
+│                                                                 │
+│ useCanViewDashboard(slug):                                     │
+│ ├── Ejer? → altid true                                         │
+│ └── Check team_dashboard_permissions via useAccessibleDashboards│
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Dette fjerner ca. 99 rækker (alle dashboard-specifikke permissions undtagen `menu_dashboards`).
+---
 
-### Fase 2: Tilføj Frontend-filter i PermissionEditor.tsx
+## Tekniske Ændringer
 
-Tilføj et filter der kun viser permissions som er defineret i `permissionKeys.ts`:
+### Fase 1: Fjern Permission-krav fra Dashboard Routes
 
-**Linje ~310-314 - Efter `permissionsByRole` skabes:**
+**Fil: `src/routes/config.tsx`**
 
+Ændre alle dashboard-routes fra:
 ```typescript
-// Group permissions by role
-const permissionsByRole = extendedPermissions.reduce((acc, p) => {
-  if (!acc[p.role_key]) acc[p.role_key] = [];
-  // FILTER: Only include permissions that are defined in permissionKeys.ts
-  if (ALL_PERMISSION_KEYS.includes(p.permission_key as any)) {
-    acc[p.role_key].push(p);
-  }
-  return acc;
-}, {} as Record<string, typeof extendedPermissions>);
+{ 
+  path: "/dashboards/cph-sales", 
+  component: CphSalesDashboard, 
+  access: "role", 
+  positionPermission: "menu_dashboard_cph_sales" // ← FJERN
+}
 ```
 
-Dette sikrer at selvom databasen har "gamle" keys, vises de ikke i UI'et.
-
-### Fase 3: Ryd op i PermissionsTab.tsx
-
-Fjern de ubrugte dashboard-ikoner fra `permissionIconMap` (linje 144-154):
-
-**Før:**
+Til:
 ```typescript
-// DASHBOARDS
-menu_section_dashboards: <Monitor className="h-4 w-4" />,
-menu_dashboard_cph_sales: <BarChart3 className="h-4 w-4" />,
-menu_dashboard_cs_top_20: <Trophy className="h-4 w-4" />,
-menu_dashboard_fieldmarketing: <Car className="h-4 w-4" />,
-menu_dashboard_eesy_tm: <BarChart3 className="h-4 w-4" />,
-menu_dashboard_tdc_erhverv: <Phone className="h-4 w-4" />,
-menu_dashboard_relatel: <BarChart3 className="h-4 w-4" />,
-menu_dashboard_united: <Building2 className="h-4 w-4" />,
-menu_dashboard_design: <Settings className="h-4 w-4" />,
-menu_dashboard_settings: <Settings className="h-4 w-4" />,
+{ 
+  path: "/dashboards/cph-sales", 
+  component: CphSalesDashboard, 
+  access: "protected" // ← Kun login krævet
+}
 ```
 
-**Efter:**
+**Påvirkede routes:**
+- `/dashboards/cph-sales`
+- `/dashboards/fieldmarketing`
+- `/dashboards/relatel`
+- `/dashboards/tdc-erhverv`
+- `/dashboards/eesy-tm`
+- `/dashboards/mg-test`
+- `/dashboards/united`
+- `/dashboards/test`
+- `/dashboards/cs-top-20`
+- `/dashboards/design` → Behold som ejer-only
+- `/dashboards/settings` → Behold som ejer-only
+
+### Fase 2: Tilføj Runtime Access-check i Dashboard-komponenter
+
+**Ny hook: `useRequireDashboardAccess(slug)`**
+
+Denne hook redirecter brugeren hvis de ikke har adgang:
+
 ```typescript
-// DASHBOARDS (individuelle dashboards administreres i dashboard-miljøet)
-menu_section_dashboards: <Monitor className="h-4 w-4" />,
-menu_dashboards: <Monitor className="h-4 w-4" />,
+// src/hooks/useRequireDashboardAccess.ts
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCanViewDashboard } from "@/hooks/useTeamDashboardPermissions";
+import { useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
+import { toast } from "sonner";
+
+export function useRequireDashboardAccess(dashboardSlug: string) {
+  const navigate = useNavigate();
+  const canView = useCanViewDashboard(dashboardSlug);
+  const { isLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
+
+  useEffect(() => {
+    if (!isLoading && !canView) {
+      toast.error("Du har ikke adgang til dette dashboard");
+      // Redirect til dashboard-oversigt eller første tilgængelige
+      if (accessibleDashboards.length > 0) {
+        navigate(accessibleDashboards[0].path);
+      } else {
+        navigate("/dashboards");
+      }
+    }
+  }, [isLoading, canView, navigate, accessibleDashboards]);
+
+  return { canView, isLoading };
+}
+```
+
+**Implementer i hver dashboard-komponent:**
+
+```typescript
+// Eksempel: CphSalesDashboard.tsx
+export default function CphSalesDashboard() {
+  const { canView, isLoading } = useRequireDashboardAccess("cph-sales");
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (!canView) return null; // Redirect håndteres af hook
+  
+  // ... resten af komponenten
+}
+```
+
+### Fase 3: Behold Ejer-adgang til Settings/Design
+
+Dashboard Settings og Design dashboardet skal kun være tilgængeligt for ejere. Da `menu_dashboard_settings` er slettet, tilføj en ny permission key:
+
+**Fil: `src/config/permissionKeys.ts`**
+
+```typescript
+// Under DASHBOARDS section
+menu_dashboard_admin: { label: 'Dashboard Administration', section: 'dashboards', parent: 'menu_section_dashboards' },
+```
+
+**Opdater routes:**
+```typescript
+{ path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },
+{ path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboard_admin" },
+```
+
+### Fase 4: Tilføj Settings-link til Dashboard-sidebar
+
+**Fil: `src/components/layout/DashboardSidebar.tsx`**
+
+Tilføj et settings-link i bunden af sidebaren (kun synlig for ejere):
+
+```typescript
+{isOwner && (
+  <NavLink to="/dashboards/settings" className="...">
+    <Settings className="h-4 w-4" />
+    {!isCollapsed && <span>Indstillinger</span>}
+  </NavLink>
+)}
 ```
 
 ---
@@ -79,28 +178,42 @@ menu_dashboards: <Monitor className="h-4 w-4" />,
 
 | Fil | Ændring |
 |-----|---------|
-| **Database** | Slet 99 rækker med `menu_dashboard_%` og `tab_dashboard_%` |
-| `src/components/employees/permissions/PermissionEditor.tsx` | Tilføj filter mod `ALL_PERMISSION_KEYS` |
-| `src/components/employees/PermissionsTab.tsx` | Fjern ubrugte dashboard-ikoner |
+| `src/routes/config.tsx` | Fjern positionPermission fra dashboard routes, brug "protected" |
+| `src/hooks/useRequireDashboardAccess.ts` | **NY FIL** - Runtime access check hook |
+| `src/pages/dashboards/CphSalesDashboard.tsx` | Tilføj access check |
+| `src/pages/dashboards/FieldmarketingDashboardFull.tsx` | Tilføj access check |
+| `src/pages/dashboards/*.tsx` | Tilføj access check til alle dashboard-sider |
+| `src/config/permissionKeys.ts` | Tilføj `menu_dashboard_admin` |
+| `src/components/layout/DashboardSidebar.tsx` | Tilføj settings-link for ejere |
 
 ---
 
-## Forventet Resultat
+## Test-scenarie efter Implementering
 
-Efter ændringerne vil Dashboards-sektionen i permission editoren kun vise:
+### Oscar Belcher (team: Stab)
 
-```
-Dashboards
-└── menu_dashboards (Dashboards generelt) - kontrollerer miljø-adgang
-```
+| Route | Forventet Resultat |
+|-------|-------------------|
+| `/dashboards` | ✓ Viser oversigt med cs-top-20 |
+| `/dashboards/cs-top-20` | ✓ Viser dashboard (Stab har 'all' access) |
+| `/dashboards/cph-sales` | ✗ Redirect + toast "Ingen adgang" |
+| `/dashboards/settings` | ✗ Blokeret (ikke ejer) |
 
-Individuelle dashboard-rettigheder administreres nu udelukkende via:
-- Dashboard-miljøets indstillinger
-- `team_dashboard_permissions` tabellen
-- `DashboardPermissionsTab.tsx` UI
+### Ejer
+
+| Route | Forventet Resultat |
+|-------|-------------------|
+| `/dashboards` | ✓ Viser alle dashboards |
+| `/dashboards/settings` | ✓ Kan administrere rettigheder |
 
 ---
 
-## Sikkerhedsgaranti
+## Sammenfatning
 
-Filteret i frontend sikrer at selvom nogen manuelt tilføjer ugyldige keys i databasen, vil de aldrig vises i UI'et - kun keys defineret i `permissionKeys.ts` vises.
+Denne plan:
+
+1. **Fjerner blokeringen** - Dashboard-routes kræver kun login, ikke specifikke permissions
+2. **Bevarer sikkerhed** - Runtime-check via `useCanViewDashboard()` sikrer team-baseret adgang
+3. **Genopretter admin-adgang** - Ny `menu_dashboard_admin` key til Settings/Design
+4. **Konsistent arkitektur** - Team-baseret adgang styrer alt, ingen konflikt med rolle-baseret
+
