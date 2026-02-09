@@ -1,85 +1,38 @@
 
-# Mobil UI/UX Optimering af Home-siden
+# Fix: FM-sælgere kan ikke registrere salg (RLS-problem)
 
-## Nuværende udfordringer
-Baseret på analysen af den aktuelle mobile visning:
+## Problem
+Salgsregistreringen for Fieldmarketing fejler stille, fordi `sales`-tabellens INSERT RLS-policy kun tillader `is_manager_or_above()`. Normale FM-sælgere har ikke denne rolle, så deres inserts bliver blokeret uden fejlmeddelelse (Supabase returnerer tom data i stedet for en fejl ved RLS-blokering).
 
-1. **Hero-kortet fylder meget** - Den cirkulære progress-ring og tekst tager meget plads på små skærme
-2. **Grid-layout på mobil** - Liga og daglig kommission stables korrekt, men graferne fylder meget vertikalt
-3. **Chart-højde er fast** - 140px er fint, men kan føles trangt på mobil med mange bars
-4. **Team & Fællesskab-sektionen** - Begivenheder har mange knapper, der kan være svære at trykke på mobil
-5. **Manglende mobile-first polish** - Spacing, fontstørrelser og touch-targets kan optimeres
+## Årsag
+Da FM-salg blev centraliseret fra den gamle `fieldmarketing_sales`-tabel til `sales`-tabellen, blev RLS ikke opdateret til at dække FM-sælgeres INSERT-behov.
 
-## Foreslåede forbedringer
+## Løsning
+Tilføj en ny RLS INSERT-policy specifikt for FM-sælgere:
 
-### 1. Kompakt Hero-kort på mobil
-- Reducer progress-ring størrelse fra 140px til **100px på mobil**
-- Brug **horisontalt layout** på mobil med ring til venstre og stats til højre
-- Mindre padding (p-4 i stedet for p-5) på mobil
-- Kortere motivationsbesked på mobil
+### 1. Database-migration
+Opret en ny INSERT-policy på `sales`-tabellen der tillader autentificerede brugere at indsætte rækker hvor `source = 'fieldmarketing'`:
 
-### 2. Forbedret graf-visning
-- Større touch-targets på bars i grafen
-- Bedre læsbare dagsnavne (forkortet på mobil)
-- Motivationsbesked med større emoji for bedre synlighed
-
-### 3. Touch-optimerede begivenheder
-- Større klikbare områder på events (min-height: 48px)
-- Mere kompakte action-knapper med swipe-gesture support (fremtidig)
-- Tydeligere separator mellem events
-
-### 4. Liga-visning polish
-- Kompaktere ranking med bedre kontrast
-- Større touch-target på "Se fuld liga" knap
-
-### 5. Generelle mobile forbedringer
-- Reducer vertical spacing (gap-4 → gap-3 på mobil)
-- Ensartede border-radius
-- Bedre kontrast på muted tekst
-- Smooth scroll-oplevelse
-
-## Tekniske ændringer
-
-### `src/components/home/HeroPerformanceCard.tsx`
-```text
-- Dynamisk ring-størrelse: 100px på mobil, 140px på desktop
-- Horisontalt layout på mobil med flexbox
-- Mindre padding og kompaktere typography
-- Responsiv CTA-knap størrelse
+```sql
+CREATE POLICY "FM sellers can insert fieldmarketing sales"
+ON public.sales
+FOR INSERT
+WITH CHECK (
+  source = 'fieldmarketing'
+  AND auth.uid() IS NOT NULL
+);
 ```
 
-### `src/components/home/DailyCommissionChart.tsx`
-```text
-- Tilpas chart margins for mobil
-- Større motivations-emoji
-- Kompaktere header
-```
+Dette sikrer at:
+- Kun fieldmarketing-salg kan oprettes af ikke-managers
+- Brugeren skal være logget ind
+- Andre salgstyper (telesales, tryg, etc.) kræver stadig manager-rettigheder
 
-### `src/components/home/CompactLeagueView.tsx`
-```text
-- Bedre spacing i ranking-liste
-- Større touch-targets
-- Mere synlig "dig" markering
-```
+### 2. Forbedret fejlhåndtering i SalesRegistration
+Opdater `handleSubmit` i `src/pages/vagt-flow/SalesRegistration.tsx` til at vise en tydelig fejlbesked hvis INSERT fejler, så problemer er lettere at diagnosticere fremover.
 
-### `src/pages/Home.tsx`
-```text
-- Responsiv grid-gap (gap-3 på mobil, gap-4 på tablet+)
-- Bedre padding i Team & Fællesskab sektion
-- Touch-optimerede event-kort
-- Mere kompakte celebration badges
-```
-
-### `src/components/home/StickyPerformanceBar.tsx`
-```text
-- Subtil gradient baggrund for bedre synlighed
-- Animeret indgang
-```
-
-## Resultat
-En mere "native-app-agtig" oplevelse på mobil med:
-- Hurtigere visuel scanning
-- Bedre touch-interaktion
-- Mere poleret og moderne udseende
-- Bedre udnyttelse af skærmplads
-
+## Tekniske detaljer
+- **Fil**: Database migration (ny RLS policy)
+- **Fil**: `src/pages/vagt-flow/SalesRegistration.tsx` (bedre error handling)
+- Ingen ændringer i hooks eller andre komponenter nødvendige
+- Eksisterende manager-policy forbliver uændret
