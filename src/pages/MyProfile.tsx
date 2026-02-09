@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download } from "lucide-react";
+import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
@@ -1360,7 +1361,7 @@ export default function MyProfile() {
               <CardContent>
                 {contracts.length > 0 ? (
                   <div className="space-y-3">
-                    {contracts.map((contract) => (
+                    {contracts.map((contract: any) => (
                       <div key={contract.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                         <div>
                           <p className="font-medium">{contract.title}</p>
@@ -1370,9 +1371,25 @@ export default function MyProfile() {
                         </div>
                         <div className="flex items-center gap-3">
                           {getContractStatusBadge(contract.status || "draft")}
-                          {contract.status === "pending_employee" && (
+                          {contract.status === "pending_employee" ? (
                             <Button size="sm" onClick={() => navigate(`/contract/${contract.id}`)}>
                               Underskriv
+                            </Button>
+                          ) : (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              title="Download som PDF"
+                              onClick={() => downloadContractAsPdf({
+                                id: contract.id,
+                                title: contract.title,
+                                content: contract.content,
+                                created_at: contract.created_at,
+                                status: contract.status || 'draft',
+                                signatures: contract.contract_signatures
+                              })}
+                            >
+                              <Download className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
