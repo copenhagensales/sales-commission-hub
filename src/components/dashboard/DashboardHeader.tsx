@@ -98,30 +98,30 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
 
   return (
     <div 
-      className={`flex items-center justify-between mb-6 pb-4 border-b border-border bg-background transition-all duration-300 ${
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 pb-4 border-b border-border bg-background transition-all duration-300 ${
         isFullscreen 
           ? `fixed top-0 left-0 right-0 z-50 px-6 py-4 mb-0 ${isHeaderVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}` 
           : ''
       }`}
     >
       {/* Left side - Logo with home button and title */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <img 
           src={cphSalesLogo} 
           alt="CPH Sales" 
-          className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          className="h-8 sm:h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           onClick={handleGoToMenu}
         />
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">{title}</h1>
           {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{subtitle}</p>
           )}
         </div>
       </div>
 
       {/* Right side - Screen resolution and buttons */}
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         {rightContent}
         
         {!isTvBoardMode && (
