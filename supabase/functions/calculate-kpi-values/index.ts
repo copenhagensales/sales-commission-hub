@@ -2070,13 +2070,14 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM sales count for this client
+      // FM sales count for this client (from unified sales table)
       const { count: fmCount } = await supabase
-        .from("fieldmarketing_sales")
+        .from("sales")
         .select("*", { count: "exact", head: true })
-        .eq("client_id", clientId)
-        .gte("registered_at", startStr)
-        .lte("registered_at", endStr);
+        .eq("source", "fieldmarketing")
+        .filter("raw_payload->>fm_client_id", "eq", clientId)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
       
       return telesalesCount + (fmCount || 0);
     }
@@ -2106,17 +2107,19 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM commission for this client
+      // FM commission for this client (from unified sales table)
       const { data: fmSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("product_name")
-        .eq("client_id", clientId)
-        .gte("registered_at", startStr)
-        .lte("registered_at", endStr);
+        .from("sales")
+        .select("raw_payload")
+        .eq("source", "fieldmarketing")
+        .filter("raw_payload->>fm_client_id", "eq", clientId)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
       
       let fmCommission = 0;
       for (const sale of (fmSales || [])) {
-        const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+        const productName = (sale as any).raw_payload?.fm_product_name;
+        const pricing = fmCommissionMap.get(productName?.toLowerCase());
         fmCommission += pricing?.commission || 0;
       }
       
@@ -2148,17 +2151,19 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM revenue for this client
+      // FM revenue for this client (from unified sales table)
       const { data: fmSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("product_name")
-        .eq("client_id", clientId)
-        .gte("registered_at", startStr)
-        .lte("registered_at", endStr);
+        .from("sales")
+        .select("raw_payload")
+        .eq("source", "fieldmarketing")
+        .filter("raw_payload->>fm_client_id", "eq", clientId)
+        .gte("sale_datetime", startStr)
+        .lte("sale_datetime", endStr);
       
       let fmRevenue = 0;
       for (const sale of (fmSales || [])) {
-        const pricing = fmCommissionMap.get((sale as any).product_name?.toLowerCase());
+        const productName = (sale as any).raw_payload?.fm_product_name;
+        const pricing = fmCommissionMap.get(productName?.toLowerCase());
         fmRevenue += pricing?.price || 0;
       }
       
