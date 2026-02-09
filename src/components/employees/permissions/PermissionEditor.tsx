@@ -425,11 +425,14 @@ export function PermissionEditor() {
     }
   };
 
-  // Auto-seed when selecting a role with no permissions
+  // Auto-seed missing permissions when selecting a role
   useEffect(() => {
     if (selectedRole && !permissionsLoading) {
-      const rolePermissionCount = permissionsByRole[selectedRole]?.length || 0;
-      if (rolePermissionCount === 0) {
+      const existingKeys = permissionsByRole[selectedRole]?.map(p => p.permission_key) || [];
+      const missingKeys = ALL_PERMISSION_KEYS.filter(key => !existingKeys.includes(key));
+      
+      // Seed missing keys - not just when role has 0 permissions
+      if (missingKeys.length > 0) {
         seedPermissionsForRole(selectedRole);
       }
     }
