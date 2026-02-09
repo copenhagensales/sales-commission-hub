@@ -1,76 +1,91 @@
 
-# Plan: Forbedret Dashboard-Rettighedsstyring
+
+# Plan: Fix Dashboard Access Race Condition
 
 ## Problemanalyse
 
-Der er **to separate systemer** til at styre dashboard-adgang, som skaber forvirring:
+Der er et timing/race condition problem i dashboard-adgangssystemet som forhindrer medarbejdere i at se deres tildelte dashboards.
 
-| System | Placering | Hvad det styrer |
-|--------|-----------|-----------------|
-| **Permission Editor** | `/employees?tab=permissions` | Generel adgang til dashboard-sektionen (`menu_dashboards`, `menu_dashboard_admin`) |
-| **Team Dashboard Permissions** | `/dashboards/settings` → Rettigheder | Specifikke dashboards per team (cph-sales, eesy-tm, etc.) |
+### Hvad går galt
 
-### Hvorfor medarbejdere ikke ser Dashboard-knappen
-Knappen "Dashboards" i sidebaren (via `EnvironmentSwitcher`) vises kun hvis brugeren har adgang til mindst ét dashboard. Dette afgøres af:
+1. Brugeren (f.eks. Matias) navigerer til `/dashboards/tdc-erhverv`
+2. `useRequireDashboardAccess("tdc-erhverv")` køres
+3. Den kalder `useCanViewDashboard` og `useAccessibleDashboards` separat
+4. Pga. timing-forskelle returnerer `useCanViewDashboard` `false` FØR dataen er klar
+5. `useRequireDashboardAccess` ser `isLoading: false` og `canView: false`
+6. Den viser toast "Du har ikke adgang" og redirecter til `/dashboards`
 
-1. Brugerens **team-medlemskab** (via `team_members` tabel)
-2. **Team Dashboard Permissions** hvor det pågældende team har `access_level = 'all'`
+### Teknisk årsag
 
-**Hvis medarbejderen ikke er medlem af et team med dashboard-adgang, ser de ikke knappen.**
-
----
-
-## Løsning: Integrer Dashboard-Vælger i Permission Editor
-
-### Arkitektur-ændring
-Tilføj en ny komponent `DashboardRolePermissionsEditor` til Permission Editor, der viser:
-- Liste over alle 9 dashboards fra `DASHBOARD_LIST`
-- Checkboxes for hvert dashboard per rolle
-- Gemmer som rolle-baseret config i en ny tabel
-
-### Database-ændring
-Ny tabel: `role_dashboard_permissions`
-
-```text
-┌─────────────────────────────────────────────────┐
-│              role_dashboard_permissions          │
-├─────────────────────────────────────────────────┤
-│ id             UUID (PK)                        │
-│ role_key       TEXT (FK → role_definitions)    │
-│ dashboard_slug TEXT                             │
-│ can_view       BOOLEAN                          │
-│ created_at     TIMESTAMPTZ                      │
-│ updated_at     TIMESTAMPTZ                      │
-└─────────────────────────────────────────────────┘
+I `useCanViewDashboard` (linje 271-281):
+```typescript
+export function useCanViewDashboard(dashboardSlug: string): boolean {
+  const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
+  const { isOwner } = useUnifiedPermissions();
+  
+  if (isOwner) return true;
+  if (isLoading) return false;  // ← Problemet!
+  
+  return accessibleDashboards.some(d => d.slug === dashboardSlug);
+}
 ```
 
-### Ændret Adgangslogik
-1. Behold eksisterende team-baseret system i `/dashboards/settings`
-2. Tilføj rolle-baseret adgang som **supplement**
-3. En bruger har adgang til et dashboard hvis:
-   - **ENTEN** deres team har adgang (team_dashboard_permissions)
-   - **ELLER** deres rolle har adgang (role_dashboard_permissions)
+Når `isLoading` er `true`, returneres `false` i stedet for at indikere "ukendt tilstand". 
+
+I `useAccessibleDashboards` (linje 264):
+```typescript
+enabled: !!user && !unifiedLoading
+```
+
+Queryen afhænger af `unifiedLoading` fra `useUnifiedPermissions`, men bruger ikke `isReady`. Det betyder queryen kan køre mens `isOwner` stadig har sin default værdi.
 
 ---
 
-## Implementeringsplan
+## Løsning
 
-### Trin 1: Database
-- Opret `role_dashboard_permissions` tabel
-- Seed default permissions for alle roller (alle dashboards = false undtagen ejer)
+### Ændring 1: `useCanViewDashboard` skal returnere et objekt med loading state
 
-### Trin 2: Backend Hook
-- Opret `useRoleDashboardPermissions` hook
-- Udvid `useAccessibleDashboards` til at inkludere rolle-baserede dashboards
+Fra:
+```typescript
+export function useCanViewDashboard(dashboardSlug: string): boolean
+```
 
-### Trin 3: Permission Editor UI
-- Tilføj ny sektion "Dashboard Adgang" i `PermissionsTab.tsx`
-- Vis alle 9 dashboards med checkboxes per rolle
-- Tillad multi-select (vælg dashboard 1, 2, 4 som ønsket)
+Til:
+```typescript
+export function useCanViewDashboard(dashboardSlug: string): { canView: boolean; isLoading: boolean }
+```
 
-### Trin 4: Test
-- Verificer at medarbejdere nu ser Dashboard-knappen
-- Verificer at de kun ser de specifikke dashboards de har adgang til
+### Ændring 2: Brug `isReady` i stedet for `isLoading` i `useAccessibleDashboards`
+
+Sikre at queryen IKKE kører før `useUnifiedPermissions` er fuldt klar:
+
+```typescript
+const { isOwner, isLoading: unifiedLoading, isReady } = useUnifiedPermissions();
+// ...
+enabled: !!user && isReady,  // ← Brug isReady i stedet for !unifiedLoading
+```
+
+### Ændring 3: Opdater `useRequireDashboardAccess` til at håndtere begge loading states
+
+```typescript
+export function useRequireDashboardAccess(dashboardSlug: string) {
+  const navigate = useNavigate();
+  const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
+  const { isLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
+
+  // Kombiner begge loading states
+  const isFullyLoaded = !canViewLoading && !isLoading;
+
+  useEffect(() => {
+    if (isFullyLoaded && !canView) {
+      toast.error("Du har ikke adgang til dette dashboard");
+      // ... redirect logic
+    }
+  }, [isFullyLoaded, canView, navigate, accessibleDashboards]);
+
+  return { canView, isLoading: !isFullyLoaded };
+}
+```
 
 ---
 
@@ -78,59 +93,86 @@ Ny tabel: `role_dashboard_permissions`
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/migrations/` | Ny tabel `role_dashboard_permissions` |
-| `src/hooks/useRoleDashboardPermissions.ts` | Nyt hook til rolle-dashboard permissions |
-| `src/hooks/useTeamDashboardPermissions.ts` | Udvid `useAccessibleDashboards` |
-| `src/components/employees/PermissionsTab.tsx` | Tilføj dashboard-vælger UI |
-| `src/components/employees/permissions/RoleDashboardEditor.tsx` | Ny komponent med dashboard checkboxes |
+| `src/hooks/useTeamDashboardPermissions.ts` | Opdater `useCanViewDashboard` til at returnere objekt med loading state; Brug `isReady` i `useAccessibleDashboards` |
+| `src/hooks/useRequireDashboardAccess.ts` | Håndter nye return type fra `useCanViewDashboard` |
+| `src/hooks/useUnifiedPermissions.ts` | Eksporter `isReady` (allerede eksporteret, men verificer) |
 
 ---
 
-## UI-skitse: Dashboard-vælger i Permission Editor
+## Teknisk Implementation
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Dashboards                                                   │
-│ Vælg hvilke dashboards denne rolle har adgang til           │
-├─────────────────────────────────────────────────────────────┤
-│ ☑ CPH Sales              ☐ Fieldmarketing     ☑ Eesy TM     │
-│ ☑ TDC Erhverv            ☐ Relatel            ☐ MG Test     │
-│ ☐ United                 ☐ Test Dashboard     ☐ CS Top 20   │
-└─────────────────────────────────────────────────────────────┘
-```
+### useTeamDashboardPermissions.ts
 
----
-
-## Tekniske Detaljer
-
-### Ny tabel RLS
-```sql
-CREATE POLICY "Owners can manage role dashboard permissions"
-  ON role_dashboard_permissions
-  USING (public.is_owner());
-```
-
-### Udvidet useAccessibleDashboards
 ```typescript
-// Eksisterende team-baseret logik...
-const teamDashboards = // ...existing code...
+// Opdater useAccessibleDashboards (linje 165-268)
+export function useAccessibleDashboards() {
+  const { user } = useAuth();
+  const { isOwner, isReady } = useUnifiedPermissions();  // ← Brug isReady
+  const { data: assistantRelations } = useTeamAssistantLeaders();
+  
+  return useQuery({
+    queryKey: ["accessible-dashboards", user?.id, isOwner],
+    queryFn: async () => {
+      // ... eksisterende queryFn
+    },
+    enabled: !!user && isReady,  // ← Vent på isReady
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+  });
+}
 
-// NY: Rolle-baseret logik
-const { data: rolePerms } = await supabase
-  .from("role_dashboard_permissions")
-  .select("dashboard_slug")
-  .eq("role_key", userRole)
-  .eq("can_view", true);
-
-const roleDashboards = DASHBOARD_LIST.filter(d => 
-  rolePerms?.some(p => p.dashboard_slug === d.slug)
-);
-
-// Kombiner begge
-return [...new Set([...teamDashboards, ...roleDashboards])];
+// Opdater useCanViewDashboard (linje 270-281)
+export function useCanViewDashboard(dashboardSlug: string): { canView: boolean; isLoading: boolean } {
+  const { data: accessibleDashboards = [], isLoading } = useAccessibleDashboards();
+  const { isOwner, isReady } = useUnifiedPermissions();
+  
+  // Ikke klar endnu
+  if (!isReady || isLoading) {
+    return { canView: false, isLoading: true };
+  }
+  
+  // Ejere har altid adgang
+  if (isOwner) {
+    return { canView: true, isLoading: false };
+  }
+  
+  const canView = accessibleDashboards.some(d => d.slug === dashboardSlug);
+  return { canView, isLoading: false };
+}
 ```
 
-### Forventet Resultat
-- Administratorer kan vælge specifikke dashboards per rolle direkte i Permission Editor
-- Medarbejdere ser Dashboard-knappen når de har mindst ét dashboard
-- Både team-baseret OG rolle-baseret adgang fungerer side om side
+### useRequireDashboardAccess.ts
+
+```typescript
+export function useRequireDashboardAccess(dashboardSlug: string) {
+  const navigate = useNavigate();
+  const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
+  const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
+
+  const isLoading = canViewLoading || accessLoading;
+
+  useEffect(() => {
+    if (!isLoading && !canView) {
+      toast.error("Du har ikke adgang til dette dashboard");
+      
+      if (accessibleDashboards.length > 0) {
+        navigate(accessibleDashboards[0].path, { replace: true });
+      } else {
+        navigate("/dashboards", { replace: true });
+      }
+    }
+  }, [isLoading, canView, navigate, accessibleDashboards]);
+
+  return { canView, isLoading };
+}
+```
+
+---
+
+## Forventet resultat
+
+- Medarbejdere som Matias ser nu korrekt deres tildelte dashboards (TDC Erhverv, CS Top 20)
+- Ingen falske "Du har ikke adgang" toasts
+- Loading spinner vises korrekt mens data indlæses
+- Ejere har stadig fuld adgang til alle dashboards
+
