@@ -16,15 +16,18 @@ import { toast } from "sonner";
  */
 export function useRequireDashboardAccess(dashboardSlug: string) {
   const navigate = useNavigate();
-  const canView = useCanViewDashboard(dashboardSlug);
-  const { isLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
+  const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
+  const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
+
+  // Kombiner begge loading states for at undgå race conditions
+  const isLoading = canViewLoading || accessLoading;
 
   useEffect(() => {
-    // Only redirect after loading is complete and we confirmed no access
+    // Kun redirect efter data er fuldt loaded og vi bekræfter ingen adgang
     if (!isLoading && !canView) {
       toast.error("Du har ikke adgang til dette dashboard");
       
-      // Redirect to first accessible dashboard or overview
+      // Redirect til første tilgængelige dashboard eller oversigt
       if (accessibleDashboards.length > 0) {
         navigate(accessibleDashboards[0].path, { replace: true });
       } else {

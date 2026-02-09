@@ -7307,6 +7307,33 @@ export type Database = {
         }
         Relationships: []
       }
+      role_dashboard_permissions: {
+        Row: {
+          can_view: boolean
+          created_at: string
+          dashboard_slug: string
+          id: string
+          role_key: string
+          updated_at: string
+        }
+        Insert: {
+          can_view?: boolean
+          created_at?: string
+          dashboard_slug: string
+          id?: string
+          role_key: string
+          updated_at?: string
+        }
+        Update: {
+          can_view?: boolean
+          created_at?: string
+          dashboard_slug?: string
+          id?: string
+          role_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       role_page_permissions: {
         Row: {
           can_edit: boolean | null
