@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Check, Clock, X, Eye, AlertCircle, PenLine } from "lucide-react";
-
+import { FileText, Check, Clock, X, Eye, AlertCircle, PenLine, Download } from "lucide-react";
+import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
 const statusLabels: Record<ContractStatus, string> = {
@@ -244,16 +244,37 @@ export default function MyContracts() {
                             Underskriv
                           </Button>
                         ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/contract/${contract.id}`);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              title="Se kontrakt"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/contract/${contract.id}`);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              title="Download som PDF"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadContractAsPdf({
+                                  id: contract.id,
+                                  title: contract.title,
+                                  content: contract.content,
+                                  created_at: contract.created_at,
+                                  status: contract.status,
+                                  signatures: contract.signatures
+                                });
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
