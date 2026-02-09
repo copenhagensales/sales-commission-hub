@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCanViewDashboard, useAccessibleDashboards } from "@/hooks/useTeamDashboardPermissions";
 import { toast } from "sonner";
@@ -19,22 +19,36 @@ export function useRequireDashboardAccess(dashboardSlug: string) {
   const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
   const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
 
-  // Kombiner begge loading states for at undgå race conditions
+  // Track the slug to detect navigation between dashboards
+  const currentSlugRef = useRef(dashboardSlug);
+  const hasRedirectedRef = useRef(false);
+
+  // Reset redirect flag when slug changes (user navigated to new dashboard)
+  useEffect(() => {
+    if (currentSlugRef.current !== dashboardSlug) {
+      currentSlugRef.current = dashboardSlug;
+      hasRedirectedRef.current = false;
+    }
+  }, [dashboardSlug]);
+
   const isLoading = canViewLoading || accessLoading;
 
   useEffect(() => {
-    // Kun redirect efter data er fuldt loaded og vi bekræfter ingen adgang
+    // Don't redirect if already redirected for this slug
+    if (hasRedirectedRef.current) return;
+    
+    // Only redirect after data is fully loaded and we confirm no access
     if (!isLoading && !canView) {
+      hasRedirectedRef.current = true;
       toast.error("Du har ikke adgang til dette dashboard");
       
-      // Redirect til første tilgængelige dashboard eller oversigt
       if (accessibleDashboards.length > 0) {
         navigate(accessibleDashboards[0].path, { replace: true });
       } else {
         navigate("/dashboards", { replace: true });
       }
     }
-  }, [isLoading, canView, navigate, accessibleDashboards]);
+  }, [isLoading, canView, navigate, accessibleDashboards, dashboardSlug]);
 
   return { canView, isLoading };
 }
