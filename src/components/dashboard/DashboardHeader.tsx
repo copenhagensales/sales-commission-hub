@@ -8,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScreenResolutionIndicator } from "./ScreenResolutionIndicator";
 import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { useTvBoardContext } from "@/contexts/TvBoardContext";
@@ -126,8 +125,6 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
         
         {!isTvBoardMode && (
           <>
-            <ScreenResolutionIndicator />
-
             {/* Dashboard selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
