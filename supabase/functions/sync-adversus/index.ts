@@ -715,14 +715,37 @@ Deno.serve(async (req) => {
         `Fetched ${allSalesSync.length} TDC Erhverv sales from Adversus for October 2025 (unique by sale.id)`
       )
 
-      // Get existing external_ids to avoid duplicates
-      const { data: existingEvents } = await supabase.from('adversus_events').select('external_id')
-      const existingIds = new Set((existingEvents || []).map((e) => e.external_id))
+      // Paginated fetch of existing external_ids to avoid duplicates (table has 10k+ rows)
+      const existingIds = new Set<string>();
+      let offset = 0;
+      const PAGE_SIZE = 500;
+      while (true) {
+        const { data: page } = await supabase
+          .from('adversus_events')
+          .select('external_id')
+          .order('created_at', { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (!page || page.length === 0) break;
+        page.forEach((e: any) => existingIds.add(e.external_id));
+        offset += page.length;
+        if (page.length < PAGE_SIZE) break;
+      }
+      console.log(`[sync-adversus] Fetched ${existingIds.size} existing event IDs (paginated)`);
 
-      // Get products for matching
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, name, commission_dkk, revenue_dkk')
+      // Get products for matching - paginated
+      let productsData: any[] = [];
+      offset = 0;
+      while (true) {
+        const { data: page } = await supabase
+          .from('products')
+          .select('id, name, commission_dkk, revenue_dkk')
+          .order('created_at', { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (!page || page.length === 0) break;
+        productsData.push(...page);
+        offset += page.length;
+        if (page.length < PAGE_SIZE) break;
+      }
       const productsByName: Record<
         string,
         { id: string; commission_dkk: number; revenue_dkk: number }

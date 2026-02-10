@@ -18,6 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 // Calculate payroll period (15th to 14th)
 function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
@@ -105,15 +106,16 @@ const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: C
       const periodStart = dateRange?.from?.toISOString() || defaultPayrollPeriod.start.toISOString();
       const periodEnd = dateRange?.to?.toISOString() || defaultPayrollPeriod.end.toISOString();
       
-      const { data: periodSales, error } = await supabase
-        .from("sales")
-        .select(`id, sale_datetime, raw_payload`)
-        .eq("source", "fieldmarketing")
-        .contains("raw_payload", { fm_client_id: clientId })
-        .gte("sale_datetime", periodStart)
-        .lte("sale_datetime", periodEnd);
-      
-      if (error) throw error;
+      const periodSales = await fetchAllRows<{id: string; sale_datetime: string; raw_payload: any}>(
+        "sales",
+        "id, sale_datetime, raw_payload",
+        (q) => q
+          .eq("source", "fieldmarketing")
+          .contains("raw_payload", { fm_client_id: clientId })
+          .gte("sale_datetime", periodStart)
+          .lte("sale_datetime", periodEnd),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Fetch seller info separately
       const sellerIds = [...new Set((periodSales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
@@ -150,14 +152,15 @@ const ClientDashboard = ({ clientId, clientName, dateRange, isPayrollPeriod }: C
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       
-      const { data: todaySales, error } = await supabase
-        .from("sales")
-        .select(`id, sale_datetime, raw_payload`)
-        .eq("source", "fieldmarketing")
-        .contains("raw_payload", { fm_client_id: clientId })
-        .gte("sale_datetime", todayStart);
-      
-      if (error) throw error;
+      const todaySales = await fetchAllRows<{id: string; sale_datetime: string; raw_payload: any}>(
+        "sales",
+        "id, sale_datetime, raw_payload",
+        (q) => q
+          .eq("source", "fieldmarketing")
+          .contains("raw_payload", { fm_client_id: clientId })
+          .gte("sale_datetime", todayStart),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Fetch seller info separately
       const sellerIds = [...new Set((todaySales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];

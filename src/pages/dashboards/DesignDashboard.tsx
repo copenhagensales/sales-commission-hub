@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -255,13 +256,13 @@ export default function DesignDashboard() {
   // Fetch teams and clients from database
   useEffect(() => {
     const fetchData = async () => {
-      const [teamsResult, clientsResult] = await Promise.all([
-        supabase.from("teams").select("id, name").order("name"),
-        supabase.from("clients").select("id, name").order("name"),
+      const [teamsData, clientsData] = await Promise.all([
+        fetchAllRows<{id: string; name: string}>("teams", "id, name", undefined, { orderBy: "name" }),
+        fetchAllRows<{id: string; name: string}>("clients", "id, name", undefined, { orderBy: "name" }),
       ]);
 
-      if (teamsResult.data) setTeams(teamsResult.data);
-      if (clientsResult.data) setClients(clientsResult.data);
+      if (teamsData) setTeams(teamsData);
+      if (clientsData) setClients(clientsData);
     };
     fetchData();
   }, []);

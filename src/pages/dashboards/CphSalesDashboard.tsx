@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, startOfDay } from "date-fns";
@@ -613,31 +614,20 @@ export default function CphSalesDashboard() {
       const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
       const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
 
-      // Get teams (exclude Stab) - use any to avoid deep type issues
-      const teamsQuery = supabase.from("teams").select("id, name");
-      const teamsResult = await (teamsQuery as any);
-      const teams = ((teamsResult.data as any[]) || []).filter((t: any) => t.name !== "Stab");
+      // Get teams (exclude Stab) - use fetchAllRows for future-proofing
+      const allTeams = await fetchAllRows<{id: string; name: string}>("teams", "id, name");
+      const teams = (allTeams || []).filter((t: any) => t.name !== "Stab");
 
       if (teams.length === 0) return [];
 
       // Get team_members for employee-team mapping
-      const teamMembersQuery = supabase.from("team_members").select("employee_id, team_id");
-      const teamMembersResult = await teamMembersQuery;
-      const teamMembers = (teamMembersResult.data as any[]) || [];
+      const teamMembers = await fetchAllRows<{employee_id: string; team_id: string}>("team_members", "employee_id, team_id");
 
       // Get all agents for mapping
-      const agentsQuery = supabase
-        .from("agents")
-        .select("id, email, name");
-      const agentsResult = await agentsQuery;
-      const agents = (agentsResult.data as any[]) || [];
+      const agents = await fetchAllRows<{id: string; email: string; name: string}>("agents", "id, email, name");
 
       // Get employee_agent_mapping
-      const agentMappingsQuery = supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id");
-      const agentMappingsResult = await agentMappingsQuery;
-      const agentMappings = (agentMappingsResult.data as any[]) || [];
+      const agentMappings = await fetchAllRows<{employee_id: string; agent_id: string}>("employee_agent_mapping", "employee_id, agent_id");
 
       // Build agent_id -> agent data map
       const agentById: Record<string, { email: string; name: string }> = {};
@@ -646,11 +636,7 @@ export default function CphSalesDashboard() {
       });
 
       // Get team_clients for client grouping
-      const teamClientsQuery = supabase
-        .from("team_clients")
-        .select("team_id, client_id, clients(name)");
-      const teamClientsResult = await teamClientsQuery;
-      const teamClients = (teamClientsResult.data as any[]) || [];
+      const teamClients = await fetchAllRows<{team_id: string; client_id: string; clients: any}>("team_clients", "team_id, client_id, clients(name)");
 
       // Get sales for the month with client info - use pagination to get all results
       // Supabase has a default limit of 1000 rows, so we need to paginate

@@ -1,6 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
-import { chunk } from "../utils/batch.ts"
+import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 
 /**
@@ -593,17 +593,17 @@ export async function processSales(
   
   // Fetch products, product mappings, pricing rules, campaign mappings, and check for active data mappings in parallel
   const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult, integrationsResult] = await Promise.all([
-    supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
-    supabase.from("adversus_product_mappings").select("*"),
-    supabase.from("product_pricing_rules").select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to, use_rule_name_as_display").eq("is_active", true),
-    supabase.from("adversus_campaign_mappings").select("id, adversus_campaign_id"),
+    fetchAllPaginated(supabase, "products", "id, name, commission_dkk, revenue_dkk", (q) => q),
+    fetchAllPaginated(supabase, "adversus_product_mappings", "*", (q) => q),
+    fetchAllPaginated(supabase, "product_pricing_rules", "id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to, use_rule_name_as_display", (q) => q.eq("is_active", true)),
+    fetchAllPaginated(supabase, "adversus_campaign_mappings", "id, adversus_campaign_id", (q) => q),
     supabase.from("dialer_integrations").select("id, name").eq("is_active", true)
   ]);
 
-  const dbProducts = productsResult.data;
-  const dbMappings = mappingsResult.data;
-  const pricingRules = pricingRulesResult.data;
-  const campaignMappings = campaignMappingsResult.data;
+  const dbProducts = productsResult;
+  const dbMappings = mappingsResult;
+  const pricingRules = pricingRulesResult;
+  const campaignMappings = campaignMappingsResult;
   const dialerIntegrations = integrationsResult.data || [];
 
   // Build integration lookup map by name for data mappings

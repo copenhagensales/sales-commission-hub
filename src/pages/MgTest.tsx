@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { useVagtEmployees, type VagtEmployee } from "@/hooks/useVagtEmployee";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -453,9 +454,8 @@ export default function MgTest() {
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
     queryKey: ["mg-agents"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("agents").select("id, name, email, is_active");
-      if (error) throw error;
-      return data as AgentRow[];
+      const data = await fetchAllRows<AgentRow>("agents", "id, name, email, is_active");
+      return data;
     },
   });
 

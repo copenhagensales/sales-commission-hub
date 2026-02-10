@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -182,12 +183,7 @@ export default function CandidateDetail() {
   } = useQuery({
     queryKey: ["teams"],
     queryFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.from("teams").select("id, name").order("name");
-      if (error) throw error;
-      return data;
+      return await fetchAllRows<{id: string; name: string}>("teams", "id, name", undefined, { orderBy: "name" });
     }
   });
   const updateCandidateMutation = useMutation({

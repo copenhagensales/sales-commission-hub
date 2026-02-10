@@ -100,17 +100,18 @@ export function useDashboardSalesData({
         ] as string[];
 
         if (agentEmails.length > 0) {
-          const { data: agentsData } = await supabase.from("agents").select("id, email, external_dialer_id");
+          const agentsData = await fetchAllRows<{id: string; email: string; external_dialer_id: string | null}>("agents", "id, email, external_dialer_id");
           const matchingAgents = (agentsData || []).filter((a) =>
             agentEmails.includes(a.email?.toLowerCase())
           );
           const matchingAgentIds = matchingAgents.map((a) => a.id);
 
           if (matchingAgentIds.length > 0) {
-            const { data: mappings } = await supabase
-              .from("employee_agent_mapping")
-              .select("employee_id, agent_id")
-              .in("agent_id", matchingAgentIds);
+            const mappings = await fetchAllRows<{employee_id: string; agent_id: string}>(
+              "employee_agent_mapping",
+              "employee_id, agent_id",
+              (q) => q.in("agent_id", matchingAgentIds)
+            );
 
             employeeIds = [...new Set((mappings || []).map((m) => m.employee_id))];
 
@@ -303,24 +304,27 @@ export function useDashboardSalesData({
 
       // Step 5: Fetch fieldmarketing sales from unified sales table
       
-      let fmQuery = supabase
-        .from("sales")
-        .select("id, sale_datetime, raw_payload, client_campaign_id")
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`);
-      
-      if (resolvedClientId) {
-        // Filter FM sales by client via raw_payload
-        fmQuery = fmQuery.contains("raw_payload", { fm_client_id: resolvedClientId } as any);
-      }
-      
-      const { data: fmSalesData } = await fmQuery;
+      const fmSalesData = await fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null}>(
+        "sales",
+        "id, sale_datetime, raw_payload, client_campaign_id",
+        (q) => {
+          let filtered = q
+            .eq("source", "fieldmarketing")
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`);
+          if (resolvedClientId) {
+            filtered = filtered.contains("raw_payload", { fm_client_id: resolvedClientId } as any);
+          }
+          return filtered;
+        },
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Fetch campaign mappings for dialer_campaign_id resolution
-      const { data: campaignMappings } = await supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id");
+      const campaignMappings = await fetchAllRows<{id: string; adversus_campaign_id: string}>(
+        "adversus_campaign_mappings",
+        "id, adversus_campaign_id"
+      );
       
       const dialerCampaignToMappingId = new Map<string, string>();
       campaignMappings?.forEach(m => {
@@ -330,7 +334,10 @@ export function useDashboardSalesData({
       });
 
       // Step 6: Get product commission/revenue maps for FM
-      const { data: allProducts } = await supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
+      const allProducts = await fetchAllRows<{id: string; name: string; commission_dkk: number; revenue_dkk: number}>(
+        "products",
+        "id, name, commission_dkk, revenue_dkk"
+      );
 
       const productCommissionMap = new Map<string, number>();
       const productRevenueMap = new Map<string, number>();

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -149,26 +150,28 @@ export function useCoachingTasks(filters?: { employeeId?: string; leaderId?: str
   return useQuery({
     queryKey: ["coaching-tasks", filters],
     queryFn: async () => {
-      let query = supabase.from("onboarding_coaching_tasks").select("*");
-      
-      if (filters?.employeeId) {
-        query = query.eq("employee_id", filters.employeeId);
-      }
-      if (filters?.leaderId) {
-        query = query.eq("leader_id", filters.leaderId);
-      }
-      if (filters?.status && !filters.includeAll) {
-        query = query.eq("status", filters.status);
-      }
-      if (!filters?.status && !filters?.includeAll) {
-        // Default: show open and overdue
-        query = query.in("status", ["open", "overdue"]);
-      }
-      
-      const { data, error } = await query.order("due_date", { ascending: true });
-
-      if (error) throw error;
-      return data as CoachingTask[];
+      const data = await fetchAllRows<CoachingTask>(
+        "onboarding_coaching_tasks",
+        "*",
+        (q) => {
+          let query = q;
+          if (filters?.employeeId) {
+            query = query.eq("employee_id", filters.employeeId);
+          }
+          if (filters?.leaderId) {
+            query = query.eq("leader_id", filters.leaderId);
+          }
+          if (filters?.status && !filters.includeAll) {
+            query = query.eq("status", filters.status);
+          }
+          if (!filters?.status && !filters?.includeAll) {
+            query = query.in("status", ["open", "overdue"]);
+          }
+          return query;
+        },
+        { orderBy: "due_date", ascending: true }
+      );
+      return data;
     },
   });
 }
