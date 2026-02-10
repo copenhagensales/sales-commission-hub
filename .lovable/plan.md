@@ -1,89 +1,80 @@
 
-# Komplet Oprydning: FM + Systemdækkende Problemer
+# Fix: Fieldmarketing Dashboard - Manglende Tab-permissions
 
-## Analyse-resultat
+## Rodaarsag
 
-Ud over de 3 FM-menupunkter der skal slettes, fandt analysen foelgende problemer i resten af systemet:
+Ved den forrige oprydning blev `tab_fm_eesy` og `tab_fm_yousee` slettet fra baade `permissionKeys.ts` og databasen, fordi de var boern af det fjernede `menu_fm_dashboard`. Men disse keys bruges stadig aktivt af Fieldmarketing-dashboardet i dashboard-miljoeet (`/dashboards/fieldmarketing`) til at styre fane-synlighed.
 
----
-
-## Problem 1: FM - Dashboard, Vagtplan FM, Min uge (som aftalt)
-
-Tre sidebar-menupunkter peger paa ruter der ikke eksisterer (`/vagt-flow/vagtplan-fm` og `/vagt-flow/min-uge`) eller duplikerer funktionalitet (`/vagt-flow/fieldmarketing-dashboard`).
-
-**Slet fra:**
-- `AppSidebar.tsx`: Fjern de 3 sidebar-entries (linje 1179-1205) + fjern fra `showFieldmarketingMenu` (linje 444)
-- `usePositionPermissions.ts`: Fjern `canViewFmDashboard`, `canEditFmDashboard`, `canViewFmVagtplanFm`, `canEditFmVagtplanFm`, `canViewFmMyWeek`
-- `permissionKeys.ts`: Fjern `menu_fm_dashboard`, `menu_fm_my_week`, `menu_fm_vagtplan_fm`, `tab_fm_eesy`, `tab_fm_yousee`
-- `permissions.ts`: Fjern `menu_fm_my_week` fra PERMISSION_CATEGORIES
-- `routes/config.tsx`: Fjern `/vagt-flow/fieldmarketing-dashboard` ruten + `VagtFieldmarketingDashboard` import
-- Database: Slet raekker for de 5 keys
+Resultatet: Alle ikke-ejere (inkl. William Bornak som fm_leder) ser en tom side med "Du har ikke adgang", fordi `canView("tab_fm_eesy")` returnerer false naar keyen ikke eksisterer.
 
 ---
 
-## Problem 2: `menu_cancellations` mangler i permissionKeys.ts
+## AEndring 1: Tilfoej tab_fm_eesy og tab_fm_yousee tilbage i permissionKeys.ts
 
-Permission key `menu_cancellations` bruges i:
-- `routes/config.tsx` (linje 367): rute med `positionPermission: "menu_cancellations"`
-- `AppSidebar.tsx` (linje 84): `canViewCancellations = p.canView("menu_cancellations")`
+**Fil**: `src/config/permissionKeys.ts`
 
-Men den eksisterer IKKE i `permissionKeys.ts` (den centrale kilde). Det betyder:
-- Den dukker ikke op i Permission Editor
-- Auto-seeding opretter den ikke for nye roller
-- Kun ejere kan se den (owner-override)
+Tilfoej de to tab-keys under Fieldmarketing-sektionen (linje 237-242 omraadet). De placeres som children af et nyt dashboard-parent under FM, saa de er korrekt kategoriseret:
 
-**Fix**: Tilfoej `menu_cancellations` til `permissionKeys.ts` under `menu_section_salary`, og tilfoej den til `permissions.ts` PERMISSION_CATEGORIES under Loen-sektionen. Tilfoej ogsaa `canViewCancellations` og `canEditCancellations` som egentlige permission helpers i `usePositionPermissions.ts` i stedet for den loese `p.canView()` reference i sidebaren.
+```text
+// Under "Fieldmarketing Tabs" sektionen, tilfoej:
+tab_fm_eesy: { label: 'Fane: Eesy FM Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
+tab_fm_yousee: { label: 'Fane: Yousee Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
+```
 
----
-
-## Problem 3: Okonomi-menu mangler permissions-check i sidebaren
-
-Okonomi-sektionen i sidebaren (linje 1597-1649) renderer ALLE menupunkter uden permissions-check. Alle 5 NavLinks vises altid naar `showEconomicMenu` er true, uden at tjekke individuelle rettigheder som `menu_economic_dashboard`, `menu_economic_expenses` osv.
-
-**Fix**: Wrap hvert NavLink i et permissions-check:
-- Overblik: `p.canView("menu_economic_dashboard")`
-- Udgifter: `p.canView("menu_economic_expenses")`
-- Budget 2026: `p.canView("menu_economic_budget")`
-- Mapping: `p.canView("menu_economic_mapping")`
-- Import: `p.canView("menu_economic_upload")`
-
-Tilfoej ogsaa de tilsvarende `canViewEconomic*` helpers til `usePositionPermissions.ts`.
+Disse placeres under `menu_fm_overview` som parent, da de er faner i FM-dashboardet.
 
 ---
 
-## Problem 4: Live Stats bruger forkert permission
+## AEndring 2: Opdater permissionGroups.ts
 
-Live Stats i sidebaren (linje 1667) vises naar `p.canViewSettings` er true, men den burde bruge sin egen permission `menu_live_stats`. Lige nu kan alle med Settings-adgang se Live Stats, selvom det er en separat funktion.
+**Fil**: `src/components/employees/permissions/permissionGroups.ts`
 
-**Fix**: AEndr betingelsen til `p.canViewLiveStats` (eller `p.canView("menu_live_stats")`), og tilfoej `canViewLiveStats` som helper i `usePositionPermissions.ts`.
+Fjern den foraeldre reference til `menu_fm_dashboard` (linje 36-39) som ikke laengere eksisterer, og tilfoej en ny gruppe under `menu_fm_overview`:
+
+```text
+// Fjern:
+'menu_fm_dashboard': {
+  label: 'FM Dashboard',
+  children: ['tab_fm_eesy', 'tab_fm_yousee']
+}
+
+// Tilfoej:
+'menu_fm_overview': {
+  label: 'FM Oversigt',
+  children: ['tab_fm_eesy', 'tab_fm_yousee']
+}
+```
 
 ---
 
-## Problem 5: Beskeder i Mit Hjem bruger forkert permission
+## AEndring 3: Database - Indsaet manglende permission-raekker
 
-I sidebaren (linje 552) vises "Beskeder" under Mit Hjem med `p.canViewMessages`, men `canViewMessages` mapper til `menu_messages` (rekruttering-beskeder). Den korrekte permission er `menu_messages_personal`.
+Koer SQL for at genoprette tab-permissions for relevante roller:
 
-Der FINDES allerede et helper i `usePositionPermissions.ts`: `canViewMessagesPersonal` eksisterer IKKE - men burde oprettes for `menu_messages_personal`. Lige nu bruger sidebaren den forkerte check.
-
-**Fix**: Tilfoej `canViewMessagesPersonal` helper i `usePositionPermissions.ts` og brug den i sidebaren i stedet for `canViewMessages`.
+```text
+INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
+VALUES 
+  ('fm_leder', 'tab_fm_eesy', true, true, 'team'),
+  ('fm_leder', 'tab_fm_yousee', true, true, 'team'),
+  ('assisterende_teamleder_fm', 'tab_fm_eesy', true, false, 'team'),
+  ('assisterende_teamleder_fm', 'tab_fm_yousee', true, false, 'team'),
+  ('ejer', 'tab_fm_eesy', true, true, 'all'),
+  ('ejer', 'tab_fm_yousee', true, true, 'all')
+ON CONFLICT DO NOTHING;
+```
 
 ---
 
-## Samlet Filoversigt
+## Filoversigt
 
-| Fil | AEndringer |
+| Fil | AEndring |
 |---|---|
-| `src/config/permissionKeys.ts` | Fjern 5 FM-keys, tilfoej `menu_cancellations` |
-| `src/config/permissions.ts` | Fjern `menu_fm_my_week`, tilfoej Annulleringer |
-| `src/hooks/usePositionPermissions.ts` | Fjern 5 FM-helpers, tilfoej cancellations/economic/live-stats/messages-personal helpers |
-| `src/components/layout/AppSidebar.tsx` | Fjern 3 FM-entries, fix okonomi permissions, fix Live Stats, fix Beskeder |
-| `src/routes/config.tsx` | Fjern fieldmarketing-dashboard rute + import |
-| Database | Slet 5 FM permission-raekker |
+| `src/config/permissionKeys.ts` | Tilfoej `tab_fm_eesy` og `tab_fm_yousee` tilbage |
+| `src/components/employees/permissions/permissionGroups.ts` | Flyt tab-gruppe fra slettet parent til `menu_fm_overview` |
+| Database: `role_page_permissions` | Indsaet permissions for fm_leder, assisterende_teamleder_fm og ejer |
 
-## Prioritering
-
-1. **Kritisk** - FM oprydning (Problem 1): Fjerner doede links
-2. **Hoej** - Beskeder forkert permission (Problem 5): Kan give forkert adgang
-3. **Hoej** - menu_cancellations mangler (Problem 2): Usynlig i Permission Editor
-4. **Medium** - Okonomi mangler checks (Problem 3): Viser alt naar sektionen er synlig
-5. **Lav** - Live Stats forkert check (Problem 4): Mindre afvigelse
+## Effekt
+- William Bornak (fm_leder) kan se Fieldmarketing-dashboardet med begge faner (Eesy FM og Yousee)
+- Assisterende Teamledere FM kan ogsaa se fanerne
+- Ejere paavirkes ikke (de har allerede adgang via owner-override)
+- Permission Editor viser tab-permissions korrekt under Fieldmarketing-sektionen
