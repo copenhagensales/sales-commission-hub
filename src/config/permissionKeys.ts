@@ -180,6 +180,7 @@ export const PERMISSION_KEYS = {
 
   // ==================== LØN (under menu_section_salary) ====================
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
+  menu_cancellations: { label: 'Annulleringer', section: 'salary', parent: 'menu_section_salary' },
 
   // ==================== DASHBOARDS (under menu_section_dashboards) ====================
   // NOTE: Individual dashboard permissions are managed via team_dashboard_permissions table
@@ -222,10 +223,8 @@ export const PERMISSION_KEYS = {
 
   // ==================== FIELDMARKETING (under menu_section_fieldmarketing) ====================
   menu_fm_overview: { label: 'Oversigt', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_my_week: { label: 'Min uge', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_booking: { label: 'Booking', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_vehicles: { label: 'Køretøjer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_dashboard: { label: 'Dashboard', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_sales_registration: { label: 'Salgsregistrering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_billing: { label: 'Fakturering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_travel_expenses: { label: 'Rejseudgifter', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
@@ -234,7 +233,6 @@ export const PERMISSION_KEYS = {
   menu_fm_book_week: { label: 'Book uge', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_bookings: { label: 'Kommende bookinger', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_locations: { label: 'Lokationer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_vagtplan_fm: { label: 'Vagtplan FM', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
 
   // Fieldmarketing Tabs
   tab_fm_book_week: { label: 'Fane: Book uge', section: 'fieldmarketing', parent: 'menu_fm_booking' },
@@ -242,8 +240,6 @@ export const PERMISSION_KEYS = {
   tab_fm_markets: { label: 'Fane: Kommende markeder', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_locations: { label: 'Fane: Lokationer', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_vagtplan: { label: 'Fane: Vagtplan FM', section: 'fieldmarketing', parent: 'menu_fm_booking' },
-  tab_fm_eesy: { label: 'Fane: Eesy FM', section: 'fieldmarketing', parent: 'menu_fm_dashboard' },
-  tab_fm_yousee: { label: 'Fane: Yousee', section: 'fieldmarketing', parent: 'menu_fm_dashboard' },
 
   // ==================== SALG & SYSTEM (under menu_section_sales_system) ====================
   menu_sales: { label: 'Salg', section: 'sales_system', parent: 'menu_section_sales_system' },

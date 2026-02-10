@@ -441,7 +441,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     (p.canViewFmOverview || p.canViewFmBookWeek || 
      p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
      p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
-     p.canViewFmDashboard || p.canViewFmVagtplanFm || p.canViewFmMyWeek);
+     false);
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
@@ -549,7 +549,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               )}
 
               {/* Beskeder */}
-              {p.canViewMessages && (
+              {p.canViewMessagesPersonal && (
                 <NavLink
                   to="/messages"
                   onClick={handleNavClick}
@@ -1176,33 +1176,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     {t("sidebar.vehicles")}
                   </NavLink>
                 )}
-                {(p.canViewFmDashboard || p.canViewFmSalesRegistration) && (
-                  <NavLink to="/vagt-flow/fieldmarketing-dashboard" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/fieldmarketing-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    {t("sidebar.fieldmarketingDashboard")}
-                  </NavLink>
-                )}
-                {p.canViewFmVagtplanFm && (
-                  <NavLink to="/vagt-flow/vagtplan-fm" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/vagtplan-fm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <CalendarClock className="h-4 w-4" />
-                    Vagtplan FM
-                  </NavLink>
-                )}
-                {p.canViewFmMyWeek && (
-                  <NavLink to="/vagt-flow/min-uge" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/min-uge" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Calendar className="h-4 w-4" />
-                    Min uge
-                  </NavLink>
-                )}
                 {p.canViewFmSalesRegistration && (
                   <NavLink to="/vagt-flow/sales-registration" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1609,6 +1582,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {economicOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewEconomicDashboard && (
                 <NavLink to="/economic" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/economic" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1616,6 +1590,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <LayoutDashboard className="h-4 w-4" />
                   Overblik
                 </NavLink>
+                )}
+                {p.canViewEconomicExpenses && (
                 <NavLink to="/economic/expenses" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/economic/expenses" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1623,6 +1599,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <Receipt className="h-4 w-4" />
                   Udgifter
                 </NavLink>
+                )}
+                {p.canViewEconomicBudget && (
                 <NavLink to="/economic/budget" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/economic/budget" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1630,6 +1608,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <Target className="h-4 w-4" />
                   Budget 2026
                 </NavLink>
+                )}
+                {p.canViewEconomicMapping && (
                 <NavLink to="/economic/mapping" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/economic/mapping" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1637,6 +1617,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <Database className="h-4 w-4" />
                   Mapping
                 </NavLink>
+                )}
+                {p.canViewEconomicUpload && (
                 <NavLink to="/admin/economic-upload" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/admin/economic-upload" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1644,6 +1626,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <Database className="h-4 w-4" />
                   Import
                 </NavLink>
+                )}
               </CollapsibleContent>
             </Collapsible>
           )}
@@ -1664,7 +1647,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           )}
 
           {/* Live Stats */}
-          {p.canViewSettings && (
+          {p.canViewLiveStats && (
             <NavLink
               to="/live-stats"
               onClick={handleNavClick}

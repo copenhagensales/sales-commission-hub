@@ -26,7 +26,6 @@ import {
   VagtLocationDetail,
   VagtBilling,
   VagtSalesRegistration,
-  VagtFieldmarketingDashboard,
   VagtTravelExpenses,
   VagtEditSalesRegistrations,
   ShiftOverview,
@@ -192,12 +191,6 @@ export const routes: RouteConfig[] = [
   {
     path: "/vagt-flow/sales-registration",
     component: VagtSalesRegistration,
-    access: "role",
-    positionPermission: "menu_fm_sales_registration",
-  },
-  {
-    path: "/vagt-flow/fieldmarketing-dashboard",
-    component: VagtFieldmarketingDashboard,
     access: "role",
     positionPermission: "menu_fm_sales_registration",
   },
