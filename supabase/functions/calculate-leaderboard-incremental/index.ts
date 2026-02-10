@@ -444,21 +444,36 @@ Deno.serve(async (req) => {
     });
 
     // ============= BUILD AGENT MAPPINGS =============
-    const { data: agents } = await supabase.from("agents").select("id, email");
+    // Helper for paginated fetch
+    const PAGE_SIZE = 500;
+    async function fetchAllPaginated(table: string, select: string, filters?: (q: any) => any) {
+      const all: any[] = [];
+      let offset = 0;
+      while (true) {
+        let q = supabase.from(table).select(select).order("created_at", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+        if (filters) q = filters(q);
+        const { data: page } = await q;
+        if (!page || page.length === 0) break;
+        all.push(...page);
+        offset += page.length;
+        if (page.length < PAGE_SIZE) break;
+      }
+      return all;
+    }
+
+    const agents = await fetchAllPaginated("agents", "id, email");
     
     const emailToAgentId = new Map<string, string>();
-    for (const agent of (agents || [])) {
+    for (const agent of agents) {
       if (agent.email) {
         emailToAgentId.set(agent.email.toLowerCase(), agent.id);
       }
     }
 
-    const { data: agentMappings } = await supabase
-      .from("employee_agent_mapping")
-      .select("agent_id, employee_id");
+    const agentMappings = await fetchAllPaginated("employee_agent_mapping", "agent_id, employee_id");
     
     const agentIdToEmployeeId = new Map<string, string>();
-    for (const mapping of (agentMappings || [])) {
+    for (const mapping of agentMappings) {
       agentIdToEmployeeId.set(mapping.agent_id, mapping.employee_id);
     }
 
@@ -498,15 +513,13 @@ Deno.serve(async (req) => {
     console.log(`[calculate-leaderboard-incremental] Cross-sale products: ${crossSaleProductIds.size}`);    
 
     // ============= FETCH CLIENTS & CAMPAIGNS =============
-    const { data: clients } = await supabase.from("clients").select("id, name");
-    const clientList = (clients || []) as { id: string; name: string }[];
+    const clients = await fetchAllPaginated("clients", "id, name");
+    const clientList = clients as { id: string; name: string }[];
 
-    const { data: campaigns } = await supabase
-      .from("client_campaigns")
-      .select("id, client_id");
+    const campaigns = await fetchAllPaginated("client_campaigns", "id, client_id");
     
     const campaignToClientMap = new Map<string, string>();
-    for (const campaign of (campaigns || [])) {
+    for (const campaign of campaigns) {
       campaignToClientMap.set(campaign.id, campaign.client_id);
     }
 

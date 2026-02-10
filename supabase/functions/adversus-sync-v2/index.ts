@@ -191,16 +191,28 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
   // --- CACHES (Aquí está la magia para recuperar nombres) ---
   
   // 1. Productos y Mapeos
-  const { data: products } = await supabase.from('products').select('id, name, commission_dkk, revenue_dkk')
-  const { data: prodMappings } = await supabase.from('adversus_product_mappings').select('*')
-  
-  // 2. Agentes (Para quitar el "Desconocido")
-  const { data: agents } = await supabase.from('agents').select('id, external_adversus_id, name')
+  // Paginated lookup fetches to future-proof against 1000-row limit
+  const PAGE_SIZE = 500;
+  async function fetchAll(table: string, select: string) {
+    const all: any[] = [];
+    let offset = 0;
+    while (true) {
+      const { data: page } = await supabase.from(table).select(select).order('created_at', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+      if (!page || page.length === 0) break;
+      all.push(...page);
+      offset += page.length;
+      if (page.length < PAGE_SIZE) break;
+    }
+    return all;
+  }
+  const products = await fetchAll('products', 'id, name, commission_dkk, revenue_dkk');
+  const prodMappings = await fetchAll('adversus_product_mappings', '*');
+  const agents = await fetchAll('agents', 'id, external_adversus_id, name');
 
   // Mapas para búsqueda rápida
-  const mapByExtId = new Map(prodMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
-  const mapByName = new Map(products?.map((p: any) => [p.name.toLowerCase(), p]))
-  const mapAgents = new Map(agents?.map((a: any) => [String(a.external_adversus_id), a])) // Mapa de agentes por ID externo
+  const mapByExtId = new Map(prodMappings.map((m: any) => [m.adversus_external_id, m.product_id]));
+  const mapByName = new Map(products.map((p: any) => [p.name.toLowerCase(), p]));
+  const mapAgents = new Map(agents.map((a: any) => [String(a.external_adversus_id), a]));
 
   let processed = 0
   let errors = 0

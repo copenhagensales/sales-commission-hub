@@ -630,11 +630,12 @@ const fetchMetricValueForFormula = async (
       const dateStart = startISO.split("T")[0];
       const dateEnd = endISO.split("T")[0];
       
-      const { data: shifts } = await supabase
-        .from("shift")
-        .select("start_time, end_time, break_minutes")
-        .gte("date", dateStart)
-        .lte("date", dateEnd);
+      const shifts = await fetchAllRows<{start_time: string; end_time: string; break_minutes: number | null}>(
+        "shift",
+        "start_time, end_time, break_minutes",
+        (q) => q.gte("date", dateStart).lte("date", dateEnd),
+        { orderBy: "date", ascending: true }
+      );
       
       let totalHours = 0;
       (shifts || []).forEach((shift: any) => {

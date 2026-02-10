@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 // Types
 export interface EconomicKategori {
@@ -130,26 +131,27 @@ export function usePosteringerEnriched(filters?: {
   return useQuery({
     queryKey: ["posteringer-enriched", filters],
     queryFn: async () => {
-      // We'll use RPC or direct query since it's a view
-      let query = supabase.from("posteringer_enriched").select("*");
-      
-      if (filters?.year) {
-        const yearStart = `${filters.year}-01-01`;
-        const yearEnd = `${filters.year}-12-31`;
-        query = query.gte("dato", yearStart).lte("dato", yearEnd);
-      }
-      
-      if (filters?.teamId) {
-        query = query.eq("team_id", filters.teamId);
-      }
-      
-      if (filters?.kategoriId) {
-        query = query.eq("kategori_id", filters.kategoriId);
-      }
-      
-      const { data, error } = await query.order("dato", { ascending: false });
-      if (error) throw error;
-      return data as PosteringEnriched[];
+      const data = await fetchAllRows<PosteringEnriched>(
+        "posteringer_enriched",
+        "*",
+        (q) => {
+          let query = q;
+          if (filters?.year) {
+            const yearStart = `${filters.year}-01-01`;
+            const yearEnd = `${filters.year}-12-31`;
+            query = query.gte("dato", yearStart).lte("dato", yearEnd);
+          }
+          if (filters?.teamId) {
+            query = query.eq("team_id", filters.teamId);
+          }
+          if (filters?.kategoriId) {
+            query = query.eq("kategori_id", filters.kategoriId);
+          }
+          return query;
+        },
+        { orderBy: "dato", ascending: false }
+      );
+      return data;
     },
   });
 }

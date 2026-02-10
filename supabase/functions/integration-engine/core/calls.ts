@@ -1,6 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardCall } from "../types.ts"
-import { chunk } from "../utils/batch.ts"
+import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 
 /**
  * List of email domains that should be excluded from syncing.
@@ -119,15 +119,15 @@ export async function processCalls(
     "INFO",
     `Procesando ${filteredCalls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
   )
-  const { data: agents } = await supabase.from("agents").select("id, external_adversus_id, external_dialer_id, email")
+  const agents = await fetchAllPaginated(supabase, "agents", "id, external_adversus_id, external_dialer_id, email", (q) => q);
   const agentMapByExtId = new Map<string, string>(
-    agents?.filter((a: any) => a.external_adversus_id && a.id).map((a: any) => [a.external_adversus_id, a.id]) || []
+    agents.filter((a: any) => a.external_adversus_id && a.id).map((a: any) => [a.external_adversus_id, a.id])
   )
   const agentMapByDialerId = new Map<string, string>(
-    agents?.filter((a: any) => a.external_dialer_id && a.id).map((a: any) => [a.external_dialer_id, a.id]) || []
+    agents.filter((a: any) => a.external_dialer_id && a.id).map((a: any) => [a.external_dialer_id, a.id])
   )
   const agentMapByEmail = new Map<string, string>(
-    agents?.filter((a: any) => a.email && a.id).map((a: any) => [a.email.toLowerCase(), a.id]) || []
+    agents.filter((a: any) => a.email && a.id).map((a: any) => [a.email.toLowerCase(), a.id])
   )
   let totalProcessed = 0
   let totalErrors = 0
