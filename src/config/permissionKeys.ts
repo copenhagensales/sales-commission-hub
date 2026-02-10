@@ -235,6 +235,8 @@ export const PERMISSION_KEYS = {
   menu_fm_locations: { label: 'Lokationer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
 
   // Fieldmarketing Tabs
+  tab_fm_eesy: { label: 'Fane: Eesy FM Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
+  tab_fm_yousee: { label: 'Fane: Yousee Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
   tab_fm_book_week: { label: 'Fane: Book uge', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_bookings: { label: 'Fane: Kommende bookinger', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_markets: { label: 'Fane: Kommende markeder', section: 'fieldmarketing', parent: 'menu_fm_booking' },

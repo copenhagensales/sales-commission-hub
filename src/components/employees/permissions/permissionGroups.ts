@@ -32,9 +32,9 @@ export const PERMISSION_GROUPS: Record<string, { label: string; children: string
     label: 'Beskeder',
     children: ['tab_messages_all', 'tab_messages_sms', 'tab_messages_email', 'tab_messages_call', 'tab_messages_sent']
   },
-  // FM Dashboard tabs
-  'menu_fm_dashboard': {
-    label: 'FM Dashboard',
+  // FM Oversigt tabs
+  'menu_fm_overview': {
+    label: 'FM Oversigt',
     children: ['tab_fm_eesy', 'tab_fm_yousee']
   }
 };
