@@ -1,111 +1,89 @@
 
-# Fieldmarketing Rettighedsfix - Komplet Plan
+# Komplet Oprydning: FM + Systemdækkende Problemer
 
-## Identificerede Problemer
+## Analyse-resultat
 
-### Problem 1: Kritisk - Forkert rollemapping i useUnifiedPermissions
-I filen `useUnifiedPermissions.ts` (linje 129) matcher "Assisterende Teamleder FM" det generiske `includes('teamleder')`-tjek foer det specifikke FM-tjek. Dette betyder at Assisterende Teamleder FM faar `teamleder`-rettigheder i stedet for `assisterende_teamleder_fm`-rettigheder.
-
-`usePositionPermissions.ts` haandterer dette korrekt (linje 67 tjekker foer linje 73), men `useUnifiedPermissions.ts` har fejlen.
-
-**Fix**: Tilfoej specifik check for "assisterende teamleder fm" FOER den generiske `includes('teamleder')` check.
-
-### Problem 2: Manglende permission-raekkker i databasen
-Foelgende permission keys mangler helt for `fm_leder` og `assisterende_teamleder_fm`:
-
-| Permission Key | fm_leder | assisterende_teamleder_fm |
-|---|---|---|
-| `menu_fm_dashboard` | Sat til false | Mangler helt |
-| `menu_fm_my_week` | Sat til false | Mangler helt |
-| `menu_fm_vagtplan_fm` | Sat til false | Har can_view: true |
-
-`menu_fm_dashboard` og `menu_fm_my_week` skal vaere aktiveret for begge roller.
-
-### Problem 3: Sidebar mangler menupunkter
-Sidebaren renderer IKKE foelgende FM-menupunkter, selvom de findes som permission keys:
-- **Dashboard** (`menu_fm_dashboard`) - Der er ingen sidebar-entry der bruger denne permission. "Dashboard" linket bruger `canViewFmSalesRegistration` i stedet.
-- **Vagtplan FM** (`menu_fm_vagtplan_fm`) - Ingen sidebar-entry
-- **Min uge** (`menu_fm_my_week`) - Ingen sidebar-entry
-
-Screenshottet viser at "Dashboard" bor vaere et separat menupunkt med sin egen permission.
-
-### Problem 4: Sidebar mangler canViewFm-helpers
-`usePositionPermissions.ts` returnerer IKKE `canViewFmDashboard` eller `canViewFmVagtplanFm` - disse properties mangler i return-objektet.
+Ud over de 3 FM-menupunkter der skal slettes, fandt analysen foelgende problemer i resten af systemet:
 
 ---
 
-## Loesningsplan
+## Problem 1: FM - Dashboard, Vagtplan FM, Min uge (som aftalt)
 
-### AEndring 1: Fix rollemapping i useUnifiedPermissions.ts
-**Fil**: `src/hooks/useUnifiedPermissions.ts` (linje 124-133)
+Tre sidebar-menupunkter peger paa ruter der ikke eksisterer (`/vagt-flow/vagtplan-fm` og `/vagt-flow/min-uge`) eller duplikerer funktionalitet (`/vagt-flow/fieldmarketing-dashboard`).
 
-Tilfoej specifik check for "assisterende teamleder fm" foer den generiske teamleder-check:
-
-```text
-if (titleLower === 'ejer') return 'ejer';
-if (titleLower === 'fieldmarketing leder') return 'fm_leder';
-if (titleLower === 'assisterende teamleder fm') return 'assisterende_teamleder_fm';  // <-- NY
-if (titleLower.includes('teamleder')) return 'teamleder';
-if (titleLower === 'rekruttering') return 'rekruttering';
-if (titleLower === 'some') return 'some';
-if (titleLower === 'fieldmarketing') return 'fm_medarbejder_';
-```
-
-### AEndring 2: Database-migration - aktiver manglende permissions
-Koer SQL for at aktivere de manglende/deaktiverede FM permission keys:
-
-```text
--- Aktiver menu_fm_dashboard for fm_leder
-UPDATE role_page_permissions 
-SET can_view = true, can_edit = true 
-WHERE role_key = 'fm_leder' AND permission_key = 'menu_fm_dashboard';
-
--- Aktiver menu_fm_vagtplan_fm for fm_leder
-UPDATE role_page_permissions 
-SET can_view = true, can_edit = true 
-WHERE role_key = 'fm_leder' AND permission_key = 'menu_fm_vagtplan_fm';
-
--- Indsaet manglende raekkker for assisterende_teamleder_fm
-INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
-VALUES 
-  ('assisterende_teamleder_fm', 'menu_fm_dashboard', true, true, 'team'),
-  ('assisterende_teamleder_fm', 'menu_fm_my_week', true, true, 'self')
-ON CONFLICT DO NOTHING;
-```
-
-### AEndring 3: Tilfoej manglende sidebar-menupunkter
-**Fil**: `src/components/layout/AppSidebar.tsx`
-
-Tilfoej tre manglende menupunkter i Fieldmarketing-sektionen:
-1. **Dashboard** (`canViewFmDashboard`) - peger paa `/vagt-flow/fieldmarketing-dashboard` med `menu_fm_dashboard` permission
-2. **Vagtplan FM** (`canViewFmVagtplanFm`) - peger paa den relevante rute
-
-Opdater ogsaa `showFieldmarketingMenu`-checket til at inkludere de nye permissions.
-
-### AEndring 4: Tilfoej manglende permission helpers
-**Fil**: `src/hooks/usePositionPermissions.ts`
-
-Tilfoej de manglende `canView`/`canEdit` properties:
-```text
-canViewFmDashboard: canView("menu_fm_dashboard"),
-canEditFmDashboard: canEdit("menu_fm_dashboard"),
-canViewFmVagtplanFm: canView("menu_fm_vagtplan_fm"),
-canEditFmVagtplanFm: canEdit("menu_fm_vagtplan_fm"),
-```
+**Slet fra:**
+- `AppSidebar.tsx`: Fjern de 3 sidebar-entries (linje 1179-1205) + fjern fra `showFieldmarketingMenu` (linje 444)
+- `usePositionPermissions.ts`: Fjern `canViewFmDashboard`, `canEditFmDashboard`, `canViewFmVagtplanFm`, `canEditFmVagtplanFm`, `canViewFmMyWeek`
+- `permissionKeys.ts`: Fjern `menu_fm_dashboard`, `menu_fm_my_week`, `menu_fm_vagtplan_fm`, `tab_fm_eesy`, `tab_fm_yousee`
+- `permissions.ts`: Fjern `menu_fm_my_week` fra PERMISSION_CATEGORIES
+- `routes/config.tsx`: Fjern `/vagt-flow/fieldmarketing-dashboard` ruten + `VagtFieldmarketingDashboard` import
+- Database: Slet raekker for de 5 keys
 
 ---
 
-## Filoversigt
+## Problem 2: `menu_cancellations` mangler i permissionKeys.ts
 
-| Fil | AEndring |
+Permission key `menu_cancellations` bruges i:
+- `routes/config.tsx` (linje 367): rute med `positionPermission: "menu_cancellations"`
+- `AppSidebar.tsx` (linje 84): `canViewCancellations = p.canView("menu_cancellations")`
+
+Men den eksisterer IKKE i `permissionKeys.ts` (den centrale kilde). Det betyder:
+- Den dukker ikke op i Permission Editor
+- Auto-seeding opretter den ikke for nye roller
+- Kun ejere kan se den (owner-override)
+
+**Fix**: Tilfoej `menu_cancellations` til `permissionKeys.ts` under `menu_section_salary`, og tilfoej den til `permissions.ts` PERMISSION_CATEGORIES under Loen-sektionen. Tilfoej ogsaa `canViewCancellations` og `canEditCancellations` som egentlige permission helpers i `usePositionPermissions.ts` i stedet for den loese `p.canView()` reference i sidebaren.
+
+---
+
+## Problem 3: Okonomi-menu mangler permissions-check i sidebaren
+
+Okonomi-sektionen i sidebaren (linje 1597-1649) renderer ALLE menupunkter uden permissions-check. Alle 5 NavLinks vises altid naar `showEconomicMenu` er true, uden at tjekke individuelle rettigheder som `menu_economic_dashboard`, `menu_economic_expenses` osv.
+
+**Fix**: Wrap hvert NavLink i et permissions-check:
+- Overblik: `p.canView("menu_economic_dashboard")`
+- Udgifter: `p.canView("menu_economic_expenses")`
+- Budget 2026: `p.canView("menu_economic_budget")`
+- Mapping: `p.canView("menu_economic_mapping")`
+- Import: `p.canView("menu_economic_upload")`
+
+Tilfoej ogsaa de tilsvarende `canViewEconomic*` helpers til `usePositionPermissions.ts`.
+
+---
+
+## Problem 4: Live Stats bruger forkert permission
+
+Live Stats i sidebaren (linje 1667) vises naar `p.canViewSettings` er true, men den burde bruge sin egen permission `menu_live_stats`. Lige nu kan alle med Settings-adgang se Live Stats, selvom det er en separat funktion.
+
+**Fix**: AEndr betingelsen til `p.canViewLiveStats` (eller `p.canView("menu_live_stats")`), og tilfoej `canViewLiveStats` som helper i `usePositionPermissions.ts`.
+
+---
+
+## Problem 5: Beskeder i Mit Hjem bruger forkert permission
+
+I sidebaren (linje 552) vises "Beskeder" under Mit Hjem med `p.canViewMessages`, men `canViewMessages` mapper til `menu_messages` (rekruttering-beskeder). Den korrekte permission er `menu_messages_personal`.
+
+Der FINDES allerede et helper i `usePositionPermissions.ts`: `canViewMessagesPersonal` eksisterer IKKE - men burde oprettes for `menu_messages_personal`. Lige nu bruger sidebaren den forkerte check.
+
+**Fix**: Tilfoej `canViewMessagesPersonal` helper i `usePositionPermissions.ts` og brug den i sidebaren i stedet for `canViewMessages`.
+
+---
+
+## Samlet Filoversigt
+
+| Fil | AEndringer |
 |---|---|
-| `src/hooks/useUnifiedPermissions.ts` | Fix rollemapping for Assisterende Teamleder FM |
-| `src/hooks/usePositionPermissions.ts` | Tilfoej canViewFmDashboard og canViewFmVagtplanFm |
-| `src/components/layout/AppSidebar.tsx` | Tilfoej Dashboard og Vagtplan FM menupunkter |
-| Database migration | Aktiver manglende permission-raekkker |
+| `src/config/permissionKeys.ts` | Fjern 5 FM-keys, tilfoej `menu_cancellations` |
+| `src/config/permissions.ts` | Fjern `menu_fm_my_week`, tilfoej Annulleringer |
+| `src/hooks/usePositionPermissions.ts` | Fjern 5 FM-helpers, tilfoej cancellations/economic/live-stats/messages-personal helpers |
+| `src/components/layout/AppSidebar.tsx` | Fjern 3 FM-entries, fix okonomi permissions, fix Live Stats, fix Beskeder |
+| `src/routes/config.tsx` | Fjern fieldmarketing-dashboard rute + import |
+| Database | Slet 5 FM permission-raekker |
 
-## Effekt
-- Assisterende Teamleder FM faar korrekte FM-rettigheder (ikke generisk teamleder)
-- Fieldmarketing leder og assistent kan se Dashboard og Vagtplan FM i sidebaren
-- Alle FM-menupunkter fra screenshottet vil vaere synlige med korrekte rettigheder
-- Eksisterende roller og rettigheder paavirkes ikke
+## Prioritering
+
+1. **Kritisk** - FM oprydning (Problem 1): Fjerner doede links
+2. **Hoej** - Beskeder forkert permission (Problem 5): Kan give forkert adgang
+3. **Hoej** - menu_cancellations mangler (Problem 2): Usynlig i Permission Editor
+4. **Medium** - Okonomi mangler checks (Problem 3): Viser alt naar sektionen er synlig
+5. **Lav** - Live Stats forkert check (Problem 4): Mindre afvigelse
