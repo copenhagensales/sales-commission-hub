@@ -575,7 +575,6 @@ export function usePermissions() {
     // Fieldmarketing menu
     canViewFmOverview: canView("menu_fm_overview"),
     canEditFmOverview: canEdit("menu_fm_overview"),
-    canViewFmMyWeek: hasPermission("menu_fm_my_week"),
     canViewFmBookWeek: canView("menu_fm_book_week"),
     canEditFmBookWeek: canEdit("menu_fm_book_week"),
     canViewFmBookings: canView("menu_fm_bookings"),
@@ -593,10 +592,6 @@ export function usePermissions() {
     canViewFmEditSales: canView("menu_fm_edit_sales"),
     canEditFmEditSales: canEdit("menu_fm_edit_sales"),
     canViewFmTravelExpenses: canView("menu_fm_travel_expenses"),
-    canViewFmDashboard: canView("menu_fm_dashboard"),
-    canEditFmDashboard: canEdit("menu_fm_dashboard"),
-    canViewFmVagtplanFm: canView("menu_fm_vagtplan_fm"),
-    canEditFmVagtplanFm: canEdit("menu_fm_vagtplan_fm"),
     // Recruitment menu
     canViewRecruitmentDashboard: canView("menu_recruitment_dashboard"),
     canViewCandidates: canView("menu_candidates"),
@@ -645,5 +640,16 @@ export function usePermissions() {
     // Admin menu
     canViewKpiDefinitions: canView("menu_kpi_definitions"),
     canEditKpiDefinitions: canEdit("menu_kpi_definitions"),
+    // Cancellations
+    canViewCancellations: canView("menu_cancellations"),
+    canEditCancellations: canEdit("menu_cancellations"),
+    // Personal messages (distinct from recruitment messages)
+    canViewMessagesPersonal: canView("menu_messages_personal"),
+    // Economic individual items
+    canViewEconomicDashboard: canView("menu_economic_dashboard"),
+    canViewEconomicExpenses: canView("menu_economic_expenses"),
+    canViewEconomicBudget: canView("menu_economic_budget"),
+    canViewEconomicMapping: canView("menu_economic_mapping"),
+    canViewEconomicUpload: canView("menu_economic_upload"),
   };
 }
