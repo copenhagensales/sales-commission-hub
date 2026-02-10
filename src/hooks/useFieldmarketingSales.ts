@@ -239,13 +239,11 @@ export function useCreateFieldmarketingSale() {
         };
       }));
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("sales")
-        .insert(enrichedSales)
-        .select();
+        .insert(enrichedSales);
       
       if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
