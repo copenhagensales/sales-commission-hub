@@ -1,101 +1,111 @@
 
+# Fieldmarketing Rettighedsfix - Komplet Plan
 
-# Bloomreach_API Fallback Fix
+## Identificerede Problemer
 
-## Problem
-ASE-integrationen filtrerer 9 gyldige salg fra, fordi `lastModifiedByUser.orgCode` overskives af "Bloomreach_API" efter salget lukkes. Filteret kraever `@copenhagensales.dk`, saa disse salg afvises. Den rigtige saelger staar i `firstProcessedByUser.orgCode`.
+### Problem 1: Kritisk - Forkert rollemapping i useUnifiedPermissions
+I filen `useUnifiedPermissions.ts` (linje 129) matcher "Assisterende Teamleder FM" det generiske `includes('teamleder')`-tjek foer det specifikke FM-tjek. Dette betyder at Assisterende Teamleder FM faar `teamleder`-rettigheder i stedet for `assisterende_teamleder_fm`-rettigheder.
 
-## Loesning (2 aendringer i enreach.ts)
+`usePositionPermissions.ts` haandterer dette korrekt (linje 67 tjekker foer linje 73), men `useUnifiedPermissions.ts` har fejlen.
 
-### AEndring 1: Fallback i `checkRule` (linje 828-847)
+**Fix**: Tilfoej specifik check for "assisterende teamleder fm" FOER den generiske `includes('teamleder')` check.
 
-Naar et filter paa `lastModifiedByUser.orgCode` fejler, proev automatisk `firstProcessedByUser.orgCode` som fallback (og omvendt). Dette sikrer at filteret matcher uanset hvilket felt der indeholder den korrekte agent-email.
+### Problem 2: Manglende permission-raekkker i databasen
+Foelgende permission keys mangler helt for `fm_leder` og `assisterende_teamleder_fm`:
 
-Konkret: efter linje 847 (den eksisterende `agentEmail` compat-logik), tilfoej en ny fallback-blok:
+| Permission Key | fm_leder | assisterende_teamleder_fm |
+|---|---|---|
+| `menu_fm_dashboard` | Sat til false | Mangler helt |
+| `menu_fm_my_week` | Sat til false | Mangler helt |
+| `menu_fm_vagtplan_fm` | Sat til false | Har can_view: true |
 
-```
-// Bloomreach_API fallback: if lastModifiedByUser.orgCode fails filter,
-// try firstProcessedByUser.orgCode (and vice versa)
-if (rule.field === "lastModifiedByUser.orgCode") {
-  // Already resolved fieldValue from lastModifiedByUser.orgCode
-  // If it doesn't pass the filter, we'll let checkRule continue with
-  // the resolved value - but first try the fallback
-  const fallback = this.getNestedValue(lead, "firstProcessedByUser.orgCode") ??
-    this.getNestedValue(lead, "FirstProcessedByUser.orgCode");
-  if (fallback && (!fieldValue || fieldValue === "")) {
-    fieldValue = fallback;
-  }
-}
-```
+`menu_fm_dashboard` og `menu_fm_my_week` skal vaere aktiveret for begge roller.
 
-Men dette er ikke nok - vi skal proeve fallback naar vaerdien *ikke matcher filteret*, ikke kun naar den er tom. Derfor en bedre tilgang: Wrap hele `checkRule`-evalueringen saa vi proever fallback-feltet hvis det primaere felt fejler:
+### Problem 3: Sidebar mangler menupunkter
+Sidebaren renderer IKKE foelgende FM-menupunkter, selvom de findes som permission keys:
+- **Dashboard** (`menu_fm_dashboard`) - Der er ingen sidebar-entry der bruger denne permission. "Dashboard" linket bruger `canViewFmSalesRegistration` i stedet.
+- **Vagtplan FM** (`menu_fm_vagtplan_fm`) - Ingen sidebar-entry
+- **Min uge** (`menu_fm_my_week`) - Ingen sidebar-entry
 
-**Bedre implementering** - tilfoej fallback-logik i `passesDataFilters` legacy filter-loop (linje 900-904):
+Screenshottet viser at "Dashboard" bor vaere et separat menupunkt med sin egen permission.
 
-```typescript
-// I stedet for:
-const passesLegacy = filters.every((rule) => this.checkRule(lead, rule));
+### Problem 4: Sidebar mangler canViewFm-helpers
+`usePositionPermissions.ts` returnerer IKKE `canViewFmDashboard` eller `canViewFmVagtplanFm` - disse properties mangler i return-objektet.
 
-// Erstat med:
-const passesLegacy = filters.every((rule) => {
-  if (this.checkRule(lead, rule)) return true;
-  
-  // Bloomreach_API fallback: try alternative user field
-  if (rule.field === "lastModifiedByUser.orgCode") {
-    const fallbackRule = { ...rule, field: "firstProcessedByUser.orgCode" };
-    if (this.checkRule(lead, fallbackRule)) {
-      console.log(`[EnreachAdapter] Bloomreach fallback: lastModifiedByUser failed, firstProcessedByUser passed for filter`);
-      return true;
-    }
-  }
-  return false;
-});
-```
+---
 
-Samme logik tilfoejs i `checkFilterGroup` (linje 887-896) for at daekke nye filter-grupper.
+## Loesningsplan
 
-### AEndring 2: Fallback i `mapLeadToSale` agent-email (linje 500-506)
+### AEndring 1: Fix rollemapping i useUnifiedPermissions.ts
+**Fil**: `src/hooks/useUnifiedPermissions.ts` (linje 124-133)
 
-Nuvaerende kode (linje 506):
-```typescript
-const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || "";
+Tilfoej specifik check for "assisterende teamleder fm" foer den generiske teamleder-check:
+
+```text
+if (titleLower === 'ejer') return 'ejer';
+if (titleLower === 'fieldmarketing leder') return 'fm_leder';
+if (titleLower === 'assisterende teamleder fm') return 'assisterende_teamleder_fm';  // <-- NY
+if (titleLower.includes('teamleder')) return 'teamleder';
+if (titleLower === 'rekruttering') return 'rekruttering';
+if (titleLower === 'some') return 'some';
+if (titleLower === 'fieldmarketing') return 'fm_medarbejder_';
 ```
 
-Dette virker allerede korrekt - den proever `firstProcessedByUser` foerst. Men vi skal ogsaa validere at vaerdien er en reel email (ikke "Bloomreach_API" eller lignende):
+### AEndring 2: Database-migration - aktiver manglende permissions
+Koer SQL for at aktivere de manglende/deaktiverede FM permission keys:
 
-```typescript
-const VALID_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-const isValidAgentEmail = (email: string | undefined): boolean => {
-  if (!email) return false;
-  return VALID_AGENT_DOMAINS.some(d => email.toLowerCase().endsWith(d));
-};
+```text
+-- Aktiver menu_fm_dashboard for fm_leder
+UPDATE role_page_permissions 
+SET can_view = true, can_edit = true 
+WHERE role_key = 'fm_leder' AND permission_key = 'menu_fm_dashboard';
 
-const firstOrgCode = firstProcessedByUser?.orgCode as string | undefined;
-const lastOrgCode = lastModifiedByUser?.orgCode as string | undefined;
+-- Aktiver menu_fm_vagtplan_fm for fm_leder
+UPDATE role_page_permissions 
+SET can_view = true, can_edit = true 
+WHERE role_key = 'fm_leder' AND permission_key = 'menu_fm_vagtplan_fm';
 
-// Prefer firstProcessedByUser, but validate it's a real agent email
-// Fall back to lastModifiedByUser if first is invalid, and vice versa
-let agentOrgCode = "";
-if (isValidAgentEmail(firstOrgCode)) {
-  agentOrgCode = firstOrgCode!;
-} else if (isValidAgentEmail(lastOrgCode)) {
-  agentOrgCode = lastOrgCode!;
-} else {
-  agentOrgCode = firstOrgCode || lastOrgCode || "";
-}
+-- Indsaet manglende raekkker for assisterende_teamleder_fm
+INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
+VALUES 
+  ('assisterende_teamleder_fm', 'menu_fm_dashboard', true, true, 'team'),
+  ('assisterende_teamleder_fm', 'menu_fm_my_week', true, true, 'self')
+ON CONFLICT DO NOTHING;
 ```
 
-## Fil-oversigt
+### AEndring 3: Tilfoej manglende sidebar-menupunkter
+**Fil**: `src/components/layout/AppSidebar.tsx`
 
-| Fil | Linjer | AEndring |
-|-----|--------|----------|
-| `supabase/functions/integration-engine/adapters/enreach.ts` | ~900-904 | Fallback i `passesDataFilters` legacy loop |
-| `supabase/functions/integration-engine/adapters/enreach.ts` | ~887-896 | Fallback i `checkFilterGroup` |
-| `supabase/functions/integration-engine/adapters/enreach.ts` | ~500-506 | Smart agent-email validering i `mapLeadToSale` |
+Tilfoej tre manglende menupunkter i Fieldmarketing-sektionen:
+1. **Dashboard** (`canViewFmDashboard`) - peger paa `/vagt-flow/fieldmarketing-dashboard` med `menu_fm_dashboard` permission
+2. **Vagtplan FM** (`canViewFmVagtplanFm`) - peger paa den relevante rute
+
+Opdater ogsaa `showFieldmarketingMenu`-checket til at inkludere de nye permissions.
+
+### AEndring 4: Tilfoej manglende permission helpers
+**Fil**: `src/hooks/usePositionPermissions.ts`
+
+Tilfoej de manglende `canView`/`canEdit` properties:
+```text
+canViewFmDashboard: canView("menu_fm_dashboard"),
+canEditFmDashboard: canEdit("menu_fm_dashboard"),
+canViewFmVagtplanFm: canView("menu_fm_vagtplan_fm"),
+canEditFmVagtplanFm: canEdit("menu_fm_vagtplan_fm"),
+```
+
+---
+
+## Filoversigt
+
+| Fil | AEndring |
+|---|---|
+| `src/hooks/useUnifiedPermissions.ts` | Fix rollemapping for Assisterende Teamleder FM |
+| `src/hooks/usePositionPermissions.ts` | Tilfoej canViewFmDashboard og canViewFmVagtplanFm |
+| `src/components/layout/AppSidebar.tsx` | Tilfoej Dashboard og Vagtplan FM menupunkter |
+| Database migration | Aktiver manglende permission-raekkker |
 
 ## Effekt
-- 9 Bloomreach_API-filtrerede salg vil blive registreret ved naeste sync
-- Fremtidige Bloomreach-overskrivninger haandteres automatisk
-- Straightline Agency forbliver filtreret fra (ingen aendring)
-- Eksisterende filtre og logik paavirkes ikke for andre klienter
-
+- Assisterende Teamleder FM faar korrekte FM-rettigheder (ikke generisk teamleder)
+- Fieldmarketing leder og assistent kan se Dashboard og Vagtplan FM i sidebaren
+- Alle FM-menupunkter fra screenshottet vil vaere synlige med korrekte rettigheder
+- Eksisterende roller og rettigheder paavirkes ikke
