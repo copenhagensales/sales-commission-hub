@@ -229,56 +229,49 @@ export const useDashboardKpiData = () => {
         }
 
         case "sales-revenue": {
-          let query = supabase
-            .from("sale_items")
-            .select(`
-              quantity,
-              product_id,
-              products!inner(revenue_dkk),
-              sales!inner(sale_datetime, client_campaign_id)
-            `)
-            .gte("sales.sale_datetime", startISO)
-            .lte("sales.sale_datetime", endISO);
-          
+          let revCampaignIds: string[] = [];
           if (clientId) {
             const { data: campaigns } = await supabase
               .from("client_campaigns")
               .select("id")
               .eq("client_id", clientId);
-            
-            if (campaigns && campaigns.length > 0) {
-              const campaignIds = campaigns.map(c => c.id);
-              query = query.in("sales.client_campaign_id", campaignIds);
-            }
+            revCampaignIds = (campaigns || []).map(c => c.id);
           }
           
-          const { data, error } = await query;
-          if (error) throw error;
+          const revenueItems = await fetchAllRows<any>(
+            "sale_items",
+            `quantity, product_id, products!inner(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`,
+            (q) => {
+              let filtered = q
+                .gte("sales.sale_datetime", startISO)
+                .lte("sales.sale_datetime", endISO);
+              if (revCampaignIds.length > 0) {
+                filtered = filtered.in("sales.client_campaign_id", revCampaignIds);
+              }
+              return filtered;
+            },
+            { orderBy: "id", ascending: true }
+          );
           
-          value = data?.reduce((sum, item) => {
+          value = revenueItems.reduce((sum, item) => {
             const revenue = (item.products as any)?.revenue_dkk || 0;
             return sum + (revenue * (item.quantity || 1));
-          }, 0) || 0;
+          }, 0);
           break;
         }
 
         case "avg-order-value": {
-          let query = supabase
-            .from("sale_items")
-            .select(`
-              quantity,
-              product_id,
-              products!inner(revenue_dkk),
-              sales!inner(sale_datetime, id)
-            `)
-            .gte("sales.sale_datetime", startISO)
-            .lte("sales.sale_datetime", endISO);
-          
-          const { data, error } = await query;
-          if (error) throw error;
+          const aovItems = await fetchAllRows<any>(
+            "sale_items",
+            `quantity, product_id, products!inner(revenue_dkk), sales!inner(sale_datetime, id)`,
+            (q) => q
+              .gte("sales.sale_datetime", startISO)
+              .lte("sales.sale_datetime", endISO),
+            { orderBy: "id", ascending: true }
+          );
           
           const salesMap = new Map<string, number>();
-          data?.forEach(item => {
+          aovItems.forEach(item => {
             const saleId = (item.sales as any)?.id;
             const revenue = (item.products as any)?.revenue_dkk || 0;
             const current = salesMap.get(saleId) || 0;
@@ -315,31 +308,23 @@ export const useDashboardKpiData = () => {
           break;
         }
 
-        case "avg-call-duration": {
-          const { data, error } = await supabase
-            .from("dialer_calls")
-            .select("duration_seconds")
-            .gte("start_time", startISO)
-            .lte("start_time", endISO)
-            .gt("duration_seconds", 0);
-          
-          if (error) throw error;
-          const totalDuration = data?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0;
-          value = data && data.length > 0 ? totalDuration / data.length : 0;
-          break;
-        }
-
+        case "avg-call-duration":
         case "talk-time": {
-          const { data, error } = await supabase
-            .from("dialer_calls")
-            .select("duration_seconds")
-            .gte("start_time", startISO)
-            .lte("start_time", endISO);
+          // Use RPC for server-side aggregation instead of fetching 12,000+ rows
+          const { data: callStats, error } = await supabase.rpc("get_call_stats", {
+            start_ts: startISO,
+            end_ts: endISO,
+          });
           
           if (error) throw error;
-          value = data?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0;
-          // Convert to hours for display
-          value = value / 3600;
+          const stats = callStats?.[0];
+          
+          if (kpiTypeId === "avg-call-duration") {
+            value = Number(stats?.avg_duration) || 0;
+          } else {
+            // talk-time: convert seconds to hours
+            value = (Number(stats?.total_duration) || 0) / 3600;
+          }
           break;
         }
 
@@ -450,32 +435,30 @@ export const useDashboardKpiData = () => {
             campaignIds = (campaigns || []).map(c => c.id);
           }
           
-          // Use mapped_commission from sale_items, matching Sales page logic
-          let query = supabase
-            .from("sale_items")
-            .select(`
-              quantity,
-              mapped_commission,
-              sales!inner(sale_datetime, client_campaign_id, validation_status)
-            `)
-            .gte("sales.sale_datetime", startISO)
-            .lte("sales.sale_datetime", endISO)
-            .not("sales.validation_status", "eq", "cancelled")
-            .not("sales.validation_status", "eq", "rejected");
-          
-          if (campaignIds.length > 0) {
-            query = query.in("sales.client_campaign_id", campaignIds);
-          }
-          
-          const { data, error } = await query;
-          if (error) throw error;
+          // Use mapped_commission from sale_items with pagination
+          const commItems = await fetchAllRows<any>(
+            "sale_items",
+            `quantity, mapped_commission, sales!inner(sale_datetime, client_campaign_id, validation_status)`,
+            (q) => {
+              let filtered = q
+                .gte("sales.sale_datetime", startISO)
+                .lte("sales.sale_datetime", endISO)
+                .not("sales.validation_status", "eq", "cancelled")
+                .not("sales.validation_status", "eq", "rejected");
+              if (campaignIds.length > 0) {
+                filtered = filtered.in("sales.client_campaign_id", campaignIds);
+              }
+              return filtered;
+            },
+            { orderBy: "id", ascending: true }
+          );
           
           // mapped_commission already contains the total for the line (qty × unit_commission)
           // so we just sum it directly without multiplying by quantity again
-          value = data?.reduce((sum, item) => {
-            const lineCommission = Number((item as any).mapped_commission) || 0;
+          value = commItems.reduce((sum, item) => {
+            const lineCommission = Number(item.mapped_commission) || 0;
             return sum + lineCommission;
-          }, 0) || 0;
+          }, 0);
           break;
         }
 
@@ -565,14 +548,16 @@ const fetchMetricValueForFormula = async (
       }
       
       if (campaignIds.length > 0) {
-        const { data: salesData } = await supabase
-          .from("sales")
-          .select(`id, sale_items (quantity, products (counts_as_sale))`)
-          .in("client_campaign_id", campaignIds)
-          .gte("sale_datetime", startISO)
-          .lte("sale_datetime", endISO);
+        const salesData = await fetchAllRows<any>(
+          "sales",
+          `id, sale_items (quantity, products (counts_as_sale))`,
+          (q) => q.in("client_campaign_id", campaignIds)
+                  .gte("sale_datetime", startISO)
+                  .lte("sale_datetime", endISO),
+          { orderBy: "sale_datetime", ascending: false }
+        );
         
-        (salesData || []).forEach((sale: any) => {
+        salesData.forEach((sale: any) => {
           (sale.sale_items || []).forEach((item: any) => {
             if (item.products?.counts_as_sale !== false) {
               telesalesCount += Number(item.quantity) || 1;
@@ -597,39 +582,45 @@ const fetchMetricValueForFormula = async (
     }
 
     case "commission": {
-      // Sum mapped_commission from sale_items
-      let query = supabase
-        .from("sale_items")
-        .select(`mapped_commission, sales!inner(sale_datetime, client_campaign_id, validation_status)`)
-        .gte("sales.sale_datetime", startISO)
-        .lte("sales.sale_datetime", endISO)
-        .not("sales.validation_status", "eq", "cancelled")
-        .not("sales.validation_status", "eq", "rejected");
-
-      if (campaignIds.length > 0) {
-        query = query.in("sales.client_campaign_id", campaignIds);
-      }
-
-      const { data } = await query;
-      return data?.reduce((sum, item) => sum + (Number((item as any).mapped_commission) || 0), 0) || 0;
+      // Sum mapped_commission from sale_items with pagination
+      const commissionData = await fetchAllRows<any>(
+        "sale_items",
+        `mapped_commission, sales!inner(sale_datetime, client_campaign_id, validation_status)`,
+        (q) => {
+          let filtered = q
+            .gte("sales.sale_datetime", startISO)
+            .lte("sales.sale_datetime", endISO)
+            .not("sales.validation_status", "eq", "cancelled")
+            .not("sales.validation_status", "eq", "rejected");
+          if (campaignIds.length > 0) {
+            filtered = filtered.in("sales.client_campaign_id", campaignIds);
+          }
+          return filtered;
+        },
+        { orderBy: "id", ascending: true }
+      );
+      return commissionData.reduce((sum, item) => sum + (Number(item.mapped_commission) || 0), 0);
     }
 
     case "revenue": {
-      let query = supabase
-        .from("sale_items")
-        .select(`quantity, products(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`)
-        .gte("sales.sale_datetime", startISO)
-        .lte("sales.sale_datetime", endISO);
-
-      if (campaignIds.length > 0) {
-        query = query.in("sales.client_campaign_id", campaignIds);
-      }
-
-      const { data } = await query;
-      return data?.reduce((sum, item) => {
+      const revenueData = await fetchAllRows<any>(
+        "sale_items",
+        `quantity, products(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`,
+        (q) => {
+          let filtered = q
+            .gte("sales.sale_datetime", startISO)
+            .lte("sales.sale_datetime", endISO);
+          if (campaignIds.length > 0) {
+            filtered = filtered.in("sales.client_campaign_id", campaignIds);
+          }
+          return filtered;
+        },
+        { orderBy: "id", ascending: true }
+      );
+      return revenueData.reduce((sum, item) => {
         const revenue = (item.products as any)?.revenue_dkk || 0;
         return sum + (revenue * (item.quantity || 1));
-      }, 0) || 0;
+      }, 0);
     }
 
     case "timer":
@@ -738,12 +729,12 @@ const fetchMetricValueForFormula = async (
     }
 
     case "talk_time_seconds": {
-      const { data } = await supabase
-        .from("dialer_calls")
-        .select("duration_seconds")
-        .gte("start_time", startISO)
-        .lte("start_time", endISO);
-      return data?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0;
+      // Use RPC for server-side aggregation instead of fetching all rows
+      const { data: callStats } = await supabase.rpc("get_call_stats", {
+        start_ts: startISO,
+        end_ts: endISO,
+      });
+      return Number(callStats?.[0]?.total_duration) || 0;
     }
 
     default:
@@ -978,33 +969,24 @@ export const useWidgetKpiData = (widgets: Array<{
                 }
                 
                 if (campaignIds.length > 0) {
-                  // Fetch sales with sale_items to count properly (like TeamOverview)
-                  const { data: salesData, error } = await supabase
-                    .from("sales")
-                    .select(`
-                      id,
-                      sale_items (
-                        quantity,
-                        products (
-                          counts_as_sale
-                        )
-                      )
-                    `)
-                    .in("client_campaign_id", campaignIds)
-                    .gte("sale_datetime", startISO)
-                    .lte("sale_datetime", endISO);
+                  // Fetch sales with sale_items using pagination
+                  const salesData = await fetchAllRows<any>(
+                    "sales",
+                    `id, sale_items(quantity, products(counts_as_sale))`,
+                    (q) => q.in("client_campaign_id", campaignIds)
+                            .gte("sale_datetime", startISO)
+                            .lte("sale_datetime", endISO),
+                    { orderBy: "sale_datetime", ascending: false }
+                  );
                   
-                  if (!error) {
-                    // Count sales from sale_items where counts_as_sale !== false
-                    (salesData || []).forEach((sale: any) => {
-                      (sale.sale_items || []).forEach((item: any) => {
-                        const countsAsSale = item.products?.counts_as_sale !== false;
-                        if (countsAsSale) {
-                          telesalesCount += Number(item.quantity) || 1;
-                        }
-                      });
+                  salesData.forEach((sale: any) => {
+                    (sale.sale_items || []).forEach((item: any) => {
+                      const countsAsSale = item.products?.counts_as_sale !== false;
+                      if (countsAsSale) {
+                        telesalesCount += Number(item.quantity) || 1;
+                      }
                     });
-                  }
+                  });
                 }
                 
                 // Also count fieldmarketing from unified sales table
@@ -1032,35 +1014,35 @@ export const useWidgetKpiData = (widgets: Array<{
               
               case "sales-revenue": {
                 let telesalesRevenue = 0;
-                // Fieldmarketing_sales doesn't have revenue/price column
                 
-                let query = supabase
-                  .from("sale_items")
-                  .select(`
-                    quantity,
-                    products(revenue_dkk),
-                    sales!inner(sale_datetime, client_campaign_id)
-                  `)
-                  .gte("sales.sale_datetime", startISO)
-                  .lte("sales.sale_datetime", endISO);
-                
+                let widgetRevCampaignIds: string[] = [];
                 if (widget.clientId) {
                   const { data: campaigns } = await supabase
                     .from("client_campaigns")
                     .select("id")
                     .eq("client_id", widget.clientId);
-                  
-                  if (campaigns && campaigns.length > 0) {
-                    const campaignIds = campaigns.map(c => c.id);
-                    query = query.in("sales.client_campaign_id", campaignIds);
-                  }
+                  widgetRevCampaignIds = (campaigns || []).map(c => c.id);
                 }
                 
-                const { data } = await query;
-                telesalesRevenue = data?.reduce((sum, item) => {
+                const widgetRevItems = await fetchAllRows<any>(
+                  "sale_items",
+                  `quantity, products(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`,
+                  (q) => {
+                    let filtered = q
+                      .gte("sales.sale_datetime", startISO)
+                      .lte("sales.sale_datetime", endISO);
+                    if (widgetRevCampaignIds.length > 0) {
+                      filtered = filtered.in("sales.client_campaign_id", widgetRevCampaignIds);
+                    }
+                    return filtered;
+                  },
+                  { orderBy: "id", ascending: true }
+                );
+                
+                telesalesRevenue = widgetRevItems.reduce((sum, item) => {
                   const revenue = (item.products as any)?.revenue_dkk || 0;
                   return sum + (revenue * (item.quantity || 1));
-                }, 0) || 0;
+                }, 0);
                 
                 value = telesalesRevenue;
                 break;
@@ -1194,27 +1176,25 @@ export const useWidgetKpiData = (widgets: Array<{
                   campaignIds = (campaigns || []).map((c) => c.id);
                 }
 
-                let query = supabase
-                  .from("sale_items")
-                  .select(`
-                    mapped_commission,
-                    sales!inner(sale_datetime, client_campaign_id, validation_status)
-                  `)
-                  .gte("sales.sale_datetime", startISO)
-                  .lte("sales.sale_datetime", endISO)
-                  .not("sales.validation_status", "eq", "cancelled")
-                  .not("sales.validation_status", "eq", "rejected");
-
-                if (campaignIds.length > 0) {
-                  query = query.in("sales.client_campaign_id", campaignIds);
-                }
-
-                const { data, error } = await query;
-                if (error) throw error;
+                const widgetCommItems = await fetchAllRows<any>(
+                  "sale_items",
+                  `mapped_commission, sales!inner(sale_datetime, client_campaign_id, validation_status)`,
+                  (q) => {
+                    let filtered = q
+                      .gte("sales.sale_datetime", startISO)
+                      .lte("sales.sale_datetime", endISO)
+                      .not("sales.validation_status", "eq", "cancelled")
+                      .not("sales.validation_status", "eq", "rejected");
+                    if (campaignIds.length > 0) {
+                      filtered = filtered.in("sales.client_campaign_id", campaignIds);
+                    }
+                    return filtered;
+                  },
+                  { orderBy: "id", ascending: true }
+                );
 
                 // mapped_commission already contains the total for the line
-                value =
-                  data?.reduce((sum, item) => sum + (Number((item as any).mapped_commission) || 0), 0) || 0;
+                value = widgetCommItems.reduce((sum, item) => sum + (Number(item.mapped_commission) || 0), 0);
                 break;
               }
               

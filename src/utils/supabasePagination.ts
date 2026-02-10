@@ -73,7 +73,9 @@ export async function fetchAllRows<T = unknown>(
     }
   }
 
-  if (allData.length > 1000) {
+  if (allData.length >= 5000) {
+    console.warn(`[fetchAllRows] HIGH VOLUME: ${allData.length} rows from ${table} - consider RPC`);
+  } else if (allData.length > 1000) {
     console.log(`[fetchAllRows] Fetched ${allData.length} rows from ${table} (paginated)`);
   }
   

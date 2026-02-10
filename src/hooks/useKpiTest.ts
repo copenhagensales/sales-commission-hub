@@ -167,6 +167,7 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
   const joinType = clientId ? "!inner" : "";
   const selectClause = `id,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,product_id,products(counts_as_sale))`;
   
+  // Note: Range header added below for pagination safety
   let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
   salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
   
@@ -174,7 +175,7 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
     salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
   }
   
-  const salesRes = await fetch(salesUrl, { headers });
+  const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
   const salesData = salesRes.ok ? await salesRes.json() : [];
   
   // Count telesales: sum of quantities where counts_as_sale != false

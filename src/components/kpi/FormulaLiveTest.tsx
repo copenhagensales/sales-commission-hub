@@ -400,7 +400,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build sales query with agent_email filter
-      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))`;
+      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))&limit=10000`;
       salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       
       if (employeeId && agentEmails.length > 0) {
@@ -414,7 +414,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const salesRes = await fetch(salesUrl, { headers });
+      const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
       const salesData = salesRes.ok ? await salesRes.json() : [];
       
       // 3. Count only products where counts_as_sale = true
@@ -460,7 +460,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build query with agent_email filter
-      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)`;
+      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)&limit=10000`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       
       if (employeeId && agentEmails.length > 0) {
@@ -472,7 +472,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers: { ...headers, Range: "0-9999" } });
       const data = res.ok ? await res.json() : [];
       
       let total = 0;
@@ -602,7 +602,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build query with agent_email filter for telesales revenue
-      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_revenue)`;
+      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_revenue)&limit=10000`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       
       if (employeeId && agentEmails.length > 0) {
@@ -615,7 +615,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers: { ...headers, Range: "0-9999" } });
       const data = res.ok ? await res.json() : [];
       
       let total = 0;

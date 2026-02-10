@@ -34,18 +34,16 @@ async function fetchEmployeesWithClientActivity(clientId: string): Promise<strin
   const authToken = session?.access_token || supabaseKey;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
   
-  // Get unique agent_names (emails) from sales for this client
-  const salesRes = await fetch(
-    `${supabaseUrl}/rest/v1/sales?select=agent_name&client_id=eq.${clientId}`,
-    { headers }
-  );
-  const salesData: { agent_name: string }[] = await salesRes.json();
-  const agentEmails = [...new Set(salesData.map(s => s.agent_name).filter(Boolean))];
+  // Get unique agent emails for this client using RPC (avoids fetching all sales)
+  const { data: rpcEmails } = await supabase.rpc("get_distinct_agent_emails_for_client", {
+    p_client_id: clientId,
+  });
+  const agentEmails = (rpcEmails || []).map((r: any) => r.agent_email).filter(Boolean);
   
   // Get FM seller IDs for this client from unified sales table
   const fmRes = await fetch(
     `${supabaseUrl}/rest/v1/sales?select=raw_payload&source=eq.fieldmarketing`,
-    { headers }
+    { headers: { ...headers, Range: "0-9999" } }
   );
   const fmData: { raw_payload: { fm_seller_id: string; fm_client_id: string } }[] = await fmRes.json();
   const fmDataFiltered = fmData.filter(d => d.raw_payload?.fm_client_id === clientId);
@@ -324,7 +322,7 @@ export default function DailyReports() {
         // First, fetch all sales for this client in the date range to get agent emails
         const salesForClientUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${selectedClient}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
         const salesForClientRes = await fetch(salesForClientUrl, {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${authToken}` }
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Range: "0-9999" }
         });
         const salesForClient = await salesForClientRes.json();
         
@@ -583,7 +581,8 @@ export default function DailyReports() {
             headers: { 
               apikey: supabaseKey, 
               Authorization: `Bearer ${authToken}`,
-              Accept: "application/json"
+              Accept: "application/json",
+              Range: "0-9999"
             }
           });
           
