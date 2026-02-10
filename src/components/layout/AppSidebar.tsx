@@ -440,7 +440,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
     (p.canViewFmOverview || p.canViewFmBookWeek || 
      p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
-     p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration);
+     p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
+     p.canViewFmDashboard || p.canViewFmVagtplanFm || p.canViewFmMyWeek);
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
@@ -1175,13 +1176,31 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     {t("sidebar.vehicles")}
                   </NavLink>
                 )}
-                {p.canViewFmSalesRegistration && (
+                {(p.canViewFmDashboard || p.canViewFmSalesRegistration) && (
                   <NavLink to="/vagt-flow/fieldmarketing-dashboard" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/vagt-flow/fieldmarketing-dashboard" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
                     <BarChart3 className="h-4 w-4" />
                     {t("sidebar.fieldmarketingDashboard")}
+                  </NavLink>
+                )}
+                {p.canViewFmVagtplanFm && (
+                  <NavLink to="/vagt-flow/vagtplan-fm" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/vagt-flow/vagtplan-fm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <CalendarClock className="h-4 w-4" />
+                    Vagtplan FM
+                  </NavLink>
+                )}
+                {p.canViewFmMyWeek && (
+                  <NavLink to="/vagt-flow/min-uge" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/vagt-flow/min-uge" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Calendar className="h-4 w-4" />
+                    Min uge
                   </NavLink>
                 )}
                 {p.canViewFmSalesRegistration && (

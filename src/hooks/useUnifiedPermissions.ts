@@ -124,8 +124,9 @@ function useCurrentUserRole() {
       // Fallback: map job_title to role (legacy support)
       if (employee?.job_title) {
         const titleLower = employee.job_title.toLowerCase();
-        if (titleLower === 'ejer') return 'ejer';
+      if (titleLower === 'ejer') return 'ejer';
         if (titleLower === 'fieldmarketing leder') return 'fm_leder';
+        if (titleLower === 'assisterende teamleder fm') return 'assisterende_teamleder_fm';
         if (titleLower.includes('teamleder')) return 'teamleder';
         if (titleLower === 'rekruttering') return 'rekruttering';
         if (titleLower === 'some') return 'some';
