@@ -1,80 +1,43 @@
 
-# Fix: Fieldmarketing Dashboard - Manglende Tab-permissions
+
+# Fix: Martinas manglende salg i Salgsregistreringer
 
 ## Rodaarsag
 
-Ved den forrige oprydning blev `tab_fm_eesy` og `tab_fm_yousee` slettet fra baade `permissionKeys.ts` og databasen, fordi de var boern af det fjernede `menu_fm_dashboard`. Men disse keys bruges stadig aktivt af Fieldmarketing-dashboardet i dashboard-miljoeet (`/dashboards/fieldmarketing`) til at styre fane-synlighed.
+Martina har **359 FM-salg** i databasen, men siden viser kun ca. 112. Det skyldes at queryen i `EditSalesRegistrations.tsx` (linje 135-147) bruger en simpel `.select()` uden pagination. Supabase returnerer maks 1.000 raekker pr. query, og med **2.509 FM-salg** i den valgte periode afskaaeres resten. Da resultatet er sorteret efter dato (nyeste foerst), mister Martina sine aeldre salg.
 
-Resultatet: Alle ikke-ejere (inkl. William Bornak som fm_leder) ser en tom side med "Du har ikke adgang", fordi `canView("tab_fm_eesy")` returnerer false naar keyen ikke eksisterer.
+## Loesning
 
----
+Erstat den direkte Supabase-query med systemets eksisterende `fetchAllRows` utility, som automatisk paginerer og henter alle raekker.
 
-## AEndring 1: Tilfoej tab_fm_eesy og tab_fm_yousee tilbage i permissionKeys.ts
+## Tekniske detaljer
 
-**Fil**: `src/config/permissionKeys.ts`
+**Fil**: `src/pages/vagt-flow/EditSalesRegistrations.tsx`
 
-Tilfoej de to tab-keys under Fieldmarketing-sektionen (linje 237-242 omraadet). De placeres som children af et nyt dashboard-parent under FM, saa de er korrekt kategoriseret:
+AEndring i `queryFn` (linje 134-148):
+- Erstat `supabase.from("sales").select(...).eq(...).gte(...).lte(...).order(...)` med `fetchAllRows()`
+- `fetchAllRows` bruger `.range()` internt med batches paa 500 raekker og henter automatisk alle sider
+- Sortering haandteres via `orderBy`-optionen
 
-```text
-// Under "Fieldmarketing Tabs" sektionen, tilfoej:
-tab_fm_eesy: { label: 'Fane: Eesy FM Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
-tab_fm_yousee: { label: 'Fane: Yousee Dashboard', section: 'fieldmarketing', parent: 'menu_fm_overview' },
-```
-
-Disse placeres under `menu_fm_overview` som parent, da de er faner i FM-dashboardet.
-
----
-
-## AEndring 2: Opdater permissionGroups.ts
-
-**Fil**: `src/components/employees/permissions/permissionGroups.ts`
-
-Fjern den foraeldre reference til `menu_fm_dashboard` (linje 36-39) som ikke laengere eksisterer, og tilfoej en ny gruppe under `menu_fm_overview`:
+Den opdaterede query vil se ud som:
 
 ```text
-// Fjern:
-'menu_fm_dashboard': {
-  label: 'FM Dashboard',
-  children: ['tab_fm_eesy', 'tab_fm_yousee']
-}
-
-// Tilfoej:
-'menu_fm_overview': {
-  label: 'FM Oversigt',
-  children: ['tab_fm_eesy', 'tab_fm_yousee']
-}
+const data = await fetchAllRows(
+  "sales",
+  "id, sale_datetime, customer_phone, raw_payload, created_at",
+  (query) => query
+    .eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${dateRange.from}T00:00:00`)
+    .lte("sale_datetime", `${dateRange.to}T23:59:59`),
+  { orderBy: "sale_datetime", ascending: false }
+);
 ```
 
----
-
-## AEndring 3: Database - Indsaet manglende permission-raekker
-
-Koer SQL for at genoprette tab-permissions for relevante roller:
-
-```text
-INSERT INTO role_page_permissions (role_key, permission_key, can_view, can_edit, visibility)
-VALUES 
-  ('fm_leder', 'tab_fm_eesy', true, true, 'team'),
-  ('fm_leder', 'tab_fm_yousee', true, true, 'team'),
-  ('assisterende_teamleder_fm', 'tab_fm_eesy', true, false, 'team'),
-  ('assisterende_teamleder_fm', 'tab_fm_yousee', true, false, 'team'),
-  ('ejer', 'tab_fm_eesy', true, true, 'all'),
-  ('ejer', 'tab_fm_yousee', true, true, 'all')
-ON CONFLICT DO NOTHING;
-```
-
----
-
-## Filoversigt
-
-| Fil | AEndring |
-|---|---|
-| `src/config/permissionKeys.ts` | Tilfoej `tab_fm_eesy` og `tab_fm_yousee` tilbage |
-| `src/components/employees/permissions/permissionGroups.ts` | Flyt tab-gruppe fra slettet parent til `menu_fm_overview` |
-| Database: `role_page_permissions` | Indsaet permissions for fm_leder, assisterende_teamleder_fm og ejer |
+Tilfoej import af `fetchAllRows` fra `@/utils/supabasePagination` oeverst i filen.
 
 ## Effekt
-- William Bornak (fm_leder) kan se Fieldmarketing-dashboardet med begge faner (Eesy FM og Yousee)
-- Assisterende Teamledere FM kan ogsaa se fanerne
-- Ejere paavirkes ikke (de har allerede adgang via owner-override)
-- Permission Editor viser tab-permissions korrekt under Fieldmarketing-sektionen
+- Alle Martinas 359 salg vil vaere synlige
+- Alle 2.509+ FM-salg i perioden hentes korrekt
+- Ingen oevre graense paa antal raekker
+- Eksisterende filtrering, gruppering og redigering fungerer uaendret
+
