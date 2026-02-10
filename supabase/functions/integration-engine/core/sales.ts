@@ -378,13 +378,12 @@ async function processSalesBatch(
     if (webhookDuplicateIds.length > 0) {
       const { data: webhookSales } = await supabase
         .from("sales")
-        .select("id, adversus_external_id, external_reference, customer_phone")
+        .select("id, adversus_external_id, customer_phone")
         .in("adversus_external_id", webhookDuplicateIds)
         .eq("integration_type", "adversus")
       if (webhookSales && webhookSales.length > 0) {
         for (const ws of webhookSales) {
           if (ws.adversus_external_id) {
-            if (ws.external_reference) webhookOppMap.set(ws.adversus_external_id, ws.external_reference)
             if (ws.customer_phone) webhookPhoneMap.set(ws.adversus_external_id, ws.customer_phone)
           }
         }
