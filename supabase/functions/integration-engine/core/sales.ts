@@ -36,26 +36,25 @@ const VALID_EMAIL_DOMAINS = [
   "@cph-sales.dk",
 ];
 
-/**
- * Patterns for emails that should be excluded (pseudo-emails from integrations)
- */
+const WHITELISTED_EMAILS = [
+  "kongtelling@gmail.com",
+  "rasmusventura700@gmail.com",
+];
+
 const EXCLUDED_EMAIL_PATTERNS = [
   /^agent-\d+@adversus\.local$/i,
 ];
 
-/**
- * Check if an email is valid for syncing to the database.
- */
 function isValidSyncEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
   
-  // First check if it matches an excluded pattern (pseudo-emails)
+  if (WHITELISTED_EMAILS.includes(emailLower)) return true;
+  
   if (EXCLUDED_EMAIL_PATTERNS.some(pattern => pattern.test(emailLower))) {
     return false;
   }
   
-  // Then check if it's from a valid domain
   return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
 }
 

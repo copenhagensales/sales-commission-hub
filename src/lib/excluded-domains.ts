@@ -9,6 +9,14 @@ export const VALID_EMAIL_DOMAINS = [
 ];
 
 /**
+ * Specific email addresses that should always be accepted regardless of domain.
+ */
+export const WHITELISTED_EMAILS = [
+  "kongtelling@gmail.com",
+  "rasmusventura700@gmail.com",
+];
+
+/**
  * Patterns for emails that should be excluded even if domain matches.
  * These are pseudo-emails created by integrations.
  */
@@ -50,6 +58,9 @@ export function isExcludedEmail(email: string | null | undefined): boolean {
 export function isValidSyncEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
+  
+  // Check exact whitelist first
+  if (WHITELISTED_EMAILS.includes(emailLower)) return true;
   
   // First check if it matches an excluded pattern (pseudo-emails)
   if (EXCLUDED_EMAIL_PATTERNS.some(pattern => pattern.test(emailLower))) {
