@@ -503,7 +503,22 @@ export class EnreachAdapter implements DialerAdapter {
     const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as
       | Record<string, unknown>
       | undefined;
-    const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || "";
+    // Smart agent-email: validate against known domains to avoid "Bloomreach_API" etc.
+    const VALID_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const isValidAgentEmail = (email: string | undefined): boolean => {
+      if (!email) return false;
+      return VALID_AGENT_DOMAINS.some(d => email.toLowerCase().endsWith(d));
+    };
+    const firstOrgCode = firstProcessedByUser?.orgCode as string | undefined;
+    const lastOrgCode = lastModifiedByUser?.orgCode as string | undefined;
+    let agentOrgCode = "";
+    if (isValidAgentEmail(firstOrgCode)) {
+      agentOrgCode = firstOrgCode!;
+    } else if (isValidAgentEmail(lastOrgCode)) {
+      agentOrgCode = lastOrgCode!;
+    } else {
+      agentOrgCode = firstOrgCode || lastOrgCode || "";
+    }
 
     let agentName = this.getStr(firstProcessedByUser, ["name", "Name", "fullName"]);
     if (!agentName) agentName = agentOrgCode;
@@ -887,19 +902,41 @@ export class EnreachAdapter implements DialerAdapter {
   private checkFilterGroup(lead: HeroBaseLead, group: DataFilterGroup): boolean {
     if (!group.rules || group.rules.length === 0) return true;
 
+    const checkRuleWithFallback = (rule: DataFilterRule): boolean => {
+      if (this.checkRule(lead, rule)) return true;
+      // Bloomreach_API fallback: try firstProcessedByUser when lastModifiedByUser fails
+      if (rule.field === "lastModifiedByUser.orgCode") {
+        const fallbackRule = { ...rule, field: "firstProcessedByUser.orgCode" };
+        if (this.checkRule(lead, fallbackRule)) {
+          console.log(`[EnreachAdapter] Bloomreach fallback: lastModifiedByUser failed, firstProcessedByUser passed for filter in group`);
+          return true;
+        }
+      }
+      return false;
+    };
+
     if (group.logic === "OR") {
-      // OR: at least one rule must pass
-      return group.rules.some((rule) => this.checkRule(lead, rule));
+      return group.rules.some(checkRuleWithFallback);
     } else {
-      // AND (default): all rules must pass
-      return group.rules.every((rule) => this.checkRule(lead, rule));
+      return group.rules.every(checkRuleWithFallback);
     }
   }
 
   private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[], groups?: DataFilterGroup[], groupsLogic?: 'AND' | 'OR'): boolean {
     // FIRST: Check legacy filters (these are always AND, must ALL pass)
     if (filters && filters.length > 0) {
-      const passesLegacy = filters.every((rule) => this.checkRule(lead, rule));
+      const passesLegacy = filters.every((rule) => {
+        if (this.checkRule(lead, rule)) return true;
+        // Bloomreach_API fallback: try firstProcessedByUser when lastModifiedByUser fails
+        if (rule.field === "lastModifiedByUser.orgCode") {
+          const fallbackRule = { ...rule, field: "firstProcessedByUser.orgCode" };
+          if (this.checkRule(lead, fallbackRule)) {
+            console.log(`[EnreachAdapter] Bloomreach fallback: lastModifiedByUser failed, firstProcessedByUser passed for legacy filter`);
+            return true;
+          }
+        }
+        return false;
+      });
       if (!passesLegacy) return false;
     }
 
