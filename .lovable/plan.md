@@ -1,43 +1,50 @@
 
 
-# Fix: Martinas manglende salg i Salgsregistreringer
+## Godkend specifikke emails i API-filtrering
 
-## Rodaarsag
+**Problem:** Systemet tillader kun emails fra tre domaner (`@copenhagensales.dk`, `@cph-relatel.dk`, `@cph-sales.dk`). De to Gmail-adresser bliver derfor filtreret fra i alle API-synkroniseringer.
 
-Martina har **359 FM-salg** i databasen, men siden viser kun ca. 112. Det skyldes at queryen i `EditSalesRegistrations.tsx` (linje 135-147) bruger en simpel `.select()` uden pagination. Supabase returnerer maks 1.000 raekker pr. query, og med **2.509 FM-salg** i den valgte periode afskaaeres resten. Da resultatet er sorteret efter dato (nyeste foerst), mister Martina sine aeldre salg.
+**Losning:** Tilfoej en whitelist for specifikke email-adresser, der skal accepteres uanset domane.
 
-## Loesning
+### Emails der skal godkendes
+- `kongtelling@gmail.com`
+- `rasmusventura700@gmail.com`
 
-Erstat den direkte Supabase-query med systemets eksisterende `fetchAllRows` utility, som automatisk paginerer og henter alle raekker.
+### Filer der skal opdateres
 
-## Tekniske detaljer
+Email-valideringen er duplikeret pa 6 steder. Alle skal opdateres:
 
-**Fil**: `src/pages/vagt-flow/EditSalesRegistrations.tsx`
+1. **`src/lib/excluded-domains.ts`** - Frontend-kopi (central definition)
+2. **`supabase/functions/integration-engine/core/users.ts`** - Bruger-sync
+3. **`supabase/functions/integration-engine/core/sales.ts`** - Salgs-sync
+4. **`supabase/functions/integration-engine/adapters/enreach.ts`** - Enreach (2 steder)
+5. **`supabase/functions/integration-engine/adapters/adversus.ts`** - Adversus
 
-AEndring i `queryFn` (linje 134-148):
-- Erstat `supabase.from("sales").select(...).eq(...).gte(...).lte(...).order(...)` med `fetchAllRows()`
-- `fetchAllRows` bruger `.range()` internt med batches paa 500 raekker og henter automatisk alle sider
-- Sortering haandteres via `orderBy`-optionen
+### Aendring i hver fil
 
-Den opdaterede query vil se ud som:
+Tilfoej en `WHITELISTED_EMAILS`-liste og opdater `isValidSyncEmail`-funktionen:
 
 ```text
-const data = await fetchAllRows(
-  "sales",
-  "id, sale_datetime, customer_phone, raw_payload, created_at",
-  (query) => query
-    .eq("source", "fieldmarketing")
-    .gte("sale_datetime", `${dateRange.from}T00:00:00`)
-    .lte("sale_datetime", `${dateRange.to}T23:59:59`),
-  { orderBy: "sale_datetime", ascending: false }
-);
+const WHITELISTED_EMAILS = [
+  "kongtelling@gmail.com",
+  "rasmusventura700@gmail.com",
+];
+
+function isValidSyncEmail(email) {
+  if (!email) return false;
+  const emailLower = email.toLowerCase();
+
+  // Check exact whitelist first
+  if (WHITELISTED_EMAILS.includes(emailLower)) return true;
+
+  // Then excluded patterns
+  if (EXCLUDED_EMAIL_PATTERNS.some(...)) return false;
+
+  // Then domain check
+  return VALID_EMAIL_DOMAINS.some(...);
+}
 ```
 
-Tilfoej import af `fetchAllRows` fra `@/utils/supabasePagination` oeverst i filen.
-
-## Effekt
-- Alle Martinas 359 salg vil vaere synlige
-- Alle 2.509+ FM-salg i perioden hentes korrekt
-- Ingen oevre graense paa antal raekker
-- Eksisterende filtrering, gruppering og redigering fungerer uaendret
+### Risiko
+Lav risiko. Det er en simpel tilfoejelse af en whitelist-check for validering. Ingen eksisterende funktionalitet pavirkes.
 
