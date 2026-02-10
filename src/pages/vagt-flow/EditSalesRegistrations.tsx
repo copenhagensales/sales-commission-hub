@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -132,21 +133,15 @@ export default function EditSalesRegistrations() {
   const { data: sales, isLoading: loadingSales } = useQuery({
     queryKey: ["fm-sales-edit", dateRange.from, dateRange.to],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          sale_datetime,
-          customer_phone,
-          raw_payload,
-          created_at
-        `)
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${dateRange.from}T00:00:00`)
-        .lte("sale_datetime", `${dateRange.to}T23:59:59`)
-        .order("sale_datetime", { ascending: false });
-
-      if (error) throw error;
+      const data = await fetchAllRows<{ id: string; sale_datetime: string; customer_phone: string | null; raw_payload: any; created_at: string }>(
+        "sales",
+        "id, sale_datetime, customer_phone, raw_payload, created_at",
+        (query) => query
+          .eq("source", "fieldmarketing")
+          .gte("sale_datetime", `${dateRange.from}T00:00:00`)
+          .lte("sale_datetime", `${dateRange.to}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
       // Extract unique IDs from raw_payload
       const sellerIds = [...new Set(data?.map(s => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
