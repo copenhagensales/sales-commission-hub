@@ -367,9 +367,11 @@ export class EnreachAdapter implements DialerAdapter {
         
         // Filter out sales with invalid/missing email using whitelist
         const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+        const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
         const isValidSyncEmail = (email: string | null | undefined): boolean => {
           if (!email) return false;
           const emailLower = email.toLowerCase();
+          if (WHITELISTED_EMAILS.includes(emailLower)) return true;
           return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
         };
         
@@ -462,9 +464,11 @@ export class EnreachAdapter implements DialerAdapter {
         
         // Filter out sales with invalid/missing email using whitelist
         const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+        const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
         const isValidSyncEmail = (email: string | null | undefined): boolean => {
           if (!email) return false;
           const emailLower = email.toLowerCase();
+          if (WHITELISTED_EMAILS.includes(emailLower)) return true;
           return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
         };
         

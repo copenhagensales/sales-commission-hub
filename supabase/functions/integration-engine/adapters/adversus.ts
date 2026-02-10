@@ -152,9 +152,11 @@ export class AdversusAdapter implements DialerAdapter {
 
     // Valid email domains for syncing
     const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
     const isValidSyncEmail = (email: string | null): boolean => {
       if (!email) return false;
       const emailLower = email.toLowerCase();
+      if (WHITELISTED_EMAILS.includes(emailLower)) return true;
       return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
     };
 
@@ -299,9 +301,11 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
     // Valid email domains for syncing (same as fetchSales)
     const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
     const isValidSyncEmail = (email: string | null): boolean => {
       if (!email) return false;
       const emailLower = email.toLowerCase();
+      if (WHITELISTED_EMAILS.includes(emailLower)) return true;
       return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
     };
 
