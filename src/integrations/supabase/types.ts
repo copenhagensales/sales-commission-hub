@@ -9431,6 +9431,13 @@ export type Database = {
         Returns: string
       }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
+      get_call_stats: {
+        Args: { end_ts: string; start_ts: string }
+        Returns: {
+          avg_duration: number
+          total_duration: number
+        }[]
+      }
       get_client_sales_stats: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
@@ -9490,6 +9497,12 @@ export type Database = {
       get_dialer_credentials: {
         Args: { p_encryption_key: string; p_integration_id: string }
         Returns: Json
+      }
+      get_distinct_agent_emails_for_client: {
+        Args: { p_client_id: string }
+        Returns: {
+          agent_email: string
+        }[]
       }
       get_distinct_cached_kpi_slugs: {
         Args: never
@@ -9614,6 +9627,14 @@ export type Database = {
           sale_id: string
           sale_item_id: string
           source: string
+        }[]
+      }
+      get_source_counts: {
+        Args: never
+        Returns: {
+          cnt: number
+          entity_type: string
+          source_name: string
         }[]
       }
       get_team_employees_basic_info: {

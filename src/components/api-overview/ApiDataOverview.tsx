@@ -32,45 +32,37 @@ export default function ApiDataOverview() {
   const { data: sourceStats, isLoading: sourcesLoading } = useQuery({
     queryKey: ["api-overview-sources-stats"],
     queryFn: async () => {
-      // Get sources from agents, sales, calls, and events with counts
-      const [agentData, salesData, callsData, eventsData] = await Promise.all([
-        supabase.from("agents").select("source").not("source", "is", null),
-        supabase.from("sales").select("source").not("source", "is", null),
-        supabase.from("dialer_calls").select("integration_type").not("integration_type", "is", null),
+      // Use RPC for server-side GROUP BY instead of fetching 30,000+ rows
+      const [rpcResult, eventsData] = await Promise.all([
+        supabase.rpc("get_source_counts"),
         supabase.from("adversus_events").select("id", { count: "exact", head: true }),
       ]);
 
       const sourceMap = new Map<string, { agents: number; sales: number; calls: number; events: number }>();
       
-      agentData.data?.forEach(r => {
-        if (r.source) {
-          const key = r.source.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
-          existing.agents += 1;
-          sourceMap.set(key, existing);
-        }
-      });
+      let totalAgents = 0;
+      let totalSales = 0;
+      let totalCalls = 0;
       
-      salesData.data?.forEach(r => {
-        if (r.source) {
-          const key = r.source.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
-          existing.sales += 1;
-          // For non-adversus providers, sales count as events (each sale originated from an API event)
-          if (key !== "adversus") {
-            existing.events += 1;
-          }
-          sourceMap.set(key, existing);
+      (rpcResult.data || []).forEach((row: any) => {
+        const key = row.source_name;
+        if (!key) return;
+        const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
+        
+        if (row.entity_type === 'sales') {
+          existing.sales = Number(row.cnt);
+          totalSales += Number(row.cnt);
+        } else if (row.entity_type === 'sales_as_events') {
+          existing.events += Number(row.cnt);
+        } else if (row.entity_type === 'calls') {
+          existing.calls = Number(row.cnt);
+          totalCalls += Number(row.cnt);
+        } else if (row.entity_type === 'agents') {
+          existing.agents = Number(row.cnt);
+          totalAgents += Number(row.cnt);
         }
-      });
-      
-      callsData.data?.forEach(r => {
-        if (r.integration_type) {
-          const key = r.integration_type.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
-          existing.calls += 1;
-          sourceMap.set(key, existing);
-        }
+        
+        sourceMap.set(key, existing);
       });
 
       // Add adversus events count from dedicated events table
@@ -87,10 +79,10 @@ export default function ApiDataOverview() {
       return {
         sources: Array.from(sourceMap.keys()).sort(),
         bySource: Object.fromEntries(sourceMap),
-        totalAgents: agentData.data?.length || 0,
-        totalSales: salesData.data?.length || 0,
-        totalCalls: callsData.data?.length || 0,
-        totalEvents: totalEvents,
+        totalAgents,
+        totalSales,
+        totalCalls,
+        totalEvents,
       };
     },
   });

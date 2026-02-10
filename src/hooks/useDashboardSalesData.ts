@@ -88,7 +88,7 @@ export function useDashboardSalesData({
       if (resolvedClientId) {
         // Find employees who have sales for this client via agent mapping
         const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${resolvedClientId}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-        const salesRes = await fetch(salesUrl, { headers });
+        const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
         const salesForClient = await salesRes.json();
 
         const agentEmails = [
@@ -292,7 +292,7 @@ export function useDashboardSalesData({
           }
 
           const salesRes = await fetch(salesUrl, {
-            headers: { ...headers, Accept: "application/json" },
+            headers: { ...headers, Accept: "application/json", Range: "0-9999" },
           });
 
           if (salesRes.ok) {
@@ -302,19 +302,20 @@ export function useDashboardSalesData({
       }
 
       // Step 5: Fetch fieldmarketing sales from unified sales table
-      const fmFilters: Record<string, string> = {
-        source: "fieldmarketing",
-      };
-      if (resolvedClientId) {
-        fmFilters.client_id = resolvedClientId;
-      }
       
-      const { data: fmSalesData } = await supabase
+      let fmQuery = supabase
         .from("sales")
-        .select("id, agent_name, normalized_data, sale_datetime, client_campaign_id")
-        .match(fmFilters)
+        .select("id, sale_datetime, raw_payload, client_campaign_id")
+        .eq("source", "fieldmarketing")
         .gte("sale_datetime", `${startStr}T00:00:00`)
         .lte("sale_datetime", `${endStr}T23:59:59`);
+      
+      if (resolvedClientId) {
+        // Filter FM sales by client via raw_payload
+        fmQuery = fmQuery.contains("raw_payload", { fm_client_id: resolvedClientId } as any);
+      }
+      
+      const { data: fmSalesData } = await fmQuery;
 
       // Fetch campaign mappings for dialer_campaign_id resolution
       const { data: campaignMappings } = await supabase
@@ -398,7 +399,7 @@ export function useDashboardSalesData({
 
           let hours = 0;
           if (hoursSource === "timestamp") {
-            const empTimestamp = timeStampsData.find((ts) => ts.employee_id === empId && ts.date === dayStr);
+            const empTimestamp = timeStampsData.find((ts) => ts.employee_id === empId && ts.clock_in && format(new Date(ts.clock_in), 'yyyy-MM-dd') === dayStr);
             if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
               const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
               const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
@@ -431,7 +432,8 @@ export function useDashboardSalesData({
 
           // FM sales
           const empFmSales = (fmSalesData || []).filter((s: any) => {
-            return s.seller_id === empId && s.registered_at >= dayStart && s.registered_at <= dayEnd;
+            const sellerId = (s.raw_payload as any)?.fm_seller_id;
+            return sellerId === empId && s.sale_datetime >= dayStart && s.sale_datetime <= dayEnd;
           });
 
           empSales.forEach((sale: any) => {
@@ -462,7 +464,7 @@ export function useDashboardSalesData({
 
           empFmSales.forEach((sale: any) => {
             totalSales += 1;
-            const productName = (sale.product_name || "").toLowerCase();
+            const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
             totalCommission += productCommissionMap.get(productName) || 0;
             totalRevenue += productRevenueMap.get(productName) || 0;
           });
