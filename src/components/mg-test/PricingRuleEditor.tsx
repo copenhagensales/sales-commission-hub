@@ -56,12 +56,14 @@ const NUMERIC_OPERATORS = [
   { value: "lte", label: "Under eller lig med (≤)" },
   { value: "gt", label: "Over (>)" },
   { value: "lt", label: "Under (<)" },
+  { value: "between", label: "Mellem (interval)" },
 ];
 
 // Type for numeric condition value
 interface NumericConditionValue {
-  operator: 'gte' | 'lte' | 'gt' | 'lt';
+  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'between';
   value: number;
+  value2?: number;
 }
 
 // Check if a condition value is numeric
@@ -302,17 +304,19 @@ export function PricingRuleEditor({
     setConditions((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateNumericCondition = (key: string, field: 'operator' | 'value', newValue: string | number) => {
+  const updateNumericCondition = (key: string, field: 'operator' | 'value' | 'value2', newValue: string | number) => {
     setConditions((prev) => {
       const currentValue = prev[key];
       if (isNumericCondition(currentValue)) {
-        return {
-          ...prev,
-          [key]: {
-            ...currentValue,
-            [field]: field === 'value' ? Number(newValue) : newValue
-          }
+        const updated = {
+          ...currentValue,
+          [field]: (field === 'value' || field === 'value2') ? Number(newValue) : newValue
         };
+        // When switching to 'between', ensure value2 exists
+        if (field === 'operator' && newValue === 'between' && updated.value2 === undefined) {
+          updated.value2 = 0;
+        }
+        return { ...prev, [key]: updated };
       }
       return prev;
     });
@@ -478,8 +482,20 @@ export function PricingRuleEditor({
                       className="w-28"
                       value={value.value}
                       onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
-                      placeholder="Beløb"
+                      placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
                     />
+                    {value.operator === 'between' && (
+                      <>
+                        <span className="text-muted-foreground text-sm">og</span>
+                        <Input
+                          type="number"
+                          className="w-28"
+                          value={value.value2 ?? 0}
+                          onChange={(e) => updateNumericCondition(key, 'value2', e.target.value)}
+                          placeholder="Til"
+                        />
+                      </>
+                    )}
                   </>
                 ) : (
                   // String condition UI: equals + dropdown

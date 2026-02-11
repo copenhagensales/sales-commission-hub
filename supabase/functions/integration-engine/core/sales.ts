@@ -22,6 +22,7 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
     case 'lte': return numericLeadValue <= condition.value;
     case 'gt': return numericLeadValue > condition.value;
     case 'lt': return numericLeadValue < condition.value;
+    case 'between': return numericLeadValue >= condition.value && numericLeadValue <= (condition.value2 ?? condition.value);
     default: return false;
   }
 }
