@@ -313,6 +313,18 @@ export class EnreachAdapter implements DialerAdapter {
         // Store ALL raw leads for debugging
         for (const lead of leads) {
           allRawLeads.push(lead as Record<string, unknown>);
+
+          // Search for specific phone number
+          const PHONE_SEARCH = "51806520";
+          const leadStr = JSON.stringify(lead);
+          if (leadStr.includes(PHONE_SEARCH)) {
+            const closure = this.getStr(lead, ["closure", "Closure"]);
+            const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+            const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
+            const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
+            const campaignCode = campaignObj ? this.getStr(campaignObj, ["code", "Code"]) : "unknown";
+            console.log(`[EnreachAdapter] *** PHONE ${PHONE_SEARCH} FOUND in raw data! closure=${closure}, agent=${agentEmail}, campaign=${campaignCode}`);
+          }
         }
 
         // Log leads from today for diagnostics
@@ -434,7 +446,6 @@ export class EnreachAdapter implements DialerAdapter {
       const toStr = range.to.split("T")[0];
       console.log(`[EnreachAdapter] Fetching leads for range ${fromStr} -> ${toStr} (will filter closure=success client-side)`);
 
-      // NO usar LeadClosures=Success - filtrar client-side como hace el simulador
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true`;
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
@@ -448,21 +459,70 @@ export class EnreachAdapter implements DialerAdapter {
       const dataFilterGroups = this.config?.productExtraction?.dataFilterGroups;
       const dataFilterGroupsLogic = this.config?.productExtraction?.dataFilterGroupsLogic;
 
+      // Diagnostic counters
+      let totalLeadsReceived = 0;
+      let closureSuccessCount = 0;
+      let filteredByDataFilters = 0;
+      let filteredByEmail = 0;
+
+      // Store raw leads for debug
+      const allRawLeads: Record<string, unknown>[] = [];
+      const skipReasonMap = new Map<string, string>();
+
+      const PHONE_SEARCH = "51806520";
+
       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        totalLeadsReceived += leads.length;
+
+        // Store ALL raw leads for debugging
+        for (const lead of leads) {
+          allRawLeads.push(lead as Record<string, unknown>);
+
+          // Search for specific phone number
+          const leadStr = JSON.stringify(lead);
+          if (leadStr.includes(PHONE_SEARCH)) {
+            const closure = this.getStr(lead, ["closure", "Closure"]);
+            const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+            const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
+            const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
+            const campaignCode = campaignObj ? this.getStr(campaignObj, ["code", "Code"]) : "unknown";
+            console.log(`[EnreachAdapter] *** PHONE ${PHONE_SEARCH} FOUND in raw data! closure=${closure}, agent=${agentEmail}, campaign=${campaignCode}`);
+          }
+        }
+
         // Filtrar solo closure=Success (case-insensitive)
         let filtered = leads.filter((lead) => {
           const closure = this.getStr(lead, ["closure", "Closure"]);
-          return closure && closure.toLowerCase() === "success";
+          const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
+          const isSuccess = closure && closure.toLowerCase() === "success";
+          if (!isSuccess && externalId) {
+            skipReasonMap.set(externalId, `closure_not_success:${closure}`);
+          }
+          return isSuccess;
         });
+        closureSuccessCount += filtered.length;
 
+        // Aplicar filtros de datos adicionales si existen
         if ((dataFilters && dataFilters.length > 0) || (dataFilterGroups && dataFilterGroups.length > 0)) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic));
+          const beforeFilter = filtered.length;
+          filtered = filtered.filter((lead) => {
+            const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
+            const passes = this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic);
+            if (!passes) {
+              const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+              const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
+              if (externalId) {
+                skipReasonMap.set(externalId, `data_filter:email=${agentEmail}`);
+              }
+            }
+            return passes;
+          });
+          filteredByDataFilters += (beforeFilter - filtered.length);
         }
 
         // Map leads to sales, then filter by valid email
         const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
         
-        // Filter out sales with invalid/missing email using whitelist
         const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
         const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
         const isValidSyncEmail = (email: string | null | undefined): boolean => {
@@ -472,10 +532,46 @@ export class EnreachAdapter implements DialerAdapter {
           return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
         };
         
-        return mappedSales.filter(sale => isValidSyncEmail(sale.agentEmail));
+        const validSales = mappedSales.filter(sale => {
+          if (!isValidSyncEmail(sale.agentEmail)) {
+            const externalId = sale.externalId;
+            if (externalId) {
+              skipReasonMap.set(externalId, `invalid_email:${sale.agentEmail || 'empty'}`);
+            }
+            filteredByEmail++;
+            return false;
+          }
+          return true;
+        });
+
+        return validSales;
       };
 
-      return await this.processPageByPage(endpoint, pageProcessor);
+      const results = await this.processPageByPage(endpoint, pageProcessor);
+
+      // Store debug data for later retrieval
+      this.lastDebugData = {
+        rawLeads: allRawLeads,
+        processedSales: results,
+        skipReasonMap: skipReasonMap,
+      };
+
+      // Log diagnostic summary
+      console.log(`[EnreachAdapter] ===== RANGE SYNC DIAGNOSTICS for ${this.dialerName} =====`);
+      console.log(`[EnreachAdapter] Range: ${fromStr} -> ${toStr}`);
+      console.log(`[EnreachAdapter] Total leads from API: ${totalLeadsReceived}`);
+      console.log(`[EnreachAdapter] Leads with closure=success: ${closureSuccessCount}`);
+      console.log(`[EnreachAdapter] Filtered out by data filters: ${filteredByDataFilters}`);
+      console.log(`[EnreachAdapter] Filtered out by email whitelist: ${filteredByEmail}`);
+      console.log(`[EnreachAdapter] Final sales count: ${results.length}`);
+      console.log(`[EnreachAdapter] Debug data stored: ${allRawLeads.length} raw leads, ${skipReasonMap.size} skip reasons`);
+
+      // Check if phone number was found
+      const phoneFound = allRawLeads.some(l => JSON.stringify(l).includes(PHONE_SEARCH));
+      console.log(`[EnreachAdapter] Phone ${PHONE_SEARCH} found in raw data: ${phoneFound}`);
+      console.log(`[EnreachAdapter] ===== END RANGE DIAGNOSTICS =====`);
+
+      return results;
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSalesRange:", error);
       return [];
