@@ -12,9 +12,10 @@ const ASE_LEAD_PRODUCT_ID = "e360f3c2-b448-474b-bbf8-e7dc629a0d2a";
 
 // Types for pricing rules
 interface NumericCondition {
-  operator: "gte" | "lte" | "gt" | "lt" | "between";
+  operator: "gte" | "lte" | "gt" | "lt" | "between" | "in";
   value: number;
   value2?: number;
+  values?: number[];
 }
 
 interface PricingRule {
@@ -54,6 +55,8 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
       return numericLeadValue < condition.value;
     case "between":
       return numericLeadValue >= condition.value && numericLeadValue <= (condition.value2 ?? condition.value);
+    case "in":
+      return (condition.values ?? []).includes(numericLeadValue);
     default:
       return false;
   }
