@@ -1026,13 +1026,33 @@ export function ClientDBTab() {
           </div>
 
           {/* Summary Card */}
-          <ClientDBSummaryCard
-            teamDB={totals.finalDB}
-            stabExpenses={totals.stabExpenses}
-            staffSalaries={totals.staffSalaries}
-            netEarnings={totals.netEarnings}
-            staffSalaryList={staffSalaryList}
-          />
+          {(() => {
+            // Calculate proration factor for month/payroll modes
+            let prorationFactor = 1;
+            if (periodMode === "month" || periodMode === "payroll") {
+              const today = new Date();
+              const effectiveEnd = today < periodEnd ? today : periodEnd;
+              const daysPassed = Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              const totalDays = Math.floor((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              prorationFactor = totalDays > 0 ? daysPassed / totalDays : 1;
+            }
+            const isProrated = prorationFactor < 1;
+            const proratedStabExpenses = totals.stabExpenses * prorationFactor;
+            const proratedStaffSalaries = totals.staffSalaries * prorationFactor;
+            const proratedNetEarnings = totals.finalDB - proratedStabExpenses - proratedStaffSalaries;
+
+            return (
+              <ClientDBSummaryCard
+                teamDB={totals.finalDB}
+                stabExpenses={proratedStabExpenses}
+                staffSalaries={proratedStaffSalaries}
+                netEarnings={proratedNetEarnings}
+                staffSalaryList={staffSalaryList}
+                fullStabExpenses={isProrated ? totals.stabExpenses : undefined}
+                fullStaffSalaries={isProrated ? totals.staffSalaries : undefined}
+              />
+            );
+          })()}
         </CardContent>
       </Card>
 

@@ -22,6 +22,8 @@ interface ClientDBSummaryCardProps {
   staffSalaries: number;
   netEarnings: number;
   staffSalaryList?: StaffSalaryItem[];
+  fullStabExpenses?: number;
+  fullStaffSalaries?: number;
 }
 
 export function ClientDBSummaryCard({
@@ -30,6 +32,8 @@ export function ClientDBSummaryCard({
   staffSalaries,
   netEarnings,
   staffSalaryList = [],
+  fullStabExpenses,
+  fullStaffSalaries,
 }: ClientDBSummaryCardProps) {
   const [isStaffExpanded, setIsStaffExpanded] = useState(false);
   const netPercent = teamDB > 0 ? ((netEarnings / teamDB) * 100).toFixed(1) : "0";
@@ -60,6 +64,9 @@ export function ClientDBSummaryCard({
             <span className="text-muted-foreground">− Stab-udgifter</span>
             <span className="text-destructive tabular-nums">
               -{formatCurrency(stabExpenses)}
+              {fullStabExpenses !== undefined && (
+                <span className="text-muted-foreground ml-1">({formatCurrency(fullStabExpenses)})</span>
+              )}
             </span>
           </div>
           
@@ -83,6 +90,9 @@ export function ClientDBSummaryCard({
               </CollapsibleTrigger>
               <span className="text-destructive tabular-nums">
                 -{formatCurrency(staffSalaries)}
+                {fullStaffSalaries !== undefined && (
+                  <span className="text-muted-foreground ml-1">({formatCurrency(fullStaffSalaries)})</span>
+                )}
               </span>
             </div>
 
