@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
-type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "costs" | "finalDB" | "dbPercent";
+type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "costs" | "finalDB" | "dbPercent" | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
@@ -776,6 +776,10 @@ export function ClientDBTab() {
           aVal = a.dbPercent;
           bVal = b.dbPercent;
           break;
+        case "revenuePerFTE":
+          aVal = a.revenuePerFTE;
+          bVal = b.revenuePerFTE;
+          break;
         case "finalDB":
         default:
           aVal = a.finalDB;
@@ -971,19 +975,28 @@ export function ClientDBTab() {
                       <SortIcon column="dbPercent" />
                     </div>
                   </TableHead>
+                  <TableHead 
+                    className="w-[100px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleSort("revenuePerFTE")}
+                  >
+                    <div className="flex items-center gap-1 justify-end">
+                      Oms/FTE
+                      <SortIcon column="revenuePerFTE" />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
                 ) : filteredAndSortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       {hideZeroClients && clientDBData.length > 0 
                         ? "Alle klienter er skjult (ingen aktivitet)"
                         : "Ingen data for denne periode"
