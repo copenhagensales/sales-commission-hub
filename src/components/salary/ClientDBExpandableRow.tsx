@@ -57,6 +57,7 @@ export function ClientDBExpandableRow({
   
   const totalCosts = 
     client.adjustedSellerCost + 
+    client.sickPayAmount +
     client.locationCosts + 
     client.assistantAllocation + 
     client.leaderAllocation + 
