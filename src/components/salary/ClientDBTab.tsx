@@ -979,15 +979,6 @@ export function ClientDBTab() {
                       <SortIcon column="dbPercent" />
                     </div>
                   </TableHead>
-                  <TableHead 
-                    className="w-[100px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("revenuePerFTE")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Oms/FTE
-                      <SortIcon column="revenuePerFTE" />
-                    </div>
-                  </TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
