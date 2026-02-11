@@ -612,7 +612,7 @@ Deno.serve(async (req) => {
       
       if (isTeamSale) {
         for (const item of ((sale as any).sale_items || [])) {
-          teamCommission += (item.mapped_commission || 0) * (item.quantity || 1);
+          teamCommission += (item.mapped_commission || 0);
         }
       }
     }
@@ -1667,7 +1667,7 @@ async function calculateTotalCommission(
   const saleItems = (data || []) as SaleItem[];
 
   let telesalesCommission = saleItems.reduce((sum, item) => {
-    return sum + (item.mapped_commission || 0) * (item.quantity || 1);
+    return sum + (item.mapped_commission || 0);
   }, 0);
 
   // FM commission from unified sales table
@@ -1709,7 +1709,7 @@ async function calculateTotalRevenue(
   const saleItems = (data || []) as SaleItem[];
 
   let telesalesRevenue = saleItems.reduce((sum, item) => {
-    return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
+    return sum + (item.mapped_revenue || 0);
   }, 0);
 
   // FM revenue from unified sales table
@@ -2102,7 +2102,7 @@ async function calculateClientKpiValue(
             .in("sale_id", saleIds);
 
           telesalesCommission = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
-            return sum + (item.mapped_commission || 0) * (item.quantity || 1);
+            return sum + (item.mapped_commission || 0);
           }, 0);
         }
       }
@@ -2146,7 +2146,7 @@ async function calculateClientKpiValue(
             .in("sale_id", saleIds);
 
           telesalesRevenue = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
-            return sum + (item.mapped_revenue || 0) * (item.quantity || 1);
+            return sum + (item.mapped_revenue || 0);
           }, 0);
         }
       }
