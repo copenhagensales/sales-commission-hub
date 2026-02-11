@@ -135,6 +135,59 @@ async function fetchAllSaleItems(
   return allItems;
 }
 
+// Generic batched .in() query helper — avoids PostgREST URL length limit
+async function queryInBatches<T>(
+  supabase: SupabaseClient,
+  table: string,
+  filterColumn: string,
+  ids: string[],
+  selectColumns: string,
+  batchSize = 200
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const results: T[] = [];
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const batch = ids.slice(i, i + batchSize);
+    const { data, error } = await supabase
+      .from(table)
+      .select(selectColumns)
+      .in(filterColumn, batch);
+    if (error) {
+      console.error(`[queryInBatches] ${table} error:`, error.message);
+      continue;
+    }
+    if (data) results.push(...(data as T[]));
+  }
+  return results;
+}
+
+// Paginated sales ID fetch — avoids 1000-row default limit
+async function fetchAllSaleIds(
+  supabase: SupabaseClient,
+  campaignIds: string[],
+  startStr: string,
+  endStr: string
+): Promise<string[]> {
+  if (campaignIds.length === 0) return [];
+  const allIds: string[] = [];
+  const PAGE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("sales")
+      .select("id")
+      .in("client_campaign_id", campaignIds)
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .range(offset, offset + PAGE - 1);
+    if (!data || data.length === 0) break;
+    allIds.push(...data.map((s: { id: string }) => s.id));
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+  return allIds;
+}
+
 // Type for employee KPI sales (simpler than leaderboard)
 type EmployeeKpiSale = {
   id: string;
@@ -2044,39 +2097,28 @@ async function calculateClientKpiValue(
   switch (kpiSlug) {
     case "sales_count":
     case "antal_salg": {
-      // Telesales count
+      // Telesales count (using paginated + batched helpers)
       let telesalesCount = 0;
       if (campaignIds.length > 0) {
-        const { data: sales } = await supabase
-          .from("sales")
-          .select("id")
-          .in("client_campaign_id", campaignIds)
-          .gte("sale_datetime", startStr)
-          .lte("sale_datetime", endStr);
-        
-        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        const saleIds = await fetchAllSaleIds(supabase, campaignIds, startStr, endStr);
         if (saleIds.length > 0) {
-          const { data: saleItems } = await supabase
-            .from("sale_items")
-            .select("quantity, product_id")
-            .in("sale_id", saleIds);
+          const saleItems = await queryInBatches<{quantity: number|null; product_id: string|null}>(
+            supabase, "sale_items", "sale_id", saleIds, "quantity, product_id"
+          );
 
-          const productIds = [...new Set((saleItems || []).map((si: any) => si.product_id).filter(Boolean))] as string[];
+          const productIds = [...new Set(saleItems.map((si) => si.product_id).filter(Boolean))] as string[];
           
           let countingProductIds = new Set<string>();
           if (productIds.length > 0) {
-            const { data: productsData } = await supabase
-              .from("products")
-              .select("id, counts_as_sale")
-              .in("id", productIds);
-            
-            const products = (productsData || []) as Product[];
+            const products = await queryInBatches<Product>(
+              supabase, "products", "id", productIds, "id, counts_as_sale"
+            );
             countingProductIds = new Set(
               products.filter(p => p.counts_as_sale !== false).map(p => p.id)
             );
           }
 
-          for (const item of (saleItems || []) as SaleItem[]) {
+          for (const item of saleItems as SaleItem[]) {
             if (!item.product_id || countingProductIds.has(item.product_id)) {
               telesalesCount += item.quantity || 1;
             }
@@ -2098,24 +2140,16 @@ async function calculateClientKpiValue(
 
     case "total_commission":
     case "total_provision": {
-      // Telesales commission
+      // Telesales commission (using paginated + batched helpers)
       let telesalesCommission = 0;
       if (campaignIds.length > 0) {
-        const { data: sales } = await supabase
-          .from("sales")
-          .select("id")
-          .in("client_campaign_id", campaignIds)
-          .gte("sale_datetime", startStr)
-          .lte("sale_datetime", endStr);
-        
-        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        const saleIds = await fetchAllSaleIds(supabase, campaignIds, startStr, endStr);
         if (saleIds.length > 0) {
-          const { data: saleItems } = await supabase
-            .from("sale_items")
-            .select("mapped_commission, quantity")
-            .in("sale_id", saleIds);
+          const saleItems = await queryInBatches<SaleItem>(
+            supabase, "sale_items", "sale_id", saleIds, "mapped_commission, quantity"
+          );
 
-          telesalesCommission = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+          telesalesCommission = saleItems.reduce((sum, item) => {
             return sum + (item.mapped_commission || 0);
           }, 0);
         }
@@ -2142,24 +2176,16 @@ async function calculateClientKpiValue(
 
     case "total_revenue":
     case "total_omsætning": {
-      // Telesales revenue
+      // Telesales revenue (using paginated + batched helpers)
       let telesalesRevenue = 0;
       if (campaignIds.length > 0) {
-        const { data: sales } = await supabase
-          .from("sales")
-          .select("id")
-          .in("client_campaign_id", campaignIds)
-          .gte("sale_datetime", startStr)
-          .lte("sale_datetime", endStr);
-        
-        const saleIds = (sales || []).map((s: { id: string }) => s.id);
+        const saleIds = await fetchAllSaleIds(supabase, campaignIds, startStr, endStr);
         if (saleIds.length > 0) {
-          const { data: saleItems } = await supabase
-            .from("sale_items")
-            .select("mapped_revenue, quantity")
-            .in("sale_id", saleIds);
+          const saleItems = await queryInBatches<SaleItem>(
+            supabase, "sale_items", "sale_id", saleIds, "mapped_revenue, quantity"
+          );
 
-          telesalesRevenue = ((saleItems || []) as SaleItem[]).reduce((sum, item) => {
+          telesalesRevenue = saleItems.reduce((sum, item) => {
             return sum + (item.mapped_revenue || 0);
           }, 0);
         }
