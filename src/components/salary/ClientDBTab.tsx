@@ -769,8 +769,8 @@ export function ClientDBTab() {
           bVal = b.adjustedRevenue;
           break;
         case "costs":
-          aVal = a.adjustedSellerCost + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
-          bVal = b.adjustedSellerCost + b.locationCosts + b.assistantAllocation + b.leaderAllocation + b.leaderVacationPay + b.atpBarsselAllocation;
+          aVal = a.adjustedSellerCost + a.sickPayAmount + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
+          bVal = b.adjustedSellerCost + b.sickPayAmount + b.locationCosts + b.assistantAllocation + b.leaderAllocation + b.leaderVacationPay + b.atpBarsselAllocation;
           break;
         case "dbPercent":
           aVal = a.dbPercent;
