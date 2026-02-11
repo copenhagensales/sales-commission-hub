@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
 
     // Build base URL
     let baseUrl = creds.api_url || integration.api_url || "https://wshero01.herobase.com/api";
+    // Sanitize URL: remove common prefixes like "Web: ", "URL: " that users may accidentally include
+    baseUrl = baseUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl;
+    }
     if (!baseUrl.endsWith('/api')) {
       baseUrl = baseUrl.endsWith('/') ? baseUrl + 'api' : baseUrl + '/api';
     }
@@ -342,6 +347,116 @@ Deno.serve(async (req) => {
       count: dbSales?.length || 0,
       samples: dbSales?.slice(0, 10),
     };
+
+    // ============ TEST 8: Fetch all projects ============
+    console.log("[Enreach-Diagnostics] TEST 8: Fetching /projects...");
+    try {
+      const projectsUrl = `${baseUrl}/projects`;
+      const res8 = await fetch(projectsUrl, { headers });
+      if (res8.ok) {
+        const data8 = await res8.json();
+        const dataArray = Array.isArray(data8) ? data8 : (data8.Results || data8.results || data8.Projects || data8.projects || []);
+        const trpProjects = dataArray.filter((p: Record<string, unknown>) => {
+          const name = String(p.Name || p.name || p.ProjectName || "").toLowerCase();
+          return name.includes("trp") || name.includes("recycling");
+        });
+        results.projects = {
+          status: res8.status,
+          success: true,
+          totalProjects: dataArray.length,
+          allProjects: dataArray.slice(0, 50),
+          trpMatches: trpProjects,
+          trpFound: trpProjects.length > 0,
+        };
+        console.log(`[Enreach-Diagnostics] /projects returned ${dataArray.length} projects, TRP matches: ${trpProjects.length}`);
+      } else {
+        results.projects = { status: res8.status, error: (await res8.text()).substring(0, 300) };
+      }
+    } catch (e) {
+      results.projects = { error: (e as Error).message };
+    }
+
+    // ============ TEST 9: Fetch TRP campaigns ============
+    console.log("[Enreach-Diagnostics] TEST 9: Fetching /campaigns?Project=TRP*...");
+    try {
+      const trpCampaignsUrl = `${baseUrl}/campaigns?Project=TRP*&Active=All`;
+      const res9 = await fetch(trpCampaignsUrl, { headers });
+      if (res9.ok) {
+        const data9 = await res9.json();
+        const dataArray = Array.isArray(data9) ? data9 : (data9.Results || data9.results || data9.Campaigns || data9.campaigns || []);
+        results.trpCampaigns = {
+          status: res9.status,
+          success: true,
+          totalCampaigns: dataArray.length,
+          campaigns: dataArray.slice(0, 30),
+        };
+        console.log(`[Enreach-Diagnostics] TRP campaigns: ${dataArray.length}`);
+      } else {
+        results.trpCampaigns = { status: res9.status, error: (await res9.text()).substring(0, 300) };
+      }
+    } catch (e) {
+      results.trpCampaigns = { error: (e as Error).message };
+    }
+
+    // ============ TEST 10: Search /calls for phone 51806520 ============
+    console.log("[Enreach-Diagnostics] TEST 10: Searching /calls for phone 51806520...");
+    try {
+      const callsUrl = `${baseUrl}/calls?StartTime=2026-01-27&TimeSpan=3.00:00:00&Include=campaign,user&PageSize=500`;
+      const res10 = await fetch(callsUrl, { headers });
+      if (res10.ok) {
+        const data10 = await res10.json();
+        const dataArray = Array.isArray(data10) ? data10 : (data10.Results || data10.results || data10.Calls || data10.calls || data10.Data || data10.data || []);
+        const phoneMatches = dataArray.filter((c: Record<string, unknown>) => {
+          const phone = String(c.LeadPhoneNumber || c.leadPhoneNumber || c.PhoneNumber || c.phoneNumber || "");
+          return phone.includes("51806520");
+        });
+        results.callsPhoneSearch = {
+          status: res10.status,
+          success: true,
+          totalCalls: dataArray.length,
+          phoneMatches: phoneMatches,
+          phoneMatchCount: phoneMatches.length,
+          sampleCalls: dataArray.slice(0, 5),
+          topLevelKeys: Object.keys(data10 || {}),
+          callFieldKeys: dataArray.length > 0 ? Object.keys(dataArray[0] || {}) : [],
+        };
+        console.log(`[Enreach-Diagnostics] /calls returned ${dataArray.length} calls, phone 51806520 matches: ${phoneMatches.length}`);
+      } else {
+        results.callsPhoneSearch = { status: res10.status, error: (await res10.text()).substring(0, 300) };
+      }
+    } catch (e) {
+      results.callsPhoneSearch = { error: (e as Error).message };
+    }
+
+    // ============ TEST 11: Try /leads endpoint ============
+    console.log("[Enreach-Diagnostics] TEST 11: Fetching /leads?ModifiedFrom=2026-01-27...");
+    try {
+      const leadsAltUrl = `${baseUrl}/leads?ModifiedFrom=2026-01-27&PageSize=500`;
+      const res11 = await fetch(leadsAltUrl, { headers });
+      if (res11.ok) {
+        const data11 = await res11.json();
+        const dataArray = Array.isArray(data11) ? data11 : (data11.Results || data11.results || data11.Leads || data11.leads || data11.Data || data11.data || []);
+        const phoneMatches = dataArray.filter((l: Record<string, unknown>) => {
+          const allValues = JSON.stringify(l);
+          return allValues.includes("51806520");
+        });
+        results.leadsEndpoint = {
+          status: res11.status,
+          success: true,
+          totalLeads: dataArray.length,
+          phoneMatches: phoneMatches.slice(0, 5),
+          phoneMatchCount: phoneMatches.length,
+          sampleLeads: dataArray.slice(0, 5),
+          topLevelKeys: Object.keys(data11 || {}),
+          leadFieldKeys: dataArray.length > 0 ? Object.keys(dataArray[0] || {}) : [],
+        };
+        console.log(`[Enreach-Diagnostics] /leads returned ${dataArray.length} leads, phone 51806520 matches: ${phoneMatches.length}`);
+      } else {
+        results.leadsEndpoint = { status: res11.status, error: (await res11.text()).substring(0, 300) };
+      }
+    } catch (e) {
+      results.leadsEndpoint = { error: (e as Error).message };
+    }
 
     // Summary analysis
     results.analysis = generateAnalysis(results);

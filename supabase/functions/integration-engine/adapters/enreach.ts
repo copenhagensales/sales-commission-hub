@@ -91,6 +91,30 @@ export class EnreachAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
+  /** Fetch all projects accessible to this API user */
+  async fetchAccessibleProjects(): Promise<{ uniqueId: string; name: string; active: boolean }[]> {
+    const url = `${this.baseUrl}/projects`;
+    console.log(`[EnreachAdapter] Fetching accessible projects: ${url}`);
+    try {
+      const res = await fetch(url, { headers: this.headers });
+      if (!res.ok) {
+        console.warn(`[EnreachAdapter] /projects returned ${res.status}`);
+        return [];
+      }
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : (data.Results || data.results || data.Projects || data.projects || []);
+      console.log(`[EnreachAdapter] Accessible projects: ${arr.length} — ${arr.map((p: any) => p.Name || p.name).join(", ")}`);
+      return arr.map((p: any) => ({
+        uniqueId: String(p.UniqueId || p.uniqueId || p.Id || p.id || ""),
+        name: String(p.Name || p.name || ""),
+        active: Boolean(p.Active ?? p.active ?? true),
+      }));
+    } catch (e) {
+      console.error(`[EnreachAdapter] fetchAccessibleProjects error:`, e);
+      return [];
+    }
+  }
+
   private getValue(obj: Record<string, unknown> | null | undefined, keys: string[]): unknown {
     if (!obj || typeof obj !== "object") return null;
     for (const key of keys) {
