@@ -1,29 +1,31 @@
 
 
-## Fix: Tilføj sygeløn til omkostningssortering
+## Vis Revenue/FTE (Oms/FTE) i DB per Klient tabellen
 
-### Problem
-Når du sorterer klienterne efter "Omkostninger", medregnes `sickPayAmount` ikke i summen. Det betyder at klienter med høj sygeløn kan fremstå billigere end de reelt er.
+### Hvad
+Feltet `revenuePerFTE` beregnes allerede korrekt i koden men vises aldrig i tabellen. Vi tilfojer det som en ny synlig kolonne, sa I kan se produktiviteten pr. medarbejder direkte i oversigten.
 
-### Rettelse
+### Hvad det giver jer
+- **Sammenlignelighed**: En klient med 500k omsaetning og 10 FTE er mindre effektiv end en med 300k og 3 FTE — det kan I nu se direkte.
+- **Styringsindsigt**: Identificer hurtigt hvilke klienter der udnytter kapaciteten bedst.
 
-**Fil: `src/components/salary/ClientDBTab.tsx`** (linje 772-773)
+### AEndringer
 
-Tilføj `a.sickPayAmount` og `b.sickPayAmount` til sorteringsberegningen:
+**Fil: `src/components/salary/ClientDBTab.tsx`**
 
-```
-// Før:
-aVal = a.adjustedSellerCost + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
+1. **Tilf0j ny TableHead-kolonne** mellem DB% og den tomme kolonne (ca. linje 973):
+   - Header: "Oms/FTE" med sorteringsmulighed
+   - Bredde: `w-[100px]`, hojrestillet
 
-// Efter:
-aVal = a.adjustedSellerCost + a.sickPayAmount + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
-```
+2. **Tilf0j sorteringslogik** i `handleSort`-funktionen (ca. linje 775):
+   - Ny case `"revenuePerFTE"` der sorterer pa `client.revenuePerFTE`
 
-### ATP/Barsel — allerede korrekt
-Koden tæller allerede sælgere + assistenter + leder per team (linje 373-377), så ingen ændring er nødvendig her.
+3. **Opdater colSpan** for loading/empty states fra 9 til 10
 
-### Berørte filer
-| Fil | Ændring |
-|-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Tilføj `sickPayAmount` til omkostningssortering (2 linjer) |
+**Fil: `src/components/salary/ClientDBExpandableRow.tsx`** (eller tilsvarende raekke-komponent)
+
+4. **Tilf0j ny TableCell** der viser `formatCurrency(client.revenuePerFTE)` i hver raekke
+
+### Teknisk detalje
+Ingen ny beregning nodvendig — `revenuePerFTE` er allerede beregnet pa linje 670 og 829. Vi eksponerer blot vaerdien i UI'et.
 
