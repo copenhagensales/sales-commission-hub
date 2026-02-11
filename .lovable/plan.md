@@ -1,31 +1,57 @@
 
 
-## Vis Revenue/FTE (Oms/FTE) i DB per Klient tabellen
+## Relativ udgiftsvisning i Samlet Oversigt
 
-### Hvad
-Feltet `revenuePerFTE` beregnes allerede korrekt i koden men vises aldrig i tabellen. Vi tilfojer det som en ny synlig kolonne, sa I kan se produktiviteten pr. medarbejder direkte i oversigten.
+### Problem
+Naar du vaelger "Denne maaned" den 11. februar, viser "Samlet Oversigt" det fulde manedsbeloeb for stab-udgifter og stabsloenninger. Men omsaetning og DB afspejler kun data til og med den 11. Det giver et misvisende billede — det ser altid ud som underskud i starten af perioden.
 
-### Hvad det giver jer
-- **Sammenlignelighed**: En klient med 500k omsaetning og 10 FTE er mindre effektiv end en med 300k og 3 FTE — det kan I nu se direkte.
-- **Styringsindsigt**: Identificer hurtigt hvilke klienter der udnytter kapaciteten bedst.
+### Loesning
+Vis den relative (proraterede) udgift som primaer vaerdi og det fulde periodebeloeb i parentes. Eksempel:
 
-### AEndringer
+```text
+- Stab-udgifter          -467.000 kr. (932.000 kr.)
+- Stabsloenninger         -28.438 kr. (56.876 kr.)
+NETTO                    -38.550 kr.
+```
+
+Det betyder: "Vi har brugt 467k ud af 932k for maaneden, og med den DB vi har nu, er netto -38k."
+
+### Hvad aendres
 
 **Fil: `src/components/salary/ClientDBTab.tsx`**
 
-1. **Tilf0j ny TableHead-kolonne** mellem DB% og den tomme kolonne (ca. linje 973):
-   - Header: "Oms/FTE" med sorteringsmulighed
-   - Bredde: `w-[100px]`, hojrestillet
+1. Beregn en prorateringsfaktor baseret paa periodemodus:
+   - For "month": `dage passeret / dage i maaneden`
+   - For "payroll": `dage passeret / dage i loenperiode`
+   - For "week", "day", "custom": faktor = 1 (ingen proratering, vis som nu)
+2. Beregn `prorated` versioner af `stabExpenses` og `staffSalaries`
+3. Send baade `prorated` og `full` vaerdier til summary-kortet
+4. Beregn NETTO baseret paa de proraterede vaerdier
 
-2. **Tilf0j sorteringslogik** i `handleSort`-funktionen (ca. linje 775):
-   - Ny case `"revenuePerFTE"` der sorterer pa `client.revenuePerFTE`
+**Fil: `src/components/salary/ClientDBSummaryCard.tsx`**
 
-3. **Opdater colSpan** for loading/empty states fra 9 til 10
+1. Udvid props med valgfrie `fullStabExpenses` og `fullStaffSalaries`
+2. Naar `full`-vaerdier er tilgaengelige og forskellige fra de primaere, vis formatet:
+   `-{prorateret} ({fuld vaerdi})`
+3. NETTO beregnes paa de proraterede tal (som allerede er tilfaeldet)
 
-**Fil: `src/components/salary/ClientDBExpandableRow.tsx`** (eller tilsvarende raekke-komponent)
+### Prorateringslogik
 
-4. **Tilf0j ny TableCell** der viser `formatCurrency(client.revenuePerFTE)` i hver raekke
+```text
+periodMode === "month" eller "payroll":
+  dagsPasseret = min(idag, periodEnd) - periodStart + 1
+  dageTotalt   = periodEnd - periodStart + 1
+  faktor       = dagsPasseret / dageTotalt
+  prorateretUdgift = fuldUdgift * faktor
 
-### Teknisk detalje
-Ingen ny beregning nodvendig — `revenuePerFTE` er allerede beregnet pa linje 670 og 829. Vi eksponerer blot vaerdien i UI'et.
+Andre modes (dag, uge, custom):
+  Ingen proratering — vis som hidtil
+```
+
+### Beroerte filer
+
+| Fil | AEndring |
+|-----|---------|
+| `src/components/salary/ClientDBTab.tsx` | Beregn prorateringsfaktor og send full/prorated vaerdier |
+| `src/components/salary/ClientDBSummaryCard.tsx` | Vis prorateret vaerdi med fuld vaerdi i parentes |
 
