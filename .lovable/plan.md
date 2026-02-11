@@ -1,54 +1,40 @@
 
 
-## Multi-select af Daekningssum-vaerdier
+## Fix: Dobbelt-multiplikation af revenue og commission i KPI-cache
 
 ### Problem
-I dag kan man kun vaelge en enkelt vaerdi/operator for Daekningssum (f.eks. ">= 6000"). Brugeren oensker at kunne vaelge flere specifikke Daekningssum-vaerdier paa samme tid, saa en regel kan matche f.eks. baade 5000 og 10000.
+KPI-cache-beregningen (`calculate-kpi-values`) ganger `mapped_revenue * quantity` og `mapped_commission * quantity`, men disse vaerdier er **allerede ganget med quantity** naar de gemmes i `sale_items` tabellen (f.eks. i `sync-adversus`: `mapped_revenue: revenue * quantity`).
 
-### Loesning
-Tilfoej en ny operator "Er en af" (in) til Daekningssum, som tillader multi-select af specifikke beloeb.
+Det betyder at alle KPI-cache-vaerdier for `total_revenue` og `total_commission` er ca. 3x for hoeje.
 
-### AEndringer
+**Eksempel for TDC Erhverv i februar 2026:**
+- Korrekt revenue (direkte fra DB): **653.800 kr**
+- KPI-cache revenue: **2.132.000 kr** (dobbelt-ganget)
+- Vist i "DB per Klient": **1.918.800 kr** (cache-vaerdi fra et tidligere tidspunkt)
 
-**1. Frontend - PricingRuleEditor.tsx**
-- Tilfoej ny operator `{ value: "in", label: "Er en af (multi-valg)" }` til `NUMERIC_OPERATORS`
-- Udvid `NumericConditionValue` med `values?: number[]` felt
-- Naar operator er "in", vis en multi-value input (f.eks. komma-separerede tal eller chips med tilfoej/fjern)
-- UI: Inputfelt hvor man kan skrive et beloeb og tilfoeje det, med chips der viser de valgte vaerdier og kan fjernes
+### Beroorte steder i `supabase/functions/calculate-kpi-values/index.ts`
 
-**2. Backend - integration-engine/types.ts**
-- Tilfoej `'in'` til `NumericCondition.operator` union type
-- Tilfoej `values?: number[]` til `NumericCondition` interface
+Der er **6 steder** der skal rettes - alle aendrer `* (item.quantity || 1)` til bare vaerdien:
 
-**3. Backend - integration-engine/core/sales.ts**
-- Tilfoej case for `'in'` i `evaluateNumericCondition`:
-  ```
-  case 'in': return (condition.values ?? []).includes(numericLeadValue);
-  ```
+1. **Linje 615**: `teamCommission += (item.mapped_commission || 0) * (item.quantity || 1)` - team commission
+2. **Linje 1669-1671**: Global `calculateTotalCommission` funktion  
+3. **Linje 1711-1713**: Global `calculateTotalRevenue` funktion
+4. **Linje 2104-2106**: Client-scoped commission beregning
+5. **Linje 2148-2150**: Client-scoped revenue beregning
 
-**4. Backend - rematch-pricing-rules/index.ts**
-- Samme aendring som sales.ts: tilfoej `'in'` case i `evaluateNumericCondition`
-- Opdater `NumericCondition` interface med `'in'` og `values`
-
-### UI-design for "Er en af"
-Naar brugeren vaelger "Er en af" operatoren:
-- Vis et number-inputfelt med en "Tilfoej" knap
-- Valgte vaerdier vises som chips/badges (f.eks. `[5000 x] [10000 x]`)
-- Klik paa X paa en chip fjerner vaerdien
-
-### Eksempel paa gemt data
-```json
-{
-  "Daekningssum": {
-    "operator": "in",
-    "value": 0,
-    "values": [5000, 6000, 10000]
-  }
-}
+Alle aendres fra:
+```
+(item.mapped_commission || 0) * (item.quantity || 1)
+```
+Til:
+```
+(item.mapped_commission || 0)
 ```
 
-### Bagudkompatibilitet
-- Eksisterende regler med gte/lte/gt/lt/between paavirkes ikke
-- `value` feltet beholdes (bruges bare ikke ved "in")
-- Backend falder tilbage til `false` hvis `values` mangler ved "in"
+(Samme moenster for `mapped_revenue`)
 
+### Leaderboard-beregningerne er korrekte
+Linje 1119-1121 og lignende steder bruger allerede `mapped_commission` direkte uden dobbelt-multiplikation. Disse roeres ikke.
+
+### Efter deploy
+KPI-cachen skal genberegnes for at opdatere de forkerte vaerdier. Dette sker automatisk ved naeste scheduled koersel, eller kan trigges manuelt.
