@@ -1,57 +1,41 @@
 
 
-## Relativ udgiftsvisning i Samlet Oversigt
+## Fix: Cap boderomkostninger ved "i dag" for alle klienter
 
 ### Problem
-Naar du vaelger "Denne maaned" den 11. februar, viser "Samlet Oversigt" det fulde manedsbeloeb for stab-udgifter og stabsloenninger. Men omsaetning og DB afspejler kun data til og med den 11. Det giver et misvisende billede — det ser altid ud som underskud i starten af perioden.
+Naar "Denne maaned" vaelges den 11. februar, medregnes boderomkostninger for alle bookede dage i hele februar — ogsaa d. 12, 13 osv. — for **alle** klienter med lokationsbookings. Omsaetning og salgsdata stopper ved i dag. Det giver et skaevt billede for alle opgaver, ikke kun Yousee.
 
 ### Loesning
-Vis den relative (proraterede) udgift som primaer vaerdi og det fulde periodebeloeb i parentes. Eksempel:
+Cap `periodDaysArray` ved dagens dato for "month" og "payroll" modes, saa boderomkostninger kun taeller afviklede dage. Den fulde maaneds boder beregnes stadig separat (til parentes-visning).
 
+### AEndring
+
+**Fil: `src/components/salary/ClientDBTab.tsx`** (linje 572)
+
+Foer:
 ```text
-- Stab-udgifter          -467.000 kr. (932.000 kr.)
-- Stabsloenninger         -28.438 kr. (56.876 kr.)
-NETTO                    -38.550 kr.
+const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
 ```
 
-Det betyder: "Vi har brugt 467k ud af 932k for maaneden, og med den DB vi har nu, er netto -38k."
-
-### Hvad aendres
-
-**Fil: `src/components/salary/ClientDBTab.tsx`**
-
-1. Beregn en prorateringsfaktor baseret paa periodemodus:
-   - For "month": `dage passeret / dage i maaneden`
-   - For "payroll": `dage passeret / dage i loenperiode`
-   - For "week", "day", "custom": faktor = 1 (ingen proratering, vis som nu)
-2. Beregn `prorated` versioner af `stabExpenses` og `staffSalaries`
-3. Send baade `prorated` og `full` vaerdier til summary-kortet
-4. Beregn NETTO baseret paa de proraterede vaerdier
-
-**Fil: `src/components/salary/ClientDBSummaryCard.tsx`**
-
-1. Udvid props med valgfrie `fullStabExpenses` og `fullStaffSalaries`
-2. Naar `full`-vaerdier er tilgaengelige og forskellige fra de primaere, vis formatet:
-   `-{prorateret} ({fuld vaerdi})`
-3. NETTO beregnes paa de proraterede tal (som allerede er tilfaeldet)
-
-### Prorateringslogik
-
+Efter:
 ```text
-periodMode === "month" eller "payroll":
-  dagsPasseret = min(idag, periodEnd) - periodStart + 1
-  dageTotalt   = periodEnd - periodStart + 1
-  faktor       = dagsPasseret / dageTotalt
-  prorateretUdgift = fuldUdgift * faktor
-
-Andre modes (dag, uge, custom):
-  Ingen proratering — vis som hidtil
+const today = new Date();
+const effectivePeriodEnd = (periodMode === "month" || periodMode === "payroll") && today < periodEnd
+  ? today
+  : periodEnd;
+const periodDaysArray = eachDayOfInterval({ start: periodStart, end: effectivePeriodEnd });
 ```
 
-### Beroerte filer
+`fullMonthDaysArray` (linje 578) forbliver uaendret — den bruger allerede `monthEnd` og sikrer at parentes-vaerdien viser den fulde maaneds forventede boder.
+
+### Resultat
+- Alle klienters boderomkostninger matcher nu den faktiske salgsperiode (til og med i dag)
+- Fuld maaneds boderomkostning vises stadig i parentes
+- Ingen aendring for "week", "day" eller "custom" modes
+
+### Beroert fil
 
 | Fil | AEndring |
 |-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Beregn prorateringsfaktor og send full/prorated vaerdier |
-| `src/components/salary/ClientDBSummaryCard.tsx` | Vis prorateret vaerdi med fuld vaerdi i parentes |
+| `src/components/salary/ClientDBTab.tsx` | Cap periodDaysArray ved today for month/payroll |
 
