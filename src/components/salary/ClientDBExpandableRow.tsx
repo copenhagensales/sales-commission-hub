@@ -27,6 +27,7 @@ interface ClientDBRowData {
   // Calculated deduction amounts
   sickPayAmount: number;
   cancellationRevenueDeduction: number;
+  revenuePerFTE: number;
 }
 
 interface TrendInfo {
@@ -167,6 +168,11 @@ export function ClientDBExpandableRow({
               {formatPercent(client.dbPercent)}
             </span>
           </div>
+        </TableCell>
+
+        {/* Revenue per FTE */}
+        <TableCell className="text-right tabular-nums w-[100px] text-muted-foreground">
+          {client.revenuePerFTE > 0 ? formatCurrency(client.revenuePerFTE) : "—"}
         </TableCell>
 
         {/* Actions */}
