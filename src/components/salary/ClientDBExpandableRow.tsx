@@ -170,10 +170,6 @@ export function ClientDBExpandableRow({
           </div>
         </TableCell>
 
-        {/* Revenue per FTE */}
-        <TableCell className="text-right tabular-nums w-[100px] text-muted-foreground">
-          {client.revenuePerFTE > 0 ? formatCurrency(client.revenuePerFTE) : "—"}
-        </TableCell>
 
         {/* Actions */}
         <TableCell className="w-12">
