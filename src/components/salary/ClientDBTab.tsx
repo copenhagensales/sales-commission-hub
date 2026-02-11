@@ -630,18 +630,16 @@ export function ClientDBTab() {
       const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
       const sellerSalaryCost = commission + sellerVacationPay;
 
-      // Apply sick pay factor first (increases base cost), then cancellation factor (reduces)
-      const sickPayFactor = 1 + (sickPayPercent / 100);
-      const sellerCostWithSickPay = sellerSalaryCost * sickPayFactor;
+      // Cancellation reduces revenue and seller cost proportionally
       const cancellationFactor = 1 - (cancellationPercent / 100);
       const adjustedRevenue = salesData.revenue * cancellationFactor;
-      const adjustedSellerCost = sellerCostWithSickPay * cancellationFactor;
+      const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
 
-      // Calculate deduction amounts for display
+      // Sick pay is a fixed expense independent of cancellations
       const sickPayAmount = sellerSalaryCost * (sickPayPercent / 100);
       const cancellationRevenueDeduction = salesData.revenue * (cancellationPercent / 100);
 
-      const basisDB = adjustedRevenue - adjustedSellerCost - locationCosts;
+      const basisDB = adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts;
       const fteCount = teamId ? (teamMemberCounts?.[teamId] || 0) : 0;
 
       const clientData: ClientDBData = {
