@@ -1,47 +1,45 @@
 
 
-## Vis Centre/Boder med fuld måneds-beløb i parentes
+## Fix: Sygeløn som selvstændig udgift i DB-beregningen
 
-### Hvad ændres
-Når du vælger en kortere periode (fx en uge), viser Centre/Boder i dag kun beløbet for den valgte periode. Med denne ændring vises det som fx **-57.000 kr.** med **(77.700 kr./md.)** i parentes nedenunder, så du altid ved hvad den fulde måneds bookingomkostning er.
+### Problem
+Sygeløn ganges i dag ind i sælgerlønnen som en faktor (`sellerSalaryCost * 1.05`), og derefter reduceres hele beløbet med annulleringsprocenten. Men sygeløn er en reel udgift vi betaler uanset annulleringer — den bør stå som en separat post.
 
-### Teknisk plan
+### Ny beregningslogik
 
-**Fil 1: `src/components/salary/ClientDBTab.tsx`**
-
-1. Beregn fuld-måneds lokationsomkostninger ved siden af periode-specifikke:
-   - Udled `monthStart` og `monthEnd` fra `periodStart` (via `startOfMonth`/`endOfMonth`)
-   - Tilføj en ekstra `fullMonthLocationCostsMap` der itererer over hele månedens dage i stedet for kun perioden
-   - Kun beregnes hvis perioden IKKE allerede er en hel måned (for at undgå dobbeltberegning)
-
-2. Udvid `ClientDBData` interfacet med et nyt felt:
-   - `fullMonthLocationCosts: number` — den samlede bookingomkostning for hele måneden
-
-3. Sæt værdien i clientDataList-opbygningen:
-   - `fullMonthLocationCosts: isFMClient ? (fullMonthLocationCostsMap.get(client.id) || 0) : 0`
-
-4. Send `fullMonthLocationCosts` videre til `ClientDBExpandableRow` via props
-
-**Fil 2: `src/components/salary/ClientDBExpandableRow.tsx`**
-
-1. Udvid `ClientDBRowData` interfacet med `fullMonthLocationCosts: number`
-
-2. I den udvidede rækkevisning, ændr Centre/Boder-cellen:
-   - Vis periode-beløbet som før: `-57.000 kr.`
-   - Tilføj en linje under med fuld måneds-beløb i parentes: `(77.700 kr./md.)`
-   - Kun vis parentes-linjen hvis `fullMonthLocationCosts !== locationCosts` (dvs. perioden er kortere end hele måneden)
-
-### Eksempel på visning
-
-```text
-Centre/Boder
--57.000 kr.
-(77.700 kr./md.)
+**Før (forkert):**
+```
+sellerCostWithSickPay = sellerSalaryCost × (1 + sygeløn%)
+adjustedSellerCost = sellerCostWithSickPay × (1 - annullering%)
+basisDB = adjustedRevenue - adjustedSellerCost - locationCosts
 ```
 
-### Berørte filer
-| Fil | Ændring |
-|-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Beregn `fullMonthLocationCosts`, udvid interface, send som prop |
-| `src/components/salary/ClientDBExpandableRow.tsx` | Udvid interface, vis fuld-måned i parentes |
+**Efter (korrekt):**
+```
+adjustedSellerCost = sellerSalaryCost × (1 - annullering%)
+sickPayAmount = sellerSalaryCost × (sygeløn% / 100)          ← fast udgift
+basisDB = adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts
+```
+
+### Fil-aendringer
+
+**`src/components/salary/ClientDBTab.tsx`** (linje 633-644):
+- Fjern `sickPayFactor` og `sellerCostWithSickPay`
+- Beregn `adjustedSellerCost` direkte fra `sellerSalaryCost * cancellationFactor`
+- Behold `sickPayAmount = sellerSalaryCost * (sickPayPercent / 100)` som separat post
+- Opdater `basisDB` til: `adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts`
+
+**`src/components/salary/ClientDBExpandableRow.tsx`**:
+- Vis "Sygeløn" som en selvstændig udgiftslinje i den udvidede visning (hvis den ikke allerede gør det), så det er tydeligt at det er en separat omkostning og ikke en del af sælgerlønnen.
+
+### Eksempel
+Med 100.000 kr. sælgerløn, 5% sygeløn og 10% annullering:
+
+| | Før (forkert) | Efter (korrekt) |
+|---|---|---|
+| Sælgerløn justeret | 100.000 × 1,05 × 0,90 = 94.500 | 100.000 × 0,90 = 90.000 |
+| Sygeløn separat | (indeholdt i ovenstående) | 100.000 × 0,05 = 5.000 |
+| Total omkostning | 94.500 | 95.000 |
+
+Forskellen er lille men principielt korrekt: sygeløn er en fast udgift der ikke skal reduceres af annulleringsprocenten.
 
