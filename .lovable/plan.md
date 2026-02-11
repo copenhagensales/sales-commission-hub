@@ -1,45 +1,29 @@
 
 
-## Fix: Sygeløn som selvstændig udgift i DB-beregningen
+## Fix: Tilføj sygeløn til omkostningssortering
 
 ### Problem
-Sygeløn ganges i dag ind i sælgerlønnen som en faktor (`sellerSalaryCost * 1.05`), og derefter reduceres hele beløbet med annulleringsprocenten. Men sygeløn er en reel udgift vi betaler uanset annulleringer — den bør stå som en separat post.
+Når du sorterer klienterne efter "Omkostninger", medregnes `sickPayAmount` ikke i summen. Det betyder at klienter med høj sygeløn kan fremstå billigere end de reelt er.
 
-### Ny beregningslogik
+### Rettelse
 
-**Før (forkert):**
-```
-sellerCostWithSickPay = sellerSalaryCost × (1 + sygeløn%)
-adjustedSellerCost = sellerCostWithSickPay × (1 - annullering%)
-basisDB = adjustedRevenue - adjustedSellerCost - locationCosts
-```
+**Fil: `src/components/salary/ClientDBTab.tsx`** (linje 772-773)
 
-**Efter (korrekt):**
+Tilføj `a.sickPayAmount` og `b.sickPayAmount` til sorteringsberegningen:
+
 ```
-adjustedSellerCost = sellerSalaryCost × (1 - annullering%)
-sickPayAmount = sellerSalaryCost × (sygeløn% / 100)          ← fast udgift
-basisDB = adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts
+// Før:
+aVal = a.adjustedSellerCost + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
+
+// Efter:
+aVal = a.adjustedSellerCost + a.sickPayAmount + a.locationCosts + a.assistantAllocation + a.leaderAllocation + a.leaderVacationPay + a.atpBarsselAllocation;
 ```
 
-### Fil-aendringer
+### ATP/Barsel — allerede korrekt
+Koden tæller allerede sælgere + assistenter + leder per team (linje 373-377), så ingen ændring er nødvendig her.
 
-**`src/components/salary/ClientDBTab.tsx`** (linje 633-644):
-- Fjern `sickPayFactor` og `sellerCostWithSickPay`
-- Beregn `adjustedSellerCost` direkte fra `sellerSalaryCost * cancellationFactor`
-- Behold `sickPayAmount = sellerSalaryCost * (sickPayPercent / 100)` som separat post
-- Opdater `basisDB` til: `adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts`
-
-**`src/components/salary/ClientDBExpandableRow.tsx`**:
-- Vis "Sygeløn" som en selvstændig udgiftslinje i den udvidede visning (hvis den ikke allerede gør det), så det er tydeligt at det er en separat omkostning og ikke en del af sælgerlønnen.
-
-### Eksempel
-Med 100.000 kr. sælgerløn, 5% sygeløn og 10% annullering:
-
-| | Før (forkert) | Efter (korrekt) |
-|---|---|---|
-| Sælgerløn justeret | 100.000 × 1,05 × 0,90 = 94.500 | 100.000 × 0,90 = 90.000 |
-| Sygeløn separat | (indeholdt i ovenstående) | 100.000 × 0,05 = 5.000 |
-| Total omkostning | 94.500 | 95.000 |
-
-Forskellen er lille men principielt korrekt: sygeløn er en fast udgift der ikke skal reduceres af annulleringsprocenten.
+### Berørte filer
+| Fil | Ændring |
+|-----|---------|
+| `src/components/salary/ClientDBTab.tsx` | Tilføj `sickPayAmount` til omkostningssortering (2 linjer) |
 
