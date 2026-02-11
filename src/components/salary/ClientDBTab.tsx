@@ -68,6 +68,7 @@ interface ClientDBData {
   sellerVacationPay: number;
   sellerSalaryCost: number;
   locationCosts: number;
+  fullMonthLocationCosts: number;
   cancellationPercent: number;
   sickPayPercent: number;
   adjustedRevenue: number;
@@ -567,7 +568,14 @@ export function ClientDBTab() {
 
     // Calculate location costs per client from bookings
     const locationCostsMap = new Map<string, number>();
+    const fullMonthLocationCostsMap = new Map<string, number>();
     const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
+
+    // Check if period is already a full month
+    const monthStart = startOfMonth(periodStart);
+    const monthEnd = endOfMonth(periodStart);
+    const isFullMonth = isSameDay(periodStart, monthStart) && isSameDay(periodEnd, monthEnd);
+    const fullMonthDaysArray = isFullMonth ? periodDaysArray : eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     for (const booking of bookings || []) {
       if (!booking.client_id) continue;
@@ -577,6 +585,7 @@ export function ClientDBTab() {
       const bookedDays = (booking.booked_days as number[]) || [];
       const dailyRate = booking.daily_rate_override || (booking.location as any)?.daily_rate || 0;
       
+      // Period-specific costs
       for (const day of periodDaysArray) {
         const dayIndex = getBookedDayIndex(day);
         if (day >= bookingStart && day <= bookingEnd && bookedDays.includes(dayIndex)) {
@@ -584,6 +593,19 @@ export function ClientDBTab() {
             booking.client_id,
             (locationCostsMap.get(booking.client_id) || 0) + dailyRate
           );
+        }
+      }
+
+      // Full month costs (only calculate separately if not already full month)
+      if (!isFullMonth) {
+        for (const day of fullMonthDaysArray) {
+          const dayIndex = getBookedDayIndex(day);
+          if (day >= bookingStart && day <= bookingEnd && bookedDays.includes(dayIndex)) {
+            fullMonthLocationCostsMap.set(
+              booking.client_id,
+              (fullMonthLocationCostsMap.get(booking.client_id) || 0) + dailyRate
+            );
+          }
         }
       }
     }
@@ -633,6 +655,7 @@ export function ClientDBTab() {
         sellerVacationPay,
         sellerSalaryCost,
         locationCosts,
+        fullMonthLocationCosts: isFMClient ? (isFullMonth ? locationCosts : (fullMonthLocationCostsMap.get(client.id) || 0)) : 0,
         cancellationPercent,
         sickPayPercent,
         adjustedRevenue,

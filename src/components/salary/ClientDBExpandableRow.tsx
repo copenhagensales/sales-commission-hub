@@ -15,6 +15,7 @@ interface ClientDBRowData {
   adjustedRevenue: number;
   adjustedSellerCost: number;
   locationCosts: number;
+  fullMonthLocationCosts: number;
   assistantAllocation: number;
   leaderAllocation: number;
   leaderVacationPay: number;
@@ -198,6 +199,11 @@ export function ClientDBExpandableRow({
                 <p className="font-medium text-destructive">
                   {client.locationCosts > 0 ? `-${formatCurrency(client.locationCosts)}` : "—"}
                 </p>
+                {client.fullMonthLocationCosts > 0 && client.fullMonthLocationCosts !== client.locationCosts && (
+                  <p className="text-xs text-muted-foreground">
+                    ({formatCurrency(client.fullMonthLocationCosts)}/md.)
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Assist.løn</p>
