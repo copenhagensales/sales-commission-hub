@@ -1,26 +1,18 @@
 
 
-## Komplet systemdaekkende paginering - IMPLEMENTERET ✅
+## Catch-up sync for ASE/Enreach HeroBase 01: Januar-Februar 2026
 
-Alle 14 filer og 33 queries er nu pagineret med `fetchAllRows` (frontend) og `fetchAllPaginated` / inline paginering (edge functions).
+Koerer catch-up sync i 3 mindre bidder for at undgaa memory-problemer:
 
-### Status: ALT FÆRDIGT
+1. **1. januar - 15. januar 2026**
+2. **16. januar - 31. januar 2026**
+3. **1. februar - 11. februar 2026**
 
-| # | Fil | Status |
-|---|-----|--------|
-| 1 | `FieldmarketingDashboardFull.tsx` | ✅ |
-| 2 | `useDashboardSalesData.ts` | ✅ |
-| 3 | `sync-adversus/index.ts` | ✅ |
-| 4 | `useDashboardKpiData.ts` | ✅ |
-| 5 | `CphSalesDashboard.tsx` | ✅ |
-| 6 | `MgTest.tsx` | ✅ |
-| 7 | `useOnboarding.ts` | ✅ |
-| 8 | `useEconomicData.ts` | ✅ |
-| 9 | `DesignDashboard.tsx` | ✅ |
-| 10 | `CandidateDetail.tsx` | ✅ |
-| 11 | `calculate-leaderboard-incremental/index.ts` | ✅ |
-| 12 | `adversus-sync-v2/index.ts` | ✅ |
-| 13 | `integration-engine/core/sales.ts` | ✅ |
-| 14 | `integration-engine/core/calls.ts` | ✅ |
+Hver bide koeres med `background: true` og `maxRecords: 5000` saa alle salg inkluderes. Efter hver bide tjekkes om telefonnumrene **004542472719** og **004550238391** nu findes i databasen.
 
-Edge functions deployed: sync-adversus, calculate-leaderboard-incremental, adversus-sync-v2, integration-engine
+### Teknisk detalje
+- Integration ID: `a76cf63a-4b02-4d99-b6b5-20a8e4552ba5` (ASE)
+- Actions: `["sales"]`
+- Source: `enreach`
+- Baggrundskørsel for at undgaa timeout
+
