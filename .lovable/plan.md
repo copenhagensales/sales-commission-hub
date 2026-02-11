@@ -1,48 +1,66 @@
 
 
-## Tilfoej debug-logging til fetchSalesRange
+## Udvid API-koden til at hente manglende data fra HeroBase
 
-### Problem
-`fetchSalesRange` (linje 428-483) mangler debug-logging, saa vi kan ikke se om telefonnummer 004551806520 bliver hentet fra HeroBase API og derefter filtreret fra. Kun `fetchSales` (den daglige sync) gemmer debug data.
+### Analyse af HeroBase API
 
-### Loesning
-Tilfoej samme debug-tracking til `fetchSalesRange` som allerede findes i `fetchSales`, samt et specifikt telefonnummer-soeg saa vi kan spore praecis hvad der sker med leadet.
+Jeg har gennemgaaet den fulde API-dokumentation for HeroBase (Enreach). Her er de vigtigste endpoints vi kan bruge:
 
-### AEndringer
+### Nuvaerende situation
+- Vi bruger KUN `/simpleleads?Projects=*&ModifiedFrom=...&AllClosedStatuses=true`
+- `Projects=*` bruger glob-syntax og BURDE matche alle projekter
+- Men telefonnummer 51806520 fra "TRP - Recycling" kampagnen dukker IKKE op i de 5.053 leads der returneres
+
+### Nye muligheder fra API-dokumentationen
+
+HeroBase API'en har flere endpoints vi IKKE bruger i dag:
+
+1. **`/projects`** - Returnerer alle projekter API-brugeren har adgang til (uniqueId, name, active). Dette kan bekraefte om "TRP - Recycling" overhovedet er tilgaengeligt.
+
+2. **`/campaigns?Project=TRP*`** - Kan filtrere kampagner efter projekt med glob-syntax. Viser om TRP-kampagner er synlige.
+
+3. **`/leads`** - Et alternativt endpoint til `/simpleleads` med flere filtermuligheder, bl.a. `searchName` (gemte soegninger) og `ModifiedFrom`. Returnerer muligvis andre data end simpleleads.
+
+4. **`/leads/{uniqueId}`** - Kan hente et specifikt lead hvis vi kender dets ID.
+
+5. **`/calls`** - Har `leadPhoneNumber` felt og kan filtreres paa tid. Kan bruges til at finde opkaldet og dermed leadets `uniqueLeadId`.
+
+### Plan: Tilfoej diagnostisk projekt- og kampagne-tjek
+
+**Fil: `supabase/functions/enreach-diagnostics/index.ts`**
+
+Udvid den eksisterende diagnostics-funktion med tre nye tests:
+
+- **TEST 8: Hent alle projekter** (`/projects`) - Logger alle projekter API-brugeren har adgang til, saa vi kan verificere om "TRP - Recycling" (eller lignende) er paa listen.
+
+- **TEST 9: Hent TRP-kampagner** (`/campaigns?Project=TRP*&Active=All`) - Soeger specifikt efter kampagner under TRP-projektet.
+
+- **TEST 10: Soeg via /calls efter telefonnummer** (`/calls?StartTime=2026-01-27&TimeSpan=3.00:00:00&Include=campaign,user`) - Soeger efter opkald i tidsperioden omkring 28. januar og filtrerer paa telefonnummer 51806520 i resultaterne. Calls-endpointet har `leadPhoneNumber` og `leadClosure` felter, saa vi kan finde salget den vej.
+
+- **TEST 11: Proev /leads endpoint** (`/leads?ModifiedFrom=2026-01-27&PageSize=500`) - Proever det alternative leads-endpoint som muligvis returnerer data som simpleleads ikke goer.
 
 **Fil: `supabase/functions/integration-engine/adapters/enreach.ts`**
 
-1. Tilfoej raw lead tracking og skipReasonMap til `fetchSalesRange` (ligesom i `fetchSales`):
-   - Opret `allRawLeads` array og `skipReasonMap` i `fetchSalesRange`
-   - Gem alle raw leads i `allRawLeads` foer filtrering
-   - Track skip-reasons for closure og dataFilter
-   - Track skip-reasons for email-whitelist
-   - Gem debug data i `this.lastDebugData` efter pagination
+Tilfoej en ny metode `fetchAccessibleProjects()` der kalder `/projects` og returnerer listen. Denne kan bruges til at logge hvilke projekter der er tilgaengelige under sync, og give en advarsel hvis forventede projekter mangler.
 
-2. Tilfoej telefonnummer-soegning i pageProcessor (baade `fetchSales` og `fetchSalesRange`):
-   - Log specifikt naar et lead med telefonnummer `51806520` ses i raw data
-   - Log hvilken closure, agent-email og kampagne leadet har
-   - Log om det filtreres fra og af hvilken grund
-
-### Teknisk detalje
-
-Konkret aendres `fetchSalesRange` metoden (linje 428-483) til at:
+### Tekniske detaljer
 
 ```text
-fetchSalesRange (foer)          fetchSalesRange (efter)
---------------------------      --------------------------
-Henter leads                    Henter leads
-Filtrerer closure=success       Gemmer ALLE raw leads
-Filtrerer dataFilters           Filtrerer closure=success (tracker skip)
-Filtrerer email                 Filtrerer dataFilters (tracker skip)
-Returnerer                      Filtrerer email (tracker skip)
-                                Soeger efter 51806520
-                                Gemmer debug data
-                                Logger diagnostik
-                                Returnerer
+Nye API-kald:
+  GET /projects                              -> Liste af {uniqueId, name, active}
+  GET /campaigns?Project=TRP*&Active=All     -> TRP-kampagner
+  GET /calls?StartTime=...&TimeSpan=...      -> Opkald med leadPhoneNumber
+  GET /leads?ModifiedFrom=...                -> Alternativt lead-endpoint
 ```
 
-Dette sikrer at naeste gang vi koerer en catch-up sync, kan vi se i debug-loggen praecis hvad der skete med det manglende lead.
+Strategien er:
+1. Foerst koer diagnostics for at bekraefte om TRP-projektet er synligt
+2. Hvis det er synligt: proev `/leads` endpoint som alternativ datakilde
+3. Hvis det IKKE er synligt: problemet er API-brugerens projektrettigheder (skal fixes i HeroBase admin)
+4. Brug `/calls` som fallback til at finde salget via telefonnummer
 
-### Test
-Efter deploy koeres en ny catch-up sync for 27-29. januar 2026, og derefter tjekkes `integration_debug_log` for at se om telefonnummeret dukker op i raw_items, skipped_items eller registered_items.
+### Forventet resultat
+Vi faar et klart svar paa om problemet er:
+- A) API-brugeren mangler adgang til TRP-projektet (skal fixes i HeroBase)
+- B) `/simpleleads` returnerer ikke alle leads (skal skifte til `/leads` endpoint)
+- C) Leadet kan findes via `/calls` og vi kan tilfoeje en alternativ sync-sti
