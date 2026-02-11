@@ -86,6 +86,11 @@ interface ClientDBData {
   // Calculated deduction amounts
   sickPayAmount: number;
   cancellationRevenueDeduction: number;
+  // Full-month expected values (for parenthesis display when period is capped)
+  fullMonthAssistantAllocation: number;
+  fullMonthLeaderAllocation: number;
+  fullMonthLeaderVacationPay: number;
+  fullMonthAtpBarsselAllocation: number;
 }
 
 interface TeamSalaryInfo {
@@ -110,6 +115,9 @@ export function ClientDBTab() {
   const [hideZeroClients, setHideZeroClients] = useState(true);
   const queryClient = useQueryClient();
 
+  // Cap period at today for month/payroll modes so costs match revenue timeline
+  const isCapped = (periodMode === "month" || periodMode === "payroll") && new Date() < periodEnd;
+  const effectivePeriodEnd = isCapped ? new Date() : periodEnd;
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
       setSortDirection(prev => prev === "asc" ? "desc" : "asc");
@@ -415,11 +423,18 @@ export function ClientDBTab() {
     return getAllAssistantIds(teamAssistants);
   }, [teamAssistants]);
 
-  // Calculate assistant salaries based on hours
+  // Calculate assistant salaries based on hours (capped at today for current periods)
   const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
     periodStart,
-    periodEnd,
+    effectivePeriodEnd,
     allAssistantIds
+  );
+
+  // Full-month assistant salary calculation (for parenthesis display)
+  const { data: fullMonthAssistantHoursData } = useAssistantHoursCalculation(
+    periodStart,
+    periodEnd,
+    isCapped ? allAssistantIds : [] // Only fetch when capping is active
   );
 
   // Fetch previous period comparison data
@@ -674,6 +689,10 @@ export function ClientDBTab() {
         revenuePerFTE: fteCount > 0 ? adjustedRevenue / fteCount : 0,
         sickPayAmount,
         cancellationRevenueDeduction,
+        fullMonthAssistantAllocation: 0,
+        fullMonthLeaderAllocation: 0,
+        fullMonthLeaderVacationPay: 0,
+        fullMonthAtpBarsselAllocation: 0,
       };
 
       clientDataList.push(clientData);
@@ -685,9 +704,11 @@ export function ClientDBTab() {
     }
 
     // Calculate team allocations
-    const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
+    const workdaysInPeriod = countWorkDaysInPeriod(periodStart, effectivePeriodEnd);
+    const fullMonthWorkdays = isCapped ? countWorkDaysInPeriod(periodStart, periodEnd) : workdaysInPeriod;
     const WORKDAYS_PER_MONTH = 22;
     const prorationFactor = workdaysInPeriod / WORKDAYS_PER_MONTH;
+    const fullMonthProrationFactor = fullMonthWorkdays / WORKDAYS_PER_MONTH;
     const atpRate = atpBarsselRate || 381;
 
     for (const [teamId, teamClients] of Object.entries(clientsByTeam)) {
@@ -699,19 +720,29 @@ export function ClientDBTab() {
 
       const teamAssistantIds = getTeamAssistantIds(teamAssistants, teamId);
       let totalAssistantSalary = 0;
+      let fullMonthTotalAssistantSalary = 0;
       for (const aId of teamAssistantIds) {
         const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
         totalAssistantSalary += assistantData?.totalSalary || 0;
+        if (isCapped) {
+          const fullData = fullMonthAssistantHoursData ? fullMonthAssistantHoursData[aId] : null;
+          fullMonthTotalAssistantSalary += fullData?.totalSalary || 0;
+        }
       }
 
       const teamMemberCount = teamMemberCounts?.[teamId] || 0;
       const teamAtpBarsselCost = teamMemberCount * atpRate * prorationFactor;
+      const fullMonthAtpBarsselCost = isCapped ? teamMemberCount * atpRate * fullMonthProrationFactor : teamAtpBarsselCost;
 
       for (const client of teamClients) {
         const revenueShare = client.adjustedRevenue / teamTotalRevenue;
         client.assistantAllocation = totalAssistantSalary * revenueShare;
         client.atpBarsselAllocation = teamAtpBarsselCost * revenueShare;
         client.dbBeforeLeader = client.basisDB - client.assistantAllocation - client.atpBarsselAllocation;
+        if (isCapped) {
+          client.fullMonthAssistantAllocation = fullMonthTotalAssistantSalary * revenueShare;
+          client.fullMonthAtpBarsselAllocation = fullMonthAtpBarsselCost * revenueShare;
+        }
       }
 
       const teamTotalDBBeforeLeader = teamClients.reduce((sum, c) => sum + c.dbBeforeLeader, 0);
@@ -719,12 +750,20 @@ export function ClientDBTab() {
       const proratedMinimumSalary = teamInfo.minimumSalary * prorationFactor;
       const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
 
+      // Full-month leader salary
+      const fullMonthProratedMinSalary = isCapped ? teamInfo.minimumSalary * fullMonthProrationFactor : proratedMinimumSalary;
+      const fullMonthLeaderSalary = isCapped ? Math.max(calculatedLeaderSalary, fullMonthProratedMinSalary) : finalTeamLeaderSalary;
+
       const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1);
       for (const client of teamClients) {
         const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
         client.leaderAllocation = finalTeamLeaderSalary * dbShare;
         client.leaderVacationPay = client.leaderAllocation * VACATION_PAY_RATES.LEADER;
         client.finalDB = client.dbBeforeLeader - client.leaderAllocation - client.leaderVacationPay;
+        if (isCapped) {
+          client.fullMonthLeaderAllocation = fullMonthLeaderSalary * dbShare;
+          client.fullMonthLeaderVacationPay = client.fullMonthLeaderAllocation * VACATION_PAY_RATES.LEADER;
+        }
       }
     }
 
@@ -739,7 +778,7 @@ export function ClientDBTab() {
     }
 
     return clientDataList;
-  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, periodStart, periodEnd, teamMemberCounts, atpBarsselRate]);
+  }, [clientsWithTeams, salesByClient, adjustmentPercents, bookings, teamSalaries, assistantHoursData, fullMonthAssistantHoursData, teamAssistants, periodStart, periodEnd, effectivePeriodEnd, isCapped, teamMemberCounts, atpBarsselRate]);
 
   // Filtered and sorted client data
   const filteredAndSortedData = useMemo(() => {

@@ -28,6 +28,11 @@ interface ClientDBRowData {
   sickPayAmount: number;
   cancellationRevenueDeduction: number;
   revenuePerFTE: number;
+  // Full-month expected values
+  fullMonthAssistantAllocation: number;
+  fullMonthLeaderAllocation: number;
+  fullMonthLeaderVacationPay: number;
+  fullMonthAtpBarsselAllocation: number;
 }
 
 interface TrendInfo {
@@ -213,6 +218,11 @@ export function ClientDBExpandableRow({
                 <p className="font-medium text-destructive">
                   {client.assistantAllocation > 0 ? `-${formatCurrency(client.assistantAllocation)}` : "—"}
                 </p>
+                {client.fullMonthAssistantAllocation > 0 && client.fullMonthAssistantAllocation !== client.assistantAllocation && (
+                  <p className="text-xs text-muted-foreground">
+                    ({formatCurrency(client.fullMonthAssistantAllocation)}/md.)
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Lederløn</p>
@@ -221,12 +231,22 @@ export function ClientDBExpandableRow({
                     ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
                     : "—"}
                 </p>
+                {client.fullMonthLeaderAllocation > 0 && client.fullMonthLeaderAllocation !== client.leaderAllocation && (
+                  <p className="text-xs text-muted-foreground">
+                    ({formatCurrency(client.fullMonthLeaderAllocation + client.fullMonthLeaderVacationPay)}/md.)
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">ATP/Barsel</p>
                 <p className="font-medium text-destructive">
                   {client.atpBarsselAllocation > 0 ? `-${formatCurrency(client.atpBarsselAllocation)}` : "—"}
                 </p>
+                {client.fullMonthAtpBarsselAllocation > 0 && client.fullMonthAtpBarsselAllocation !== client.atpBarsselAllocation && (
+                  <p className="text-xs text-muted-foreground">
+                    ({formatCurrency(client.fullMonthAtpBarsselAllocation)}/md.)
+                  </p>
+                )}
               </div>
               <div>
                 <button
