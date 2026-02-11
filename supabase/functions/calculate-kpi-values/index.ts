@@ -304,6 +304,19 @@ function formatDisplayName(fullName: string): string {
   return fullName;
 }
 
+// Helper to upsert a batch of cached values immediately
+async function saveKpiValuesBatch(supabase: SupabaseClient, values: CachedValue[], label: string): Promise<void> {
+  if (values.length === 0) return;
+  const { error } = await supabase
+    .from("kpi_cached_values")
+    .upsert(values, { onConflict: "kpi_slug,period_type,scope_type,scope_id" });
+  if (error) {
+    console.error(`[Progressive Save - ${label}] Error:`, error);
+  } else {
+    console.log(`[Progressive Save - ${label}] Saved ${values.length} values`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -315,6 +328,28 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Parse chunk parameter for split execution
+    let chunk: string | null = null;
+    try {
+      const body = await req.json();
+      chunk = body?.chunk || null;
+    } catch {
+      // No body or invalid JSON - run everything (backward compatible)
+    }
+
+    const validChunks = ["kpis", "leaderboards"];
+    if (chunk && !validChunks.includes(chunk)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid chunk: ${chunk}. Valid: ${validChunks.join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const runKpis = !chunk || chunk === "kpis";
+    const runLeaderboards = !chunk || chunk === "leaderboards";
+
+    console.log(`[calculate-kpi-values] Starting with chunk=${chunk || "all"} (kpis=${runKpis}, leaderboards=${runLeaderboards})`);
+
     const now = new Date();
     const periods = [
       { type: "today", start: getStartOfDay(now), end: now },
@@ -323,6 +358,21 @@ Deno.serve(async (req) => {
       { type: "payroll_period", ...getPayrollPeriod(now) },
     ];
 
+    const calculatedAt = now.toISOString();
+    let totalKpisSaved = 0;
+    let totalLeaderboardsSaved = 0;
+
+    // Fetch clients (needed for both KPIs and leaderboards)
+    const { data: clients } = await supabase
+      .from("clients")
+      .select("id, name");
+    
+    const clientList = (clients || []) as { id: string; name: string }[];
+
+    // Pre-fetch FM commission map once for all calculations
+    const fmCommissionMap = await fetchFmCommissionMap(supabase);
+
+  if (runKpis) {
     // Fetch all active KPI definitions
     const { data: kpiDefinitions, error: kpiError } = await supabase
       .from("kpi_definitions")
@@ -334,27 +384,15 @@ Deno.serve(async (req) => {
       throw kpiError;
     }
 
-    const cachedValues: CachedValue[] = [];
-    const leaderboardCaches: LeaderboardCache[] = [];
-    const calculatedAt = now.toISOString();
-
-    // Fetch clients for client-scoped KPIs
-    const { data: clients } = await supabase
-      .from("clients")
-      .select("id, name");
-    
-    const clientList = (clients || []) as { id: string; name: string }[];
-
-    // Pre-fetch FM commission map once for all calculations
-    const fmCommissionMap = await fetchFmCommissionMap(supabase);
-
-    // Calculate each KPI for each period (global scope)
+    // ============= GLOBAL KPIs =============
+    console.log("Calculating global KPIs...");
+    const globalKpis: CachedValue[] = [];
     for (const kpi of (kpiDefinitions as KpiDefinition[]) || []) {
       for (const period of periods) {
         try {
           const value = await calculateKpiValue(supabase, kpi, period.start, period.end, fmCommissionMap);
           
-          cachedValues.push({
+          globalKpis.push({
             kpi_slug: kpi.slug,
             period_type: period.type,
             scope_type: "global",
@@ -368,17 +406,22 @@ Deno.serve(async (req) => {
         }
       }
     }
+    // SAVE GLOBAL KPIs IMMEDIATELY
+    await saveKpiValuesBatch(supabase, globalKpis, "Global KPIs");
+    totalKpisSaved += globalKpis.length;
 
-    // Calculate client-scoped KPIs for key metrics
+    // ============= CLIENT-SCOPED KPIs =============
+    console.log("Calculating client-scoped KPIs...");
     const clientScopedKpis = ["sales_count", "total_commission", "total_revenue", "total_hours", "antal_salg", "total_provision"];
     
     for (const client of clientList) {
+      const clientKpis: CachedValue[] = [];
       for (const period of periods) {
         for (const kpiSlug of clientScopedKpis) {
           try {
             const value = await calculateClientKpiValue(supabase, kpiSlug, client.id, period.start, period.end, fmCommissionMap);
             
-            cachedValues.push({
+            clientKpis.push({
               kpi_slug: kpiSlug,
               period_type: period.type,
               scope_type: "client",
@@ -389,12 +432,15 @@ Deno.serve(async (req) => {
             });
           } catch (err) {
             console.error(`Error calculating ${kpiSlug} for client ${client.id} ${period.type}:`, err);
+          }
         }
       }
+      // SAVE PER CLIENT to ensure each client's data is persisted
+      await saveKpiValuesBatch(supabase, clientKpis, `Client ${client.name}`);
+      totalKpisSaved += clientKpis.length;
     }
-  }
 
-  // ============= EMPLOYEE-SCOPED KPIs =============
+   // ============= EMPLOYEE-SCOPED KPIs =============
   console.log("Calculating employee-scoped KPIs...");
   
   // Get active employees with agent mappings
@@ -435,7 +481,6 @@ Deno.serve(async (req) => {
   );
   
   // Fetch FM sales for employee-scoped calculations from unified sales table
-  // Use raw_payload.fm_seller_id to match FM sales to employees
   const { data: allPeriodFmSalesRaw } = await supabase
     .from("sales")
     .select("id, sale_datetime, raw_payload")
@@ -470,14 +515,13 @@ Deno.serve(async (req) => {
   }
   
   // Calculate for each active employee
-  // Don't skip employees without agent mappings - they might have FM sales
+  const employeeKpis: CachedValue[] = [];
   for (const emp of (activeEmployees || [])) {
     const agentData = employeeAgentMap.get(emp.id);
     const hasAgentMappings = agentData && 
       (agentData.emails.length > 0 || agentData.externalIds.length > 0);
     
     for (const period of employeePeriods) {
-      // Filter telesales for this employee in this period (only if they have agent mappings)
       const empSales = hasAgentMappings ? (allPeriodSales || []).filter((sale: any) => {
         const saleDate = new Date(sale.sale_datetime);
         if (saleDate < period.start || saleDate > period.end) return false;
@@ -489,16 +533,12 @@ Deno.serve(async (req) => {
                (saleExternalId && agentData!.externalIds.includes(saleExternalId));
       }) : [];
       
-      // Filter FM sales for this employee in this period
-      // Match directly on seller_id = employee.id (same logic as DailyReports)
       const empFmSales = (allPeriodFmSales || []).filter((sale: any) => {
         const saleDate = new Date(sale.registered_at);
         if (saleDate < period.start || saleDate > period.end) return false;
-        
         return sale.seller_id === emp.id;
       });
       
-      // Calculate sales count (telesales)
       let salesCount = 0;
       let totalCommission = 0;
       
@@ -510,21 +550,18 @@ Deno.serve(async (req) => {
           }
           totalCommission += (item as any).mapped_commission || 0;
         }
-        // If no items, count as 1 sale
         if (!sale.sale_items || sale.sale_items.length === 0) {
           salesCount += 1;
         }
       }
       
-      // Add FM sales count and commission
       for (const fmSale of empFmSales) {
         salesCount += 1;
         const fmPricing = fmCommissionMap.get((fmSale as any).product_name?.toLowerCase());
         totalCommission += fmPricing?.commission || 0;
       }
       
-      // Add sales_count
-      cachedValues.push({
+      employeeKpis.push({
         kpi_slug: "sales_count",
         period_type: period.type,
         scope_type: "employee",
@@ -534,8 +571,7 @@ Deno.serve(async (req) => {
         calculated_at: calculatedAt,
       });
       
-      // Add total_commission
-      cachedValues.push({
+      employeeKpis.push({
         kpi_slug: "total_commission",
         period_type: period.type,
         scope_type: "employee",
@@ -547,23 +583,13 @@ Deno.serve(async (req) => {
     }
   }
   
-  // === PARTIAL SAVE: Upsert employee-scoped KPIs immediately to avoid losing data on timeout ===
-  if (cachedValues.length > 0) {
-    const { error: partialUpsertError } = await supabase
-      .from("kpi_cached_values")
-      .upsert(cachedValues, {
-        onConflict: "kpi_slug,period_type,scope_type,scope_id",
-      });
-    
-    if (partialUpsertError) {
-      console.error("[Partial Save] Error upserting employee KPIs:", partialUpsertError);
-    }
-  }
+  // SAVE EMPLOYEE KPIs IMMEDIATELY
+  await saveKpiValuesBatch(supabase, employeeKpis, "Employee KPIs");
+  totalKpisSaved += employeeKpis.length;
 
   // ============= TEAM-SCOPED COMMISSION =============
   console.log("Calculating team-scoped commission for goals...");
   
-  // Fetch teams with active goals for payroll period
   const payrollStart = payrollPeriodDates.start.toISOString().split("T")[0];
   const payrollEnd = payrollPeriodDates.end.toISOString().split("T")[0];
   
@@ -573,11 +599,10 @@ Deno.serve(async (req) => {
     .eq("period_start", payrollStart)
     .eq("period_end", payrollEnd);
   
-  // For each team with a goal, calculate commission including FM
+  const teamKpis: CachedValue[] = [];
   for (const goal of (teamGoals || [])) {
     const teamId = goal.team_id;
     
-    // Get team members
     const { data: teamMemberData } = await supabase
       .from("team_members")
       .select("employee_id")
@@ -586,7 +611,6 @@ Deno.serve(async (req) => {
     const memberIds = (teamMemberData || []).map((m: any) => m.employee_id);
     if (memberIds.length === 0) continue;
     
-    // Get agent mappings for team members
     const teamAgentEmails: string[] = [];
     const teamExternalIds: string[] = [];
     
@@ -600,7 +624,6 @@ Deno.serve(async (req) => {
     
     if (teamAgentEmails.length === 0 && teamExternalIds.length === 0) continue;
     
-    // Calculate team commission from already-fetched telesales data
     let teamCommission = 0;
     
     for (const sale of (allPeriodSales || [])) {
@@ -617,7 +640,6 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Add FM commission for team members (match by seller_id)
     for (const fmSale of (allPeriodFmSales || [])) {
       const sellerId = (fmSale as any).seller_id;
       if (sellerId && memberIds.includes(sellerId)) {
@@ -626,8 +648,7 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Cache team commission for payroll_period
-    cachedValues.push({
+    teamKpis.push({
       kpi_slug: "total_commission",
       period_type: "payroll_period",
       scope_type: "team",
@@ -637,11 +658,14 @@ Deno.serve(async (req) => {
       calculated_at: calculatedAt,
     });
   }
+  
+  // SAVE TEAM KPIs IMMEDIATELY
+  await saveKpiValuesBatch(supabase, teamKpis, "Team KPIs");
+  totalKpisSaved += teamKpis.length;
 
   // ============= LIGA POSITION KPIs =============
   console.log("Calculating liga position KPIs...");
 
-  // Hent aktiv sæson (qualification eller active)
   const { data: activeSeason } = await supabase
     .from("league_seasons")
     .select("id, status")
@@ -651,15 +675,14 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (activeSeason) {
-    // Hent alle aktive standings
     const { data: standings } = await supabase
       .from("league_qualification_standings")
       .select("employee_id, overall_rank, projected_division, projected_rank, current_provision, deals_count")
       .eq("season_id", activeSeason.id);
 
+    const ligaKpis: CachedValue[] = [];
     for (const standing of (standings || [])) {
-      // Liga position (overall rank)
-      cachedValues.push({
+      ligaKpis.push({
         kpi_slug: "liga_position",
         period_type: "current",
         scope_type: "employee",
@@ -669,8 +692,7 @@ Deno.serve(async (req) => {
         calculated_at: calculatedAt,
       });
 
-      // Liga division
-      cachedValues.push({
+      ligaKpis.push({
         kpi_slug: "liga_division",
         period_type: "current",
         scope_type: "employee",
@@ -682,8 +704,7 @@ Deno.serve(async (req) => {
         calculated_at: calculatedAt,
       });
 
-      // Rank inden for division
-      cachedValues.push({
+      ligaKpis.push({
         kpi_slug: "liga_division_rank",
         period_type: "current",
         scope_type: "employee",
@@ -693,8 +714,7 @@ Deno.serve(async (req) => {
         calculated_at: calculatedAt,
       });
 
-      // Liga provision
-      cachedValues.push({
+      ligaKpis.push({
         kpi_slug: "liga_provision",
         period_type: "current",
         scope_type: "employee",
@@ -705,21 +725,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // SAVE LIGA KPIs IMMEDIATELY
+    await saveKpiValuesBatch(supabase, ligaKpis, "Liga KPIs");
+    totalKpisSaved += ligaKpis.length;
     console.log(`Cached liga KPIs for ${(standings || []).length} enrolled employees`);
   } else {
     console.log("No active league season found - skipping liga KPIs");
   }
 
+  } // end if (runKpis)
+
+  if (runLeaderboards) {
     // ============= LEADERBOARD CACHE CALCULATION =============
     console.log("Calculating global leaderboards...");
     
+    const leaderboardCaches: LeaderboardCache[] = [];
+
     // Fetch employee data for leaderboards
     const { data: employees } = await supabase
       .from("employee_master_data")
       .select("id, first_name, last_name, avatar_url")
       .eq("is_active", true);
     
-    // Use employee ID as key for reliable lookups (not name which may not match agent_name)
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
     (employees || []).forEach(emp => {
       const fullName = `${emp.first_name} ${emp.last_name}`;
@@ -754,7 +781,7 @@ Deno.serve(async (req) => {
           employeeMap,
           employeeTeamMap,
           fmCommissionMap,
-          30 // Top 30
+          30
         );
         
         globalLeaderboards.push({
@@ -771,7 +798,7 @@ Deno.serve(async (req) => {
       }
     }
     
-    // SAVE GLOBAL LEADERBOARDS IMMEDIATELY (most critical for dashboards)
+    // SAVE GLOBAL LEADERBOARDS IMMEDIATELY
     if (globalLeaderboards.length > 0) {
       const { error: globalError } = await supabase
         .from("kpi_leaderboard_cache")
@@ -786,7 +813,7 @@ Deno.serve(async (req) => {
       .from("teams")
       .select("id, name");
     
-    // Calculate team-scoped leaderboards and SAVE AFTER EACH TEAM
+    // Calculate team-scoped leaderboards
     const teamLeaderboards: LeaderboardCache[] = [];
     for (const team of (teams || []) as { id: string; name: string }[]) {
       for (const period of periods) {
@@ -799,7 +826,7 @@ Deno.serve(async (req) => {
             employeeMap,
             team.name,
             fmCommissionMap,
-            20 // Top 20 per team
+            20
           );
           
           teamLeaderboards.push({
@@ -815,7 +842,7 @@ Deno.serve(async (req) => {
       }
     }
     
-    // SAVE ALL TEAM LEADERBOARDS (critical for United dashboard)
+    // SAVE ALL TEAM LEADERBOARDS
     if (teamLeaderboards.length > 0) {
       const { error: teamError } = await supabase
         .from("kpi_leaderboard_cache")
@@ -840,7 +867,7 @@ Deno.serve(async (req) => {
             employeeMap,
             employeeTeamMap,
             fmCommissionMap,
-            30 // Top 30 per client
+            30
           );
           
           clientLeaderboards.push({
@@ -870,30 +897,17 @@ Deno.serve(async (req) => {
       leaderboardCaches.push(...clientLeaderboards);
     }
 
-    // Upsert all cached KPI values
-    if (cachedValues.length > 0) {
-      const { error: upsertError } = await supabase
-        .from("kpi_cached_values")
-        .upsert(cachedValues, {
-          onConflict: "kpi_slug,period_type,scope_type,scope_id",
-        });
+    totalLeaderboardsSaved = leaderboardCaches.length;
+  } // end if (runLeaderboards)
 
-      if (upsertError) {
-        console.error("Error upserting cached values:", upsertError);
-        throw upsertError;
-      }
-    }
-
-    // NOTE: Leaderboards are now saved progressively above (global, team, client batches)
-    // This ensures data is persisted even if the function times out later
-
-    console.log(`Successfully calculated ${cachedValues.length} KPI values and ${leaderboardCaches.length} leaderboards`);
+    console.log(`Successfully calculated ${totalKpisSaved} KPI values and ${totalLeaderboardsSaved} leaderboards (chunk=${chunk || "all"})`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        calculated: cachedValues.length,
-        leaderboards: leaderboardCaches.length,
+        chunk: chunk || "all",
+        kpis_saved: totalKpisSaved,
+        leaderboards_saved: totalLeaderboardsSaved,
         timestamp: calculatedAt,
       }),
       {
