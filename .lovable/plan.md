@@ -1,41 +1,46 @@
 
 
-## Fix: Cap boderomkostninger ved "i dag" for alle klienter
+## Problem: Uendelig request-loop i "DB per Klient"
 
-### Problem
-Naar "Denne maaned" vaelges den 11. februar, medregnes boderomkostninger for alle bookede dage i hele februar — ogsaa d. 12, 13 osv. — for **alle** klienter med lokationsbookings. Omsaetning og salgsdata stopper ved i dag. Det giver et skaevt billede for alle opgaver, ikke kun Yousee.
+Tabellen hænger på "Indlæser..." fordi der kører en uendelig fetch-loop.
 
-### Loesning
-Cap `periodDaysArray` ved dagens dato for "month" og "payroll" modes, saa boderomkostninger kun taeller afviklede dage. Den fulde maaneds boder beregnes stadig separat (til parentes-visning).
+### Årsag
 
-### AEndring
-
-**Fil: `src/components/salary/ClientDBTab.tsx`** (linje 572)
-
-Foer:
-```text
-const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
+Linje 120 i `ClientDBTab.tsx`:
+```
+const effectivePeriodEnd = isCapped ? new Date() : periodEnd;
 ```
 
-Efter:
-```text
-const today = new Date();
-const effectivePeriodEnd = (periodMode === "month" || periodMode === "payroll") && today < periodEnd
-  ? today
-  : periodEnd;
-const periodDaysArray = eachDayOfInterval({ start: periodStart, end: effectivePeriodEnd });
-```
+Hver gang komponenten rendrer, laves et **nyt** `new Date()` med en ny millisekund-timestamp. Det nye objekt ender i query-keyen for `useAssistantHoursCalculation` (og den fulde-maned-variant), som medforer:
 
-`fullMonthDaysArray` (linje 578) forbliver uaendret — den bruger allerede `monthEnd` og sikrer at parentes-vaerdien viser den fulde maaneds forventede boder.
+1. Nyt `Date`-objekt → ny `.toISOString()` → ny query key
+2. Ny query startes → data returneres → state opdateres
+3. Re-render → nyt `new Date()` → ny query key → gaa til punkt 2
 
-### Resultat
-- Alle klienters boderomkostninger matcher nu den faktiske salgsperiode (til og med i dag)
-- Fuld maaneds boderomkostning vises stadig i parentes
-- Ingen aendring for "week", "day" eller "custom" modes
+### Losning
 
-### Beroert fil
+Stabiliser `effectivePeriodEnd` ved at runde `new Date()` ned til **starten af dagen** (midnat), saa den ikke aendrer sig mellem re-renders. Alternativt kan vi bruge `useMemo` til at cache vaerdien.
 
-| Fil | AEndring |
-|-----|---------|
-| `src/components/salary/ClientDBTab.tsx` | Cap periodDaysArray ved today for month/payroll |
+### Implementeringsplan
+
+**Fil: `src/components/salary/ClientDBTab.tsx`**
+
+1. Importer `startOfDay` fra `date-fns` (eller brug eksisterende imports)
+2. AEndr linje 120 fra:
+   ```
+   const effectivePeriodEnd = isCapped ? new Date() : periodEnd;
+   ```
+   til:
+   ```
+   const today = useMemo(() => startOfDay(new Date()), []);
+   const effectivePeriodEnd = isCapped ? today : periodEnd;
+   ```
+   
+   Da det er en DB-rapport paa dagsniveau, er det tilstraekkeligt at cappe ved starten af dagen. Dette sikrer at `effectivePeriodEnd` er stabil mellem re-renders.
+
+3. Fjern den gamle `const today = new Date()` paa linje 587 inde i `useMemo`-blokken og brug den nye stabile `today` i stedet.
+
+### Teknisk detalje
+
+`useMemo(() => startOfDay(new Date()), [])` koerer kun en gang pr. komponent-mount. Da vi kun behover at cappe ved "i dag" (ikke "lige nu"), er dette praecist nok og eliminerer loop-problemet fuldstaendigt.
 
