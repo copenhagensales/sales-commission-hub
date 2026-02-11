@@ -115,9 +115,15 @@ export function ClientDBTab() {
   const [hideZeroClients, setHideZeroClients] = useState(true);
   const queryClient = useQueryClient();
 
+  // Stable "today" reference to prevent infinite query loops (new Date() changes every render)
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   // Cap period at today for month/payroll modes so costs match revenue timeline
-  const isCapped = (periodMode === "month" || periodMode === "payroll") && new Date() < periodEnd;
-  const effectivePeriodEnd = isCapped ? new Date() : periodEnd;
+  const isCapped = (periodMode === "month" || periodMode === "payroll") && today < periodEnd;
+  const effectivePeriodEnd = isCapped ? today : periodEnd;
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
       setSortDirection(prev => prev === "asc" ? "desc" : "asc");
@@ -584,10 +590,7 @@ export function ClientDBTab() {
     // Calculate location costs per client from bookings
     const locationCostsMap = new Map<string, number>();
     const fullMonthLocationCostsMap = new Map<string, number>();
-    const today = new Date();
-    const effectivePeriodEnd = (periodMode === "month" || periodMode === "payroll") && today < periodEnd
-      ? today
-      : periodEnd;
+    // Reuse the stable 'today' and component-level 'effectivePeriodEnd' / 'isCapped'
     const periodDaysArray = eachDayOfInterval({ start: periodStart, end: effectivePeriodEnd });
 
     // Check if period is already a full month
