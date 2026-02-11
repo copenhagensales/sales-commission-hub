@@ -569,7 +569,11 @@ export function ClientDBTab() {
     // Calculate location costs per client from bookings
     const locationCostsMap = new Map<string, number>();
     const fullMonthLocationCostsMap = new Map<string, number>();
-    const periodDaysArray = eachDayOfInterval({ start: periodStart, end: periodEnd });
+    const today = new Date();
+    const effectivePeriodEnd = (periodMode === "month" || periodMode === "payroll") && today < periodEnd
+      ? today
+      : periodEnd;
+    const periodDaysArray = eachDayOfInterval({ start: periodStart, end: effectivePeriodEnd });
 
     // Check if period is already a full month
     const monthStart = startOfMonth(periodStart);
