@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2 } from "lucide-react";
+import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Collapsible,
@@ -57,13 +58,15 @@ const NUMERIC_OPERATORS = [
   { value: "gt", label: "Over (>)" },
   { value: "lt", label: "Under (<)" },
   { value: "between", label: "Mellem (interval)" },
+  { value: "in", label: "Er en af (multi-valg)" },
 ];
 
 // Type for numeric condition value
 interface NumericConditionValue {
-  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'between';
+  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'between' | 'in';
   value: number;
   value2?: number;
+  values?: number[];
 }
 
 // Check if a condition value is numeric
@@ -103,6 +106,45 @@ interface PricingRuleEditorProps {
   existingRule?: PricingRule | null;
   onSave: () => void;
   onCancel: () => void;
+}
+
+// Inline multi-value input for "in" operator
+function InMultiValueInput({ values, onAdd, onRemove }: { values: number[]; onAdd: (v: number) => void; onRemove: (v: number) => void }) {
+  const [inputVal, setInputVal] = useState("");
+  const handleAdd = () => {
+    const num = parseFloat(inputVal);
+    if (!isNaN(num) && !values.includes(num)) {
+      onAdd(num);
+      setInputVal("");
+    }
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          className="w-28"
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          placeholder="Beløb"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
+        />
+        <Button type="button" variant="outline" size="sm" onClick={handleAdd} className="h-10 px-2">
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {values.map((v) => (
+            <Badge key={v} variant="secondary" className="gap-1 cursor-pointer" onClick={() => onRemove(v)}>
+              {v.toLocaleString("da-DK")}
+              <X className="h-3 w-3" />
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function PricingRuleEditor({
@@ -316,7 +358,34 @@ export function PricingRuleEditor({
         if (field === 'operator' && newValue === 'between' && updated.value2 === undefined) {
           updated.value2 = 0;
         }
+        // When switching to 'in', initialize values array
+        if (field === 'operator' && newValue === 'in' && !updated.values) {
+          updated.values = [];
+        }
         return { ...prev, [key]: updated };
+      }
+      return prev;
+    });
+  };
+
+  const addNumericValue = (key: string, newVal: number) => {
+    setConditions((prev) => {
+      const currentValue = prev[key];
+      if (isNumericCondition(currentValue)) {
+        const existing = currentValue.values ?? [];
+        if (!existing.includes(newVal)) {
+          return { ...prev, [key]: { ...currentValue, values: [...existing, newVal].sort((a, b) => a - b) } };
+        }
+      }
+      return prev;
+    });
+  };
+
+  const removeNumericValue = (key: string, valToRemove: number) => {
+    setConditions((prev) => {
+      const currentValue = prev[key];
+      if (isNumericCondition(currentValue)) {
+        return { ...prev, [key]: { ...currentValue, values: (currentValue.values ?? []).filter(v => v !== valToRemove) } };
       }
       return prev;
     });
@@ -477,13 +546,15 @@ export function PricingRuleEditor({
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
-                      type="number"
-                      className="w-28"
-                      value={value.value}
-                      onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
-                      placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
-                    />
+                    {value.operator !== 'in' && (
+                      <Input
+                        type="number"
+                        className="w-28"
+                        value={value.value}
+                        onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
+                        placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
+                      />
+                    )}
                     {value.operator === 'between' && (
                       <>
                         <span className="text-muted-foreground text-sm">og</span>
@@ -495,6 +566,13 @@ export function PricingRuleEditor({
                           placeholder="Til"
                         />
                       </>
+                    )}
+                    {value.operator === 'in' && (
+                      <InMultiValueInput
+                        values={value.values ?? []}
+                        onAdd={(v) => addNumericValue(key, v)}
+                        onRemove={(v) => removeNumericValue(key, v)}
+                      />
                     )}
                   </>
                 ) : (

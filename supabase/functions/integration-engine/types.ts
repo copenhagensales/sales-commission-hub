@@ -171,9 +171,10 @@ export interface FetchParams {
 
 // Numeric condition for range-based matching (e.g., "Dækningssum >= 6000")
 export interface NumericCondition {
-  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'between';
+  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'between' | 'in';
   value: number;
   value2?: number;
+  values?: number[];
 }
 
 // Pricing rule for conditional commission/revenue calculation

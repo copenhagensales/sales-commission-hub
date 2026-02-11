@@ -23,6 +23,7 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
     case 'gt': return numericLeadValue > condition.value;
     case 'lt': return numericLeadValue < condition.value;
     case 'between': return numericLeadValue >= condition.value && numericLeadValue <= (condition.value2 ?? condition.value);
+    case 'in': return (condition.values ?? []).includes(numericLeadValue);
     default: return false;
   }
 }
