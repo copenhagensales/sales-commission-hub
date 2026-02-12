@@ -15,7 +15,7 @@ import {
   Award, 
   Users,
   Calendar,
-  Gift,
+  
   PartyPopper,
   Plus,
   Trash2,
@@ -396,24 +396,6 @@ const Home = () => {
     }
   });
 
-  // Fetch new employees (started this month)
-  const { data: newEmployees = [] } = useQuery({
-    queryKey: ["home-new-employees"],
-    queryFn: async () => {
-      const monthStart = startOfMonth(new Date()).toISOString();
-      
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, employment_start_date, teams:team_id(name)")
-        .eq("is_active", true)
-        .gte("employment_start_date", monthStart)
-        .order("employment_start_date", { ascending: false })
-        .limit(5);
-      
-      return data || [];
-    },
-    staleTime: 300000,
-  });
 
   // Use personal weekly stats hook
   const { data: personalWeeklyStats } = usePersonalWeeklyStats(employee?.id);
@@ -537,256 +519,225 @@ const Home = () => {
         )}
 
 
-        {/* ZONE 3: Team & Community - Full Width */}
+        {/* ZONE 3: Upcoming Events - Full Width */}
         <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-              <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-              Team & Fællesskab
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 md:space-y-4 px-3 md:px-6 pb-3 md:pb-6">
-            {/* New Employees */}
-            {newEmployees.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs md:text-sm font-medium flex items-center gap-1.5 md:gap-2">
-                  <Gift className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-                  Velkommen til nye kolleger
-                </p>
-                <div className="flex flex-wrap gap-1.5 md:gap-2">
-                  {newEmployees.map((emp) => (
-                    <Badge 
-                      key={emp.id} 
-                      variant="secondary"
-                      className="px-2 md:px-3 py-1 md:py-1.5 bg-primary/10 text-primary border-0 text-xs"
-                    >
-                      {emp.first_name} {emp.last_name}
-                      {(emp.teams as { name: string } | null)?.name && (
-                        <span className="ml-1 opacity-70 hidden sm:inline">({(emp.teams as { name: string }).name})</span>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Upcoming Events */}
-            <div className="pt-3 border-t">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs md:text-sm font-medium flex items-center gap-1.5 md:gap-2">
-                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-                  Kommende begivenheder
-                </p>
-                <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Tilføj begivenhed</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4 max-h-[70vh] overflow-y-auto">
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Titel *</Label>
-                        <Input 
-                          id="title"
-                          value={newEvent.title}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="Fx Fredagsbar"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Beskrivelse</Label>
-                        <Textarea 
-                          id="description"
-                          value={newEvent.description}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Beskriv begivenheden..."
-                          rows={3}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="date">Dato *</Label>
-                          <Input 
-                            id="date"
-                            type="date"
-                            value={newEvent.event_date}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="time">Tidspunkt</Label>
-                          <Input 
-                            id="time"
-                            type="time"
-                            value={newEvent.event_time}
-                            onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="location">Sted</Label>
-                        <Input 
-                          id="location"
-                          value={newEvent.location}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                          placeholder="Fx Kontoret"
-                        />
-                      </div>
-                      
-                      {/* Team selection */}
-                      {teams.length > 0 && (
-                        <div className="space-y-2">
-                          <Label>Inviter teams</Label>
-                          <div className="flex flex-wrap gap-3">
-                            {teams.map((team) => (
-                              <label key={team.id} className="flex items-center gap-2 cursor-pointer">
-                                <Checkbox
-                                  checked={newEvent.invited_teams.includes(team.id)}
-                                  onCheckedChange={(checked) => {
-                                    setNewEvent(prev => ({
-                                      ...prev,
-                                      invited_teams: checked 
-                                        ? [...prev.invited_teams, team.id]
-                                        : prev.invited_teams.filter(id => id !== team.id)
-                                    }));
-                                  }}
-                                />
-                                <span className="text-sm">{team.name}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Show popup toggle */}
-                      <div className="flex items-center justify-between py-2">
-                        <Label htmlFor="show-popup" className="cursor-pointer">
-                          Vis popup-invitation ved login
-                        </Label>
-                        <Switch
-                          id="show-popup"
-                          checked={newEvent.show_popup}
-                          onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, show_popup: checked }))}
-                        />
-                      </div>
-                      
-                      <Button 
-                        className="w-full" 
-                        onClick={() => addEventMutation.mutate(newEvent)}
-                        disabled={!newEvent.title || !newEvent.event_date || addEventMutation.isPending}
-                      >
-                        {addEventMutation.isPending ? "Tilføjer..." : "Tilføj begivenhed"}
-                      </Button>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
+                <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+                Kommende begivenheder
+              </CardTitle>
+              <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Tilføj begivenhed</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4 max-h-[70vh] overflow-y-auto">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Titel *</Label>
+                      <Input 
+                        id="title"
+                        value={newEvent.title}
+                        onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="Fx Fredagsbar"
+                      />
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="space-y-1.5 md:space-y-2">
-                {companyEvents.length === 0 ? (
-                  <p className="text-xs md:text-sm text-muted-foreground text-center py-4">Ingen kommende begivenheder</p>
-                ) : (
-                  companyEvents.slice(0, 3).map((event) => {
-                    const attendees = getEventAttendees(event.id);
-                    const myStatus = getMyAttendance(event.id);
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Beskrivelse</Label>
+                      <Textarea 
+                        id="description"
+                        value={newEvent.description}
+                        onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Beskriv begivenheden..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Dato *</Label>
+                        <Input 
+                          id="date"
+                          type="date"
+                          value={newEvent.event_date}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="time">Tidspunkt</Label>
+                        <Input 
+                          id="time"
+                          type="time"
+                          value={newEvent.event_time}
+                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Sted</Label>
+                      <Input 
+                        id="location"
+                        value={newEvent.location}
+                        onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                        placeholder="Fx Kontoret"
+                      />
+                    </div>
                     
-                    return (
-                      <div key={event.id} className="flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg bg-muted/50 group min-h-[52px] md:min-h-0">
-                        <div className="text-center min-w-[36px] md:min-w-[40px]">
-                          <div className="text-lg md:text-xl font-bold text-primary">
-                            {format(parseISO(event.event_date), "d")}
-                          </div>
-                          <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase">
-                            {format(parseISO(event.event_date), "MMM", { locale: da })}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p 
-                            className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
-                            onClick={() => setSelectedEventForDetail(event.id)}
-                          >
-                            {event.title}
-                          </p>
-                          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-                            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-                              {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
-                              {event.event_time && event.location && " - "}
-                              {event.location}
-                            </p>
-                            {attendees.length > 0 && (
-                              <HoverCard>
-                                <HoverCardTrigger asChild>
-                                  <Badge variant="outline" className="cursor-pointer gap-0.5 text-[10px] md:text-xs px-1 md:px-1.5 py-0">
-                                    <Users className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                                    {attendees.length}
-                                  </Badge>
-                                </HoverCardTrigger>
-                                <HoverCardContent className="w-56 p-3">
-                                  <p className="font-medium text-sm mb-2">Deltagere</p>
-                                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                                    {attendees.map((a) => (
-                                      <div key={a.id} className="flex items-center gap-2 text-sm">
-                                        <Avatar className="h-5 w-5">
-                                          <AvatarFallback className="text-[10px]">
-                                            {(a.employee as any)?.first_name?.[0]}{(a.employee as any)?.last_name?.[0]}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                        <span className="truncate">
-                                          {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </HoverCardContent>
-                              </HoverCard>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
-                          <Button
-                            variant={myStatus === 'attending' ? "default" : "ghost"}
-                            size="sm"
-                            className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
-                            onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
-                            disabled={toggleAttendanceMutation.isPending}
-                          >
-                            <ThumbsUp className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant={myStatus === 'not_attending' ? "default" : "ghost"}
-                            size="sm"
-                            className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
-                            onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
-                            disabled={toggleAttendanceMutation.isPending}
-                          >
-                            <ThumbsDown className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 md:h-7 md:w-7 p-0 hidden sm:flex"
-                            onClick={() => setSelectedEventForDetail(event.id)}
-                            title="Læs mere"
-                          >
-                            <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-                            onClick={() => deleteEventMutation.mutate(event.id)}
-                          >
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </Button>
+                    {/* Team selection */}
+                    {teams.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Inviter teams</Label>
+                        <div className="flex flex-wrap gap-3">
+                          {teams.map((team) => (
+                            <label key={team.id} className="flex items-center gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={newEvent.invited_teams.includes(team.id)}
+                                onCheckedChange={(checked) => {
+                                  setNewEvent(prev => ({
+                                    ...prev,
+                                    invited_teams: checked 
+                                      ? [...prev.invited_teams, team.id]
+                                      : prev.invited_teams.filter(id => id !== team.id)
+                                  }));
+                                }}
+                              />
+                              <span className="text-sm">{team.name}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                    )}
+                    
+                    {/* Show popup toggle */}
+                    <div className="flex items-center justify-between py-2">
+                      <Label htmlFor="show-popup" className="cursor-pointer">
+                        Vis popup-invitation ved login
+                      </Label>
+                      <Switch
+                        id="show-popup"
+                        checked={newEvent.show_popup}
+                        onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, show_popup: checked }))}
+                      />
+                    </div>
+                    
+                    <Button 
+                      className="w-full" 
+                      onClick={() => addEventMutation.mutate(newEvent)}
+                      disabled={!newEvent.title || !newEvent.event_date || addEventMutation.isPending}
+                    >
+                      {addEventMutation.isPending ? "Tilføjer..." : "Tilføj begivenhed"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="space-y-1.5 md:space-y-2">
+              {companyEvents.length === 0 ? (
+                <p className="text-xs md:text-sm text-muted-foreground text-center py-4">Ingen kommende begivenheder</p>
+              ) : (
+                companyEvents.slice(0, 3).map((event) => {
+                  const attendees = getEventAttendees(event.id);
+                  const myStatus = getMyAttendance(event.id);
+                  
+                  return (
+                    <div key={event.id} className="flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg bg-muted/50 group min-h-[52px] md:min-h-0">
+                      <div className="text-center min-w-[36px] md:min-w-[40px]">
+                        <div className="text-lg md:text-xl font-bold text-primary">
+                          {format(parseISO(event.event_date), "d")}
+                        </div>
+                        <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase">
+                          {format(parseISO(event.event_date), "MMM", { locale: da })}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p 
+                          className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
+                          onClick={() => setSelectedEventForDetail(event.id)}
+                        >
+                          {event.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                          <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+                            {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
+                            {event.event_time && event.location && " - "}
+                            {event.location}
+                          </p>
+                          {attendees.length > 0 && (
+                            <HoverCard>
+                              <HoverCardTrigger asChild>
+                                <Badge variant="outline" className="cursor-pointer gap-0.5 text-[10px] md:text-xs px-1 md:px-1.5 py-0">
+                                  <Users className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                  {attendees.length}
+                                </Badge>
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-56 p-3">
+                                <p className="font-medium text-sm mb-2">Deltagere</p>
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                  {attendees.map((a) => (
+                                    <div key={a.id} className="flex items-center gap-2 text-sm">
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-[10px]">
+                                          {(a.employee as any)?.first_name?.[0]}{(a.employee as any)?.last_name?.[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="truncate">
+                                        {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
+                        <Button
+                          variant={myStatus === 'attending' ? "default" : "ghost"}
+                          size="sm"
+                          className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
+                          onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
+                          disabled={toggleAttendanceMutation.isPending}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant={myStatus === 'not_attending' ? "default" : "ghost"}
+                          size="sm"
+                          className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
+                          onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
+                          disabled={toggleAttendanceMutation.isPending}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 md:h-7 md:w-7 p-0 hidden sm:flex"
+                          onClick={() => setSelectedEventForDetail(event.id)}
+                          title="Læs mere"
+                        >
+                          <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+                          onClick={() => deleteEventMutation.mutate(event.id)}
+                        >
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>
