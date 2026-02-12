@@ -351,10 +351,23 @@ export function ClientDBTab() {
     return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
   }, [staffHoursData]);
 
-  // Fetch daily sales aggregates for the NETTO chart (same period as selected)
+  // Fixed 31-day window for NETTO chart (independent of selected period)
+  const FIXED_MONTHLY_OVERHEAD = 988876; // Stab 932.000 + Stabsløn 56.876
+  const chartPeriodStart = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 31);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const chartPeriodEnd = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, []);
+
   const { data: dailyAggregates, isLoading: dailyAggregatesLoading } = useSalesAggregatesExtended({
-    periodStart,
-    periodEnd: effectivePeriodEnd,
+    periodStart: chartPeriodStart,
+    periodEnd: chartPeriodEnd,
     groupBy: ["date"],
     enabled: true,
   });
@@ -1151,7 +1164,7 @@ export function ClientDBTab() {
         nettoTotal={totals.netEarnings}
         teamDB={totals.finalDB}
         totalRevenue={totals.revenue}
-        totalOverhead={totals.totalOverhead}
+        totalOverhead={FIXED_MONTHLY_OVERHEAD}
         isLoading={isLoading || dailyAggregatesLoading}
       />
 
