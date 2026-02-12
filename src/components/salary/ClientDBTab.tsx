@@ -529,7 +529,24 @@ export function ClientDBTab() {
   // Calculate chart header totals using full DB-per-klient logic on 31-day data
   const chartTotals = useMemo(() => {
     if (!chartSalesByClient || !clientsWithTeams || !teamSalaries) {
-      return { nettoTotal: 0, teamDB: 0, totalRevenue: 0 };
+      // Fallback: use simple calculation from dailyAggregates while full calculation loads
+      const byDate = dailyAggregates?.byDate;
+      if (!byDate || Object.keys(byDate).length === 0) {
+        return { nettoTotal: 0, teamDB: 0, totalRevenue: 0, isLoading: true };
+      }
+      let totalRevenue = 0;
+      let totalCommission = 0;
+      for (const day of Object.values(byDate)) {
+        totalRevenue += day.revenue;
+        totalCommission += day.commission;
+      }
+      const teamDB = totalRevenue - totalCommission * 1.125;
+      return {
+        totalRevenue: Math.round(totalRevenue),
+        teamDB: Math.round(teamDB),
+        nettoTotal: Math.round(teamDB - FIXED_MONTHLY_OVERHEAD),
+        isLoading: true,
+      };
     }
     const adjustmentMap = new Map(adjustmentPercents?.map(a => [a.client_id, a]) || []);
     const atpRate = atpBarsselRate || 381;
@@ -626,8 +643,9 @@ export function ClientDBTab() {
       totalRevenue: Math.round(chartRevenue),
       teamDB: Math.round(chartTeamDB),
       nettoTotal: Math.round(chartTeamDB - FIXED_MONTHLY_OVERHEAD),
+      isLoading: false,
     };
-  }, [chartSalesByClient, clientsWithTeams, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, teamMemberCounts, atpBarsselRate, chartPeriodStart, chartPeriodEnd]);
+  }, [chartSalesByClient, clientsWithTeams, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, teamMemberCounts, atpBarsselRate, chartPeriodStart, chartPeriodEnd, dailyAggregates]);
 
   // Fetch previous period comparison data
   const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
