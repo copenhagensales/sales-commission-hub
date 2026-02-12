@@ -31,6 +31,7 @@ import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculati
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
+import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
@@ -349,6 +350,14 @@ export function ClientDBTab() {
     if (!staffHoursData) return 0;
     return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
   }, [staffHoursData]);
+
+  // Fetch daily sales aggregates for the NETTO chart
+  const { data: dailyAggregates, isLoading: dailyAggregatesLoading } = useSalesAggregatesExtended({
+    periodStart,
+    periodEnd: effectivePeriodEnd,
+    groupBy: ["date"],
+    enabled: true,
+  });
 
   // Fetch team assistant leaders from junction table
   const { data: teamAssistants = [] } = useTeamAssistantLeaders();
@@ -1136,8 +1145,15 @@ export function ClientDBTab() {
         </div>
       )}
 
-      {/* Daily DB chart */}
-      <ClientDBDailyChart />
+      {/* Daily NETTO chart */}
+      <ClientDBDailyChart
+        byDate={dailyAggregates?.byDate || {}}
+        nettoTotal={totals.netEarnings}
+        teamDB={totals.finalDB}
+        totalRevenue={totals.revenue}
+        totalOverhead={totals.totalOverhead}
+        isLoading={isLoading || dailyAggregatesLoading}
+      />
 
       {/* Daily breakdown modal */}
       {selectedClientForDaily && (
