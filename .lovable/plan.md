@@ -1,37 +1,26 @@
 
-## Daglig DB-søjlediagram med trendlinje
+## Daglig DB-graf: Standard 30 dage + samlet oversigt
 
-Tilfoej et soejlediagram i bunden af "DB per Klient"-siden der viser den samlede Final DB pr. dag for alle klienter, med en lineaer trendlinje.
+### Aendringer i `src/components/salary/ClientDBDailyChart.tsx`
 
-### Ny komponent: `src/components/salary/ClientDBDailyChart.tsx`
+**1. Hardcode periode til sidste 30 dage**
+- Fjern `periodStart`/`periodEnd` props.
+- Beregn internt med `useMemo`: `periodStart = startOfDay(subDays(new Date(), 30))`, `periodEnd = startOfDay(new Date())`.
+- Hook'en henter altid de sidste 30 dages data uafhaengigt af den valgte loenperiode.
 
-- Modtager `clientDBData` (allerede beregnet i `ClientDBTab`) samt `periodStart` og `effectivePeriodEnd` som props.
-- Henter salgsdata pr. dag via `useSalesAggregatesExtended` med `groupBy: ['date']` (ingen klient-filter, saa det er alle teams).
-- For hver dag beregnes en forenklet DB: `revenue - commission * 1.125` (provision + 12.5% feriepenge).
-- Viser et `BarChart` fra recharts med:
-  - Soejler farvekodet (groen for positiv DB, roed for negativ).
-  - En `Line` (trendlinje) beregnet som lineaer regression over alle dagspunkter.
-  - X-akse med datoer (format "d/M"), Y-akse med DKK-vaerdier.
-  - Tooltip med dato, DB-vaerdi og antal salg.
-- Wrapped i et `Card` med titel "DB pr. dag" og et `TrendingUp`-ikon.
+**2. Tilfoej samlet tal i header**
+- Beregn `totalDB` og `totalRevenue` fra chartData med `useMemo`:
+  - `totalDB = sum(chartData.db)`
+  - `totalRevenue = sum(aggregates.byDate[*].revenue)`
+- Vis i card-headeren som to badges/tal ved siden af titlen, fx:
+  - "DB pr. dag (sidste 30 dage) -- DB: 245.320 kr | Oms: 892.100 kr"
+- Formateret med `toLocaleString("da-DK")` og `kr` suffix.
 
-### AEndring i `src/components/salary/ClientDBTab.tsx`
+**3. Opdater titel**
+- AEndr titlen fra "DB pr. dag (alle klienter)" til "DB pr. dag (sidste 30 dage)".
 
-- Importer `ClientDBDailyChart`.
-- Indsaet komponenten lige foer det afsluttende `</div>` (efter "Samlet Oversigt"-kortet, foer edit-modal og daily-breakdown-modal), ca. linje 1098.
-- Videregiv `periodStart`, `effectivePeriodEnd` og evt. `clientId` filter.
+### Tekniske detaljer
 
-### Trendlinje-beregning
-
-Lineaer regression (y = ax + b) beregnes i en `useMemo` over dagsdataen:
-- x = dagindex (0, 1, 2, ...)
-- y = DB-vaerdi
-- Beregn haeldning (a) og skaering (b) med standard formel.
-- Tegn som en `Line` i et `ComposedChart`.
-
-### Visuelt design
-
-- Moerkt kort-design (matcher eksisterende UI).
-- Groenne soejler for positiv DB, roede for negativ.
-- Stiplet trendlinje i hvid/lysegraa.
-- Responsiv hoejde (~300px).
+- Importerer `subDays` og `startOfDay` fra `date-fns`.
+- Props-interfacet bliver tomt eller fjernes helt (ingen props nødvendige).
+- Opdaterer ogsaa kaldet i `ClientDBTab.tsx` saa det ikke laengere sender `periodStart`/`periodEnd`.
