@@ -372,6 +372,26 @@ export function ClientDBTab() {
     enabled: true,
   });
 
+  // Calculate chart header totals from the 31-day window data
+  const chartTotals = useMemo(() => {
+    const byDate = dailyAggregates?.byDate;
+    if (!byDate || Object.keys(byDate).length === 0) {
+      return { nettoTotal: 0, teamDB: 0, totalRevenue: 0 };
+    }
+    let totalRevenue = 0;
+    let totalCommission = 0;
+    for (const day of Object.values(byDate)) {
+      totalRevenue += day.revenue;
+      totalCommission += day.commission;
+    }
+    const teamDB = totalRevenue - totalCommission * 1.125;
+    return {
+      totalRevenue: Math.round(totalRevenue),
+      teamDB: Math.round(teamDB),
+      nettoTotal: Math.round(teamDB - FIXED_MONTHLY_OVERHEAD),
+    };
+  }, [dailyAggregates]);
+
   // Fetch team assistant leaders from junction table
   const { data: teamAssistants = [] } = useTeamAssistantLeaders();
 
@@ -1161,9 +1181,9 @@ export function ClientDBTab() {
       {/* Daily NETTO chart */}
       <ClientDBDailyChart
         byDate={dailyAggregates?.byDate || {}}
-        nettoTotal={totals.netEarnings}
-        teamDB={totals.finalDB}
-        totalRevenue={totals.revenue}
+        nettoTotal={chartTotals.nettoTotal}
+        teamDB={chartTotals.teamDB}
+        totalRevenue={chartTotals.totalRevenue}
         totalOverhead={FIXED_MONTHLY_OVERHEAD}
         isLoading={isLoading || dailyAggregatesLoading}
       />
