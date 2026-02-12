@@ -13,14 +13,12 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, startOfDay } from "date-fns";
 
-interface ClientDBDailyChartProps {
-  periodStart: Date;
-  periodEnd: Date;
-}
+export function ClientDBDailyChart() {
+  const periodStart = useMemo(() => startOfDay(subDays(new Date(), 30)), []);
+  const periodEnd = useMemo(() => startOfDay(new Date()), []);
 
-export function ClientDBDailyChart({ periodStart, periodEnd }: ClientDBDailyChartProps) {
   const { data: aggregates, isLoading } = useSalesAggregatesExtended({
     periodStart,
     periodEnd,
@@ -44,6 +42,11 @@ export function ClientDBDailyChart({ periodStart, periodEnd }: ClientDBDailyChar
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [aggregates]);
 
+  const { totalDB, totalRevenue } = useMemo(() => {
+    const db = chartData.reduce((sum, d) => sum + d.db, 0);
+    const rev = chartData.reduce((sum, d) => sum + (aggregates?.byDate?.[d.date]?.revenue || 0), 0);
+    return { totalDB: Math.round(db), totalRevenue: Math.round(rev) };
+  }, [chartData, aggregates]);
   // Linear regression trend line
   const trendData = useMemo(() => {
     if (chartData.length < 2) return chartData.map((d) => ({ ...d, trend: d.db }));
@@ -93,10 +96,22 @@ export function ClientDBDailyChart({ periodStart, periodEnd }: ClientDBDailyChar
   return (
     <Card className="mt-4">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <TrendingUp className="h-4 w-4" />
-          DB pr. dag (alle klienter)
-        </CardTitle>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            DB pr. dag (sidste 30 dage)
+          </CardTitle>
+          <div className="flex items-center gap-4 text-xs">
+            <span className="text-muted-foreground">
+              DB: <span className={totalDB >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                {totalDB.toLocaleString("da-DK")} kr
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Oms: <span className="text-foreground font-semibold">{totalRevenue.toLocaleString("da-DK")} kr</span>
+            </span>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

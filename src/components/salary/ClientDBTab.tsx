@@ -1137,7 +1137,7 @@ export function ClientDBTab() {
       )}
 
       {/* Daily DB chart */}
-      <ClientDBDailyChart periodStart={periodStart} periodEnd={effectivePeriodEnd} />
+      <ClientDBDailyChart />
 
       {/* Daily breakdown modal */}
       {selectedClientForDaily && (
