@@ -1,38 +1,38 @@
 
-## Opdater DB-grafen til at vise NETTO fra Samlet Oversigt
+
+## Fordel kun overhead paa hverdage i NETTO pr. dag grafen
 
 ### Problem
-Grafen "DB pr. dag" beregner sit eget simple DB-tal (omsaetning minus provision * 1,125 = ~2,5M kr), men Samlet Oversigt viser et helt andet tal (Team DB: 771.587 kr, NETTO: 347.783 kr) fordi den medregner annulleringer, sygeloen, lokationsomkostninger, assistent-/lederallokering, stab-udgifter og stabsloenninger.
+Stab-udgifter og stabsloenninger fordeles i dag paa alle dage med salg -- ogsaa weekender. Det giver kunstigt negative soejler i weekender, hvor der kun er lidt omsaetning men stadig faar tildelt en stor del af overhead.
 
 ### Loesning
-Grafen skal modtage de allerede beregnede tal fra ClientDBTab som props i stedet for at hente og beregne sine egne.
+Aendr fordelingslogikken saa overhead kun fordeles paa hverdage (mandag-fredag) med salg. Weekenddage viser kun deres rene DB (omsaetning minus provision inkl. feriepenge) uden overhead-fradrag.
 
-### Trin
+### Teknisk aendring
 
-**1. Opdater ClientDBDailyChart til at acceptere props**
-- Tilfoej props for `nettoTotal`, `teamDB`, `totalRevenue`, `stabExpenses`, og `staffSalaries`
-- Fjern den interne `useSalesAggregatesExtended` hook (grafen henter ikke laengere selv data)
-- Behold den eksisterende daglige bar-data fra parent, eller modtag `byDate` data som prop
-- Vis NETTO-totalet i headeren i stedet for det simple DB-tal
-- Fordel overhead (stab + stabsloenninger) jaevnt over dage med salg, saa daglige soejler viser daglig NETTO
+**Fil: `src/components/salary/ClientDBDailyChart.tsx`**
 
-**2. Opdater ClientDBTab til at videregive data**
-- Send `totals` og `aggregates.byDate` ned til `ClientDBDailyChart`
-- Grafen bruger herefter praecis de samme tal som Samlet Oversigt
+I `chartData` useMemo (linje ~55-62):
 
-### Teknisk detalje
-
-Daglige soejler beregnes saaledes:
 ```text
-Per dag:
-  dagDB = revenue - commission * 1.125 (som nu)
-  dailyOverhead = totalOverhead / antalDageMedSalg
-  dagNetto = dagDB - dailyOverhead
+Nuvaerende logik:
+  daysWithSales = alle dage med salg > 0
+  dailyOverhead = totalOverhead / daysWithSales
+  netto = db - dailyOverhead (for alle dage med salg)
+
+Ny logik:
+  // Tjek om en dato er hverdag (man-fre)
+  isWeekday = parseISO(dateStr).getDay() >= 1 && <= 5
+
+  weekdaysWithSales = dage der baade er hverdage OG har salg > 0
+  dailyOverhead = totalOverhead / weekdaysWithSales
+
+  netto = db - dailyOverhead  (kun for hverdage med salg)
+  netto = db                  (for weekender -- ingen overhead)
 ```
 
-Header viser:
-```text
-NETTO: [totals.netEarnings] kr  |  Team DB: [totals.finalDB] kr
-```
+Dette sikrer at:
+- Weekender viser ren DB uden stab-fradrag
+- Hverdage baerer hele overhead-byrden
+- Summen af alle daglige soejler stadig matcher NETTO-totalet
 
-Dette sikrer at totalerne i grafen matcher praecis med Samlet Oversigt, og de daglige soejler giver et retvisende billede af den daglige netto-indtjening.
