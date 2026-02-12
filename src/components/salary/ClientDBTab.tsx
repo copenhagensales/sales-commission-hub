@@ -351,10 +351,21 @@ export function ClientDBTab() {
     return Object.values(staffHoursData).reduce((sum, s) => sum + s.totalSalary, 0);
   }, [staffHoursData]);
 
-  // Fetch daily sales aggregates for the NETTO chart
+  // Fetch daily sales aggregates for the NETTO chart (always last 30 days)
+  const chartPeriodStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 30);
+    return d;
+  }, []);
+  const chartPeriodEnd = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   const { data: dailyAggregates, isLoading: dailyAggregatesLoading } = useSalesAggregatesExtended({
-    periodStart,
-    periodEnd: effectivePeriodEnd,
+    periodStart: chartPeriodStart,
+    periodEnd: chartPeriodEnd,
     groupBy: ["date"],
     enabled: true,
   });
