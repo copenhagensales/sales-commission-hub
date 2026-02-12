@@ -1,26 +1,29 @@
 
-## Daglig DB-graf: Standard 30 dage + samlet oversigt
 
-### Aendringer i `src/components/salary/ClientDBDailyChart.tsx`
+## Fix: Fjern dobbelt-multiplikation i get_sales_aggregates_v2
 
-**1. Hardcode periode til sidste 30 dage**
-- Fjern `periodStart`/`periodEnd` props.
-- Beregn internt med `useMemo`: `periodStart = startOfDay(subDays(new Date(), 30))`, `periodEnd = startOfDay(new Date())`.
-- Hook'en henter altid de sidste 30 dages data uafhaengigt af den valgte loenperiode.
+### Problem
+RPC-funktionen `get_sales_aggregates_v2` ganger `mapped_commission` og `mapped_revenue` med `quantity`, men disse vaerdier er allerede praemultipliceret med quantity under synkroniseringen. Det giver dobbelte tal for omsaetning og provision overalt i systemet, der bruger denne RPC.
 
-**2. Tilfoej samlet tal i header**
-- Beregn `totalDB` og `totalRevenue` fra chartData med `useMemo`:
-  - `totalDB = sum(chartData.db)`
-  - `totalRevenue = sum(aggregates.byDate[*].revenue)`
-- Vis i card-headeren som to badges/tal ved siden af titlen, fx:
-  - "DB pr. dag (sidste 30 dage) -- DB: 245.320 kr | Oms: 892.100 kr"
-- Formateret med `toLocaleString("da-DK")` og `kr` suffix.
+### Linje der skal aendres (i en ny migration)
 
-**3. Opdater titel**
-- AEndr titlen fra "DB pr. dag (alle klienter)" til "DB pr. dag (sidste 30 dage)".
+**Fra:**
+```sql
+COALESCE(SUM(fs.mapped_commission * fs.quantity), 0) AS total_commission,
+COALESCE(SUM(fs.mapped_revenue * fs.quantity), 0) AS total_revenue
+```
 
-### Tekniske detaljer
+**Til:**
+```sql
+COALESCE(SUM(fs.mapped_commission), 0) AS total_commission,
+COALESCE(SUM(fs.mapped_revenue), 0) AS total_revenue
+```
 
-- Importerer `subDays` og `startOfDay` fra `date-fns`.
-- Props-interfacet bliver tomt eller fjernes helt (ingen props nødvendige).
-- Opdaterer ogsaa kaldet i `ClientDBTab.tsx` saa det ikke laengere sender `periodStart`/`periodEnd`.
+### Implementation
+Opret en ny SQL-migration med `CREATE OR REPLACE FUNCTION get_sales_aggregates_v2(...)` der er identisk med den eksisterende, bortset fra at linje 58-59 fjerner `* fs.quantity` fra commission og revenue summerne.
+
+Salgstal-linjen (linje 57) forbliver uaendret, da `quantity` korrekt bruges til at taelle antal solgte enheder.
+
+### Effekt
+Alle komponenter der bruger `useSalesAggregatesExtended` (og dermed RPC'en) vil automatisk vise korrekte tal - inklusiv den nye daglige DB-graf, Client DB-rapporten, og dashboards.
+
