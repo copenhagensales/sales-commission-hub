@@ -23,6 +23,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Info,
+  CalendarX,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -36,7 +37,7 @@ import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { format, parseISO, differenceInYears, startOfMonth, addDays, isSameDay, isAfter, isBefore } from "date-fns";
+import { format, parseISO, differenceInDays, differenceInYears, startOfMonth, addDays, isSameDay, isAfter, isBefore } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
@@ -520,7 +521,7 @@ const Home = () => {
 
 
         {/* ZONE 3: Upcoming Events - Full Width */}
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+        <Card className="border-l-4 border-l-primary border-0 shadow-lg bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
@@ -639,29 +640,43 @@ const Home = () => {
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
             <div className="space-y-1.5 md:space-y-2">
               {companyEvents.length === 0 ? (
-                <p className="text-xs md:text-sm text-muted-foreground text-center py-4">Ingen kommende begivenheder</p>
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                  <CalendarX className="w-8 h-8 mb-2 opacity-50" />
+                  <p className="text-xs md:text-sm font-medium">Ingen kommende begivenheder</p>
+                  <p className="text-[10px] md:text-xs opacity-70">Tilføj en begivenhed med + knappen ovenfor</p>
+                </div>
               ) : (
-                companyEvents.slice(0, 3).map((event) => {
+                companyEvents.slice(0, 3).map((event, index) => {
                   const attendees = getEventAttendees(event.id);
                   const myStatus = getMyAttendance(event.id);
                   
                   return (
-                    <div key={event.id} className="flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg bg-muted/50 group min-h-[52px] md:min-h-0">
-                      <div className="text-center min-w-[36px] md:min-w-[40px]">
-                        <div className="text-lg md:text-xl font-bold text-primary">
+                    <div key={event.id} className={`flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg group min-h-[52px] md:min-h-0 transition-colors ${index === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
+                      <div className="bg-primary rounded-lg p-1.5 text-center min-w-[36px] md:min-w-[40px]">
+                        <div className="text-lg md:text-xl font-bold text-primary-foreground">
                           {format(parseISO(event.event_date), "d")}
                         </div>
-                        <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase">
+                        <div className="text-[9px] md:text-[10px] text-primary-foreground/80 uppercase">
                           {format(parseISO(event.event_date), "MMM", { locale: da })}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p 
-                          className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
-                          onClick={() => setSelectedEventForDetail(event.id)}
-                        >
-                          {event.title}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p 
+                            className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
+                            onClick={() => setSelectedEventForDetail(event.id)}
+                          >
+                            {event.title}
+                          </p>
+                          {index === 0 && (() => {
+                            const daysUntil = differenceInDays(parseISO(event.event_date), new Date());
+                            return daysUntil >= 0 ? (
+                              <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1.5 py-0 shrink-0">
+                                {daysUntil === 0 ? 'I dag' : daysUntil === 1 ? 'I morgen' : `om ${daysUntil} dage`}
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                           <p className="text-[10px] md:text-xs text-muted-foreground truncate">
                             {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
