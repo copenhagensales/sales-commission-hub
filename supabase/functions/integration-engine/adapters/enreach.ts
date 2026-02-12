@@ -739,17 +739,22 @@ export class EnreachAdapter implements DialerAdapter {
     }
 
     if (strategy === "conditional" && extractionConfig?.conditionalRules && dataObj) {
+      console.log(`[EnreachAdapter] Evaluating ${extractionConfig.conditionalRules.length} conditional rules for lead ${lead.uniqueId || 'unknown'}`);
       for (const rule of extractionConfig.conditionalRules) {
+        const ruleLabel = rule.staticProductName || rule.extractionType || 'unknown';
         // Check if rule conditions pass
         if (!this.checkExtractionRuleConditions(rule, dataObj, lead)) {
+          console.log(`[EnreachAdapter] Rule "${ruleLabel}" (${rule.extractionType}) - conditions NOT met`);
           continue;
         }
         const extractedProducts = this.extractFromRule(rule, dataObj, lead);
+        console.log(`[EnreachAdapter] Rule "${ruleLabel}" (${rule.extractionType}) - conditions MET, extracted ${extractedProducts.length} products: ${extractedProducts.map(p => p.name).join(', ')}`);
         if (extractedProducts.length > 0) {
           products.push(...extractedProducts);
           // Removed break to allow multiple matching rules
         }
       }
+      console.log(`[EnreachAdapter] Total extracted products: ${products.length} - ${products.map(p => p.name).join(', ')}`);
       if (products.length > 0) return products;
     }
 
