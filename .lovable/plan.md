@@ -1,61 +1,61 @@
 
 
-## Ret NETTO pr. dag til fulde DB-beregninger for 31-dages vinduet
+# Tilføj Lønsikring som bi-produkt (cross-sale) på ASE-salg
 
-### Problem
-Header-tallene (NETTO, Team DB, Oms) i grafen bruger en forenklet beregning: `teamDB = revenue - commission * 1.125`. Den ignorerer annulleringsprocenter, sygeloen, lokationsomkostninger, lederloen, assistentloen og ATP/Barsel -- og viser derfor et for hoejt tal.
+## Hvad ændres?
+Når en sælger laver et ASE-salg med både A-kasse OG Lønsikring, registreres der i dag kun hovedproduktet "Salg" (1.000 kr). Lønsikringen ignoreres.
 
-### Loesning
-Beregn chart-totaler ved at koere den fulde "DB per Klient"-logik paa 31-dages salgsdata. Vi genbruger allerede hentede strukturelle data (annulleringsprocenter, team-opsaetning, lederloenninger, assistentloenninger) og henter kun ny salgsdata pr. klient for 31-dages vinduet.
+Med denne ændring vil salget stadig tælle som **1 salg**, men med **2 linjeposter**:
+- Hovedprodukt: "Salg" -- 1.000 kr provision
+- Bi-produkt: "Lønsikring Udvidet" -- 400 kr provision (via eksisterende pricing rule)
+- **Samlet: 1.400 kr provision pr. salg**
 
-### Teknisk aendring
+Lønsikring-produktet er allerede opsat som "bi-salg" (counts_as_cross_sale = true), så det tæller ikke som et ekstra salg i statistikken.
 
-**Fil: `src/components/salary/ClientDBTab.tsx`**
+## Hvad skal gøres?
 
-**1. Ny data-fetch: salg pr. klient for 31-dages vinduet**
-
-Tilfoej en `useQuery` der henter salgsdata grupperet pr. klient for `chartPeriodStart` til `chartPeriodEnd` (31 dage). Samme logik som den eksisterende `salesByClientDirect` query, men med 31-dages datoer.
-
-**2. Ny `chartTotals` beregning med fuld DB-logik**
-
-Erstat den simple `chartTotals` useMemo med en fuld beregning der:
+### 1. Opdater ASE-integrationens konfiguration i databasen
+Tilføj en ny conditional rule i `dialer_integrations.config` for ASE (id: `a76cf63a`). Den nye regel indsættes som nr. 2 i listen:
 
 ```text
-For hver klient:
-  1. Hent cancellationPercent og sickPayPercent fra adjustmentPercents
-  2. commission = salgsdata.commission
-  3. sellerVacationPay = commission * 12.5%
-  4. sellerSalaryCost = commission + sellerVacationPay
-  5. cancellationFactor = 1 - cancellationPercent/100
-  6. adjustedRevenue = revenue * cancellationFactor
-  7. adjustedSellerCost = sellerSalaryCost * cancellationFactor
-  8. sickPayAmount = sellerSalaryCost * sickPayPercent/100
-  9. locationCosts (FM-klienter, beregnet fra bookings for 31-dages vinduet)
-  10. basisDB = adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts
+Nuværende regler:
+  1. Lønsikring (solo): A-kasse salg=Nej + Forening=Fagforening med lønsikring -> "Lønsikring"
+  2. Lead: Ja-Afdeling=Lead -> "Lead"  
+  3. Salg: Ja-Afdeling=Salg -> "Salg"
 
-Derefter pr. team:
-  11. Fordel assistentloen via revenueShare
-  12. Fordel ATP/Barsel via revenueShare
-  13. Beregn dbBeforeLeader
-  14. Fordel lederloen via dbShare (MAX af procent vs. minimum)
-
-Sum alle klienters finalDB = chartTeamDB
-chartNetto = chartTeamDB - FIXED_MONTHLY_OVERHEAD
+Nye regler:
+  1. Lønsikring (solo): uændret
+  2. NY: Lønsikring (bi-salg): Lønsikring != tom -> specific_fields med targetKey "Lønsikring" 
+  3. Lead: uændret
+  4. Salg: uændret
 ```
 
-Assistentloen og lederloen genbruges fra de eksisterende queries (allerede hentet for den valgte periode). Da 31 dage svarer til ca. 1 maaned, er de eksisterende vaerdier en rimelig approksimation. Alternativt kan vi proratere baseret paa arbejdsdage.
+Den nye regel bruger `extractionType: "specific_fields"` med `targetKeys: ["Lønsikring"]`, som henter feltværdien (fx "Lønsikring Udvidet") direkte som produktnavn. Betingelsen er at feltet "Lønsikring" ikke er tomt.
 
-**3. Lokationsomkostninger for 31-dages vinduet**
+### 2. Tilføj "not_empty" operator i Enreach-adapteren
+`checkExtractionRuleConditions` skal understøtte en `not_empty` operator, der returnerer true hvis feltværdien eksisterer og ikke er tom. Det er en lille tilføjelse i switch-casen.
 
-Beregn FM-lokationsomkostninger ved at iterere over bookings med `chartPeriodStart`/`chartPeriodEnd` i stedet for rapportperioden.
+### 3. Kør re-sync for eksisterende salg
+Efter ændringen trigges en sync for ASE-kampagnen, som genskaber sale_items med de nye regler. Eksisterende salg får derved tilføjet Lønsikring-biproduktet med korrekt provision.
 
-**4. Ingen aendringer i ClientDBDailyChart.tsx**
+## Tekniske detaljer
 
-Grafen viser fortsat daglige soejler baseret paa `dailyAggregates.byDate`. Kun header-tallene aendres.
+### Database-opdatering (SQL)
+Opdater `config` JSONB-kolonnen i `dialer_integrations` for ASE-integrationen med den nye conditionalRule.
 
-### Resultat
+### Kodeændring: Enreach-adapter
+Fil: `supabase/functions/integration-engine/adapters/enreach.ts`
 
-- NETTO-tallet i grafen afspejler den reelle netto-indtjening efter alle fradrag
-- Daglige soejler viser fortsat daglig DB med fast overhead fordelt paa hverdage
-- Strukturelle data (cancellation%, teams, loenninger) genbruges -- ingen ekstra queries ud over salg pr. klient
+Tilføj i `checkExtractionRuleConditions`-metoden support for operator `not_empty`:
+```text
+case "not_empty":
+  return fieldValue !== undefined && fieldValue !== null && String(fieldValue).trim() !== "";
+```
 
+### Ingen frontend-ændringer
+Bi-produkter vises allerede korrekt i salgsdetaljer og provisionsberegninger, da systemet summerer alle sale_items for et salg.
+
+### Forventet resultat for Alexanders 9 salg d. 6. feb:
+- 8 salg med "Fagforening med lønsikring": 2 sale_items hver (Salg 1.000 kr + Lønsikring 400 kr = 1.400 kr)
+- 1 salg med "Ase Lønmodtager": 1 sale_item (Salg 600 kr, ingen Lønsikring)
+- **Ny total: 8 x 1.400 + 1 x 600 = 11.800 kr** (op fra 8.600 kr)
