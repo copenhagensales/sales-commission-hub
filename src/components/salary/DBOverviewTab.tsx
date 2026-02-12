@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Calendar, HelpCircle } from "lucide-react";
+import { TrendingUp, Calendar, HelpCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DBTeamDetailCard } from "./DBTeamDetailCard";
 import { DBPeriodSelector } from "./DBPeriodSelector";
@@ -40,6 +40,7 @@ export function DBOverviewTab() {
   const [selectedPresetLabel, setSelectedPresetLabel] = useState<string | undefined>("Denne måned");
   const [selectedTeam, setSelectedTeam] = useState<TeamDB | null>(null);
   const [dailyViewTeam, setDailyViewTeam] = useState<TeamDB | null>(null);
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
   const handlePeriodChange = (start: Date, end: Date) => {
     setPeriodStart(start);
@@ -257,33 +258,99 @@ export function DBOverviewTab() {
                   </TableRow>
                 ) : (
                   <>
-                    {teamsDB.map((team) => (
-                      <TableRow 
-                        key={team.teamId} 
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedTeam(team)}
-                      >
-                        <TableCell className="font-medium">{team.teamName}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(team.revenue)}</TableCell>
-                        <TableCell className="text-right text-destructive">-{formatCurrency(team.sellerSalaryCosts)}</TableCell>
-                        <TableCell className="text-right text-destructive">-{formatCurrency(team.leaderSalary)}</TableCell>
-                        <TableCell className="text-right text-destructive">-{formatCurrency(team.assistantSalary)}</TableCell>
-                        <TableCell className="text-right text-destructive">-{formatCurrency(team.expenses)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(team.db)}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDailyViewTeam(team);
-                            }}
+                    {teamsDB.map((team) => {
+                      const isExpanded = expandedTeamId === team.teamId;
+                      const dbBeforeLeader = team.revenue - team.sellerSalaryCosts - team.expenses;
+                      const calculatedLeaderSalary = dbBeforeLeader * (team.percentageRate / 100);
+                      const usesMinimum = team.leaderSalary === team.minimumSalary && calculatedLeaderSalary < team.minimumSalary;
+
+                      return (
+                        <>
+                          <TableRow 
+                            key={team.teamId} 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setExpandedTeamId(isExpanded ? null : team.teamId)}
                           >
-                            <Calendar className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-1">
+                                {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                {team.teamName}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">{formatCurrency(team.revenue)}</TableCell>
+                            <TableCell className="text-right text-destructive">-{formatCurrency(team.sellerSalaryCosts)}</TableCell>
+                            <TableCell className="text-right text-destructive">-{formatCurrency(team.leaderSalary)}</TableCell>
+                            <TableCell className="text-right text-destructive">-{formatCurrency(team.assistantSalary)}</TableCell>
+                            <TableCell className="text-right text-destructive">-{formatCurrency(team.expenses)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(team.db)}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedTeam(team);
+                                  }}
+                                >
+                                  <HelpCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDailyViewTeam(team);
+                                  }}
+                                >
+                                  <Calendar className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow key={`${team.teamId}-expanded`} className="bg-muted/30 hover:bg-muted/30">
+                              <TableCell colSpan={8} className="py-3 px-6">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Teamleder</p>
+                                    <p className="font-medium">{team.leaderName}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Procentsats</p>
+                                    <p className="font-medium">{team.percentageRate}%</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Minimumsløn</p>
+                                    <p className="font-medium">{formatCurrency(team.minimumSalary)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">DB før lederløn</p>
+                                    <p className="font-medium">{formatCurrency(dbBeforeLeader)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Beregnet ({team.percentageRate}% af DB)</p>
+                                    <p className="font-medium">{formatCurrency(calculatedLeaderSalary)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Endelig lederløn</p>
+                                    <p className="font-medium text-destructive">
+                                      {formatCurrency(team.leaderSalary)} {usesMinimum && <span className="text-xs text-muted-foreground">(minimum)</span>}
+                                    </p>
+                                  </div>
+                                  {team.assistantNames.length > 0 && (
+                                    <div>
+                                      <p className="text-muted-foreground">Assistenter</p>
+                                      <p className="font-medium">{team.assistantNames.join(", ")}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      );
+                    })}
                     <TableRow className="bg-muted/50 font-medium">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
