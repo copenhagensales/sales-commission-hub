@@ -1,27 +1,37 @@
 
+## Daglig DB-søjlediagram med trendlinje
 
-## Tilføj debug-logging til lederlønsberegningen
+Tilfoej et soejlediagram i bunden af "DB per Klient"-siden der viser den samlede Final DB pr. dag for alle klienter, med en lineaer trendlinje.
 
-For at kunne se præcis hvilke tal der bruges til at beregne Finansforbundets lederallokering, tilføjer vi console.log-statements i beregningslogikken.
+### Ny komponent: `src/components/salary/ClientDBDailyChart.tsx`
 
-### Hvad logges
+- Modtager `clientDBData` (allerede beregnet i `ClientDBTab`) samt `periodStart` og `effectivePeriodEnd` som props.
+- Henter salgsdata pr. dag via `useSalesAggregatesExtended` med `groupBy: ['date']` (ingen klient-filter, saa det er alle teams).
+- For hver dag beregnes en forenklet DB: `revenue - commission * 1.125` (provision + 12.5% feriepenge).
+- Viser et `BarChart` fra recharts med:
+  - Soejler farvekodet (groen for positiv DB, roed for negativ).
+  - En `Line` (trendlinje) beregnet som lineaer regression over alle dagspunkter.
+  - X-akse med datoer (format "d/M"), Y-akse med DKK-vaerdier.
+  - Tooltip med dato, DB-vaerdi og antal salg.
+- Wrapped i et `Card` med titel "DB pr. dag" og et `TrendingUp`-ikon.
 
-Inde i teamets leder-beregningsloop (linje ~751-769 i `ClientDBTab.tsx`) tilføjes to log-statements:
+### AEndring i `src/components/salary/ClientDBTab.tsx`
 
-**1. Per team (efter linje 754):**
-- `teamId`, `percentageRate`, `minimumSalary`
-- `teamTotalDBBeforeLeader`
-- `calculatedLeaderSalary` (DB * procentsats)
-- `proratedMinimumSalary` (minimumsløn * prorationFactor)
-- `finalTeamLeaderSalary` (MAX af de to)
-- `prorationFactor`, `workdaysInPeriod`
+- Importer `ClientDBDailyChart`.
+- Indsaet komponenten lige foer det afsluttende `</div>` (efter "Samlet Oversigt"-kortet, foer edit-modal og daily-breakdown-modal), ca. linje 1098.
+- Videregiv `periodStart`, `effectivePeriodEnd` og evt. `clientId` filter.
 
-**2. Per klient (efter linje 764):**
-- `clientName`, `dbBeforeLeader`, `dbShare`
-- `leaderAllocation`, `leaderVacationPay`
-- `finalDB`
+### Trendlinje-beregning
 
-### Fil
-- `src/components/salary/ClientDBTab.tsx` -- to console.log-blokke tilføjes i useMemo-beregningen.
+Lineaer regression (y = ax + b) beregnes i en `useMemo` over dagsdataen:
+- x = dagindex (0, 1, 2, ...)
+- y = DB-vaerdi
+- Beregn haeldning (a) og skaering (b) med standard formel.
+- Tegn som en `Line` i et `ComposedChart`.
 
-Disse logs kan fjernes igen når vi har verificeret tallene.
+### Visuelt design
+
+- Moerkt kort-design (matcher eksisterende UI).
+- Groenne soejler for positiv DB, roede for negativ.
+- Stiplet trendlinje i hvid/lysegraa.
+- Responsiv hoejde (~300px).
