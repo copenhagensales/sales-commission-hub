@@ -26,6 +26,7 @@ import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { ClientDBKPIs } from "./ClientDBKPIs";
 import { ClientDBExpandableRow } from "./ClientDBExpandableRow";
 import { ClientDBSummaryCard } from "./ClientDBSummaryCard";
+import { ClientDBDailyChart } from "./ClientDBDailyChart";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
@@ -1134,6 +1135,9 @@ export function ClientDBTab() {
           </Card>
         </div>
       )}
+
+      {/* Daily DB chart */}
+      <ClientDBDailyChart periodStart={periodStart} periodEnd={effectivePeriodEnd} />
 
       {/* Daily breakdown modal */}
       {selectedClientForDaily && (
