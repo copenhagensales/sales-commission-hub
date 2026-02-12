@@ -208,17 +208,24 @@ export function useCreateFieldmarketingSale() {
 
   return useMutation({
     mutationFn: async (sales: CreateSaleParams[]) => {
+      console.log("[FM-SALES] Starting mutation with", sales.length, "sales", JSON.stringify(sales));
       // Enrich sales with employee data and insert into centralized sales table
       const enrichedSales = await Promise.all(sales.map(async (sale) => {
         // Get employee name/email
-        const { data: employee } = await supabase
+        const { data: employee, error: empError } = await supabase
           .from("employee_master_data")
           .select("first_name, last_name, work_email")
           .eq("id", sale.seller_id)
           .maybeSingle();
 
+        if (empError) {
+          console.error("[FM-SALES] Employee lookup error:", empError);
+        }
+        console.log("[FM-SALES] Employee lookup result:", employee?.first_name, employee?.last_name);
+
         // Map client_id to client_campaign_id
         const clientCampaignId = FM_CLIENT_CAMPAIGN_MAP[sale.client_id] || null;
+        console.log("[FM-SALES] Client mapping:", sale.client_id, "->", clientCampaignId);
 
         return {
           source: 'fieldmarketing' as const,
@@ -239,11 +246,16 @@ export function useCreateFieldmarketingSale() {
         };
       }));
 
+      console.log("[FM-SALES] Inserting enriched sales:", JSON.stringify(enrichedSales));
       const { error } = await supabase
         .from("sales")
         .insert(enrichedSales);
       
-      if (error) throw error;
+      if (error) {
+        console.error("[FM-SALES] Insert error:", JSON.stringify(error));
+        throw error;
+      }
+      console.log("[FM-SALES] Insert successful!");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
