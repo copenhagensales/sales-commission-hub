@@ -1,38 +1,25 @@
 
-
-## Fordel kun overhead paa hverdage i NETTO pr. dag grafen
+## Fix: NETTO pr. dag grafen blander to perioder
 
 ### Problem
-Stab-udgifter og stabsloenninger fordeles i dag paa alle dage med salg -- ogsaa weekender. Det giver kunstigt negative soejler i weekender, hvor der kun er lidt omsaetning men stadig faar tildelt en stor del af overhead.
+Grafen viser salgsdata for de seneste 30 dage (13. jan - 12. feb), men bruger overhead-tal fra den valgte periode (februar). Det giver et helt forkert NETTO-tal fordi:
+- Soejlernes DB er beregnet fra 30 dages omsaetning/provision
+- Overhead er kun fra februar
+- Resultatet matcher ingen af de to perioder
 
 ### Loesning
-Aendr fordelingslogikken saa overhead kun fordeles paa hverdage (mandag-fredag) med salg. Weekenddage viser kun deres rene DB (omsaetning minus provision inkl. feriepenge) uden overhead-fradrag.
+Grafen skal bruge den valgte periodes data konsekvent -- baade for salgsdata OG for overhead/totaler. Naar man vaelger februar, viser grafen februars dage med februars overhead.
 
 ### Teknisk aendring
 
-**Fil: `src/components/salary/ClientDBDailyChart.tsx`**
+**Fil: `src/components/salary/ClientDBTab.tsx`**
 
-I `chartData` useMemo (linje ~55-62):
-
-```text
-Nuvaerende logik:
-  daysWithSales = alle dage med salg > 0
-  dailyOverhead = totalOverhead / daysWithSales
-  netto = db - dailyOverhead (for alle dage med salg)
-
-Ny logik:
-  // Tjek om en dato er hverdag (man-fre)
-  isWeekday = parseISO(dateStr).getDay() >= 1 && <= 5
-
-  weekdaysWithSales = dage der baade er hverdage OG har salg > 0
-  dailyOverhead = totalOverhead / weekdaysWithSales
-
-  netto = db - dailyOverhead  (kun for hverdage med salg)
-  netto = db                  (for weekender -- ingen overhead)
-```
+1. Fjern den separate `chartPeriodStart`/`chartPeriodEnd` (seneste 30 dage) og `dailyAggregates` query
+2. Tilfoej `date` til den eksisterende `useSalesAggregatesExtended` query's `groupBy` array, saa vi faar `byDate` data for den valgte periode
+3. Brug `aggregates.byDate` i stedet for `dailyAggregates.byDate` naar vi sender data til `ClientDBDailyChart`
 
 Dette sikrer at:
-- Weekender viser ren DB uden stab-fradrag
-- Hverdage baerer hele overhead-byrden
-- Summen af alle daglige soejler stadig matcher NETTO-totalet
-
+- Grafens datointerval matcher den valgte periode (fx februar)
+- Overhead-tallene hoerer til samme periode
+- NETTO-totalet i grafen matcher praecis med Samlet Oversigt
+- Summen af de daglige soejler giver det korrekte NETTO-tal
