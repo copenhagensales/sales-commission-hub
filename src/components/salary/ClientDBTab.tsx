@@ -753,6 +753,8 @@ export function ClientDBTab() {
       const proratedMinimumSalary = teamInfo.minimumSalary * prorationFactor;
       const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
 
+      console.log(`[LeaderDB] Team=${teamId} | rate=${teamInfo.percentageRate}% | minSalary=${teamInfo.minimumSalary} | teamDBBeforeLeader=${teamTotalDBBeforeLeader.toFixed(0)} | calcLeader=${calculatedLeaderSalary.toFixed(0)} | proratedMin=${proratedMinimumSalary.toFixed(0)} | FINAL=${finalTeamLeaderSalary.toFixed(0)} | prorationFactor=${prorationFactor.toFixed(4)}`);
+
       // Full-month leader salary
       const fullMonthProratedMinSalary = isCapped ? teamInfo.minimumSalary * fullMonthProrationFactor : proratedMinimumSalary;
       const fullMonthLeaderSalary = isCapped ? Math.max(calculatedLeaderSalary, fullMonthProratedMinSalary) : finalTeamLeaderSalary;
@@ -763,6 +765,7 @@ export function ClientDBTab() {
         client.leaderAllocation = finalTeamLeaderSalary * dbShare;
         client.leaderVacationPay = client.leaderAllocation * VACATION_PAY_RATES.LEADER;
         client.finalDB = client.dbBeforeLeader - client.leaderAllocation - client.leaderVacationPay;
+        console.log(`[LeaderDB]   Client=${client.clientName} | dbBeforeLeader=${client.dbBeforeLeader.toFixed(0)} | dbShare=${dbShare.toFixed(4)} | leaderAlloc=${client.leaderAllocation.toFixed(0)} | leaderVacPay=${client.leaderVacationPay.toFixed(0)} | finalDB=${client.finalDB.toFixed(0)}`);
         if (isCapped) {
           client.fullMonthLeaderAllocation = fullMonthLeaderSalary * dbShare;
           client.fullMonthLeaderVacationPay = client.fullMonthLeaderAllocation * VACATION_PAY_RATES.LEADER;
