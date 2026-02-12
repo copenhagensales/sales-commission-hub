@@ -372,25 +372,7 @@ export function ClientDBTab() {
     enabled: true,
   });
 
-  // Calculate chart header totals from the 31-day window data
-  const chartTotals = useMemo(() => {
-    const byDate = dailyAggregates?.byDate;
-    if (!byDate || Object.keys(byDate).length === 0) {
-      return { nettoTotal: 0, teamDB: 0, totalRevenue: 0 };
-    }
-    let totalRevenue = 0;
-    let totalCommission = 0;
-    for (const day of Object.values(byDate)) {
-      totalRevenue += day.revenue;
-      totalCommission += day.commission;
-    }
-    const teamDB = totalRevenue - totalCommission * 1.125;
-    return {
-      totalRevenue: Math.round(totalRevenue),
-      teamDB: Math.round(teamDB),
-      nettoTotal: Math.round(teamDB - FIXED_MONTHLY_OVERHEAD),
-    };
-  }, [dailyAggregates]);
+  
 
   // Fetch team assistant leaders from junction table
   const { data: teamAssistants = [] } = useTeamAssistantLeaders();
@@ -485,6 +467,167 @@ export function ClientDBTab() {
     periodEnd,
     isCapped ? allAssistantIds : [] // Only fetch when capping is active
   );
+
+  // Fetch sales by client for the 31-day chart window (full DB calculation)
+  const { data: chartSalesByClient } = useQuery({
+    queryKey: ["chart-sales-by-client", chartPeriodStart.toISOString(), chartPeriodEnd.toISOString()],
+    queryFn: async () => {
+      const telesalesData = await fetchAllRows<any>(
+        "sales",
+        `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
+        (q) => q.gte("sale_datetime", chartPeriodStart.toISOString())
+                .lte("sale_datetime", chartPeriodEnd.toISOString()),
+        { orderBy: "sale_datetime", ascending: false }
+      );
+      const rawFmSalesData = await fetchAllRows<any>(
+        "sales",
+        `id, raw_payload, sale_datetime`,
+        (q) => q.eq("source", "fieldmarketing")
+                .gte("sale_datetime", chartPeriodStart.toISOString())
+                .lte("sale_datetime", chartPeriodEnd.toISOString()),
+        { orderBy: "sale_datetime", ascending: false }
+      );
+      const fmSalesData = (rawFmSalesData || []).map((s: any) => ({
+        id: s.id,
+        client_id: (s.raw_payload as any)?.fm_client_id,
+        product_name: (s.raw_payload as any)?.fm_product_name,
+      }));
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, commission_dkk, revenue_dkk");
+      const productsByName = new Map(products?.map(p => [p.name?.toLowerCase(), p]) || []);
+      const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
+      for (const sale of telesalesData || []) {
+        const clientId = (sale.client_campaigns as any)?.client_id;
+        if (!clientId) continue;
+        if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
+        for (const item of sale.sale_items || []) {
+          const countsAsSale = (item.products as any)?.counts_as_sale !== false;
+          const qty = Number(item.quantity) || 1;
+          if (countsAsSale) byClient[clientId].sales += qty;
+          byClient[clientId].commission += Number(item.mapped_commission) || 0;
+          byClient[clientId].revenue += Number(item.mapped_revenue) || 0;
+        }
+      }
+      for (const fmSale of fmSalesData || []) {
+        const clientId = fmSale.client_id;
+        if (!clientId) continue;
+        if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
+        byClient[clientId].sales += 1;
+        const product = productsByName.get(fmSale.product_name?.toLowerCase());
+        if (product) {
+          byClient[clientId].commission += Number(product.commission_dkk) || 0;
+          byClient[clientId].revenue += Number(product.revenue_dkk) || 0;
+        }
+      }
+      return byClient;
+    },
+    enabled: !!clientsWithTeams,
+    staleTime: 60000,
+  });
+
+  // Calculate chart header totals using full DB-per-klient logic on 31-day data
+  const chartTotals = useMemo(() => {
+    if (!chartSalesByClient || !clientsWithTeams || !teamSalaries) {
+      return { nettoTotal: 0, teamDB: 0, totalRevenue: 0 };
+    }
+    const adjustmentMap = new Map(adjustmentPercents?.map(a => [a.client_id, a]) || []);
+    const atpRate = atpBarsselRate || 381;
+    const chartDaysArray = eachDayOfInterval({ start: chartPeriodStart, end: chartPeriodEnd });
+    const chartLocationCostsMap = new Map<string, number>();
+    for (const booking of bookings || []) {
+      if (!booking.client_id) continue;
+      const bookingStart = parseISO(booking.start_date);
+      const bookingEnd = parseISO(booking.end_date);
+      const bookedDays = (booking.booked_days as number[]) || [];
+      const dailyRate = booking.daily_rate_override || (booking.location as any)?.daily_rate || 0;
+      for (const day of chartDaysArray) {
+        const dayIndex = getBookedDayIndex(day);
+        if (day >= bookingStart && day <= bookingEnd && bookedDays.includes(dayIndex)) {
+          chartLocationCostsMap.set(booking.client_id, (chartLocationCostsMap.get(booking.client_id) || 0) + dailyRate);
+        }
+      }
+    }
+    interface ChartClientData {
+      clientId: string; teamId: string | null; adjustedRevenue: number; basisDB: number;
+      assistantAllocation: number; atpBarsselAllocation: number; dbBeforeLeader: number;
+      leaderAllocation: number; leaderVacationPay: number; finalDB: number;
+    }
+    const chartClientsByTeam: Record<string, ChartClientData[]> = {};
+    const allChartClients: ChartClientData[] = [];
+    for (const client of clientsWithTeams) {
+      const salesData = chartSalesByClient[client.id];
+      if (!salesData || (salesData.sales === 0 && salesData.revenue === 0)) continue;
+      const teamClientData = (client.team_clients as any[])?.[0];
+      const teamId = teamClientData?.team_id || null;
+      const adjustment = adjustmentMap.get(client.id);
+      const cancellationPercent = Number(adjustment?.cancellation_percent) || 0;
+      const sickPayPercent = Number(adjustment?.sick_pay_percent) || 0;
+      const isFMClient = FM_CLIENT_NAMES.includes(client.name);
+      const locationCosts = isFMClient ? (chartLocationCostsMap.get(client.id) || 0) : 0;
+      const commission = salesData.commission;
+      const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
+      const sellerSalaryCost = commission + sellerVacationPay;
+      const cancellationFactor = 1 - (cancellationPercent / 100);
+      const adjustedRevenue = salesData.revenue * cancellationFactor;
+      const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
+      const sickPayAmount = sellerSalaryCost * (sickPayPercent / 100);
+      const basisDB = adjustedRevenue - adjustedSellerCost - sickPayAmount - locationCosts;
+      const cd: ChartClientData = {
+        clientId: client.id, teamId, adjustedRevenue, basisDB,
+        assistantAllocation: 0, atpBarsselAllocation: 0, dbBeforeLeader: 0,
+        leaderAllocation: 0, leaderVacationPay: 0, finalDB: basisDB,
+      };
+      allChartClients.push(cd);
+      if (teamId) {
+        if (!chartClientsByTeam[teamId]) chartClientsByTeam[teamId] = [];
+        chartClientsByTeam[teamId].push(cd);
+      }
+    }
+    const WORKDAYS_PER_MONTH = 22;
+    const chartWorkdays = countWorkDaysInPeriod(chartPeriodStart, chartPeriodEnd);
+    const chartProration = chartWorkdays / WORKDAYS_PER_MONTH;
+    for (const [teamId, teamClients] of Object.entries(chartClientsByTeam)) {
+      const teamInfo = teamSalaries[teamId];
+      if (!teamInfo) continue;
+      const teamTotalRevenue = teamClients.reduce((sum, c) => sum + c.adjustedRevenue, 0);
+      if (teamTotalRevenue === 0) continue;
+      const teamAssistantIds = getTeamAssistantIds(teamAssistants, teamId);
+      let totalAssistantSalary = 0;
+      for (const aId of teamAssistantIds) {
+        totalAssistantSalary += assistantHoursData?.[aId]?.totalSalary || 0;
+      }
+      const teamMemberCount = teamMemberCounts?.[teamId] || 0;
+      const teamAtpBarsselCost = teamMemberCount * atpRate * chartProration;
+      for (const client of teamClients) {
+        const revenueShare = client.adjustedRevenue / teamTotalRevenue;
+        client.assistantAllocation = totalAssistantSalary * revenueShare;
+        client.atpBarsselAllocation = teamAtpBarsselCost * revenueShare;
+        client.dbBeforeLeader = client.basisDB - client.assistantAllocation - client.atpBarsselAllocation;
+      }
+      const teamTotalDBBeforeLeader = teamClients.reduce((sum, c) => sum + c.dbBeforeLeader, 0);
+      const calculatedLeaderSalary = teamTotalDBBeforeLeader * (teamInfo.percentageRate / 100);
+      const proratedMinimumSalary = teamInfo.minimumSalary * chartProration;
+      const finalTeamLeaderSalary = Math.max(calculatedLeaderSalary, proratedMinimumSalary);
+      const teamDBForAllocation = Math.max(teamTotalDBBeforeLeader, 1);
+      for (const client of teamClients) {
+        const dbShare = Math.max(client.dbBeforeLeader, 0) / teamDBForAllocation;
+        client.leaderAllocation = finalTeamLeaderSalary * dbShare;
+        client.leaderVacationPay = client.leaderAllocation * VACATION_PAY_RATES.LEADER;
+        client.finalDB = client.dbBeforeLeader - client.leaderAllocation - client.leaderVacationPay;
+      }
+    }
+    for (const c of allChartClients) {
+      if (!c.teamId) c.finalDB = c.basisDB;
+    }
+    const chartTeamDB = allChartClients.reduce((sum, c) => sum + c.finalDB, 0);
+    const chartRevenue = allChartClients.reduce((sum, c) => sum + c.adjustedRevenue, 0);
+    return {
+      totalRevenue: Math.round(chartRevenue),
+      teamDB: Math.round(chartTeamDB),
+      nettoTotal: Math.round(chartTeamDB - FIXED_MONTHLY_OVERHEAD),
+    };
+  }, [chartSalesByClient, clientsWithTeams, adjustmentPercents, bookings, teamSalaries, assistantHoursData, teamAssistants, teamMemberCounts, atpBarsselRate, chartPeriodStart, chartPeriodEnd]);
 
   // Fetch previous period comparison data
   const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
