@@ -1,29 +1,38 @@
 
-
-## Fix: Fjern dobbelt-multiplikation i get_sales_aggregates_v2
+## Opdater DB-grafen til at vise NETTO fra Samlet Oversigt
 
 ### Problem
-RPC-funktionen `get_sales_aggregates_v2` ganger `mapped_commission` og `mapped_revenue` med `quantity`, men disse vaerdier er allerede praemultipliceret med quantity under synkroniseringen. Det giver dobbelte tal for omsaetning og provision overalt i systemet, der bruger denne RPC.
+Grafen "DB pr. dag" beregner sit eget simple DB-tal (omsaetning minus provision * 1,125 = ~2,5M kr), men Samlet Oversigt viser et helt andet tal (Team DB: 771.587 kr, NETTO: 347.783 kr) fordi den medregner annulleringer, sygeloen, lokationsomkostninger, assistent-/lederallokering, stab-udgifter og stabsloenninger.
 
-### Linje der skal aendres (i en ny migration)
+### Loesning
+Grafen skal modtage de allerede beregnede tal fra ClientDBTab som props i stedet for at hente og beregne sine egne.
 
-**Fra:**
-```sql
-COALESCE(SUM(fs.mapped_commission * fs.quantity), 0) AS total_commission,
-COALESCE(SUM(fs.mapped_revenue * fs.quantity), 0) AS total_revenue
+### Trin
+
+**1. Opdater ClientDBDailyChart til at acceptere props**
+- Tilfoej props for `nettoTotal`, `teamDB`, `totalRevenue`, `stabExpenses`, og `staffSalaries`
+- Fjern den interne `useSalesAggregatesExtended` hook (grafen henter ikke laengere selv data)
+- Behold den eksisterende daglige bar-data fra parent, eller modtag `byDate` data som prop
+- Vis NETTO-totalet i headeren i stedet for det simple DB-tal
+- Fordel overhead (stab + stabsloenninger) jaevnt over dage med salg, saa daglige soejler viser daglig NETTO
+
+**2. Opdater ClientDBTab til at videregive data**
+- Send `totals` og `aggregates.byDate` ned til `ClientDBDailyChart`
+- Grafen bruger herefter praecis de samme tal som Samlet Oversigt
+
+### Teknisk detalje
+
+Daglige soejler beregnes saaledes:
+```text
+Per dag:
+  dagDB = revenue - commission * 1.125 (som nu)
+  dailyOverhead = totalOverhead / antalDageMedSalg
+  dagNetto = dagDB - dailyOverhead
 ```
 
-**Til:**
-```sql
-COALESCE(SUM(fs.mapped_commission), 0) AS total_commission,
-COALESCE(SUM(fs.mapped_revenue), 0) AS total_revenue
+Header viser:
+```text
+NETTO: [totals.netEarnings] kr  |  Team DB: [totals.finalDB] kr
 ```
 
-### Implementation
-Opret en ny SQL-migration med `CREATE OR REPLACE FUNCTION get_sales_aggregates_v2(...)` der er identisk med den eksisterende, bortset fra at linje 58-59 fjerner `* fs.quantity` fra commission og revenue summerne.
-
-Salgstal-linjen (linje 57) forbliver uaendret, da `quantity` korrekt bruges til at taelle antal solgte enheder.
-
-### Effekt
-Alle komponenter der bruger `useSalesAggregatesExtended` (og dermed RPC'en) vil automatisk vise korrekte tal - inklusiv den nye daglige DB-graf, Client DB-rapporten, og dashboards.
-
+Dette sikrer at totalerne i grafen matcher praecis med Samlet Oversigt, og de daglige soejler giver et retvisende billede af den daglige netto-indtjening.
