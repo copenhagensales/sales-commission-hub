@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
-import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import {
   ComposedChart,
   Bar,
@@ -13,23 +12,35 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { format, parseISO, subDays, startOfDay } from "date-fns";
+import { format, parseISO } from "date-fns";
 
-export function ClientDBDailyChart() {
-  const periodStart = useMemo(() => startOfDay(subDays(new Date(), 30)), []);
-  const periodEnd = useMemo(() => startOfDay(new Date()), []);
+interface DateAggregate {
+  revenue: number;
+  commission: number;
+  sales: number;
+}
 
-  const { data: aggregates, isLoading } = useSalesAggregatesExtended({
-    periodStart,
-    periodEnd,
-    groupBy: ["date"],
-    enabled: true,
-  });
+interface ClientDBDailyChartProps {
+  byDate: Record<string, DateAggregate>;
+  nettoTotal: number;
+  teamDB: number;
+  totalRevenue: number;
+  totalOverhead: number;
+  isLoading: boolean;
+}
 
+export function ClientDBDailyChart({
+  byDate,
+  nettoTotal,
+  teamDB,
+  totalRevenue,
+  totalOverhead,
+  isLoading,
+}: ClientDBDailyChartProps) {
   const chartData = useMemo(() => {
-    if (!aggregates?.byDate) return [];
+    if (!byDate || Object.keys(byDate).length === 0) return [];
 
-    return Object.entries(aggregates.byDate)
+    const entries = Object.entries(byDate)
       .map(([dateStr, d]) => {
         const db = d.revenue - d.commission * 1.125;
         return {
@@ -40,23 +51,27 @@ export function ClientDBDailyChart() {
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [aggregates]);
 
-  const { totalDB, totalRevenue } = useMemo(() => {
-    const db = chartData.reduce((sum, d) => sum + d.db, 0);
-    const rev = chartData.reduce((sum, d) => sum + (aggregates?.byDate?.[d.date]?.revenue || 0), 0);
-    return { totalDB: Math.round(db), totalRevenue: Math.round(rev) };
-  }, [chartData, aggregates]);
-  // Linear regression trend line
+    // Distribute overhead evenly across days with sales
+    const daysWithSales = entries.filter((e) => e.sales > 0).length || entries.length;
+    const dailyOverhead = daysWithSales > 0 ? totalOverhead / daysWithSales : 0;
+
+    return entries.map((e) => ({
+      ...e,
+      netto: Math.round(e.db - (e.sales > 0 ? dailyOverhead : 0)),
+    }));
+  }, [byDate, totalOverhead]);
+
+  // Linear regression trend line on netto
   const trendData = useMemo(() => {
-    if (chartData.length < 2) return chartData.map((d) => ({ ...d, trend: d.db }));
+    if (chartData.length < 2) return chartData.map((d) => ({ ...d, trend: d.netto }));
 
     const n = chartData.length;
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
     for (let i = 0; i < n; i++) {
       sumX += i;
-      sumY += chartData[i].db;
-      sumXY += i * chartData[i].db;
+      sumY += chartData[i].netto;
+      sumXY += i * chartData[i].netto;
       sumX2 += i * i;
     }
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
@@ -74,7 +89,7 @@ export function ClientDBDailyChart() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            DB pr. dag
+            NETTO pr. dag
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -99,12 +114,17 @@ export function ClientDBDailyChart() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            DB pr. dag (sidste 30 dage)
+            NETTO pr. dag
           </CardTitle>
           <div className="flex items-center gap-4 text-xs">
             <span className="text-muted-foreground">
-              DB: <span className={totalDB >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
-                {totalDB.toLocaleString("da-DK")} kr
+              NETTO: <span className={nettoTotal >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                {nettoTotal.toLocaleString("da-DK")} kr
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Team DB: <span className={teamDB >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                {teamDB.toLocaleString("da-DK")} kr
               </span>
             </span>
             <span className="text-muted-foreground">
@@ -139,18 +159,18 @@ export function ClientDBDailyChart() {
               }}
               formatter={(value: number, name: string) => {
                 if (name === "trend") return [`${value.toLocaleString("da-DK")} kr`, "Trend"];
-                return [`${value.toLocaleString("da-DK")} kr`, "DB"];
+                return [`${value.toLocaleString("da-DK")} kr`, "NETTO"];
               }}
               labelFormatter={(label: string, payload: any[]) => {
                 const sales = payload?.[0]?.payload?.sales;
                 return `${label}${sales != null ? ` · ${sales} salg` : ""}`;
               }}
             />
-            <Bar dataKey="db" radius={[3, 3, 0, 0]} maxBarSize={40}>
+            <Bar dataKey="netto" radius={[3, 3, 0, 0]} maxBarSize={40}>
               {trendData.map((entry, i) => (
                 <Cell
                   key={i}
-                  fill={entry.db >= 0 ? "hsl(142, 71%, 45%)" : "hsl(0, 84%, 60%)"}
+                  fill={entry.netto >= 0 ? "hsl(142, 71%, 45%)" : "hsl(0, 84%, 60%)"}
                   opacity={0.85}
                 />
               ))}
