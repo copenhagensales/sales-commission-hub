@@ -52,13 +52,17 @@ export function ClientDBDailyChart({
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Distribute overhead evenly across days with sales
-    const daysWithSales = entries.filter((e) => e.sales > 0).length || entries.length;
-    const dailyOverhead = daysWithSales > 0 ? totalOverhead / daysWithSales : 0;
+    // Distribute overhead only across weekdays with sales
+    const isWeekday = (dateStr: string) => {
+      const day = parseISO(dateStr).getDay();
+      return day >= 1 && day <= 5;
+    };
+    const weekdaysWithSales = entries.filter((e) => e.sales > 0 && isWeekday(e.date)).length || 1;
+    const dailyOverhead = totalOverhead / weekdaysWithSales;
 
     return entries.map((e) => ({
       ...e,
-      netto: Math.round(e.db - (e.sales > 0 ? dailyOverhead : 0)),
+      netto: Math.round(e.db - (e.sales > 0 && isWeekday(e.date) ? dailyOverhead : 0)),
     }));
   }, [byDate, totalOverhead]);
 
