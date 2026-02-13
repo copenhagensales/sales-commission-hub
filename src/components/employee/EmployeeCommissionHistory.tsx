@@ -203,28 +203,25 @@ export function EmployeeCommissionHistory({
     enabled: !!employeeId,
   });
 
-  // Fetch products for FM commission lookup
-  const { data: products = [] } = useQuery({
-    queryKey: ["products-commission"],
+  // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
+  const { data: fmPricingMap } = useQuery({
+    queryKey: ["fm-pricing-map"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, commission_dkk");
-      if (error) throw error;
-      return data;
+      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
+      return buildFmPricingMap();
     },
   });
 
-  // Build product commission map for FM
+  // Build product commission map for FM from pricing map
   const productCommissionMap = useMemo(() => {
     const map = new Map<string, number>();
-    products.forEach(p => {
-      if (p.name) {
-        map.set(p.name.toLowerCase(), p.commission_dkk ?? 0);
-      }
-    });
+    if (fmPricingMap) {
+      fmPricingMap.forEach((pricing, name) => {
+        map.set(name, pricing.commission);
+      });
+    }
     return map;
-  }, [products]);
+  }, [fmPricingMap]);
 
   // Process daily data - using vagtplan leder as source of truth
   const dailyData = useMemo(() => {

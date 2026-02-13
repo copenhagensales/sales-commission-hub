@@ -240,7 +240,7 @@ export const useDashboardKpiData = () => {
           
           const revenueItems = await fetchAllRows<any>(
             "sale_items",
-            `quantity, product_id, products!inner(revenue_dkk), sales!inner(sale_datetime, client_campaign_id)`,
+            `mapped_revenue, sales!inner(sale_datetime, client_campaign_id)`,
             (q) => {
               let filtered = q
                 .gte("sales.sale_datetime", startISO)
@@ -253,9 +253,9 @@ export const useDashboardKpiData = () => {
             { orderBy: "id", ascending: true }
           );
           
+          // mapped_revenue is already pre-calculated by backend rematch (qty × rule price)
           value = revenueItems.reduce((sum, item) => {
-            const revenue = (item.products as any)?.revenue_dkk || 0;
-            return sum + (revenue * (item.quantity || 1));
+            return sum + (Number(item.mapped_revenue) || 0);
           }, 0);
           break;
         }
@@ -263,7 +263,7 @@ export const useDashboardKpiData = () => {
         case "avg-order-value": {
           const aovItems = await fetchAllRows<any>(
             "sale_items",
-            `quantity, product_id, products!inner(revenue_dkk), sales!inner(sale_datetime, id)`,
+            `mapped_revenue, sales!inner(sale_datetime, id)`,
             (q) => q
               .gte("sales.sale_datetime", startISO)
               .lte("sales.sale_datetime", endISO),
@@ -273,9 +273,9 @@ export const useDashboardKpiData = () => {
           const salesMap = new Map<string, number>();
           aovItems.forEach(item => {
             const saleId = (item.sales as any)?.id;
-            const revenue = (item.products as any)?.revenue_dkk || 0;
+            const revenue = Number(item.mapped_revenue) || 0;
             const current = salesMap.get(saleId) || 0;
-            salesMap.set(saleId, current + (revenue * (item.quantity || 1)));
+            salesMap.set(saleId, current + revenue);
           });
           
           const totalRevenue = Array.from(salesMap.values()).reduce((sum, v) => sum + v, 0);

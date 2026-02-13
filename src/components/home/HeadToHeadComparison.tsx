@@ -545,22 +545,37 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       // 4. Fetch product pricing rules (replaces deprecated product_campaign_overrides)
       const { data: productPricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk")
+        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk, priority")
         .eq("is_active", true);
       
-      // Build campaign override map: product_id + campaign_mapping_id -> { commission, revenue }
+      // Build override maps: campaign-specific AND universal rules
       const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      (productPricingRules || []).forEach(rule => {
+      const universalOverrideMap = new Map<string, { commission: number; revenue: number }>();
+      
+      // Sort by priority desc
+      const sortedPricingRules = [...(productPricingRules || [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+      
+      sortedPricingRules.forEach(rule => {
         const campaignIds = rule.campaign_mapping_ids || [];
-        campaignIds.forEach((campaignMappingId: string) => {
-          const key = `${rule.product_id}_${campaignMappingId}`;
-          if (!campaignOverrideMap.has(key)) {
-            campaignOverrideMap.set(key, {
+        if (campaignIds.length === 0) {
+          // Universal rule
+          if (!universalOverrideMap.has(rule.product_id)) {
+            universalOverrideMap.set(rule.product_id, {
               commission: rule.commission_dkk ?? 0,
               revenue: rule.revenue_dkk ?? 0
             });
           }
-        });
+        } else {
+          campaignIds.forEach((campaignMappingId: string) => {
+            const key = `${rule.product_id}_${campaignMappingId}`;
+            if (!campaignOverrideMap.has(key)) {
+              campaignOverrideMap.set(key, {
+                commission: rule.commission_dkk ?? 0,
+                revenue: rule.revenue_dkk ?? 0
+              });
+            }
+          });
+        }
       });
 
       // 5. Fetch call stats
@@ -621,14 +636,17 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               salesCount += Number(item.quantity) || 1;
             }
             
-            // Check for campaign override - use it if exists, otherwise fallback to mapped values
+            // Check for campaign override, then universal override, then fallback to mapped values
             const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-            const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+            const campaignOverride = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
+            const universalOverride = universalOverrideMap.get(item.product_id);
             
-            if (override) {
-              // Use campaign-specific commission/revenue (already includes quantity factor)
-              revenue += override.revenue;
-              commission += override.commission;
+            if (campaignOverride) {
+              revenue += campaignOverride.revenue;
+              commission += campaignOverride.commission;
+            } else if (universalOverride) {
+              revenue += universalOverride.revenue;
+              commission += universalOverride.commission;
             } else {
               // Fallback to mapped values from sale_items (already includes quantity)
               revenue += Number(item.mapped_revenue) || 0;

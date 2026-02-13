@@ -225,23 +225,37 @@ export default function RevenueByClient() {
       // Get product pricing rules (replaces deprecated product_campaign_overrides)
       const { data: productPricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, revenue_dkk, commission_dkk")
+        .select("product_id, campaign_mapping_ids, revenue_dkk, commission_dkk, priority")
         .eq("is_active", true);
       
-      // Build override maps: product_id + campaign_mapping_id -> value
+      // Build override maps including BOTH campaign-specific AND universal rules
       const revenueOverrideMap = new Map<string, number>();
       const commissionOverrideMap = new Map<string, number>();
-      productPricingRules?.forEach((rule) => {
+      const universalRevenueMap = new Map<string, number>();
+      const universalCommissionMap = new Map<string, number>();
+      
+      // Sort by priority desc
+      const sortedRules = [...(productPricingRules || [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+      
+      sortedRules.forEach((rule) => {
         const campaignIds = rule.campaign_mapping_ids || [];
-        campaignIds.forEach((campaignMappingId: string) => {
-          const key = `${rule.product_id}_${campaignMappingId}`;
-          if (rule.revenue_dkk !== null && !revenueOverrideMap.has(key)) {
-            revenueOverrideMap.set(key, rule.revenue_dkk);
+        if (campaignIds.length === 0) {
+          // Universal rule
+          if (!universalRevenueMap.has(rule.product_id)) {
+            universalRevenueMap.set(rule.product_id, rule.revenue_dkk ?? 0);
+            universalCommissionMap.set(rule.product_id, rule.commission_dkk ?? 0);
           }
-          if (rule.commission_dkk !== null && !commissionOverrideMap.has(key)) {
-            commissionOverrideMap.set(key, rule.commission_dkk);
-          }
-        });
+        } else {
+          campaignIds.forEach((campaignMappingId: string) => {
+            const key = `${rule.product_id}_${campaignMappingId}`;
+            if (rule.revenue_dkk !== null && !revenueOverrideMap.has(key)) {
+              revenueOverrideMap.set(key, rule.revenue_dkk);
+            }
+            if (rule.commission_dkk !== null && !commissionOverrideMap.has(key)) {
+              commissionOverrideMap.set(key, rule.commission_dkk);
+            }
+          });
+        }
       });
 
       // Map sale_items to sales
@@ -259,17 +273,16 @@ export default function RevenueByClient() {
         .gte("sale_datetime", `${startDateStr}T00:00:00`)
         .lte("sale_datetime", `${endDateStr}T23:59:59`);
 
-      // Get products for FM revenue and commission lookup
-      const { data: products } = await supabase
-        .from("products")
-        .select("name, revenue_dkk, commission_dkk");
-      
+      // Get FM pricing using the shared helper (respects pricing rules hierarchy)
+      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
+      const fmPricingMap = await buildFmPricingMap();
+
+      // productRevenueMap/productCommissionMap now use pricing rules
       const productRevenueMap = new Map<string, number>();
       const productCommissionMap = new Map<string, number>();
-      products?.forEach((p) => {
-        const lowerName = p.name.toLowerCase();
-        productRevenueMap.set(lowerName, p.revenue_dkk ?? 0);
-        productCommissionMap.set(lowerName, p.commission_dkk ?? 0);
+      fmPricingMap.forEach((pricing, name) => {
+        productRevenueMap.set(name, pricing.revenue);
+        productCommissionMap.set(name, pricing.commission);
       });
 
       // Aggregate per client and date (now includes commission)
@@ -299,14 +312,19 @@ export default function RevenueByClient() {
           const revenueOverride = overrideKey ? revenueOverrideMap.get(overrideKey) : undefined;
           const commissionOverride = overrideKey ? commissionOverrideMap.get(overrideKey) : undefined;
           
+          // Try campaign-specific, then universal, then mapped values
           if (revenueOverride !== undefined) {
             saleRevenue += revenueOverride;
+          } else if (universalRevenueMap.has(item.product_id)) {
+            saleRevenue += universalRevenueMap.get(item.product_id)!;
           } else {
             saleRevenue += Number(item.mapped_revenue) || 0;
           }
           
           if (commissionOverride !== undefined) {
             saleCommission += commissionOverride;
+          } else if (universalCommissionMap.has(item.product_id)) {
+            saleCommission += universalCommissionMap.get(item.product_id)!;
           } else {
             saleCommission += Number(item.mapped_commission) || 0;
           }
