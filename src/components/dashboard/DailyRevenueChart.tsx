@@ -76,20 +76,33 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
       // Get product pricing rules (replaces deprecated product_campaign_overrides)
       const { data: productPricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, revenue_dkk")
+        .select("product_id, campaign_mapping_ids, revenue_dkk, priority")
         .eq("is_active", true);
       
-      // Build override map: product_id + campaign_mapping_id -> revenue
-      const overrideMap = new Map<string, number>();
-      productPricingRules?.forEach((rule) => {
+      // Build override map including BOTH campaign-specific AND universal rules
+      // product_id + campaign_mapping_id -> revenue (campaign-specific)
+      // product_id -> revenue (universal fallback, campaign_mapping_ids is null/empty)
+      const campaignOverrideMap = new Map<string, number>();
+      const universalOverrideMap = new Map<string, number>();
+      
+      // Sort by priority desc so highest priority wins
+      const sortedRules = [...(productPricingRules || [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+      
+      sortedRules.forEach((rule) => {
         const campaignIds = rule.campaign_mapping_ids || [];
-        campaignIds.forEach((campaignMappingId: string) => {
-          const key = `${rule.product_id}_${campaignMappingId}`;
-          // Only set if not already set (first rule wins by priority from DB order)
-          if (!overrideMap.has(key)) {
-            overrideMap.set(key, rule.revenue_dkk ?? 0);
+        if (campaignIds.length === 0) {
+          // Universal rule - applies to all campaigns
+          if (!universalOverrideMap.has(rule.product_id)) {
+            universalOverrideMap.set(rule.product_id, rule.revenue_dkk ?? 0);
           }
-        });
+        } else {
+          campaignIds.forEach((campaignMappingId: string) => {
+            const key = `${rule.product_id}_${campaignMappingId}`;
+            if (!campaignOverrideMap.has(key)) {
+              campaignOverrideMap.set(key, rule.revenue_dkk ?? 0);
+            }
+          });
+        }
       });
 
       // Map sale_items to sales
@@ -112,10 +125,13 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         let saleRevenue = 0;
         items.forEach((item) => {
           const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const override = overrideKey ? overrideMap.get(overrideKey) : null;
+          const campaignOverride = overrideKey ? campaignOverrideMap.get(overrideKey) : undefined;
+          const universalOverride = universalOverrideMap.get(item.product_id);
           
-          if (override !== null && override !== undefined) {
-            saleRevenue += override;
+          if (campaignOverride !== undefined) {
+            saleRevenue += campaignOverride;
+          } else if (universalOverride !== undefined) {
+            saleRevenue += universalOverride;
           } else {
             saleRevenue += Number(item.mapped_revenue) || 0;
           }
@@ -132,21 +148,16 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         .gte("sale_datetime", `${startDateStr}T00:00:00`)
         .lte("sale_datetime", `${todayStr}T23:59:59`);
 
-      // Get products for FM revenue lookup
-      const { data: products } = await supabase
-        .from("products")
-        .select("name, revenue_dkk");
-      
-      const productRevenueMap = new Map<string, number>();
-      products?.forEach((p) => {
-        productRevenueMap.set(p.name.toLowerCase(), p.revenue_dkk ?? 0);
-      });
+      // Get FM pricing using the shared helper (respects pricing rules hierarchy)
+      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
+      const fmPricingMap = await buildFmPricingMap();
 
       // Add FM revenue
       fmSales?.forEach((sale) => {
         const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
         const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
-        const revenue = productRevenueMap.get(productName) || 0;
+        const pricing = fmPricingMap.get(productName);
+        const revenue = pricing?.revenue || 0;
         revenueByDay[saleDate] = (revenueByDay[saleDate] || 0) + revenue;
       });
 

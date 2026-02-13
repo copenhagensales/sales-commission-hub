@@ -492,10 +492,10 @@ export function ClientDBTab() {
         client_id: (s.raw_payload as any)?.fm_client_id,
         product_name: (s.raw_payload as any)?.fm_product_name,
       }));
-      const { data: products } = await supabase
-        .from("products")
-        .select("id, name, commission_dkk, revenue_dkk");
-      const productsByName = new Map(products?.map(p => [p.name?.toLowerCase(), p]) || []);
+      // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
+      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
+      const fmPricingMap = await buildFmPricingMap();
+      
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       for (const sale of telesalesData || []) {
         const clientId = (sale.client_campaigns as any)?.client_id;
@@ -514,10 +514,10 @@ export function ClientDBTab() {
         if (!clientId) continue;
         if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
         byClient[clientId].sales += 1;
-        const product = productsByName.get(fmSale.product_name?.toLowerCase());
-        if (product) {
-          byClient[clientId].commission += Number(product.commission_dkk) || 0;
-          byClient[clientId].revenue += Number(product.revenue_dkk) || 0;
+        const pricing = fmPricingMap.get(fmSale.product_name?.toLowerCase());
+        if (pricing) {
+          byClient[clientId].commission += pricing.commission;
+          byClient[clientId].revenue += pricing.revenue;
         }
       }
       return byClient;
@@ -730,11 +730,9 @@ export function ClientDBTab() {
         product_name: (s.raw_payload as any)?.fm_product_name,
       }));
 
-      const { data: products } = await supabase
-        .from("products")
-        .select("id, name, commission_dkk, revenue_dkk");
-      
-      const productsByName = new Map(products?.map(p => [p.name?.toLowerCase(), p]) || []);
+      // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
+      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
+      const fmPricingMap = await buildFmPricingMap();
 
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       
@@ -765,10 +763,10 @@ export function ClientDBTab() {
 
         byClient[clientId].sales += 1;
         
-        const product = productsByName.get(fmSale.product_name?.toLowerCase());
-        if (product) {
-          byClient[clientId].commission += Number(product.commission_dkk) || 0;
-          byClient[clientId].revenue += Number(product.revenue_dkk) || 0;
+        const pricing = fmPricingMap.get(fmSale.product_name?.toLowerCase());
+        if (pricing) {
+          byClient[clientId].commission += pricing.commission;
+          byClient[clientId].revenue += pricing.revenue;
         }
       }
 

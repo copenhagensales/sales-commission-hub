@@ -9,3 +9,4 @@ export * from './vacation-pay';
 export * from './hours';
 export * from './dates';
 export * from './formatting';
+export * from './fmPricing';
