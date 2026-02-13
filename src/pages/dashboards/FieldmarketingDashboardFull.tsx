@@ -39,7 +39,9 @@ function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
   }
 }
 import { da } from "date-fns/locale";
-import { TrendingUp, Users, Calendar, Package, Trophy, Loader2 } from "lucide-react";
+import { TrendingUp, Users, Calendar, Package, Trophy, Loader2, Download } from "lucide-react";
+import * as XLSX from "xlsx";
+import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
@@ -402,6 +404,54 @@ const FieldmarketingDashboardFull = () => {
     to: defaultPayrollPeriod.end,
   });
   const [isCustomRange, setIsCustomRange] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const allSales = await fetchAllRows<{
+        id: string; sale_datetime: string; agent_name: string; customer_phone: string;
+        validation_status: string; raw_payload: any; client_campaign_id: string;
+      }>(
+        "sales",
+        "id, sale_datetime, agent_name, customer_phone, validation_status, raw_payload, client_campaign_id",
+        (q) => q.eq("source", "fieldmarketing"),
+        { orderBy: "sale_datetime", ascending: false }
+      );
+
+      // Fetch client names via client_campaigns
+      const campaignIds = [...new Set(allSales.map(s => s.client_campaign_id).filter(Boolean))];
+      let clientMap: Record<string, string> = {};
+      if (campaignIds.length > 0) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id, client:client_id(name)")
+          .in("id", campaignIds);
+        (campaigns || []).forEach((cc: any) => {
+          clientMap[cc.id] = cc.client?.name || "";
+        });
+      }
+
+      const rows = allSales.map(s => ({
+        Dato: s.sale_datetime ? format(new Date(s.sale_datetime), "yyyy-MM-dd HH:mm") : "",
+        Sælger: s.agent_name || "",
+        Telefonnummer: s.customer_phone || "",
+        Produkt: s.raw_payload?.fm_product_name || "",
+        Klient: clientMap[s.client_campaign_id] || "",
+        Validering: s.validation_status || "",
+        Kommentar: s.raw_payload?.fm_comment || "",
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "FM Salg");
+      XLSX.writeFile(wb, `FM_salg_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    } catch (err) {
+      console.error("Excel export failed:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
   
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setDateRange(range);
@@ -476,6 +526,10 @@ const FieldmarketingDashboardFull = () => {
         subtitle="Oversigt over salg fra fieldmarketing events"
         rightContent={
           <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isExporting}>
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+              Excel
+            </Button>
             <DashboardDateRangePicker 
               dateRange={dateRange} 
               onDateRangeChange={handleDateRangeChange} 
