@@ -1,32 +1,22 @@
 
+# Sammenklappelig "Tidligere" sektion
 
-# Download Excel-knap til FM Dashboard
-
-## Hvad der bygges
-En "Download Excel"-knap i headeren paa Fieldmarketing Dashboard, der henter ALLE FM-salg fra databasen og genererer en Excel-fil direkte i browseren.
+## Hvad der aendres
+"Tidligere"-sektionen paa Kommende Opstarter-siden goeres sammenklappelig med Collapsible-komponenten, saa den er lukket som standard. Alle andre sektioner (I dag, I morgen, Denne uge, Kommende) vises som normalt.
 
 ## Implementering
 
-### 1. Tilfoej eksport-funktion i `FieldmarketingDashboardFull.tsx`
+### Fil: `src/pages/personnel/UpcomingStarts.tsx`
 
-- Importerer `xlsx` (allerede installeret i projektet)
-- Importerer `Download`-ikon fra `lucide-react`
-- Opretter en `handleExportExcel()` funktion der:
-  1. Henter alle salg fra `sales`-tabellen med `source = 'fieldmarketing'` via `fetchAllRows` (pagineret)
-  2. Joiner med `client_campaigns` og `clients` for klientnavne
-  3. Mapper data til laesbare kolonner: Dato, Saelger, Telefon, Produkt, Klient, Status, Kommentar
-  4. Genererer en `.xlsx`-fil med `xlsx.utils.json_to_sheet()` og trigger download
+1. Importerer `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` fra `@/components/ui/collapsible` og `ChevronRight`-ikonet fra `lucide-react`.
 
-### 2. Tilfoej knap i dashboard-headeren
+2. Tilfoej state: `const [pastOpen, setPastOpen] = useState(false)` - lukket som standard.
 
-- Placeres ved siden af dato-vaelgeren i `rightContent`
-- Bruger eksisterende `Button`-komponent med `variant="outline"` og `size="sm"`
-- Viser loading-spinner under download
+3. Aendrer renderingen af "Tidligere"-sektionen (linje 765) fra `renderSection("Tidligere", past)` til en dedicated Collapsible-blok:
+   - Header med "Tidligere" titel + badge med antal + chevron-ikon der roterer naar den er aaben
+   - Klikbar header-linje der toggler sektionen
+   - Indholdet (grid med cohort-kort) vises kun naar den er foldet ud
 
-### Tekniske detaljer
-
-- Bruger `fetchAllRows` for at omgaa 1000-raekke-graensen
-- Henter data on-demand (ikke cached) for at sikre friske data
-- Filtrerer IKKE paa klient - eksporterer alle FM-salg paa tvaers af klienter
-- Kolonner i Excel: Dato, Saelger, Telefonnummer, Produkt, Klient, Validering, Kommentar
-
+### Visuelt resultat
+- Lukket: En kompakt linje med "Tidligere (8)" og en pil
+- Aaben: Linjen udvides og viser alle tidligere hold i det samme grid-layout som foer
