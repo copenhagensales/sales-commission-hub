@@ -440,14 +440,12 @@ export default function CphSalesDashboard() {
         }
       }
       
-      // FM sales - use _clientName from mapped data
+      // FM sales - resolve client name via client_campaign_id (same as TM sales)
       for (const fmSale of (fmSales || [])) {
-        // FM sales now come from unified sales table with normalized client info
-        const clientName = (fmSale as any)._clientName || (fmSale as any).normalized_data?.client_name;
-        const clientLogo = (fmSale as any)._clientLogo;
+        const clientName = fmSale.client_campaign_id ? campaignClientMap[fmSale.client_campaign_id] || null : null;
         if (clientName) {
           if (!salesByClient[clientName]) {
-            salesByClient[clientName] = { count: 0, logoUrl: clientLogo || null };
+            salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
           }
           salesByClient[clientName].count += 1;
         }
