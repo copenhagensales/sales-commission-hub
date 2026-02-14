@@ -245,12 +245,30 @@ async function fetchAndCalculateClientSide(params: {
     ? "id, agent_email, sale_datetime, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))"
     : "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))";
 
-  const sales = await fetchAllRows<any>(
-    "sales",
-    selectFields,
-    filters,
-    { orderBy: "sale_datetime", ascending: false }
-  );
+  // Fetch sales and employee mapping in parallel
+  const [sales, mappingResult] = await Promise.all([
+    fetchAllRows<any>(
+      "sales",
+      selectFields,
+      filters,
+      { orderBy: "sale_datetime", ascending: false }
+    ),
+    groupBy.includes('employee')
+      ? supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agents!inner(email)")
+          .then(r => r.data || [])
+      : Promise.resolve([]),
+  ]);
+
+  // Build email -> employee_id lookup
+  const emailToEmployeeId: Record<string, string> = {};
+  for (const m of mappingResult as any[]) {
+    const email = m.agents?.email?.toLowerCase();
+    if (email && m.employee_id) {
+      emailToEmployeeId[email] = m.employee_id;
+    }
+  }
 
   // Filter by agent emails if specified
   const filteredSales = agentEmails && agentEmails.length > 0
@@ -273,12 +291,13 @@ async function fetchAndCalculateClientSide(params: {
 
   for (const sale of filteredSales) {
     const agentEmail = sale.agent_email || "unknown";
+    const employeeKey = emailToEmployeeId[agentEmail.toLowerCase()] || agentEmail;
     const saleDate = sale.sale_datetime?.split("T")[0] || "unknown";
     const date = new Date(saleDate);
 
     // Initialize groupings
-    if (groupBy.includes('employee') && !result.byEmployee[agentEmail]) {
-      result.byEmployee[agentEmail] = { 
+    if (groupBy.includes('employee') && !result.byEmployee[employeeKey]) {
+      result.byEmployee[employeeKey] = { 
         name: agentEmail.split("@")[0], 
         email: agentEmail,
         sales: 0, 
@@ -321,9 +340,9 @@ async function fetchAndCalculateClientSide(params: {
 
       // By employee
       if (groupBy.includes('employee')) {
-        if (countsAsSale) result.byEmployee[agentEmail].sales += qty;
-        result.byEmployee[agentEmail].commission += commission;
-        result.byEmployee[agentEmail].revenue += revenue;
+        if (countsAsSale) result.byEmployee[employeeKey].sales += qty;
+        result.byEmployee[employeeKey].commission += commission;
+        result.byEmployee[employeeKey].revenue += revenue;
       }
 
       // By date
