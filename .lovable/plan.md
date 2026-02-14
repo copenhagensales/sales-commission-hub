@@ -1,22 +1,27 @@
 
-# Sammenklappelig "Tidligere" sektion
+# Fix: DB Oversigt viser alle nuller
 
-## Hvad der aendres
-"Tidligere"-sektionen paa Kommende Opstarter-siden goeres sammenklappelig med Collapsible-komponenten, saa den er lukket som standard. Alle andre sektioner (I dag, I morgen, Denne uge, Kommende) vises som normalt.
+## Problem
+`DBOverviewTab` slaar medarbejdere op med deres **employee UUID** (`aggregatesByEmployee[employeeId]`), men salgsdata fra aggregeringshooket er grupperet efter **agent email**. De matcher aldrig, saa alle vaerdier bliver 0.
 
-## Implementering
+## Loesning
+Opdater den server-side RPC-funktion (`get_sales_aggregates_v2`) til at returnere `employee_id` som group_key i stedet for `agent_email`, naar der grupperes efter medarbejder. RPC'en har allerede adgang til `eam.employee_id` via JOIN'et med `employee_agent_mapping`.
 
-### Fil: `src/pages/personnel/UpcomingStarts.tsx`
+Derudover opdateres client-side fallback-logikken i `useSalesAggregatesExtended.ts` til ogsaa at lave opslagning via employee_id.
 
-1. Importerer `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` fra `@/components/ui/collapsible` og `ChevronRight`-ikonet fra `lucide-react`.
+## Aendringer
 
-2. Tilfoej state: `const [pastOpen, setPastOpen] = useState(false)` - lukket som standard.
+### 1. Database-migration: Opdater RPC `get_sales_aggregates_v2`
+- Aendre `group_key` for 'employee' og 'both' fra `agent_email` til `COALESCE(eam.employee_id::TEXT, agent_email)`
+- `group_name` beholdes som foer (baseret paa email/navn)
+- Dette sikrer at `byEmployee` indekseres med employee UUID, som `DBOverviewTab` forventer
 
-3. Aendrer renderingen af "Tidligere"-sektionen (linje 765) fra `renderSection("Tidligere", past)` til en dedicated Collapsible-blok:
-   - Header med "Tidligere" titel + badge med antal + chevron-ikon der roterer naar den er aaben
-   - Klikbar header-linje der toggler sektionen
-   - Indholdet (grid med cohort-kort) vises kun naar den er foldet ud
+### 2. Opdater client-side fallback i `useSalesAggregatesExtended.ts`
+- I fallback-funktionen (`fetchAndCalculateClientSide`): hent `employee_agent_mapping` for at mappe agent_email -> employee_id
+- Indekser `byEmployee` med employee_id i stedet for email
+- Sikrer konsistens mellem RPC- og fallback-kodevejene
 
-### Visuelt resultat
-- Lukket: En kompakt linje med "Tidligere (8)" og en pil
-- Aaben: Linjen udvides og viser alle tidligere hold i det samme grid-layout som foer
+### Tekniske detaljer
+- RPC'en JOINer allerede `employee_agent_mapping`, saa `eam.employee_id` er tilgaengelig uden ekstra JOINs
+- `COALESCE` sikrer at salg uden employee-mapping stadig vises (med email som fallback)
+- Ingen aendringer i `DBOverviewTab.tsx` er noedvendige - den bruger allerede korrekt employee UUID
