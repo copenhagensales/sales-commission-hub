@@ -4,7 +4,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
 import {
   AlertDialog,
@@ -109,6 +110,7 @@ export default function UpcomingStarts() {
     start_time: string | null;
     max_capacity: number | null;
   } | null>(null);
+  const [pastOpen, setPastOpen] = useState(false);
   const p = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -762,7 +764,24 @@ export default function UpcomingStarts() {
             {renderSection("I morgen", tomorrow)}
             {renderSection("Denne uge", thisWeek)}
             {renderSection("Kommende", upcoming)}
-            {renderSection("Tidligere", past)}
+            {past.length > 0 && (
+              <Collapsible open={pastOpen} onOpenChange={setPastOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 cursor-pointer w-full">
+                  <ChevronRight className={`h-5 w-5 transition-transform ${pastOpen ? "rotate-90" : ""}`} />
+                  <h2 className="text-lg font-semibold">
+                    Tidligere
+                    <Badge variant="secondary" className="ml-2">
+                      {past.length}
+                    </Badge>
+                  </h2>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {past.map(renderCohortCard)}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
         )}
       </div>
