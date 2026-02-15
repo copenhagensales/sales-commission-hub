@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Ban, Minus } from "lucide-react";
+import { Loader2, Ban, Minus, ThumbsDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,7 @@ interface CancellationDialogProps {
 
 export function CancellationDialog({ saleId, open, onClose }: CancellationDialogProps) {
   const queryClient = useQueryClient();
-  const [confirmItemId, setConfirmItemId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ itemId: string; type: "cancel" | "reject" } | null>(null);
 
   const { data: saleItems = [], isLoading } = useQuery({
     queryKey: ["sale-items-for-cancellation", saleId],
@@ -58,24 +58,45 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
     enabled: !!saleId && open,
   });
 
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["sale-items-for-cancellation", saleId] });
+    queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
+  };
+
   const cancelOneUnitMutation = useMutation({
     mutationFn: async (item: { id: string; quantity: number; cancelled_quantity: number }) => {
       const newCancelled = (item.cancelled_quantity ?? 0) + 1;
       const fullyDone = newCancelled >= (item.quantity ?? 1);
       const { error } = await supabase
         .from("sale_items")
-        .update({
-          cancelled_quantity: newCancelled,
-          is_cancelled: fullyDone,
-        })
+        .update({ cancelled_quantity: newCancelled, is_cancelled: fullyDone })
         .eq("id", item.id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "1 stk annulleret", description: "Produktet er delvist annulleret." });
-      queryClient.invalidateQueries({ queryKey: ["sale-items-for-cancellation", saleId] });
-      queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
-      setConfirmItemId(null);
+      invalidateQueries();
+      setConfirmAction(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const rejectOneUnitMutation = useMutation({
+    mutationFn: async (item: { id: string; quantity: number; cancelled_quantity: number }) => {
+      const newCancelled = (item.cancelled_quantity ?? 0) + 1;
+      const fullyDone = newCancelled >= (item.quantity ?? 1);
+      const { error } = await supabase
+        .from("sale_items")
+        .update({ cancelled_quantity: newCancelled, is_cancelled: fullyDone })
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "1 stk afvist", description: "Produktet er delvist afvist." });
+      invalidateQueries();
+      setConfirmAction(null);
     },
     onError: (error: Error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -91,22 +112,44 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
         .eq("id", saleId);
       if (salesError) throw salesError;
 
-      // Set each item's cancelled_quantity = quantity and is_cancelled = true
       for (const item of saleItems) {
         const { error } = await supabase
           .from("sale_items")
-          .update({
-            cancelled_quantity: item.quantity ?? 1,
-            is_cancelled: true,
-          })
+          .update({ cancelled_quantity: item.quantity ?? 1, is_cancelled: true })
           .eq("id", item.id);
         if (error) throw error;
       }
     },
     onSuccess: () => {
       toast({ title: "Salg annulleret", description: "Hele salget og alle produkter er annulleret." });
-      queryClient.invalidateQueries({ queryKey: ["sale-items-for-cancellation", saleId] });
-      queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
+      invalidateQueries();
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const rejectAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!saleId) return;
+      const { error: salesError } = await supabase
+        .from("sales")
+        .update({ validation_status: "rejected" })
+        .eq("id", saleId);
+      if (salesError) throw salesError;
+
+      for (const item of saleItems) {
+        const { error } = await supabase
+          .from("sale_items")
+          .update({ cancelled_quantity: item.quantity ?? 1, is_cancelled: true })
+          .eq("id", item.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Salg afvist", description: "Hele salget og alle produkter er afvist." });
+      invalidateQueries();
       onClose();
     },
     onError: (error: Error) => {
@@ -115,7 +158,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
   });
 
   const allCancelled = saleItems.length > 0 && saleItems.every((item) => item.is_cancelled);
-  const isPending = cancelOneUnitMutation.isPending || cancelAllMutation.isPending;
+  const isPending = cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending || cancelAllMutation.isPending || rejectAllMutation.isPending;
 
   const formatCommission = (value: number | null) => {
     if (value == null) return "-";
@@ -128,7 +171,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
         <DialogHeader>
           <DialogTitle>Produkter i salget</DialogTitle>
           <DialogDescription>
-            Annuller hele salget eller udvalgte produkter (1 stk ad gangen)
+            Annuller eller afvis hele salget eller udvalgte produkter (1 stk ad gangen)
           </DialogDescription>
         </DialogHeader>
 
@@ -187,34 +230,45 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
                       </TableCell>
                       <TableCell className="text-right">
                         {!fullyDone && (
-                          confirmItemId === item.id ? (
+                          confirmAction?.itemId === item.id ? (
                             <div className="flex items-center gap-1 justify-end">
                               <Button
                                 variant="destructive"
                                 size="sm"
                                 disabled={isPending}
-                                onClick={() => cancelOneUnitMutation.mutate({
-                                  id: item.id,
-                                  quantity: qty,
-                                  cancelled_quantity: cancelled,
-                                })}
+                                onClick={() => {
+                                  const mutate = confirmAction.type === "cancel" ? cancelOneUnitMutation : rejectOneUnitMutation;
+                                  mutate.mutate({ id: item.id, quantity: qty, cancelled_quantity: cancelled });
+                                }}
                               >
-                                {cancelOneUnitMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bekræft"}
+                                {(cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bekræft"}
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setConfirmItemId(null)}>
+                              <Button variant="ghost" size="sm" onClick={() => setConfirmAction(null)}>
                                 Fortryd
                               </Button>
                             </div>
                           ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isPending}
-                              onClick={() => setConfirmItemId(item.id)}
-                            >
-                              <Minus className="h-3 w-3 mr-1" />
-                              Annuller 1 stk
-                            </Button>
+                            <div className="flex items-center gap-1 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isPending}
+                                onClick={() => setConfirmAction({ itemId: item.id, type: "cancel" })}
+                              >
+                                <Minus className="h-3 w-3 mr-1" />
+                                Annuller 1
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isPending}
+                                onClick={() => setConfirmAction({ itemId: item.id, type: "reject" })}
+                                className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                              >
+                                <ThumbsDown className="h-3 w-3 mr-1" />
+                                Afvis 1
+                              </Button>
+                            </div>
                           )
                         )}
                       </TableCell>
@@ -231,31 +285,59 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
             Luk
           </Button>
           {saleItems.length > 0 && !allCancelled && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isPending}>
-                  <Ban className="h-4 w-4 mr-1" />
-                  Annuller hele salget
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Bekræft annullering af hele salget</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Er du sikker på at du vil annullere hele salget og alle tilhørende produkter? Denne handling kan ikke fortrydes.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Fortryd</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => cancelAllMutation.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Ja, annuller hele salget
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={isPending}>
+                    <Ban className="h-4 w-4 mr-1" />
+                    Annuller hele salget
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Bekræft annullering af hele salget</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Er du sikker på at du vil annullere hele salget og alle tilhørende produkter? Denne handling kan ikke fortrydes.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Fortryd</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => cancelAllMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Ja, annuller hele salget
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={isPending} className="text-destructive border-destructive/50 hover:bg-destructive/10">
+                    <ThumbsDown className="h-4 w-4 mr-1" />
+                    Afvis hele salget
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Bekræft afvisning af hele salget</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Er du sikker på at du vil afvise hele salget og alle tilhørende produkter? Denne handling kan ikke fortrydes.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Fortryd</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => rejectAllMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Ja, afvis hele salget
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

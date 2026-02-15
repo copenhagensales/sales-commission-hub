@@ -208,7 +208,7 @@ export function ManualCancellationsTab() {
                       onClick={() => setSelectedSaleId(sale.id)}
                     >
                       <X className="h-4 w-4 mr-1" />
-                      Annuller
+                      Annuller/afvis
                     </Button>
                   </TableCell>
                 </TableRow>
