@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ManualCancellationsTab } from "@/components/cancellations/ManualCancellationsTab";
 import { UploadCancellationsTab } from "@/components/cancellations/UploadCancellationsTab";
+import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function Cancellations() {
@@ -15,15 +16,19 @@ export default function Cancellations() {
         </div>
 
         <Tabs defaultValue="manual" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="manual">Annuller/afvis</TabsTrigger>
-            <TabsTrigger value="upload">Upload/match annulleringer</TabsTrigger>
+            <TabsTrigger value="upload">Upload/match</TabsTrigger>
+            <TabsTrigger value="duplicates">Dubletter</TabsTrigger>
           </TabsList>
           <TabsContent value="manual" className="mt-6">
             <ManualCancellationsTab />
           </TabsContent>
           <TabsContent value="upload" className="mt-6">
             <UploadCancellationsTab />
+          </TabsContent>
+          <TabsContent value="duplicates" className="mt-6">
+            <DuplicatesTab />
           </TabsContent>
         </Tabs>
       </div>
