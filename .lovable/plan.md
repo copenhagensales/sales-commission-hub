@@ -1,74 +1,133 @@
 
 
-# Udfyld FM sale_items med korrekte provisioner
+# Fix: Direkte FM-queries uden pagination (1000-rækkers grænse)
 
-## Status efter forrige aendring
-- 3.487 FM sale_items er oprettet med `mapped_commission = 0` og `mapped_revenue = 0`
-- Alle FM produktnavne matcher korrekt mod `products`-tabellen (0 ukendte)
-- `product_id` er NULL paa alle FM sale_items (ingen FK-kobling)
+## Fund
 
-## Verificerede fund
+Følgende 8 steder bruger direkte `supabase.from("sales")` med FM-filter UDEN `fetchAllRows`, og risikerer at miste data ved 1000+ rækker:
 
-### Provision (commission) - INGEN dobbelt-taelling risiko
-De tre `commission`-cases i `useDashboardKpiData.ts` (linje 420, 586, 1160) summerer `mapped_commission` fra `sale_items` UDEN FM-eksklusion og UDEN at tilfoeje FM provision separat. Det betyder:
-- **Nu**: FM provision mangler helt fra disse beregninger (vaerdi = 0)
-- **Efter opdatering**: FM provision inkluderes korrekt via sale_items
-- **Ingen dobbelt-taelling**, da der ikke er separat FM-addition i disse cases
+| # | Fil | Linje | Beskrivelse | Risiko |
+|---|-----|-------|-------------|--------|
+| 1 | `src/pages/reports/DailyReports.tsx` | 333 | FM-sælger lookup (raw_payload) | HOJ - alle FM-salg i perioden |
+| 2 | `src/pages/reports/DailyReports.tsx` | 653 | Hoved FM-salgs query | HOJ - alle FM-salg i perioden |
+| 3 | `src/pages/dashboards/CphSalesDashboard.tsx` | 411 | FM sales for "Salg per opgave" | HOJ - en måneds FM-salg |
+| 4 | `src/pages/dashboards/CphSalesDashboard.tsx` | 814 | FM sales for team performance | HOJ - en måneds FM-salg |
+| 5 | `src/pages/vagt-flow/FieldmarketingDashboard.tsx` | 113 | Måneds-sælger stats | MIDDEL - filtreret på klient |
+| 6 | `src/pages/vagt-flow/FieldmarketingDashboard.tsx` | 163 | Dags-sælger stats | LAV - kun en dag |
+| 7 | `src/hooks/useKpiTest.ts` | 351-362 | FM commission beregning | MIDDEL - test/debug tool |
+| 8 | `src/hooks/useKpiTest.ts` | 499-510 | FM revenue beregning | MIDDEL - test/debug tool |
 
-Filer der allerede er beskyttet (har FM-eksklusion + separat FM-addition):
-- `useKpiTest.ts` (linje 466: `source=neq.fieldmarketing` + separat FM beregning)
-- `FormulaLiveTest.tsx` (linje 466: `source=neq.fieldmarketing`)
-- `useSalesAggregates.ts` (linje 81: `.neq("source", "fieldmarketing")`)
-
-### Revenue - neutral
-Revenue-casen (linje 607-625) bruger `products(revenue_dkk)` via FK-join. FM sale_items har `product_id = NULL`, saa de returnerer 0 revenue. At opdatere `mapped_revenue` aendrer ikke denne query, da den ikke laeser `mapped_revenue`. Sikkert.
+### Allerede sikre (bruger fetchAllRows eller count-only):
+- `EditSalesRegistrations.tsx` (linje 137) - bruger `fetchAllRows` KORREKT
+- `useDashboardSalesData.ts` (linje 307) - bruger `fetchAllRows` KORREKT
+- `useFieldmarketingSales.ts` (linje 154) - bruger `count: "exact", head: true` (ingen data)
+- `useKpiTest.ts` (linje 202) - bruger `count: "exact"` (ingen data)
+- `MyProfile.tsx` (linje 739, 749) - filtreret på enkelt sælger, aldrig 1000+
 
 ## Plan
 
-### Trin 1: SQL-opdatering af eksisterende FM sale_items
-Opdater alle 3.487 raekker med korrekt provision og omsaetning baseret paa produktnavn-match:
+### Fil 1: `src/pages/reports/DailyReports.tsx` (2 steder)
 
-```sql
-UPDATE sale_items si
-SET 
-  mapped_commission = COALESCE(pr.commission_dkk, p.commission_dkk, 0),
-  mapped_revenue = COALESCE(pr.revenue_dkk, p.revenue_dkk, 0)
-FROM sales s
-JOIN products p ON LOWER(p.name) = LOWER(si.display_name)
-LEFT JOIN LATERAL (
-  SELECT commission_dkk, revenue_dkk
-  FROM product_pricing_rules
-  WHERE product_id = p.id
-    AND is_active = true
-    AND (campaign_mapping_ids IS NULL OR campaign_mapping_ids = '{}')
-  ORDER BY priority DESC
-  LIMIT 1
-) pr ON true
-WHERE si.sale_id = s.id
-  AND s.source = 'fieldmarketing'
-  AND si.mapped_commission = 0;
+**Linje 333-338**: Erstat direkte query med `fetchAllRows`:
+```typescript
+const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
+  "sales", "raw_payload",
+  (q) => q.eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${startStr}T00:00:00`)
+    .lte("sale_datetime", `${endStr}T23:59:59`),
+  { orderBy: "sale_datetime", ascending: false }
+);
 ```
 
-### Trin 2: Opdater useCreateFieldmarketingSale hook
-**Fil: `src/hooks/useFieldmarketingSales.ts`**
+**Linje 653-666**: Erstat direkte query med `fetchAllRows`:
+```typescript
+const rawFmSalesData = await fetchAllRows<{
+  id: string; agent_name: string; sale_datetime: string;
+  raw_payload: any; client_campaign_id: string | null;
+}>(
+  "sales",
+  "id, agent_name, sale_datetime, raw_payload, client_campaign_id",
+  (q) => q.eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${startStr}T00:00:00`)
+    .lte("sale_datetime", `${endStr}T23:59:59`),
+  { orderBy: "sale_datetime", ascending: false }
+);
+```
 
-Importer `buildFmPricingMap` fra `fmPricing.ts` og brug den til at slaa korrekte provisioner op naar nye sale_items oprettes (i stedet for hardcoded 0).
+### Fil 2: `src/pages/dashboards/CphSalesDashboard.tsx` (2 steder)
 
-### Trin 3: Opdater EditSalesRegistrations
-**Fil: `src/pages/vagt-flow/EditSalesRegistrations.tsx`**
+**Linje 411-418**: Erstat med `fetchAllRows`:
+```typescript
+const fmSales = await fetchAllRows<{
+  id: string; agent_name: string; normalized_data: any;
+  sale_datetime: string; client_campaign_id: string | null;
+}>(
+  "sales",
+  "id, agent_name, normalized_data, sale_datetime, client_campaign_id",
+  (q) => q.eq("source", "fieldmarketing")
+    .gte("sale_datetime", startOfPeriod)
+    .lte("sale_datetime", endOfPeriod),
+  { orderBy: "sale_datetime", ascending: false }
+);
+```
 
-Ved aendring af produktnavn (baade enkelt- og gruppe-redigering), slaa ny provision/omsaetning op via `buildFmPricingMap` og opdater `mapped_commission`/`mapped_revenue` i sale_items.
+**Linje 814-819**: Erstat med `fetchAllRows`:
+```typescript
+const fmSalesData = await fetchAllRows<{
+  id: string; agent_name: string; raw_payload: any; sale_datetime: string;
+}>(
+  "sales",
+  "id, agent_name, raw_payload, sale_datetime",
+  (q) => q.eq("source", "fieldmarketing")
+    .gte("sale_datetime", `${monthStart}T00:00:00`)
+    .lte("sale_datetime", `${todayStr}T23:59:59`),
+  { orderBy: "sale_datetime", ascending: false }
+);
+```
 
-## Samlet aendringsoversigt
+### Fil 3: `src/pages/vagt-flow/FieldmarketingDashboard.tsx` (2 steder)
 
-| Komponent | Aendring |
-|-----------|----------|
-| SQL data-opdatering | UPDATE 3.487 FM sale_items med korrekte provisioner |
-| `useFieldmarketingSales.ts` | Brug `buildFmPricingMap()` ved oprettelse af sale_items |
-| `EditSalesRegistrations.tsx` | Brug `buildFmPricingMap()` ved redigering af sale_items |
+**Linje 113-122**: Erstat måneds-query med `fetchAllRows`:
+```typescript
+const monthSales = await fetchAllRows<{
+  agent_name: string; raw_payload: any; sale_datetime: string;
+}>(
+  "sales",
+  "agent_name, raw_payload, sale_datetime",
+  (q) => q.eq("source", "fieldmarketing")
+    .contains("raw_payload", { fm_client_id: clientId })
+    .gte("sale_datetime", monthStart),
+  { orderBy: "sale_datetime", ascending: false }
+);
+```
 
-## Hvad aendres IKKE
-- Ingen nye filtre nødvendige (provision-queries er allerede korrekte)
-- `raw_payload` forbliver intakt
-- Dashboard-logik uaendret
-- Revenue-beregninger upaavirkede
+**Linje 163-173**: Erstat dags-query med `fetchAllRows` (for konsistens):
+```typescript
+const daySales = await fetchAllRows<{
+  agent_name: string; raw_payload: any; sale_datetime: string;
+}>(
+  "sales",
+  "agent_name, raw_payload, sale_datetime",
+  (q) => q.eq("source", "fieldmarketing")
+    .contains("raw_payload", { fm_client_id: clientId })
+    .gte("sale_datetime", dayStart)
+    .lte("sale_datetime", dayEnd),
+  { orderBy: "sale_datetime", ascending: false }
+);
+```
+
+### Fil 4: `src/hooks/useKpiTest.ts` (2 steder)
+
+**Linje 351-362**: FM commission query - erstat med `fetchAllRows`
+**Linje 499-510**: FM revenue query - erstat med `fetchAllRows`
+
+## Samlet oversigt
+
+| Fil | Antal ændringer |
+|-----|----------------|
+| `DailyReports.tsx` | 2 queries -> `fetchAllRows` |
+| `CphSalesDashboard.tsx` | 2 queries -> `fetchAllRows` |
+| `FieldmarketingDashboard.tsx` | 2 queries -> `fetchAllRows` |
+| `useKpiTest.ts` | 2 queries -> `fetchAllRows` |
+
+**Total: 8 queries opdateres til pagineret fetch**
