@@ -1,30 +1,108 @@
 
 
-# Tilføj medarbejder-filter til Dubletter-fanen
+# Fratræk kun afviste (rejected) salg fra alle viste tal i systemet
 
-## Hvad ændres
+## Overblik
 
-En ny dropdown "Vælg medarbejder" tilføjes i filter-rækken. Dropdown'en viser **kun medarbejdere der optræder i dublet-grupper**, så man ikke kan vælge nogen uden resultater.
-
-## Teknisk tilgang (1 fil: `DuplicatesTab.tsx`)
-
-1. **Ny state**: `selectedAgent` (string, default `""` = alle)
-
-2. **Beregn medarbejderliste fra `duplicateGroups`**: En `useMemo` der scanner alle dublet-grupper og samler unikke `agent_name`-værdier. Kun navne der faktisk optræder i dubletter vises i dropdown'en.
-
-3. **Filtrer visningen**: De viste `duplicateGroups` filtreres med endnu en `useMemo` - hvis en medarbejder er valgt, vises kun grupper hvor mindst ét salg har den valgte `agent_name`.
-
-4. **UI**: Grid ændres fra `md:grid-cols-3` til `md:grid-cols-4` for at rumme den nye dropdown. Dropdown'en viser "Alle medarbejdere" som default plus de dynamiske navne, sorteret alfabetisk.
-
-5. **Reset**: Når kunde eller datofiltre ændres, nulstilles `selectedAgent` automatisk (da medarbejderlisten kan ændre sig).
+Alle steder i systemet der henter og viser salgstal, provision og omsætning skal filtrere `rejected` salg fra. I dag mangler dette filter mange steder, og andre steder filtrerer det fejlagtigt også `cancelled` salg fra.
 
 ## Ændringer
 
-- Tilføj `selectedAgent` state
-- Tilføj `agentsWithDuplicates` useMemo (udled fra `duplicateGroups`)
-- Tilføj `filteredGroups` useMemo (filter `duplicateGroups` baseret på `selectedAgent`)
-- Opdater grid layout til 4 kolonner
-- Tilføj Select-komponent for medarbejder
-- Brug `filteredGroups` i stedet for `duplicateGroups` i rendering og summary-beregning
-- Nulstil `selectedAgent` når `selectedClientId`, `dateFrom` eller `dateTo` ændres
+### 1. SQL RPC-funktioner (database-migration)
+
+**`get_sales_aggregates` (v1)** -- Linje 48:
+- Fra: `NOT IN ('cancelled', 'rejected')`
+- Til: `!= 'rejected'`
+
+**`get_sales_aggregates_v2`** -- Linje 47:
+- Fra: `NOT IN ('cancelled', 'rejected')`
+- Til: `!= 'rejected'`
+
+---
+
+### 2. Frontend hooks (client-side fallback queries)
+
+**`src/hooks/useSalesAggregates.ts`** -- fallback query:
+- Tilfoej `.neq("validation_status", "rejected")` til filteret
+
+**`src/hooks/useSalesAggregatesExtended.ts`** -- `fetchAndCalculateClientSide`:
+- Tilfoej `.neq("validation_status", "rejected")` til filteret
+
+**`src/hooks/useDashboardKpiData.ts`** -- 3 steder (linje ~447, ~595, ~1190):
+- Fjern `.not("sales.validation_status", "eq", "cancelled")` (behold kun `rejected`-filteret)
+
+---
+
+### 3. Frontend sider (direkte sales-queries)
+
+**`src/pages/CsTop20Dashboard.tsx`** (~linje 112):
+- Tilfoej `.neq("validation_status", "rejected")` til custom leaderboard query
+
+**`src/pages/UnitedDashboard.tsx`** (~linje 184-204):
+- Tilfoej `.neq("validation_status", "rejected")` til alle tre period-queries (today, week, month)
+
+**`src/pages/dashboards/CphSalesDashboard.tsx`** (~linje 242 og ~305):
+- Tilfoej `.neq("validation_status", "rejected")` til today-sales og FM-sales queries
+
+**`src/components/dashboard/DailyRevenueChart.tsx`** (~linje 30 og ~144):
+- Tilfoej `.neq("validation_status", "rejected")` til begge paginated sales-queries
+
+**`src/components/home/HeadToHeadComparison.tsx`** (~linje 506):
+- Tilfoej `.neq("validation_status", "rejected")` til head-to-head sales query
+
+**`src/components/sales/SalesFeed.tsx`** (~linje 246):
+- Tilfoej `.neq("validation_status", "rejected")` til sales feed query (saa rejected salg ikke vises i feed)
+
+**`src/components/my-profile/SalesGoalTracker.tsx`** (~linje 154):
+- Tilfoej `.not("sales.validation_status", "eq", "rejected")` til sale_items inner-join query
+
+**`src/pages/ImmediatePaymentASE.tsx`** (~linje 280):
+- Tilfoej `.neq("validation_status", "rejected")` til ASE immediate payment query
+
+**`src/pages/shift-planning/ShiftOverview.tsx`** (~linje 213):
+- Tilfoej `rejected`-udelukkelse til weekly sales query (opdater `or`-filter)
+
+---
+
+### 4. Edge functions (backend KPI og dashboard beregninger)
+
+**`supabase/functions/calculate-kpi-values/index.ts`** -- 7 steder:
+- `fetchAllSaleIds` (~linje 176): tilfoej `.neq("validation_status", "rejected")`
+- `fetchAllSalesWithItemsForEmployeeKpi` (~linje 212): tilfoej filter
+- FM sales fetch (~linje 537): tilfoej filter
+- `fetchAllSalesWithItems` leaderboard (~linje 1009): tilfoej filter
+- `fetchFmSalesForPeriod` (~linje 1057): tilfoej filter
+- `calculateSalesCount` (~linje 1668 og 1707): tilfoej filter paa sale_items via join og FM count
+- `calculateTotalCommission` (~linje 1723 og 1741): tilfoej filter
+- `calculateTotalRevenue` (~linje 1765): tilfoej filter
+
+**`supabase/functions/calculate-kpi-incremental/index.ts`** -- 2 steder:
+- Telesales query (~linje 223): tilfoej `.neq("validation_status", "rejected")`
+- FM sales query (~linje 239): tilfoej `.neq("validation_status", "rejected")`
+
+**`supabase/functions/calculate-leaderboard-incremental/index.ts`** -- 2 steder:
+- `fetchAllSalesWithItems` (~linje 166): tilfoej `.neq("validation_status", "rejected")`
+- `fetchFmSalesForPeriod` (~linje 206): tilfoej `.neq("validation_status", "rejected")`
+
+**`supabase/functions/tv-dashboard-data/index.ts`** -- ~15 steder:
+- Alle `.from("sales")` queries i filen: tilfoej `.neq("validation_status", "rejected")`
+- Gaelder: CPH dashboard (~linje 59, 255, 290), team dashboard (~linje 677, 1090), CS Top 20 (~linje 2264-2330 alle period-queries)
+
+**`supabase/functions/league-calculate-standings/index.ts`** -- 2 steder:
+- Telesales query (~linje 183): tilfoej `.neq("validation_status", "rejected")`
+- FM sales query (~linje 211): tilfoej `.neq("validation_status", "rejected")`
+
+---
+
+### Resultat
+
+| Status | Taeller med? |
+|---|---|
+| `NULL` | Ja |
+| `pending` | Ja |
+| `approved` | Ja |
+| `cancelled` | Ja |
+| `rejected` | **Nej** -- fratrukket overalt |
+
+Alle viste tal i hele systemet (dashboards, TV-boards, KPI-cache, leaderboards, dagsrapporter, loenberegning, head-to-head, sales feed, salgsmaal) vil konsekvent udelukke afviste salg.
 
