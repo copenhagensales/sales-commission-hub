@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useCurrentEmployee } from "@/hooks/useShiftPlanning";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
+import { fetchAllRows } from "@/utils/supabasePagination";
 
 // Helper function to fetch employees with activity on a specific client
 // Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
@@ -40,12 +41,11 @@ async function fetchEmployeesWithClientActivity(clientId: string): Promise<strin
   });
   const agentEmails = (rpcEmails || []).map((r: any) => r.agent_email).filter(Boolean);
   
-  // Get FM seller IDs for this client from unified sales table
-  const fmRes = await fetch(
-    `${supabaseUrl}/rest/v1/sales?select=raw_payload&source=eq.fieldmarketing`,
-    { headers: { ...headers, Range: "0-9999" } }
+  // Get FM seller IDs for this client from unified sales table (paginated)
+  const fmData = await fetchAllRows<{ raw_payload: { fm_seller_id: string; fm_client_id: string } }>(
+    "sales", "raw_payload",
+    (q) => q.eq("source", "fieldmarketing")
   );
-  const fmData: { raw_payload: { fm_seller_id: string; fm_client_id: string } }[] = await fmRes.json();
   const fmDataFiltered = fmData.filter(d => d.raw_payload?.fm_client_id === clientId);
   const fmEmployeeIds = fmDataFiltered.map(s => s.raw_payload?.fm_seller_id).filter(Boolean);
   
@@ -306,12 +306,6 @@ export default function DailyReports() {
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
-      // Get user's auth token for RLS-protected tables like sales
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || supabaseKey;
       let employeeIds: string[] = [];
       let filteredEmployees: any[] = [];
       let agentMappings: any[] = [];
@@ -319,12 +313,14 @@ export default function DailyReports() {
       // When a specific client is selected, find employees who have sales for that client
       // This handles employees without team assignments
       if (selectedClient !== "all") {
-        // First, fetch all sales for this client in the date range to get agent emails
-        const salesForClientUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${selectedClient}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-        const salesForClientRes = await fetch(salesForClientUrl, {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${authToken}`, Range: "0-9999" }
-        });
-        const salesForClient = await salesForClientRes.json();
+        // First, fetch all sales for this client in the date range to get agent emails (paginated)
+        const salesForClient = await fetchAllRows<{ agent_email: string }>(
+          "sales", "agent_email, client_campaigns!inner(client_id)",
+          (q) => q
+            .eq("client_campaigns.client_id", selectedClient)
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`)
+        );
         
         // Get unique agent emails from these sales
         const agentEmails = [...new Set(
@@ -552,47 +548,31 @@ export default function DailyReports() {
           .map(e => e.toLowerCase());
         
         if (emailIdentifiers.length > 0) {
-          // Use REST API directly to support dynamic !inner join for client filtering
+          // Use fetchAllRows with dynamic !inner join for client filtering (paginated)
           const joinType = selectedClient !== "all" ? "!inner" : "";
+          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))`;
           
-          // Build query - include dialer_campaign_id and product_id for campaign override lookup
-          const selectParts = [
-            "id", "agent_name", "agent_email", "sale_datetime", "client_campaign_id", "dialer_campaign_id",
-            `client_campaigns${joinType}(client_id)`,
-            "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))"
-          ];
-          const selectClause = selectParts.join(",");
-          // Use eq for exact match (case-insensitive handled by lowercasing both sides)
-          // The agent_email in sales is stored in various cases, so match lowercase
-          const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
+          const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
           
-          // Build URL without encoding the select clause (PostgREST needs literal !inner)
-          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
-          salesUrl += `&or=(${emailOrFilter})`;
-          salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-          
-          if (selectedClient !== "all") {
-            salesUrl += `&client_campaigns.client_id=eq.${selectedClient}`;
-          }
-          
-          console.log("[DailyReport] Sales URL:", salesUrl);
-          
-          const salesRes = await fetch(salesUrl, {
-            headers: { 
-              apikey: supabaseKey, 
-              Authorization: `Bearer ${authToken}`,
-              Accept: "application/json",
-              Range: "0-9999"
-            }
-          });
-          
-          if (!salesRes.ok) {
-            console.error("[DailyReport] Sales fetch failed:", salesRes.status, await salesRes.text());
+          try {
+            salesData = await fetchAllRows(
+              "sales", selectClause,
+              (q) => {
+                let query = q
+                  .or(emailOrFilter)
+                  .gte("sale_datetime", `${startStr}T00:00:00`)
+                  .lte("sale_datetime", `${endStr}T23:59:59`);
+                if (selectedClient !== "all") {
+                  query = query.eq("client_campaigns.client_id", selectedClient);
+                }
+                return query;
+              }
+            );
+          } catch (err) {
+            console.error("[DailyReport] Sales fetch failed:", err);
             salesData = [];
-          } else {
-            salesData = await salesRes.json();
           }
-          console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_email, items: s.sale_items?.length })));
+          console.log("[DailyReport] Sales fetched:", salesData.length);
         }
       }
       
