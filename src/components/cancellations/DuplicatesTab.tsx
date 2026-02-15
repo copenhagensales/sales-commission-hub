@@ -82,6 +82,7 @@ export function DuplicatesTab() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   
+  const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -176,9 +177,28 @@ export function DuplicatesTab() {
     return groups;
   }, [sales]);
 
+  // Agents that appear in duplicate groups
+  const agentsWithDuplicates = useMemo(() => {
+    const names = new Set<string>();
+    for (const group of duplicateGroups) {
+      for (const sale of group.sales) {
+        if (sale.agent_name) names.add(sale.agent_name);
+      }
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "da"));
+  }, [duplicateGroups]);
+
+  // Filter groups by selected agent
+  const filteredGroups = useMemo(() => {
+    if (!selectedAgent) return duplicateGroups;
+    return duplicateGroups.filter((g) =>
+      g.sales.some((s) => s.agent_name === selectedAgent)
+    );
+  }, [duplicateGroups, selectedAgent]);
+
   const totalSalesInvolved = useMemo(
-    () => duplicateGroups.reduce((sum, g) => sum + g.sales.length, 0),
-    [duplicateGroups]
+    () => filteredGroups.reduce((sum, g) => sum + g.sales.length, 0),
+    [filteredGroups]
   );
 
   const toggleGroup = (key: string) => {
@@ -193,10 +213,10 @@ export function DuplicatesTab() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label>Vælg kunde</Label>
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedAgent(""); }}>
             <SelectTrigger>
               <SelectValue placeholder="Vælg en kunde..." />
             </SelectTrigger>
@@ -221,7 +241,7 @@ export function DuplicatesTab() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="pointer-events-auto" locale={da} />
+              <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setSelectedAgent(""); }} initialFocus className="pointer-events-auto" locale={da} />
             </PopoverContent>
           </Popover>
         </div>
@@ -236,11 +256,27 @@ export function DuplicatesTab() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="pointer-events-auto" locale={da} />
+              <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setSelectedAgent(""); }} initialFocus className="pointer-events-auto" locale={da} />
             </PopoverContent>
           </Popover>
         </div>
 
+        <div className="space-y-2">
+          <Label>Vælg medarbejder</Label>
+          <Select value={selectedAgent || "all"} onValueChange={(v) => setSelectedAgent(v === "all" ? "" : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Alle medarbejdere" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle medarbejdere</SelectItem>
+              {agentsWithDuplicates.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Summary + Results */}
@@ -253,7 +289,7 @@ export function DuplicatesTab() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : duplicateGroups.length === 0 ? (
+      ) : filteredGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <p>Ingen dubletter fundet med de valgte filtre</p>
         </div>
@@ -263,7 +299,7 @@ export function DuplicatesTab() {
           <div className="flex gap-4">
             <div className="rounded-lg border bg-card p-4 flex-1">
               <p className="text-sm text-muted-foreground">Dublet-grupper</p>
-              <p className="text-2xl font-bold">{duplicateGroups.length}</p>
+              <p className="text-2xl font-bold">{filteredGroups.length}</p>
             </div>
             <div className="rounded-lg border bg-card p-4 flex-1">
               <p className="text-sm text-muted-foreground">Salg involveret</p>
@@ -273,7 +309,7 @@ export function DuplicatesTab() {
 
           {/* Grouped results */}
           <div className="space-y-2">
-            {duplicateGroups.map((group) => {
+            {filteredGroups.map((group) => {
               const isOpen = openGroups.has(group.key);
               return (
                 <Collapsible key={group.key} open={isOpen} onOpenChange={() => toggleGroup(group.key)}>
