@@ -7475,6 +7475,7 @@ export type Database = {
         Row: {
           adversus_external_id: string | null
           adversus_product_title: string | null
+          cancelled_quantity: number
           created_at: string | null
           display_name: string | null
           id: string
@@ -7493,6 +7494,7 @@ export type Database = {
         Insert: {
           adversus_external_id?: string | null
           adversus_product_title?: string | null
+          cancelled_quantity?: number
           created_at?: string | null
           display_name?: string | null
           id?: string
@@ -7511,6 +7513,7 @@ export type Database = {
         Update: {
           adversus_external_id?: string | null
           adversus_product_title?: string | null
+          cancelled_quantity?: number
           created_at?: string | null
           display_name?: string | null
           id?: string
