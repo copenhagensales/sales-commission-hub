@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export function ManualCancellationsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   // Fetch clients
@@ -98,6 +99,21 @@ export function ManualCancellationsTab() {
     enabled: !!selectedClientId,
   });
 
+  // Unique agents from current results
+  const agentsInResults = useMemo(() => {
+    const names = new Set<string>();
+    for (const sale of sales) {
+      if (sale.agent_name) names.add(sale.agent_name);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "da"));
+  }, [sales]);
+
+  // Filter sales by selected agent
+  const filteredSales = useMemo(() => {
+    if (!selectedAgent) return sales;
+    return sales.filter((s) => s.agent_name === selectedAgent);
+  }, [sales, selectedAgent]);
+
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "approved":
@@ -116,10 +132,10 @@ export function ManualCancellationsTab() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="space-y-2">
           <Label htmlFor="client-select">Vælg kunde</Label>
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedAgent(""); }}>
             <SelectTrigger id="client-select">
               <SelectValue placeholder="Vælg en kunde..." />
             </SelectTrigger>
@@ -176,6 +192,22 @@ export function ManualCancellationsTab() {
             />
           </div>
         </div>
+        <div className="space-y-2">
+          <Label>Vælg medarbejder</Label>
+          <Select value={selectedAgent || "all"} onValueChange={(v) => setSelectedAgent(v === "all" ? "" : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Alle medarbejdere" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle medarbejdere</SelectItem>
+              {agentsInResults.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Results */}
@@ -188,7 +220,7 @@ export function ManualCancellationsTab() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : sales.length === 0 ? (
+      ) : filteredSales.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <p>Ingen salg fundet med de valgte filtre</p>
         </div>
@@ -206,7 +238,7 @@ export function ManualCancellationsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) => (
+              {filteredSales.map((sale) => (
                 <TableRow key={sale.id}>
                   <TableCell>
                     {sale.sale_datetime
@@ -234,7 +266,7 @@ export function ManualCancellationsTab() {
         </div>
       )}
 
-      {sales.length === 100 && (
+      {filteredSales.length === 100 && (
         <p className="text-sm text-muted-foreground text-center">
           Viser de første 100 resultater. Brug filtre for at indsnævre søgningen.
         </p>
