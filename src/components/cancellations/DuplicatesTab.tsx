@@ -100,22 +100,22 @@ export function DuplicatesTab() {
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["sales-for-duplicates", selectedClientId, dateFrom, dateTo],
     queryFn: async () => {
-      if (!selectedClientId) return [];
-
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .eq("client_id", selectedClientId);
-
-      const campaignIds = campaigns?.map((c) => c.id) || [];
-      if (campaignIds.length === 0) return [];
-
       let query = supabase
         .from("sales")
         .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload")
-        .in("client_campaign_id", campaignIds)
         .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false });
+
+      if (selectedClientId !== "all") {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", selectedClientId);
+
+        const campaignIds = campaigns?.map((c) => c.id) || [];
+        if (campaignIds.length === 0) return [];
+        query = query.in("client_campaign_id", campaignIds);
+      }
 
       if (dateFrom) query = query.gte("sale_datetime", format(dateFrom, "yyyy-MM-dd"));
       if (dateTo) query = query.lte("sale_datetime", format(dateTo, "yyyy-MM-dd") + "T23:59:59");
@@ -201,6 +201,7 @@ export function DuplicatesTab() {
               <SelectValue placeholder="Vælg en kunde..." />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">Alle kunder</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   {client.name}
