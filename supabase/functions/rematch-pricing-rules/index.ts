@@ -117,11 +117,9 @@ function matchPricingRule(
 
     // Date-based filtering: skip rules outside their validity window
     if (saleDateStr) {
-      // If rule has effective_from and sale date is before it, skip
       if (rule.effective_from && saleDateStr < rule.effective_from) {
         continue;
       }
-      // If rule has effective_to and sale date is on or after it, skip
       if (rule.effective_to && saleDateStr >= rule.effective_to) {
         continue;
       }
@@ -140,7 +138,6 @@ function matchPricingRule(
     const conditions = rule.conditions || {};
     const conditionKeys = Object.keys(conditions);
     let allConditionsMet = true;
-    let failedCondition: string | null = null;
 
     for (const [condKey, condValue] of Object.entries(conditions)) {
       const leadField = allFields.find((f) => f.label === condKey);
@@ -237,8 +234,7 @@ serve(async (req) => {
       // Otherwise, only process items without matched rule and zero commission
       query = query
         .is("matched_pricing_rule_id", null)
-        .not("product_id", "is", null)
-        .eq("mapped_commission", 0);
+        .not("product_id", "is", null);
     }
 
     if (source) {
