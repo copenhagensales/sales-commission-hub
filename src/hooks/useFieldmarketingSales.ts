@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
+import { buildFmPricingMap } from "@/lib/calculations/fmPricing";
 
 export interface FieldmarketingSale {
   id: string;
@@ -258,16 +259,21 @@ export function useCreateFieldmarketingSale() {
       }
       console.log("[FM-SALES] Insert successful!", insertedSales?.length, "rows");
 
-      // Create sale_items for each inserted sale
+      // Create sale_items for each inserted sale with correct pricing
       if (insertedSales && insertedSales.length > 0) {
-        const saleItems = insertedSales.map((inserted, idx) => ({
-          sale_id: inserted.id,
-          display_name: sales[idx]?.product_name || "Ukendt produkt",
-          adversus_product_title: sales[idx]?.product_name || "Ukendt produkt",
-          quantity: 1,
-          mapped_commission: 0,
-          mapped_revenue: 0,
-        }));
+        const pricingMap = await buildFmPricingMap();
+        const saleItems = insertedSales.map((inserted, idx) => {
+          const productName = sales[idx]?.product_name || "Ukendt produkt";
+          const pricing = pricingMap.get(productName.toLowerCase());
+          return {
+            sale_id: inserted.id,
+            display_name: productName,
+            adversus_product_title: productName,
+            quantity: 1,
+            mapped_commission: pricing?.commission ?? 0,
+            mapped_revenue: pricing?.revenue ?? 0,
+          };
+        });
         const { error: itemsError } = await supabase
           .from("sale_items")
           .insert(saleItems);
