@@ -408,14 +408,17 @@ export default function CphSalesDashboard() {
       }
       
       // Fetch FM sales for period from unified sales table
-      const { data: fmSales } = await supabase
-        .from("sales")
-        .select(`
-          id, agent_name, normalized_data, sale_datetime, client_campaign_id
-        `)
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", startOfPeriod)
-        .lte("sale_datetime", endOfPeriod);
+      const fmSales = await fetchAllRows<{
+        id: string; agent_name: string; normalized_data: any;
+        sale_datetime: string; client_campaign_id: string | null;
+      }>(
+        "sales",
+        "id, agent_name, normalized_data, sale_datetime, client_campaign_id",
+        (q) => q.eq("source", "fieldmarketing")
+          .gte("sale_datetime", startOfPeriod)
+          .lte("sale_datetime", endOfPeriod),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
       // Calculate sales by client
       const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
@@ -811,12 +814,16 @@ export default function CphSalesDashboard() {
 
       // ============ FIELDMARKETING SALES INTEGRATION ============
       // Fetch FM sales from unified sales table for the month and add to team totals
-      const { data: fmSalesData } = await supabase
-        .from("sales")
-        .select("id, agent_name, raw_payload, sale_datetime")
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${monthStart}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
+      const fmSalesData = await fetchAllRows<{
+        id: string; agent_name: string; raw_payload: any; sale_datetime: string;
+      }>(
+        "sales",
+        "id, agent_name, raw_payload, sale_datetime",
+        (q) => q.eq("source", "fieldmarketing")
+          .gte("sale_datetime", `${monthStart}T00:00:00`)
+          .lte("sale_datetime", `${todayStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Build seller_id -> team_id map (seller_id from raw_payload is the employee_id)
       (fmSalesData || []).forEach((fmSale: any) => {

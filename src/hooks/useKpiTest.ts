@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { useToast } from "@/hooks/use-toast";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
@@ -348,18 +349,20 @@ async function testTotalCommission(start: Date, end: Date, clientId?: string): P
   });
 
   // FM from unified sales table
-  let fmQuery = supabase
-    .from("sales")
-    .select("id, raw_payload")
-    .eq("source", "fieldmarketing")
-    .gte("sale_datetime", `${startStr}T00:00:00`)
-    .lte("sale_datetime", `${endStr}T23:59:59`);
-  
-  if (clientId) {
-    fmQuery = fmQuery.contains("raw_payload", { fm_client_id: clientId });
-  }
-  
-  const { data: fmSales } = await fmQuery;
+  const fmSales = await fetchAllRows<{ id: string; raw_payload: any }>(
+    "sales",
+    "id, raw_payload",
+    (q) => {
+      let query = q.eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`);
+      if (clientId) {
+        query = query.contains("raw_payload", { fm_client_id: clientId });
+      }
+      return query;
+    },
+    { orderBy: "sale_datetime", ascending: false }
+  );
   
   let fmCommission = 0;
   (fmSales || []).forEach((sale: any) => {
@@ -496,21 +499,23 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
   });
 
   // FM from unified sales table
-  let fmQuery = supabase
-    .from("sales")
-    .select("id, raw_payload")
-    .eq("source", "fieldmarketing")
-    .gte("sale_datetime", `${startStr}T00:00:00`)
-    .lte("sale_datetime", `${endStr}T23:59:59`);
-  
-  if (clientId) {
-    fmQuery = fmQuery.contains("raw_payload", { fm_client_id: clientId });
-  }
-  
-  const { data: fmSales } = await fmQuery;
+  const fmSalesRev = await fetchAllRows<{ id: string; raw_payload: any }>(
+    "sales",
+    "id, raw_payload",
+    (q) => {
+      let query = q.eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`);
+      if (clientId) {
+        query = query.contains("raw_payload", { fm_client_id: clientId });
+      }
+      return query;
+    },
+    { orderBy: "sale_datetime", ascending: false }
+  );
   
   let fmRevenue = 0;
-  (fmSales || []).forEach((sale: any) => {
+  (fmSalesRev || []).forEach((sale: any) => {
     const productName = (sale.raw_payload?.fm_product_name || "").toLowerCase();
     fmRevenue += productRevenueMap.get(productName) || 0;
   });
@@ -525,9 +530,9 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
       "Fieldmarketing omsætning": `${Math.round(fmRevenue).toLocaleString("da-DK")} DKK`,
       "Med campaign override": withOverride,
       "Med mapped_revenue": withMapped,
-      "FM salg": fmSales?.length || 0,
+      "FM salg": fmSalesRev?.length || 0,
     },
-    rowCount: salesData.length + (fmSales?.length || 0),
+    rowCount: salesData.length + (fmSalesRev?.length || 0),
   };
 }
 

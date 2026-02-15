@@ -27,6 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, endOfDay } from "date-fns";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -110,18 +111,18 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
-      const { data: monthSales, error } = await supabase
-        .from("sales")
-        .select(`
-          agent_name,
-          raw_payload,
-          sale_datetime
-        `)
-        .eq("source", "fieldmarketing")
-        .contains("raw_payload", { fm_client_id: clientId })
-        .gte("sale_datetime", monthStart);
+      const monthSales = await fetchAllRows<{
+        agent_name: string; raw_payload: any; sale_datetime: string;
+      }>(
+        "sales",
+        "agent_name, raw_payload, sale_datetime",
+        (q) => q.eq("source", "fieldmarketing")
+          .contains("raw_payload", { fm_client_id: clientId })
+          .gte("sale_datetime", monthStart),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
-      if (error) throw error;
+
 
       // We need to fetch employee names separately
       const sellerIds = [...new Set((monthSales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
@@ -160,19 +161,19 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
   const { data: daySellers } = useQuery({
     queryKey: ["fieldmarketing-day-sellers", clientId, productCommissions, dayStart],
     queryFn: async () => {
-      const { data: daySales, error } = await supabase
-        .from("sales")
-        .select(`
-          agent_name,
-          raw_payload,
-          sale_datetime
-        `)
-        .eq("source", "fieldmarketing")
-        .contains("raw_payload", { fm_client_id: clientId })
-        .gte("sale_datetime", dayStart)
-        .lte("sale_datetime", dayEnd);
+      const daySales = await fetchAllRows<{
+        agent_name: string; raw_payload: any; sale_datetime: string;
+      }>(
+        "sales",
+        "agent_name, raw_payload, sale_datetime",
+        (q) => q.eq("source", "fieldmarketing")
+          .contains("raw_payload", { fm_client_id: clientId })
+          .gte("sale_datetime", dayStart)
+          .lte("sale_datetime", dayEnd),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
-      if (error) throw error;
+
 
       // Fetch employee names
       const sellerIds = [...new Set((daySales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
