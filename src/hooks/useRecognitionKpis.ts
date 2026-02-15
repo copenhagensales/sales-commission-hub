@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
 
 interface RecognitionPerson {
@@ -91,25 +92,17 @@ async function fetchWeekRecognitionFallback(weekStart: Date, weekEnd: Date): Pro
   const startStr = format(weekStart, "yyyy-MM-dd'T'00:00:00");
   const endStr = format(weekEnd, "yyyy-MM-dd'T'23:59:59");
 
-  // Fetch sale_items with sales data for the period
-  const { data: saleItems, error } = await supabase
-    .from("sale_items")
-    .select(`
-      id,
-      mapped_commission,
-      sales!inner(
-        id,
-        sale_datetime,
-        agent_email,
-        agent_name,
-        status
-      )
-    `)
-    .gte("sales.sale_datetime", startStr)
-    .lte("sales.sale_datetime", endStr)
-    .eq("sales.status", "approved");
+  const saleItems = await fetchAllRows<any>(
+    "sale_items",
+    `id, mapped_commission,
+        sales!inner(id, sale_datetime, agent_email, agent_name, status)`,
+    (q) => q.gte("sales.sale_datetime", startStr)
+      .lte("sales.sale_datetime", endStr)
+      .eq("sales.status", "approved"),
+    { orderBy: "id", ascending: true }
+  );
 
-  if (error || !saleItems || saleItems.length === 0) {
+  if (!saleItems || saleItems.length === 0) {
     return { topWeekly: null, bestDay: null };
   }
 

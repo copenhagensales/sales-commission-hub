@@ -50,6 +50,7 @@ export async function fetchAllRows<T = unknown>(
       .from(table)
       .select(select)
       .order(orderBy, { ascending })
+      .order("id", { ascending: true })
       .range(offset, offset + pageSize - 1);
 
     // Apply custom filters if provided
