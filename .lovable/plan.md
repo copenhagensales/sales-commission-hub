@@ -1,61 +1,26 @@
 
 
-# Ny fane: Dubletter
+# Forbedrede datovælgere i alle faner
 
-## Hvad bygges
-En tredje fane "Dubletter" paa Annulleringer-siden, der finder og viser salg hvor samme kunde er lukket mere end een gang. Dubletter detekteres via telefonnummer, kundenavn (customer_company) og CVR-nummer (fra normalized_data).
+## Hvad ændres
+Erstat de native `<input type="date">` felter med Shadcn Calendar + Popover datovælgere i de to faner der har datofiltre:
 
-## Duplet-detekterings-logik
+1. **ManualCancellationsTab** - "Fra dato" og "Til dato"
+2. **DuplicatesTab** - "Fra dato" og "Til dato"
 
-Systemet finder dubletter ved at gruppere salg paa foelgende felter (mindst eet match):
-1. **Telefonnummer** (`customer_phone`) - eksakt match, ignorerer tomme/dummy-numre (0000000, 00000000, 99999999)
-2. **Virksomhedsnavn** (`customer_company`) - case-insensitiv match, ignorerer tomme
-3. **Kundenavn** (`raw_payload->>'CustomerName'`) - case-insensitiv match som supplement
-
-Salg med status `cancelled` ekskluderes fra dublet-soegningen.
-
-## UI-design
-
-### Filtre (samme stil som eksisterende faner)
-- **Vaelg kunde** - dropdown med klienter
-- **Fra dato / Til dato** - datovaegler
-- **Minimum dubletter** - dropdown (2, 3, 4+)
-
-### Resultattabel
-Grupperet visning per dublet-gruppe:
-- Telefonnummer / Virksomhed / Kundenavn
-- Antal salg i gruppen
-- Expand/collapse for at se individuelle salg med:
-  - Salgsdato, saelger, telefon, virksomhed, kilde (source), status
-  - Knap til at annullere individuelt salg (genbruger CancellationDialog)
-
-### Opsummering
-- Antal dublet-grupper fundet
-- Samlet antal salg involveret
+(UploadCancellationsTab har ingen datofelter og skal ikke ændres.)
 
 ## Tekniske detaljer
 
-### Ny fil: `src/components/cancellations/DuplicatesTab.tsx`
-- Hook der henter salg med filtre og grupperer client-side paa telefonnummer
-- SQL-query der finder telefonnumre med flere salg via subquery
-- Bruger Collapsible fra Radix UI til expand/collapse per gruppe
-- Genbruger `CancellationDialog` til annullering
-- Genbruger `getStatusBadge`-logikken fra ManualCancellationsTab
+### Begge filer: Samme moenster
 
-### AEndring: `src/pages/salary/Cancellations.tsx`
-- Tilfoej tredje tab "Dubletter" i TabsList (grid-cols-3)
-- Importer og render `DuplicatesTab` i TabsContent
+- Skift `dateFrom`/`dateTo` state fra `string` til `Date | undefined`
+- Importer `Calendar`, `Popover`, `PopoverTrigger`, `PopoverContent` fra Shadcn
+- Importer `CalendarIcon` fra lucide-react og `cn` fra utils
+- Erstat `<Input type="date">` med en Popover-knap der viser valgt dato formateret paa dansk (`dd/MM/yyyy`) og aabner en kalender
+- Konverter `Date` til ISO-streng i query-filteret for Supabase
+- Tilfoej `pointer-events-auto` paa Calendar for korrekt interaktion
 
-### Query-strategi
-Henter alle salg for valgt kunde hvor telefonnummeret forekommer mere end een gang:
-```text
-1. Foerst: find telefonnumre med count > 1
-2. Derefter: hent alle salg for disse numre
-3. Client-side: grupper og vis
-```
+### Resultat
+Pæne, konsistente datovælgere med kalender-popup i stedet for browserens standard dato-input, som passer til det moerke tema.
 
-### Komponenter der genbruges
-- Table, Badge, Button, Select, Input fra UI-biblioteket
-- CancellationDialog til annullering
-- Collapsible til gruppevisning
-- Loader2, AlertCircle ikoner fra lucide
