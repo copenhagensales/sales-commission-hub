@@ -105,12 +105,32 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
 
   const undoOneUnitMutation = useMutation({
     mutationFn: async (item: { id: string; cancelled_quantity: number }) => {
+      if (!saleId) throw new Error("No saleId");
       const newCancelled = Math.max((item.cancelled_quantity ?? 0) - 1, 0);
       const { error } = await supabase
         .from("sale_items")
         .update({ cancelled_quantity: newCancelled, is_cancelled: false })
         .eq("id", item.id);
       if (error) throw error;
+
+      // Check if at least one unit is now active across all sale_items
+      const { data: allItems, error: fetchError } = await supabase
+        .from("sale_items")
+        .select("quantity, cancelled_quantity")
+        .eq("sale_id", saleId);
+      if (fetchError) throw fetchError;
+
+      const hasActiveUnit = (allItems ?? []).some(
+        (si) => (si.quantity ?? 1) - (si.cancelled_quantity ?? 0) > 0
+      );
+
+      if (hasActiveUnit) {
+        const { error: salesError } = await supabase
+          .from("sales")
+          .update({ validation_status: null })
+          .eq("id", saleId);
+        if (salesError) throw salesError;
+      }
     },
     onSuccess: () => {
       toast({ title: "1 stk gendannet", description: "Annulleringen er fortrudt for 1 stk." });
