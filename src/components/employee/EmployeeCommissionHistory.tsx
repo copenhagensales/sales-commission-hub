@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { formatNumber, BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,21 +158,16 @@ export function EmployeeCommissionHistory({
       if (agentEmails.length === 0) return [];
       const startStr = periodStart.toISOString().split("T")[0];
       const endStr = periodEnd.toISOString().split("T")[0];
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          sale_datetime,
-          agent_email,
-          client_campaign_id,
-          client_campaigns(client_id, clients(name)),
-          sale_items(mapped_commission, quantity, products(counts_as_sale))
-        `)
-        .in("agent_email", agentEmails)
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`);
-      if (error) throw error;
-      return data;
+      return fetchAllRows<any>(
+        "sales",
+        `id, sale_datetime, agent_email, client_campaign_id,
+            client_campaigns(client_id, clients(name)),
+            sale_items(mapped_commission, quantity, products(counts_as_sale))`,
+        (q) => q.in("agent_email", agentEmails)
+          .gte("sale_datetime", `${startStr}T00:00:00`)
+          .lte("sale_datetime", `${endStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
     },
     enabled: agentEmails.length > 0,
   });
@@ -183,15 +179,15 @@ export function EmployeeCommissionHistory({
     queryFn: async () => {
       const startStr = periodStart.toISOString().split("T")[0];
       const endStr = periodEnd.toISOString().split("T")[0];
-      const { data, error } = await supabase
-        .from("sales")
-        .select("id, sale_datetime, raw_payload, client_campaign_id")
-        .eq("source", "fieldmarketing")
-        .contains("raw_payload", { fm_seller_id: employeeId })
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`);
-      if (error) throw error;
-      // Transform to expected format
+      const data = await fetchAllRows<any>(
+        "sales",
+        "id, sale_datetime, raw_payload, client_campaign_id",
+        (q) => q.eq("source", "fieldmarketing")
+          .contains("raw_payload", { fm_seller_id: employeeId })
+          .gte("sale_datetime", `${startStr}T00:00:00`)
+          .lte("sale_datetime", `${endStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       return (data || []).map(s => ({
         id: s.id,
         registered_at: s.sale_datetime,

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { subMonths, subWeeks, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
 
 interface ClientPeriodComparison {
@@ -94,20 +95,17 @@ export function useClientPeriodComparison(
       prevEnd.toISOString(),
     ],
     queryFn: async () => {
-      // Fetch telesales with sale_items for revenue
-      const { data: sales, error } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          client_campaign_id,
-          client_campaigns!inner(client_id),
-          sale_items(mapped_revenue, products(counts_as_sale))
-        `)
-        .gte("sale_datetime", prevStart.toISOString())
-        .lte("sale_datetime", prevEnd.toISOString());
+      const sales = await fetchAllRows<any>(
+        "sales",
+        `id, client_campaign_id,
+            client_campaigns!inner(client_id),
+            sale_items(mapped_revenue, products(counts_as_sale))`,
+        (q) => q.gte("sale_datetime", prevStart.toISOString())
+          .lte("sale_datetime", prevEnd.toISOString()),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
-      if (error) {
-        console.error("Error fetching previous period data:", error);
+      if (!sales || sales.length === 0) {
         return {};
       }
 

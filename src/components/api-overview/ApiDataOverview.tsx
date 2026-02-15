@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -114,46 +115,14 @@ export default function ApiDataOverview() {
     queryKey: ["api-overview-sales", effectiveProvider],
     queryFn: async () => {
       if (!effectiveProvider) return [];
-      const allSales: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("sales")
-          .select(`
-            id,
-            adversus_external_id,
-            agent_name,
-            agent_email,
-            agent_external_id,
-            customer_phone,
-            customer_company,
-            sale_datetime,
-            validation_status,
-            status,
-            source,
-            integration_type,
-            dialer_campaign_id,
-            created_at
-          `)
-          .ilike("source", effectiveProvider)
-          .order("sale_datetime", { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allSales.push(...data);
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      return allSales;
+      return fetchAllRows<any>(
+        "sales",
+        `id, adversus_external_id, agent_name, agent_email, agent_external_id,
+            customer_phone, customer_company, sale_datetime, validation_status,
+            status, source, integration_type, dialer_campaign_id, created_at`,
+        (q) => q.ilike("source", effectiveProvider),
+        { orderBy: "sale_datetime", ascending: false }
+      );
     },
     enabled: !!effectiveProvider,
   });

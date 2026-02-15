@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchByIds } from "@/utils/supabasePagination";
 
 interface NormalizedSaleData {
   id: string;
@@ -21,12 +22,12 @@ export function useNormalizedSalesData(saleIds: string[]) {
     queryFn: async () => {
       if (saleIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from("sales")
-        .select("id, normalized_data, raw_payload")
-        .in("id", saleIds);
-
-      if (error) throw error;
+      const data = await fetchByIds<any>(
+        "sales",
+        "id",
+        saleIds,
+        "id, normalized_data, raw_payload"
+      );
 
       return (data || []).map((sale): NormalizedSaleData => ({
         id: sale.id,

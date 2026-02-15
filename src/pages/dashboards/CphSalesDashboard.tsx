@@ -354,30 +354,18 @@ export default function CphSalesDashboard() {
       const endOfPeriod = `${salesPeriodEnd}T23:59:59`;
       
       // Fetch TM sales for period
-      let salesData: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      while (true) {
-        const { data: salesPage } = await supabase
-          .from("sales")
-          .select(`
-            id, agent_name, sale_datetime, status, client_campaign_id,
+      const salesData = await fetchAllRows<any>(
+        "sales",
+        `id, agent_name, sale_datetime, status, client_campaign_id,
             sale_items (
               quantity,
               product_id,
               mapped_commission,
               products (counts_as_sale)
-            )
-          `)
-          .gte("sale_datetime", startOfPeriod)
-          .lte("sale_datetime", endOfPeriod)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-        
-        if (!salesPage || salesPage.length === 0) break;
-        salesData = [...salesData, ...salesPage];
-        if (salesPage.length < pageSize) break;
-        page++;
-      }
+            )`,
+        (q) => q.gte("sale_datetime", startOfPeriod).lte("sale_datetime", endOfPeriod),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
       // Get campaign -> client mapping
       const campaignIds = [...new Set(salesData.map(s => s.client_campaign_id).filter(Boolean))] as string[];
@@ -641,22 +629,12 @@ export default function CphSalesDashboard() {
 
       // Get sales for the month with client info - use pagination to get all results
       // Supabase has a default limit of 1000 rows, so we need to paginate
-      let salesData: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      while (true) {
-        const { data: salesPage } = await supabase
-          .from("sales")
-          .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
-          .gte("sale_datetime", `${monthStart}T00:00:00`)
-          .lte("sale_datetime", `${todayStr}T23:59:59`)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-        
-        if (!salesPage || salesPage.length === 0) break;
-        salesData = [...salesData, ...salesPage];
-        if (salesPage.length < pageSize) break;
-        page++;
-      }
+      const salesData = await fetchAllRows<any>(
+        "sales",
+        "id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))",
+        (q) => q.gte("sale_datetime", `${monthStart}T00:00:00`).lte("sale_datetime", `${todayStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Get sale_items with products for those sales - batch in chunks to avoid query size limits
       const saleIds = salesData.map((s) => s.id);

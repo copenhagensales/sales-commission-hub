@@ -4,6 +4,7 @@ import { format, startOfDay, startOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -193,17 +194,19 @@ export default function UnitedDashboard() {
               .in("client_campaign_id", campaignIds)
               .neq("source", "fieldmarketing")
               .gte("sale_datetime", weekStart.toISOString()),
-            supabase
-              .from("sales")
-              .select("sale_items(quantity, products(counts_as_sale))")
-              .in("client_campaign_id", campaignIds)
-              .neq("source", "fieldmarketing")
-              .gte("sale_datetime", payrollPeriod.start.toISOString())
+            fetchAllRows<any>(
+              "sales",
+              "sale_items(quantity, products(counts_as_sale))",
+              (q) => q.in("client_campaign_id", campaignIds)
+                .neq("source", "fieldmarketing")
+                .gte("sale_datetime", payrollPeriod.start.toISOString()),
+              { orderBy: "sale_datetime", ascending: false }
+            )
           ]);
 
           const countSales = (data: any) => {
-            if (!data.data) return 0;
-            return data.data.reduce((total: number, sale: any) => {
+            const rows = Array.isArray(data) ? data : data?.data || [];
+            return rows.reduce((total: number, sale: any) => {
               const saleCount = (sale.sale_items || []).reduce((sum: number, item: any) => {
                 if (item.products?.counts_as_sale !== false) {
                   return sum + (item.quantity || 1);
@@ -252,11 +255,13 @@ export default function UnitedDashboard() {
           }
 
           // Get sales for this client to find active agent emails
-          const { data: sales } = await supabase
-            .from("sales")
-            .select("agent_email")
-            .in("client_campaign_id", campaigns.map(c => c.id))
-            .gte("sale_datetime", payrollPeriod.start.toISOString());
+          const sales = await fetchAllRows<any>(
+            "sales",
+            "agent_email",
+            (q) => q.in("client_campaign_id", campaigns.map(c => c.id))
+              .gte("sale_datetime", payrollPeriod.start.toISOString()),
+            { orderBy: "sale_datetime", ascending: false }
+          );
 
           const agentEmails = [...new Set((sales || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean))];
           

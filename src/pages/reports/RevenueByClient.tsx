@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
@@ -171,30 +172,14 @@ export default function RevenueByClient() {
     queryKey: ["revenue-by-client", startDateStr, endDateStr, selectedClientId],
     queryFn: async () => {
       // Get TM sales with client info
-      let salesData: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      
-      while (true) {
-        const { data: salesPage, error } = await supabase
-          .from("sales")
-          .select(`
-            id, 
-            sale_datetime, 
-            client_campaign_id,
+      const salesData = await fetchAllRows<any>(
+        "sales",
+        `id, sale_datetime, client_campaign_id,
             client_campaigns(client_id, clients(id, name)),
-            dialer_campaign_id
-          `)
-          .gte("sale_datetime", `${startDateStr}T00:00:00`)
-          .lte("sale_datetime", `${endDateStr}T23:59:59`)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-        
-        if (error) throw error;
-        if (!salesPage || salesPage.length === 0) break;
-        salesData = [...salesData, ...salesPage];
-        if (salesPage.length < pageSize) break;
-        page++;
-      }
+            dialer_campaign_id`,
+        (q) => q.gte("sale_datetime", `${startDateStr}T00:00:00`).lte("sale_datetime", `${endDateStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Get sale_items with revenue
       const saleIds = salesData.map((s) => s.id);
@@ -266,12 +251,14 @@ export default function RevenueByClient() {
       });
 
       // Get FM sales from unified sales table
-      const { data: fmSales } = await supabase
-        .from("sales")
-        .select("id, sale_datetime, raw_payload")
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${startDateStr}T00:00:00`)
-        .lte("sale_datetime", `${endDateStr}T23:59:59`);
+      const fmSales = await fetchAllRows<any>(
+        "sales",
+        "id, sale_datetime, raw_payload",
+        (q) => q.eq("source", "fieldmarketing")
+          .gte("sale_datetime", `${startDateStr}T00:00:00`)
+          .lte("sale_datetime", `${endDateStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
 
       // Get FM pricing using the shared helper (respects pricing rules hierarchy)
       const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
