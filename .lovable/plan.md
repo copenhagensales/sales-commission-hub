@@ -1,31 +1,61 @@
 
-# Map flkl1-agent til Floras medarbejderprofil
 
-## Problem
-Flora har 64 ASE-salg registreret under agenten `flkl1@copenhagensales.dk`, men denne agent er ikke mappet til hendes medarbejderprofil. Kun `flkl@copenhagensales.dk` er mappet. Derfor returnerer `useHasImmediatePaymentSales`-hooket `false`, og menupunktet "Straksbetaling (ASE)" er skjult for hende.
+# Ny fane: Dubletter
 
-38 af de 64 salg har prisregler med `allows_immediate_payment = true`, saa hun burde have adgang.
+## Hvad bygges
+En tredje fane "Dubletter" paa Annulleringer-siden, der finder og viser salg hvor samme kunde er lukket mere end een gang. Dubletter detekteres via telefonnummer, kundenavn (customer_company) og CVR-nummer (fra normalized_data).
 
-## Loesning
+## Duplet-detekterings-logik
 
-### Trin 1: Opret agent-mapping
-Indsaet en ny raekke i `employee_agent_mapping` der forbinder Floras medarbejder-ID med `flkl1`-agenten:
+Systemet finder dubletter ved at gruppere salg paa foelgende felter (mindst eet match):
+1. **Telefonnummer** (`customer_phone`) - eksakt match, ignorerer tomme/dummy-numre (0000000, 00000000, 99999999)
+2. **Virksomhedsnavn** (`customer_company`) - case-insensitiv match, ignorerer tomme
+3. **Kundenavn** (`raw_payload->>'CustomerName'`) - case-insensitiv match som supplement
 
-- **employee_id**: `a30e5992-3545-424c-9b4a-bc429b035ff6` (Flora)
-- **agent_id**: `203c1d38-3f42-435e-bb3f-a4b734bf84dc` (flkl1@copenhagensales.dk)
+Salg med status `cancelled` ekskluderes fra dublet-soegningen.
 
+## UI-design
+
+### Filtre (samme stil som eksisterende faner)
+- **Vaelg kunde** - dropdown med klienter
+- **Fra dato / Til dato** - datovaegler
+- **Minimum dubletter** - dropdown (2, 3, 4+)
+
+### Resultattabel
+Grupperet visning per dublet-gruppe:
+- Telefonnummer / Virksomhed / Kundenavn
+- Antal salg i gruppen
+- Expand/collapse for at se individuelle salg med:
+  - Salgsdato, saelger, telefon, virksomhed, kilde (source), status
+  - Knap til at annullere individuelt salg (genbruger CancellationDialog)
+
+### Opsummering
+- Antal dublet-grupper fundet
+- Samlet antal salg involveret
+
+## Tekniske detaljer
+
+### Ny fil: `src/components/cancellations/DuplicatesTab.tsx`
+- Hook der henter salg med filtre og grupperer client-side paa telefonnummer
+- SQL-query der finder telefonnumre med flere salg via subquery
+- Bruger Collapsible fra Radix UI til expand/collapse per gruppe
+- Genbruger `CancellationDialog` til annullering
+- Genbruger `getStatusBadge`-logikken fra ManualCancellationsTab
+
+### AEndring: `src/pages/salary/Cancellations.tsx`
+- Tilfoej tredje tab "Dubletter" i TabsList (grid-cols-3)
+- Importer og render `DuplicatesTab` i TabsContent
+
+### Query-strategi
+Henter alle salg for valgt kunde hvor telefonnummeret forekommer mere end een gang:
 ```text
-INSERT INTO employee_agent_mapping (employee_id, agent_id)
-VALUES (
-  'a30e5992-3545-424c-9b4a-bc429b035ff6',
-  '203c1d38-3f42-435e-bb3f-a4b734bf84dc'
-);
+1. Foerst: find telefonnumre med count > 1
+2. Derefter: hent alle salg for disse numre
+3. Client-side: grupper og vis
 ```
 
-### Ingen kodeaendringer
-Hooket `useHasImmediatePaymentSales` henter automatisk alle agent-mappings og tjekker ASE-salg for hver agent-email. Naar `flkl1` er mappet, vil hooket finde de 38 salg med `allows_immediate_payment = true` og vise menupunktet.
-
-## Forventet resultat
-- Flora kan se "Straksbetaling (ASE)" i menuen
-- Hendes 64 ASE-salg (under flkl1) taeller med i provision og statistik
-- Ingen pavirkning paa andre medarbejdere
+### Komponenter der genbruges
+- Table, Badge, Button, Select, Input fra UI-biblioteket
+- CancellationDialog til annullering
+- Collapsible til gruppevisning
+- Loader2, AlertCircle ikoner fra lucide
