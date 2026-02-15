@@ -103,6 +103,24 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
     },
   });
 
+  const undoOneUnitMutation = useMutation({
+    mutationFn: async (item: { id: string; cancelled_quantity: number }) => {
+      const newCancelled = Math.max((item.cancelled_quantity ?? 0) - 1, 0);
+      const { error } = await supabase
+        .from("sale_items")
+        .update({ cancelled_quantity: newCancelled, is_cancelled: false })
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "1 stk gendannet", description: "Annulleringen er fortrudt for 1 stk." });
+      invalidateQueries();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const cancelAllMutation = useMutation({
     mutationFn: async () => {
       if (!saleId) return;
@@ -158,7 +176,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
   });
 
   const allCancelled = saleItems.length > 0 && saleItems.every((item) => item.is_cancelled);
-  const isPending = cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending || cancelAllMutation.isPending || rejectAllMutation.isPending;
+  const isPending = cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending || cancelAllMutation.isPending || rejectAllMutation.isPending || undoOneUnitMutation.isPending;
 
   const formatCommission = (value: number | null) => {
     if (value == null) return "-";
@@ -229,6 +247,17 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
                         ) : null}
                       </TableCell>
                       <TableCell className="text-right">
+                        {cancelled > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() => undoOneUnitMutation.mutate({ id: item.id, cancelled_quantity: cancelled })}
+                            className="text-primary hover:text-primary/80 mr-1"
+                          >
+                            {undoOneUnitMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Fortryd 1"}
+                          </Button>
+                        )}
                         {!fullyDone && (
                           confirmAction?.itemId === item.id ? (
                             <div className="flex items-center gap-1 justify-end">
