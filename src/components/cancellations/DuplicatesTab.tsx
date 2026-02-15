@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,9 +31,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Loader2, AlertCircle, ChevronDown, ChevronRight, X, Copy } from "lucide-react";
+import { Loader2, AlertCircle, ChevronDown, ChevronRight, X, Copy, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { CancellationDialog } from "./CancellationDialog";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
@@ -72,8 +79,8 @@ function isValidPhone(phone: string | null | undefined): phone is string {
 
 export function DuplicatesTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [minDuplicates, setMinDuplicates] = useState("2");
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -110,8 +117,8 @@ export function DuplicatesTab() {
         .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false });
 
-      if (dateFrom) query = query.gte("sale_datetime", dateFrom);
-      if (dateTo) query = query.lte("sale_datetime", dateTo + "T23:59:59");
+      if (dateFrom) query = query.gte("sale_datetime", format(dateFrom, "yyyy-MM-dd"));
+      if (dateTo) query = query.lte("sale_datetime", format(dateTo, "yyyy-MM-dd") + "T23:59:59");
 
       // Fetch all rows with pagination to avoid 1000-row limit
       const allRows: SaleRow[] = [];
@@ -205,12 +212,32 @@ export function DuplicatesTab() {
 
         <div className="space-y-2">
           <Label>Fra dato</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFrom ? format(dateFrom, "dd/MM/yyyy", { locale: da }) : "Vælg dato..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="pointer-events-auto" locale={da} />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
           <Label>Til dato</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateTo ? format(dateTo, "dd/MM/yyyy", { locale: da }) : "Vælg dato..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="pointer-events-auto" locale={da} />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
