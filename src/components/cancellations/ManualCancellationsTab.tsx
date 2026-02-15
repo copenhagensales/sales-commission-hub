@@ -71,7 +71,6 @@ export function ManualCancellationsTab() {
           agent_name
         `)
         .in("client_campaign_id", campaignIds)
-        .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false })
         .limit(100);
 
