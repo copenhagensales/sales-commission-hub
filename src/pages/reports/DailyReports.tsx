@@ -330,12 +330,13 @@ export default function DailyReports() {
         )] as string[];
         
         // ALSO fetch seller_ids from unified sales table for this client
-        const { data: fmSellersForClient } = await supabase
-          .from("sales")
-          .select("raw_payload")
-          .eq("source", "fieldmarketing")
-          .gte("sale_datetime", `${startStr}T00:00:00`)
-          .lte("sale_datetime", `${endStr}T23:59:59`);
+        const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
+          "sales", "raw_payload",
+          (q) => q.eq("source", "fieldmarketing")
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`),
+          { orderBy: "sale_datetime", ascending: false }
+        );
         
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
@@ -650,20 +651,17 @@ export default function DailyReports() {
       });
 
       // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
-      let fmSalesQuery = supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_name,
-          sale_datetime,
-          raw_payload,
-          client_campaign_id
-        `)
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`);
-      
-      const { data: rawFmSalesData } = await fmSalesQuery;
+      const rawFmSalesData = await fetchAllRows<{
+        id: string; agent_name: string; sale_datetime: string;
+        raw_payload: any; client_campaign_id: string | null;
+      }>(
+        "sales",
+        "id, agent_name, sale_datetime, raw_payload, client_campaign_id",
+        (q) => q.eq("source", "fieldmarketing")
+          .gte("sale_datetime", `${startStr}T00:00:00`)
+          .lte("sale_datetime", `${endStr}T23:59:59`),
+        { orderBy: "sale_datetime", ascending: false }
+      );
       
       // Filter by employeeIds using raw_payload fm_seller_id
       const fmSalesData = (rawFmSalesData || []).filter(sale => {
