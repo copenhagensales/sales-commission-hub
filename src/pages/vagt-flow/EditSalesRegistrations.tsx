@@ -262,6 +262,24 @@ export default function EditSalesRegistrations() {
         .update(updateData)
         .eq("id", id);
       if (error) throw error;
+
+      // Sync sale_items with updated product name
+      const { data: existingItem } = await supabase
+        .from("sale_items")
+        .select("id")
+        .eq("sale_id", id)
+        .maybeSingle();
+      
+      if (existingItem) {
+        await supabase
+          .from("sale_items")
+          .update({ display_name: updates.product_name, adversus_product_title: updates.product_name })
+          .eq("id", existingItem.id);
+      } else {
+        await supabase
+          .from("sale_items")
+          .insert({ sale_id: id, display_name: updates.product_name, adversus_product_title: updates.product_name, quantity: 1, mapped_commission: 0, mapped_revenue: 0 });
+      }
     },
     onSuccess: () => {
       toast.success("Salgsregistrering opdateret");
@@ -349,6 +367,18 @@ export default function EditSalesRegistrations() {
           })
           .eq("id", item.id!);
         if (error) throw error;
+
+        // Sync sale_items
+        const { data: existingItemRow } = await supabase
+          .from("sale_items")
+          .select("id")
+          .eq("sale_id", item.id!)
+          .maybeSingle();
+        if (existingItemRow) {
+          await supabase.from("sale_items").update({ display_name: item.product_name, adversus_product_title: item.product_name }).eq("id", existingItemRow.id);
+        } else {
+          await supabase.from("sale_items").insert({ sale_id: item.id!, display_name: item.product_name, adversus_product_title: item.product_name, quantity: 1, mapped_commission: 0, mapped_revenue: 0 });
+        }
       }
       
       // Create new items via centralized sales table
@@ -382,10 +412,24 @@ export default function EditSalesRegistrations() {
             fm_comment: item.comment || null,
           },
         }));
-        const { error } = await supabase
+        const { data: insertedNewSales, error } = await supabase
           .from("sales")
-          .insert(newSales);
+          .insert(newSales)
+          .select("id");
         if (error) throw error;
+
+        // Create sale_items for new sales
+        if (insertedNewSales && insertedNewSales.length > 0) {
+          const newSaleItems = insertedNewSales.map((inserted, idx) => ({
+            sale_id: inserted.id,
+            display_name: toCreate[idx]?.product_name || "Ukendt produkt",
+            adversus_product_title: toCreate[idx]?.product_name || "Ukendt produkt",
+            quantity: 1,
+            mapped_commission: 0,
+            mapped_revenue: 0,
+          }));
+          await supabase.from("sale_items").insert(newSaleItems);
+        }
       }
     },
     onSuccess: () => {

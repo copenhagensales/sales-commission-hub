@@ -402,6 +402,7 @@ async function fetchKpiValue(
       // 2. Build sales query with agent_email filter
       let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))&limit=10000`;
       salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+      salesUrl += `&source=neq.fieldmarketing`;
       
       if (employeeId && agentEmails.length > 0) {
         // Match on agent_email (case-insensitive)
@@ -462,6 +463,7 @@ async function fetchKpiValue(
       // 2. Build query with agent_email filter
       let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)&limit=10000`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+      url += `&source=neq.fieldmarketing`;
       
       if (employeeId && agentEmails.length > 0) {
         const emailFilters = agentEmails

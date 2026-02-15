@@ -475,7 +475,8 @@ export function ClientDBTab() {
       const telesalesData = await fetchAllRows<any>(
         "sales",
         `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
-        (q) => q.gte("sale_datetime", chartPeriodStart.toISOString())
+        (q) => q.neq("source", "fieldmarketing")
+                .gte("sale_datetime", chartPeriodStart.toISOString())
                 .lte("sale_datetime", chartPeriodEnd.toISOString()),
         { orderBy: "sale_datetime", ascending: false }
       );
@@ -708,7 +709,8 @@ export function ClientDBTab() {
       const telesalesData = await fetchAllRows<any>(
         "sales",
         `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
-        (q) => q.gte("sale_datetime", periodStart.toISOString())
+        (q) => q.neq("source", "fieldmarketing")
+                .gte("sale_datetime", periodStart.toISOString())
                 .lte("sale_datetime", periodEnd.toISOString()),
         { orderBy: "sale_datetime", ascending: false }
       );

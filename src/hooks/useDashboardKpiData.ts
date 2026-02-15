@@ -185,6 +185,7 @@ export const useDashboardKpiData = () => {
               "sales",
               `id, sale_items(quantity, products(counts_as_sale))`,
               (q) => q.in("client_campaign_id", campaignIds)
+                      .neq("source", "fieldmarketing")
                       .gte("sale_datetime", startISO)
                       .lte("sale_datetime", endISO),
               { orderBy: "sale_datetime", ascending: false }
@@ -552,6 +553,7 @@ const fetchMetricValueForFormula = async (
           "sales",
           `id, sale_items (quantity, products (counts_as_sale))`,
           (q) => q.in("client_campaign_id", campaignIds)
+                  .neq("source", "fieldmarketing")
                   .gte("sale_datetime", startISO)
                   .lte("sale_datetime", endISO),
           { orderBy: "sale_datetime", ascending: false }
@@ -975,6 +977,7 @@ export const useWidgetKpiData = (widgets: Array<{
                     "sales",
                     `id, sale_items(quantity, products(counts_as_sale))`,
                     (q) => q.in("client_campaign_id", campaignIds)
+                            .neq("source", "fieldmarketing")
                             .gte("sale_datetime", startISO)
                             .lte("sale_datetime", endISO),
                     { orderBy: "sale_datetime", ascending: false }
