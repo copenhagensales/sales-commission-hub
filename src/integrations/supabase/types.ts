@@ -7478,6 +7478,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
+          is_cancelled: boolean
           is_immediate_payment: boolean | null
           mapped_commission: number | null
           mapped_revenue: number | null
@@ -7495,6 +7496,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          is_cancelled?: boolean
           is_immediate_payment?: boolean | null
           mapped_commission?: number | null
           mapped_revenue?: number | null
@@ -7512,6 +7514,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          is_cancelled?: boolean
           is_immediate_payment?: boolean | null
           mapped_commission?: number | null
           mapped_revenue?: number | null

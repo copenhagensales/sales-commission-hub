@@ -1,0 +1,1 @@
+ALTER TABLE public.sale_items ADD COLUMN is_cancelled boolean NOT NULL DEFAULT false;

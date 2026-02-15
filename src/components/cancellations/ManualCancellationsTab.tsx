@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,28 +20,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/hooks/use-toast";
-import { Search, X, Loader2, AlertCircle } from "lucide-react";
+import { Search, Loader2, AlertCircle, X } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { CancellationDialog } from "./CancellationDialog";
 
 export function ManualCancellationsTab() {
-  const queryClient = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   // Fetch clients
   const { data: clients = [], isLoading: isLoadingClients } = useQuery({
@@ -63,7 +51,6 @@ export function ManualCancellationsTab() {
     queryFn: async () => {
       if (!selectedClientId) return [];
 
-      // First get client_campaign_ids for this client
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
@@ -103,31 +90,6 @@ export function ManualCancellationsTab() {
       return data;
     },
     enabled: !!selectedClientId,
-  });
-
-  // Cancel sale mutation
-  const cancelMutation = useMutation({
-    mutationFn: async (saleId: string) => {
-      const { error } = await supabase
-        .from("sales")
-        .update({ validation_status: "cancelled" })
-        .eq("id", saleId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Salg annulleret",
-        description: "Salget er blevet markeret som annulleret.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Fejl",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   const getStatusBadge = (status: string | null) => {
@@ -240,41 +202,14 @@ export function ManualCancellationsTab() {
                   <TableCell>{sale.customer_company || "-"}</TableCell>
                   <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
                   <TableCell className="text-right">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={cancelMutation.isPending}
-                        >
-                          {cancelMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <X className="h-4 w-4 mr-1" />
-                              Annuller
-                            </>
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Bekræft annullering</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Er du sikker på at du vil annullere dette salg? Denne handling kan ikke fortrydes.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Fortryd</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => cancelMutation.mutate(sale.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Ja, annuller salg
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setSelectedSaleId(sale.id)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Annuller
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -288,6 +223,12 @@ export function ManualCancellationsTab() {
           Viser de første 100 resultater. Brug filtre for at indsnævre søgningen.
         </p>
       )}
+
+      <CancellationDialog
+        saleId={selectedSaleId}
+        open={!!selectedSaleId}
+        onClose={() => setSelectedSaleId(null)}
+      />
     </div>
   );
 }
