@@ -78,6 +78,7 @@ export function useSalesAggregates({
       // Fallback: fetch all sales with pagination and calculate client-side
       const filters = (query: any) => {
         let q = query
+          .neq("source", "fieldmarketing")
           .gte("sale_datetime", startStr)
           .lte("sale_datetime", endStr);
         

@@ -170,6 +170,7 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
   // Note: Range header added below for pagination safety
   let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
   salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+  salesUrl += `&source=neq.fieldmarketing`;
   
   if (clientId) {
     salesUrl += `&client_campaigns.client_id=eq.${clientId}`;

@@ -284,7 +284,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
           <Button variant="ghost" onClick={onClose} disabled={isPending}>
             Luk
           </Button>
-          {saleItems.length > 0 && !allCancelled && (
+          {!allCancelled && (
             <>
               <AlertDialog>
                 <AlertDialogTrigger asChild>

@@ -247,15 +247,35 @@ export function useCreateFieldmarketingSale() {
       }));
 
       console.log("[FM-SALES] Inserting enriched sales:", JSON.stringify(enrichedSales));
-      const { error } = await supabase
+      const { data: insertedSales, error } = await supabase
         .from("sales")
-        .insert(enrichedSales);
+        .insert(enrichedSales)
+        .select("id");
       
       if (error) {
         console.error("[FM-SALES] Insert error:", JSON.stringify(error));
         throw error;
       }
-      console.log("[FM-SALES] Insert successful!");
+      console.log("[FM-SALES] Insert successful!", insertedSales?.length, "rows");
+
+      // Create sale_items for each inserted sale
+      if (insertedSales && insertedSales.length > 0) {
+        const saleItems = insertedSales.map((inserted, idx) => ({
+          sale_id: inserted.id,
+          display_name: sales[idx]?.product_name || "Ukendt produkt",
+          adversus_product_title: sales[idx]?.product_name || "Ukendt produkt",
+          quantity: 1,
+          mapped_commission: 0,
+          mapped_revenue: 0,
+        }));
+        const { error: itemsError } = await supabase
+          .from("sale_items")
+          .insert(saleItems);
+        if (itemsError) {
+          console.error("[FM-SALES] sale_items insert error:", JSON.stringify(itemsError));
+          // Don't throw - the sale itself was created successfully
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });

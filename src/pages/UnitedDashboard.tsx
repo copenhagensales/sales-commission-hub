@@ -185,16 +185,19 @@ export default function UnitedDashboard() {
               .from("sales")
               .select("sale_items(quantity, products(counts_as_sale))")
               .in("client_campaign_id", campaignIds)
+              .neq("source", "fieldmarketing")
               .gte("sale_datetime", today.toISOString()),
             supabase
               .from("sales")
               .select("sale_items(quantity, products(counts_as_sale))")
               .in("client_campaign_id", campaignIds)
+              .neq("source", "fieldmarketing")
               .gte("sale_datetime", weekStart.toISOString()),
             supabase
               .from("sales")
               .select("sale_items(quantity, products(counts_as_sale))")
               .in("client_campaign_id", campaignIds)
+              .neq("source", "fieldmarketing")
               .gte("sale_datetime", payrollPeriod.start.toISOString())
           ]);
 
