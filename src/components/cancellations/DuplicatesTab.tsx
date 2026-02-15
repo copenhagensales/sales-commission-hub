@@ -81,7 +81,7 @@ export function DuplicatesTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [minDuplicates, setMinDuplicates] = useState("2");
+  
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -151,7 +151,7 @@ export function DuplicatesTab() {
       }
     }
 
-    const minCount = parseInt(minDuplicates) || 2;
+    const minCount = 2;
     const groups: DuplicateGroup[] = [];
 
     for (const [phone, phoneSales] of phoneMap) {
@@ -174,7 +174,7 @@ export function DuplicatesTab() {
     // Sort by number of duplicates descending
     groups.sort((a, b) => b.sales.length - a.sales.length);
     return groups;
-  }, [sales, minDuplicates]);
+  }, [sales]);
 
   const totalSalesInvolved = useMemo(
     () => duplicateGroups.reduce((sum, g) => sum + g.sales.length, 0),
@@ -193,7 +193,7 @@ export function DuplicatesTab() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label>Vælg kunde</Label>
           <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -240,19 +240,6 @@ export function DuplicatesTab() {
           </Popover>
         </div>
 
-        <div className="space-y-2">
-          <Label>Minimum dubletter</Label>
-          <Select value={minDuplicates} onValueChange={setMinDuplicates}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2+</SelectItem>
-              <SelectItem value="3">3+</SelectItem>
-              <SelectItem value="4">4+</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {/* Summary + Results */}
