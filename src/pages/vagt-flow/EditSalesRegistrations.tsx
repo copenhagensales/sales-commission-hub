@@ -18,6 +18,7 @@ import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { buildFmPricingMap } from "@/lib/calculations/fmPricing";
 
 interface SaleRecord {
   id: string;
@@ -263,7 +264,10 @@ export default function EditSalesRegistrations() {
         .eq("id", id);
       if (error) throw error;
 
-      // Sync sale_items with updated product name
+      // Sync sale_items with updated product name and pricing
+      const pricingMap = await buildFmPricingMap();
+      const pricing = pricingMap.get(updates.product_name.toLowerCase());
+      
       const { data: existingItem } = await supabase
         .from("sale_items")
         .select("id")
@@ -273,12 +277,24 @@ export default function EditSalesRegistrations() {
       if (existingItem) {
         await supabase
           .from("sale_items")
-          .update({ display_name: updates.product_name, adversus_product_title: updates.product_name })
+          .update({ 
+            display_name: updates.product_name, 
+            adversus_product_title: updates.product_name,
+            mapped_commission: pricing?.commission ?? 0,
+            mapped_revenue: pricing?.revenue ?? 0,
+          })
           .eq("id", existingItem.id);
       } else {
         await supabase
           .from("sale_items")
-          .insert({ sale_id: id, display_name: updates.product_name, adversus_product_title: updates.product_name, quantity: 1, mapped_commission: 0, mapped_revenue: 0 });
+          .insert({ 
+            sale_id: id, 
+            display_name: updates.product_name, 
+            adversus_product_title: updates.product_name, 
+            quantity: 1, 
+            mapped_commission: pricing?.commission ?? 0, 
+            mapped_revenue: pricing?.revenue ?? 0,
+          });
       }
     },
     onSuccess: () => {
@@ -368,16 +384,30 @@ export default function EditSalesRegistrations() {
           .eq("id", item.id!);
         if (error) throw error;
 
-        // Sync sale_items
+        // Sync sale_items with pricing
+        const pricingMap = await buildFmPricingMap();
         const { data: existingItemRow } = await supabase
           .from("sale_items")
           .select("id")
           .eq("sale_id", item.id!)
           .maybeSingle();
+        const itemPricing = pricingMap.get(item.product_name.toLowerCase());
         if (existingItemRow) {
-          await supabase.from("sale_items").update({ display_name: item.product_name, adversus_product_title: item.product_name }).eq("id", existingItemRow.id);
+          await supabase.from("sale_items").update({ 
+            display_name: item.product_name, 
+            adversus_product_title: item.product_name,
+            mapped_commission: itemPricing?.commission ?? 0,
+            mapped_revenue: itemPricing?.revenue ?? 0,
+          }).eq("id", existingItemRow.id);
         } else {
-          await supabase.from("sale_items").insert({ sale_id: item.id!, display_name: item.product_name, adversus_product_title: item.product_name, quantity: 1, mapped_commission: 0, mapped_revenue: 0 });
+          await supabase.from("sale_items").insert({ 
+            sale_id: item.id!, 
+            display_name: item.product_name, 
+            adversus_product_title: item.product_name, 
+            quantity: 1, 
+            mapped_commission: itemPricing?.commission ?? 0, 
+            mapped_revenue: itemPricing?.revenue ?? 0,
+          });
         }
       }
       
@@ -418,16 +448,21 @@ export default function EditSalesRegistrations() {
           .select("id");
         if (error) throw error;
 
-        // Create sale_items for new sales
+        // Create sale_items for new sales with correct pricing
         if (insertedNewSales && insertedNewSales.length > 0) {
-          const newSaleItems = insertedNewSales.map((inserted, idx) => ({
-            sale_id: inserted.id,
-            display_name: toCreate[idx]?.product_name || "Ukendt produkt",
-            adversus_product_title: toCreate[idx]?.product_name || "Ukendt produkt",
-            quantity: 1,
-            mapped_commission: 0,
-            mapped_revenue: 0,
-          }));
+          const pricingMapForNew = await buildFmPricingMap();
+          const newSaleItems = insertedNewSales.map((inserted, idx) => {
+            const productName = toCreate[idx]?.product_name || "Ukendt produkt";
+            const p = pricingMapForNew.get(productName.toLowerCase());
+            return {
+              sale_id: inserted.id,
+              display_name: productName,
+              adversus_product_title: productName,
+              quantity: 1,
+              mapped_commission: p?.commission ?? 0,
+              mapped_revenue: p?.revenue ?? 0,
+            };
+          });
           await supabase.from("sale_items").insert(newSaleItems);
         }
       }
