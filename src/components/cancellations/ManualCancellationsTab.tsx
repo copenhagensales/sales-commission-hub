@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,17 +18,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, AlertCircle, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Search, Loader2, AlertCircle, X, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { CancellationDialog } from "./CancellationDialog";
 
 export function ManualCancellationsTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   // Fetch clients
@@ -75,10 +82,10 @@ export function ManualCancellationsTab() {
         .limit(100);
 
       if (dateFrom) {
-        query = query.gte("sale_datetime", dateFrom);
+        query = query.gte("sale_datetime", format(dateFrom, "yyyy-MM-dd"));
       }
       if (dateTo) {
-        query = query.lte("sale_datetime", dateTo + "T23:59:59");
+        query = query.lte("sale_datetime", format(dateTo, "yyyy-MM-dd") + "T23:59:59");
       }
       if (searchTerm) {
         query = query.or(`customer_phone.ilike.%${searchTerm}%,customer_company.ilike.%${searchTerm}%`);
@@ -127,23 +134,33 @@ export function ManualCancellationsTab() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="date-from">Fra dato</Label>
-          <Input
-            id="date-from"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
+          <Label>Fra dato</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFrom ? format(dateFrom, "dd/MM/yyyy", { locale: da }) : "Vælg dato..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="pointer-events-auto" locale={da} />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="date-to">Til dato</Label>
-          <Input
-            id="date-to"
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
+          <Label>Til dato</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateTo ? format(dateTo, "dd/MM/yyyy", { locale: da }) : "Vælg dato..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="pointer-events-auto" locale={da} />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
