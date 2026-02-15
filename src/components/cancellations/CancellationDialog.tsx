@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Ban } from "lucide-react";
+import { Loader2, Ban, Minus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +49,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
       if (!saleId) return [];
       const { data, error } = await supabase
         .from("sale_items")
-        .select("id, display_name, adversus_product_title, quantity, mapped_commission, mapped_revenue, is_cancelled")
+        .select("id, display_name, adversus_product_title, quantity, mapped_commission, mapped_revenue, is_cancelled, cancelled_quantity")
         .eq("sale_id", saleId)
         .order("created_at");
       if (error) throw error;
@@ -58,16 +58,21 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
     enabled: !!saleId && open,
   });
 
-  const cancelItemMutation = useMutation({
-    mutationFn: async (itemId: string) => {
+  const cancelOneUnitMutation = useMutation({
+    mutationFn: async (item: { id: string; quantity: number; cancelled_quantity: number }) => {
+      const newCancelled = (item.cancelled_quantity ?? 0) + 1;
+      const fullyDone = newCancelled >= (item.quantity ?? 1);
       const { error } = await supabase
         .from("sale_items")
-        .update({ is_cancelled: true })
-        .eq("id", itemId);
+        .update({
+          cancelled_quantity: newCancelled,
+          is_cancelled: fullyDone,
+        })
+        .eq("id", item.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Produkt annulleret", description: "Produktet er blevet markeret som annulleret." });
+      toast({ title: "1 stk annulleret", description: "Produktet er delvist annulleret." });
       queryClient.invalidateQueries({ queryKey: ["sale-items-for-cancellation", saleId] });
       queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
       setConfirmItemId(null);
@@ -86,11 +91,17 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
         .eq("id", saleId);
       if (salesError) throw salesError;
 
-      const { error: itemsError } = await supabase
-        .from("sale_items")
-        .update({ is_cancelled: true })
-        .eq("sale_id", saleId);
-      if (itemsError) throw itemsError;
+      // Set each item's cancelled_quantity = quantity and is_cancelled = true
+      for (const item of saleItems) {
+        const { error } = await supabase
+          .from("sale_items")
+          .update({
+            cancelled_quantity: item.quantity ?? 1,
+            is_cancelled: true,
+          })
+          .eq("id", item.id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast({ title: "Salg annulleret", description: "Hele salget og alle produkter er annulleret." });
@@ -104,7 +115,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
   });
 
   const allCancelled = saleItems.length > 0 && saleItems.every((item) => item.is_cancelled);
-  const isPending = cancelItemMutation.isPending || cancelAllMutation.isPending;
+  const isPending = cancelOneUnitMutation.isPending || cancelAllMutation.isPending;
 
   const formatCommission = (value: number | null) => {
     if (value == null) return "-";
@@ -117,7 +128,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
         <DialogHeader>
           <DialogTitle>Produkter i salget</DialogTitle>
           <DialogDescription>
-            Annuller hele salget eller udvalgte produkter
+            Annuller hele salget eller udvalgte produkter (1 stk ad gangen)
           </DialogDescription>
         </DialogHeader>
 
@@ -134,57 +145,82 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
                 <TableRow>
                   <TableHead>Produkt</TableHead>
                   <TableHead className="text-right">Antal</TableHead>
-                  <TableHead className="text-right">Provision</TableHead>
+                  <TableHead className="text-right">Prov./stk</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                   <TableHead className="text-right">Handling</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {saleItems.map((item) => (
-                  <TableRow key={item.id} className={item.is_cancelled ? "opacity-50" : ""}>
-                    <TableCell className={item.is_cancelled ? "line-through" : ""}>
-                      {item.display_name ?? item.adversus_product_title ?? "Ukendt produkt"}
-                    </TableCell>
-                    <TableCell className={`text-right ${item.is_cancelled ? "line-through" : ""}`}>
-                      {item.quantity ?? 1}
-                    </TableCell>
-                    <TableCell className={`text-right ${item.is_cancelled ? "line-through" : ""}`}>
-                      {formatCommission(item.mapped_commission)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.is_cancelled ? (
-                        <Badge variant="outline" className="text-muted-foreground">Annulleret</Badge>
-                      ) : confirmItemId === item.id ? (
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={isPending}
-                            onClick={() => cancelItemMutation.mutate(item.id)}
-                          >
-                            {cancelItemMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bekræft"}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setConfirmItemId(null)}
-                          >
-                            Fortryd
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isPending}
-                          onClick={() => setConfirmItemId(item.id)}
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Annuller
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {saleItems.map((item) => {
+                  const qty = item.quantity ?? 1;
+                  const cancelled = item.cancelled_quantity ?? 0;
+                  const remaining = qty - cancelled;
+                  const fullyDone = remaining <= 0;
+                  const perUnit = qty > 0 && item.mapped_commission != null
+                    ? item.mapped_commission / qty
+                    : null;
+
+                  return (
+                    <TableRow key={item.id} className={fullyDone ? "opacity-50" : ""}>
+                      <TableCell className={fullyDone ? "line-through" : ""}>
+                        {item.display_name ?? item.adversus_product_title ?? "Ukendt produkt"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {cancelled > 0 ? (
+                          <span>
+                            <span className="text-muted-foreground line-through mr-1">{qty}</span>
+                            {remaining}
+                          </span>
+                        ) : (
+                          qty
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCommission(perUnit)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {fullyDone ? (
+                          <Badge variant="outline" className="text-muted-foreground">Annulleret</Badge>
+                        ) : cancelled > 0 ? (
+                          <Badge variant="secondary">{cancelled} annulleret</Badge>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!fullyDone && (
+                          confirmItemId === item.id ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={isPending}
+                                onClick={() => cancelOneUnitMutation.mutate({
+                                  id: item.id,
+                                  quantity: qty,
+                                  cancelled_quantity: cancelled,
+                                })}
+                              >
+                                {cancelOneUnitMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bekræft"}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => setConfirmItemId(null)}>
+                                Fortryd
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isPending}
+                              onClick={() => setConfirmItemId(item.id)}
+                            >
+                              <Minus className="h-3 w-3 mr-1" />
+                              Annuller 1 stk
+                            </Button>
+                          )
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

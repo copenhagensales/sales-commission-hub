@@ -1,0 +1,1 @@
+ALTER TABLE public.sale_items ADD COLUMN cancelled_quantity integer NOT NULL DEFAULT 0;
