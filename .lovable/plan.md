@@ -1,58 +1,42 @@
 
 
-# Delvis annullering af produkter med quantity > 1
+# Omdoeb fanen og tilfoej afvisning som mulighed
 
-## Problem
-Naar et produkt har quantity > 1 (fx 6 stk), vises det som en enkelt raekke med kun en "Annuller"-knap der annullerer alle 6 paa en gang. Brugeren oensker at kunne annullere fx 1 ud af 6.
+## Oversigt
+Fanen "Manuelle annulleringer" omdoebes til "Annuller/afvis", og CancellationDialog udvides saa brugeren kan vaelge mellem at **annullere** eller **afvise** salg/produkter.
 
-## Loesning
+## Aendringer
 
-### Trin 1: Database-migration
-Tilfoej en `cancelled_quantity` kolonne til `sale_items`:
+### 1. Omdoeb fanen
+I `Cancellations.tsx`: Aendr TabsTrigger-teksten fra "Manuelle annulleringer" til "Annuller/afvis".
 
-```text
-ALTER TABLE sale_items 
-ADD COLUMN cancelled_quantity integer NOT NULL DEFAULT 0;
-```
+### 2. Opdater knappen i tabellen
+I `ManualCancellationsTab.tsx`: Aendr knap-teksten fra "Annuller" til "Annuller/afvis".
 
-Dette erstatter den binaere `is_cancelled`-tilgang med en taeller, saa man kan annullere 1, 2, 3... op til det fulde antal.
+### 3. Udvid CancellationDialog med afvisnings-mulighed
+I `CancellationDialog.tsx`:
 
-### Trin 2: Opdater CancellationDialog
+**Per produkt (raekke-niveau):**
+- Aendr "Annuller 1 stk"-knappen til to knapper: "Annuller 1 stk" og "Afvis 1 stk"
+- Ved afvisning saettes `is_cancelled = true` (eller tilsvarende) men `validation_status` paa salget saettes til `rejected` i stedet for `cancelled`
 
-**Visning per produkt-raekke:**
-- Vis produktnavn, total antal, provision pr. stk (beregnet som `mapped_commission / quantity`), og antal allerede annulleret
-- Vis "Annuller 1 stk"-knap saa laenge `cancelled_quantity < quantity`
-- Naar `cancelled_quantity == quantity`, vis "Annulleret" badge (som nu)
-- Opdater `is_cancelled` til `true` automatisk naar `cancelled_quantity == quantity`
+**Hele salget (footer):**
+- Tilfoej en "Afvis hele salget"-knap ved siden af "Annuller hele salget"
+- "Afvis hele salget" saetter `sales.validation_status = 'rejected'` og markerer alle items
 
-**Annuller-handling (per klik):**
-- Oejer `cancelled_quantity` med 1
-- Hvis `cancelled_quantity` naar `quantity`, saet ogsaa `is_cancelled = true`
-
-**"Annuller hele salget"-knappen:**
-- Saetter `cancelled_quantity = quantity` og `is_cancelled = true` for alle items
-- Saetter `sales.validation_status = 'cancelled'`
-
-### Trin 3: Tilpas provision-visning
-Da `mapped_commission` er prae-multipliceret med quantity, beregnes provision pr. stk som:
-```text
-per_unit_commission = mapped_commission / quantity
-```
-Vis baade total provision og antal annulleret, fx:
-- "6900 kr (6 stk)" med info om "2 annulleret"
+**Dialog-titel:**
+- Opdater beskrivelsen til at naevne baade annullering og afvisning
 
 ### Tekniske detaljer
 
-**Nye kolonner:**
-```text
-sale_items.cancelled_quantity (integer, default 0)
-```
-
 **Filer der aendres:**
-- `src/components/cancellations/CancellationDialog.tsx` - ny UI-logik for delvis annullering
-- Database migration for `cancelled_quantity`
+- `src/pages/salary/Cancellations.tsx` - omdoeb fane-tekst
+- `src/components/cancellations/ManualCancellationsTab.tsx` - omdoeb knap-tekst
+- `src/components/cancellations/CancellationDialog.tsx` - tilfoej afvis-mutations og UI
 
-**Kompatibilitet:**
-- `is_cancelled` bevares og saettes automatisk naar alle enheder er annulleret
-- Eksisterende logik der checker `is_cancelled` fortsaetter med at fungere
+**Ingen database-aendringer** - `validation_status` understotter allerede vaerdien `rejected`.
+
+**Nye mutations i CancellationDialog:**
+- `rejectOneUnitMutation` - samme logik som `cancelOneUnitMutation` men med `rejected` status-kontekst
+- `rejectAllMutation` - saetter `validation_status = 'rejected'` paa salget og markerer alle items
 
