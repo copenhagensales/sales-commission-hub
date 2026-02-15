@@ -36,8 +36,9 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
             client_campaigns(client_id, clients(name)),
             dialer_campaign_id
           `)
-          .gte("sale_datetime", `${startDateStr}T00:00:00`)
+           .gte("sale_datetime", `${startDateStr}T00:00:00`)
           .lte("sale_datetime", `${todayStr}T23:59:59`)
+          .neq("validation_status", "rejected")
           .range(page * pageSize, (page + 1) * pageSize - 1);
         
         if (error) throw error;
@@ -146,7 +147,8 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         .select("id, sale_datetime, raw_payload")
         .eq("source", "fieldmarketing")
         .gte("sale_datetime", `${startDateStr}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`);
+        .lte("sale_datetime", `${todayStr}T23:59:59`)
+        .neq("validation_status", "rejected");
 
       // Get FM pricing using the shared helper (respects pricing rules hierarchy)
       const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");

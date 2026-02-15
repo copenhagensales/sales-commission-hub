@@ -252,6 +252,7 @@ export default function CphSalesDashboard() {
         `)
         .gte("sale_datetime", startOfDay)
         .lte("sale_datetime", endOfDay)
+        .neq("validation_status", "rejected")
         .order("created_at", { ascending: false });
       if (error) throw error;
       
@@ -309,7 +310,8 @@ export default function CphSalesDashboard() {
         `)
         .eq("source", "fieldmarketing")
         .gte("sale_datetime", startOfDay)
-        .lte("sale_datetime", endOfDay);
+        .lte("sale_datetime", endOfDay)
+        .neq("validation_status", "rejected");
       
       if (error) throw error;
       

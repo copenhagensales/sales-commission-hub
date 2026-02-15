@@ -187,18 +187,21 @@ export default function UnitedDashboard() {
               .select("sale_items(quantity, products(counts_as_sale))")
               .in("client_campaign_id", campaignIds)
               .neq("source", "fieldmarketing")
+              .neq("validation_status", "rejected")
               .gte("sale_datetime", today.toISOString()),
             supabase
               .from("sales")
               .select("sale_items(quantity, products(counts_as_sale))")
               .in("client_campaign_id", campaignIds)
               .neq("source", "fieldmarketing")
+              .neq("validation_status", "rejected")
               .gte("sale_datetime", weekStart.toISOString()),
             fetchAllRows<any>(
               "sales",
               "sale_items(quantity, products(counts_as_sale))",
               (q) => q.in("client_campaign_id", campaignIds)
                 .neq("source", "fieldmarketing")
+                .neq("validation_status", "rejected")
                 .gte("sale_datetime", payrollPeriod.start.toISOString()),
               { orderBy: "sale_datetime", ascending: false }
             )

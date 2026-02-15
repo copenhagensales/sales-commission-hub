@@ -59,6 +59,7 @@ async function fetchAllSales(
     let query = supabase
       .from("sales")
       .select(selectFields)
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", dateStart)
       .lte("sale_datetime", dateEnd)
       .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -276,6 +277,7 @@ Deno.serve(async (req) => {
       `)
       .gte("sale_datetime", startOfDay)
       .lte("sale_datetime", endOfDay)
+      .neq("validation_status", "rejected")
       .order("sale_datetime", { ascending: false });
 
     if (salesError) {
@@ -296,6 +298,7 @@ Deno.serve(async (req) => {
         sale_datetime
       `)
       .eq("source", "fieldmarketing")
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", startOfDay)
       .lte("sale_datetime", endOfDay);
 
@@ -677,6 +680,7 @@ async function fetchTeamPerformanceData(supabase: any, todayStr: string) {
     const { data: salesPage } = await supabase
       .from("sales")
       .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", `${monthStart}T00:00:00`)
       .lte("sale_datetime", `${todayStr}T23:59:59`)
       .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -1098,6 +1102,7 @@ async function handleTeamDashboard(
       )
     `)
     .in("client_campaign_id", campaignIds.length > 0 ? campaignIds : ['none'])
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", monthStart)
     .order("sale_datetime", { ascending: false });
 
@@ -2265,6 +2270,7 @@ async function handleCsTop20Data(
     .from("sales")
     .select("id, agent_name, normalized_data, sale_datetime")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", `${todayStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
@@ -2272,6 +2278,7 @@ async function handleCsTop20Data(
     .from("sales")
     .select("id, agent_name, normalized_data, sale_datetime")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", `${weekStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
@@ -2279,6 +2286,7 @@ async function handleCsTop20Data(
     .from("sales")
     .select("id, agent_name, normalized_data, sale_datetime")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
     .lte("sale_datetime", `${todayStr}T23:59:59`);
 
@@ -2292,6 +2300,7 @@ async function handleCsTop20Data(
     const { data: salesPage } = await supabase
       .from("sales")
       .select(selectFields)
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", `${todayStr}T00:00:00`)
       .lte("sale_datetime", `${todayStr}T23:59:59`)
       .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -2309,6 +2318,7 @@ async function handleCsTop20Data(
     const { data: salesPage } = await supabase
       .from("sales")
       .select(selectFields)
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", `${weekStartStr}T00:00:00`)
       .lte("sale_datetime", `${todayStr}T23:59:59`)
       .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -2326,6 +2336,7 @@ async function handleCsTop20Data(
     const { data: salesPage } = await supabase
       .from("sales")
       .select(selectFields)
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
       .lte("sale_datetime", `${todayStr}T23:59:59`)
       .range(page * pageSize, (page + 1) * pageSize - 1);

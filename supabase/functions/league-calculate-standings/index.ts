@@ -183,6 +183,7 @@ Deno.serve(async (req) => {
       const { data: salesBatch, error: salesError } = await supabase
         .from("sales")
         .select("id, agent_email, dialer_campaign_id, client_campaign_id")
+        .neq("validation_status", "rejected")
         .gte("sale_datetime", sourceStart)
         .lte("sale_datetime", sourceEnd)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
@@ -212,6 +213,7 @@ Deno.serve(async (req) => {
       .from("sales")
       .select("id, sale_datetime, raw_payload")
       .eq("source", "fieldmarketing")
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", sourceStart)
       .lte("sale_datetime", sourceEnd);
 

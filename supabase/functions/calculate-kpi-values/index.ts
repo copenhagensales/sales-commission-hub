@@ -177,6 +177,7 @@ async function fetchAllSaleIds(
       .from("sales")
       .select("id")
       .in("client_campaign_id", campaignIds)
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .range(offset, offset + PAGE - 1);
@@ -212,6 +213,7 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
     const { data: sales, error } = await supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -538,6 +540,7 @@ Deno.serve(async (req) => {
     .from("sales")
     .select("id, sale_datetime, raw_payload")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", payrollPeriodDates.start.toISOString())
     .lte("sale_datetime", payrollPeriodDates.end.toISOString());
   
@@ -1009,6 +1012,7 @@ async function fetchAllSalesWithItems(
     let query = supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, agent_name, sale_datetime, sale_items(sale_id, quantity, mapped_commission, product_id)")
+      .neq("validation_status", "rejected")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -1058,6 +1062,7 @@ async function fetchFmSalesForPeriod(
     .from("sales")
     .select("id, sale_datetime, raw_payload")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
   
@@ -1667,7 +1672,8 @@ async function calculateSalesCount(
 ): Promise<number> {
   const { data, error: siError } = await supabase
     .from("sale_items")
-    .select("quantity, product_id, sale_id")
+    .select("quantity, product_id, sale_id, sales!inner(validation_status)")
+    .not("sales.validation_status", "eq", "rejected")
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
@@ -1707,6 +1713,7 @@ async function calculateSalesCount(
     .from("sales")
     .select("*", { count: "exact", head: true })
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
 
@@ -1722,7 +1729,8 @@ async function calculateTotalCommission(
   // Telesales commission from sale_items
   const { data, error } = await supabase
     .from("sale_items")
-    .select("mapped_commission, quantity")
+    .select("mapped_commission, quantity, sales!inner(validation_status)")
+    .not("sales.validation_status", "eq", "rejected")
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
@@ -1742,6 +1750,7 @@ async function calculateTotalCommission(
     .from("sales")
     .select("raw_payload")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
 
@@ -1764,7 +1773,8 @@ async function calculateTotalRevenue(
   // Telesales revenue from sale_items
   const { data, error } = await supabase
     .from("sale_items")
-    .select("mapped_revenue, quantity")
+    .select("mapped_revenue, quantity, sales!inner(validation_status)")
+    .not("sales.validation_status", "eq", "rejected")
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
@@ -1784,6 +1794,7 @@ async function calculateTotalRevenue(
     .from("sales")
     .select("raw_payload")
     .eq("source", "fieldmarketing")
+    .neq("validation_status", "rejected")
     .gte("sale_datetime", startStr)
     .lte("sale_datetime", endStr);
 

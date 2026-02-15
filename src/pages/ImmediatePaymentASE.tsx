@@ -296,6 +296,7 @@ export default function ImmediatePaymentASE() {
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", payrollPeriod.start.toISOString())
         .lte("sale_datetime", payrollPeriod.end.toISOString())
+        .neq("validation_status", "rejected")
         .order("sale_datetime", { ascending: false });
 
       if (!salesData) return [];

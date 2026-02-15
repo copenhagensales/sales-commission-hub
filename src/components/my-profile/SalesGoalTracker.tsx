@@ -153,9 +153,10 @@ export function SalesGoalTracker({
       // Get sale items for the current week using agent_name
       const { data, error } = await supabase
         .from("sale_items")
-        .select("mapped_commission, sales!inner(agent_name, sale_datetime)")
+        .select("mapped_commission, sales!inner(agent_name, sale_datetime, validation_status)")
         .eq("sales.agent_name", agentName)
-        .gte("sales.sale_datetime", `${weekStartStr}T00:00:00`);
+        .gte("sales.sale_datetime", `${weekStartStr}T00:00:00`)
+        .not("sales.validation_status", "eq", "rejected");
       
       if (error) throw error;
       

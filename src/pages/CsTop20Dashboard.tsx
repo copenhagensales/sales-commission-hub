@@ -110,6 +110,7 @@ function useCustomPeriodLeaderboard(
         `)
         .gte("sale_datetime", period.from.toISOString())
         .lte("sale_datetime", period.to.toISOString())
+        .neq("validation_status", "rejected")
         .order("sale_datetime", { ascending: false });
       
       if (error) {

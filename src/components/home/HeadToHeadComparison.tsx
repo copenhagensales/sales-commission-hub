@@ -521,8 +521,9 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               )
             )
           `)
-          .gte("sale_datetime", rangeStart)
-          .lte("sale_datetime", rangeEnd);
+           .gte("sale_datetime", rangeStart)
+          .lte("sale_datetime", rangeEnd)
+          .neq("validation_status", "rejected");
         
         // Filter by agent emails (case-insensitive)
         salesData = (sales || []).filter(s => 
