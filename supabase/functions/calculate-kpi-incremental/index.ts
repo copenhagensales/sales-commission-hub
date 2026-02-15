@@ -223,6 +223,7 @@ Deno.serve(async (req) => {
     const { data: newSales, error: salesError } = await supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, sale_datetime, created_at")
+      .neq("validation_status", "rejected")
       .gt("created_at", olderWatermark)
       .gte("sale_datetime", payrollPeriod.start.toISOString())
       .lte("sale_datetime", payrollPeriod.end.toISOString())
@@ -240,6 +241,7 @@ Deno.serve(async (req) => {
       .from("sales")
       .select("id, normalized_data, agent_name, sale_datetime, created_at")
       .eq("source", "fieldmarketing")
+      .neq("validation_status", "rejected")
       .gt("created_at", olderWatermark)
       .gte("sale_datetime", payrollPeriod.start.toISOString())
       .lte("sale_datetime", payrollPeriod.end.toISOString())

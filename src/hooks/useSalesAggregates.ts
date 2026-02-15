@@ -79,6 +79,7 @@ export function useSalesAggregates({
       const filters = (query: any) => {
         let q = query
           .neq("source", "fieldmarketing")
+          .neq("validation_status", "rejected")
           .gte("sale_datetime", startStr)
           .lte("sale_datetime", endStr);
         

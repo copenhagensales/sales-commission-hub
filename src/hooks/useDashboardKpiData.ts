@@ -444,7 +444,6 @@ export const useDashboardKpiData = () => {
               let filtered = q
                 .gte("sales.sale_datetime", startISO)
                 .lte("sales.sale_datetime", endISO)
-                .not("sales.validation_status", "eq", "cancelled")
                 .not("sales.validation_status", "eq", "rejected");
               if (campaignIds.length > 0) {
                 filtered = filtered.in("sales.client_campaign_id", campaignIds);
@@ -592,7 +591,6 @@ const fetchMetricValueForFormula = async (
           let filtered = q
             .gte("sales.sale_datetime", startISO)
             .lte("sales.sale_datetime", endISO)
-            .not("sales.validation_status", "eq", "cancelled")
             .not("sales.validation_status", "eq", "rejected");
           if (campaignIds.length > 0) {
             filtered = filtered.in("sales.client_campaign_id", campaignIds);
@@ -1187,7 +1185,6 @@ export const useWidgetKpiData = (widgets: Array<{
                     let filtered = q
                       .gte("sales.sale_datetime", startISO)
                       .lte("sales.sale_datetime", endISO)
-                      .not("sales.validation_status", "eq", "cancelled")
                       .not("sales.validation_status", "eq", "rejected");
                     if (campaignIds.length > 0) {
                       filtered = filtered.in("sales.client_campaign_id", campaignIds);

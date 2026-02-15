@@ -268,6 +268,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
             products (id, name)
           )
         `, { count: "exact" })
+        .neq("validation_status", "rejected")
         .order("sale_datetime", { ascending: false });
 
       // Apply filters
