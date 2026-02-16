@@ -1,33 +1,23 @@
 
 
-## Tilf distribution af besvarelser ved mouseover i gennemsnitsgrafen
+## Fjern dobbelt adgangstjek på Fieldmarketing Dashboard
 
-### Hvad skal ændres
-Lige nu viser tooltip'en på barcharten kun gennemsnittet og det fulde spørgsmål. Planen er at udvide tooltip'en, så den også viser fordelingen af individuelle svar -- fx "Score 1: 2 svar, Score 9: 4 svar".
+### Hvad bliver ændret
+En enkelt fil ændres: `src/pages/dashboards/FieldmarketingDashboardFull.tsx`
 
-### Ændringer
+Det dobbelte adgangstjek fjernes, så kun team-adgangen (via `useRequireDashboardAccess`) bestemmer om en bruger kan se dashboardet. Når de har adgang, ser de alle tabs.
 
-**Fil: `src/pages/PulseSurveyResults.tsx`**
+### Ændringer i detaljer
 
-1. Udvid `AveragesChart`-komponenten til også at modtage `filteredResponses` (de rå besvarelser) som prop.
+1. **Fjern `useUnifiedPermissions`** -- import og kald (linje 47 og 398) slettes, da `canView` ikke længere bruges til tab-filtrering
+2. **Fjern `visibleTabs`** -- hele useMemo-blokken (linje 461-465) slettes
+3. **Fjern "ingen adgang"-blokken** -- linje 500-508 slettes (den der viser "Du har ikke adgang" når visibleTabs er tom)
+4. **Fjern `permissionsLoading`** fra loading-tjekket (linje 485) -- kun `accessLoading` beholdes
+5. **Erstat alle `visibleTabs` med `allTabs`** i:
+   - `defaultTab` (linje 467)
+   - `gridColsClass` (linje 520)
+   - TabsList-rendering (linje 554)
+   - TabsContent-rendering (linje 561)
 
-2. For hvert spørgsmål i `data`-arrayet, beregn en histogram-fordeling (antal besvarelser per score-værdi) baseret på de rå responses.
-
-3. Opdater den custom tooltip til at vise:
-   - Gennemsnittet (som nu)
-   - Det fulde spørgsmål (som nu)
-   - En lille tabel/liste over fordelingen: "Score X: Y svar" for alle scores der har mindst 1 besvarelse, sorteret fra lavest til højest
-   - Totalt antal besvarelser for det pågældende spørgsmål
-
-4. Opdater kaldet til `AveragesChart` (ca. linje 430) til at sende `filteredResponses` med som prop.
-
-### Tekniske detaljer
-
-- `AveragesChart` props udvides med `responses: any[]`
-- I `data`-mappingen tilføjes et `distribution`-objekt per spørgsmål:
-  ```
-  distribution: { [scoreValue: number]: count }
-  ```
-- Tooltip-indholdet udvides med en liste over fordelingen, kun for scores med mindst 1 besvarelse
-- Ingen nye dependencies kræves -- alt bygger på eksisterende Recharts custom tooltip
-
+### Resultat
+Enhver bruger med team-baseret adgang til "fieldmarketing"-dashboardet vil automatisk se begge tabs (Eesy FM og Yousee) uden yderligere rettighedstjek.
