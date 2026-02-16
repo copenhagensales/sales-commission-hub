@@ -1,60 +1,37 @@
 
-# Produktopdeling i Dagsrapporter
 
-## Hvad skal tilfojes
-Naar man ser dagsrapporten, skal man kunne se hvilke produkter der er solgt, antal pr. produkt, provision pr. produkt, og samlet provision/omsaetning. Dette vises som en udvidelig sektion under hver medarbejder (eller under hver dag i multi-dag visning).
+# Kampagneopdeling i Produktopdeling
 
-## Overordnet design
-- Klik paa en medarbejder-raekke aabner en produktopdeling under raekken
-- For enkeldag: viser produkter direkte under medarbejderen
-- For multi-dag: foerst dagsopdeling (eksisterende), derefter produktopdeling under hele medarbejderen eller under hver dag
-- Produktopdelingen viser: produktnavn, antal solgt, provision pr. produkt, omsaetning pr. produkt
+## Hvad skal aendres
+Produktopdelingen i dagsrapporter skal udvides saa hvert produkt ogsaa viser hvilken kampagne det er solgt paa. Hvis samme produkt er solgt paa to forskellige kampagner, vises de som separate raekker.
 
-## Teknisk plan
+## Aendringer i detaljer
 
-### 1. Udvid DailyEntry interface
-Tilfoej et `products` felt til `DailyEntry` der indeholder produktniveau-data:
-
+### 1. Udvid ProductSaleDetail interface
+Tilfoej `campaign_name` felt:
 ```typescript
 interface ProductSaleDetail {
   product_name: string;
+  campaign_name: string;  // NYT
   quantity: number;
   commission: number;
   revenue: number;
 }
-
-interface DailyEntry {
-  // ... eksisterende felter
-  product_details: ProductSaleDetail[];
-}
 ```
 
-Tilfoej ogsaa `product_details` paa `EmployeeReportData` for samlet produktopdeling.
+### 2. Udvid campaign mappings fetch
+Den eksisterende fetch af `adversus_campaign_mappings` henter allerede `adversus_campaign_id` og `id`. Tilfoej `adversus_campaign_name` til select-clause, og opbyg et nyt Map fra `adversus_campaign_id` til `adversus_campaign_name`.
 
-### 2. Udvid data-fetching
-I select-clause for sales (linje ~554), tilfoej produktnavn:
-- Aendr `sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))` til `sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`
+### 3. Aendr aggregeringsnoegle
+I stedet for kun at bruge `product_name` som noegle i `dayProductMap`, bruges nu en kombineret noegle: `produktnavn|||kampagnenavn`. Kampagnenavnet resolves fra salgets `dialer_campaign_id` via det nye Map. For FM-salg saettes kampagnenavnet til "Fieldmarketing".
 
-### 3. Aggreger produktdata i beregningslogikken
-I loopet der behandler sale_items (linje ~835-846):
-- Opbyg en Map pr. dag med produktnavn som noegle
-- Aggreger quantity, commission og revenue pr. produkt
-- Tilfoej den aggregerede produktliste til `DailyEntry.product_details`
-- Saml ogsaa en total produktopdeling paa medarbejderniveau i `EmployeeReportData.product_details`
+### 4. Opdater UI-tabellen
+Tilfoej en "Kampagne"-kolonne i produktopdeling-tabellen mellem "Produkt" og "Antal". Opdater ogsaa `key` paa raekker til at bruge baade produkt og kampagne.
 
-### 4. Tilfoej fieldmarketing-produkter
-FM-salg (linje ~849-860) bruger allerede `fm_product_name` fra raw_payload - dette skal ogsaa inkluderes i produkt-aggregeringen.
-
-### 5. Vis produktopdeling i UI
-Under den udvidede medarbejder-raekke (efter dagsopdeling eller direkte for enkeltdag):
-- Vis en undertabel med kolonner: Produkt | Antal | Provision | Omsaetning
-- Sorteret efter antal (hoejest foerst)
-- Vis en summerings-raekke med totaler
-- Stilmaessigt: let baggrund (bg-muted/20), indrykning for at indikere hierarki
-
-### 6. Filer der aendres
-- `src/pages/reports/DailyReports.tsx` - eneste fil der skal aendres:
-  - Udvid interfaces (DailyEntry, EmployeeReportData)
-  - Udvid select-clause til at inkludere produktnavne
-  - Tilfoej produktaggregering i beregningsloopet
-  - Tilfoej produktopdeling i tabel-renderingen (expandable section)
+### 5. Fil der aendres
+Kun `src/pages/reports/DailyReports.tsx`:
+- Linje 77-82: Udvid interface med `campaign_name`
+- Linje 590-596: Tilfoej `adversus_campaign_name` til campaign mappings fetch og byg navn-Map
+- Linje 832-900: Aendr aggregeringsnoegle til produkt+kampagne
+- Linje 942-957: Tilsvarende for employee-level aggregering
+- Linje 1513-1541: Tilfoej Kampagne-kolonne i UI-tabellen
