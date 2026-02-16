@@ -1,0 +1,1 @@
+ALTER TABLE public.cohort_members ADD COLUMN agent_email TEXT;

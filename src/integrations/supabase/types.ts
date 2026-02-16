@@ -1965,6 +1965,7 @@ export type Database = {
       }
       cohort_members: {
         Row: {
+          agent_email: string | null
           candidate_id: string | null
           cohort_id: string
           created_at: string
@@ -1976,6 +1977,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_email?: string | null
           candidate_id?: string | null
           cohort_id: string
           created_at?: string
@@ -1987,6 +1989,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_email?: string | null
           candidate_id?: string | null
           cohort_id?: string
           created_at?: string
