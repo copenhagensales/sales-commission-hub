@@ -11,11 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export type PeriodType = 
@@ -178,64 +173,64 @@ export function DashboardPeriodSelector({
   }
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                <span>{displayLabel}</span>
-              </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            {PERIOD_PRESETS.map((preset) => (
-              <DropdownMenuItem
-                key={preset.type}
-                onClick={() => handlePresetSelect(preset.type)}
-                className={cn(
-                  "cursor-pointer",
-                  selectedPeriod.type === preset.type && "bg-accent"
-                )}
-              >
-                {preset.label}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
+    <div className={cn("flex items-center gap-2 relative", className)}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-between">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span>{displayLabel}</span>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[200px]">
+          {PERIOD_PRESETS.map((preset) => (
             <DropdownMenuItem
-              onClick={() => {
-                setTimeout(() => setCalendarOpen(true), 150);
-              }}
+              key={preset.type}
+              onClick={() => handlePresetSelect(preset.type)}
               className={cn(
                 "cursor-pointer",
-                selectedPeriod.type === "custom" && "bg-accent"
+                selectedPeriod.type === preset.type && "bg-accent"
               )}
             >
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              Brugerdefineret...
+              {preset.label}
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <PopoverTrigger asChild>
-          <span className="hidden" />
-        </PopoverTrigger>
-        <PopoverContent 
-          className="w-auto p-0 z-50" 
-          align="end"
-          sideOffset={8}
-        >
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              setTimeout(() => setCalendarOpen(true), 200);
+            }}
+            className={cn(
+              "cursor-pointer",
+              selectedPeriod.type === "custom" && "bg-accent"
+            )}
+          >
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            Brugerdefineret...
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {calendarOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setCalendarOpen(false)} 
+        />
+      )}
+      {calendarOpen && (
+        <div className="absolute right-0 top-full mt-2 z-50 rounded-md border bg-popover p-0 shadow-md animate-in fade-in-0 zoom-in-95">
           <Calendar
             mode="range"
             selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
             onSelect={handleDateRangeSelect}
             numberOfMonths={2}
             locale={da}
-            className="pointer-events-auto"
+            className="pointer-events-auto p-3"
           />
-        </PopoverContent>
-      </Popover>
+        </div>
+      )}
     </div>
   );
 }
