@@ -155,7 +155,15 @@ export default function RelatelDashboard() {
     if (!liveData?.byEmployee) return [];
     const idToName = employeeData?.idToNameMap;
     const idToAvatar = employeeData?.idToAvatarMap;
-    return Object.entries(liveData.byEmployee)
+    
+    // Debug: log keys to understand if they are UUIDs or emails
+    const entries = Object.entries(liveData.byEmployee);
+    if (entries.length > 0) {
+      console.log("[RelatelDashboard] byEmployee keys sample:", entries.slice(0, 3).map(([k, v]) => ({ key: k, name: (v as any).name, resolved: idToName?.get(k) })));
+      console.log("[RelatelDashboard] idToNameMap size:", idToName?.size, "sample:", idToName ? Array.from(idToName.entries()).slice(0, 3) : "N/A");
+    }
+    
+    return entries
       .map(([key, emp]) => ({
         name: idToName?.get(key) || emp.name,
         totalSales: emp.sales,
