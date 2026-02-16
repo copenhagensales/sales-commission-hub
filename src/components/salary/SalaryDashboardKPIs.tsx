@@ -28,7 +28,7 @@ function KpiCard({ title, value, icon, subtitle, isLoading }: KpiCardProps) {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mt-1" />
             ) : (
               <>
-                <p className="text-xl font-bold truncate">{value}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{value}</p>
                 {subtitle && (
                   <p className="text-xs text-muted-foreground">{subtitle}</p>
                 )}
@@ -107,7 +107,7 @@ export function SalaryDashboardKPIs() {
     (personnelCounts?.staff || 0);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
       <KpiCard
         title="Personale løn"
         value={formatCurrency(totalMonthlySalary)}

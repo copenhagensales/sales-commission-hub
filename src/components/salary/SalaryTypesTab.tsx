@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Plus, Pencil, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SalaryType {
   id: string;
@@ -61,6 +62,7 @@ const PAYOUT_FREQUENCY_LABELS: Record<PayoutFrequency, string> = {
 };
 
 export function SalaryTypesTab() {
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -428,6 +430,34 @@ export function SalaryTypesTab() {
           ) : filteredTypes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchTerm ? "Ingen lønarter matcher din søgning" : "Ingen lønarter oprettet endnu"}
+            </div>
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {filteredTypes.map((type) => (
+                <div key={type.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{type.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={type.is_active}
+                        onCheckedChange={(checked) =>
+                          toggleActiveMutation.mutate({ id: type.id, isActive: checked })
+                        }
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(type)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {type.description && (
+                    <p className="text-xs text-muted-foreground">{type.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs">{formatAmount(type)}</Badge>
+                    <span className="text-xs text-muted-foreground">{formatDefinition(type)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <Table>
