@@ -399,7 +399,7 @@ export default function RelatelDashboard() {
         {/* ========== LIVE MODE: Show single period KPIs + leaderboard ========== */}
         {!useCached && (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 max-w-sm">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Salg</CardTitle>
@@ -408,19 +408,6 @@ export default function RelatelDashboard() {
                 <CardContent>
                   <div className="text-3xl font-bold text-primary">
                     {isLoading ? "..." : liveSalesCount}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{selectedPeriod.label}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Provision</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-primary">
-                    {isLoading ? "..." : formatCurrency(liveCommission)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{selectedPeriod.label}</p>
                 </CardContent>
