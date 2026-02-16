@@ -36,6 +36,7 @@ interface CohortMember {
   candidate_id: string | null;
   employee_id: string | null;
   daily_bonus_client_id: string | null;
+  agent_email: string | null;
   candidate?: {
     id: string;
     first_name: string;
@@ -101,6 +102,7 @@ export default function UpcomingStarts() {
     name: string;
     teamId: string | null;
     clientId: string | null;
+    agentEmail: string | null;
   } | null>(null);
   const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
   const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
@@ -308,6 +310,52 @@ export default function UpcomingStarts() {
             .eq("id", candidate.id);
 
           if (candError) throw candError;
+
+          // 5. Create agent + mapping if agent_email is set
+          if (member.agent_email) {
+            try {
+              // Create or find agent by email
+              const { data: existingAgent } = await supabase
+                .from("agents")
+                .select("id")
+                .eq("email", member.agent_email.toLowerCase())
+                .maybeSingle();
+
+              let agentId: string;
+              if (existingAgent) {
+                agentId = existingAgent.id;
+              } else {
+                const { data: newAgent, error: agentError } = await supabase
+                  .from("agents")
+                  .insert({
+                    email: member.agent_email.toLowerCase(),
+                    name: `${candidate.first_name} ${candidate.last_name}`,
+                    is_active: true,
+                    source: "cohort_onboarding",
+                  })
+                  .select()
+                  .single();
+                if (agentError) throw agentError;
+                agentId = newAgent.id;
+              }
+
+              // Create employee_agent_mapping
+              const { error: mappingError } = await supabase
+                .from("employee_agent_mapping")
+                .insert({
+                  employee_id: employee.id,
+                  agent_id: agentId,
+                })
+                .select()
+                .single();
+              if (mappingError && !mappingError.message.includes("duplicate")) {
+                console.error("Agent mapping error:", mappingError);
+              }
+            } catch (agentErr) {
+              console.error("Agent creation error:", agentErr);
+              // Don't fail the whole process for agent mapping
+            }
+          }
 
           results.sent++;
         } catch (err: any) {
@@ -521,6 +569,12 @@ export default function UpcomingStarts() {
                         {position && (
                           <p className="text-sm text-muted-foreground truncate">{position}</p>
                         )}
+                        {member.agent_email && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            {member.agent_email}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 ml-2">
                         <Badge variant="outline" className="text-xs shrink-0">
@@ -540,6 +594,7 @@ export default function UpcomingStarts() {
                                       name,
                                       teamId: cohort.team_id,
                                       clientId: member.daily_bonus_client_id,
+                                      agentEmail: member.agent_email,
                                     });
                                     setEditMemberDialogOpen(true);
                                   }}
@@ -548,7 +603,7 @@ export default function UpcomingStarts() {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Rediger dagsbonuskunde</p>
+                                <p>Rediger deltager</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -805,6 +860,7 @@ export default function UpcomingStarts() {
           memberName={selectedMemberForEdit.name}
           teamId={selectedMemberForEdit.teamId}
           currentClientId={selectedMemberForEdit.clientId}
+          currentAgentEmail={selectedMemberForEdit.agentEmail}
         />
       )}
 

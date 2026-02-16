@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ interface EditMemberClientDialogProps {
   memberName: string;
   teamId: string | null;
   currentClientId: string | null;
+  currentAgentEmail: string | null;
 }
 
 export function EditMemberClientDialog({
@@ -36,17 +38,20 @@ export function EditMemberClientDialog({
   memberName,
   teamId,
   currentClientId,
+  currentAgentEmail,
 }: EditMemberClientDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(currentClientId);
+  const [agentEmail, setAgentEmail] = useState<string>(currentAgentEmail || "");
 
   // Reset when dialog opens with new data
   useEffect(() => {
     if (open) {
       setSelectedClientId(currentClientId);
+      setAgentEmail(currentAgentEmail || "");
     }
-  }, [open, currentClientId]);
+  }, [open, currentClientId, currentAgentEmail]);
 
   // Fetch clients for the team
   const { data: teamClients = [], isLoading } = useQuery({
@@ -68,7 +73,10 @@ export function EditMemberClientDialog({
     mutationFn: async () => {
       const { error } = await supabase
         .from("cohort_members")
-        .update({ daily_bonus_client_id: selectedClientId })
+        .update({ 
+          daily_bonus_client_id: selectedClientId,
+          agent_email: agentEmail.trim() || null,
+        })
         .eq("id", memberId);
       if (error) throw error;
     },
@@ -94,7 +102,7 @@ export function EditMemberClientDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Rediger dagsbonuskunde</DialogTitle>
+          <DialogTitle>Rediger deltager</DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
@@ -144,6 +152,21 @@ export function EditMemberClientDialog({
               </p>
             </div>
           )}
+
+          {/* Agent email field */}
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="agent-email">CopenhagenSales mail</Label>
+            <Input
+              id="agent-email"
+              type="email"
+              placeholder="fx shha@copenhagensales.dk"
+              value={agentEmail}
+              onChange={(e) => setAgentEmail(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Bruges til at oprette agent-mapping når holdet startes
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
