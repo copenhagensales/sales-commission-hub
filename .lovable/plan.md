@@ -1,23 +1,38 @@
 
 
-## Fjern dobbelt adgangstjek på Fieldmarketing Dashboard
+## Fix: FM-medarbejdere kan ikke se teamets salg (RLS-problem)
 
-### Hvad bliver ændret
-En enkelt fil ændres: `src/pages/dashboards/FieldmarketingDashboardFull.tsx`
+### Problem
+RLS-politikken "FM sellers can view own fieldmarketing sales" begrænser FM-sælgere til kun at se salg hvor `agent_email` matcher deres egen email. Det betyder at Julie kun ser sine egne 146 salg, og ikke teamets salg fra den 15.-16. februar.
 
-Det dobbelte adgangstjek fjernes, så kun team-adgangen (via `useRequireDashboardAccess`) bestemmer om en bruger kan se dashboardet. Når de har adgang, ser de alle tabs.
+### Løsning
+Opdater RLS-politikken så FM-sælgere kan se **alle** fieldmarketing-salg (source = 'fieldmarketing'), ikke kun deres egne.
 
-### Ændringer i detaljer
+### Tekniske ændringer
 
-1. **Fjern `useUnifiedPermissions`** -- import og kald (linje 47 og 398) slettes, da `canView` ikke længere bruges til tab-filtrering
-2. **Fjern `visibleTabs`** -- hele useMemo-blokken (linje 461-465) slettes
-3. **Fjern "ingen adgang"-blokken** -- linje 500-508 slettes (den der viser "Du har ikke adgang" når visibleTabs er tom)
-4. **Fjern `permissionsLoading`** fra loading-tjekket (linje 485) -- kun `accessLoading` beholdes
-5. **Erstat alle `visibleTabs` med `allTabs`** i:
-   - `defaultTab` (linje 467)
-   - `gridColsClass` (linje 520)
-   - TabsList-rendering (linje 554)
-   - TabsContent-rendering (linje 561)
+**Database-migration (SQL):**
 
-### Resultat
-Enhver bruger med team-baseret adgang til "fieldmarketing"-dashboardet vil automatisk se begge tabs (Eesy FM og Yousee) uden yderligere rettighedstjek.
+1. Drop den eksisterende restriktive policy:
+```sql
+DROP POLICY "FM sellers can view own fieldmarketing sales" ON sales;
+```
+
+2. Opret ny policy der giver FM-sælgere adgang til alle FM-salg:
+```sql
+CREATE POLICY "FM sellers can view all fieldmarketing sales"
+ON sales FOR SELECT
+USING (
+  source = 'fieldmarketing'
+  AND EXISTS (
+    SELECT 1 FROM employee_master_data
+    WHERE auth_user_id = auth.uid()
+    AND is_active = true
+  )
+);
+```
+
+Denne policy tillader enhver aktiv medarbejder med en auth-konto at se alle fieldmarketing-salg. Den generelle "Employees can view own sales" og "Managers can view sales" policy håndterer fortsat adgang til andre salgstyper (telesalg osv.).
+
+### Ingen kodeændringer
+Dashboardet henter allerede data korrekt -- problemet er udelukkende at databasen blokerer rækkerne via RLS. Når politikken er opdateret, vil alle FM-sælgere automatisk kunne se hele teamets salg, lønperiode-tabellen og dagens sælgere.
+
