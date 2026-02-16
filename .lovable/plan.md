@@ -1,31 +1,18 @@
 
-## Forbedring af "Brugerdefineret" periodevalg
+
+## Udvid salgsgrænsen og tydeliggør limit-advarsel
 
 ### Problem
-Naar man klikker "Brugerdefineret..." i dropdown-menuen, lukker dropdown'en forst, og sa abner en separat kalender-popup via en `setTimeout`-hack. Det foeles usammenhaegende og kraever to trin.
+Annulleringssiden henter maksimalt 100 salg. Relatel har 423+ salg i perioden, og medarbejdere med salg uden for de 100 nyeste vises ikke i dropdown.
 
-### Losning
-Erstat `DropdownMenu` + separat kalender med en enkelt `Popover` der viser **presets til venstre** og **kalender til hojre** i et samlet panel - praecis som `DashboardDateRangePicker` allerede gor andetsteds.
+### Ændringer
 
-### Nyt flow
-1. Klik pa knappen -> en popover abner
-2. Venstre side: hurtigvalg (I dag, I gar, Denne uge, osv.)
-3. Hojre side: kalender i range-mode til brugerdefineret valg
-4. Valg af preset eller faerdiggorelse af dato-range lukker popoveren automatisk
+**Fil:** `src/components/cancellations/ManualCancellationsTab.tsx`
 
-### Tekniske detaljer
+1. **Hæv grænsen** fra `.limit(100)` til `.limit(1000)` i Supabase-forespørgslen (linje 83).
+2. **Opdater advarslen** i bunden (linje ~188) til at vise en mere tydelig besked med et advarselikon, der klart fortæller brugeren at der er flere salg end vist, og at de bør indsnævre med filtre.
 
-**Fil: `src/components/dashboard/DashboardPeriodSelector.tsx`**
+### Resultat
+- Op til 1000 salg hentes nu, så Jonas og andre medarbejdere med ældre salg i perioden bliver synlige.
+- Brugeren ser tydeligt en advarsel, hvis der er præcis 1000 resultater, hvilket indikerer at der kan være flere salg bag grænsen.
 
-- Fjern import af `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuTrigger`
-- Tilfoej import af `Popover`, `PopoverContent`, `PopoverTrigger` fra `@/components/ui/popover`
-- Fjern `calendarOpen` state (ikke laengere noedvendig)
-- Tilfoej `open`/`setOpen` state til Popover
-- Erstat hele JSX-blokken (linje 175-234) med:
-  - `Popover` med `open`/`onOpenChange`
-  - `PopoverTrigger` med den eksisterende knap
-  - `PopoverContent` med `flex`-layout:
-    - Venstre: `div` med `border-r` og preset-knapper (`Button variant="ghost"`) der kalder `handlePresetSelect` + lukker popover
-    - Hojre: `Calendar mode="range"` med `numberOfMonths={2}`, `locale={da}`, der lukker popover nar begge datoer er valgt
-- Al eksisterende logik for periodeberegning, `getDefaultPeriod`, caching-funktioner og typer forbliver uaendret
-- Fjern `ChevronDown` import (erstattes af ren kalender-ikon stil)
