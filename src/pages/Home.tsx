@@ -15,7 +15,6 @@ import {
   Award, 
   Users,
   Calendar,
-  
   PartyPopper,
   Plus,
   Trash2,
@@ -24,11 +23,13 @@ import {
   ThumbsDown,
   Info,
   CalendarX,
+  Pencil,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { EventDetailDialog } from "@/components/home/EventDetailDialog";
+import { EditEventDialog } from "@/components/home/EditEventDialog";
 import { EventInvitationPopup } from "@/components/home/EventInvitationPopup";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -69,6 +70,9 @@ const Home = () => {
   });
   const [celebrationsOpen, setCelebrationsOpen] = useState(true);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<string | null>(null);
+  
+  const { isOwner } = usePermissions();
 
   const handleLogout = async () => {
     queryClient.clear();
@@ -457,6 +461,13 @@ const Home = () => {
         isLoading={toggleAttendanceMutation.isPending}
       />
 
+      {/* Edit Event Dialog */}
+      <EditEventDialog
+        event={editingEvent ? companyEvents.find(e => e.id === editingEvent) ?? null : null}
+        open={!!editingEvent}
+        onOpenChange={(open) => !open && setEditingEvent(null)}
+      />
+
       {/* Mobile Sticky Performance Bar */}
       <StickyPerformanceBar
         progressPercent={progressPercent}
@@ -740,14 +751,27 @@ const Home = () => {
                         >
                           <Info className="w-3.5 h-3.5 text-muted-foreground" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-                          onClick={() => deleteEventMutation.mutate(event.id)}
-                        >
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </Button>
+                        {(isOwner || event.created_by === user?.id) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+                            onClick={() => setEditingEvent(event.id)}
+                            title="Rediger"
+                          >
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          </Button>
+                        )}
+                        {(isOwner || event.created_by === user?.id) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+                            onClick={() => deleteEventMutation.mutate(event.id)}
+                          >
+                            <Trash2 className="w-3 h-3 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
