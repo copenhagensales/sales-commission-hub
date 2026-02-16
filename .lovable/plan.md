@@ -1,35 +1,36 @@
 
 
-## Fix: Brugerdefineret periode henter ikke data
+## Fix: Forkerte navne og visning i live-mode
 
 ### Problem
-`DashboardPeriodSelector` opdaterer `selectedPeriod`-state, men ingen data-hooks bruger denne state. Alle tal kommer fra hardcodede cache-perioder (`today`, `this_week`, `payroll_period`) via `useClientDashboardKpis` og `useCachedLeaderboards`. Brugerdefineret periode har derfor ingen effekt.
+Nar dashboardet bruger live-data (ved brugerdefineret periode), vises salgernes navne som forkortede email-prafikser (fx "thor", "jani", "jakr") i stedet for fulde navne. Det skyldes at live-queryen bruger `agentEmail.split("@")[0]` som navn.
+
+Derudover mangler avatars og "Switch"-kolonnen i live-mode.
 
 ### Losning
-Nar brugeren valger en brugerdefineret periode (eller "i gar", "sidste 7 dage" osv.), skal dashboardet falde tilbage til en live-query mod databasen i stedet for cached KPIs. Cached KPIs understotter kun faste perioder (today, this_week, this_month, payroll_period).
 
-### Tekniske andringer
+**1. Hent medarbejdernavne korrekt i live-mode**
+- Udvid den eksisterende `employeeData`-query til ogsa at bygge et opslag fra employee_id og email til fuldt navn
+- Brug dette opslag til at erstatte de forkortede navne i `liveSellers`
 
-**1. Tilfoej live-query fallback i `RelatelDashboard.tsx`:**
-- Importer `useSalesAggregatesExtended` og `canUseCachedKpis` 
-- Naar `canUseCachedKpis(selectedPeriod.type)` er `false`, brug `useSalesAggregatesExtended` med `selectedPeriod.from` / `selectedPeriod.to` til at hente data direkte fra databasen
-- Naar `canUseCachedKpis` er `true`, brug de eksisterende cached KPIs som i dag
+**2. Tilfoej avatars til live-salgere**
+- Brug det eksisterende avatar-map til at saette `avatarUrl` pa live-salgere
 
-**2. Opdater hero-kort (KPI-cards):**
-- Vis data baseret pa den valgte periode i stedet for altid at vise dag/uge/lonperiode
-- For standard-perioder: brug cached KPIs (hurtigt)
-- For custom/yesterday/last_7_days: brug live-aggregerede data
+**3. Konkrete aendringer i `RelatelDashboard.tsx`:**
 
-**3. Opdater leaderboard-tabellerne:**
-- For cached perioder: brug `useCachedLeaderboards` som nu
-- For custom perioder: brug `useSalesAggregatesExtended` med `groupBy: ['employee']` og vis `byEmployee` data som leaderboard
+- Udvid `employeeData`-queryen til at returnere et `idToNameMap` (employee_id -> fuldt navn) og et `emailToNameMap` (via `employee_agent_mapping`) sa live-data kan oplose rigtige navne
+- Opdater `liveSellers` useMemo til at slaa navne og avatars op fra disse maps
+- Beholde den eksisterende cached-mode uaendret (den virker korrekt)
 
-**4. Vis korrekt periode-label:**
-- Brug `selectedPeriod.label` i subtitle i stedet for altid at vise payroll-perioden
+### Teknisk detalje
 
-### Samme monster for andre dashboards
-Samme problem eksisterer i `TdcErhvervDashboard.tsx`, `UnitedDashboard.tsx`, og `EesyTmDashboard.tsx`. Disse kan fixes efterfolgende med samme tilgang.
+Problemet er i `useSalesAggregatesExtended.ts` linje 302:
+```text
+name: agentEmail.split("@")[0]  // -> "thor" i stedet for "Thor Jensen"
+```
 
-### Kompleksitet
-Middel -- kraever betinget datahentning og sammenfletning af to datakilder (cached vs. live) i UI-laget.
+RPC-pathen (`get_sales_aggregates_v2`) returnerer muligvis ogsa kun korte navne. Losningen er at oplose navne i dashboard-komponenten via employee_master_data + employee_agent_mapping, uanset hvad RPC/fallback returnerer.
+
+### Filer der aendres
+- `src/pages/RelatelDashboard.tsx` (udvid employee-query + opdater liveSellers mapping)
 
