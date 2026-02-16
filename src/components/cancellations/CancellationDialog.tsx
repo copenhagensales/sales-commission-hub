@@ -127,7 +127,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
       if (hasActiveUnit) {
         const { error: salesError } = await supabase
           .from("sales")
-          .update({ validation_status: null })
+          .update({ validation_status: "pending" })
           .eq("id", saleId);
         if (salesError) throw salesError;
       }
