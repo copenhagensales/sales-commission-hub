@@ -1,38 +1,35 @@
 
 
-## Fix: FM-medarbejdere kan ikke se teamets salg (RLS-problem)
+## Fix: Brugerdefineret periode henter ikke data
 
 ### Problem
-RLS-politikken "FM sellers can view own fieldmarketing sales" begrænser FM-sælgere til kun at se salg hvor `agent_email` matcher deres egen email. Det betyder at Julie kun ser sine egne 146 salg, og ikke teamets salg fra den 15.-16. februar.
+`DashboardPeriodSelector` opdaterer `selectedPeriod`-state, men ingen data-hooks bruger denne state. Alle tal kommer fra hardcodede cache-perioder (`today`, `this_week`, `payroll_period`) via `useClientDashboardKpis` og `useCachedLeaderboards`. Brugerdefineret periode har derfor ingen effekt.
 
-### Løsning
-Opdater RLS-politikken så FM-sælgere kan se **alle** fieldmarketing-salg (source = 'fieldmarketing'), ikke kun deres egne.
+### Losning
+Nar brugeren valger en brugerdefineret periode (eller "i gar", "sidste 7 dage" osv.), skal dashboardet falde tilbage til en live-query mod databasen i stedet for cached KPIs. Cached KPIs understotter kun faste perioder (today, this_week, this_month, payroll_period).
 
-### Tekniske ændringer
+### Tekniske andringer
 
-**Database-migration (SQL):**
+**1. Tilfoej live-query fallback i `RelatelDashboard.tsx`:**
+- Importer `useSalesAggregatesExtended` og `canUseCachedKpis` 
+- Naar `canUseCachedKpis(selectedPeriod.type)` er `false`, brug `useSalesAggregatesExtended` med `selectedPeriod.from` / `selectedPeriod.to` til at hente data direkte fra databasen
+- Naar `canUseCachedKpis` er `true`, brug de eksisterende cached KPIs som i dag
 
-1. Drop den eksisterende restriktive policy:
-```sql
-DROP POLICY "FM sellers can view own fieldmarketing sales" ON sales;
-```
+**2. Opdater hero-kort (KPI-cards):**
+- Vis data baseret pa den valgte periode i stedet for altid at vise dag/uge/lonperiode
+- For standard-perioder: brug cached KPIs (hurtigt)
+- For custom/yesterday/last_7_days: brug live-aggregerede data
 
-2. Opret ny policy der giver FM-sælgere adgang til alle FM-salg:
-```sql
-CREATE POLICY "FM sellers can view all fieldmarketing sales"
-ON sales FOR SELECT
-USING (
-  source = 'fieldmarketing'
-  AND EXISTS (
-    SELECT 1 FROM employee_master_data
-    WHERE auth_user_id = auth.uid()
-    AND is_active = true
-  )
-);
-```
+**3. Opdater leaderboard-tabellerne:**
+- For cached perioder: brug `useCachedLeaderboards` som nu
+- For custom perioder: brug `useSalesAggregatesExtended` med `groupBy: ['employee']` og vis `byEmployee` data som leaderboard
 
-Denne policy tillader enhver aktiv medarbejder med en auth-konto at se alle fieldmarketing-salg. Den generelle "Employees can view own sales" og "Managers can view sales" policy håndterer fortsat adgang til andre salgstyper (telesalg osv.).
+**4. Vis korrekt periode-label:**
+- Brug `selectedPeriod.label` i subtitle i stedet for altid at vise payroll-perioden
 
-### Ingen kodeændringer
-Dashboardet henter allerede data korrekt -- problemet er udelukkende at databasen blokerer rækkerne via RLS. Når politikken er opdateret, vil alle FM-sælgere automatisk kunne se hele teamets salg, lønperiode-tabellen og dagens sælgere.
+### Samme monster for andre dashboards
+Samme problem eksisterer i `TdcErhvervDashboard.tsx`, `UnitedDashboard.tsx`, og `EesyTmDashboard.tsx`. Disse kan fixes efterfolgende med samme tilgang.
+
+### Kompleksitet
+Middel -- kraever betinget datahentning og sammenfletning af to datakilder (cached vs. live) i UI-laget.
 
