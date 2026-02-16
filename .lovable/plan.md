@@ -1,18 +1,35 @@
 
 
-## Udvid salgsgrænsen og tydeliggør limit-advarsel
+## Tilføj CophagenSales-mail til holddeltagere
 
-### Problem
-Annulleringssiden henter maksimalt 100 salg. Relatel har 423+ salg i perioden, og medarbejdere med salg uden for de 100 nyeste vises ikke i dropdown.
+### Hvad bliver bygget
+Et nyt inputfelt under hver deltagers navn i holdobersigten, hvor du kan skrive deres CophenhagenSales-mailadresse (f.eks. `shha@copenhagensales.dk`). Mailen gemmes pa deltagerens record og bruges automatisk, nar medarbejderen oprettes via "Start hold og send invitationer".
 
-### Ændringer
+### Brugeroplevelse
+- Under hver deltagers navn og stilling vises et lille mail-inputfelt (eller teksten pa den gemte mail)
+- Du kan klikke pa blyants-ikonet (som allerede er der) for at redigere -- eller mailen redigeres inline
+- Nar "Start hold og send invitationer" korer, oprettes en agent + agent-mapping automatisk for den nye medarbejder
 
-**Fil:** `src/components/cancellations/ManualCancellationsTab.tsx`
+### Tekniske ændringer
 
-1. **Hæv grænsen** fra `.limit(100)` til `.limit(1000)` i Supabase-forespørgslen (linje 83).
-2. **Opdater advarslen** i bunden (linje ~188) til at vise en mere tydelig besked med et advarselikon, der klart fortæller brugeren at der er flere salg end vist, og at de bør indsnævre med filtre.
+**1. Database: Ny kolonne pa `cohort_members`**
+- Tilfojer `agent_email TEXT` pa `cohort_members`-tabellen til at gemme den planlagte CophenhagenSales-mail
+
+**2. Udvid `EditMemberClientDialog.tsx`**
+- Tilfojer et inputfelt til "CophenhagenSales mail" (med `@copenhagensales.dk` som placeholder)
+- Gemmer vaerdien til `cohort_members.agent_email` sammen med dagsbonuskunden
+- Omdober dialogen til noget mere generelt, f.eks. "Rediger deltager"
+
+**3. Vis mailen i deltagerlisten (`UpcomingStarts.tsx`)**
+- Under deltagerens navn/stilling vises den gemte agent_email i en lille tekst med mail-ikon
+- Fetch agent_email i member-queryen (allerede `select *`, sa den kommer automatisk)
+
+**4. Brug mailen ved medarbejderoprettelse (`UpcomingStarts.tsx` - `startCohortAndInviteMutation`)**
+- Nar en medarbejder oprettes fra en kandidat, tjekkes om `member.agent_email` er udfyldt
+- Hvis ja: opret en record i `agents`-tabellen med den mail og opret en `employee_agent_mapping` der kobler den nye medarbejder til agenten
+- Dette sikrer at medarbejderens salg kan spores fra dag et
 
 ### Resultat
-- Op til 1000 salg hentes nu, så Jonas og andre medarbejdere med ældre salg i perioden bliver synlige.
-- Brugeren ser tydeligt en advarsel, hvis der er præcis 1000 resultater, hvilket indikerer at der kan være flere salg bag grænsen.
+- Du kan notere CophenhagenSales-mailen pa deltagere for de starter
+- Nar holdet startes, oprettes agent-mappingen automatisk sa provision og salgsstatistik virker med det samme
 
