@@ -33,6 +33,7 @@ import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
@@ -1098,6 +1099,8 @@ export function ClientDBTab() {
 
   const hiddenCount = clientDBData.length - filteredAndSortedData.length;
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="space-y-4">
       {/* KPI Dashboard */}
@@ -1110,24 +1113,10 @@ export function ClientDBTab() {
       />
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div className="flex items-center gap-3">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 pb-4">
+          <div className="flex items-center gap-2 flex-wrap">
             <TrendingUp className="h-5 w-5 text-primary" />
-            <CardTitle>DB per Klient</CardTitle>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
-                    <strong>Omkostninger</strong> = Sælgerløn + Centre/Boder + Assist.løn + Lederløn + ATP/B<br/>
-                    <strong>Sælgerløn</strong> = provision + 12,5% feriepenge<br/>
-                    Klik på en række for at se omkostningsdetaljer
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <CardTitle className="text-base sm:text-lg">DB per Klient</CardTitle>
           </div>
           
           {/* Hide zero toggle */}
@@ -1155,104 +1144,134 @@ export function ClientDBTab() {
             onPresetLabelChange={setSelectedPresetLabel}
           />
 
-          <div className="rounded-md border overflow-x-auto">
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead 
-                    className="min-w-[140px] cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("clientName")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Klient
-                      <SortIcon column="clientName" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="min-w-[100px] cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("teamName")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Team
-                      <SortIcon column="teamName" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="w-[70px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("sales")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Salg
-                      <SortIcon column="sales" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("revenue")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Omsætning
-                      <SortIcon column="revenue" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("costs")}
-                  >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
-                          Omkostninger
-                          <SortIcon column="costs" />
-                        </TooltipTrigger>
-                        <TooltipContent>Samlet: Sælger + Lokation + Assist. + Leder + ATP</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead 
-                    className="w-[110px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("finalDB")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      Final DB
-                      <SortIcon column="finalDB" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="w-[140px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort("dbPercent")}
-                  >
-                    <div className="flex items-center gap-1 justify-end">
-                      DB%
-                      <SortIcon column="dbPercent" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Indlæser...</div>
+          ) : filteredAndSortedData.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {hideZeroClients && clientDBData.length > 0 
+                ? "Alle klienter er skjult (ingen aktivitet)"
+                : "Ingen data for denne periode"
+              }
+            </div>
+          ) : isMobile ? (
+            /* Mobile card layout */
+            <div className="space-y-2">
+              {filteredAndSortedData.map((client) => (
+                <div 
+                  key={client.clientId} 
+                  className="border rounded-lg p-3 space-y-2"
+                  onClick={() => setSelectedClientForDaily({ id: client.clientId, name: client.clientName })}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm truncate flex-1 mr-2">{client.clientName}</span>
+                    <span className={cn(
+                      "text-sm font-semibold tabular-nums whitespace-nowrap",
+                      client.finalDB >= 0 ? "text-primary" : "text-destructive"
+                    )}>
+                      {formatCurrency(client.finalDB)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{client.teamName || "—"}</span>
+                    <span className={cn(
+                      "tabular-nums",
+                      client.dbPercent >= 20 ? "text-primary" : 
+                      client.dbPercent >= 0 ? "text-muted-foreground" : "text-destructive"
+                    )}>
+                      {client.dbPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{client.sales} salg</span>
+                    <span>Oms. {formatCurrency(client.adjustedRevenue)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Desktop table */
+            <div className="rounded-md border overflow-x-auto">
+              <Table className="table-fixed">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      Indlæser...
-                    </TableCell>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead 
+                      className="min-w-[140px] cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("clientName")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Klient
+                        <SortIcon column="clientName" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="min-w-[100px] cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("teamName")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Team
+                        <SortIcon column="teamName" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="w-[70px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("sales")}
+                    >
+                      <div className="flex items-center gap-1 justify-end">
+                        Salg
+                        <SortIcon column="sales" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("revenue")}
+                    >
+                      <div className="flex items-center gap-1 justify-end">
+                        Omsætning
+                        <SortIcon column="revenue" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="w-[120px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("costs")}
+                    >
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger className="flex items-center gap-1 ml-auto">
+                            Omkostninger
+                            <SortIcon column="costs" />
+                          </TooltipTrigger>
+                          <TooltipContent>Samlet: Sælger + Lokation + Assist. + Leder + ATP</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead 
+                      className="w-[110px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("finalDB")}
+                    >
+                      <div className="flex items-center gap-1 justify-end">
+                        Final DB
+                        <SortIcon column="finalDB" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="w-[140px] text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("dbPercent")}
+                    >
+                      <div className="flex items-center gap-1 justify-end">
+                        DB%
+                        <SortIcon column="dbPercent" />
+                      </div>
+                    </TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
-                ) : filteredAndSortedData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      {hideZeroClients && clientDBData.length > 0 
-                        ? "Alle klienter er skjult (ingen aktivitet)"
-                        : "Ingen data for denne periode"
-                      }
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredAndSortedData.map((client) => {
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedData.map((client) => {
                     const prevData = previousPeriodData?.[client.clientId];
                     const trend = prevData ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue) : null;
                     
-                      return (
+                    return (
                       <ClientDBExpandableRow
                         key={client.clientId}
                         client={client}
@@ -1263,11 +1282,11 @@ export function ClientDBTab() {
                         onShowDaily={setSelectedClientForDaily}
                       />
                     );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           {/* Summary Card */}
           {(() => {
