@@ -179,64 +179,63 @@ export function DashboardPeriodSelector({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-between">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>{displayLabel}</span>
-            </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
-          {PERIOD_PRESETS.map((preset) => (
-            <DropdownMenuItem
-              key={preset.type}
-              onClick={() => handlePresetSelect(preset.type)}
-              className={cn(
-                "cursor-pointer",
-                selectedPeriod.type === preset.type && "bg-accent"
-              )}
-            >
-              {preset.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span>{displayLabel}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[200px]">
+            {PERIOD_PRESETS.map((preset) => (
               <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setCalendarOpen(true);
-                }}
+                key={preset.type}
+                onClick={() => handlePresetSelect(preset.type)}
                 className={cn(
                   "cursor-pointer",
-                  selectedPeriod.type === "custom" && "bg-accent"
+                  selectedPeriod.type === preset.type && "bg-accent"
                 )}
               >
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                Brugerdefineret...
+                {preset.label}
               </DropdownMenuItem>
-            </PopoverTrigger>
-            <PopoverContent 
-              className="w-auto p-0" 
-              align="end"
-              side="left"
-              sideOffset={8}
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setTimeout(() => setCalendarOpen(true), 150);
+              }}
+              className={cn(
+                "cursor-pointer",
+                selectedPeriod.type === "custom" && "bg-accent"
+              )}
             >
-              <Calendar
-                mode="range"
-                selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
-                onSelect={handleDateRangeSelect}
-                numberOfMonths={2}
-                locale={da}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Brugerdefineret...
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <PopoverTrigger asChild>
+          <span className="hidden" />
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-auto p-0 z-50" 
+          align="end"
+          sideOffset={8}
+        >
+          <Calendar
+            mode="range"
+            selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
+            onSelect={handleDateRangeSelect}
+            numberOfMonths={2}
+            locale={da}
+            className="pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
