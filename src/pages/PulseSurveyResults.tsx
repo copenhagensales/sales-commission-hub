@@ -78,14 +78,26 @@ function calculateAverages(responses: any[], questionData: Record<string, { labe
   return averages;
 }
 
-function AveragesChart({ averages, questionData }: { averages: Record<string, number> | null; questionData: Record<string, { label: string; fullQuestion: string }> }) {
+function AveragesChart({ averages, questionData, responses = [] }: { averages: Record<string, number> | null; questionData: Record<string, { label: string; fullQuestion: string }>; responses?: any[] }) {
   if (!averages) return <p className="text-muted-foreground">Ingen data</p>;
 
-  const data = Object.entries(averages).map(([key, value]) => ({
-    name: questionData[key]?.label || key,
-    fullQuestion: questionData[key]?.fullQuestion || '',
-    score: value,
-  }));
+  const data = Object.entries(averages).map(([key, value]) => {
+    const distribution: Record<number, number> = {};
+    responses.forEach(r => {
+      const val = r[key];
+      if (val !== undefined && val !== null && typeof val === 'number') {
+        distribution[val] = (distribution[val] || 0) + 1;
+      }
+    });
+    const totalResponses = Object.values(distribution).reduce((a, b) => a + b, 0);
+    return {
+      name: questionData[key]?.label || key,
+      fullQuestion: questionData[key]?.fullQuestion || '',
+      score: value,
+      distribution,
+      totalResponses,
+    };
+  });
 
   return (
     <TooltipProvider>
@@ -98,10 +110,25 @@ function AveragesChart({ averages, questionData }: { averages: Record<string, nu
             content={({ active, payload }) => {
               if (active && payload && payload.length) {
                 const data = payload[0].payload;
+                const dist = data.distribution as Record<number, number>;
+                const sortedEntries = Object.entries(dist)
+                  .map(([k, v]) => [Number(k), v] as [number, number])
+                  .sort(([a], [b]) => a - b);
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg max-w-xs">
                     <p className="font-medium text-sm">{data.name}: {data.score}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{data.fullQuestion}</p>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">{data.fullQuestion}</p>
+                    {sortedEntries.length > 0 && (
+                      <div className="border-t pt-2 mt-1 space-y-0.5">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Fordeling ({data.totalResponses} svar):</p>
+                        {sortedEntries.map(([score, count]) => (
+                          <div key={score} className="flex justify-between text-xs gap-3">
+                            <span>Score {score}</span>
+                            <span className="font-medium">{count} svar</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -432,7 +459,7 @@ export default function PulseSurveyResults() {
                   </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <AveragesChart averages={averages} questionData={questionData} />
+                    <AveragesChart averages={averages} questionData={questionData} responses={filteredResponses} />
                   </CardContent>
                 </Card>
 
