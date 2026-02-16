@@ -61,6 +61,7 @@ export function CancellationDialog({ saleId, open, onClose }: CancellationDialog
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["sale-items-for-cancellation", saleId] });
     queryClient.invalidateQueries({ queryKey: ["sales-for-cancellations"] });
+    queryClient.invalidateQueries({ queryKey: ["sales-for-duplicates"] });
   };
 
   const cancelOneUnitMutation = useMutation({
