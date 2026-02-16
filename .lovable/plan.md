@@ -1,24 +1,33 @@
 
 
-# Fix: Fortryd-knappen nulstiller ikke salgets validation_status
+## Tilf distribution af besvarelser ved mouseover i gennemsnitsgrafen
 
-## Problem
-Naar man fortryder en annullering/afvisning via "Fortryd 1"-knappen, opdateres kun `sale_items`-tabellen (cancelled_quantity og is_cancelled). Men salgets overordnede `validation_status` i `sales`-tabellen forbliver uaendret ("rejected" eller "cancelled"). Det betyder, at salget stadig vises som afvist i systemet -- og med det nye rejected-filter bliver det stadig fratrukket provision og salgstal.
+### Hvad skal ændres
+Lige nu viser tooltip'en på barcharten kun gennemsnittet og det fulde spørgsmål. Planen er at udvide tooltip'en, så den også viser fordelingen af individuelle svar -- fx "Score 1: 2 svar, Score 9: 4 svar".
 
-## Loesning
-Opdater `undoOneUnitMutation` i `CancellationDialog.tsx` saa den ogsaa nulstiller `sales.validation_status` naar der fortrydes enheder.
+### Ændringer
 
-### Logik
-Efter at have dekrementeret `cancelled_quantity` paa det enkelte item, tjek om der nu er **mindst en aktiv enhed** paa tvaers af alle sale_items. Hvis ja, nulstil `sales.validation_status` til `null` (eller en passende vaerdi) saa salget igen taeller med i beregninger.
+**Fil: `src/pages/PulseSurveyResults.tsx`**
 
-## Teknisk detalje
+1. Udvid `AveragesChart`-komponenten til også at modtage `filteredResponses` (de rå besvarelser) som prop.
 
-**Fil**: `src/components/cancellations/CancellationDialog.tsx`
+2. For hvert spørgsmål i `data`-arrayet, beregn en histogram-fordeling (antal besvarelser per score-værdi) baseret på de rå responses.
 
-I `undoOneUnitMutation.mutationFn`:
-1. Udfor den eksisterende `sale_items` update (dekrementerer cancelled_quantity)
-2. Derefter: Hent alle sale_items for salget og tjek om der nu er mindst en enhed der ikke er fuldt annulleret
-3. Hvis ja, opdater `sales.validation_status` til `null` via `supabase.from("sales").update({ validation_status: null }).eq("id", saleId)`
+3. Opdater den custom tooltip til at vise:
+   - Gennemsnittet (som nu)
+   - Det fulde spørgsmål (som nu)
+   - En lille tabel/liste over fordelingen: "Score X: Y svar" for alle scores der har mindst 1 besvarelse, sorteret fra lavest til højest
+   - Totalt antal besvarelser for det pågældende spørgsmål
 
-Dette sikrer at saa snart en bruger fortryder bare en enkelt enhed, genaktiveres salget automatisk i alle dashboards, rapporter og KPI-beregninger.
+4. Opdater kaldet til `AveragesChart` (ca. linje 430) til at sende `filteredResponses` med som prop.
+
+### Tekniske detaljer
+
+- `AveragesChart` props udvides med `responses: any[]`
+- I `data`-mappingen tilføjes et `distribution`-objekt per spørgsmål:
+  ```
+  distribution: { [scoreValue: number]: count }
+  ```
+- Tooltip-indholdet udvides med en liste over fordelingen, kun for scores med mindst 1 besvarelse
+- Ingen nye dependencies kræves -- alt bygger på eksisterende Recharts custom tooltip
 
