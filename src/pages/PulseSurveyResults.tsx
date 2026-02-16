@@ -126,7 +126,7 @@ const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
   { id: 'leader_availability_score', label: 'Lederens tid og overskud', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
   { id: 'wellbeing_score', label: 'Samlet trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
   { id: 'psychological_safety_score', label: 'Psykologisk tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
-  { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
+  { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 6 måneder?', type: 'rating', min: 1, max: 10 },
 ];
 
 export default function PulseSurveyResults() {
