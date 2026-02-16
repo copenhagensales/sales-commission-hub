@@ -1,16 +1,10 @@
 import { useMemo, useState } from "react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, ChevronDown } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export type PeriodType = 
@@ -128,7 +122,7 @@ export function DashboardPeriodSelector({
   className,
   disabled = false,
 }: DashboardPeriodSelectorProps) {
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
     from: selectedPeriod.from,
     to: selectedPeriod.to,
@@ -146,6 +140,7 @@ export function DashboardPeriodSelector({
   const handlePresetSelect = (type: PeriodType) => {
     const period = getDefaultPeriod(type);
     onPeriodChange(period);
+    setOpen(false);
   };
 
   const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
@@ -164,7 +159,7 @@ export function DashboardPeriodSelector({
         to: endOfDay(range.to),
         label: `${fromStr} - ${toStr}`,
       });
-      setCalendarOpen(false);
+      setOpen(false);
     }
   };
 
@@ -173,64 +168,44 @@ export function DashboardPeriodSelector({
   }
 
   return (
-    <div className={cn("flex items-center gap-2 relative", className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-between">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>{displayLabel}</span>
-            </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+    <div className={cn("flex items-center gap-2", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-start">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <span>{displayLabel}</span>
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
-          {PERIOD_PRESETS.map((preset) => (
-            <DropdownMenuItem
-              key={preset.type}
-              onClick={() => handlePresetSelect(preset.type)}
-              className={cn(
-                "cursor-pointer",
-                selectedPeriod.type === preset.type && "bg-accent"
-              )}
-            >
-              {preset.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              setTimeout(() => setCalendarOpen(true), 200);
-            }}
-            className={cn(
-              "cursor-pointer",
-              selectedPeriod.type === "custom" && "bg-accent"
-            )}
-          >
-            <CalendarIcon className="h-4 w-4 mr-2" />
-            Brugerdefineret...
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {calendarOpen && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setCalendarOpen(false)} 
-        />
-      )}
-      {calendarOpen && (
-        <div className="absolute right-0 top-full mt-2 z-50 rounded-md border bg-popover p-0 shadow-md animate-in fade-in-0 zoom-in-95">
-          <Calendar
-            mode="range"
-            selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
-            onSelect={handleDateRangeSelect}
-            numberOfMonths={2}
-            locale={da}
-            className="pointer-events-auto p-3"
-          />
-        </div>
-      )}
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <div className="flex">
+            <div className="border-r p-2 space-y-1">
+              {PERIOD_PRESETS.map((preset) => (
+                <Button
+                  key={preset.type}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full justify-start text-sm",
+                    selectedPeriod.type === preset.type && "bg-accent"
+                  )}
+                  onClick={() => handlePresetSelect(preset.type)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+            <Calendar
+              mode="range"
+              defaultMonth={dateRange.from}
+              selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
+              onSelect={handleDateRangeSelect}
+              numberOfMonths={2}
+              locale={da}
+              className="pointer-events-auto p-3"
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
