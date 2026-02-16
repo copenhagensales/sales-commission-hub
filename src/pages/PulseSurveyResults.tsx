@@ -463,6 +463,12 @@ export default function PulseSurveyResults() {
                   </CardContent>
                 </Card>
 
+                <TeamHeatmap 
+                  responses={normalizedResponses} 
+                  teams={teams || []} 
+                  questionData={questionData} 
+                />
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Anciennitet fordeling</CardTitle>
