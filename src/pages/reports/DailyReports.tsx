@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Package } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -74,6 +74,13 @@ const reportColumnOptions = [
   { id: "revenue", label: "Omsætning", icon: DollarSign },
 ];
 
+interface ProductSaleDetail {
+  product_name: string;
+  quantity: number;
+  commission: number;
+  revenue: number;
+}
+
 interface DailyEntry {
   date: string;
   hours: number;
@@ -84,6 +91,7 @@ interface DailyEntry {
   commission: number;
   clients: string[];
   missing_shift: boolean;
+  product_details: ProductSaleDetail[];
 }
 
 interface EmployeeReportData {
@@ -99,6 +107,7 @@ interface EmployeeReportData {
   clients: string[];
   daily_entries: DailyEntry[];
   has_missing_shifts: boolean;
+  product_details: ProductSaleDetail[];
 }
 
 export default function DailyReports() {
@@ -551,7 +560,7 @@ export default function DailyReports() {
         if (emailIdentifiers.length > 0) {
           // Use fetchAllRows with dynamic !inner join for client filtering (paginated)
           const joinType = selectedClient !== "all" ? "!inner" : "";
-          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))`;
+          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
           
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
           
@@ -820,6 +829,7 @@ export default function DailyReports() {
           let revenue = 0;
           let commission = 0;
           const dayClientIds = new Set<string>();
+          const dayProductMap = new Map<string, { quantity: number; commission: number; revenue: number }>();
           
           empSales.forEach((sale: any) => {
             // Collect client_id from this sale
@@ -834,14 +844,27 @@ export default function DailyReports() {
             
             (sale.sale_items || []).forEach((item: any) => {
               const countsAsSale = item.products?.counts_as_sale !== false;
+              const qty = Number(item.quantity) || 1;
               if (countsAsSale) {
-                salesCount += Number(item.quantity) || 1;
+                salesCount += qty;
               }
               
               // Use pre-calculated mapped values from sale_items
-              // These are already correctly calculated with quantity in the integration-engine
-              revenue += Number(item.mapped_revenue) || 0;
-              commission += Number(item.mapped_commission) || 0;
+              const itemRevenue = Number(item.mapped_revenue) || 0;
+              const itemCommission = Number(item.mapped_commission) || 0;
+              revenue += itemRevenue;
+              commission += itemCommission;
+              
+              // Aggregate by product name
+              const productName = item.products?.name || "Ukendt produkt";
+              const existing = dayProductMap.get(productName);
+              if (existing) {
+                existing.quantity += qty;
+                existing.commission += itemCommission;
+                existing.revenue += itemRevenue;
+              } else {
+                dayProductMap.set(productName, { quantity: qty, commission: itemCommission, revenue: itemRevenue });
+              }
             });
           });
 
@@ -850,14 +873,31 @@ export default function DailyReports() {
             salesCount += 1;
             const rawPayload = sale.raw_payload as any;
             const productName = (rawPayload?.fm_product_name || "").toLowerCase();
-            commission += productCommissionMap.get(productName) || 0;
-            revenue += productRevenueMap.get(productName) || 0;
+            const fmCommission = productCommissionMap.get(productName) || 0;
+            const fmRevenue = productRevenueMap.get(productName) || 0;
+            commission += fmCommission;
+            revenue += fmRevenue;
             // FM sales have client_id in raw_payload
             const clientId = rawPayload?.fm_client_id;
             if (clientId) {
               dayClientIds.add(clientId);
             }
+            // Aggregate FM product
+            const displayName = rawPayload?.fm_product_name || "Ukendt FM-produkt";
+            const existing = dayProductMap.get(displayName);
+            if (existing) {
+              existing.quantity += 1;
+              existing.commission += fmCommission;
+              existing.revenue += fmRevenue;
+            } else {
+              dayProductMap.set(displayName, { quantity: 1, commission: fmCommission, revenue: fmRevenue });
+            }
           });
+
+          // Build product details sorted by quantity desc
+          const dayProductDetails: ProductSaleDetail[] = Array.from(dayProductMap.entries())
+            .map(([name, data]) => ({ product_name: name, quantity: data.quantity, commission: Math.round(data.commission), revenue: Math.round(data.revenue) }))
+            .sort((a, b) => b.quantity - a.quantity);
 
           // Map client IDs to names
           const dayClientNames = Array.from(dayClientIds)
@@ -878,7 +918,8 @@ export default function DailyReports() {
             revenue: Math.round(revenue),
             commission: Math.round(commission),
             clients: dayClientNames,
-            missing_shift: missingShift && salesCount > 0,  // Only flag if there are sales but no shift
+            missing_shift: missingShift && salesCount > 0,
+            product_details: dayProductDetails,
           });
 
           totalHours += hours;
@@ -897,6 +938,24 @@ export default function DailyReports() {
           // Check if any day has missing shift with sales
           const hasMissingShifts = dailyEntries.some(entry => entry.missing_shift);
           
+          // Aggregate product details across all days for employee-level summary
+          const empProductMap = new Map<string, { quantity: number; commission: number; revenue: number }>();
+          dailyEntries.forEach(entry => {
+            entry.product_details.forEach(pd => {
+              const existing = empProductMap.get(pd.product_name);
+              if (existing) {
+                existing.quantity += pd.quantity;
+                existing.commission += pd.commission;
+                existing.revenue += pd.revenue;
+              } else {
+                empProductMap.set(pd.product_name, { quantity: pd.quantity, commission: pd.commission, revenue: pd.revenue });
+              }
+            });
+          });
+          const empProductDetails: ProductSaleDetail[] = Array.from(empProductMap.entries())
+            .map(([name, data]) => ({ product_name: name, ...data }))
+            .sort((a, b) => b.quantity - a.quantity);
+          
           report.push({
             employee_id: empId,
             employee_name: `${emp.first_name} ${emp.last_name}`,
@@ -910,6 +969,7 @@ export default function DailyReports() {
             clients: Array.from(allClientNames),
             daily_entries: dailyEntries.sort((a, b) => b.date.localeCompare(a.date)),
             has_missing_shifts: hasMissingShifts,
+            product_details: empProductDetails,
           });
         }
       }
@@ -1340,17 +1400,22 @@ export default function DailyReports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedReportData.map((row) => (
+                    {sortedReportData.map((row) => {
+                      const isExpanded = expandedEmployees.has(row.employee_id);
+                      const productDetails = isMultipleDays ? row.product_details : (row.daily_entries[0]?.product_details || []);
+                      const colCount = 2 + (isMultipleDays ? 1 : 1) + selectedColumns.length;
+                      
+                      return (
                       <>
                         {/* Main row - aggregated or single day */}
                         <TableRow 
                           key={row.employee_id}
-                          className={cn(isMultipleDays && "cursor-pointer hover:bg-muted/50")}
-                          onClick={isMultipleDays ? () => toggleEmployeeExpanded(row.employee_id) : undefined}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => toggleEmployeeExpanded(row.employee_id)}
                         >
                           {isMultipleDays && (
                             <TableCell className="w-8 p-2">
-                              {expandedEmployees.has(row.employee_id) ? (
+                              {isExpanded ? (
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                               ) : (
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -1359,7 +1424,14 @@ export default function DailyReports() {
                           )}
                           {!isMultipleDays && (
                             <TableCell className="font-medium">
-                              {format(parseISO(row.daily_entries[0]?.date || format(dateRange.start, "yyyy-MM-dd")), "d. MMM", { locale: da })}
+                              <div className="flex items-center gap-1">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                )}
+                                {format(parseISO(row.daily_entries[0]?.date || format(dateRange.start, "yyyy-MM-dd")), "d. MMM", { locale: da })}
+                              </div>
                             </TableCell>
                           )}
                           <TableCell className="font-medium">
@@ -1427,8 +1499,56 @@ export default function DailyReports() {
                           )}
                         </TableRow>
 
+                        {/* Product breakdown row */}
+                        {isExpanded && productDetails.length > 0 && (
+                          <TableRow key={`${row.employee_id}-products`} className="bg-muted/10 hover:bg-muted/10">
+                            <TableCell colSpan={colCount} className="p-0">
+                              <div className="pl-10 pr-4 py-3">
+                                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                  <Package className="h-3.5 w-3.5" />
+                                  Produktopdeling
+                                </div>
+                                <div className="rounded-md border border-border/50 overflow-hidden">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-muted/30">
+                                        <TableHead className="text-xs py-2">Produkt</TableHead>
+                                        <TableHead className="text-xs py-2 text-right">Antal</TableHead>
+                                        <TableHead className="text-xs py-2 text-right">Provision</TableHead>
+                                        <TableHead className="text-xs py-2 text-right">Omsætning</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {productDetails.map((pd) => (
+                                        <TableRow key={pd.product_name} className="border-border/30">
+                                          <TableCell className="py-1.5 text-sm">{pd.product_name}</TableCell>
+                                          <TableCell className="py-1.5 text-sm text-right">{pd.quantity}</TableCell>
+                                          <TableCell className="py-1.5 text-sm text-right">{pd.commission.toLocaleString("da-DK")} kr.</TableCell>
+                                          <TableCell className="py-1.5 text-sm text-right">{pd.revenue.toLocaleString("da-DK")} kr.</TableCell>
+                                        </TableRow>
+                                      ))}
+                                      <TableRow className="bg-muted/20 font-medium border-t">
+                                        <TableCell className="py-1.5 text-sm">Total</TableCell>
+                                        <TableCell className="py-1.5 text-sm text-right">
+                                          {productDetails.reduce((s, p) => s + p.quantity, 0)}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 text-sm text-right">
+                                          {productDetails.reduce((s, p) => s + p.commission, 0).toLocaleString("da-DK")} kr.
+                                        </TableCell>
+                                        <TableCell className="py-1.5 text-sm text-right">
+                                          {productDetails.reduce((s, p) => s + p.revenue, 0).toLocaleString("da-DK")} kr.
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+
                         {/* Expanded daily details */}
-                        {isMultipleDays && expandedEmployees.has(row.employee_id) && row.daily_entries.map((entry) => (
+                        {isMultipleDays && isExpanded && row.daily_entries.map((entry) => (
                           <TableRow key={`${row.employee_id}-${entry.date}`} className="bg-muted/30">
                             <TableCell></TableCell>
                             <TableCell className="text-muted-foreground pl-6">
@@ -1491,7 +1611,8 @@ export default function DailyReports() {
                           </TableRow>
                         ))}
                       </>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
 
