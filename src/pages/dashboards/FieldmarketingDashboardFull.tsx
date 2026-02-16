@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +44,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
@@ -395,7 +395,6 @@ const FieldmarketingDashboardFull = () => {
   // Runtime access check - redirects if user doesn't have team-based permission
   const { canView: hasDashboardAccess, isLoading: accessLoading } = useRequireDashboardAccess("fieldmarketing");
   
-  const { canView, isLoading: permissionsLoading } = useUnifiedPermissions();
   
   // Date range state - default to payroll period (15th to 14th)
   const defaultPayrollPeriod = getPayrollPeriod(new Date());
@@ -458,13 +457,7 @@ const FieldmarketingDashboardFull = () => {
     setIsCustomRange(true);
   };
   
-  // Filter tabs based on permissions
-  const visibleTabs = useMemo(() => 
-    allTabs.filter(tab => canView(tab.permissionKey)),
-    [canView]
-  );
-  
-  const defaultTab = visibleTabs[0]?.value || "eesy-fm";
+  const defaultTab = allTabs[0]?.value || "eesy-fm";
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   // Fetch client logos dynamically from the database
@@ -482,7 +475,7 @@ const FieldmarketingDashboardFull = () => {
     },
   });
 
-  if (permissionsLoading || accessLoading) {
+  if (accessLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-12">
@@ -497,16 +490,6 @@ const FieldmarketingDashboardFull = () => {
     return null;
   }
 
-  if (visibleTabs.length === 0) {
-    return (
-      <DashboardLayout>
-        <div className="text-center py-12 text-muted-foreground">
-          Du har ikke adgang til denne side.
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   const activeClientId = TAB_TO_CLIENT_ID[activeTab];
   const activeClient = clients?.find(c => c.id === activeClientId);
 
@@ -517,7 +500,7 @@ const FieldmarketingDashboardFull = () => {
     3: "grid-cols-3",
     4: "grid-cols-4",
   };
-  const gridColsClass = gridColsMap[visibleTabs.length] || "grid-cols-2";
+  const gridColsClass = gridColsMap[allTabs.length] || "grid-cols-2";
 
   return (
     <DashboardLayout>
@@ -551,14 +534,14 @@ const FieldmarketingDashboardFull = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={`grid w-full max-w-md ${gridColsClass}`}>
-          {visibleTabs.map(tab => (
+          {allTabs.map(tab => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {visibleTabs.map(tab => (
+        {allTabs.map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <ClientDashboard 
               clientId={TAB_TO_CLIENT_ID[tab.value]} 
