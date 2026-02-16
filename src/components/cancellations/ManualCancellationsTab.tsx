@@ -80,7 +80,7 @@ export function ManualCancellationsTab() {
         `)
         .in("client_campaign_id", campaignIds)
         .order("sale_datetime", { ascending: false })
-        .limit(100);
+        .limit(1000);
 
       if (dateFrom) {
         query = query.gte("sale_datetime", format(dateFrom, "yyyy-MM-dd"));
@@ -266,10 +266,13 @@ export function ManualCancellationsTab() {
         </div>
       )}
 
-      {filteredSales.length === 100 && (
-        <p className="text-sm text-muted-foreground text-center">
-          Viser de første 100 resultater. Brug filtre for at indsnævre søgningen.
-        </p>
+      {sales.length >= 1000 && (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <p>
+            <strong>Advarsel:</strong> Der er flere end 1.000 salg i den valgte periode. Nogle salg og medarbejdere kan mangle. Indsnævr med datofiltre for at se alle.
+          </p>
+        </div>
       )}
 
       <CancellationDialog
