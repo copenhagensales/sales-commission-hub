@@ -235,15 +235,17 @@ const Home = () => {
         if (emp.employment_start_date) {
           const startDate = parseISO(emp.employment_start_date);
           const years = differenceInYears(today, startDate);
-          if (years > 0) {
+          // Only show full-year anniversaries (skip ½-year)
+          if (years >= 1) {
             const anniversaryThisYear = new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const anniversaryYears = years + (isAfter(anniversaryThisYear, today) ? 1 : 0);
             
             if ((isSameDay(anniversaryThisYear, today) || isAfter(anniversaryThisYear, today)) && 
                 isBefore(anniversaryThisYear, addDays(today, 14))) {
               results.push({ 
                 type: 'anniversary', 
                 name: `${emp.first_name} ${emp.last_name}`,
-                years,
+                years: anniversaryYears,
                 date: anniversaryThisYear,
                 isToday: isSameDay(anniversaryThisYear, today)
               });
@@ -517,8 +519,8 @@ const Home = () => {
                       <p className="font-medium">{celebration.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum`
-                          : `Fylder ${celebration.years} år`
+                          ? `${celebration.years} års jubilæum 🏆`
+                          : `Tillykke med fødselsdagen! 🎈`
                         }
                       </p>
                     </div>
@@ -803,14 +805,23 @@ const Home = () => {
                     {upcomingCelebrations.map((celebration, idx) => (
                       <div 
                         key={idx}
-                        className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg bg-muted/50 text-xs md:text-sm"
+                        className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm border ${
+                          celebration.type === 'birthday' 
+                            ? 'bg-primary/10 border-primary/20' 
+                            : 'bg-amber-500/10 border-amber-500/20'
+                        }`}
                       >
                         {celebration.type === 'birthday' ? (
-                          <Cake className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+                          <span className="text-base">🎂</span>
                         ) : (
-                          <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-warning" />
+                          <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-500" />
                         )}
                         <span className="font-medium">{celebration.name}</span>
+                        {celebration.type === 'anniversary' && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                            {celebration.years} år
+                          </Badge>
+                        )}
                         <span className="text-muted-foreground hidden sm:inline">•</span>
                         <span className="text-muted-foreground">
                           {formatCelebrationDate(celebration.date, celebration.isToday)}
