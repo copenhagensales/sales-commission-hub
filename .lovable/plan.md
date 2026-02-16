@@ -1,37 +1,45 @@
 
+# Slet fallback-regler oprettet 15. februar
 
-# Kampagneopdeling i Produktopdeling
+## Overblik
+Der er **44 fallback-regler** oprettet den 15. februar i to batches:
 
-## Hvad skal aendres
-Produktopdelingen i dagsrapporter skal udvides saa hvert produkt ogsaa viser hvilken kampagne det er solgt paa. Hvis samme produkt er solgt paa to forskellige kampagner, vises de som separate raekker.
+| Batch | Tidspunkt | Antal |
+|-------|-----------|-------|
+| Batch 1 | 15:15:18 | 39 |
+| Batch 2 | 16:38:20 | 5 |
+| **Total** | | **44** |
 
-## Aendringer i detaljer
+**398 salg** er aktuelt matchet til disse regler og vil blive genmatchet.
 
-### 1. Udvid ProductSaleDetail interface
-Tilfoej `campaign_name` felt:
-```typescript
-interface ProductSaleDetail {
-  product_name: string;
-  campaign_name: string;  // NYT
-  quantity: number;
-  commission: number;
-  revenue: number;
-}
+## Plan
+
+### Trin 1: Slet de 44 fallback-regler
+Slet alle prisregler med prioritet 0, ingen betingelser, oprettet den 15. februar 2026.
+
+```text
+DELETE FROM product_pricing_rules
+WHERE priority = 0 
+  AND (conditions IS NULL OR conditions = '{}'::jsonb)
+  AND created_at::date = '2026-02-15'
 ```
 
-### 2. Udvid campaign mappings fetch
-Den eksisterende fetch af `adversus_campaign_mappings` henter allerede `adversus_campaign_id` og `id`. Tilfoej `adversus_campaign_name` til select-clause, og opbyg et nyt Map fra `adversus_campaign_id` til `adversus_campaign_name`.
+### Trin 2: Nulstil de 398 paavirkedede salg
+Saet `matched_pricing_rule_id = NULL` saa de kan genmatches:
 
-### 3. Aendr aggregeringsnoegle
-I stedet for kun at bruge `product_name` som noegle i `dayProductMap`, bruges nu en kombineret noegle: `produktnavn|||kampagnenavn`. Kampagnenavnet resolves fra salgets `dialer_campaign_id` via det nye Map. For FM-salg saettes kampagnenavnet til "Fieldmarketing".
+```text
+UPDATE sale_items
+SET matched_pricing_rule_id = NULL
+WHERE matched_pricing_rule_id NOT IN (
+  SELECT id FROM product_pricing_rules
+)
+```
 
-### 4. Opdater UI-tabellen
-Tilfoej en "Kampagne"-kolonne i produktopdeling-tabellen mellem "Produkt" og "Antal". Opdater ogsaa `key` paa raekker til at bruge baade produkt og kampagne.
+### Trin 3: Koer rematch
+Kald `rematch-pricing-rules` edge-funktionen for at genmatch alle salg uden matchet regel. De faar enten en specifik prisregel eller basispriserne fra products-tabellen.
 
-### 5. Fil der aendres
-Kun `src/pages/reports/DailyReports.tsx`:
-- Linje 77-82: Udvid interface med `campaign_name`
-- Linje 590-596: Tilfoej `adversus_campaign_name` til campaign mappings fetch og byg navn-Map
-- Linje 832-900: Aendr aggregeringsnoegle til produkt+kampagne
-- Linje 942-957: Tilsvarende for employee-level aggregering
-- Linje 1513-1541: Tilfoej Kampagne-kolonne i UI-tabellen
+### Trin 4: Verificer
+Tjek at alle 398 salg er korrekt genmatchet.
+
+## Teknisk note
+Ingen kodeaendringer -- kun 2 database-operationer (DELETE + UPDATE) og et kald til den eksisterende edge-funktion.
