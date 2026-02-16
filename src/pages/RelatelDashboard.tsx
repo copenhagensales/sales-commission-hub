@@ -115,7 +115,7 @@ export default function RelatelDashboard() {
     enabled: !useCached,
   });
 
-  // Fetch employee avatars
+  // Fetch employee names and avatars (for live-mode name resolution)
   const { data: employeeData } = useQuery({
     queryKey: ["employee-data-relatel"],
     queryFn: async () => {
@@ -125,13 +125,17 @@ export default function RelatelDashboard() {
         .eq("is_active", true);
       
       const avatarMap = new Map<string, string>();
+      const idToNameMap = new Map<string, string>();
+      const idToAvatarMap = new Map<string, string | null>();
       (data || []).forEach(emp => {
         const fullName = `${emp.first_name} ${emp.last_name}`;
         if (emp.avatar_url) {
           avatarMap.set(fullName.toLowerCase(), emp.avatar_url);
         }
+        idToNameMap.set(emp.id, fullName);
+        idToAvatarMap.set(emp.id, emp.avatar_url);
       });
-      return { avatarMap };
+      return { avatarMap, idToNameMap, idToAvatarMap };
     },
     enabled: !tvMode
   });
@@ -149,17 +153,19 @@ export default function RelatelDashboard() {
   // ========== LIVE sellers from useSalesAggregatesExtended ==========
   const liveSellers: MappedSellerData[] = useMemo(() => {
     if (!liveData?.byEmployee) return [];
+    const idToName = employeeData?.idToNameMap;
+    const idToAvatar = employeeData?.idToAvatarMap;
     return Object.entries(liveData.byEmployee)
       .map(([key, emp]) => ({
-        name: emp.name,
+        name: idToName?.get(key) || emp.name,
         totalSales: emp.sales,
-        totalCrossSales: 0, // cross-sales not available in live aggregation
+        totalCrossSales: 0,
         totalCommission: emp.commission,
-        avatarUrl: null,
+        avatarUrl: idToAvatar?.get(key) ?? null,
         employeeId: key,
       }))
       .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [liveData]);
+  }, [liveData, employeeData]);
 
   // Cached sellers
   const sortedDailySellers: MappedSellerData[] = useMemo(() => {
