@@ -1,36 +1,31 @@
 
-
-## Fix: Forkerte navne og visning i live-mode
+## Forbedring af "Brugerdefineret" periodevalg
 
 ### Problem
-Nar dashboardet bruger live-data (ved brugerdefineret periode), vises salgernes navne som forkortede email-prafikser (fx "thor", "jani", "jakr") i stedet for fulde navne. Det skyldes at live-queryen bruger `agentEmail.split("@")[0]` som navn.
-
-Derudover mangler avatars og "Switch"-kolonnen i live-mode.
+Naar man klikker "Brugerdefineret..." i dropdown-menuen, lukker dropdown'en forst, og sa abner en separat kalender-popup via en `setTimeout`-hack. Det foeles usammenhaegende og kraever to trin.
 
 ### Losning
+Erstat `DropdownMenu` + separat kalender med en enkelt `Popover` der viser **presets til venstre** og **kalender til hojre** i et samlet panel - praecis som `DashboardDateRangePicker` allerede gor andetsteds.
 
-**1. Hent medarbejdernavne korrekt i live-mode**
-- Udvid den eksisterende `employeeData`-query til ogsa at bygge et opslag fra employee_id og email til fuldt navn
-- Brug dette opslag til at erstatte de forkortede navne i `liveSellers`
+### Nyt flow
+1. Klik pa knappen -> en popover abner
+2. Venstre side: hurtigvalg (I dag, I gar, Denne uge, osv.)
+3. Hojre side: kalender i range-mode til brugerdefineret valg
+4. Valg af preset eller faerdiggorelse af dato-range lukker popoveren automatisk
 
-**2. Tilfoej avatars til live-salgere**
-- Brug det eksisterende avatar-map til at saette `avatarUrl` pa live-salgere
+### Tekniske detaljer
 
-**3. Konkrete aendringer i `RelatelDashboard.tsx`:**
+**Fil: `src/components/dashboard/DashboardPeriodSelector.tsx`**
 
-- Udvid `employeeData`-queryen til at returnere et `idToNameMap` (employee_id -> fuldt navn) og et `emailToNameMap` (via `employee_agent_mapping`) sa live-data kan oplose rigtige navne
-- Opdater `liveSellers` useMemo til at slaa navne og avatars op fra disse maps
-- Beholde den eksisterende cached-mode uaendret (den virker korrekt)
-
-### Teknisk detalje
-
-Problemet er i `useSalesAggregatesExtended.ts` linje 302:
-```text
-name: agentEmail.split("@")[0]  // -> "thor" i stedet for "Thor Jensen"
-```
-
-RPC-pathen (`get_sales_aggregates_v2`) returnerer muligvis ogsa kun korte navne. Losningen er at oplose navne i dashboard-komponenten via employee_master_data + employee_agent_mapping, uanset hvad RPC/fallback returnerer.
-
-### Filer der aendres
-- `src/pages/RelatelDashboard.tsx` (udvid employee-query + opdater liveSellers mapping)
-
+- Fjern import af `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuTrigger`
+- Tilfoej import af `Popover`, `PopoverContent`, `PopoverTrigger` fra `@/components/ui/popover`
+- Fjern `calendarOpen` state (ikke laengere noedvendig)
+- Tilfoej `open`/`setOpen` state til Popover
+- Erstat hele JSX-blokken (linje 175-234) med:
+  - `Popover` med `open`/`onOpenChange`
+  - `PopoverTrigger` med den eksisterende knap
+  - `PopoverContent` med `flex`-layout:
+    - Venstre: `div` med `border-r` og preset-knapper (`Button variant="ghost"`) der kalder `handlePresetSelect` + lukker popover
+    - Hojre: `Calendar mode="range"` med `numberOfMonths={2}`, `locale={da}`, der lukker popover nar begge datoer er valgt
+- Al eksisterende logik for periodeberegning, `getDefaultPeriod`, caching-funktioner og typer forbliver uaendret
+- Fjern `ChevronDown` import (erstattes af ren kalender-ikon stil)
