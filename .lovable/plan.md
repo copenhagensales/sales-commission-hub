@@ -1,61 +1,34 @@
 
 
-## Fix: rematch-pricing-rules laeser leadResultFields for Relatel
+## Kør rematch-pricing-rules for alle Relatel-produkter
 
-### Problemet (verificeret med data)
-Relatel-salg gemmer "Tilskud" i `raw_payload.leadResultFields`, men rematch-funktionen laeser KUN `raw_payload.data` (som er `null` for Relatel). Derfor matcher prisregler med `conditions: { "Tilskud": "0%" }` aldrig, og salg falder til lavere fallback-priser.
+### Hvad der sker
+Den opdaterede `rematch-pricing-rules` Edge Function (med `leadResultFields`-fix) køres for alle Relatel-produkter, så Tilskud-baserede prisregler (priority 5) nu matcher korrekt i stedet for at falde tilbage til lavere priority 0-regler.
 
-### Bevis fra databasen
-- `raw_payload.data` = `null` for Relatel-salg
-- `raw_payload.leadResultFields` = `{ "Tilskud": "0%", "Bindingsperiode": "36", ... }`
-- 65+ prisregler med Tilskud-betingelse (priority 5) springer over, fallback (priority 0) bruges
+### Fremgangsmåde
 
-### Paavirkede produkter
-Switch Contact Center og MBB-varianter (ATL/BTL) - alle med Tilskud-differentierede prisregler.
+1. **Dry-run først** for 2-3 Switch-produkter for at verificere at Tilskud-reglerne matcher korrekt
+2. **Fuld kørsel (ikke dry-run)** for alle Relatel-produkter i grupper:
+   - Switch Contact Center-produkter
+   - MBB-produkter (1000GB, 2000GB varianter)
+   - Fri Tale-produkter (alle varianter)
+3. **Verificering** - tjek at provisioner er opdateret korrekt via database-forespørgsler
 
-### Upaavirkede produkter
-ASE-produkter (bruger `raw_payload.data` som allerede virker), alle andre klienter.
+### Produktgrupper der rematches
+- **Switch Contact Center** (alle varianter)
+- **MBB 1000GB / 2000GB** (ATL, BTL, Router-varianter)
+- **Fri Tale** (10GB til fri data, ATL/BTL varianter)
 
-### Aendring (1 fil, ca. 15 linjer)
+### Forventet resultat
+- Salg med `Tilskud=0%` får højere provision (priority 5-regler)
+- Salg med `Tilskud=100%` beholder fallback-provision (priority 0-regler)
+- `is_immediate_payment` og andre manuelle overrides bevares
 
-**Fil:** `supabase/functions/rematch-pricing-rules/index.ts`
+### Risiko
+Lav - funktionen opdaterer kun `matched_pricing_rule_id`, `mapped_commission`, `mapped_revenue` og `display_name`. Manuelle overrides som `is_immediate_payment` røres ikke.
 
-Paa linje 339-340, efter extraction af `rawPayloadData`, tilfoej merge af `leadResultFields` og `leadResultData`:
-
-```text
-// Nuvaerende (linje 340):
-let rawPayloadData = rawPayload?.data as Record<string, unknown> | undefined;
-
-// Tilfoej efter linje 340:
-const leadResultFields = rawPayload?.leadResultFields as Record<string, unknown> | undefined;
-const leadResultData = rawPayload?.leadResultData as Record<string, unknown> | undefined;
-
-// Merge leadResultFields ind i rawPayloadData (saa conditions kan finde Tilskud)
-if (leadResultFields && typeof leadResultFields === "object") {
-  if (!rawPayloadData) rawPayloadData = {};
-  for (const [key, value] of Object.entries(leadResultFields)) {
-    if (value !== null && value !== undefined && value !== "") {
-      rawPayloadData[key] = value;
-    }
-  }
-}
-if (leadResultData && typeof leadResultData === "object") {
-  if (!rawPayloadData) rawPayloadData = {};
-  for (const [key, value] of Object.entries(leadResultData)) {
-    if (value !== null && value !== undefined && value !== "") {
-      rawPayloadData[key] = value;
-    }
-  }
-}
-```
-
-### Resultat efter fix
-- Prisregler med `Tilskud: 0%` (priority 5) vil nu matche korrekt for Relatel-salg
-- Switch og MBB-produkter faar de rigtige provisioner
-- ASE og alle andre klienter er helt upaavirkede (deres data-struktur aendres ikke)
-
-### Anbefalet test
-1. Deploy fix
-2. Koer `dry_run: true` for et enkelt Switch-produkt og verificer at Tilskud-regler matcher
-3. Koer uden dry_run naar resultat er bekraeftet
+### Tekniske detaljer
+- Edge Function kaldes via `supabase.functions.invoke("rematch-pricing-rules", { body: { product_id: "..." } })` for hvert produkt-ID
+- Hvert kald processer alle `sale_items` for det pågældende produkt
+- Dry-run returnerer statistik uden at ændre data
 
