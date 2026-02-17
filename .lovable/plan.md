@@ -1,41 +1,57 @@
 
 
-# Rematch alle ASE-salg med opdaterede prisregler
+## Rediger Kurv - Omdob og udvid funktionalitet
 
-## Baggrund
-Prisreglen "A-kasse uden straksbetaling under 6000 lønsikring" er opdateret til intervallet 1-5999 (tidligere 0-5999). Alle eksisterende ASE-salg skal genmatches for at sikre korrekte provisioner.
+### Oversigt
+AEndrer "Annuller/afvis"-fanen og dialogen til "Rediger kurv", saa man kan tilfoeje/fjerne produkter i et salg, samt stadig annullere eller afvise hele salget.
 
-## Forventet resultat efter rematch
+---
 
-| Scenarie | Daekningssum | Regel | Provision |
-|----------|-------------|-------|-----------|
-| Uden loensikring (beriget til 0) | 0 | Basisregel (prio 1) | 400 kr |
-| Reel daekningssum 1-5999 | 1-5999 | Under 6000 (prio 2) | 600 kr |
-| Med loensikring (beriget til 6000) | 6000+ | Over 6000 (prio 3) | 800 kr |
+### AEndring 1: Tab-tekst i Cancellations.tsx
+- AEndr TabsTrigger fra "Annuller/afvis" til "Rediger kurv"
 
-## Plan
+### AEndring 2: Knap i ManualCancellationsTab.tsx
+- AEndr knapteksten fra "Annuller/afvis" til "Rediger kurv"
+- Skift ikon fra `X` til `ShoppingCart`
+- AEndr variant fra `destructive` til `outline`
 
-### Trin 1: Nulstil matched_pricing_rule_id paa ASE Salg
-Saet `matched_pricing_rule_id = NULL` paa alle sale_items med ASE Salg-produktet, saa de kan genmatches:
+### AEndring 3: Udvid CancellationDialog.tsx
+Dialogen omdoebes til **EditCartDialog** og faar foelgende nye funktioner:
 
-```text
-UPDATE sale_items
-SET matched_pricing_rule_id = NULL
-WHERE product_id = '1ad52862-2102-472e-9cdf-52f9c76997a2'
-```
+**Ny titel og beskrivelse:**
+- "Rediger kurv" / "Tilfoej eller fjern produkter, eller annuller/afvis hele salget"
 
-### Trin 2: Koer rematch for ASE Salg
-Kald `rematch-pricing-rules` edge-funktionen med product_id for ASE Salg. Da Supabase har en 1000-raekke graense, koeres funktionen gentagne gange indtil alle er behandlet.
+**Tilfoej produkt-sektion (ny):**
+- Hent salgets `client_campaign_id` fra `sales`-tabellen
+- Hent tilgaengelige produkter fra `products`-tabellen filtreret paa den kampagne
+- Dropdown til at vaelge produkt + antal-input (standard 1)
+- "Tilfoej"-knap der opretter ny raekke i `sale_items` med:
+  - `sale_id`, `product_id`, `display_name` (fra produktet)
+  - `quantity`, `mapped_commission` (commission_dkk x antal), `mapped_revenue` (revenue_dkk x antal)
 
-### Trin 3: Nulstil og rematch ASE Lead
-Gentag trin 1-2 for ASE Lead-produktet (`e360f3c2-b448-474b-bbf8-e7dc629a0d2a`).
+**Fjern produkt (ny):**
+- Slet-knap (TrashIcon) per raekke der helt fjerner `sale_item`-raekken fra databasen
+- Bekraeftelsesdialog foer sletning
 
-### Trin 4: Verificer
-- Tjek at ingen salg har `matched_pricing_rule_id = NULL` tilbage
-- Bekraeft at `is_immediate_payment`-flaget er bevaret paa de salg der havde det
+**Bevar eksisterende funktionalitet:**
+- Annuller 1 stk / Afvis 1 stk per produkt
+- Fortryd 1
+- "Annuller hele salget" og "Afvis hele salget" i footer
 
-## Teknisk note
-- Ingen kodeaendringer noedvendige -- edge-funktionen haandterer allerede data-enrichment (Daekningssum=0 eller 6000) og det opdaterede regelinterval
-- `is_immediate_payment` pavirkes ikke af rematch, da feltet bevidst udelades fra update-payloaden
-- Funktionen skal maaske koeres 2-3 gange per produkt pga. 1000-raekke graensen
+---
+
+### Tekniske detaljer
+
+**Filer der aendres:**
+1. `src/pages/salary/Cancellations.tsx` - Tab-tekst
+2. `src/components/cancellations/ManualCancellationsTab.tsx` - Knap-tekst, ikon, variant
+3. `src/components/cancellations/CancellationDialog.tsx` - Omdoeb til EditCartDialog, tilfoej produkt-query, tilfoej/slet mutations
+
+**Database:** Ingen skemaaendringer noedvendige. Alle kolonner findes allerede i `sale_items` og `products`.
+
+**Nye queries i dialogen:**
+- `sales` query for `client_campaign_id` (baseret paa `saleId`)
+- `products` query filtreret paa `client_campaign_id`
+- INSERT mutation til `sale_items` for nye produkter
+- DELETE mutation til `sale_items` for fjernelse
 
