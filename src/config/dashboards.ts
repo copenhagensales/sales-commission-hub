@@ -72,4 +72,11 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "Top 20 customer success oversigt",
     permissionKey: "menu_dashboard_cs_top_20" 
   },
+  { 
+    slug: "sales-overview-all", 
+    name: "Salgsoversigt alle", 
+    path: "/dashboards/sales-overview-all", 
+    description: "Samlet salgsoversigt for alle klienter - dagens salg",
+    permissionKey: "menu_dashboard_sales_overview_all" 
+  },
 ];

@@ -91,6 +91,7 @@ export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashbo
 export const CphSalesDashboard = lazyPage(() => import("@/pages/dashboards/CphSalesDashboard"));
 export const DashboardSettings = lazyPage(() => import("@/pages/dashboards/DashboardSettings"));
 export const DesignDashboard = lazyPage(() => import("@/pages/dashboards/DesignDashboard"));
+export const SalesOverviewAll = lazyPage(() => import("@/pages/dashboards/SalesOverviewAll"));
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
 
