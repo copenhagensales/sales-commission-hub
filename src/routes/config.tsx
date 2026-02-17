@@ -75,6 +75,7 @@ import {
   CphSalesDashboard,
   DashboardSettings,
   DesignDashboard,
+  SalesOverviewAll,
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
@@ -302,6 +303,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/eesy-tm", component: EesyTmDashboard, access: "protected" },
   { path: "/dashboards/united", component: UnitedDashboard, access: "protected" },
   { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
+  { path: "/dashboards/sales-overview-all", component: SalesOverviewAll, access: "protected" },
 
   // Dashboard Admin pages - restricted to those with dashboard admin permission
   { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },

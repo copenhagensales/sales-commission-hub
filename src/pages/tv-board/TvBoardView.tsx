@@ -11,8 +11,8 @@ import TdcErhvervDashboard from "@/pages/TdcErhvervDashboard";
 import RelatelDashboard from "@/pages/RelatelDashboard";
 import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 import UnitedDashboard from "@/pages/UnitedDashboard";
+import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
 import { Loader2 } from "lucide-react";
-
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
@@ -22,6 +22,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "relatel": RelatelDashboard,
   "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,
+  "sales-overview-all": SalesOverviewAll,
 };
 
 export default function TvBoardView() {
