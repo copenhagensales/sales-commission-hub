@@ -1,35 +1,30 @@
 
 
-## Fix: Forældede parent_keys i rettighedsdatabasen + forebyggelse
+## Fix: Tilskudsregel matcher ikke for Switch Contact Center #1
 
-### Oversigt
-Tre ændringer sikrer at rettigheder altid vises under den korrekte sektion, selv når hierarkiet ændres i koden.
+### Problem
+Prisreglerne for "Switch Contact Center #1" pa Switch Krydssalgs-kampagnen har et prioritetsproblem:
 
-### Trin
+| Produkt | Regel | Prioritet | Provision |
+|---------|-------|-----------|-----------|
+| ATL | Tilskud=0% | **5** | 2.125 kr |
+| ATL | Ingen betingelser | 0 | 1.883 kr |
+| #1 | Tilskud=0% | **0** | 1.414 kr |
+| #1 | Ingen betingelser | **0** | 1.253 kr |
 
-**1. Database-opdatering**
-Ret alle eksisterende `menu_cancellations`-rækker til den korrekte parent:
+Matching-logikken sorterer efter prioritet (hojest forst). Nar begge regler har prioritet 0, vinder reglen uden betingelser, fordi den matcher alt. Derfor far #1 kun 1.254 kr i stedet for 1.414 kr.
+
+### Losning
+
+**Database-opdatering**: Saet prioriteten pa Tilskud=0% reglen for Switch Contact Center #1 (pa Switch Krydssalgs-kampagnen) til 5:
+
 ```sql
-UPDATE role_page_permissions 
-SET parent_key = 'menu_section_reports' 
-WHERE permission_key = 'menu_cancellations' 
-AND (parent_key IS NULL OR parent_key != 'menu_section_reports');
+UPDATE product_pricing_rules 
+SET priority = 5 
+WHERE id = '71ee6084-765d-4ca8-a698-0602d1df2036';
 ```
 
-**2. Auto-korrektion ved rollevalg (PermissionEditor.tsx, linje 428-439)**
-Udvid `useEffect` til at finde og rette rækker med forældet `parent_key` ved at sammenligne mod `PERMISSION_HIERARCHY`. Opdaterer i baggrunden og invaliderer cache.
+**Rematch**: Kor derefter rematch-pricing-rules for at genberegne provisioner pa eksisterende salg, der blev ramt af den forkerte prioritet.
 
-**3. Fix copyPermissionsFromRole (PermissionEditor.tsx, linje 396 + PermissionEditorV2.tsx, linje 299)**
-Prioriter den autoritative `PERMISSION_HIERARCHY` over kilderollens `parent_key`:
-```
-// Fra: p.parent_key || PERMISSION_HIERARCHY[...] || null
-// Til: PERMISSION_HIERARCHY[...] ?? p.parent_key ?? null
-```
-
-### Tekniske detaljer
-
-Berørte filer:
-- `src/components/employees/permissions/PermissionEditor.tsx` (linje 396 og 428-439)
-- `src/components/employees/permissions/PermissionEditorV2.tsx` (linje 299)
-- Database: `role_page_permissions` tabel (data-opdatering)
-
+### Forebyggelse
+Overvej ogsa at tjekke de ovrige Switch Contact Center-produkter (#2, #3, #4) for samme problem, og saette Tilskud-regler til prioritet 5 konsekvent.
