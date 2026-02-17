@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 
 interface AdversusCredentials {
   username?: string;
@@ -1099,4 +1099,91 @@ export class AdversusAdapter implements DialerAdapter {
     return 'OTHER';
   }
 
+  // ==========================================
+  // SESSION FETCHING (ALL outcomes for hitrate)
+  // ==========================================
+
+  async fetchSessions(days: number): Promise<StandardSession[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    return this.fetchSessionsRange({ from: startDate.toISOString(), to: new Date().toISOString() });
+  }
+
+  async fetchSessionsRange(range: { from: string; to: string }): Promise<StandardSession[]> {
+    const startIso = range.from.includes('T') ? range.from : `${range.from}T00:00:00Z`;
+    const endIso = range.to.includes('T') ? range.to : `${range.to}T23:59:59Z`;
+
+    console.log(`[Adversus] Fetching sessions range ${startIso} -> ${endIso}`);
+
+    const allSessions: StandardSession[] = [];
+    const seenIds = new Set<string>();
+    let page = 1;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore && page <= 100) {
+      try {
+        const filterObj = { startTime: { $gt: startIso, $lt: endIso } };
+        const filterStr = encodeURIComponent(JSON.stringify(filterObj));
+        const url = `/sessions?filters=${filterStr}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`;
+
+        const data = await this.get(url);
+        const sessions = data.sessions || data || [];
+
+        if (!Array.isArray(sessions) || sessions.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const s of sessions) {
+          const externalId = String(s.id || s.uniqueId || "");
+          if (!externalId || seenIds.has(externalId)) continue;
+          seenIds.add(externalId);
+
+          const hasCdr = !!(s.cdr || s.conversationSeconds > 0);
+
+          allSessions.push({
+            externalId,
+            integrationType: "adversus",
+            dialerName: this.dialerName,
+            leadExternalId: s.leadId ? String(s.leadId) : undefined,
+            agentExternalId: s.userId ? String(s.userId) : undefined,
+            campaignExternalId: s.campaignId ? String(s.campaignId) : undefined,
+            status: s.status || "unknown",
+            startTime: s.startTime || s.created || undefined,
+            endTime: s.endTime || undefined,
+            sessionSeconds: s.sessionSeconds || s.durationSeconds || undefined,
+            hasCdr,
+            cdrDurationSeconds: s.cdr?.durationSeconds || s.conversationSeconds || undefined,
+            cdrDisposition: s.cdr?.disposition || s.disposition || undefined,
+            metadata: {
+              callType: s.type,
+              hangupCause: s.hangupCause,
+            },
+          });
+        }
+
+        console.log(`[Adversus] Sessions page ${page}: ${sessions.length} records (total unique: ${allSessions.length})`);
+
+        if (sessions.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch (e) {
+        console.error(`[Adversus] Error fetching sessions page ${page}:`, e);
+        hasMore = false;
+      }
+    }
+
+    // Log status distribution
+    const statusCounts = new Map<string, number>();
+    for (const s of allSessions) {
+      statusCounts.set(s.status, (statusCounts.get(s.status) || 0) + 1);
+    }
+    console.log(`[Adversus] Sessions fetched: ${allSessions.length} total. Status distribution: ${JSON.stringify(Object.fromEntries(statusCounts))}`);
+
+    return allSessions;
+  }
 }

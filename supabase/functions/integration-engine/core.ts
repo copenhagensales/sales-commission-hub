@@ -1,9 +1,10 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { StandardSale, StandardUser, StandardCampaign, StandardCall, CampaignMappingConfig } from "./types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig } from "./types.ts";
 import { processUsers as coreProcessUsers } from "./core/users.ts";
 import { processCampaigns as coreProcessCampaigns } from "./core/campaigns.ts";
 import { processSales as coreProcessSales } from "./core/sales.ts";
 import { processCalls as coreProcessCalls } from "./core/calls.ts";
+import { processSessions as coreProcessSessions } from "./core/sessions.ts";
 import { getCampaignMappings as coreGetCampaignMappings } from "./core/mappings.ts";
 
 export class IngestionEngine {
@@ -35,5 +36,9 @@ export class IngestionEngine {
 
   async processCalls(calls: StandardCall[], batchSize = 500) {
     return coreProcessCalls(this.supabase, calls, batchSize, this.log.bind(this));
+  }
+
+  async processSessions(sessions: StandardSession[], integrationId: string, batchSize = 500) {
+    return coreProcessSessions(this.supabase, sessions, integrationId, batchSize, this.log.bind(this));
   }
 }

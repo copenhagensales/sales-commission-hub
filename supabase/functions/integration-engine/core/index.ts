@@ -9,4 +9,5 @@ export { processUsers } from "./users.ts";
 export { processCampaigns } from "./campaigns.ts";
 export { processSales } from "./sales.ts";
 export { processCalls } from "./calls.ts";
+export { processSessions } from "./sessions.ts";
 export { getCampaignMappings } from "./mappings.ts";

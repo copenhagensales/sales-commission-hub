@@ -1,4 +1,4 @@
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, DateRange } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, StandardSession, CampaignMappingConfig, DateRange } from "../types.ts";
 
 export interface DialerAdapter {
   // Campaign mappings are passed to fetchSales so the adapter can extract external references
@@ -10,6 +10,9 @@ export interface DialerAdapter {
   // GDPR-Compliant call data extraction - only IDs and metadata, no personal Lead data
   fetchCalls?(days: number): Promise<StandardCall[]>;
   fetchCallsRange?(range: DateRange): Promise<StandardCall[]>;
+  // Session data extraction - ALL outcomes for hitrate analytics
+  fetchSessions?(days: number): Promise<StandardSession[]>;
+  fetchSessionsRange?(range: DateRange): Promise<StandardSession[]>;
   // Lightweight raw sales fetch for field sampling (skips lead enrichment)
   fetchSalesRaw?(limit?: number): Promise<Record<string, unknown>[]>;
 }
