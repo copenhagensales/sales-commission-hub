@@ -1,28 +1,42 @@
 
-
-# Robust Sessions-sync: Komplet implementeringsplan
+# Robust Sessions-sync: Komplet Implementeringsplan
 
 ## Hvad bygges
 
 En komplet sessions-ingest pipeline der henter ALLE opkaldsudfald (ikke kun salg) fra Adversus og Enreach, med idempotent incremental sync, rate limit haandtering og et analytics-lag til hitrate-beregninger. Samtidig fixes `buildLeadDataMap` saa alle leads hentes korrekt uanset kampagnestoerrelse.
 
+**Nul-regression garanti**: Ingen aendringer i sales-processing, pricing rules, straksbetalinger, fieldmarketing, eller eksisterende calls-flow.
+
 ---
 
-## A) Database migrationer (4 migrationer, additiv, non-breaking)
+## A) DATABASE MIGRATIONER (4 additive, non-breaking)
 
 ### Migration 1: `dialer_sessions` tabel
-Ny tabel til ALLE session-udfald. Schema:
-- `id uuid PK DEFAULT gen_random_uuid()`
-- `integration_id uuid NOT NULL FK -> dialer_integrations(id) ON DELETE CASCADE`
-- `external_id text NOT NULL`
-- `lead_external_id text`, `agent_external_id text`, `campaign_external_id text`
-- `status text NOT NULL` (success, notInterested, unqualified, invalid, automaticRedial, privateRedial, noAnswer, busy, unknown)
-- `start_time timestamptz`, `end_time timestamptz`, `session_seconds integer`
-- `has_cdr boolean DEFAULT false`, `cdr_duration_seconds integer`, `cdr_disposition text`
-- `source text NOT NULL DEFAULT 'adversus'`
-- `metadata jsonb DEFAULT '{}'::jsonb`
-- `created_at timestamptz DEFAULT now()`, `updated_at timestamptz DEFAULT now()`
-- UNIQUE `(integration_id, external_id)`
+
+Ny tabel til at gemme ALLE session-udfald (success, notInterested, unqualified, invalid, etc.):
+
+```text
+dialer_sessions
+  id                    uuid PK DEFAULT gen_random_uuid()
+  integration_id        uuid NOT NULL FK -> dialer_integrations(id) ON DELETE CASCADE
+  external_id           text NOT NULL
+  lead_external_id      text
+  agent_external_id     text
+  campaign_external_id  text
+  status                text NOT NULL
+  start_time            timestamptz
+  end_time              timestamptz
+  session_seconds       integer
+  has_cdr               boolean DEFAULT false
+  cdr_duration_seconds  integer
+  cdr_disposition       text
+  source                text NOT NULL DEFAULT 'adversus'
+  metadata              jsonb DEFAULT '{}'::jsonb
+  created_at            timestamptz DEFAULT now()
+  updated_at            timestamptz DEFAULT now()
+
+  UNIQUE (integration_id, external_id)
+```
 
 Indekser:
 - `(integration_id, start_time DESC)`
@@ -31,30 +45,42 @@ Indekser:
 - `(integration_id, status, start_time DESC)`
 
 RLS (same pattern som `dialer_calls`):
-- SELECT: `is_manager_or_above(auth.uid())`
+- Enabled
+- SELECT: `is_teamleder_or_above(auth.uid())`
 - INSERT: service role (WITH CHECK true)
 - UPDATE: service role (WITH CHECK true)
 
-Trigger: `updated_at = now()` paa UPDATE via custom trigger function (moddatetime er ikke installeret).
+Trigger: Custom `updated_at` trigger paa UPDATE (moddatetime extension er ikke installeret).
 
 ### Migration 2: `dialer_sync_state` tabel
-- `integration_id uuid NOT NULL FK -> dialer_integrations(id) ON DELETE CASCADE`
-- `dataset text NOT NULL` (sales, calls, sessions, users, campaigns)
-- `last_success_at timestamptz`
-- `cursor text`
-- `last_error_at timestamptz`, `last_error text`
-- `updated_at timestamptz NOT NULL DEFAULT now()`
-- PK `(integration_id, dataset)`
 
-RLS: SELECT for `is_manager_or_above`, service role INSERT/UPDATE.
+Incremental sync watermark/cursor tracking:
+
+```text
+dialer_sync_state
+  integration_id   uuid NOT NULL FK -> dialer_integrations(id) ON DELETE CASCADE
+  dataset          text NOT NULL (sales, calls, sessions, users, campaigns)
+  last_success_at  timestamptz
+  cursor           text
+  last_error_at    timestamptz
+  last_error       text
+  updated_at       timestamptz NOT NULL DEFAULT now()
+
+  PK (integration_id, dataset)
+```
+
+RLS: Enabled, SELECT for managers, service-role INSERT/UPDATE.
 
 ### Migration 3: `integration_id` paa `dialer_calls`
-- `ALTER TABLE dialer_calls ADD COLUMN integration_id uuid REFERENCES dialer_integrations(id)` (nullable)
-- Backfill: `UPDATE dialer_calls dc SET integration_id = di.id FROM dialer_integrations di WHERE dc.dialer_name = di.name`
-- Index: `(integration_id, start_time DESC)`
-- Bevarer eksisterende UNIQUE `(external_id, integration_type, dialer_name)` - INGEN breaking change
 
-### Migration 4: Aggregeret view
+- `ALTER TABLE dialer_calls ADD COLUMN integration_id uuid REFERENCES dialer_integrations(id)` (nullable)
+- Backfill via: `UPDATE dialer_calls dc SET integration_id = di.id FROM dialer_integrations di WHERE dc.dialer_name = di.name`
+- Nyt index: `(integration_id, start_time DESC)`
+- Bevarer eksisterende UNIQUE constraint `(external_id, integration_type, dialer_name)` - INGEN breaking change
+- `core/calls.ts` onConflict forbliver `"external_id,integration_type,dialer_name"` - uaendret
+
+### Migration 4: Aggregeret view `dialer_session_daily_metrics`
+
 ```text
 CREATE VIEW dialer_session_daily_metrics AS
 SELECT
@@ -76,163 +102,283 @@ WHERE start_time IS NOT NULL
 GROUP BY 1,2,3,4;
 ```
 
+Hitrate: `success_sessions / NULLIF(total_sessions, 0)`
+
 ---
 
-## B) Integration engine aendringer
+## B) INTEGRATION ENGINE AENDRINGER
 
 ### B1: `types.ts` - Tilfoej `StandardSession`
-Ny interface med: `externalId`, `integrationType`, `dialerName`, `leadExternalId`, `agentExternalId`, `campaignExternalId`, `status`, `startTime`, `endTime`, `sessionSeconds`, `hasCdr`, `cdrDurationSeconds`, `cdrDisposition`, `metadata`.
+
+Ny interface tilfojet i bunden af filen:
+
+```text
+StandardSession
+  externalId           string
+  integrationType      'adversus' | 'enreach' | 'other'
+  dialerName           string
+  leadExternalId       string
+  agentExternalId      string
+  campaignExternalId   string
+  status               string (success, notInterested, unqualified, invalid, automaticRedial, privateRedial, noAnswer, busy, unknown)
+  startTime            string (ISO-8601)
+  endTime              string (ISO-8601)
+  sessionSeconds       number
+  hasCdr               boolean
+  cdrDurationSeconds   number
+  cdrDisposition       string
+  metadata             Record<string, unknown>
+```
 
 ### B2: `adapters/interface.ts` - Tilfoej optional metoder
+
+Tilfoej til `DialerAdapter` interface (linje 3-14):
 - `fetchSessions?(days: number): Promise<StandardSession[]>`
 - `fetchSessionsRange?(range: DateRange): Promise<StandardSession[]>`
 
+Optional metoder = non-breaking for eksisterende adapters.
+
 ### B3: `adapters/adversus.ts` - 2 aendringer
 
-**Ny `fetchSessions` + `fetchSessionsRange`**:
-- Kalder Adversus `/sessions` endpoint med `startTime` filter
-- Paginering med `pageSize=1000`, `sortProperty=startTime`, `sortDirection=DESC`
-- Henter ALLE statuses (success, notInterested, unqualified, invalid, automaticRedial, privateRedial)
-- CDR fra session objekt (sessionSeconds, cdr data)
-- Rate limit retry med exponential backoff
+**NY: `fetchSessions(days)` + `fetchSessionsRange(range)`**
 
-**Refactor `buildLeadDataMap`** (linje 422-609):
-- Fjern bulk kampagne-fetch loop (linje 449-536) der fejler paa 5000+ leads
-- Udtraek unikke `leadId`s fra salgsarrayet
-- Batch-fetch alle via eksisterende `fetchLeadById` i grupper af 5 med 200ms delay
-- Fjern `MAX_FALLBACK_LEADS = 20` begransning
-- Output-format 100% identisk: `Map<leadId, { opp, resultData, resultFields }>`
-- OPP-pattern matching og resultFields-parsing bevares uaendret
+Implementerer kald til Adversus `/sessions` endpoint (bekraeftet fra den aeldre `sync-adversus` funktion):
+- API format: `/sessions?filters={startTime:{$gt:ISO}}&page=N&pageSize=1000&sortProperty=startTime&sortDirection=DESC`
+- Henter ALLE session statuses: `success`, `notInterested`, `unqualified`, `invalid`, `automaticRedial`, `privateRedial`
+- Mapper session-objekter til `StandardSession`:
+  - `session.id` -> `externalId`
+  - `session.leadId` -> `leadExternalId`
+  - `session.userId` -> `agentExternalId`
+  - `session.campaignId` -> `campaignExternalId`
+  - `session.status` -> `status` (bruges direkte - Adversus returnerer semantiske statuses)
+  - `session.sessionSeconds` -> `sessionSeconds`
+  - `session.cdr` -> CDR-felter (durationSeconds, disposition) hvis tilgaengeligt
+- Paginering med `pageSize=1000`, stopper naar `sessions.length < pageSize`
+- Rate limit retry via eksisterende `get()` metode
+
+**FIX: `buildLeadDataMap` (linje 422-609)**
+
+Nuvaerende problem: Bulk-fetch af leads per kampagne med `pageSize=5000` mister nyere leads i store kampagner (fx Relatel 105958). Fallback begranset til `MAX_FALLBACK_LEADS = 20`.
+
+Ny logik:
+1. Fjern bulk kampagne-fetch loop (linje 449-536)
+2. Udtraek unikke `leadId`s direkte fra `sales` arrayet
+3. Batch-fetch ALLE manglende leads via eksisterende `fetchLeadById` metode (linje 616-661)
+4. Grupper i batches af 5 med 200ms delay mellem batches
+5. Fjern `MAX_FALLBACK_LEADS = 20` begransning (linje 542)
+
+Output-format 100% identisk: `Map<leadId, { opp, resultData, resultFields }>`
+- OPP-pattern matching (`/OPP-\d{4,6}/`) bevares uaendret
+- `resultFields` parsing bevares uaendret
+- Baade `fetchSales` og `fetchSalesRange` kalder `buildLeadDataMap` - begge opdateres konsistent
 
 ### B4: `adapters/enreach.ts` - Ny `fetchSessions`
-- Genbruger `/simpleleads?AllClosedStatuses=true` endpoint (dataen hentes allerede)
-- Mapper ALLE closures til StandardSession (ikke kun Success)
-- Status-mapping: `Success` -> `success`, andre closure vaerdier lowercase direkte
+
+**NY: `fetchSessions(days)` + `fetchSessionsRange(range)`**
+
+Genbruger EKSISTERENDE `/simpleleads?AllClosedStatuses=true` endpoint:
+- Dataen hentes ALLEREDE men filtreres vaek (linje 368-376: `closure.toLowerCase() === "success"`)
+- Ny sessions-metode mapper ALLE closures til `StandardSession` i stedet for at filtrere
+- Status-mapping: `Success` -> `success`, andre closures -> lowercase direkte (fx `NoSale` -> `nosale`)
 - Logger unikke closure-typer per koersel for diagnostik
-- Ingen ekstra API-kald
-- Genbruger `processPageByPage` med ny generisk version der returnerer `StandardSession[]`
+- Agent fra `firstProcessedByUser.orgCode` eller `lastModifiedByUser.orgCode`
+- Campaign fra `campaign.uniqueId`
+- Genbruger `processPageByPage` med en generisk version der returnerer `StandardSession[]`
+- **INGEN ekstra API-kald** - same data som `fetchSales` allerede henter
 
 ### B5: Nye utility-filer
 
 **`utils/rate-limiter.ts`** (ny fil):
-- Sliding window rate limiter per integration
-- `maxPerMinute: 55`, `maxPerHour: 900` (buffer under Adversus limits)
-- `waitForSlot()`: async metode der venter hvis over limit
-- 429-haandtering: Retry-After + exponential backoff + jitter
+
+Central rate limiter per integration med sliding window:
+- `maxPerMinute: 55` (buffer under Adversus 60/min limit)
+- `maxPerHour: 900` (buffer under Adversus 1000/hour limit)
+- `waitForSlot()`: async metode der venter med sleep hvis over limit
+- 429-haandtering: Laes `Retry-After` header, exponential backoff, random jitter (0-500ms)
 
 **`utils/sync-state.ts`** (ny fil):
-- `getSyncState(supabase, integrationId, dataset)` -> laes fra `dialer_sync_state`
-- `upsertSyncState(supabase, integrationId, dataset, lastSuccessAt, cursor?)` -> upsert
-- `recordSyncError(supabase, integrationId, dataset, errorMsg)` -> gem fejl
+
+CRUD helpers for `dialer_sync_state`:
+- `getSyncState(supabase, integrationId, dataset)` -> laes fra tabel, return `{ last_success_at, cursor }` eller null
+- `upsertSyncState(supabase, integrationId, dataset, lastSuccessAt, cursor?)` -> upsert med onConflict
+- `recordSyncError(supabase, integrationId, dataset, errorMsg)` -> opdater `last_error_at` + `last_error`
 
 ### B6: `core/sessions.ts` (ny fil)
+
 `processSessions(supabase, sessions, integrationId, batchSize, log)`:
-- Agent-matching via `agents` tabel (same pattern som `core/calls.ts` linje 96-131)
-- Lookup via `agentMapByExtId`, `agentMapByDialerId`, `agentMapByEmail`
-- Batch-upsert til `dialer_sessions` med `onConflict: "integration_id,external_id"`
-- `ignoreDuplicates: false` (opdater eksisterende)
+
+- Agent-matching via `agents` tabel (same pattern som `core/calls.ts` linje 96-131):
+  - Fetch alle agents med `id, external_adversus_id, external_dialer_id, email`
+  - Byg 3 lookup maps: `agentMapByExtId`, `agentMapByDialerId`, `agentMapByEmail`
+  - Match session `agentExternalId` mod alle 3 maps
+- Transform `StandardSession[]` til database rows med felter:
+  - `integration_id`, `external_id`, `lead_external_id`, `agent_external_id`, `campaign_external_id`
+  - `status`, `start_time`, `end_time`, `session_seconds`
+  - `has_cdr`, `cdr_duration_seconds`, `cdr_disposition`
+  - `source`, `metadata`, `updated_at`
+- Batch-upsert til `dialer_sessions` med `onConflict: "integration_id,external_id"`, `ignoreDuplicates: false`
 - Return `{ processed, errors, matched, duplicates }`
 
-### B7: `core/index.ts` - Re-eksporter `processSessions`
+### B7: `core/index.ts` - Re-eksporter
 
-### B8: `core.ts` - Tilfoej `processSessions` metode paa `IngestionEngine`
+Tilfoej: `export { processSessions } from "./sessions.ts";`
 
-### B9: `actions/sync-integration.ts` - Tilfoej sessions action
+### B8: `core.ts` - Tilfoej metode
 
-Kritisk backward compatibility: Aendr linje 61:
+Tilfoej `processSessions(sessions, integrationId, batchSize)` metode paa `IngestionEngine` klassen der delegerer til `core/sessions.ts`.
+
+### B9: `actions/sync-integration.ts` - Sessions action
+
+**Kritisk backward compatibility** - aendr linje 61:
+
 ```text
-// FRA:
+// FRA (nuvaerende):
 const actionList = actions || (action === "sync" ? ["campaigns", "users", "sales"] : [action]);
+
 // TIL:
 const actionList = actions || (action === "sync" ? ["campaigns", "users", "sales", "sessions"] : [action]);
 ```
 
-Sessions action flow:
-1. Laes sync state fra `dialer_sync_state`
-2. Beregn vindue: `start = last_success_at - 5min overlap`, `stop = now - 2min`
-3. Fallback for foerste koersel: `days` parameter
-4. Fetch via adapter (`fetchSessionsRange` eller `fetchSessions`)
-5. Process via `engine.processSessions`
-6. Opdater sync state ved success/error
+Dette sikrer at EKSISTERENDE cron jobs med `action: "sync"` automatisk inkluderer sessions.
 
-### B10: `utils/index.ts` - Re-eksporter nye utils
+**Ny sessions-action blok** (efter calls-blokken, linje 159):
 
----
-
-## C) Cron integration
-
-### `update-cron-schedule/index.ts`
-Aendr dialer payload (linje 50-55):
 ```text
-// FRA:
-payload = { source: provider, integration_id, action: "sync", days: 1 };
-// TIL:
-payload = { source: provider, integration_id, actions: ["campaigns", "users", "sales", "sessions"], days: 1 };
+if (actionList.includes("sessions")) {
+  // 1. Laes sync state for incremental vindue
+  const syncState = await getSyncState(supabase, integration.id, "sessions");
+  
+  // 2. Beregn window
+  //    start = last_success_at - 5min overlap (fang sent registrerede)
+  //    stop = now - 2min (undgaa in-flight records)
+  //    Fallback for ny integration: days parameter
+  const windowStart = syncState?.last_success_at
+    ? new Date(new Date(syncState.last_success_at).getTime() - 5*60*1000)
+    : new Date(Date.now() - days*24*60*60*1000);
+  const windowEnd = new Date(Date.now() - 2*60*1000);
+  
+  // 3. Fetch via adapter
+  let sessions = [];
+  if (adapter.fetchSessionsRange) {
+    sessions = await adapter.fetchSessionsRange({
+      from: windowStart.toISOString(),
+      to: windowEnd.toISOString()
+    });
+  } else if (adapter.fetchSessions) {
+    sessions = await adapter.fetchSessions(days);
+  }
+  
+  // 4. Process og upsert
+  if (sessions.length > 0) {
+    runResults["sessions"] = await engine.processSessions(sessions, integration.id);
+  }
+  
+  // 5. Opdater sync state
+  await upsertSyncState(supabase, integration.id, "sessions", windowEnd);
+}
 ```
 
-Eksisterende cron jobs med `action: "sync"` forbliver kompatible via fallback i B9.
+Sync state opdateres ogsaa i error-handling.
+
+### B10: `utils/index.ts` - Re-eksporter
+
+Tilfoej eksport af `RateLimiter`, `getSyncState`, `upsertSyncState`, `recordSyncError`.
 
 ---
 
-## D) Filer der EKSPLICIT IKKE roeres
+## C) CRON INTEGRATION
+
+### `update-cron-schedule/index.ts` (linje 50-55)
+
+Aendr dialer payload:
+
+```text
+// FRA (nuvaerende):
+payload = { source: provider || "adversus", integration_id, action: "sync", days: 1 };
+
+// TIL:
+payload = { source: provider || "adversus", integration_id, actions: ["campaigns", "users", "sales", "sessions"], days: 1 };
+```
+
+Backward compatibility: Eksisterende cron jobs bruger stadig `action: "sync"` indtil de genplanlaces. Fallback i B9 sikrer at `"sync"` ogsaa inkluderer sessions.
+
+---
+
+## D) FILER DER EKSPLICIT IKKE ROERES
 
 | Fil | Grund |
 |-----|-------|
-| `core/sales.ts` | Straksbetalings-preservation, pricing rules, email filter uaendret |
-| `core/calls.ts` | CDR processing, UNIQUE constraint uaendret |
-| `core/normalize.ts` | Data normalisering uaendret |
-| `core/campaigns.ts` | Uaendret |
-| `core/users.ts` | Uaendret |
-| `core/mappings.ts` | Uaendret |
-| `index.ts` (entry point) | Action routing allerede fleksibelt |
-| Alle FM edge functions | FM-data har source='fieldmarketing', aldrig i dialer_sessions |
+| `core/sales.ts` | Straksbetalings-preservation (linje 459-525), pricing rules, email filter, normalize-flow - ALT uaendret |
+| `core/calls.ts` | CDR processing, UNIQUE constraint `(external_id, integration_type, dialer_name)`, agent matching - uaendret |
+| `core/normalize.ts` | Data normalisering via field mappings - uaendret |
+| `core/campaigns.ts` | Campaign processing - uaendret |
+| `core/users.ts` | User processing - uaendret |
+| `core/mappings.ts` | Campaign mapping lookup - uaendret |
+| `index.ts` (entry point) | Action routing allerede fleksibelt nok |
+| `adapters/registry.ts` | Adapter instantiering - uaendret |
+| Alle FM edge functions | FM-data har `source='fieldmarketing'`, aldrig i dialer_sessions |
 | `calculate-leaderboard-*` | Bruger `sales` + `sale_items`, ikke sessions |
 | `tv-dashboard-data` | Bruger `sales` tabel, ikke sessions |
+| `dialer-webhook/*` | Webhook processing uaendret |
 
 ---
 
-## E) Komplet filliste
+## E) KOMPLET FILLISTE
 
-| Fil | Type | Risiko |
-|-----|------|--------|
-| DB Migration 1: `dialer_sessions` | Ny tabel | Lav |
-| DB Migration 2: `dialer_sync_state` | Ny tabel | Lav |
-| DB Migration 3: `dialer_calls` + `integration_id` | Additivt | Medium (verify backfill) |
-| DB Migration 4: `dialer_session_daily_metrics` view | Nyt view | Lav |
-| `integration-engine/types.ts` | Tilfoej interface | Lav |
-| `integration-engine/adapters/interface.ts` | Tilfoej optional metoder | Lav |
-| `integration-engine/adapters/adversus.ts` | fetchSessions + buildLeadDataMap fix | Hoej |
-| `integration-engine/adapters/enreach.ts` | fetchSessions | Medium |
-| `integration-engine/core/sessions.ts` | Ny fil | Lav |
-| `integration-engine/core/index.ts` | Re-eksport | Lav |
-| `integration-engine/core.ts` | Tilfoej metode | Lav |
-| `integration-engine/actions/sync-integration.ts` | Sessions action + backward compat | Medium |
-| `integration-engine/utils/rate-limiter.ts` | Ny fil | Lav |
-| `integration-engine/utils/sync-state.ts` | Ny fil | Lav |
-| `integration-engine/utils/index.ts` | Re-eksport | Lav |
-| `update-cron-schedule/index.ts` | Payload aendring | Lav |
+| # | Fil | Type | Risiko |
+|---|-----|------|--------|
+| 1 | DB Migration 1: `dialer_sessions` | Ny tabel + indekser + RLS + trigger | Lav |
+| 2 | DB Migration 2: `dialer_sync_state` | Ny tabel + RLS | Lav |
+| 3 | DB Migration 3: `dialer_calls` + `integration_id` | Additivt (nullable kolonne + backfill + index) | Medium |
+| 4 | DB Migration 4: `dialer_session_daily_metrics` view | Nyt view | Lav |
+| 5 | `integration-engine/types.ts` | Tilfoej `StandardSession` interface | Lav |
+| 6 | `integration-engine/adapters/interface.ts` | Tilfoej 2 optional metoder | Lav |
+| 7 | `integration-engine/adapters/adversus.ts` | `fetchSessions` + `fetchSessionsRange` + `buildLeadDataMap` refactor | Hoej |
+| 8 | `integration-engine/adapters/enreach.ts` | `fetchSessions` + `fetchSessionsRange` | Medium |
+| 9 | `integration-engine/core/sessions.ts` | Ny fil: `processSessions()` | Lav |
+| 10 | `integration-engine/core/index.ts` | Tilfoej re-eksport | Lav |
+| 11 | `integration-engine/core.ts` | Tilfoej `processSessions` metode | Lav |
+| 12 | `integration-engine/actions/sync-integration.ts` | Sessions action + backward compat fallback | Medium |
+| 13 | `integration-engine/utils/rate-limiter.ts` | Ny fil: central rate limiter | Lav |
+| 14 | `integration-engine/utils/sync-state.ts` | Ny fil: sync state CRUD | Lav |
+| 15 | `integration-engine/utils/index.ts` | Tilfoej re-eksporter | Lav |
+| 16 | `update-cron-schedule/index.ts` | Payload aendring | Lav |
 
 ---
 
-## F) Non-regression gates
+## F) NON-REGRESSION GATES
 
 Foer deploy verificeres:
 
-1. **Backfill match quality**: `SELECT dialer_name, COUNT(*), COUNT(integration_id) FROM dialer_calls GROUP BY 1` - alle 5 integrationer skal matche
-2. **Sales sync integritet**: Koer `actions: ["sales"]` og verificer pricing rules + `is_immediate_payment` preservation
+1. **Backfill match quality**: `SELECT dialer_name, COUNT(*), COUNT(integration_id) FROM dialer_calls GROUP BY 1` - alle integrationer skal matche
+2. **Sales sync integritet**: Koer `actions: ["sales"]` og verificer:
+   - Pricing rules matcher korrekt (Daekningssum-berigelse for ASE)
+   - `is_immediate_payment` preservation virker
+   - OPP extraction + leadResultFields bevares
 3. **FM dashboards**: `SELECT COUNT(*) FROM sales WHERE source = 'fieldmarketing'` - uaendret
-4. **Calls sync**: `SELECT COUNT(*) FROM dialer_calls` - uaendret deduplicering
-5. **Cron backward compat**: Eksisterende `action: "sync"` payload giver samme resultat + sessions
+4. **Calls sync**: Deduplicering via `(external_id, integration_type, dialer_name)` - uaendret
+5. **Cron backward compat**: `action: "sync"` payload giver sessions + sales + campaigns + users
 
-## G) Testplan
+## G) TESTPLAN
 
-1. Deploy edge functions
-2. `POST integration-engine { integration_id: "26fac...", actions: ["sessions"], days: 1 }` (Adversus)
-3. Verificer records i `dialer_sessions` med alle status-typer
-4. Verificer `dialer_sync_state` opdateret
-5. Koer igen -> ingen duplikater (idempotens)
-6. `POST integration-engine { integration_id: "d79b9632...", actions: ["sessions"], days: 1 }` (Enreach)
-7. Verificer Enreach closure-typer logget
-8. `SELECT * FROM dialer_session_daily_metrics LIMIT 10` -> hitrate aggregering
-9. Koer fuld `action: "sync"` -> backward compatible med sessions inkluderet
+1. Deploy alle edge functions
+2. **Adversus sessions**: `POST integration-engine { integration_id: "<adversus-id>", actions: ["sessions"], days: 1 }`
+   - Verificer records i `dialer_sessions` med alle status-typer (success, notInterested, etc.)
+   - Verificer `dialer_sync_state` har korrekt `last_success_at` for dataset="sessions"
+3. **Idempotens**: Koer samme sync igen -> ingen duplikater (UNIQUE constraint)
+4. **Enreach sessions**: `POST integration-engine { integration_id: "<enreach-id>", actions: ["sessions"], days: 1 }`
+   - Verificer alle closure-typer logget og gemt
+5. **buildLeadDataMap**: Koer `actions: ["sales"]` for Relatel/Adversus, verificer `leadResultData` ikke-tom for store kampagner
+6. **View test**: `SELECT * FROM dialer_session_daily_metrics WHERE date = CURRENT_DATE LIMIT 10`
+7. **Fuld sync**: `POST integration-engine { action: "sync", integration_id: "<id>", days: 1 }` -> backward compatible med sessions inkluderet
+8. **Rate limit monitoring**: Check logs for 429-fejl under kombineret sessions+sales sync
 
+## H) KENDTE RISICI + ROLLBACK
+
+| Risiko | Mitigering | Rollback |
+|--------|------------|----------|
+| `buildLeadDataMap` refactor bryder OPP-extraction | Output-format er identisk, `fetchLeadById` er allerede testet (linje 616-661) | Revert adversus.ts til foer-version |
+| `integration_id` backfill matcher forkert | Match via `dialer_name` (unik per integration), verify med COUNT query | Kolonne er nullable, kan ignoreres |
+| Rate limits overskredes med sessions+sales | Central limiter (55/min, 900/hr), sessions koerer EFTER sales | Fjern "sessions" fra actionList fallback |
+| Enreach closure-vaerdier er ukendte | Alle vaerdier gemmes som-er (TEXT felt), diagnostic logging | Intet datatab - bare ukendte status-vaerdier |
+| Cron payload-aendring bryder eksisterende jobs | `action: "sync"` fallback inkluderer sessions automatisk | Revert cron payload |
