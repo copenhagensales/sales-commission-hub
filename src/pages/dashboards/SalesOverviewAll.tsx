@@ -329,9 +329,79 @@ export default function SalesOverviewAll() {
     return () => clearInterval(timer);
   }, []);
 
-  const content = (
+  // TV mode content
+  const tvContent = (
+    <div className="space-y-12 animate-fade-in">
+      {/* Hero Clock */}
+      <div className="flex flex-col items-center justify-center pt-8 pb-4">
+        <span className="text-[120px] font-extralight tabular-nums tracking-tight leading-none text-white">
+          {format(now, "HH:mm:ss")}
+        </span>
+        <span className="text-xl font-light uppercase tracking-[0.3em] text-white/40 mt-4">
+          {format(now, "EEEE d. MMMM yyyy", { locale: da })}
+        </span>
+      </div>
+
+      {/* Total Sales Hero */}
+      <div className="flex flex-col items-center justify-center">
+        <span className="text-[96px] font-extralight tabular-nums leading-none text-white">
+          {displaySalesTotal}
+        </span>
+        <span className="text-sm font-medium uppercase tracking-[0.4em] text-white/30 mt-3">
+          Salg i dag
+        </span>
+      </div>
+
+      {/* Client Grid - Glassmorphism */}
+      <div className="px-8">
+        {Object.keys(displaySalesByClientToday).length === 0 ? (
+          <p className="text-white/30 text-center py-8 text-lg">Ingen salg registreret i dag</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {Object.entries(displaySalesByClientToday)
+              .sort(([, a], [, b]) => b.count - a.count)
+              .map(([client, data]) => (
+                <div
+                  key={client}
+                  className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 animate-fade-in"
+                >
+                  {data.logoUrl && (
+                    <div className="flex items-center justify-center rounded-xl bg-zinc-800/80 h-16 w-32 p-3">
+                      <img
+                        src={data.logoUrl}
+                        alt={client}
+                        className="object-contain max-h-full max-w-full"
+                      />
+                    </div>
+                  )}
+                  <span className="text-5xl font-light tabular-nums text-white">{data.count}</span>
+                  <span className="text-sm uppercase tracking-[0.2em] text-white/40 text-center truncate w-full">
+                    {client}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-center gap-3 text-white/25 text-sm pt-4">
+        <span className="inline-flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+          </span>
+          LIVE
+        </span>
+        <span>•</span>
+        <span>{format(now, "HH:mm:ss")}</span>
+      </div>
+    </div>
+  );
+
+  // Normal dashboard content
+  const normalContent = (
     <div className="space-y-6">
-      {/* Live Clock */}
       <div className="flex items-center justify-center gap-3 py-4">
         <Clock className="h-6 w-6 text-primary" />
         <span className="text-5xl font-bold tabular-nums tracking-tight">
@@ -347,7 +417,6 @@ export default function SalesOverviewAll() {
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
-      {/* Sales by Client Today */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Target className="h-5 w-5 text-primary" />
@@ -385,7 +454,6 @@ export default function SalesOverviewAll() {
         )}
       </div>
 
-      {/* Footer */}
       <div className="text-center text-muted-foreground text-sm">
         <p>Salgsoversigt alle • {format(today, "HH:mm", { locale: da })}</p>
       </div>
@@ -394,15 +462,15 @@ export default function SalesOverviewAll() {
 
   if (tvMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4">
-        {content}
+      <div className="min-h-screen bg-[#0a0a0a] p-4" style={{ background: 'radial-gradient(ellipse at center, #111111 0%, #0a0a0a 70%)' }}>
+        {tvContent}
       </div>
     );
   }
 
   return (
     <DashboardLayout>
-      {content}
+      {normalContent}
     </DashboardLayout>
   );
 }
