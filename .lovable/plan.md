@@ -1,40 +1,59 @@
 
 
-## Nyt dashboard: "Salgsoversigt alle"
+## Premium TV Board Redesign -- Apple-inspired UI/UX
 
-### Oversigt
-Opretter en forenklet kopi af CPH Sales-dashboardet der **kun** viser "Dagens salg"-sektionen -- dvs. de to KPI-kort (Salg i dag + Saelgere pa tavlen) samt salg per klient fordelt pa kort med logoer.
+Boardet redesignes fra bunden med en ren, moderne og minimal Apple-inspireret aestetik. Fokus pa laesbarhed fra afstand, elegante overgange, og et visuelt hierarki der guider ojet naturligt.
 
-### Indhold pa dashboardet
-- **Header** med titel "Salgsoversigt alle" og dagens dato
-- **Salg per klient i dag** -- kort-grid med klient-logoer og antal salg (inkl. fieldmarketing)
-- **KPI-kort**: Salg i dag (total, bekraeftet, afventer) + Saelgere pa tavlen
+### Design-principper
 
-Ingen date range picker, ingen top sellers, ingen team performance, ingen absence data, ingen seneste salg-liste.
+- **Typografi forst**: San Francisco-lignende vaegt med stor kontrast mellem overskrifter og undertekst
+- **Negative space**: Generost whitespace, ingen visuel stoj
+- **Subtile gradienter**: Brug af glasmorfisme og ultra-subtile baggrunde i stedet for kraftige farve-gradienter
+- **Monokromatisk med accent**: Primaert hvid/sort palette med en enkelt accent-farve
+- **Animationer**: Brug fade-in animationer for indlaedt indhold
 
-### Tekniske trin
+### Konkrete aendringer i `SalesOverviewAll.tsx`
 
-**1. Ny fil: `src/pages/dashboards/SalesOverviewAll.tsx`**
-- Kopierer data-fetching fra CphSalesDashboard for `todaySalesData` og `fmTodaySales`
-- Beregningsfunktioner: `calculateCountedSales`, `calculateSalesByClient`, `calculateConfirmedSales`, `calculatePendingSales`, `calculateSellersOnBoard`, `getSalesByClientWithLogos`
-- Henter aktive medarbejdere via `usePrecomputedKpis`
-- TV-mode support via `isTvMode()` og `tv-dashboard-data` edge function
-- Renderer kun: salg-per-klient grid + 2 KPI-kort
-- Bruger `useRequireDashboardAccess("sales-overview-all")`
+**1. Ur-sektion (hero)**
+- Uret bliver det visuelle centrum -- stort, lyst, og dominerende
+- Tid i `text-8xl` (eller `text-[120px]` for TV) med ultra-tynd font-weight
+- Dato under uret i en elegant `text-xl` med uppercase og letter-spacing
+- Fjern Clock-ikonet -- uret taler for sig selv
+- Fjern `DashboardHeader`-komponenten i TV mode for et renere look (behold i normal mode)
 
-**2. Route registrering: `src/routes/pages.ts`**
-- Tilfoej: `export const SalesOverviewAll = lazyPage(() => import("@/pages/dashboards/SalesOverviewAll"));`
+**2. Total salg hero-sektion**
+- Et centralt, stort tal der viser dagens totale salg
+- Teksten "SALG I DAG" i subtilt uppercase med tracking
+- Placeret lige under uret med god afstand
 
-**3. Route config: `src/routes/config.tsx`**
-- Tilfoej route med path `/dashboards/sales-overview-all`, access `"protected"`
+**3. Klient-grid**
+- Erstat de farverige gradient-kort med minimale glasmorfisme-kort:
+  - `bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl`
+- Logo-container med moerk baggrund og generoes padding
+- Salgstal i `text-5xl font-light` (let vaegt, ikke bold -- Apple-stil)
+- Klientnavn i `text-sm uppercase tracking-widest text-white/50`
+- Ens stoerrelse pa alle kort, sorteret efter flest salg
+- Grid: `grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5` med stoerre gap
 
-**4. Dashboard config: `src/config/dashboards.ts`**
-- Tilfoej entry: slug `sales-overview-all`, navn "Salgsoversigt alle", permissionKey `menu_dashboard_sales_overview_all`
+**4. Baggrund**
+- TV mode: `bg-[#0a0a0a]` (naesten sort) med en subtil radial gradient i midten
+- Fjern den nuvaerende `from-background via-background to-primary/5`
 
-**5. TV Board support**
-- Tilfoej `"sales-overview-all"` mapping i `TvBoardView.tsx` og `TvBoardDirect.tsx`
+**5. Footer**
+- Minimal footer med tidsstempel og en subtil pulserende "LIVE" badge
+- `text-white/30` for at holde det diskret
 
-### Filer der aendres
-- **Ny**: `src/pages/dashboards/SalesOverviewAll.tsx`
-- **AEndret**: `src/routes/pages.ts`, `src/routes/config.tsx`, `src/config/dashboards.ts`, `src/pages/tv-board/TvBoardView.tsx`, `src/pages/tv-board/TvBoardDirect.tsx`
+### Tekniske detaljer
+
+**Fil der aendres:** `src/pages/dashboards/SalesOverviewAll.tsx`
+
+Alle aendringer er isoleret til denne ene fil. Ingen nye komponenter eller dependencies kraeves.
+
+Overblik over aendringer:
+- Fjern `DashboardHeader` i TV mode (behold i normal dashboard mode)
+- Nyt hero-layout med ur + total salg
+- Nyt klient-grid med glasmorfisme-stil
+- Opdateret TV mode baggrund
+- Tilfoej fade-in animation (bruger eksisterende `animate-fade-in` klasse)
+- Behold al eksisterende datalogik uaendret
 
