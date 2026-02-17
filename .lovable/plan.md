@@ -1,58 +1,71 @@
 
 
-## Fix: "Hent sample-felter" fejler med 404
+## Fix: Forældede parent_keys i rettighedsdatabasen + forebyggelse
 
-### Problem
-Når du klikker "Hent sample-felter", returnerer API'et en 404-fejl. Årsagen er at `fetchSalesRaw`-metoden kalder det forkerte endpoint.
+### Problemet
+Når rettigheder oprettes i databasen, gemmes `parent_key` (som bestemmer hvilken sektion en rettighed vises under). Men hvis hierarkiet senere ændres i koden (fx annulleringer flyttes fra "Lon" til "Rapporter"), opdateres de eksisterende database-rækker **aldrig**. Det betyder at rettigheder forsvinder fra Permission Editor for de roller, der blev oprettet for ændringen.
 
-- `fetchSalesRaw` kalder: `/v1/orders` (eksisterer ikke)
-- `fetchSales` kalder: `/sales` (det rigtige endpoint)
+Konkret for annulleringer:
+- `ejer` har `parent_key = 'section_salary'` (eksisterer ikke)
+- `fm_leder` har `parent_key = 'menu_section_salary'` (forkert sektion)
+- Begge burde have `parent_key = 'menu_section_reports'`
 
-Adversus API'et har sit salgs-endpoint på `{baseUrl}/sales`, men `fetchSalesRaw` bruger `this.get()` som tilføjer `/v1` prefix og kalder `/orders` i stedet for `/sales`.
+Der er to fejlkilder i koden:
+1. **Auto-seed springer eksisterende rækker over** uden at tjekke om deres `parent_key` er korrekt
+2. **Kopiering af roller** kan viderefoere forældede `parent_key`-værdier fra kilderollen
 
-### Løsning
-Ret `fetchSalesRaw` i Adversus-adapteren til at kalde det korrekte endpoint direkte (ligesom `fetchSalesSequential` gør), uden at bruge `this.get()`.
+### Losning
 
-### Tekniske detaljer
+**1. Database-migration: Ret alle forkerte parent_keys**
 
-**Fil: `supabase/functions/integration-engine/adapters/adversus.ts`** (linje 111-125)
+En enkelt SQL-sætning retter alle rækker i `role_page_permissions` hvor `parent_key` ikke matcher den autoritative konfiguration i koden. De tre specifikke rettelser:
 
-Nuværende (fejlagtig) kode:
+```sql
+UPDATE role_page_permissions 
+SET parent_key = 'menu_section_reports' 
+WHERE permission_key = 'menu_cancellations' 
+AND (parent_key IS NULL OR parent_key != 'menu_section_reports');
+```
+
+**2. Auto-korrektion i PermissionEditor.tsx**
+
+Udvid `useEffect` (auto-seed ved rollevalg) til ogsaa at opdatere rækker med forkert `parent_key`. Naar en rolle vælges:
+- Sammenlign eksisterende `parent_key`-værdier med `PERMISSION_HIERARCHY`
+- Opdater rækker der afviger med den korrekte værdi
+- Invalider query-cache saa UI opdateres
+
 ```typescript
-async fetchSalesRaw(limit: number = 20): Promise<Record<string, unknown>[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
-    const filterStr = encodeURIComponent(JSON.stringify({ 
-      created: { $gt: startDate.toISOString() } 
-    }));
-    const data = await this.get(`/orders?filters=${filterStr}&pageSize=${limit}`);
-    const orders = data.orders || [];
-    return orders;
+// I useEffect (linje 428-439), efter seed-logikken:
+const existingPermissions = permissionsByRole[selectedRole] || [];
+const stalePermissions = existingPermissions.filter(p => {
+  const correctParent = PERMISSION_HIERARCHY[p.permission_key] ?? null;
+  return p.parent_key !== correctParent;
+});
+
+if (stalePermissions.length > 0) {
+  Promise.all(stalePermissions.map(p =>
+    supabase.from('role_page_permissions')
+      .update({ parent_key: PERMISSION_HIERARCHY[p.permission_key] || null })
+      .eq('id', p.id)
+  )).then(() => {
+    queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+  });
 }
 ```
 
-Rettet kode:
+**3. Fix copyPermissionsFromRole**
+
+I `copyPermissionsFromRole` (linje 396), brug altid den autoritative `PERMISSION_HIERARCHY` som kilde i stedet for at kopiere den potentielt forældede `parent_key` fra kilderollen:
+
 ```typescript
-async fetchSalesRaw(limit: number = 20): Promise<Record<string, unknown>[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
-    const filterStr = encodeURIComponent(JSON.stringify({ 
-      created: { $gt: startDate.toISOString() } 
-    }));
-    const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Basic ${this.authHeader}` },
-    });
-    if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
-    const data = await res.json();
-    const sales = data.sales || [];
-    console.log(`[Adversus] fetchSalesRaw: Retrieved ${sales.length} raw sales (limit: ${limit})`);
-    return sales;
-}
+// Aendr fra:
+parent_key: p.parent_key || PERMISSION_HIERARCHY[p.permission_key] || null,
+// Til:
+parent_key: PERMISSION_HIERARCHY[p.permission_key] ?? p.parent_key ?? null,
 ```
 
-Ændringer:
-- Kalder `/sales` direkte i stedet for `/v1/orders`
-- Bruger `data.sales` i stedet for `data.orders`
-- Matcher det mønster som `fetchSalesSequential` allerede bruger succesfuldt
+### Resultat
+- Annulleringsrettigheder vises korrekt under "Rapporter" for alle roller
+- Fremtidige hierarki-ændringer i `permissionKeys.ts` korrigeres automatisk i databasen naar en rolle åbnes i Permission Editor
+- Kopiering af roller bruger altid det nyeste hierarki
 
