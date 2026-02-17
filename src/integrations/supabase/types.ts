@@ -7676,7 +7676,6 @@ export type Database = {
         Row: {
           adversus_event_id: string | null
           adversus_external_id: string | null
-          adversus_opp_number: string | null
           agent_email: string | null
           agent_external_id: string | null
           agent_name: string | null
@@ -7687,6 +7686,7 @@ export type Database = {
           dialer_campaign_id: string | null
           id: string
           integration_type: string | null
+          internal_reference: string | null
           normalized_data: Json | null
           raw_payload: Json | null
           sale_datetime: string
@@ -7698,7 +7698,6 @@ export type Database = {
         Insert: {
           adversus_event_id?: string | null
           adversus_external_id?: string | null
-          adversus_opp_number?: string | null
           agent_email?: string | null
           agent_external_id?: string | null
           agent_name?: string | null
@@ -7709,6 +7708,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          internal_reference?: string | null
           normalized_data?: Json | null
           raw_payload?: Json | null
           sale_datetime?: string
@@ -7720,7 +7720,6 @@ export type Database = {
         Update: {
           adversus_event_id?: string | null
           adversus_external_id?: string | null
-          adversus_opp_number?: string | null
           agent_email?: string | null
           agent_external_id?: string | null
           agent_name?: string | null
@@ -7731,6 +7730,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          internal_reference?: string | null
           normalized_data?: Json | null
           raw_payload?: Json | null
           sale_datetime?: string
@@ -7755,6 +7755,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sales_reference_sequence: {
+        Row: {
+          last_number: number
+          year_month: string
+        }
+        Insert: {
+          last_number?: number
+          year_month: string
+        }
+        Update: {
+          last_number?: number
+          year_month?: string
+        }
+        Relationships: []
       }
       scheduled_emails: {
         Row: {

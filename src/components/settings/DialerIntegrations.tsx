@@ -158,7 +158,7 @@ export function DialerIntegrations() {
   const [syncDays, setSyncDays] = useState<Record<string, string>>({});
 
   // Manual function execution state
-  const [manualFunction, setManualFunction] = useState("backfill-opp");
+  const [manualFunction, setManualFunction] = useState("integration-engine");
   const [manualDays, setManualDays] = useState("30");
   const [manualLimit, setManualLimit] = useState("100");
   const [isExecuting, setIsExecuting] = useState(false);
@@ -516,9 +516,7 @@ export function DialerIntegrations() {
       const body: Record<string, unknown> = {};
       
       // Build body based on function
-      if (manualFunction === "backfill-opp") {
-        body.limit = parseInt(manualLimit) || 100;
-      } else if (manualFunction === "integration-engine") {
+      if (manualFunction === "integration-engine") {
         body.source = "adversus";
         body.action = "repair-history";
         body.days = parseInt(manualDays) || 30;
@@ -2380,7 +2378,6 @@ export function DialerIntegrations() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="backfill-opp">backfill-opp</SelectItem>
                   <SelectItem value="integration-engine">integration-engine (repair)</SelectItem>
                   <SelectItem value="sync-adversus">sync-adversus</SelectItem>
                   <SelectItem value="cleanup-inactive-employees">cleanup-inactive-employees</SelectItem>
@@ -2399,20 +2396,6 @@ export function DialerIntegrations() {
                   placeholder="30"
                   min="1"
                   max="365"
-                />
-              </div>
-            )}
-
-            {manualFunction === "backfill-opp" && (
-              <div className="space-y-2">
-                <Label>Límite (limit)</Label>
-                <Input
-                  type="number"
-                  value={manualLimit}
-                  onChange={(e) => setManualLimit(e.target.value)}
-                  placeholder="100"
-                  min="1"
-                  max="1000"
                 />
               </div>
             )}

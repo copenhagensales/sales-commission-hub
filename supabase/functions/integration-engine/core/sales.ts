@@ -367,12 +367,11 @@ async function processSalesBatch(
 
   const { data: existingSales } = await supabase
     .from("sales")
-    .select("id, adversus_external_id, adversus_opp_number, customer_phone")
+    .select("id, adversus_external_id, customer_phone")
     .in("adversus_external_id", externalIds)
   const existingSalesMap = new Map(existingSales?.map((s) => [s.adversus_external_id, s]) || [])
 
   const leadIds = sales.map((s) => s.leadId).filter(Boolean) as string[]
-  const webhookOppMap = new Map<string, string>()
   const webhookPhoneMap = new Map<string, string>()
   if (leadIds.length > 0) {
     const webhookDuplicateIds = leadIds.filter((lid) => !externalIdSet.has(lid))
@@ -390,7 +389,7 @@ async function processSalesBatch(
         }
         log(
           "INFO",
-          `Eliminando ${webhookSales.length} registros duplicados del webhook (preservando ${webhookOppMap.size} OPPs, ${webhookPhoneMap.size} teléfonos)...`
+          `Eliminando ${webhookSales.length} registros duplicados del webhook (preservando ${webhookPhoneMap.size} teléfonos)...`
         )
         const webhookSaleIds = webhookSales.map((s) => s.id)
         await supabase.from("sale_items").delete().in("sale_id", webhookSaleIds)
@@ -406,11 +405,6 @@ async function processSalesBatch(
   for (const sale of sales) {
     try {
       const existingSale = existingSalesMap.get(sale.externalId)
-      let oppNumber = sale.externalReference || null
-      if (!oppNumber && existingSale?.adversus_opp_number) oppNumber = existingSale.adversus_opp_number
-      if (!oppNumber && sale.leadId && webhookOppMap.has(sale.leadId)) {
-        oppNumber = webhookOppMap.get(sale.leadId)!
-      }
       let customerPhone = sale.customerPhone || null
       if (!customerPhone && existingSale?.customer_phone) customerPhone = existingSale.customer_phone
       if (!customerPhone && sale.leadId && webhookPhoneMap.has(sale.leadId)) {
@@ -429,7 +423,6 @@ async function processSalesBatch(
         agent_email: sale.agentEmail || null,
         customer_company: sale.customerName,
         customer_phone: customerPhone,
-        adversus_opp_number: oppNumber,
         client_campaign_id: sale.clientCampaignId || null,
         dialer_campaign_id: sale.campaignId || null,
         source: sale.dialerName,

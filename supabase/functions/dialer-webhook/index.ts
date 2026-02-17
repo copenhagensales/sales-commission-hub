@@ -190,7 +190,6 @@ async function processWebhookPayload(
       customer_phone: payload.customerPhone,
       sale_datetime: payload.eventTime,
       adversus_external_id: payload.externalId,
-      adversus_opp_number: payload.externalReference,
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,

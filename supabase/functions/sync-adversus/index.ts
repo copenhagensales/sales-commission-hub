@@ -821,7 +821,6 @@ Deno.serve(async (req) => {
                   agent_name: user.name,
                   agent_external_id: String(sale.ownedBy || sale.createdBy),
                   sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
-                  adversus_opp_number: oppNumber,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingSale.id)
@@ -933,7 +932,6 @@ Deno.serve(async (req) => {
                 customer_phone: '',
                 sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
                 adversus_external_id: externalId,
-                adversus_opp_number: oppNumber,
               })
               .select()
               .single()
@@ -1129,7 +1127,6 @@ Deno.serve(async (req) => {
                   agent_name: user.name,
                   agent_external_id: String(sale.ownedBy || sale.createdBy),
                   sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
-                  adversus_opp_number: oppNumber,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingSale.id)
@@ -1234,7 +1231,6 @@ Deno.serve(async (req) => {
                 customer_phone: '',
                 sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
                 adversus_external_id: externalId,
-                adversus_opp_number: oppNumber,
               })
               .select()
               .single()
