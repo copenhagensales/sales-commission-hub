@@ -18,9 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Ban, Minus, ThumbsDown, Trash2 } from "lucide-react";
+import { Loader2, Ban, ThumbsDown, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,6 @@ interface EditCartDialogProps {
 
 export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
   const queryClient = useQueryClient();
-  const [confirmAction, setConfirmAction] = useState<{ itemId: string; type: "cancel" | "reject" } | null>(null);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
 
   const { data: saleItems = [], isLoading } = useQuery({
@@ -66,76 +65,28 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
     queryClient.invalidateQueries({ queryKey: ["sales-for-duplicates"] });
   };
 
-  const cancelOneUnitMutation = useMutation({
-    mutationFn: async (item: { id: string; quantity: number; cancelled_quantity: number }) => {
-      const newCancelled = (item.cancelled_quantity ?? 0) + 1;
-      const fullyDone = newCancelled >= (item.quantity ?? 1);
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ id, oldQuantity, newQuantity, oldCommission, oldRevenue }: {
+      id: string;
+      oldQuantity: number;
+      newQuantity: number;
+      oldCommission: number | null;
+      oldRevenue: number | null;
+    }) => {
+      const perUnitCommission = oldQuantity > 0 && oldCommission != null ? oldCommission / oldQuantity : 0;
+      const perUnitRevenue = oldQuantity > 0 && oldRevenue != null ? oldRevenue / oldQuantity : 0;
       const { error } = await supabase
         .from("sale_items")
-        .update({ cancelled_quantity: newCancelled, is_cancelled: fullyDone })
-        .eq("id", item.id);
+        .update({
+          quantity: newQuantity,
+          mapped_commission: perUnitCommission * newQuantity,
+          mapped_revenue: perUnitRevenue * newQuantity,
+        })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "1 stk annulleret", description: "Produktet er delvist annulleret." });
-      invalidateQueries();
-      setConfirmAction(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Fejl", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const rejectOneUnitMutation = useMutation({
-    mutationFn: async (item: { id: string; quantity: number; cancelled_quantity: number }) => {
-      const newCancelled = (item.cancelled_quantity ?? 0) + 1;
-      const fullyDone = newCancelled >= (item.quantity ?? 1);
-      const { error } = await supabase
-        .from("sale_items")
-        .update({ cancelled_quantity: newCancelled, is_cancelled: fullyDone })
-        .eq("id", item.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({ title: "1 stk afvist", description: "Produktet er delvist afvist." });
-      invalidateQueries();
-      setConfirmAction(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Fejl", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const undoOneUnitMutation = useMutation({
-    mutationFn: async (item: { id: string; cancelled_quantity: number }) => {
-      if (!saleId) throw new Error("No saleId");
-      const newCancelled = Math.max((item.cancelled_quantity ?? 0) - 1, 0);
-      const { error } = await supabase
-        .from("sale_items")
-        .update({ cancelled_quantity: newCancelled, is_cancelled: false })
-        .eq("id", item.id);
-      if (error) throw error;
-
-      const { data: allItems, error: fetchError } = await supabase
-        .from("sale_items")
-        .select("quantity, cancelled_quantity")
-        .eq("sale_id", saleId);
-      if (fetchError) throw fetchError;
-
-      const hasActiveUnit = (allItems ?? []).some(
-        (si) => (si.quantity ?? 1) - (si.cancelled_quantity ?? 0) > 0
-      );
-
-      if (hasActiveUnit) {
-        const { error: salesError } = await supabase
-          .from("sales")
-          .update({ validation_status: "pending" })
-          .eq("id", saleId);
-        if (salesError) throw salesError;
-      }
-    },
-    onSuccess: () => {
-      toast({ title: "1 stk gendannet", description: "Annulleringen er fortrudt for 1 stk." });
+      toast({ title: "Antal opdateret", description: "Produktets antal er ændret." });
       invalidateQueries();
     },
     onError: (error: Error) => {
@@ -213,7 +164,7 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
   });
 
   const allCancelled = saleItems.length > 0 && saleItems.every((item) => item.is_cancelled);
-  const isPending = cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending || cancelAllMutation.isPending || rejectAllMutation.isPending || undoOneUnitMutation.isPending || deleteItemMutation.isPending;
+  const isPending = cancelAllMutation.isPending || rejectAllMutation.isPending || deleteItemMutation.isPending || updateQuantityMutation.isPending;
 
   const formatCommission = (value: number | null) => {
     if (value == null) return "-";
@@ -236,10 +187,8 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Add product section */}
             {saleId && <AddProductSection saleId={saleId} onAdded={() => {}} />}
 
-            {/* Existing items table */}
             {saleItems.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">Ingen produkter i kurven.</p>
             ) : (
@@ -248,134 +197,83 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Produkt</TableHead>
-                      <TableHead className="text-right">Antal</TableHead>
+                      <TableHead className="text-right w-24">Antal</TableHead>
                       <TableHead className="text-right">Prov./stk</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
-                      <TableHead className="text-right">Handling</TableHead>
+                      <TableHead className="text-right w-16">Handling</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {saleItems.map((item) => {
                       const qty = item.quantity ?? 1;
-                      const cancelled = item.cancelled_quantity ?? 0;
-                      const remaining = qty - cancelled;
-                      const fullyDone = remaining <= 0;
                       const perUnit = qty > 0 && item.mapped_commission != null
                         ? item.mapped_commission / qty
                         : null;
 
                       return (
-                        <TableRow key={item.id} className={fullyDone ? "opacity-50" : ""}>
-                          <TableCell className={fullyDone ? "line-through" : ""}>
+                        <TableRow key={item.id}>
+                          <TableCell>
                             {item.display_name ?? item.adversus_product_title ?? "Ukendt produkt"}
                           </TableCell>
                           <TableCell className="text-right">
-                            {cancelled > 0 ? (
-                              <span>
-                                <span className="text-muted-foreground line-through mr-1">{qty}</span>
-                                {remaining}
-                              </span>
-                            ) : (
-                              qty
-                            )}
+                            <Input
+                              type="number"
+                              min={1}
+                              defaultValue={qty}
+                              className="w-20 h-8 text-right ml-auto"
+                              disabled={isPending}
+                              onBlur={(e) => {
+                                const newQty = parseInt(e.target.value, 10);
+                                if (!isNaN(newQty) && newQty >= 1 && newQty !== qty) {
+                                  updateQuantityMutation.mutate({
+                                    id: item.id,
+                                    oldQuantity: qty,
+                                    newQuantity: newQty,
+                                    oldCommission: item.mapped_commission,
+                                    oldRevenue: item.mapped_revenue,
+                                  });
+                                } else {
+                                  e.target.value = String(qty);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                            />
                           </TableCell>
                           <TableCell className="text-right">
                             {formatCommission(perUnit)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {fullyDone ? (
-                              <Badge variant="outline" className="text-muted-foreground">Annulleret</Badge>
-                            ) : cancelled > 0 ? (
-                              <Badge variant="secondary">{cancelled} annulleret</Badge>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center gap-1 justify-end">
-                              {cancelled > 0 && (
+                            <AlertDialog open={deleteItemId === item.id} onOpenChange={(o) => !o && setDeleteItemId(null)}>
+                              <AlertDialogTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   disabled={isPending}
-                                  onClick={() => undoOneUnitMutation.mutate({ id: item.id, cancelled_quantity: cancelled })}
-                                  className="text-primary hover:text-primary/80"
+                                  onClick={() => setDeleteItemId(item.id)}
+                                  className="text-destructive hover:text-destructive/80"
                                 >
-                                  {undoOneUnitMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Fortryd 1"}
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
-                              )}
-                              {!fullyDone && (
-                                confirmAction?.itemId === item.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      disabled={isPending}
-                                      onClick={() => {
-                                        const mutate = confirmAction.type === "cancel" ? cancelOneUnitMutation : rejectOneUnitMutation;
-                                        mutate.mutate({ id: item.id, quantity: qty, cancelled_quantity: cancelled });
-                                      }}
-                                    >
-                                      {(cancelOneUnitMutation.isPending || rejectOneUnitMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bekræft"}
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => setConfirmAction(null)}>
-                                      Fortryd
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={isPending}
-                                      onClick={() => setConfirmAction({ itemId: item.id, type: "cancel" })}
-                                    >
-                                      <Minus className="h-3 w-3 mr-1" />
-                                      Annuller 1
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={isPending}
-                                      onClick={() => setConfirmAction({ itemId: item.id, type: "reject" })}
-                                      className="text-destructive border-destructive/50 hover:bg-destructive/10"
-                                    >
-                                      <ThumbsDown className="h-3 w-3 mr-1" />
-                                      Afvis 1
-                                    </Button>
-                                  </>
-                                )
-                              )}
-                              {/* Delete item button */}
-                              <AlertDialog open={deleteItemId === item.id} onOpenChange={(o) => !o && setDeleteItemId(null)}>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={isPending}
-                                    onClick={() => setDeleteItemId(item.id)}
-                                    className="text-destructive hover:text-destructive/80"
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Fjern produkt</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Er du sikker på at du vil fjerne "{item.display_name ?? item.adversus_product_title ?? "dette produkt"}" fra kurven?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Fortryd</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteItemMutation.mutate(item.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Fjern produkt</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Er du sikker på at du vil fjerne "{item.display_name ?? item.adversus_product_title ?? "dette produkt"}" fra kurven? Denne handling kan ikke fortrydes.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Fortryd</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteItemMutation.mutate(item.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Ja, fjern produkt
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                                    Ja, fjern produkt
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       );
