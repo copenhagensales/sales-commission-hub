@@ -1,42 +1,56 @@
 
-## Sikr at alt virker korrekt - Rettelser og flytning af Annulleringer
+## Synkroniser Annulleringer-rettigheder med sidebar og tilfoej tab-permissions
 
-### Oversigt
-Tre ting skal rettes for at sikre alt haenger sammen korrekt efter de seneste aendringer.
+### Problem
+1. `menu_cancellations` er stadig kategoriseret under "Loen" (`menu_section_salary`) i `permissionKeys.ts`, men sidebaren viser den under "Rapporter". Permission Editor viser derfor Annulleringer under den forkerte sektion.
+2. Annulleringssiden har 3 faner (Rediger kurv, Upload/match, Dubletter) uden individuelle rettighedsnoegler - der mangler granular kontrol.
+3. Brugeren oensker at sikre at permissionKeys.ts altid afspejler sidebarens struktur.
 
----
+### Loesning
 
-### Rettelse 1: Reset isDirty naar dialogen aabnes for et nyt salg
-**Fil:** `src/components/cancellations/EditCartDialog.tsx`
+#### 1. Flyt `menu_cancellations` til Rapporter-sektionen
+**Fil:** `src/config/permissionKeys.ts`
 
-Naar brugeren lukker dialogen og aabner den for et andet salg, forbliver `isDirty` som `true` fra forrige session. Tilfoej en reset af `isDirty` naar `saleId` aendres (via useEffect eller ved at reset i onClose-wrapperen). Bedste loesning: reset `isDirty` til `false` i en `useEffect` der lytter paa `saleId`.
+Aendr linje 183 fra:
+```text
+menu_cancellations: { label: 'Annulleringer', section: 'salary', parent: 'menu_section_salary' },
+```
+til:
+```text
+menu_cancellations: { label: 'Annulleringer', section: 'reports', parent: 'menu_section_reports' },
+```
 
-### Rettelse 2: DuplicatesTab knap-stil
-**Fil:** `src/components/cancellations/DuplicatesTab.tsx`
+Dette flytter Annulleringer fra "Loen"-sektionen til "Rapporter"-sektionen i Permission Editor, saa den matcher sidebarens placering.
 
-Knappen i dublet-fanen bruger stadig `variant="destructive"` med et `X`-ikon og teksten "Annuller". Den skal aendres til at matche ManualCancellationsTab:
-- Variant: `outline`
-- Ikon: `ShoppingCart` i stedet for `X`
-- Tekst: "Rediger kurv"
+#### 2. Tilfoej tab-permissions for Annulleringssiden
+**Fil:** `src/config/permissionKeys.ts`
 
-### Rettelse 3: Flyt Annulleringer fra Loen til Rapporter i sidebar
-**Fil:** `src/components/layout/AppSidebar.tsx`
+Tilfoej tre nye fane-noegler under `menu_cancellations` i reports-sektionen:
+```text
+tab_cancellations_manual: { label: 'Fane: Rediger kurv', section: 'reports', parent: 'menu_cancellations' },
+tab_cancellations_upload: { label: 'Fane: Upload/match', section: 'reports', parent: 'menu_cancellations' },
+tab_cancellations_duplicates: { label: 'Fane: Dubletter', section: 'reports', parent: 'menu_cancellations' },
+```
 
-4 aendringer i AppSidebar:
+#### 3. Implementer tab-permissions i Cancellations-komponenten
+**Fil:** `src/pages/salary/Cancellations.tsx`
 
-1. **Fjern fra Loen-sektionen** (linje 1556-1564): Fjern hele `canViewCancellations`-blokken fra Loen-collapsible.
+Tilfoej `useUnifiedPermissions` hook og betinget visning af tabs baseret paa rettighederne:
+- Vis kun "Rediger kurv" tab hvis bruger har `tab_cancellations_manual` rettighed
+- Vis kun "Upload/match" tab hvis bruger har `tab_cancellations_upload` rettighed
+- Vis kun "Dubletter" tab hvis bruger har `tab_cancellations_duplicates` rettighed
+- Ejer-rollen faar automatisk adgang til alt (haandteres allerede i `canView`)
 
-2. **Tilfoej til Rapporter-sektionen** (efter linje 1319, foer `</CollapsibleContent>`): Tilfoej NavLink med `canViewCancellations`-check for `/salary/cancellations` inde i Rapporter-collapsible.
+### Hvorfor dette sikrer automatisk synkronisering
 
-3. **Opdater `showReportsMenu`** (linje 461-462): Tilfoej `canViewCancellations` saa Rapporter-sektionen ogsaa vises for brugere der kun har adgang til annulleringer:
-   `const showReportsMenu = p.canView("menu_section_reports") && (p.canViewReportsAdmin || ... || canViewCancellations);`
+Systemet er allerede designet til automatisk synkronisering via denne arkitektur:
 
-4. **Opdater `reportsOpen` state** (linje 76-78): Tilfoej check for `/salary/cancellations` saa Rapporter-sektionen automatisk aabner:
-   `location.pathname.startsWith("/reports") || location.pathname === "/salary/cancellations"`
+1. **permissionKeys.ts** er den enkelte kilde til sandhed (Single Source of Truth)
+2. **Permission Editor** genererer sin UI automatisk fra `PERMISSION_KEYS` - saa naar vi aendrer parent/section her, opdateres editoren automatisk
+3. **Auto-seeding** opretter automatisk database-raekker for nye noegler naar en rolle vaelges i editoren
 
----
+Det eneste der kraeves ved fremtidige sidebar-aendringer er at opdatere `permissionKeys.ts` tilsvarende - resten haandteres automatisk.
 
 ### Filer der aendres
-1. `src/components/cancellations/EditCartDialog.tsx` - Reset isDirty ved nyt salg
-2. `src/components/cancellations/DuplicatesTab.tsx` - Opdater knap-stil til "Rediger kurv"
-3. `src/components/layout/AppSidebar.tsx` - Flyt menupunkt fra Loen til Rapporter
+1. `src/config/permissionKeys.ts` - Flyt cancellations til reports + tilfoej 3 tab-noegler
+2. `src/pages/salary/Cancellations.tsx` - Tilfoej betinget tab-visning baseret paa rettigheder
