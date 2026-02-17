@@ -296,7 +296,7 @@ export function PermissionEditorV2() {
       const newPermissions = sourcePermissions.map(p => ({
         role_key: newRoleKey,
         permission_key: p.permission_key,
-        parent_key: p.parent_key || PERMISSION_HIERARCHY[p.permission_key] || null,
+        parent_key: PERMISSION_HIERARCHY[p.permission_key] ?? p.parent_key ?? null,
         permission_type: p.permission_type || getPermissionTypeFromKey(p.permission_key),
         can_view: p.can_view,
         can_edit: p.can_edit,
