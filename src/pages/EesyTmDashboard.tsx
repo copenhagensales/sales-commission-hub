@@ -61,8 +61,101 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-// Neutral commission styling - clean and readable
-const getCommissionStyle = () => "bg-primary/10 text-primary";
+// Leaderboard table component to reduce repetition
+function TvLeaderboardTable({ 
+  title, 
+  sellers, 
+  isLoading, 
+  tvMode,
+  employeeData 
+}: { 
+  title: string; 
+  sellers: Array<{ employeeId: string; employeeName: string; displayName: string; avatarUrl?: string | null; salesCount: number; commission: number }>;
+  isLoading: boolean; 
+  tvMode: boolean;
+  employeeData?: { avatarMap: Map<string, string> };
+}) {
+  return (
+    <Card className={tvMode 
+      ? 'flex flex-col overflow-hidden border-border/60 shadow-lg' 
+      : ''
+    }>
+      <CardHeader className={tvMode ? 'pb-2 pt-4 px-4' : 'pb-3'}>
+        <CardTitle className={tvMode 
+          ? 'text-[22px] font-bold tracking-wide text-center uppercase' 
+          : 'text-lg font-bold'
+        }>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className={tvMode ? 'flex-1 overflow-hidden p-0' : ''}>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <span className="text-muted-foreground">Indlæser...</span>
+          </div>
+        ) : sellers.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <span className="text-muted-foreground">Ingen salg endnu</span>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className={tvMode ? 'border-b-2 border-border/50' : ''}>
+                <TableHead className={tvMode ? 'w-[40px] text-center text-[16px] font-semibold py-2' : 'w-10'}></TableHead>
+                <TableHead className={tvMode ? 'text-[16px] font-semibold py-2' : ''}>Navn</TableHead>
+                <TableHead className={tvMode ? 'text-right text-[16px] font-semibold py-2 w-[90px]' : 'text-right'}>Salg</TableHead>
+                <TableHead className={tvMode ? 'text-right text-[16px] font-semibold py-2 w-[130px]' : 'text-right'}>Provision</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sellers.slice(0, 10).map((seller, index) => (
+                <TableRow 
+                  key={seller.employeeId} 
+                  className={tvMode 
+                    ? `border-b border-border/20 ${index % 2 === 1 ? 'bg-muted/30' : ''}` 
+                    : 'border-b border-border/30'
+                  }
+                >
+                  <TableCell className={tvMode 
+                    ? 'text-center text-muted-foreground font-bold text-[18px] py-[10px] tabular-nums' 
+                    : 'py-2 text-center text-muted-foreground font-medium'
+                  }>{index + 1}</TableCell>
+                  <TableCell className={tvMode ? 'py-[10px]' : 'py-2'}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className={tvMode ? 'h-7 w-7' : 'h-8 w-8'}>
+                        <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
+                        <AvatarFallback className={tvMode 
+                          ? 'text-[11px] bg-primary/20 font-semibold' 
+                          : 'text-xs bg-primary/20'
+                        }>{getInitials(seller.employeeName)}</AvatarFallback>
+                      </Avatar>
+                      <span className={tvMode 
+                        ? 'font-semibold text-[18px] text-foreground' 
+                        : 'font-medium text-sm'
+                      }>{seller.displayName}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className={tvMode 
+                    ? 'text-right py-[10px] text-primary font-bold text-[20px] tabular-nums' 
+                    : 'text-right py-2 text-primary font-semibold'
+                  }>{seller.salesCount}</TableCell>
+                  <TableCell className={tvMode 
+                    ? 'text-right py-[10px] font-semibold text-[18px] text-foreground/90 tabular-nums' 
+                    : 'text-right py-2'
+                  }>
+                    {tvMode ? (
+                      formatCurrency(seller.commission)
+                    ) : (
+                      <span className="inline-block px-2 py-1 rounded text-sm font-semibold bg-primary/10 text-primary">{formatCurrency(seller.commission)}</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function EesyTmDashboard() {
   // Runtime access check - redirects if user doesn't have team-based permission
@@ -89,7 +182,6 @@ export default function EesyTmDashboard() {
   );
 
   // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
-  // Now uses public RLS policy - works for both normal and TV mode
   const { 
     sellersToday: cachedSellersToday, 
     sellersWeek: cachedSellersWeek, 
@@ -142,9 +234,18 @@ export default function EesyTmDashboard() {
   // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;
 
+  // KPI card config - keeps data/order unchanged
+  const kpiCards = [
+    { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays },
+    { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange },
+    { label: "Salg denne måned", value: salesMonth, sub: format(today, "MMMM", { locale: da }), icon: Calendar },
+    { label: "Salg lønperiode", value: salesPayroll, sub: periodLabel, icon: Calendar },
+    { label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp },
+  ];
+
   return (
     <div className={tvMode 
-      ? 'w-[1920px] h-[1080px] bg-background p-5 flex flex-col overflow-hidden' 
+      ? 'w-[1920px] h-[1080px] bg-background p-6 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       <DashboardHeader 
@@ -158,213 +259,61 @@ export default function EesyTmDashboard() {
           />
         }
       />
-      <div className={tvMode ? 'space-y-3 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
+      <div className={tvMode ? 'space-y-5 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
         {/* KPI Cards */}
-        <div className={tvMode ? 'grid grid-cols-5 gap-3' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{salesToday}</div>
-              <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg denne uge</CardTitle>
-              <CalendarRange className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{salesWeek}</div>
-              <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{salesMonth}</div>
-              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg lønperiode</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{salesPayroll}</div>
-              <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time (løn)</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{payrollSalesPerHour.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{payrollHours.toFixed(1)} timer</p>
-            </CardContent>
-          </Card>
+        <div className={tvMode ? 'grid grid-cols-5 gap-4' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
+          {kpiCards.map((kpi) => (
+            <Card key={kpi.label} className={tvMode 
+              ? 'border-border/60 shadow-lg' 
+              : ''
+            }>
+              <CardHeader className={tvMode 
+                ? 'flex flex-row items-center justify-between space-y-0 pb-1 pt-4 px-5' 
+                : 'flex flex-row items-center justify-between space-y-0 pb-2'
+              }>
+                <CardTitle className={tvMode 
+                  ? 'text-[20px] font-semibold text-muted-foreground' 
+                  : 'text-sm font-medium'
+                }>{kpi.label}</CardTitle>
+                {!tvMode && <kpi.icon className="h-4 w-4 text-muted-foreground" />}
+              </CardHeader>
+              <CardContent className={tvMode ? 'px-5 pb-4' : ''}>
+                <div className={tvMode 
+                  ? 'text-[56px] leading-tight font-bold text-primary tabular-nums' 
+                  : 'text-3xl font-bold text-primary'
+                }>{kpi.value}</div>
+                <p className={tvMode 
+                  ? 'text-[15px] text-muted-foreground mt-1' 
+                  : 'text-xs text-muted-foreground mt-1'
+                }>{kpi.sub}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Leaderboard Tables */}
-        <div className={tvMode ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' : 'grid grid-cols-1 gap-6 lg:grid-cols-3'}>
-          {/* Payroll Period */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold">Top Løn Periode</CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Indlæser...</span>
-                </div>
-              ) : sortedPayrollSellers.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Ingen salg endnu</span>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedPayrollSellers.map((seller, index) => (
-                      <TableRow key={seller.employeeId} className="border-b border-border/30">
-                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium text-sm">{seller.displayName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                        <TableCell className="text-right py-2">
-                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Weekly */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold">Top Uge</CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Indlæser...</span>
-                </div>
-              ) : sortedWeeklySellers.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Ingen salg endnu</span>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedWeeklySellers.map((seller, index) => (
-                      <TableRow key={seller.employeeId} className="border-b border-border/30">
-                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium text-sm">{seller.displayName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                        <TableCell className="text-right py-2">
-                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Daily */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold">Top Dag</CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'flex-1 overflow-auto p-0' : ''}>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Indlæser...</span>
-                </div>
-              ) : sortedDailySellers.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-muted-foreground">Ingen salg endnu</span>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDailySellers.map((seller, index) => (
-                      <TableRow key={seller.employeeId} className="border-b border-border/30">
-                        <TableCell className="py-2 text-center text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                              <AvatarFallback className="text-xs bg-primary/20">{getInitials(seller.employeeName)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium text-sm">{seller.displayName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right py-2 text-primary font-semibold">{seller.salesCount}</TableCell>
-                        <TableCell className="text-right py-2">
-                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>{formatCurrency(seller.commission)}</span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+        <div className={tvMode ? 'grid grid-cols-3 gap-5 flex-1 min-h-0' : 'grid grid-cols-1 gap-6 lg:grid-cols-3'}>
+          <TvLeaderboardTable 
+            title="Top Løn Periode" 
+            sellers={sortedPayrollSellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+            employeeData={employeeData}
+          />
+          <TvLeaderboardTable 
+            title="Top Uge" 
+            sellers={sortedWeeklySellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+            employeeData={employeeData}
+          />
+          <TvLeaderboardTable 
+            title="Top Dag" 
+            sellers={sortedDailySellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+            employeeData={employeeData}
+          />
         </div>
       </div>
     </div>
