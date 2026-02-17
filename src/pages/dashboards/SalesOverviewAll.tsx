@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target } from "lucide-react";
+import { Users, TrendingUp, Target, Clock } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
@@ -323,8 +323,25 @@ export default function SalesOverviewAll() {
     'from-indigo-500/20 to-indigo-500/5 border-indigo-500/30',
   ];
 
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const content = (
     <div className="space-y-6">
+      {/* Live Clock */}
+      <div className="flex items-center justify-center gap-3 py-4">
+        <Clock className="h-6 w-6 text-primary" />
+        <span className="text-5xl font-bold tabular-nums tracking-tight">
+          {format(now, "HH:mm:ss")}
+        </span>
+        <span className="text-lg text-muted-foreground ml-2 capitalize">
+          {format(now, "EEEE d. MMMM yyyy", { locale: da })}
+        </span>
+      </div>
+
       <DashboardHeader
         title="Salgsoversigt alle"
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
