@@ -1,56 +1,61 @@
 
-## Synkroniser Annulleringer-rettigheder med sidebar og tilfoej tab-permissions
 
-### Problem
-1. `menu_cancellations` er stadig kategoriseret under "Loen" (`menu_section_salary`) i `permissionKeys.ts`, men sidebaren viser den under "Rapporter". Permission Editor viser derfor Annulleringer under den forkerte sektion.
-2. Annulleringssiden har 3 faner (Rediger kurv, Upload/match, Dubletter) uden individuelle rettighedsnoegler - der mangler granular kontrol.
-3. Brugeren oensker at sikre at permissionKeys.ts altid afspejler sidebarens struktur.
+## Fix: rematch-pricing-rules laeser leadResultFields for Relatel
 
-### Loesning
+### Problemet (verificeret med data)
+Relatel-salg gemmer "Tilskud" i `raw_payload.leadResultFields`, men rematch-funktionen laeser KUN `raw_payload.data` (som er `null` for Relatel). Derfor matcher prisregler med `conditions: { "Tilskud": "0%" }` aldrig, og salg falder til lavere fallback-priser.
 
-#### 1. Flyt `menu_cancellations` til Rapporter-sektionen
-**Fil:** `src/config/permissionKeys.ts`
+### Bevis fra databasen
+- `raw_payload.data` = `null` for Relatel-salg
+- `raw_payload.leadResultFields` = `{ "Tilskud": "0%", "Bindingsperiode": "36", ... }`
+- 65+ prisregler med Tilskud-betingelse (priority 5) springer over, fallback (priority 0) bruges
 
-Aendr linje 183 fra:
+### Paavirkede produkter
+Switch Contact Center og MBB-varianter (ATL/BTL) - alle med Tilskud-differentierede prisregler.
+
+### Upaavirkede produkter
+ASE-produkter (bruger `raw_payload.data` som allerede virker), alle andre klienter.
+
+### Aendring (1 fil, ca. 15 linjer)
+
+**Fil:** `supabase/functions/rematch-pricing-rules/index.ts`
+
+Paa linje 339-340, efter extraction af `rawPayloadData`, tilfoej merge af `leadResultFields` og `leadResultData`:
+
 ```text
-menu_cancellations: { label: 'Annulleringer', section: 'salary', parent: 'menu_section_salary' },
+// Nuvaerende (linje 340):
+let rawPayloadData = rawPayload?.data as Record<string, unknown> | undefined;
+
+// Tilfoej efter linje 340:
+const leadResultFields = rawPayload?.leadResultFields as Record<string, unknown> | undefined;
+const leadResultData = rawPayload?.leadResultData as Record<string, unknown> | undefined;
+
+// Merge leadResultFields ind i rawPayloadData (saa conditions kan finde Tilskud)
+if (leadResultFields && typeof leadResultFields === "object") {
+  if (!rawPayloadData) rawPayloadData = {};
+  for (const [key, value] of Object.entries(leadResultFields)) {
+    if (value !== null && value !== undefined && value !== "") {
+      rawPayloadData[key] = value;
+    }
+  }
+}
+if (leadResultData && typeof leadResultData === "object") {
+  if (!rawPayloadData) rawPayloadData = {};
+  for (const [key, value] of Object.entries(leadResultData)) {
+    if (value !== null && value !== undefined && value !== "") {
+      rawPayloadData[key] = value;
+    }
+  }
+}
 ```
-til:
-```text
-menu_cancellations: { label: 'Annulleringer', section: 'reports', parent: 'menu_section_reports' },
-```
 
-Dette flytter Annulleringer fra "Loen"-sektionen til "Rapporter"-sektionen i Permission Editor, saa den matcher sidebarens placering.
+### Resultat efter fix
+- Prisregler med `Tilskud: 0%` (priority 5) vil nu matche korrekt for Relatel-salg
+- Switch og MBB-produkter faar de rigtige provisioner
+- ASE og alle andre klienter er helt upaavirkede (deres data-struktur aendres ikke)
 
-#### 2. Tilfoej tab-permissions for Annulleringssiden
-**Fil:** `src/config/permissionKeys.ts`
+### Anbefalet test
+1. Deploy fix
+2. Koer `dry_run: true` for et enkelt Switch-produkt og verificer at Tilskud-regler matcher
+3. Koer uden dry_run naar resultat er bekraeftet
 
-Tilfoej tre nye fane-noegler under `menu_cancellations` i reports-sektionen:
-```text
-tab_cancellations_manual: { label: 'Fane: Rediger kurv', section: 'reports', parent: 'menu_cancellations' },
-tab_cancellations_upload: { label: 'Fane: Upload/match', section: 'reports', parent: 'menu_cancellations' },
-tab_cancellations_duplicates: { label: 'Fane: Dubletter', section: 'reports', parent: 'menu_cancellations' },
-```
-
-#### 3. Implementer tab-permissions i Cancellations-komponenten
-**Fil:** `src/pages/salary/Cancellations.tsx`
-
-Tilfoej `useUnifiedPermissions` hook og betinget visning af tabs baseret paa rettighederne:
-- Vis kun "Rediger kurv" tab hvis bruger har `tab_cancellations_manual` rettighed
-- Vis kun "Upload/match" tab hvis bruger har `tab_cancellations_upload` rettighed
-- Vis kun "Dubletter" tab hvis bruger har `tab_cancellations_duplicates` rettighed
-- Ejer-rollen faar automatisk adgang til alt (haandteres allerede i `canView`)
-
-### Hvorfor dette sikrer automatisk synkronisering
-
-Systemet er allerede designet til automatisk synkronisering via denne arkitektur:
-
-1. **permissionKeys.ts** er den enkelte kilde til sandhed (Single Source of Truth)
-2. **Permission Editor** genererer sin UI automatisk fra `PERMISSION_KEYS` - saa naar vi aendrer parent/section her, opdateres editoren automatisk
-3. **Auto-seeding** opretter automatisk database-raekker for nye noegler naar en rolle vaelges i editoren
-
-Det eneste der kraeves ved fremtidige sidebar-aendringer er at opdatere `permissionKeys.ts` tilsvarende - resten haandteres automatisk.
-
-### Filer der aendres
-1. `src/config/permissionKeys.ts` - Flyt cancellations til reports + tilfoej 3 tab-noegler
-2. `src/pages/salary/Cancellations.tsx` - Tilfoej betinget tab-visning baseret paa rettigheder
