@@ -116,12 +116,15 @@ export class AdversusAdapter implements DialerAdapter {
       created: { $gt: startDate.toISOString() } 
     }));
     
-    // Fetch only one page with the specified limit - no lead enrichment
-    const data = await this.get(`/orders?filters=${filterStr}&pageSize=${limit}`);
-    const orders = data.orders || [];
-    
-    console.log(`[Adversus] fetchSalesRaw: Retrieved ${orders.length} raw orders (limit: ${limit})`);
-    return orders;
+    const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${this.authHeader}` },
+    });
+    if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
+    const data = await res.json();
+    const sales = data.sales || [];
+    console.log(`[Adversus] fetchSalesRaw: Retrieved ${sales.length} raw sales (limit: ${limit})`);
+    return sales;
   }
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
