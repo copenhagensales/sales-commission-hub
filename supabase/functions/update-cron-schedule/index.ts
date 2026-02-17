@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       payload = { 
         source: provider || "adversus", 
         integration_id, 
-        action: "sync", 
+        actions: ["campaigns", "users", "sales", "sessions"], 
         days: 1 
       };
     } else {

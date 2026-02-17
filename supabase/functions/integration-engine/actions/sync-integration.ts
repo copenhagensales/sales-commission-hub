@@ -1,7 +1,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
-import { saveDebugLog, createDebugLogEntry } from "../utils/index.ts";
+import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError } from "../utils/index.ts";
 import { CampaignMappingConfig } from "../types.ts";
 
 interface SyncOptions {
@@ -58,7 +58,7 @@ export async function syncIntegration(
     const runResults: Record<string, unknown> = {};
 
     // Support both 'action' (legacy) and 'actions' (new array)
-    const actionList = actions || (action === "sync" ? ["campaigns", "users", "sales"] : [action]);
+    const actionList = actions || (action === "sync" ? ["campaigns", "users", "sales", "sessions"] : [action]);
 
     // Process campaigns
     if (actionList.includes("campaigns")) {
@@ -158,7 +158,55 @@ export async function syncIntegration(
       }
     }
 
-    // Update last sync timestamp
+    // Process sessions (ALL outcomes for hitrate analytics)
+    if (actionList.includes("sessions")) {
+      try {
+        // 1. Read sync state for incremental window
+        const syncState = await getSyncState(supabase, integration.id, "sessions");
+        
+        // 2. Calculate window
+        //    start = last_success_at - 5min overlap (catch late-registered records)
+        //    stop = now - 2min (avoid in-flight records)
+        //    Fallback for new integration: days parameter
+        const windowStart = syncState?.last_success_at
+          ? new Date(new Date(syncState.last_success_at).getTime() - 5 * 60 * 1000)
+          : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const windowEnd = new Date(Date.now() - 2 * 60 * 1000);
+
+        log("INFO", `Sessions window: ${windowStart.toISOString()} -> ${windowEnd.toISOString()}`);
+
+        // 3. Fetch via adapter
+        let sessions: any[] = [];
+        if ((adapter as any).fetchSessionsRange) {
+          sessions = await (adapter as any).fetchSessionsRange({
+            from: windowStart.toISOString(),
+            to: windowEnd.toISOString(),
+          });
+        } else if ((adapter as any).fetchSessions) {
+          sessions = await (adapter as any).fetchSessions(days);
+        } else {
+          log("INFO", `Adapter for ${integration.name} does not support fetchSessions`);
+          runResults["sessions"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support sessions" };
+        }
+
+        // 4. Process and upsert
+        if (sessions.length > 0) {
+          log("INFO", `Fetched ${sessions.length} sessions, processing...`);
+          runResults["sessions"] = await engine.processSessions(sessions, integration.id);
+        } else if (!runResults["sessions"]) {
+          runResults["sessions"] = { processed: 0, errors: 0, matched: 0, message: "No sessions found" };
+        }
+
+        // 5. Update sync state on success
+        await upsertSyncState(supabase, integration.id, "sessions", windowEnd);
+      } catch (sessErr) {
+        const sessErrMsg = sessErr instanceof Error ? sessErr.message : String(sessErr);
+        log("ERROR", `Error in sessions sync: ${sessErrMsg}`);
+        await recordSyncError(supabase, integration.id, "sessions", sessErrMsg);
+        runResults["sessions"] = { processed: 0, errors: 1, message: sessErrMsg };
+      }
+    }
+
     await supabase
       .from("dialer_integrations")
       .update({ last_sync_at: new Date().toISOString(), last_status: "success" })

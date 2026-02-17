@@ -2887,6 +2887,7 @@ export type Database = {
           end_time: string
           external_id: string
           id: string
+          integration_id: string | null
           integration_type: string
           lead_external_id: string
           metadata: Json | null
@@ -2906,6 +2907,7 @@ export type Database = {
           end_time: string
           external_id: string
           id?: string
+          integration_id?: string | null
           integration_type: string
           lead_external_id: string
           metadata?: Json | null
@@ -2925,6 +2927,7 @@ export type Database = {
           end_time?: string
           external_id?: string
           id?: string
+          integration_id?: string | null
           integration_type?: string
           lead_external_id?: string
           metadata?: Json | null
@@ -2940,6 +2943,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dialer_calls_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
             referencedColumns: ["id"]
           },
         ]
@@ -2991,6 +3001,112 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      dialer_sessions: {
+        Row: {
+          agent_external_id: string | null
+          campaign_external_id: string | null
+          cdr_disposition: string | null
+          cdr_duration_seconds: number | null
+          created_at: string | null
+          end_time: string | null
+          external_id: string
+          has_cdr: boolean | null
+          id: string
+          integration_id: string
+          lead_external_id: string | null
+          metadata: Json | null
+          session_seconds: number | null
+          source: string
+          start_time: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_external_id?: string | null
+          campaign_external_id?: string | null
+          cdr_disposition?: string | null
+          cdr_duration_seconds?: number | null
+          created_at?: string | null
+          end_time?: string | null
+          external_id: string
+          has_cdr?: boolean | null
+          id?: string
+          integration_id: string
+          lead_external_id?: string | null
+          metadata?: Json | null
+          session_seconds?: number | null
+          source?: string
+          start_time?: string | null
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_external_id?: string | null
+          campaign_external_id?: string | null
+          cdr_disposition?: string | null
+          cdr_duration_seconds?: number | null
+          created_at?: string | null
+          end_time?: string | null
+          external_id?: string
+          has_cdr?: boolean | null
+          id?: string
+          integration_id?: string
+          lead_external_id?: string | null
+          metadata?: Json | null
+          session_seconds?: number | null
+          source?: string
+          start_time?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialer_sessions_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dialer_sync_state: {
+        Row: {
+          cursor: string | null
+          dataset: string
+          integration_id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_success_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          cursor?: string | null
+          dataset: string
+          integration_id: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cursor?: string | null
+          dataset?: string
+          integration_id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialer_sync_state_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       economic_baseline_exclusions: {
         Row: {
@@ -9225,6 +9341,32 @@ export type Database = {
       }
     }
     Views: {
+      dialer_session_daily_metrics: {
+        Row: {
+          agent_external_id: string | null
+          avg_call_duration: number | null
+          avg_session_seconds: number | null
+          campaign_external_id: string | null
+          date: string | null
+          integration_id: string | null
+          invalid_sessions: number | null
+          not_interested_sessions: number | null
+          redial_sessions: number | null
+          sessions_with_calls: number | null
+          success_sessions: number | null
+          total_sessions: number | null
+          unqualified_sessions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialer_sessions_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_basic_info: {
         Row: {
           avatar_url: string | null

@@ -192,3 +192,22 @@ export interface PricingRule {
   effective_to?: string | null;    // Date string: rule is valid until this date (exclusive), null = no end date
   use_rule_name_as_display?: boolean;  // If true, use rule name instead of product name in dashboards
 }
+
+// GDPR-Compliant Session Record
+// Captures ALL session outcomes (not just sales) for hitrate analytics
+export interface StandardSession {
+  externalId: string;
+  integrationType: 'adversus' | 'enreach' | 'other';
+  dialerName: string;
+  leadExternalId?: string;
+  agentExternalId?: string;
+  campaignExternalId?: string;
+  status: string;  // success, notInterested, unqualified, invalid, automaticRedial, privateRedial, noAnswer, busy, unknown
+  startTime?: string;   // ISO-8601
+  endTime?: string;     // ISO-8601
+  sessionSeconds?: number;
+  hasCdr?: boolean;
+  cdrDurationSeconds?: number;
+  cdrDisposition?: string;
+  metadata?: Record<string, unknown>;
+}

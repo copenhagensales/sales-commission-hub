@@ -5,6 +5,7 @@ import {
   StandardCampaign,
   StandardProduct,
   StandardCall,
+  StandardSession,
   CampaignMappingConfig,
   ReferenceExtractionConfig,
   DialerIntegrationConfig,
@@ -1523,5 +1524,135 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchCampaigns(): Promise<StandardCampaign[]> {
     return [];
+  }
+
+  // ==========================================
+  // SESSION FETCHING (ALL outcomes for hitrate)
+  // ==========================================
+
+  async fetchSessions(days: number): Promise<StandardSession[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    return this.fetchSessionsRange({
+      from: cutoffDate.toISOString(),
+      to: new Date().toISOString(),
+    });
+  }
+
+  async fetchSessionsRange(range: { from: string; to: string }): Promise<StandardSession[]> {
+    try {
+      const fromStr = range.from.split("T")[0];
+      const toStr = range.to.split("T")[0];
+      console.log(`[EnreachAdapter] Fetching ALL sessions (all closures) for range ${fromStr} -> ${toStr}`);
+
+      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true`;
+
+      const allSessions: StandardSession[] = [];
+      const seenIds = new Set<string>();
+      const closureTypes = new Map<string, number>();
+      let skip = 0;
+      const take = 500;
+      let hasMore = true;
+      let page = 1;
+      let totalProcessed = 0;
+
+      while (hasMore && totalProcessed < 50000) {
+        const separator = endpoint.includes("?") ? "&" : "?";
+        const pagedEndpoint = `${endpoint}${separator}skip=${skip}&take=${take}`;
+
+        try {
+          const data = (await this.get(pagedEndpoint)) as unknown;
+          let pageResults: Record<string, unknown>[] = [];
+
+          if (Array.isArray(data)) {
+            pageResults = data;
+          } else if (data && typeof data === "object") {
+            const wrapper = data as Record<string, unknown>;
+            pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as Record<string, unknown>[];
+          }
+
+          if (pageResults.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          for (const lead of pageResults) {
+            const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
+            if (!externalId || seenIds.has(externalId)) continue;
+            seenIds.add(externalId);
+
+            const closure = this.getStr(lead, ["closure", "Closure"]) || "unknown";
+            closureTypes.set(closure, (closureTypes.get(closure) || 0) + 1);
+
+            // Map closure to session status
+            const status = closure.toLowerCase() === "success" ? "success" : closure.toLowerCase();
+
+            const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
+            const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+            const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
+
+            const agentOrgCode = this.getStr(firstProcessedByUser, ["orgCode", "OrgCode"]) ||
+              this.getStr(lastModifiedByUser, ["orgCode", "OrgCode"]) || undefined;
+
+            const campaignId = campaignObj ? this.getStr(campaignObj, ["uniqueId", "UniqueId", "code"]) : undefined;
+
+            const startTime = this.getStr(lead, ["firstProcessedTime", "FirstProcessedTime"]) || undefined;
+            const endTime = this.getStr(lead, ["lastModifiedTime", "LastModifiedTime"]) || undefined;
+
+            // Calculate session duration if both times available
+            let sessionSeconds: number | undefined;
+            if (startTime && endTime) {
+              const diff = new Date(endTime).getTime() - new Date(startTime).getTime();
+              if (diff > 0) sessionSeconds = Math.round(diff / 1000);
+            }
+
+            allSessions.push({
+              externalId,
+              integrationType: "enreach",
+              dialerName: this.dialerName,
+              leadExternalId: externalId, // In Enreach, lead ID = session ID
+              agentExternalId: agentOrgCode,
+              campaignExternalId: campaignId,
+              status,
+              startTime,
+              endTime,
+              sessionSeconds,
+              hasCdr: false, // CDR data comes from /calls endpoint
+              metadata: {
+                closure,
+                campaignName: campaignObj ? this.getStr(campaignObj, ["code", "Code", "name", "Name"]) : undefined,
+              },
+            });
+          }
+
+          totalProcessed += pageResults.length;
+          console.log(`[EnreachAdapter] Sessions page ${page}: ${pageResults.length} leads (total sessions: ${allSessions.length})`);
+
+          if (pageResults.length < take) {
+            hasMore = false;
+          } else {
+            skip += take;
+            page++;
+            await new Promise(r => setTimeout(r, 50));
+          }
+        } catch (e) {
+          console.error(`[EnreachAdapter] Error fetching sessions page ${page}:`, e);
+          hasMore = false;
+        }
+      }
+
+      // Log unique closure types for diagnostics
+      console.log(`[EnreachAdapter] ===== SESSION CLOSURE TYPES for ${this.dialerName} =====`);
+      for (const [type, count] of closureTypes.entries()) {
+        console.log(`[EnreachAdapter]   ${type}: ${count}`);
+      }
+      console.log(`[EnreachAdapter] Total unique sessions: ${allSessions.length}`);
+      console.log(`[EnreachAdapter] ===== END SESSION DIAGNOSTICS =====`);
+
+      return allSessions;
+    } catch (error) {
+      console.error("[EnreachAdapter] Critical error in fetchSessionsRange:", error);
+      return [];
+    }
   }
 }
