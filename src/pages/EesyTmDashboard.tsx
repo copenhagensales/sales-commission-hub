@@ -3,17 +3,14 @@ import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatNumber } from "@/lib/calculations";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards } from "@/hooks/useCachedLeaderboard";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -50,145 +47,32 @@ function calculatePayrollPeriod(): { start: Date; end: Date } {
   }
 }
 
-// formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
-const formatCurrency = formatNumber;
-
-const getInitials = (name: string) => {
-  const parts = name.split(" ");
+const getDisplayName = (name: string) => {
+  const parts = name.trim().split(" ");
   if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
   }
-  return name.substring(0, 2).toUpperCase();
+  return name;
 };
 
-// Leaderboard table component to reduce repetition
-function TvLeaderboardTable({ 
-  title, 
-  sellers, 
-  isLoading, 
-  tvMode,
-  employeeData 
-}: { 
-  title: string; 
-  sellers: Array<{ employeeId: string; employeeName: string; displayName: string; avatarUrl?: string | null; salesCount: number; commission: number }>;
-  isLoading: boolean; 
-  tvMode: boolean;
-  employeeData?: { avatarMap: Map<string, string> };
-}) {
-  return (
-    <Card className={tvMode 
-      ? 'flex flex-col overflow-hidden border border-border/[0.14] shadow-2xl bg-card' 
-      : ''
-    }>
-      <CardHeader className={tvMode ? 'pb-2 pt-4 px-4' : 'pb-3'}>
-        <CardTitle className={tvMode 
-          ? 'text-[26px] font-bold tracking-wide text-center uppercase text-foreground' 
-          : 'text-lg font-bold'
-        }>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className={tvMode ? 'flex-1 overflow-hidden p-0' : ''}>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <span className="text-muted-foreground">Indlæser...</span>
-          </div>
-        ) : sellers.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <span className="text-muted-foreground">Ingen salg endnu</span>
-          </div>
-        ) : (
-          <>
-          <Table>
-            <TableHeader>
-              <TableRow className={tvMode ? 'border-b-2 border-border/70' : ''}>
-                <TableHead className={tvMode ? 'w-[40px] text-center text-[18px] font-bold py-3 text-foreground/80' : 'w-10'}></TableHead>
-                <TableHead className={tvMode ? 'text-[18px] font-bold py-3 text-foreground/80' : ''}>Navn</TableHead>
-                <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>Salg</TableHead>
-                <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[140px] text-foreground/80' : 'text-right'}>Provision</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sellers.slice(0, 10).map((seller, index) => (
-                <TableRow 
-                  key={seller.employeeId} 
-                  className={tvMode 
-                    ? `border-b border-border/25 ${index % 2 === 1 ? 'bg-muted/40' : ''}` 
-                    : 'border-b border-border/30'
-                  }
-                >
-                  <TableCell className={tvMode 
-                    ? 'text-center text-muted-foreground font-bold text-[20px] py-[12px] tabular-nums w-[40px]' 
-                    : 'py-2 text-center text-muted-foreground font-medium'
-                  }>{index + 1}</TableCell>
-                  <TableCell className={tvMode ? 'py-[12px]' : 'py-2'}>
-                    <div className="flex items-center gap-2">
-                      <Avatar className={tvMode ? 'h-8 w-8 flex-shrink-0' : 'h-8 w-8'}>
-                        <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
-                        <AvatarFallback className={tvMode 
-                          ? 'text-[12px] bg-primary/20 font-semibold' 
-                          : 'text-xs bg-primary/20'
-                        }>{getInitials(seller.employeeName)}</AvatarFallback>
-                      </Avatar>
-                      <span className={tvMode 
-                        ? 'font-semibold text-[20px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px] block' 
-                        : 'font-medium text-sm'
-                      }>{seller.displayName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className={tvMode 
-                    ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[90px]' 
-                    : 'text-right py-2 text-primary font-semibold'
-                  }>{seller.salesCount}</TableCell>
-                  <TableCell className={tvMode 
-                    ? 'text-right py-[12px] font-semibold text-[20px] text-foreground tabular-nums w-[140px]' 
-                    : 'text-right py-2'
-                  }>
-                    {tvMode ? (
-                      formatCurrency(seller.commission)
-                    ) : (
-                      <span className="inline-block px-2 py-1 rounded text-sm font-semibold bg-primary/10 text-primary">{formatCurrency(seller.commission)}</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {tvMode && sellers.length < 10 && sellers.length > 0 && (
-            <p className="text-center text-muted-foreground/60 text-[14px] py-2">
-              Kun {sellers.length} registrering{sellers.length !== 1 ? 'er' : ''} i denne periode
-            </p>
-          )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function EesyTmDashboard() {
-  // Runtime access check - redirects if user doesn't have team-based permission
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm");
   
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
   
-  // Auto-reload for TV mode to pick up layout/code changes
   useAutoReload(tvMode);
 
   const today = startOfDay(new Date());
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(today);
 
-  // Get client ID for Eesy TM
   const eesyClientId = getClientId("Eesy TM");
 
-  // Fetch cached KPIs for hero cards (fast, pre-computed) - now includes total_hours
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     eesyClientId || null,
     ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
-  // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
   const { 
     sellersToday: cachedSellersToday, 
     sellersWeek: cachedSellersWeek, 
@@ -199,7 +83,6 @@ export default function EesyTmDashboard() {
     { enabled: true, limit: 30 }
   );
 
-  // Fetch employee avatars and IDs
   const { data: employeeData } = useQuery({
     queryKey: ["employee-data-eesy"],
     queryFn: async () => {
@@ -220,28 +103,31 @@ export default function EesyTmDashboard() {
     staleTime: 300000,
   });
 
-  // Map cached leaderboard entries to display format
-  const sortedPayrollSellers = cachedSellersPayroll;
-  const sortedWeeklySellers = cachedSellersWeek;
-  const sortedDailySellers = cachedSellersToday;
+  // Map cached leaderboard entries to shared component format
+  const mapToSeller = (entry: any): LeaderboardSeller => ({
+    id: entry.employeeId,
+    name: entry.employeeName,
+    displayName: getDisplayName(entry.displayName || entry.employeeName),
+    avatarUrl: entry.avatarUrl,
+    salesCount: entry.salesCount,
+    commission: entry.commission,
+  });
+
+  const sortedPayrollSellers = useMemo(() => cachedSellersPayroll.map(mapToSeller), [cachedSellersPayroll]);
+  const sortedWeeklySellers = useMemo(() => cachedSellersWeek.map(mapToSeller), [cachedSellersWeek]);
+  const sortedDailySellers = useMemo(() => cachedSellersToday.map(mapToSeller), [cachedSellersToday]);
 
   const isLoading = kpisLoading || leaderboardsLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Get sales counts from cached KPIs
   const salesToday = getKpiValue(cachedKpis?.today?.sales_count, 0);
   const salesWeek = getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const salesMonth = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
   const salesPayroll = getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
-
-  // Hours now come from cached KPIs
   const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
-
-  // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;
 
-  // KPI card config - keeps data/order unchanged
   const kpiCards = [
     { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays },
     { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange },
@@ -270,31 +156,14 @@ export default function EesyTmDashboard() {
         {/* KPI Cards */}
         <div className={tvMode ? 'grid grid-cols-5 gap-4' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
           {kpiCards.map((kpi) => (
-            <Card key={kpi.label} className={tvMode 
-              ? 'border border-border/[0.14] shadow-2xl bg-card' 
-              : ''
-            }>
-              <CardHeader className={tvMode 
-                ? 'flex flex-row items-center justify-between space-y-0 pb-0 pt-4 px-5' 
-                : 'flex flex-row items-center justify-between space-y-0 pb-2'
-              }>
-                <CardTitle className={tvMode 
-                  ? 'text-[24px] font-semibold text-muted-foreground' 
-                  : 'text-sm font-medium'
-                }>{kpi.label}</CardTitle>
-                {!tvMode && <kpi.icon className="h-4 w-4 text-muted-foreground" />}
-              </CardHeader>
-              <CardContent className={tvMode ? 'px-5 pb-4' : ''}>
-                <div className={tvMode 
-                  ? 'text-[90px] leading-none font-extrabold text-primary' 
-                  : 'text-3xl font-bold text-primary'
-                } style={tvMode ? { fontVariantNumeric: 'tabular-nums' } : undefined}>{kpi.value}</div>
-                <p className={tvMode 
-                  ? 'text-[17px] text-muted-foreground mt-2' 
-                  : 'text-xs text-muted-foreground mt-1'
-                }>{kpi.sub}</p>
-              </CardContent>
-            </Card>
+            <TvKpiCard
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              sub={kpi.sub}
+              tvMode={tvMode}
+              icon={kpi.icon}
+            />
           ))}
         </div>
 
@@ -305,21 +174,18 @@ export default function EesyTmDashboard() {
             sellers={sortedPayrollSellers} 
             isLoading={isLoading} 
             tvMode={tvMode}
-            employeeData={employeeData}
           />
           <TvLeaderboardTable 
             title="Top Uge" 
             sellers={sortedWeeklySellers} 
             isLoading={isLoading} 
             tvMode={tvMode}
-            employeeData={employeeData}
           />
           <TvLeaderboardTable 
             title="Top Dag" 
             sellers={sortedDailySellers} 
             isLoading={isLoading} 
             tvMode={tvMode}
-            employeeData={employeeData}
           />
         </div>
       </div>

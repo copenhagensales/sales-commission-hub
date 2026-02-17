@@ -5,15 +5,13 @@ import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/calculations";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
 import { useCachedLeaderboards, LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -34,15 +32,6 @@ const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
   }, [enabled, intervalMs]);
 };
 
-// Unified seller data type (from cached leaderboard)
-interface MappedSellerData {
-  name: string;
-  totalSales: number;
-  totalCommission: number;
-  avatarUrl: string | null;
-  employeeId: string;
-}
-
 // Calculate payroll period (15th to 14th)
 function calculatePayrollPeriod(): { start: Date; end: Date } {
   const today = new Date();
@@ -59,54 +48,33 @@ function calculatePayrollPeriod(): { start: Date; end: Date } {
   }
 }
 
-// formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
-const formatCurrency = formatNumber;
-
-const getInitials = (name: string) => {
-  const parts = name.split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  }
-  return name.substring(0, 2).toUpperCase();
-};
-
 // Format name for display: "Kasper M" (first name + last initial)
 const getDisplayName = (name: string) => {
   const parts = name.trim().split(" ");
   if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}`;
+    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
   }
   return name;
 };
 
-// Neutral commission styling - clean and readable
-const getCommissionStyle = () => "bg-primary/10 text-primary";
-
 export default function TdcErhvervDashboard() {
-  // Runtime access check - redirects if user doesn't have team-based permission
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("tdc-erhverv");
   
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
   
-  // Auto-reload for TV mode to pick up layout/code changes
   useAutoReload(tvMode);
 
   const today = startOfDay(new Date());
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
 
-  // Get client ID for cached KPIs
   const tdcClientId = getClientId("TDC Erhverv");
 
-  // Fetch cached KPIs for hero cards (fast, pre-computed) - now includes total_hours
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     tdcClientId || null,
     ["sales_count", "total_commission", "total_revenue", "total_hours"]
   );
 
-  // ========== CACHED LEADERBOARDS (from kpi_leaderboard_cache) ==========
-  // Now uses public RLS policy - works for both normal and TV mode
   const { 
     sellersToday: cachedSellersToday, 
     sellersWeek: cachedSellersWeek, 
@@ -138,52 +106,42 @@ export default function TdcErhvervDashboard() {
     enabled: !tvMode
   });
 
-  // Convert cached leaderboard entries to component-expected format
-  const mapCachedToSeller = (entry: LeaderboardEntry): MappedSellerData => ({
+  // Convert cached leaderboard entries to shared component format
+  const mapToSeller = (entry: LeaderboardEntry): LeaderboardSeller => ({
+    id: entry.employeeId,
     name: entry.employeeName,
-    totalSales: entry.salesCount,
-    totalCommission: entry.commission,
+    displayName: getDisplayName(entry.displayName || entry.employeeName),
     avatarUrl: entry.avatarUrl,
-    employeeId: entry.employeeId,
+    salesCount: entry.salesCount,
+    commission: entry.commission,
   });
 
-  // Sort employees by commission for each period (use cached data - same source for all modes)
-  const sortedDailySellers: MappedSellerData[] = useMemo(() => {
-    return cachedSellersToday.map(mapCachedToSeller);
-  }, [cachedSellersToday]);
-
-  const sortedWeeklySellers: MappedSellerData[] = useMemo(() => {
-    return cachedSellersWeek.map(mapCachedToSeller);
-  }, [cachedSellersWeek]);
-
-  const sortedPayrollSellers: MappedSellerData[] = useMemo(() => {
-    return cachedSellersPayroll.map(mapCachedToSeller);
-  }, [cachedSellersPayroll]);
-
-  const getAvatarUrl = (name: string) => {
-    if (!employeeData?.avatarMap) return undefined;
-    return employeeData.avatarMap.get(name.toLowerCase());
-  };
+  const sortedDailySellers = useMemo(() => cachedSellersToday.map(mapToSeller), [cachedSellersToday]);
+  const sortedWeeklySellers = useMemo(() => cachedSellersWeek.map(mapToSeller), [cachedSellersWeek]);
+  const sortedPayrollSellers = useMemo(() => cachedSellersPayroll.map(mapToSeller), [cachedSellersPayroll]);
 
   const isLoading = kpisLoading || leaderboardsLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
-  // Get sales counts from cached KPIs (same source for all modes)
   const todaySales = getKpiValue(cachedKpis?.today?.sales_count, 0);
   const weekSales = getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const monthSales = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
   const payrollSales = getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
-
-  // Hours now come from cached KPIs
   const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
-
-  // Calculate sales per hour for payroll period
   const payrollSalesPerHour = payrollHours > 0 ? payrollSales / payrollHours : 0;
+
+  const kpiCards = [
+    { label: "Salg i dag", value: todaySales, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays },
+    { label: "Salg denne uge", value: weekSales, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange },
+    { label: "Salg denne måned", value: monthSales, sub: format(today, "MMMM", { locale: da }), icon: Calendar },
+    { label: "Salg lønperiode", value: payrollSales, sub: periodLabel, icon: Calendar },
+    { label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp },
+  ];
 
   return (
     <div className={tvMode 
-      ? 'w-[1920px] h-[1080px] bg-background p-5 flex flex-col overflow-hidden' 
+      ? 'w-[1920px] h-[1080px] bg-background p-6 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       <DashboardHeader 
@@ -197,263 +155,41 @@ export default function TdcErhvervDashboard() {
           />
         }
       />
-      <div className={tvMode ? 'space-y-4 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
-
-        {/* KPI Cards - Row 1: Time-based sales */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {todaySales}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{format(today, "d. MMMM", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg denne uge</CardTitle>
-              <CalendarRange className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {weekSales}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Uge {format(today, "w", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {monthSales}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{format(today, "MMMM yyyy", { locale: da })}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg lønperiode</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {payrollSales}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
-            </CardContent>
-          </Card>
+      <div className={tvMode ? 'space-y-5 flex-1 flex flex-col min-h-0' : 'space-y-6'}>
+        {/* KPI Cards */}
+        <div className={tvMode ? 'grid grid-cols-5 gap-4' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
+          {kpiCards.map((kpi) => (
+            <TvKpiCard
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              sub={kpi.sub}
+              tvMode={tvMode}
+              icon={kpi.icon}
+            />
+          ))}
         </div>
 
-        {/* KPI Card - Sales per hour (payroll period only) */}
-        <div className="grid grid-cols-1 gap-4">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg/time lønperiode</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                {payrollSalesPerHour.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {payrollSales} salg / {payrollHours.toFixed(1)} timer
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Three leaderboard columns */}
-        <div className={tvMode 
-          ? 'grid grid-cols-3 gap-4 flex-1 min-h-0' 
-          : 'grid grid-cols-1 gap-4 lg:grid-cols-3'
-        }>
-          
-          {/* Top Løn Periode */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Løn Periode
-              </CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedPayrollSellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedPayrollSellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
-                              {formatCurrency(totalCommission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Uge */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Uge
-              </CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedWeeklySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedWeeklySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
-                              {formatCurrency(totalCommission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Dag */}
-          <Card className={tvMode ? 'flex flex-col overflow-hidden' : ''}>
-            <CardHeader className="pb-3 flex-shrink-0">
-              <CardTitle className="text-center text-lg font-bold uppercase tracking-wider">
-                Top Dag
-              </CardTitle>
-            </CardHeader>
-            <CardContent className={tvMode ? 'p-0 flex-1 overflow-y-auto' : 'p-0'}>
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Indlæser...</p>
-              ) : sortedDailySellers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Navn</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDailySellers.map((seller, index) => {
-                      const { name, totalSales, totalCommission, avatarUrl } = seller;
-                      
-                      return (
-                        <TableRow key={name} className="border-b border-border/30">
-                          <TableCell className="py-2 text-center text-muted-foreground font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={avatarUrl} alt={name} />
-                                <AvatarFallback className="text-xs bg-primary/20">
-                                  {getInitials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{getDisplayName(name)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-2 text-primary font-semibold">
-                            {totalSales}
-                          </TableCell>
-                          <TableCell className="text-right py-2">
-                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getCommissionStyle()}`}>
-                              {formatCurrency(totalCommission)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+        {/* Leaderboard Tables */}
+        <div className={tvMode ? 'grid grid-cols-3 gap-5 flex-1 min-h-0' : 'grid grid-cols-1 gap-6 lg:grid-cols-3'}>
+          <TvLeaderboardTable 
+            title="Top Løn Periode" 
+            sellers={sortedPayrollSellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+          />
+          <TvLeaderboardTable 
+            title="Top Uge" 
+            sellers={sortedWeeklySellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+          />
+          <TvLeaderboardTable 
+            title="Top Dag" 
+            sellers={sortedDailySellers} 
+            isLoading={isLoading} 
+            tvMode={tvMode}
+          />
         </div>
       </div>
     </div>
