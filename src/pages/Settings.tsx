@@ -424,10 +424,6 @@ export default function Settings() {
       
       if (error) throw error;
       
-      // Si la sincronización básica termina, disparamos el backfill de OPP en segundo plano
-      // Esto no bloquea la UI
-      supabase.functions.invoke("backfill-opp");
-
       setResults({ type: "sync", data });
       toast.success(data.message || "Sincronización completada exitosamente");
     } catch (err: any) {
@@ -439,23 +435,7 @@ export default function Settings() {
   };
 
 
-  const backfillOpp = async () => {
-    setLoading("backfill-opp");
-    try {
-      const { data, error } = await supabase.functions.invoke("backfill-opp");
-      if (error) throw error;
-      setResults({ type: "backfill-opp", data });
-      if (data.remaining > 0) {
-        toast.success(`Opdaterede ${data.successful} OPP-numre. ${data.remaining} mangler stadig.`);
-      } else {
-        toast.success(`Alle OPP-numre er nu hentet!`);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Backfill af OPP fejlede");
-    } finally {
-      setLoading(null);
-    }
-  };
+
 
   const loadLastTdcImport = async () => {
     try {

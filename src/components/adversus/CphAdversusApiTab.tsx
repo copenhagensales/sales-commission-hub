@@ -312,20 +312,6 @@ export function CphAdversusApiTab() {
                   <Badge variant="outline" className="text-green-400">Aktiv</Badge>
                 </TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Edge funktion</TableCell>
-                <TableCell className="font-mono text-xs">backfill-opp</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Edge funktion</TableCell>
-                <TableCell className="font-mono text-xs">fetch-single-opp</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
-                </TableCell>
-              </TableRow>
             </TableBody>
           </Table>
         </CardContent>

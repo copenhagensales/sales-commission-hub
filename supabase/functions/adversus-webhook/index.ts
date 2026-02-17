@@ -286,7 +286,7 @@ serve(async (req) => {
         customer_phone: body.payload.lead.phone,
         sale_datetime: body.event_time || new Date().toISOString(),
         adversus_external_id: externalId,
-        adversus_opp_number: null, // Will be filled by scheduled sync
+        // OPP number now stored in raw_payload via data normalization
         validation_status: 'pending',
       })
       .select()
