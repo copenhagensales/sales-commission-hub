@@ -58,16 +58,23 @@ export function usePagePermissions() {
   return useQuery({
     queryKey: ['page-permissions'],
     queryFn: async () => {
-      // Use central pagination utility to fetch all permissions (>1000 rows)
-      const allPermissions = await fetchAllRows<PagePermission>(
-        "role_page_permissions",
-        "*",
-        undefined,
-        { orderBy: "permission_key", ascending: true }
-      );
+      // Use RPC to fetch all permissions in a single request (avoids 4 paginated calls)
+      const { data, error } = await supabase.rpc('get_all_role_page_permissions');
       
-      console.log(`[usePagePermissions] Fetched ${allPermissions.length} permissions`);
-      return allPermissions;
+      if (error) {
+        console.error('[usePagePermissions] RPC error, falling back to pagination:', error);
+        // Fallback to paginated fetch if RPC fails
+        const allPermissions = await fetchAllRows<PagePermission>(
+          "role_page_permissions",
+          "*",
+          undefined,
+          { orderBy: "permission_key", ascending: true }
+        );
+        return allPermissions;
+      }
+      
+      console.log(`[usePagePermissions] Fetched ${data?.length ?? 0} permissions via RPC`);
+      return (data ?? []) as PagePermission[];
     },
     staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
     gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
