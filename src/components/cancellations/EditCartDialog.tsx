@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -44,6 +44,10 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
   const queryClient = useQueryClient();
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    setIsDirty(false);
+  }, [saleId]);
 
   const { data: saleItems = [], isLoading } = useQuery({
     queryKey: ["sale-items-for-cancellation", saleId],
