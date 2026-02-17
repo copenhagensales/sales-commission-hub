@@ -35,7 +35,7 @@ import { Loader2, AlertCircle, ChevronDown, ChevronRight, X, Copy, CalendarIcon 
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { CancellationDialog } from "./CancellationDialog";
+import { EditCartDialog } from "./EditCartDialog";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
 
@@ -385,7 +385,7 @@ export function DuplicatesTab() {
         </>
       )}
 
-      <CancellationDialog
+      <EditCartDialog
         saleId={selectedSaleId}
         open={!!selectedSaleId}
         onClose={() => setSelectedSaleId(null)}
