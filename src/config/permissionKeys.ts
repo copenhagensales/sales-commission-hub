@@ -180,7 +180,6 @@ export const PERMISSION_KEYS = {
 
   // ==================== LØN (under menu_section_salary) ====================
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
-  menu_cancellations: { label: 'Annulleringer', section: 'salary', parent: 'menu_section_salary' },
 
   // ==================== DASHBOARDS (under menu_section_dashboards) ====================
   // NOTE: Individual dashboard permissions are managed via team_dashboard_permissions table
@@ -196,6 +195,10 @@ export const PERMISSION_KEYS = {
   menu_reports_management: { label: 'Ledelsesrapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_employee: { label: 'Medarbejderrapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_revenue_by_client: { label: 'Omsætning per opgave', section: 'reports', parent: 'menu_section_reports' },
+  menu_cancellations: { label: 'Annulleringer', section: 'reports', parent: 'menu_section_reports' },
+  tab_cancellations_manual: { label: 'Fane: Rediger kurv', section: 'reports', parent: 'menu_cancellations' },
+  tab_cancellations_upload: { label: 'Fane: Upload/match', section: 'reports', parent: 'menu_cancellations' },
+  tab_cancellations_duplicates: { label: 'Fane: Dubletter', section: 'reports', parent: 'menu_cancellations' },
 
   // ==================== ONBOARDING (under menu_section_onboarding) ====================
   menu_onboarding_overview: { label: 'Onboarding overblik', section: 'onboarding', parent: 'menu_section_onboarding' },
