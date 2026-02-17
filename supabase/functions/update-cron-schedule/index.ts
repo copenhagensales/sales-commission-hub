@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
         source: provider || "adversus", 
         integration_id, 
         action: "sync", 
-        days: 2 
+        days: 1 
       };
     } else {
       // Legacy support for other integration types
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       jobName = `${integration_type}-sync-scheduled`;
       functionName = typeToFunction[integration_type];
       payload = integration_type === "adversus" 
-        ? { source: "adversus", action: "sync", days: 2 }
+        ? { source: "adversus", action: "sync", days: 1 }
         : {};
     }
 

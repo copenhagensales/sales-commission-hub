@@ -31,7 +31,7 @@ serve(async (req) => {
     const { source, action, actions, days = 3, campaignId, integration_id, integrationId, background = false, from, to, maxRecords } = body;
     
     // Balanced limit: 50 records per sync to handle backlog while preventing CPU timeout
-    const effectiveMaxRecords = maxRecords ?? 50;
+    const effectiveMaxRecords = maxRecords ?? 200;
 
     const supabase = getSupabase();
 
