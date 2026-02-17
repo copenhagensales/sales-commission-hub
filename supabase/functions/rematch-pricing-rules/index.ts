@@ -339,6 +339,28 @@ serve(async (req) => {
       const rawPayload = item.sales?.raw_payload as Record<string, unknown> | null;
       let rawPayloadData = rawPayload?.data as Record<string, unknown> | undefined;
 
+      // Merge leadResultFields and leadResultData into rawPayloadData
+      // This ensures Relatel sales with Tilskud in leadResultFields can match pricing rules
+      const leadResultFields = rawPayload?.leadResultFields as Record<string, unknown> | undefined;
+      const leadResultData = rawPayload?.leadResultData as Record<string, unknown> | undefined;
+
+      if (leadResultFields && typeof leadResultFields === "object") {
+        if (!rawPayloadData) rawPayloadData = {};
+        for (const [key, value] of Object.entries(leadResultFields)) {
+          if (value !== null && value !== undefined && value !== "") {
+            rawPayloadData[key] = value;
+          }
+        }
+      }
+      if (leadResultData && typeof leadResultData === "object") {
+        if (!rawPayloadData) rawPayloadData = {};
+        for (const [key, value] of Object.entries(leadResultData)) {
+          if (value !== null && value !== undefined && value !== "") {
+            rawPayloadData[key] = value;
+          }
+        }
+      }
+
       // Data enrichment: Add default Dækningssum for ASE sales if missing
       // This ensures pricing rules with Dækningssum conditions can match
       if (rawPayloadData) {
