@@ -9592,6 +9592,20 @@ export type Database = {
           sale_source: string
         }[]
       }
+      get_all_role_page_permissions: {
+        Args: never
+        Returns: {
+          can_edit: boolean
+          can_view: boolean
+          description: string
+          id: string
+          parent_key: string
+          permission_key: string
+          permission_type: string
+          role_key: string
+          visibility: string
+        }[]
+      }
       get_auth_email_by_work_email: {
         Args: { _work_email: string }
         Returns: string
