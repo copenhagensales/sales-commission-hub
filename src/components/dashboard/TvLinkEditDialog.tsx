@@ -91,10 +91,10 @@ const CELEBRATION_TRIGGER_CONDITIONS = [
 ];
 
 const DURATION_OPTIONS = [
-  { value: 2, label: "2 sek" },
-  { value: 3, label: "3 sek" },
-  { value: 5, label: "5 sek" },
-  { value: 8, label: "8 sek" },
+  { value: 2000, label: "2 sek" },
+  { value: 3000, label: "3 sek" },
+  { value: 5000, label: "5 sek" },
+  { value: 8000, label: "8 sek" },
 ];
 
 // Available metrics based on dashboard type - used for both trigger and text variables
@@ -119,7 +119,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   // Celebration settings
   const [celebrationEnabled, setCelebrationEnabled] = useState(false);
   const [celebrationEffect, setCelebrationEffect] = useState("fireworks");
-  const [celebrationDuration, setCelebrationDuration] = useState(3);
+  const [celebrationDuration, setCelebrationDuration] = useState(3000);
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
   const [celebrationMetric, setCelebrationMetric] = useState("sales_today");
@@ -193,7 +193,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
       
       setCelebrationEnabled(tvLink.celebration_enabled ?? false);
       setCelebrationEffect(tvLink.celebration_effect ?? "fireworks");
-      setCelebrationDuration(tvLink.celebration_duration ?? 3);
+      setCelebrationDuration(tvLink.celebration_duration ?? 3000);
       setCelebrationTriggerCondition(tvLink.celebration_trigger_condition ?? "any_update");
       setCelebrationText(tvLink.celebration_text ?? "");
       setCelebrationMetric(tvLink.celebration_metric ?? "sales_today");

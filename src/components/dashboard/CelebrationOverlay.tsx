@@ -70,11 +70,10 @@ export const CelebrationOverlay = ({
     if (isOpen) {
       setShowContent(true);
 
-      const durationMs = duration >= 1000 ? duration : duration * 1000;
       const timer = setTimeout(() => {
         onClose();
         setShowContent(false);
-      }, durationMs);
+      }, duration);
 
       return () => clearTimeout(timer);
     } else {

@@ -2,6 +2,7 @@ interface FetchAllPostgrestRowsOptions {
   pageSize?: number;
   retries?: number;
   retryDelayMs?: number;
+  maxPages?: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,7 +50,7 @@ export async function fetchAllPostgrestRows<T = unknown>(
   headers: Record<string, string>,
   options: FetchAllPostgrestRowsOptions = {}
 ): Promise<T[]> {
-  const { pageSize = 500, retries = 2, retryDelayMs = 250 } = options;
+  const { pageSize = 500, retries = 2, retryDelayMs = 250, maxPages = 10000 } = options;
 
   const baseUrl = new URL(rawUrl);
   baseUrl.searchParams.delete("limit");
@@ -57,8 +58,9 @@ export async function fetchAllPostgrestRows<T = unknown>(
 
   const allRows: T[] = [];
   let knownTotalCount: number | null = null;
+  let reachedMaxPages = true;
 
-  for (let page = 0; ; page += 1) {
+  for (let page = 0; page < maxPages; page += 1) {
     const pageUrl = new URL(baseUrl.toString());
     pageUrl.searchParams.set("limit", String(pageSize));
     pageUrl.searchParams.set("offset", String(page * pageSize));
@@ -85,15 +87,26 @@ export async function fetchAllPostgrestRows<T = unknown>(
     }
 
     const rows = (await response.json()) as T[];
-    if (!rows.length) break;
+    if (!rows.length) {
+      reachedMaxPages = false;
+      break;
+    }
 
     allRows.push(...rows);
 
-    if (rows.length < pageSize) break;
-
-    if (knownTotalCount !== null && allRows.length >= knownTotalCount) {
+    if (rows.length < pageSize) {
+      reachedMaxPages = false;
       break;
     }
+
+    if (knownTotalCount !== null && allRows.length >= knownTotalCount) {
+      reachedMaxPages = false;
+      break;
+    }
+  }
+
+  if (reachedMaxPages) {
+    throw new Error(`PostgREST fetch exceeded max pages (${maxPages}) for URL: ${baseUrl.toString()}`);
   }
 
   return allRows;
