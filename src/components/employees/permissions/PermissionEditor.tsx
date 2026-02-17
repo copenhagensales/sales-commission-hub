@@ -393,7 +393,7 @@ export function PermissionEditor() {
       const newPermissions = sourcePermissions.map(p => ({
         role_key: newRoleKey,
         permission_key: p.permission_key,
-        parent_key: p.parent_key || PERMISSION_HIERARCHY[p.permission_key] || null,
+        parent_key: PERMISSION_HIERARCHY[p.permission_key] ?? p.parent_key ?? null,
         permission_type: p.permission_type || getPermissionTypeFromKey(p.permission_key),
         can_view: p.can_view,
         can_edit: p.can_edit,
@@ -425,7 +425,7 @@ export function PermissionEditor() {
     }
   };
 
-  // Auto-seed missing permissions when selecting a role
+  // Auto-seed missing permissions and fix stale parent_keys when selecting a role
   useEffect(() => {
     if (selectedRole && !permissionsLoading) {
       const existingKeys = permissionsByRole[selectedRole]?.map(p => p.permission_key) || [];
@@ -434,6 +434,24 @@ export function PermissionEditor() {
       // Seed missing keys - not just when role has 0 permissions
       if (missingKeys.length > 0) {
         seedPermissionsForRole(selectedRole);
+      }
+
+      // Auto-correct stale parent_keys against authoritative PERMISSION_HIERARCHY
+      const existingPermissions = permissionsByRole[selectedRole] || [];
+      const stalePermissions = existingPermissions.filter(p => {
+        const correctParent = PERMISSION_HIERARCHY[p.permission_key] ?? null;
+        return p.parent_key !== correctParent && correctParent !== null;
+      });
+
+      if (stalePermissions.length > 0) {
+        console.log(`[PermissionEditor] Fixing ${stalePermissions.length} stale parent_keys for role ${selectedRole}`);
+        Promise.all(stalePermissions.map(p =>
+          supabase.from('role_page_permissions')
+            .update({ parent_key: PERMISSION_HIERARCHY[p.permission_key] || null })
+            .eq('id', p.id)
+        )).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['page-permissions'] });
+        });
       }
     }
   }, [selectedRole, permissionsLoading]);
