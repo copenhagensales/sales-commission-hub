@@ -418,193 +418,82 @@ export class AdversusAdapter implements DialerAdapter {
     resultFields: Record<string, any> = {};
   };
 
-  // Construir mapa leadId -> LeadData con TODOS los resultatfelter (SECUENCIAL para evitar rate limit)
+  // Build lead data map by fetching only the leads referenced in sales (individually via fetchLeadById)
   private async buildLeadDataMap(
     sales: any[],
     campaignConfigMap: Map<string, CampaignMappingConfig>
   ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>> {
     const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>();
 
-    // 1. Obtener campaignIds únicos de las ventas
-    const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
-    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns, fetching leads SEQUENTIALLY...`);
+    // 1. Extract unique leadIds from sales
+    const uniqueLeadIds = [...new Set(sales.map(s => s.leadId).filter(Boolean).map(String))];
+    console.log(`[Adversus] buildLeadDataMap: ${uniqueLeadIds.length} unique leads to fetch from ${sales.length} sales`);
 
-    // 2. Preparar configs para cada campaña
-    const campaignConfigs = campaignIds.map(campaignId => {
-      const campaignIdStr = String(campaignId);
-      const config = campaignConfigMap.get(campaignIdStr);
-      let oppFieldId = '80862'; // Default
+    if (uniqueLeadIds.length === 0) {
+      return leadIdToData;
+    }
 
-      if (config?.referenceConfig?.type === 'field_id') {
-        oppFieldId = config.referenceConfig.value.replace('result_', '');
-      }
-
-      return { campaignId, oppFieldId };
-    });
-
-    // 3. Fetch SECUENCIAL de leads por campaña (evitar rate limit)
-    let totalLeads = 0;
+    const oppPattern = /OPP-\d{4,6}/;
     let totalOpps = 0;
+    let fetchSuccess = 0;
+    let fetchFailed = 0;
 
-    for (let configIndex = 0; configIndex < campaignConfigs.length; configIndex++) {
-      const { campaignId, oppFieldId } = campaignConfigs[configIndex];
-      let retryAttempt = 0;
-      const maxRetries = 3;
-      
-      while (retryAttempt < maxRetries) {
-        try {
-          const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
-          const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
+    // 2. Fetch all leads individually in batches of 5
+    const batchSize = 5;
+    const delayMs = 200;
 
-          const res = await fetch(url, {
-            headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
-          });
+    for (let i = 0; i < uniqueLeadIds.length; i += batchSize) {
+      const batch = uniqueLeadIds.slice(i, i + batchSize);
 
-          if (res.status === 429) {
-            retryAttempt++;
-            if (retryAttempt >= maxRetries) {
-              console.log(`[Adversus] Campaign ${campaignId}: Rate limited, max retries reached`);
-              break;
-            }
-            const delay = 2000 * Math.pow(2, retryAttempt - 1);
-            console.log(`[Adversus] Rate limited on campaign ${campaignId}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
-            await new Promise(r => setTimeout(r, delay));
-            continue;
-          }
+      const results = await Promise.all(
+        batch.map(leadId => this.fetchLeadById(leadId).catch(e => {
+          console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+          return null;
+        }))
+      );
 
-          if (!res.ok) {
-            console.log(`[Adversus] Campaign ${campaignId}: Failed (${res.status})`);
-            break;
-          }
+      for (let j = 0; j < batch.length; j++) {
+        const leadId = batch[j];
+        const leadData = results[j];
 
-        const data = await res.json();
-        const leads = data.leads || data || [];
-        let oppsFound = 0;
+        if (!leadData) {
+          fetchFailed++;
+          continue;
+        }
 
-        // Usar misma lógica que adversus-diagnostics (que funcionó perfectamente)
-        const oppPattern = /OPP-\d{4,6}/;
+        const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = leadData.resultData || [];
+        const resultFields: Record<string, any> = {};
+        let opp: string | null = null;
 
-        for (const lead of leads) {
-          const leadId = String(lead.id);
-          const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = lead.resultData || [];
+        if (Array.isArray(resultData)) {
+          for (const field of resultData) {
+            const fieldName = field?.name || field?.label;
+            if (field && fieldName !== undefined) {
+              resultFields[fieldName] = field.value;
 
-          // Build resultFields object (name -> value)
-          const resultFields: Record<string, any> = {};
-          let opp: string | null = null;
-
-          if (Array.isArray(resultData)) {
-            for (const field of resultData) {
-              // Support both 'name' and 'label' properties (Adversus API uses both)
-              const fieldName = field?.name || field?.label;
-              if (field && fieldName !== undefined) {
-                // Store field by name/label
-                resultFields[fieldName] = field.value;
-                
-                // Check for OPP pattern
-                if (field.value) {
-                  const value = String(field.value);
-                  const match = value.match(oppPattern);
-                  if (match && !opp) {
-                    opp = match[0];
-                    oppsFound++;
-                  }
+              if (field.value) {
+                const value = String(field.value);
+                const match = value.match(oppPattern);
+                if (match && !opp) {
+                  opp = match[0];
+                  totalOpps++;
                 }
               }
             }
           }
-
-          // Store lead data with all result fields
-          leadIdToData.set(leadId, {
-            opp,
-            resultData,
-            resultFields,
-          });
         }
 
-          totalLeads += leads.length;
-          totalOpps += oppsFound;
-          console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs`);
+        leadIdToData.set(leadId, { opp, resultData, resultFields });
+        fetchSuccess++;
+      }
 
-          // Delay mellem requests for at undgå rate limit (øget fra 100ms til 250ms)
-          await new Promise(r => setTimeout(r, 250));
-          break; // Success, exit retry loop
-        } catch (e) {
-          console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
-          break; // Exit retry loop on error
-        }
+      // Delay between batches to respect rate limits
+      if (i + batchSize < uniqueLeadIds.length) {
+        await new Promise(r => setTimeout(r, delayMs));
       }
     }
 
-    console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
-
-    // 4. FALLBACK: For missing leads, fetch directly by lead ID
-    // OPTIMIZED: Limit fallback lookups to max 20 to prevent CPU timeout
-    const MAX_FALLBACK_LEADS = 20;
-    const allLeadIds = sales.map(s => s.leadId).filter(Boolean).map(String);
-    let missingLeadIds = allLeadIds.filter(lid => !leadIdToData.has(lid));
-    
-    if (missingLeadIds.length > 0) {
-      const wasLimited = missingLeadIds.length > MAX_FALLBACK_LEADS;
-      if (wasLimited) {
-        console.log(`[Adversus] FALLBACK: Limiting from ${missingLeadIds.length} to ${MAX_FALLBACK_LEADS} leads to prevent timeout`);
-        missingLeadIds = missingLeadIds.slice(0, MAX_FALLBACK_LEADS);
-      }
-      console.log(`[Adversus] FALLBACK: Fetching ${missingLeadIds.length} missing leads individually...`);
-      
-      let fallbackSuccess = 0;
-      let fallbackFailed = 0;
-      const oppPattern = /OPP-\d{4,6}/;
-      
-      // OPTIMIZED: Reduced batch size from 10 to 5 and delays
-      const batchSize = 5;
-      for (let i = 0; i < missingLeadIds.length; i += batchSize) {
-        const batch = missingLeadIds.slice(i, i + batchSize);
-        
-        for (const leadId of batch) {
-          try {
-            const leadData = await this.fetchLeadById(leadId);
-            
-            if (leadData) {
-              const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = leadData.resultData || [];
-              const resultFields: Record<string, any> = {};
-              let opp: string | null = null;
-              
-              if (Array.isArray(resultData)) {
-                for (const field of resultData) {
-                  const fieldName = field?.name || field?.label;
-                  if (field && fieldName !== undefined) {
-                    resultFields[fieldName] = field.value;
-                    
-                    if (field.value) {
-                      const value = String(field.value);
-                      const match = value.match(oppPattern);
-                      if (match && !opp) {
-                        opp = match[0];
-                      }
-                    }
-                  }
-                }
-              }
-              
-              leadIdToData.set(leadId, { opp, resultData, resultFields });
-              fallbackSuccess++;
-            } else {
-              fallbackFailed++;
-            }
-          } catch (e) {
-            console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
-            fallbackFailed++;
-          }
-        }
-        
-        // OPTIMIZED: Reduced delay from 400ms to 150ms
-        if (i + batchSize < missingLeadIds.length) {
-          await new Promise(r => setTimeout(r, 150));
-        }
-      }
-      
-      console.log(`[Adversus] Fallback complete: ${fallbackSuccess} leads fetched, ${fallbackFailed} failed${wasLimited ? ' (limited)' : ''}`);
-    }
+    console.log(`[Adversus] buildLeadDataMap complete: ${fetchSuccess} fetched, ${fetchFailed} failed, ${totalOpps} OPPs found (${uniqueLeadIds.length} total)`);
 
     return leadIdToData;
   }
