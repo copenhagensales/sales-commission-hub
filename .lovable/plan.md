@@ -1,57 +1,39 @@
 
 
-## Rediger Kurv - Omdob og udvid funktionalitet
+## Forenkl Rediger Kurv - Fjern individuel annullering/afvisning, tilfoej antal-redigering
 
 ### Oversigt
-AEndrer "Annuller/afvis"-fanen og dialogen til "Rediger kurv", saa man kan tilfoeje/fjerne produkter i et salg, samt stadig annullere eller afvise hele salget.
+Fjerner "Annuller 1" og "Afvis 1" knapperne fra produkttabellen i EditCartDialog. I stedet faar hver raekke et redigerbart antal-felt, saa man kan aendre quantity direkte. Slet-knappen (skraldespand) og "Tilfoej produkt" beholdes. Footer-knapperne "Annuller hele salget" og "Afvis hele salget" beholdes ogsaa.
 
 ---
 
-### AEndring 1: Tab-tekst i Cancellations.tsx
-- AEndr TabsTrigger fra "Annuller/afvis" til "Rediger kurv"
+### AEndringer i EditCartDialog.tsx
 
-### AEndring 2: Knap i ManualCancellationsTab.tsx
-- AEndr knapteksten fra "Annuller/afvis" til "Rediger kurv"
-- Skift ikon fra `X` til `ShoppingCart`
-- AEndr variant fra `destructive` til `outline`
+**Fjernes:**
+- `cancelOneUnitMutation` og `rejectOneUnitMutation` (individuel annullering/afvisning)
+- `undoOneUnitMutation` (fortryd-knappen)
+- `confirmAction` state og al logik omkring det
+- "Annuller 1", "Afvis 1" og "Fortryd 1" knapperne i tabellen
+- "Status" kolonnen (ikke relevant naar man kun redigerer antal)
+- Import af `Minus`, `ThumbsDown`
 
-### AEndring 3: Udvid CancellationDialog.tsx
-Dialogen omdoebes til **EditCartDialog** og faar foelgende nye funktioner:
+**Tilfoejes:**
+- `updateQuantityMutation`: Opdaterer `quantity`, `mapped_commission` og `mapped_revenue` paa en `sale_item`. Commission og revenue genberegnes proportionelt (per-unit-vaerdi x nyt antal).
+- Antal-kolonnen bliver et redigerbart input-felt (number input, min 1) i stedet for blot at vise tallet.
 
-**Ny titel og beskrivelse:**
-- "Rediger kurv" / "Tilfoej eller fjern produkter, eller annuller/afvis hele salget"
+**Tabel-layout efter aendring:**
+| Produkt | Antal (input) | Prov./stk | Handling (slet-knap) |
 
-**Tilfoej produkt-sektion (ny):**
-- Hent salgets `client_campaign_id` fra `sales`-tabellen
-- Hent tilgaengelige produkter fra `products`-tabellen filtreret paa den kampagne
-- Dropdown til at vaelge produkt + antal-input (standard 1)
-- "Tilfoej"-knap der opretter ny raekke i `sale_items` med:
-  - `sale_id`, `product_id`, `display_name` (fra produktet)
-  - `quantity`, `mapped_commission` (commission_dkk x antal), `mapped_revenue` (revenue_dkk x antal)
+### Teknisk detalje: Genberegning af commission/revenue
+Naar antal aendres, beregnes nye vaerdier:
+- `perUnit = mapped_commission / old_quantity`
+- `new mapped_commission = perUnit * new_quantity`
+- Samme for `mapped_revenue`
 
-**Fjern produkt (ny):**
-- Slet-knap (TrashIcon) per raekke der helt fjerner `sale_item`-raekken fra databasen
-- Bekraeftelsesdialog foer sletning
-
-**Bevar eksisterende funktionalitet:**
-- Annuller 1 stk / Afvis 1 stk per produkt
-- Fortryd 1
-- "Annuller hele salget" og "Afvis hele salget" i footer
+Dette foelger den eksisterende konvention om at vaerdierne er prae-multipliceret.
 
 ---
 
-### Tekniske detaljer
-
-**Filer der aendres:**
-1. `src/pages/salary/Cancellations.tsx` - Tab-tekst
-2. `src/components/cancellations/ManualCancellationsTab.tsx` - Knap-tekst, ikon, variant
-3. `src/components/cancellations/CancellationDialog.tsx` - Omdoeb til EditCartDialog, tilfoej produkt-query, tilfoej/slet mutations
-
-**Database:** Ingen skemaaendringer noedvendige. Alle kolonner findes allerede i `sale_items` og `products`.
-
-**Nye queries i dialogen:**
-- `sales` query for `client_campaign_id` (baseret paa `saleId`)
-- `products` query filtreret paa `client_campaign_id`
-- INSERT mutation til `sale_items` for nye produkter
-- DELETE mutation til `sale_items` for fjernelse
+### Filer der aendres
+1. **`src/components/cancellations/EditCartDialog.tsx`** - Fjern individuelle cancel/reject mutations og knapper, tilfoej inline antal-redigering med update mutation
 
