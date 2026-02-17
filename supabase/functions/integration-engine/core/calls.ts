@@ -30,7 +30,8 @@ async function processCallsBatch(
   agentMapByExtId: Map<string, string>,
   agentMapByEmail: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  agentMapByDialerId: Map<string, string>
+  agentMapByDialerId: Map<string, string>,
+  integrationId: string
 ) {
   let processed = 0
   let errors = 0
@@ -63,6 +64,7 @@ async function processCallsBatch(
         agent_id: agentId,
         recording_url: call.recordingUrl || null,
         metadata: call.metadata || null,
+        integration_id: integrationId,
         updated_at: new Date().toISOString(),
       }
       allCallsData.push(callData)
@@ -96,6 +98,7 @@ async function processCallsBatch(
 export async function processCalls(
   supabase: SupabaseClient,
   calls: StandardCall[],
+  integrationId: string,
   batchSize: number,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
@@ -143,7 +146,8 @@ export async function processCalls(
       agentMapByExtId,
       agentMapByEmail,
       log,
-      agentMapByDialerId
+      agentMapByDialerId,
+      integrationId
     )
     totalProcessed += processed
     totalErrors += errors
