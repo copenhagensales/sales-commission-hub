@@ -615,6 +615,9 @@ export default function Auth() {
           <img 
             src={cphSalesLogo} 
             alt="CPH Sales" 
+            width={161}
+            height={96}
+            fetchPriority="high"
             className="mx-auto h-24 w-auto cursor-pointer"
           />
           <p className="mt-4 text-sm text-muted-foreground">
