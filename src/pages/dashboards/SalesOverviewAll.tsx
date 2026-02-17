@@ -368,47 +368,6 @@ export default function SalesOverviewAll() {
         )}
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-medium text-muted-foreground text-sm">Salg i dag</CardTitle>
-            <TrendingUp className="text-emerald-500 h-5 w-5" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-emerald-500 text-4xl">{displaySalesTotal}</div>
-            <div className="flex gap-1 mt-2">
-              <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-600">
-                {displayConfirmed} bekræftet
-              </Badge>
-              {displayPending > 0 && (
-                <Badge variant="secondary" className="bg-amber-500/20 text-amber-600">
-                  {displayPending} afventer
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-medium text-muted-foreground text-sm">Sælgere på tavlen</CardTitle>
-            <Users className="text-purple-500 h-5 w-5" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-2">
-              <span className="font-bold text-purple-500 text-4xl">{displaySellersOnBoard}</span>
-              <span className="text-muted-foreground text-lg">
-                ({displayActiveEmployees})
-              </span>
-            </div>
-            <p className="text-muted-foreground text-xs mt-2">
-              Sælgere med salg af {displayActiveEmployees} aktive
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Footer */}
       <div className="text-center text-muted-foreground text-sm">
         <p>Salgsoversigt alle • {format(today, "HH:mm", { locale: da })}</p>
