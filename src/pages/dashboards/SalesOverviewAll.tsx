@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Target, Clock } from "lucide-react";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { Target } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
@@ -402,25 +401,27 @@ export default function SalesOverviewAll() {
   // Normal dashboard content
   const normalContent = (
     <div className="space-y-6">
-      <div className="flex items-center justify-center gap-3 py-4">
-        <Clock className="h-6 w-6 text-primary" />
-        <span className="text-5xl font-bold tabular-nums tracking-tight">
-          {format(now, "HH:mm:ss")}
-        </span>
-        <span className="text-lg text-muted-foreground ml-2 capitalize">
-          {format(now, "EEEE d. MMMM yyyy", { locale: da })}
-        </span>
+      {/* Unified header with clock */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Salgsoversigt alle</h1>
+          <p className="text-sm text-muted-foreground capitalize">
+            {format(today, "EEEE d. MMMM yyyy", { locale: da })}
+          </p>
+        </div>
+        <div className="text-right">
+          <span className="text-4xl font-semibold tabular-nums tracking-tight">
+            {format(now, "HH:mm:ss")}
+          </span>
+        </div>
       </div>
 
-      <DashboardHeader
-        title="Salgsoversigt alle"
-        subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
-      />
-
+      {/* Client grid */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Target className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-base">Salg per klient i dag</h3>
+          <Badge variant="secondary" className="ml-auto">{displaySalesTotal} total</Badge>
         </div>
         {Object.keys(displaySalesByClientToday).length === 0 ? (
           <p className="text-muted-foreground text-center py-4">Ingen salg registreret i dag</p>
@@ -452,10 +453,6 @@ export default function SalesOverviewAll() {
               ))}
           </div>
         )}
-      </div>
-
-      <div className="text-center text-muted-foreground text-sm">
-        <p>Salgsoversigt alle • {format(today, "HH:mm", { locale: da })}</p>
       </div>
     </div>
   );
