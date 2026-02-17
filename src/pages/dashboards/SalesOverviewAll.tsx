@@ -9,6 +9,7 @@ import { Target } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -409,7 +410,8 @@ export default function SalesOverviewAll() {
             {format(today, "EEEE d. MMMM yyyy", { locale: da })}
           </p>
         </div>
-        <div className="text-right">
+        <div className="flex items-center gap-3">
+          <TvBoardQuickGenerator dashboardSlug="sales-overview-all" />
           <span className="text-4xl font-semibold tabular-nums tracking-tight">
             {format(now, "HH:mm:ss")}
           </span>
