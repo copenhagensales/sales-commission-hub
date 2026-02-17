@@ -31,7 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Loader2, AlertCircle, ChevronDown, ChevronRight, X, Copy, CalendarIcon } from "lucide-react";
+import { Loader2, AlertCircle, ChevronDown, ChevronRight, ShoppingCart, Copy, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -364,12 +364,12 @@ export function DuplicatesTab() {
                               <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
                               <TableCell className="text-right">
                                 <Button
-                                  variant="destructive"
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => setSelectedSaleId(sale.id)}
                                 >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Annuller
+                                  <ShoppingCart className="h-4 w-4 mr-1" />
+                                  Rediger kurv
                                 </Button>
                               </TableCell>
                             </TableRow>
