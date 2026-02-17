@@ -77,12 +77,12 @@ function TvLeaderboardTable({
 }) {
   return (
     <Card className={tvMode 
-      ? 'flex flex-col overflow-hidden border-border/60 shadow-lg' 
+      ? 'flex flex-col overflow-hidden border border-border/80 shadow-xl bg-card/95' 
       : ''
     }>
       <CardHeader className={tvMode ? 'pb-2 pt-4 px-4' : 'pb-3'}>
         <CardTitle className={tvMode 
-          ? 'text-[22px] font-bold tracking-wide text-center uppercase' 
+          ? 'text-[24px] font-bold tracking-wide text-center uppercase text-foreground' 
           : 'text-lg font-bold'
         }>{title}</CardTitle>
       </CardHeader>
@@ -98,11 +98,11 @@ function TvLeaderboardTable({
         ) : (
           <Table>
             <TableHeader>
-              <TableRow className={tvMode ? 'border-b-2 border-border/50' : ''}>
-                <TableHead className={tvMode ? 'w-[40px] text-center text-[16px] font-semibold py-2' : 'w-10'}></TableHead>
-                <TableHead className={tvMode ? 'text-[16px] font-semibold py-2' : ''}>Navn</TableHead>
-                <TableHead className={tvMode ? 'text-right text-[16px] font-semibold py-2 w-[90px]' : 'text-right'}>Salg</TableHead>
-                <TableHead className={tvMode ? 'text-right text-[16px] font-semibold py-2 w-[130px]' : 'text-right'}>Provision</TableHead>
+              <TableRow className={tvMode ? 'border-b-2 border-border/70' : ''}>
+                <TableHead className={tvMode ? 'w-[44px] text-center text-[18px] font-bold py-3 text-foreground/80' : 'w-10'}></TableHead>
+                <TableHead className={tvMode ? 'text-[18px] font-bold py-3 text-foreground/80' : ''}>Navn</TableHead>
+                <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>Salg</TableHead>
+                <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[140px] text-foreground/80' : 'text-right'}>Provision</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -110,35 +110,35 @@ function TvLeaderboardTable({
                 <TableRow 
                   key={seller.employeeId} 
                   className={tvMode 
-                    ? `border-b border-border/20 ${index % 2 === 1 ? 'bg-muted/30' : ''}` 
+                    ? `border-b border-border/25 ${index % 2 === 1 ? 'bg-muted/40' : ''}` 
                     : 'border-b border-border/30'
                   }
                 >
                   <TableCell className={tvMode 
-                    ? 'text-center text-muted-foreground font-bold text-[18px] py-[10px] tabular-nums' 
+                    ? 'text-center text-muted-foreground font-bold text-[20px] py-[12px] tabular-nums' 
                     : 'py-2 text-center text-muted-foreground font-medium'
                   }>{index + 1}</TableCell>
-                  <TableCell className={tvMode ? 'py-[10px]' : 'py-2'}>
+                  <TableCell className={tvMode ? 'py-[12px]' : 'py-2'}>
                     <div className="flex items-center gap-2">
-                      <Avatar className={tvMode ? 'h-7 w-7' : 'h-8 w-8'}>
+                      <Avatar className={tvMode ? 'h-8 w-8' : 'h-8 w-8'}>
                         <AvatarImage src={seller.avatarUrl || undefined} alt={seller.employeeName} />
                         <AvatarFallback className={tvMode 
-                          ? 'text-[11px] bg-primary/20 font-semibold' 
+                          ? 'text-[12px] bg-primary/20 font-semibold' 
                           : 'text-xs bg-primary/20'
                         }>{getInitials(seller.employeeName)}</AvatarFallback>
                       </Avatar>
                       <span className={tvMode 
-                        ? 'font-semibold text-[18px] text-foreground' 
+                        ? 'font-semibold text-[20px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]' 
                         : 'font-medium text-sm'
                       }>{seller.displayName}</span>
                     </div>
                   </TableCell>
                   <TableCell className={tvMode 
-                    ? 'text-right py-[10px] text-primary font-bold text-[20px] tabular-nums' 
+                    ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums' 
                     : 'text-right py-2 text-primary font-semibold'
                   }>{seller.salesCount}</TableCell>
                   <TableCell className={tvMode 
-                    ? 'text-right py-[10px] font-semibold text-[18px] text-foreground/90 tabular-nums' 
+                    ? 'text-right py-[12px] font-semibold text-[20px] text-foreground tabular-nums' 
                     : 'text-right py-2'
                   }>
                     {tvMode ? (
@@ -245,7 +245,7 @@ export default function EesyTmDashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-[1920px] h-[1080px] bg-background p-6 flex flex-col overflow-hidden' 
+      ? 'w-[1920px] h-[1080px] bg-background/95 p-6 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       <DashboardHeader 
@@ -264,26 +264,26 @@ export default function EesyTmDashboard() {
         <div className={tvMode ? 'grid grid-cols-5 gap-4' : 'grid grid-cols-2 gap-4 md:grid-cols-5'}>
           {kpiCards.map((kpi) => (
             <Card key={kpi.label} className={tvMode 
-              ? 'border-border/60 shadow-lg' 
+              ? 'border border-border/80 shadow-xl bg-card/95' 
               : ''
             }>
               <CardHeader className={tvMode 
-                ? 'flex flex-row items-center justify-between space-y-0 pb-1 pt-4 px-5' 
+                ? 'flex flex-row items-center justify-between space-y-0 pb-0 pt-4 px-5' 
                 : 'flex flex-row items-center justify-between space-y-0 pb-2'
               }>
                 <CardTitle className={tvMode 
-                  ? 'text-[20px] font-semibold text-muted-foreground' 
+                  ? 'text-[22px] font-semibold text-muted-foreground' 
                   : 'text-sm font-medium'
                 }>{kpi.label}</CardTitle>
                 {!tvMode && <kpi.icon className="h-4 w-4 text-muted-foreground" />}
               </CardHeader>
               <CardContent className={tvMode ? 'px-5 pb-4' : ''}>
                 <div className={tvMode 
-                  ? 'text-[56px] leading-tight font-bold text-primary tabular-nums' 
+                  ? 'text-[72px] leading-none font-extrabold text-primary tabular-nums' 
                   : 'text-3xl font-bold text-primary'
                 }>{kpi.value}</div>
                 <p className={tvMode 
-                  ? 'text-[15px] text-muted-foreground mt-1' 
+                  ? 'text-[16px] text-muted-foreground mt-2' 
                   : 'text-xs text-muted-foreground mt-1'
                 }>{kpi.sub}</p>
               </CardContent>
