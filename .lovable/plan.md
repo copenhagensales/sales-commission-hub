@@ -1,24 +1,34 @@
 
-## Vis Sales ID som CVR for Relatel i annulleringsvisningen
+# Fix: Integration-engine salgssynkronisering (20-70 min forsinkelse)
 
-### Hvad aendres
-Kun for Relatel-kunden: I "Virksomhed"-kolonnen vises `Sales ID` fra leadResultFields, hvis `customer_company` er tom. Hvis hverken `customer_company` eller `Sales ID` findes, vises "-" som nu.
+## Problem
+Integration-engine koerer hvert 5. minut som planlagt, men salg lander forsinket i databasen (20-70 min). Eesy rammer `maxRecords=50` loftet ved HVER koersel og processerer de samme 50 nyeste salg igen og igen uden at indhente backlog.
 
-Telefonnumre er desvaerre ikke tilgaengelige i databasen for Relatel-salg, sa der kan ikke vises noget nyt i telefon-kolonnen endnu.
+## Rod-aarsag
+Tre samvirkende faktorer:
 
-### Tekniske detaljer
+1. **maxRecords = 50 er for lavt** - Eesy har konsekvent 46-50 salg per koersel, hvilket betyder backlog aldrig indhentes
+2. **3-dages vindue + 50-records cap** - API'et henter 3 dages data (hundredvis af salg), men kun 50 processeres. Nye salg fra i dag skal "kaempe" om plads i top-50
+3. **Upsert-cyklus spild** - De samme 50 nyeste salg upsert'es igen og igen, da de allerede eksisterer. CPU-tid bruges paa at re-processere uaendrede data
 
-**Fil: `src/components/cancellations/ManualCancellationsTab.tsx`**
+## Loesning
+Oeg `maxRecords` fra 50 til 200 og reducer synkroniseringsvinduet fra 3 dage til 1 dag for planlagte koersler. Dette giver 4x flere salg per koersel og reducerer datamaengden fra API'et.
 
-1. Importer Relatel client ID fra `src/utils/clientIds.ts` (ID: `0ff8476d-16d8-4150-aee9-48ac90ec962d`)
+## Tekniske aendringer
 
-2. Udvid SELECT-queryen til ogsaa at hente `raw_payload` (kun naar Relatel er valgt, for at undgaa unodvendig data for andre kunder)
+### Fil 1: `supabase/functions/integration-engine/index.ts`
+- AEndr `effectiveMaxRecords` default fra 50 til 200
+- Tilfoej intelligent vindue: brug `days = 1` for planlagte synk (cron), behold `days = 3` for manuelle koersler
 
-3. Tilfoej en hjaelpefunktion der udtraekker virksomhedsnavnet:
-   - Foerst: brug `customer_company` hvis den har vaerdi
-   - Ellers: tjek om den valgte klient er Relatel, og hent `raw_payload.leadResultFields['Sales ID']`
-   - Ellers: vis "-"
+### Fil 2: `supabase/functions/update-cron-schedule/index.ts`  
+- AEndr cron payload til `days: 1` i stedet for `days: 2`, saa planlagte koersler kun henter 1 dags data
+- Dette reducerer API-load og sikrer at de 200 records daekker alle dagens salg
 
-4. Opdater Virksomhed-cellen til at bruge denne hjaelpefunktion i stedet for direkte `sale.customer_company || "-"`
+### Valgfri fremtidig optimering
+- Tilfoej et "last_synced_sale_datetime" felt paa integrationen saa der kun hentes salg EFTER sidste synkroniserede tidspunkt (inkrementel synk)
+- Dette ville eliminere re-processing af allerede synkroniserede salg helt
 
-Ingen nye dependencies eller database-aendringer er noedvendige.
+## Forventet effekt
+- Eesy: Fra 50 salg/koersel (med backlog) til op til 200 salg/koersel
+- Nye salg vises indenfor 5-10 minutter i stedet for 20-70 minutter
+- Reduceret API-belastning da kun 1 dags data hentes ved planlagte koersler
