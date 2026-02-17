@@ -439,33 +439,22 @@ export class AdversusAdapter implements DialerAdapter {
     let fetchSuccess = 0;
     let fetchFailed = 0;
 
-    // 2. Fetch all leads individually in batches of 2 with RateLimiter
-    const batchSize = 2;
-    const delayMs = 1200;
-    const rateLimiter = new RateLimiter(50, 900); // 50 req/min to leave headroom
+    // 2. Fetch leads sequentially (one at a time) to avoid 429s when multiple integrations share the same API account
+    const delayMs = 2000; // 2 sec between each request = max 30 req/min
+    const rateLimiter = new RateLimiter(25, 900); // 25 req/min - very conservative since multiple syncs share the account
 
-    for (let i = 0; i < uniqueLeadIds.length; i += batchSize) {
-      const batch = uniqueLeadIds.slice(i, i + batchSize);
+    for (let i = 0; i < uniqueLeadIds.length; i++) {
+      const leadId = uniqueLeadIds[i];
 
-      const results = await Promise.all(
-        batch.map(async leadId => {
-          await rateLimiter.waitForSlot();
-          return this.fetchLeadById(leadId).catch(e => {
-            console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
-            return null;
-          });
-        })
-      );
+      await rateLimiter.waitForSlot();
+      const leadData = await this.fetchLeadById(leadId).catch(e => {
+        console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+        return null;
+      });
 
-      for (let j = 0; j < batch.length; j++) {
-        const leadId = batch[j];
-        const leadData = results[j];
-
-        if (!leadData) {
-          fetchFailed++;
-          continue;
-        }
-
+      if (!leadData) {
+        fetchFailed++;
+      } else {
         const resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = leadData.resultData || [];
         const resultFields: Record<string, any> = {};
         let opp: string | null = null;
@@ -492,8 +481,8 @@ export class AdversusAdapter implements DialerAdapter {
         fetchSuccess++;
       }
 
-      // Delay between batches to respect rate limits
-      if (i + batchSize < uniqueLeadIds.length) {
+      // Delay between each request
+      if (i < uniqueLeadIds.length - 1) {
         await new Promise(r => setTimeout(r, delayMs));
       }
     }
@@ -525,8 +514,8 @@ export class AdversusAdapter implements DialerAdapter {
           const retryAfter = res.headers.get("Retry-After");
           const retryAfterSec = retryAfter ? parseInt(retryAfter, 10) : NaN;
           const waitMs = !isNaN(retryAfterSec)
-            ? retryAfterSec * 1000 + Math.floor(Math.random() * 500)
-            : Math.min(2000 * Math.pow(2, attempt - 1), 16000) + Math.floor(Math.random() * 500);
+            ? retryAfterSec * 1000 + Math.floor(Math.random() * 1000)
+            : Math.min(5000 * Math.pow(2, attempt - 1), 30000) + Math.floor(Math.random() * 1000);
           await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
