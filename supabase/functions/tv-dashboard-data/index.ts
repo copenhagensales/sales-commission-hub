@@ -413,8 +413,14 @@ Deno.serve(async (req) => {
     // Process fieldmarketing sales and add to salesByClient
     // NOTE: FM sales don't have sale_items relation, so each FM sale counts as 1
     for (const fmSale of fmSales) {
-      const clientId = fmSale.client_id;
-      let clientName = clientId ? clientMap[clientId] || "Ukendt FM" : "Ukendt FM";
+      // Resolve client via client_campaign_id -> campaignToClientMap -> clientMap
+      let clientName = "Ukendt FM";
+      if (fmSale.client_campaign_id) {
+        const resolvedClientId = campaignToClientMap[fmSale.client_campaign_id];
+        if (resolvedClientId) {
+          clientName = clientMap[resolvedClientId] || "Ukendt FM";
+        }
+      }
 
       // FM salg tælles som 1 (ingen sale_items relation)
       if (!salesByClient[clientName]) {
@@ -424,8 +430,8 @@ Deno.serve(async (req) => {
       totalCountedSales += 1;
 
       // Track FM seller for sellersOnBoard count
-      if (fmSale.seller_id) {
-        sellersWithSales.add(fmSale.seller_id);
+      if (fmSale.agent_name) {
+        sellersWithSales.add(fmSale.agent_name.toLowerCase());
       }
     }
 
