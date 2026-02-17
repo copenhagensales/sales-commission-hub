@@ -1,39 +1,27 @@
 
 
-## Forenkl Rediger Kurv - Fjern individuel annullering/afvisning, tilfoej antal-redigering
+## Tilfoej "Gem" knap til Rediger kurv
 
 ### Oversigt
-Fjerner "Annuller 1" og "Afvis 1" knapperne fra produkttabellen i EditCartDialog. I stedet faar hver raekke et redigerbart antal-felt, saa man kan aendre quantity direkte. Slet-knappen (skraldespand) og "Tilfoej produkt" beholdes. Footer-knapperne "Annuller hele salget" og "Afvis hele salget" beholdes ogsaa.
-
----
+Tilfoej en groen "Gem"-knap i dialogen, som kun vises naar der er foretaget aendringer i kurven (antal aendret, produkt tilfojet eller fjernet).
 
 ### AEndringer i EditCartDialog.tsx
 
-**Fjernes:**
-- `cancelOneUnitMutation` og `rejectOneUnitMutation` (individuel annullering/afvisning)
-- `undoOneUnitMutation` (fortryd-knappen)
-- `confirmAction` state og al logik omkring det
-- "Annuller 1", "Afvis 1" og "Fortryd 1" knapperne i tabellen
-- "Status" kolonnen (ikke relevant naar man kun redigerer antal)
-- Import af `Minus`, `ThumbsDown`
+**Dirty-state tracking:**
+- Tilfoej en `isDirty` state der saettes til `true` naar:
+  - Et produkts antal aendres via `updateQuantityMutation.onSuccess`
+  - Et produkt tilfojes (via `AddProductSection` callback `onAdded`)
+  - Et produkt fjernes via `deleteItemMutation.onSuccess`
 
-**Tilfoejes:**
-- `updateQuantityMutation`: Opdaterer `quantity`, `mapped_commission` og `mapped_revenue` paa en `sale_item`. Commission og revenue genberegnes proportionelt (per-unit-vaerdi x nyt antal).
-- Antal-kolonnen bliver et redigerbart input-felt (number input, min 1) i stedet for blot at vise tallet.
+**Gem-knap:**
+- Groen knap med teksten "Gem" i footer-omraadet
+- Vises kun naar `isDirty === true`
+- Klik paa knappen lukker dialogen (aendringerne er allerede gemt i databasen via mutations)
+- Styling: `bg-green-600 hover:bg-green-700 text-white`
 
-**Tabel-layout efter aendring:**
-| Produkt | Antal (input) | Prov./stk | Handling (slet-knap) |
+**Placering i footer:**
+- "Gem"-knappen placeres som den foerste/primaere knap i footeren (til hoejre)
+- Raekkefoelje: Luk | Annuller hele salget | Afvis hele salget | **Gem**
 
-### Teknisk detalje: Genberegning af commission/revenue
-Naar antal aendres, beregnes nye vaerdier:
-- `perUnit = mapped_commission / old_quantity`
-- `new mapped_commission = perUnit * new_quantity`
-- Samme for `mapped_revenue`
-
-Dette foelger den eksisterende konvention om at vaerdierne er prae-multipliceret.
-
----
-
-### Filer der aendres
-1. **`src/components/cancellations/EditCartDialog.tsx`** - Fjern individuelle cancel/reject mutations og knapper, tilfoej inline antal-redigering med update mutation
-
+### Fil der aendres
+1. `src/components/cancellations/EditCartDialog.tsx`
