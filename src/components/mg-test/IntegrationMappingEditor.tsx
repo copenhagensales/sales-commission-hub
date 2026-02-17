@@ -9,6 +9,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -20,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, RefreshCw, Save, ArrowRight, Ban } from "lucide-react";
+import { Loader2, RefreshCw, Save, ArrowRight, Ban, Plus } from "lucide-react";
+import { FieldDefinitionDialog } from "./FieldDefinitionDialog";
 import { toast } from "sonner";
 import type { FieldDefinition } from "./FieldDefinitionsManager";
 
@@ -53,6 +55,7 @@ export function IntegrationMappingEditor() {
   const [localMappings, setLocalMappings] = useState<Map<string, FieldMapping>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
   const [fetchingSamples, setFetchingSamples] = useState(false);
+  const [createFieldOpen, setCreateFieldOpen] = useState(false);
   const [sampleFields, setSampleFields] = useState<SampleField[]>([]);
 
   // Fetch integrations
@@ -242,6 +245,7 @@ export function IntegrationMappingEditor() {
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="text-xl font-semibold">API Feltmapping</CardTitle>
@@ -378,9 +382,21 @@ export function IntegrationMappingEditor() {
                                     )}
                                   </div>
                                 </SelectItem>
-                              ))}
+                          ))}
                             </div>
                           ))}
+                          <SelectSeparator />
+                          <div
+                            className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-primary hover:bg-accent"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCreateFieldOpen(true);
+                            }}
+                          >
+                            <Plus className="absolute left-2 h-3.5 w-3.5" />
+                            Opret nyt felt
+                          </div>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -410,5 +426,12 @@ export function IntegrationMappingEditor() {
         )}
       </CardContent>
     </Card>
+
+    <FieldDefinitionDialog
+      open={createFieldOpen}
+      onOpenChange={setCreateFieldOpen}
+      field={null}
+    />
+    </>
   );
 }
