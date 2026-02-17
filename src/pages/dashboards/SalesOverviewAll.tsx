@@ -14,7 +14,9 @@ import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenera
 // Check if we're in TV mode
 const isTvMode = () => {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/tv/') || sessionStorage.getItem('tv_board_code') !== null;
+  return window.location.pathname.startsWith('/tv/') ||
+         window.location.pathname.startsWith('/t/') ||
+         sessionStorage.getItem('tv_board_code') !== null;
 };
 
 interface TvDashboardData {

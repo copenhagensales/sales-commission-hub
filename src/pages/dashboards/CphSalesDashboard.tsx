@@ -93,7 +93,9 @@ interface TvDashboardData {
 // Check if we're in TV mode (accessed via /tv route with sessionStorage code)
 const isTvMode = () => {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/tv/') || sessionStorage.getItem('tv_board_code') !== null;
+  return window.location.pathname.startsWith('/tv/') ||
+         window.location.pathname.startsWith('/t/') ||
+         sessionStorage.getItem('tv_board_code') !== null;
 };
 
 export default function CphSalesDashboard() {

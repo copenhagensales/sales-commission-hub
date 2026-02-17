@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfDay, endOfDay, startOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
-import { fetchAllRows, fetchByIds } from "@/utils/supabasePagination";
+import { format, startOfDay, endOfDay, eachDayOfInterval, getDay } from "date-fns";
+import { fetchAllRows } from "@/utils/supabasePagination";
+import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 
 export interface DashboardEmployeeStats {
@@ -88,8 +89,7 @@ export function useDashboardSalesData({
       if (resolvedClientId) {
         // Find employees who have sales for this client via agent mapping
         const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${resolvedClientId}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-        const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
-        const salesForClient = await salesRes.json();
+        const salesForClient = await fetchAllPostgrestRows<any>(salesUrl, headers);
 
         const agentEmails = [
           ...new Set(
@@ -190,8 +190,9 @@ export function useDashboardSalesData({
       const teamsUsingTimestamps = primaryShifts?.filter((s) => s.hours_source === "timestamp").map((s) => s.team_id) || [];
       let timeStampsData: any[] = [];
       if (teamsUsingTimestamps.length > 0) {
+        const timestampTeamIds = new Set(teamsUsingTimestamps);
         const employeesWithTimestampTeams = teamMembers
-          ?.filter((tm) => teamsUsingTimestamps.includes(tm.team_id))
+          ?.filter((tm) => timestampTeamIds.has(tm.team_id))
           .map((tm) => tm.employee_id) || [];
 
         if (employeesWithTimestampTeams.length > 0) {
@@ -213,12 +214,6 @@ export function useDashboardSalesData({
         if (agent?.external_dialer_id) allAgentIdentifiers.push(agent.external_dialer_id);
       });
       const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
-
-      // Fetch product pricing rules for commission/revenue (replaces product_campaign_overrides)
-      const { data: productPricingRules } = await supabase
-        .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, conditions, commission_dkk, revenue_dkk, priority, is_active")
-        .eq("is_active", true);
       
       // Build a map: product_id -> array of rules (sorted by priority desc for later selection)
       const pricingRulesMap = new Map<string, Array<{ 
@@ -229,6 +224,75 @@ export function useDashboardSalesData({
         priority: number;
       }>>();
       
+      // Step 4: Fetch sales matched by agent_email - include dialer_campaign_id and product_id for override lookup
+      const salesPromise = async () => {
+        if (uniqueAgentIdentifiers.length === 0) return [] as any[];
+
+        const emailIdentifiers = uniqueAgentIdentifiers.filter((id) => id.includes("@")).map((e) => e.toLowerCase());
+        if (emailIdentifiers.length === 0) return [] as any[];
+
+        const joinType = resolvedClientId ? "!inner" : "";
+        const selectParts = [
+          "id",
+          "agent_email",
+          "sale_datetime",
+          "client_campaign_id",
+          "dialer_campaign_id",
+          `client_campaigns${joinType}(client_id)`,
+          "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))",
+        ];
+        const selectClause = selectParts.join(",");
+        const emailOrFilter = emailIdentifiers.map((e) => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
+
+        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
+        salesUrl += `&or=(${emailOrFilter})`;
+        salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+
+        if (resolvedClientId) {
+          salesUrl += `&client_campaigns.client_id=eq.${resolvedClientId}`;
+        }
+
+        return await fetchAllPostgrestRows<any>(salesUrl, headers);
+      };
+
+      // Step 5: Fetch fieldmarketing sales from unified sales table
+      const fmSalesPromise = fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null}>(
+        "sales",
+        "id, sale_datetime, raw_payload, client_campaign_id",
+        (q) => {
+          let filtered = q
+            .eq("source", "fieldmarketing")
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`);
+          if (resolvedClientId) {
+            filtered = filtered.contains("raw_payload", { fm_client_id: resolvedClientId } as any);
+          }
+          return filtered;
+        },
+        { orderBy: "sale_datetime", ascending: false }
+      );
+
+      const [salesData, fmSalesData] = await Promise.all([salesPromise(), fmSalesPromise]);
+
+      const shouldFetchPricingRules = salesData.length > 0 || fmSalesData.length > 0;
+      const hasDialerCampaignIds = salesData.some((sale: any) => Boolean(sale.dialer_campaign_id));
+
+      // Fetch product pricing rules for commission/revenue (replaces product_campaign_overrides)
+      const [{ data: productPricingRules }, campaignMappings, allProducts] = await Promise.all([
+        shouldFetchPricingRules
+          ? supabase
+              .from("product_pricing_rules")
+              .select("product_id, campaign_mapping_ids, conditions, commission_dkk, revenue_dkk, priority, is_active")
+              .eq("is_active", true)
+          : Promise.resolve({ data: [] as any[] }),
+        hasDialerCampaignIds
+          ? fetchAllRows<{id: string; adversus_campaign_id: string}>("adversus_campaign_mappings", "id, adversus_campaign_id")
+          : Promise.resolve([] as {id: string; adversus_campaign_id: string}[]),
+        fmSalesData.length > 0
+          ? fetchAllRows<{id: string; name: string; commission_dkk: number; revenue_dkk: number}>("products", "id, name, commission_dkk, revenue_dkk")
+          : Promise.resolve([] as {id: string; name: string; commission_dkk: number; revenue_dkk: number}[]),
+      ]);
+
       productPricingRules?.forEach(rule => {
         if (!rule.product_id) return;
         const existing = pricingRulesMap.get(rule.product_id) || [];
@@ -265,67 +329,7 @@ export function useDashboardSalesData({
         return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) || null;
       };
 
-      // Step 4: Fetch sales matched by agent_email - include dialer_campaign_id and product_id for override lookup
-      let salesData: any[] = [];
-      if (uniqueAgentIdentifiers.length > 0) {
-        const emailIdentifiers = uniqueAgentIdentifiers.filter((id) => id.includes("@")).map((e) => e.toLowerCase());
-
-        if (emailIdentifiers.length > 0) {
-          const joinType = resolvedClientId ? "!inner" : "";
-          const selectParts = [
-            "id",
-            "agent_email",
-            "sale_datetime",
-            "client_campaign_id",
-            "dialer_campaign_id",
-            `client_campaigns${joinType}(client_id)`,
-            "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))",
-          ];
-          const selectClause = selectParts.join(",");
-          const emailOrFilter = emailIdentifiers.map((e) => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
-
-          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
-          salesUrl += `&or=(${emailOrFilter})`;
-          salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-
-          if (resolvedClientId) {
-            salesUrl += `&client_campaigns.client_id=eq.${resolvedClientId}`;
-          }
-
-          const salesRes = await fetch(salesUrl, {
-            headers: { ...headers, Accept: "application/json", Range: "0-9999" },
-          });
-
-          if (salesRes.ok) {
-            salesData = await salesRes.json();
-          }
-        }
-      }
-
-      // Step 5: Fetch fieldmarketing sales from unified sales table
-      
-      const fmSalesData = await fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null}>(
-        "sales",
-        "id, sale_datetime, raw_payload, client_campaign_id",
-        (q) => {
-          let filtered = q
-            .eq("source", "fieldmarketing")
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`);
-          if (resolvedClientId) {
-            filtered = filtered.contains("raw_payload", { fm_client_id: resolvedClientId } as any);
-          }
-          return filtered;
-        },
-        { orderBy: "sale_datetime", ascending: false }
-      );
-
       // Fetch campaign mappings for dialer_campaign_id resolution
-      const campaignMappings = await fetchAllRows<{id: string; adversus_campaign_id: string}>(
-        "adversus_campaign_mappings",
-        "id, adversus_campaign_id"
-      );
-      
       const dialerCampaignToMappingId = new Map<string, string>();
       campaignMappings?.forEach(m => {
         if (m.adversus_campaign_id) {
@@ -334,10 +338,6 @@ export function useDashboardSalesData({
       });
 
       // Step 6: Get product commission/revenue maps for FM
-      const allProducts = await fetchAllRows<{id: string; name: string; commission_dkk: number; revenue_dkk: number}>(
-        "products",
-        "id, name, commission_dkk, revenue_dkk"
-      );
 
       const productCommissionMap = new Map<string, number>();
       const productRevenueMap = new Map<string, number>();
@@ -365,8 +365,134 @@ export function useDashboardSalesData({
         }
       });
 
-      // Step 7: Aggregate per employee
+      // Step 7: Build lookup maps used during aggregation (reduces repeated scans)
       const daysInRange = eachDayOfInterval({ start: startOfDay(startDate), end: endOfDay(endDate) });
+      const dayCountByWeekday = new Map<number, number>();
+      daysInRange.forEach((day) => {
+        const dayOfWeek = getDay(day);
+        const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+        dayCountByWeekday.set(adjustedDayOfWeek, (dayCountByWeekday.get(adjustedDayOfWeek) || 0) + 1);
+      });
+
+      const teamMemberByEmployeeId = new Map<string, string>();
+      (teamMembers || []).forEach((tm) => {
+        teamMemberByEmployeeId.set(tm.employee_id, tm.team_id);
+      });
+
+      const primaryShiftByTeamId = new Map<string, any>();
+      (primaryShifts || []).forEach((shift) => {
+        primaryShiftByTeamId.set(shift.team_id, shift);
+      });
+
+      const shiftByIdAndDay = new Map<string, Map<number, any>>();
+      (shiftDays || []).forEach((shiftDay) => {
+        const existing = shiftByIdAndDay.get(shiftDay.shift_id) || new Map<number, any>();
+        existing.set(shiftDay.day_of_week, shiftDay);
+        shiftByIdAndDay.set(shiftDay.shift_id, existing);
+      });
+
+      const shiftHoursByShiftIdAndDay = new Map<string, Map<number, number>>();
+      shiftByIdAndDay.forEach((days, shiftId) => {
+        const hoursByDay = new Map<number, number>();
+        days.forEach((shiftDay, dayOfWeek) => {
+          if (!shiftDay?.start_time || !shiftDay?.end_time) {
+            hoursByDay.set(dayOfWeek, 0);
+            return;
+          }
+
+          const [startH, startM] = shiftDay.start_time.split(":").map(Number);
+          const [endH, endM] = shiftDay.end_time.split(":").map(Number);
+          const rawHours = endH + endM / 60 - (startH + startM / 60);
+          const breakMinutes = (rawHours * 60) > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0;
+          hoursByDay.set(dayOfWeek, rawHours - breakMinutes / 60);
+        });
+        shiftHoursByShiftIdAndDay.set(shiftId, hoursByDay);
+      });
+
+      const employeeIdsByAgentEmail = new Map<string, string[]>();
+      (agentMappings || []).forEach((mapping) => {
+        const employeeId = mapping.employee_id as string;
+        const email = (mapping.agents as any)?.email?.toLowerCase() as string | undefined;
+        if (!employeeId || !email) return;
+
+        const existing = employeeIdsByAgentEmail.get(email) || [];
+        existing.push(employeeId);
+        employeeIdsByAgentEmail.set(email, existing);
+      });
+
+      const timestampHoursByEmployeeId = new Map<string, number>();
+      (timeStampsData || []).forEach((timestamp) => {
+        if (!timestamp.clock_in || !timestamp.clock_out || !timestamp.employee_id) return;
+
+        const clockInDate = new Date(timestamp.clock_in);
+        const clockOutDate = new Date(timestamp.clock_out);
+        if (Number.isNaN(clockInDate.getTime()) || Number.isNaN(clockOutDate.getTime())) return;
+
+        const rawHours = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60);
+        const breakMins = timestamp.break_minutes || 0;
+        const computedHours = Math.max(0, rawHours - breakMins / 60);
+
+        const current = timestampHoursByEmployeeId.get(timestamp.employee_id) || 0;
+        timestampHoursByEmployeeId.set(timestamp.employee_id, current + computedHours);
+      });
+
+      const regularTotalsByEmployeeId = new Map<string, { sales: number; revenue: number; commission: number }>();
+      (salesData || []).forEach((sale: any) => {
+        const saleEmail = (sale.agent_email || "").toLowerCase();
+        const matchedEmployees = employeeIdsByAgentEmail.get(saleEmail);
+        if (!matchedEmployees || matchedEmployees.length === 0) return;
+
+        let saleCount = 0;
+        let saleRevenue = 0;
+        let saleCommission = 0;
+
+        const dialerCampaignId = sale.dialer_campaign_id;
+        const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
+
+        (sale.sale_items || []).forEach((item: any) => {
+          const countsAsSale = item.products?.counts_as_sale !== false;
+          if (countsAsSale) {
+            saleCount += Number(item.quantity) || 1;
+          }
+
+          const matchingRule = item.product_id ? findMatchingRule(item.product_id, campaignMappingId || null) : null;
+          if (matchingRule) {
+            saleRevenue += matchingRule.revenue;
+            saleCommission += matchingRule.commission;
+          } else {
+            saleRevenue += Number(item.mapped_revenue) || 0;
+            saleCommission += Number(item.mapped_commission) || 0;
+          }
+        });
+
+        matchedEmployees.forEach((employeeId) => {
+          const current = regularTotalsByEmployeeId.get(employeeId) || { sales: 0, revenue: 0, commission: 0 };
+          regularTotalsByEmployeeId.set(employeeId, {
+            sales: current.sales + saleCount,
+            revenue: current.revenue + saleRevenue,
+            commission: current.commission + saleCommission,
+          });
+        });
+      });
+
+      const fmTotalsByEmployeeId = new Map<string, { sales: number; revenue: number; commission: number }>();
+      (fmSalesData || []).forEach((sale: any) => {
+        const employeeId = (sale.raw_payload as any)?.fm_seller_id;
+        if (!employeeId) return;
+
+        const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
+        const saleRevenue = productRevenueMap.get(productName) || 0;
+        const saleCommission = productCommissionMap.get(productName) || 0;
+
+        const current = fmTotalsByEmployeeId.get(employeeId) || { sales: 0, revenue: 0, commission: 0 };
+        fmTotalsByEmployeeId.set(employeeId, {
+          sales: current.sales + 1,
+          revenue: current.revenue + saleRevenue,
+          commission: current.commission + saleCommission,
+        });
+      });
+
+      // Step 8: Aggregate per employee
       const employeeStats: DashboardEmployeeStats[] = [];
 
       let grandTotalSales = 0;
@@ -378,104 +504,29 @@ export function useDashboardSalesData({
         const empId = emp.id;
         const teamName = emp.team_members?.[0]?.team?.name || null;
 
-        const empTeamMembership = teamMembers?.find((tm) => tm.employee_id === empId);
-        const empPrimaryShift = empTeamMembership
-          ? primaryShifts?.find((ps) => ps.team_id === empTeamMembership.team_id)
-          : null;
-        const empShiftDays = empPrimaryShift ? shiftDays?.filter((sd) => sd.shift_id === empPrimaryShift.id) || [] : [];
+        const empTeamId = teamMemberByEmployeeId.get(empId);
+        const empPrimaryShift = empTeamId ? primaryShiftByTeamId.get(empTeamId) : null;
         const hoursSource = empPrimaryShift?.hours_source || "shift";
 
-        const empAgentMappings = agentMappings?.filter((m) => m.employee_id === empId) || [];
-        const empAgentIdentifiers: string[] = [];
-        empAgentMappings.forEach((m) => {
-          const agent = m.agents as any;
-          if (agent?.email) empAgentIdentifiers.push(agent.email.toLowerCase());
-        });
-
         let totalHours = 0;
-        let totalSales = 0;
-        let totalRevenue = 0;
-        let totalCommission = 0;
-
-        for (const day of daysInRange) {
-          const dayStr = format(day, "yyyy-MM-dd");
-          const dayOfWeek = getDay(day);
-          const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-          const shiftForDay = empShiftDays.find((sd) => sd.day_of_week === adjustedDayOfWeek);
-
-          let hours = 0;
-          if (hoursSource === "timestamp") {
-            const empTimestamp = timeStampsData.find((ts) => ts.employee_id === empId && ts.clock_in && format(new Date(ts.clock_in), 'yyyy-MM-dd') === dayStr);
-            if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
-              const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
-              const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
-              const rawHours = outH + outM / 60 - (inH + inM / 60);
-              const breakMins = empTimestamp.break_minutes || 0;
-              hours = Math.max(0, rawHours - breakMins / 60);
-            }
-          } else {
-            if (shiftForDay?.start_time && shiftForDay?.end_time) {
-              const [startH, startM] = shiftForDay.start_time.split(":").map(Number);
-              const [endH, endM] = shiftForDay.end_time.split(":").map(Number);
-              const rawHours = endH + endM / 60 - (startH + startM / 60);
-              const breakMinutes = (rawHours * 60) > BREAK_THRESHOLD_MINUTES ? BREAK_DURATION_MINUTES : 0;
-              hours = rawHours - breakMinutes / 60;
-            }
-          }
-
-          totalHours += hours;
-
-          const dayStart = `${dayStr}T00:00:00`;
-          const dayEnd = `${dayStr}T23:59:59`;
-
-          // Regular sales
-          const empSales = empAgentIdentifiers.length > 0
-            ? salesData.filter((s: any) => {
-                const saleEmail = (s.agent_email || "").toLowerCase();
-                return empAgentIdentifiers.includes(saleEmail) && s.sale_datetime >= dayStart && s.sale_datetime <= dayEnd;
-              })
-            : [];
-
-          // FM sales
-          const empFmSales = (fmSalesData || []).filter((s: any) => {
-            const sellerId = (s.raw_payload as any)?.fm_seller_id;
-            return sellerId === empId && s.sale_datetime >= dayStart && s.sale_datetime <= dayEnd;
-          });
-
-          empSales.forEach((sale: any) => {
-            // Get campaign mapping id for this sale's dialer campaign
-            const dialerCampaignId = sale.dialer_campaign_id;
-            const campaignMappingId = dialerCampaignId ? dialerCampaignToMappingId.get(dialerCampaignId) : null;
-            
-            (sale.sale_items || []).forEach((item: any) => {
-              const countsAsSale = item.products?.counts_as_sale !== false;
-              if (countsAsSale) {
-                totalSales += Number(item.quantity) || 1;
-              }
-              
-              // Check for pricing rule - use it if exists, otherwise fallback to mapped values
-              const matchingRule = item.product_id ? findMatchingRule(item.product_id, campaignMappingId || null) : null;
-              
-              if (matchingRule) {
-                // Use rule-specific commission/revenue
-                totalRevenue += matchingRule.revenue;
-                totalCommission += matchingRule.commission;
-              } else {
-                // Fallback to mapped values from sale_items
-                totalRevenue += Number(item.mapped_revenue) || 0;
-                totalCommission += Number(item.mapped_commission) || 0;
-              }
+        if (hoursSource === "timestamp") {
+          totalHours = timestampHoursByEmployeeId.get(empId) || 0;
+        } else if (empPrimaryShift) {
+          const shiftHoursByDay = shiftHoursByShiftIdAndDay.get(empPrimaryShift.id);
+          if (shiftHoursByDay) {
+            shiftHoursByDay.forEach((hoursForDay, dayOfWeek) => {
+              const occurrences = dayCountByWeekday.get(dayOfWeek) || 0;
+              totalHours += hoursForDay * occurrences;
             });
-          });
-
-          empFmSales.forEach((sale: any) => {
-            totalSales += 1;
-            const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
-            totalCommission += productCommissionMap.get(productName) || 0;
-            totalRevenue += productRevenueMap.get(productName) || 0;
-          });
+          }
         }
+
+        const regularTotals = regularTotalsByEmployeeId.get(empId) || { sales: 0, revenue: 0, commission: 0 };
+        const fmTotals = fmTotalsByEmployeeId.get(empId) || { sales: 0, revenue: 0, commission: 0 };
+
+        const totalSales = regularTotals.sales + fmTotals.sales;
+        const totalRevenue = regularTotals.revenue + fmTotals.revenue;
+        const totalCommission = regularTotals.commission + fmTotals.commission;
 
         if (totalSales > 0 || totalHours > 0) {
           employeeStats.push({
