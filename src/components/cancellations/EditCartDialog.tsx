@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Ban, ThumbsDown, Trash2 } from "lucide-react";
+import { Loader2, Ban, ThumbsDown, Trash2, Check } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +43,7 @@ interface EditCartDialogProps {
 export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
   const queryClient = useQueryClient();
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
 
   const { data: saleItems = [], isLoading } = useQuery({
     queryKey: ["sale-items-for-cancellation", saleId],
@@ -87,6 +88,7 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
     },
     onSuccess: () => {
       toast({ title: "Antal opdateret", description: "Produktets antal er ændret." });
+      setIsDirty(true);
       invalidateQueries();
     },
     onError: (error: Error) => {
@@ -101,6 +103,7 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
     },
     onSuccess: () => {
       toast({ title: "Produkt fjernet", description: "Produktet er fjernet fra kurven." });
+      setIsDirty(true);
       invalidateQueries();
       setDeleteItemId(null);
     },
@@ -187,7 +190,7 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {saleId && <AddProductSection saleId={saleId} onAdded={() => {}} />}
+            {saleId && <AddProductSection saleId={saleId} onAdded={() => setIsDirty(true)} />}
 
             {saleItems.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">Ingen produkter i kurven.</p>
@@ -343,6 +346,16 @@ export function EditCartDialog({ saleId, open, onClose }: EditCartDialogProps) {
                 </AlertDialogContent>
               </AlertDialog>
             </>
+          )}
+          {isDirty && (
+            <Button
+              onClick={onClose}
+              disabled={isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Check className="h-4 w-4 mr-1" />
+              Gem
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
