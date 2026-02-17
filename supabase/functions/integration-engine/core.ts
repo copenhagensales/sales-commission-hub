@@ -34,8 +34,8 @@ export class IngestionEngine {
     return coreProcessSales(this.supabase, sales, batchSize, this.log.bind(this));
   }
 
-  async processCalls(calls: StandardCall[], batchSize = 500) {
-    return coreProcessCalls(this.supabase, calls, batchSize, this.log.bind(this));
+  async processCalls(calls: StandardCall[], integrationId: string, batchSize = 500) {
+    return coreProcessCalls(this.supabase, calls, integrationId, batchSize, this.log.bind(this));
   }
 
   async processSessions(sessions: StandardSession[], integrationId: string, batchSize = 500) {

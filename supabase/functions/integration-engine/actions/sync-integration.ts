@@ -132,12 +132,12 @@ export async function syncIntegration(
         log("INFO", `Fetching calls by range ${from} -> ${to}`);
         calls = await (adapter as any).fetchCallsRange({ from, to });
         log("INFO", `Fetched ${calls.length} calls`);
-        runResults["calls"] = await engine.processCalls(calls);
+        runResults["calls"] = await engine.processCalls(calls, integration.id);
       } else if (adapter.fetchCalls) {
         log("INFO", `Fetching calls for ${integration.name}...`);
         calls = await adapter.fetchCalls(days);
         log("INFO", `Fetched ${calls.length} calls`);
-        runResults["calls"] = await engine.processCalls(calls);
+        runResults["calls"] = await engine.processCalls(calls, integration.id);
       } else {
         log("INFO", `Adapter for ${integration.name} does not support fetchCalls`);
         runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
