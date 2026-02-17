@@ -1,5 +1,6 @@
 import { DialerAdapter } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
+import { RateLimiter } from "../utils/rate-limiter.ts";
 
 interface AdversusCredentials {
   username?: string;
@@ -438,18 +439,22 @@ export class AdversusAdapter implements DialerAdapter {
     let fetchSuccess = 0;
     let fetchFailed = 0;
 
-    // 2. Fetch all leads individually in batches of 5
-    const batchSize = 5;
-    const delayMs = 200;
+    // 2. Fetch all leads individually in batches of 2 with RateLimiter
+    const batchSize = 2;
+    const delayMs = 1200;
+    const rateLimiter = new RateLimiter(50, 900); // 50 req/min to leave headroom
 
     for (let i = 0; i < uniqueLeadIds.length; i += batchSize) {
       const batch = uniqueLeadIds.slice(i, i + batchSize);
 
       const results = await Promise.all(
-        batch.map(leadId => this.fetchLeadById(leadId).catch(e => {
-          console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
-          return null;
-        }))
+        batch.map(async leadId => {
+          await rateLimiter.waitForSlot();
+          return this.fetchLeadById(leadId).catch(e => {
+            console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+            return null;
+          });
+        })
       );
 
       for (let j = 0; j < batch.length; j++) {
@@ -503,50 +508,48 @@ export class AdversusAdapter implements DialerAdapter {
    * NOTE: Adversus API returns { leads: [...] } even for single-lead queries
    */
   private async fetchLeadById(leadId: string): Promise<any | null> {
-    try {
-      const url = `${this.baseUrl}/v1/leads/${leadId}`;
-      
-      const res = await fetch(url, {
-        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
-      });
-      
-      if (res.status === 429) {
-        // OPTIMIZED: Reduced wait from 1000ms to 500ms
-        console.log(`[Adversus] Rate limited on lead ${leadId}, waiting...`);
-        await new Promise(r => setTimeout(r, 500));
-        
-        const retryRes = await fetch(url, {
+    const url = `${this.baseUrl}/v1/leads/${leadId}`;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const res = await fetch(url, {
           headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
         });
-        
-        if (!retryRes.ok) {
-          console.log(`[Adversus] Retry failed for lead ${leadId}: ${retryRes.status}`);
+
+        if (res.status === 429) {
+          if (attempt > maxRetries) {
+            console.log(`[Adversus] Lead ${leadId}: 429 after ${maxRetries} retries, giving up`);
+            return null;
+          }
+          const retryAfter = res.headers.get("Retry-After");
+          const retryAfterSec = retryAfter ? parseInt(retryAfter, 10) : NaN;
+          const waitMs = !isNaN(retryAfterSec)
+            ? retryAfterSec * 1000 + Math.floor(Math.random() * 500)
+            : Math.min(2000 * Math.pow(2, attempt - 1), 16000) + Math.floor(Math.random() * 500);
+          await new Promise(r => setTimeout(r, waitMs));
+          continue;
+        }
+
+        if (!res.ok) {
+          console.log(`[Adversus] Failed to fetch lead ${leadId}: ${res.status}`);
           return null;
         }
-        
-        const data = await retryRes.json();
-        // Handle wrapped response: { leads: [...] }
+
+        const data = await res.json();
         if (data?.leads && Array.isArray(data.leads)) {
           return data.leads[0] || null;
         }
         return data;
+      } catch (e) {
+        if (attempt > maxRetries) {
+          console.error(`[Adversus] Lead ${leadId}: error after ${maxRetries} retries:`, e);
+          return null;
+        }
+        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));
       }
-      
-      if (!res.ok) {
-        console.log(`[Adversus] Failed to fetch lead ${leadId}: ${res.status}`);
-        return null;
-      }
-      
-      const data = await res.json();
-      // Handle wrapped response: { leads: [...] }
-      if (data?.leads && Array.isArray(data.leads)) {
-        return data.leads[0] || null;
-      }
-      return data;
-    } catch (e) {
-      console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
-      return null;
     }
+    return null;
   }
 
   // Validar que el OPP tenga formato correcto
