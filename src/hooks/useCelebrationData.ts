@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { formatNumber } from "@/lib/calculations";
 import { useDashboardAggregates } from "./useDashboardAggregates";
 
@@ -47,6 +47,74 @@ export function useCelebrationData({
     topPerformer,
     isLoading,
   } = useDashboardAggregates(dashboardSlug, enabled);
+
+  // Prefer latest counted seller from today; fallback to top performer.
+  const { data: latestSellerData } = useQuery({
+    queryKey: ["celebration-latest-seller", dashboardSlug, todayStr],
+    queryFn: async () => {
+      const dashboardConfig = getDashboardConfig(dashboardSlug);
+      if (!dashboardConfig.clientId) {
+        return null as { employeeName: string; salesCount: number } | null;
+      }
+
+      const dayStart = format(startOfDay(today), "yyyy-MM-dd'T'00:00:00");
+      const dayEnd = format(endOfDay(today), "yyyy-MM-dd'T'23:59:59");
+
+      const { data: latestSale } = await supabase
+        .from("sales")
+        .select("agent_email, client_campaigns!inner(client_id)")
+        .eq("source", "telesales")
+        .gte("sale_datetime", dayStart)
+        .lte("sale_datetime", dayEnd)
+        .eq("client_campaigns.client_id", dashboardConfig.clientId)
+        .order("sale_datetime", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const latestEmail = latestSale?.agent_email?.toLowerCase();
+      if (!latestEmail) return null;
+
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("id, email")
+        .ilike("email", latestEmail)
+        .limit(1)
+        .maybeSingle();
+
+      if (!agent?.id) {
+        return {
+          employeeName: latestEmail.split("@")[0] || "Medarbejder",
+          salesCount: 0,
+        };
+      }
+
+      const { data: mapping } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id")
+        .eq("agent_id", agent.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!mapping?.employee_id) {
+        return {
+          employeeName: latestEmail.split("@")[0] || "Medarbejder",
+          salesCount: 0,
+        };
+      }
+
+      const { data: employee } = await supabase
+        .from("employee_master_data")
+        .select("first_name, last_name")
+        .eq("id", mapping.employee_id)
+        .maybeSingle();
+
+      const employeeName = `${employee?.first_name || ""} ${employee?.last_name || ""}`.trim() || latestEmail.split("@")[0] || "Medarbejder";
+      const salesCount = (todayData as any)?.employeeSales?.[latestEmail]?.sales ?? topPerformer?.data.sales ?? todayData.sales;
+
+      return { employeeName, salesCount };
+    },
+    enabled: enabled && !!dashboardSlug,
+  });
 
   // Fetch goal data if relevant
   const { data: goalData } = useQuery({
@@ -98,8 +166,8 @@ export function useCelebrationData({
   };
 
   const data: CelebrationTriggerData = {
-    employeeName: topPerformer?.name || null,
-    salesCount: topPerformer?.data.sales ?? todayData.sales,
+    employeeName: latestSellerData?.employeeName || topPerformer?.name || null,
+    salesCount: latestSellerData?.salesCount ?? topPerformer?.data.sales ?? todayData.sales,
     commission: todayData.commission,
     metricValue: getMetricValue(metric),
     salesToday: todayData.sales,

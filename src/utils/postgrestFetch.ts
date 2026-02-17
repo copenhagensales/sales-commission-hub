@@ -1,6 +1,5 @@
 interface FetchAllPostgrestRowsOptions {
   pageSize?: number;
-  maxPages?: number;
   retries?: number;
   retryDelayMs?: number;
 }
@@ -50,7 +49,7 @@ export async function fetchAllPostgrestRows<T = unknown>(
   headers: Record<string, string>,
   options: FetchAllPostgrestRowsOptions = {}
 ): Promise<T[]> {
-  const { pageSize = 1000, maxPages = 200, retries = 2, retryDelayMs = 250 } = options;
+  const { pageSize = 500, retries = 2, retryDelayMs = 250 } = options;
 
   const baseUrl = new URL(rawUrl);
   baseUrl.searchParams.delete("limit");
@@ -59,7 +58,7 @@ export async function fetchAllPostgrestRows<T = unknown>(
   const allRows: T[] = [];
   let knownTotalCount: number | null = null;
 
-  for (let page = 0; page < maxPages; page += 1) {
+  for (let page = 0; ; page += 1) {
     const pageUrl = new URL(baseUrl.toString());
     pageUrl.searchParams.set("limit", String(pageSize));
     pageUrl.searchParams.set("offset", String(page * pageSize));
