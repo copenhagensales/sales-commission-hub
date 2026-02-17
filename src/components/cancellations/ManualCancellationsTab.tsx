@@ -31,6 +31,9 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { EditCartDialog } from "./EditCartDialog";
+import { CLIENT_IDS } from "@/utils/clientIds";
+
+const RELATEL_CLIENT_ID = CLIENT_IDS["Relatel"];
 
 export function ManualCancellationsTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -69,15 +72,7 @@ export function ManualCancellationsTab() {
 
       let query = supabase
         .from("sales")
-        .select(`
-          id,
-          created_at,
-          sale_datetime,
-          customer_phone,
-          customer_company,
-          validation_status,
-          agent_name
-        `)
+        .select("id, created_at, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload")
         .in("client_campaign_id", campaignIds)
         .order("sale_datetime", { ascending: false })
         .limit(1000);
@@ -113,6 +108,16 @@ export function ManualCancellationsTab() {
     if (!selectedAgent) return sales;
     return sales.filter((s) => s.agent_name === selectedAgent);
   }, [sales, selectedAgent]);
+
+  const getCompanyDisplay = (sale: typeof filteredSales[number]) => {
+    if (sale.customer_company) return sale.customer_company;
+    if (selectedClientId === RELATEL_CLIENT_ID && sale.raw_payload) {
+      const payload = sale.raw_payload as any;
+      const salesId = payload?.leadResultFields?.['Sales ID'];
+      if (salesId) return salesId;
+    }
+    return "-";
+  };
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
@@ -247,7 +252,7 @@ export function ManualCancellationsTab() {
                   </TableCell>
                   <TableCell>{sale.agent_name || "-"}</TableCell>
                   <TableCell>{sale.customer_phone || "-"}</TableCell>
-                  <TableCell>{sale.customer_company || "-"}</TableCell>
+                  <TableCell>{getCompanyDisplay(sale)}</TableCell>
                   <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
                   <TableCell className="text-right">
                     <Button
