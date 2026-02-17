@@ -17,7 +17,7 @@ export default function Cancellations() {
 
         <Tabs defaultValue="manual" className="w-full">
           <TabsList className="grid w-full max-w-lg grid-cols-3">
-            <TabsTrigger value="manual">Annuller/afvis</TabsTrigger>
+            <TabsTrigger value="manual">Rediger kurv</TabsTrigger>
             <TabsTrigger value="upload">Upload/match</TabsTrigger>
             <TabsTrigger value="duplicates">Dubletter</TabsTrigger>
           </TabsList>

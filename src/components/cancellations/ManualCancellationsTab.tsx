@@ -26,11 +26,11 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, AlertCircle, X, CalendarIcon } from "lucide-react";
+import { Search, Loader2, AlertCircle, ShoppingCart, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { CancellationDialog } from "./CancellationDialog";
+import { EditCartDialog } from "./EditCartDialog";
 
 export function ManualCancellationsTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -251,12 +251,12 @@ export function ManualCancellationsTab() {
                   <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
                   <TableCell className="text-right">
                     <Button
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
                       onClick={() => setSelectedSaleId(sale.id)}
                     >
-                      <X className="h-4 w-4 mr-1" />
-                      Annuller/afvis
+                      <ShoppingCart className="h-4 w-4 mr-1" />
+                      Rediger kurv
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -275,7 +275,7 @@ export function ManualCancellationsTab() {
         </div>
       )}
 
-      <CancellationDialog
+      <EditCartDialog
         saleId={selectedSaleId}
         open={!!selectedSaleId}
         onClose={() => setSelectedSaleId(null)}
