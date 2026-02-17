@@ -1,34 +1,55 @@
 
+## Tilføj "Opret nyt felt" direkte i Standard felt-dropdown
 
-## Kør rematch-pricing-rules for alle Relatel-produkter
+### Hvad der ændres
+I `IntegrationMappingEditor.tsx` tilføjes en "Opret nyt felt"-knap nederst i Standard felt-dropdown'en. Når brugeren klikker på den, åbnes den eksisterende `FieldDefinitionDialog` i oprettelsestilstand. Når feltet er oprettet, opdateres dropdown'en automatisk med det nye felt.
 
-### Hvad der sker
-Den opdaterede `rematch-pricing-rules` Edge Function (med `leadResultFields`-fix) køres for alle Relatel-produkter, så Tilskud-baserede prisregler (priority 5) nu matcher korrekt i stedet for at falde tilbage til lavere priority 0-regler.
-
-### Fremgangsmåde
-
-1. **Dry-run først** for 2-3 Switch-produkter for at verificere at Tilskud-reglerne matcher korrekt
-2. **Fuld kørsel (ikke dry-run)** for alle Relatel-produkter i grupper:
-   - Switch Contact Center-produkter
-   - MBB-produkter (1000GB, 2000GB varianter)
-   - Fri Tale-produkter (alle varianter)
-3. **Verificering** - tjek at provisioner er opdateret korrekt via database-forespørgsler
-
-### Produktgrupper der rematches
-- **Switch Contact Center** (alle varianter)
-- **MBB 1000GB / 2000GB** (ATL, BTL, Router-varianter)
-- **Fri Tale** (10GB til fri data, ATL/BTL varianter)
-
-### Forventet resultat
-- Salg med `Tilskud=0%` får højere provision (priority 5-regler)
-- Salg med `Tilskud=100%` beholder fallback-provision (priority 0-regler)
-- `is_immediate_payment` og andre manuelle overrides bevares
-
-### Risiko
-Lav - funktionen opdaterer kun `matched_pricing_rule_id`, `mapped_commission`, `mapped_revenue` og `display_name`. Manuelle overrides som `is_immediate_payment` røres ikke.
+### Brugeroplevelse
+1. Bruger åbner "Standard felt"-dropdown for en API-feltrække
+2. Nederst i listen ses en separator og en "+ Opret nyt felt"-knap
+3. Klik åbner `FieldDefinitionDialog` (samme dialog som bruges i Feltdefinitioner-fanen)
+4. Efter oprettelse lukkes dialogen, felt-listen genindlæses, og det nye felt er tilgængeligt i dropdown'en
 
 ### Tekniske detaljer
-- Edge Function kaldes via `supabase.functions.invoke("rematch-pricing-rules", { body: { product_id: "..." } })` for hvert produkt-ID
-- Hvert kald processer alle `sale_items` for det pågældende produkt
-- Dry-run returnerer statistik uden at ændre data
 
+**Fil: `src/components/mg-test/IntegrationMappingEditor.tsx`**
+
+1. Importer `FieldDefinitionDialog` og tilføj state for dialog-åbning:
+   ```typescript
+   import { FieldDefinitionDialog } from "./FieldDefinitionDialog";
+   // ...
+   const [createFieldOpen, setCreateFieldOpen] = useState(false);
+   ```
+
+2. Tilføj `FieldDefinitionDialog` i komponentens return (uden for tabellen):
+   ```typescript
+   <FieldDefinitionDialog
+     open={createFieldOpen}
+     onOpenChange={setCreateFieldOpen}
+     field={null}
+   />
+   ```
+
+3. I hver "Standard felt"-Select dropdown (`SelectContent`), tilføj nederst efter alle kategorigrupper:
+   ```typescript
+   <SelectSeparator />
+   <div
+     className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-primary hover:bg-accent"
+     onPointerDown={(e) => {
+       e.preventDefault();
+       e.stopPropagation();
+       setCreateFieldOpen(true);
+     }}
+   >
+     <Plus className="absolute left-2 h-3.5 w-3.5" />
+     Opret nyt felt
+   </div>
+   ```
+   Brugen af `onPointerDown` med `preventDefault`/`stopPropagation` forhindrer at dropdown'en lukker og vælger en værdi.
+
+4. Importer `SelectSeparator` fra select-komponenten og `Plus`-ikonet.
+
+### Hvorfor denne tilgang
+- Genbruger den eksisterende `FieldDefinitionDialog` -- ingen duplikering af logik
+- `queryKey: ["data-field-definitions"]` invalideres allerede af dialogen ved oprettelse, så dropdown'en opdateres automatisk
+- Kræver kun ændringer i én fil
