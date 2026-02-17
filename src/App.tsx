@@ -6,7 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AppRouter } from "@/routes/AppRouter";
 import { RolePreviewProvider } from "@/contexts/RolePreviewContext";
-import { TwilioDeviceProvider } from "@/contexts/TwilioDeviceContext";
+const TwilioDeviceProvider = React.lazy(() => import("@/contexts/TwilioDeviceContext").then(m => ({ default: m.TwilioDeviceProvider })));
 import { SessionTimeoutProvider } from "@/contexts/SessionTimeoutContext";
 
 const queryClient = new QueryClient({
@@ -91,13 +91,15 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <RolePreviewProvider>
-          <TwilioDeviceProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
-          </TwilioDeviceProvider>
+          <React.Suspense fallback={null}>
+            <TwilioDeviceProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </TwilioDeviceProvider>
+          </React.Suspense>
         </RolePreviewProvider>
       </TooltipProvider>
     </QueryClientProvider>
