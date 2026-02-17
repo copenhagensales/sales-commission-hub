@@ -1,30 +1,40 @@
 
 
-## Fix: Tilskudsregel matcher ikke for Switch Contact Center #1
+## Nyt dashboard: "Salgsoversigt alle"
 
-### Problem
-Prisreglerne for "Switch Contact Center #1" pa Switch Krydssalgs-kampagnen har et prioritetsproblem:
+### Oversigt
+Opretter en forenklet kopi af CPH Sales-dashboardet der **kun** viser "Dagens salg"-sektionen -- dvs. de to KPI-kort (Salg i dag + Saelgere pa tavlen) samt salg per klient fordelt pa kort med logoer.
 
-| Produkt | Regel | Prioritet | Provision |
-|---------|-------|-----------|-----------|
-| ATL | Tilskud=0% | **5** | 2.125 kr |
-| ATL | Ingen betingelser | 0 | 1.883 kr |
-| #1 | Tilskud=0% | **0** | 1.414 kr |
-| #1 | Ingen betingelser | **0** | 1.253 kr |
+### Indhold pa dashboardet
+- **Header** med titel "Salgsoversigt alle" og dagens dato
+- **Salg per klient i dag** -- kort-grid med klient-logoer og antal salg (inkl. fieldmarketing)
+- **KPI-kort**: Salg i dag (total, bekraeftet, afventer) + Saelgere pa tavlen
 
-Matching-logikken sorterer efter prioritet (hojest forst). Nar begge regler har prioritet 0, vinder reglen uden betingelser, fordi den matcher alt. Derfor far #1 kun 1.254 kr i stedet for 1.414 kr.
+Ingen date range picker, ingen top sellers, ingen team performance, ingen absence data, ingen seneste salg-liste.
 
-### Losning
+### Tekniske trin
 
-**Database-opdatering**: Saet prioriteten pa Tilskud=0% reglen for Switch Contact Center #1 (pa Switch Krydssalgs-kampagnen) til 5:
+**1. Ny fil: `src/pages/dashboards/SalesOverviewAll.tsx`**
+- Kopierer data-fetching fra CphSalesDashboard for `todaySalesData` og `fmTodaySales`
+- Beregningsfunktioner: `calculateCountedSales`, `calculateSalesByClient`, `calculateConfirmedSales`, `calculatePendingSales`, `calculateSellersOnBoard`, `getSalesByClientWithLogos`
+- Henter aktive medarbejdere via `usePrecomputedKpis`
+- TV-mode support via `isTvMode()` og `tv-dashboard-data` edge function
+- Renderer kun: salg-per-klient grid + 2 KPI-kort
+- Bruger `useRequireDashboardAccess("sales-overview-all")`
 
-```sql
-UPDATE product_pricing_rules 
-SET priority = 5 
-WHERE id = '71ee6084-765d-4ca8-a698-0602d1df2036';
-```
+**2. Route registrering: `src/routes/pages.ts`**
+- Tilfoej: `export const SalesOverviewAll = lazyPage(() => import("@/pages/dashboards/SalesOverviewAll"));`
 
-**Rematch**: Kor derefter rematch-pricing-rules for at genberegne provisioner pa eksisterende salg, der blev ramt af den forkerte prioritet.
+**3. Route config: `src/routes/config.tsx`**
+- Tilfoej route med path `/dashboards/sales-overview-all`, access `"protected"`
 
-### Forebyggelse
-Overvej ogsa at tjekke de ovrige Switch Contact Center-produkter (#2, #3, #4) for samme problem, og saette Tilskud-regler til prioritet 5 konsekvent.
+**4. Dashboard config: `src/config/dashboards.ts`**
+- Tilfoej entry: slug `sales-overview-all`, navn "Salgsoversigt alle", permissionKey `menu_dashboard_sales_overview_all`
+
+**5. TV Board support**
+- Tilfoej `"sales-overview-all"` mapping i `TvBoardView.tsx` og `TvBoardDirect.tsx`
+
+### Filer der aendres
+- **Ny**: `src/pages/dashboards/SalesOverviewAll.tsx`
+- **AEndret**: `src/routes/pages.ts`, `src/routes/config.tsx`, `src/config/dashboards.ts`, `src/pages/tv-board/TvBoardView.tsx`, `src/pages/tv-board/TvBoardDirect.tsx`
+
