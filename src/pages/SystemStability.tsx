@@ -12,7 +12,7 @@ import { ScheduleEditor } from "@/components/system-stability/ScheduleEditor";
 import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
 import { AuditLog } from "@/components/system-stability/AuditLog";
 import { AlertBanner } from "@/components/system-stability/AlertBanner";
-import { useStabilityAlerts } from "@/hooks/useStabilityAlerts";
+import { useStabilityAlerts, type ProviderBudget } from "@/hooks/useStabilityAlerts";
 
 interface SyncRun {
   id: string;
@@ -162,21 +162,48 @@ export default function SystemStability() {
     };
   });
 
-  // Rate limit budget
-  const now15m = Date.now() - 15 * 60 * 1000;
+  // Per-provider rate limit budget
+  const PROVIDER_LIMITS: Record<string, { limitPerMin: number; limitPerHour: number }> = {
+    adversus: { limitPerMin: 60, limitPerHour: 1000 },
+    enreach: { limitPerMin: 240, limitPerHour: 10000 },
+  };
+  const DEFAULT_LIMITS = { limitPerMin: 60, limitPerHour: 1000 };
+
+  const now1m = Date.now() - 60 * 1000;
   const now60m = Date.now() - 60 * 60 * 1000;
   const allRuns = syncRuns.length > 0 ? syncRuns : recentLogs;
-  const apiCalls15m = allRuns
-    .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now15m)
-    .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
-  const apiCalls60m = allRuns
-    .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now60m)
-    .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
 
-  const rateLimitBudget15m = 300;
-  const rateLimitBudget60m = 1200;
-  const budgetUsed15m = Math.min((apiCalls15m / rateLimitBudget15m) * 100, 100);
-  const budgetUsed60m = Math.min((apiCalls60m / rateLimitBudget60m) * 100, 100);
+  // Group integrations by provider
+  const providerMap = new Map<string, { names: string[]; ids: Set<string> }>();
+  for (const int of integrations as any[]) {
+    const p = (int.provider || "unknown").toLowerCase();
+    if (!providerMap.has(p)) providerMap.set(p, { names: [], ids: new Set() });
+    providerMap.get(p)!.names.push(int.name);
+    providerMap.get(p)!.ids.add(int.id);
+  }
+
+  const providerBudgets: (ProviderBudget & { integrationNames: string[]; calls1m: number; limit1m: number; calls60m: number; limit60m: number })[] = [];
+  for (const [provider, { names, ids }] of providerMap) {
+    const limits = PROVIDER_LIMITS[provider] || DEFAULT_LIMITS;
+    const providerRuns = allRuns.filter((r: any) => ids.has(r.integration_id));
+    const calls1m = providerRuns
+      .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now1m)
+      .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
+    const calls60m = providerRuns
+      .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now60m)
+      .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
+
+    providerBudgets.push({
+      provider,
+      integrationNames: names,
+      calls1m,
+      limit1m: limits.limitPerMin,
+      used1m: Math.min((calls1m / limits.limitPerMin) * 100, 100),
+      calls60m,
+      limit60m: limits.limitPerHour,
+      used60m: Math.min((calls60m / limits.limitPerHour) * 100, 100),
+    });
+  }
 
   // Runs table data
   const runsTableData = syncRuns.length > 0
@@ -208,8 +235,7 @@ export default function SystemStability() {
 
   const alerts = useStabilityAlerts({
     integrationMetrics,
-    budgetUsed15m,
-    budgetUsed60m,
+    providerBudgets,
   });
 
   return (
@@ -279,41 +305,48 @@ export default function SystemStability() {
         })}
       </div>
 
-      {/* Rate Limit Budget Gauge */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Rate Limit Budget (estimeret)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Sidste 15 min</span>
-              <span className="font-medium">{apiCalls15m} / {rateLimitBudget15m} kald ({budgetUsed15m.toFixed(0)}%)</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${budgetUsed15m > 80 ? "bg-destructive" : budgetUsed15m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
-                style={{ width: `${budgetUsed15m}%` }}
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Sidste 60 min</span>
-              <span className="font-medium">{apiCalls60m} / {rateLimitBudget60m} kald ({budgetUsed60m.toFixed(0)}%)</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${budgetUsed60m > 80 ? "bg-destructive" : budgetUsed60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
-                style={{ width: `${budgetUsed60m}%` }}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Rate Limit Budget per Provider */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {providerBudgets.map((pb) => (
+          <Card key={pb.provider}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                {pb.provider.charAt(0).toUpperCase() + pb.provider.slice(1)} Rate Limits
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {pb.integrationNames.join(", ")} — {pb.limit1m}/min, {pb.limit60m}/time
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Burst (1 min)</span>
+                  <span className="font-medium">{pb.calls1m} / {pb.limit1m} ({pb.used1m.toFixed(0)}%)</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${pb.used1m > 80 ? "bg-destructive" : pb.used1m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                    style={{ width: `${pb.used1m}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Time (60 min)</span>
+                  <span className="font-medium">{pb.calls60m} / {pb.limit60m} ({pb.used60m.toFixed(0)}%)</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${pb.used60m > 80 ? "bg-destructive" : pb.used60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                    style={{ width: `${pb.used60m}%` }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Timeline Overlap Visualization */}
       <TimelineOverlap integrations={integrations as any} />
