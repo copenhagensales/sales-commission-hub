@@ -1,82 +1,89 @@
 
-
-# Notifikationer/Alerts ved kritiske taerskler
+# Rate Limit Budget opdelt per API-provider med faktiske limits
 
 ## Oversigt
 
-Tilfoej et alert-system til SystemStability-dashboardet der automatisk viser advarsler naar metrics overskrider kritiske taerskler. Alerts vises bade som en persistent banner-sektion oeverst paa siden og som sonner-toasts naar nye kritiske tilstande detekteres.
+Opdel Rate Limit Budget-sektionen fra en enkelt global gauge til separate gauges per API-provider, med de faktiske rate limits fra Adversus og Enreach.
 
----
+## Faktiske API-graenser
 
-## Implementering
+**Adversus:**
+- 60 requests/minut (burst)
+- 1.000 requests/time
+- Max 2 samtidige requests
 
-### 1. Ny komponent: `AlertBanner.tsx`
+**Enreach:**
+- Dynamiske daglige limits per service (hentes fra `/api/myaccount/request/limits`)
+- Per-minut limit = Max(Ceiling(daglig limit / 1440), 240) naar fair use header sendes
+- Kald taeller 8x i produktionstid (08-21) uden fair use header
 
-Oprettes i `src/components/system-stability/AlertBanner.tsx`.
+Da vi ikke henter Enreach-limits dynamisk endnu, bruger vi konservative estimater som standard.
 
-En Card-komponent der viser aktive alerts i en liste med farve-kodning:
+## Aendringer
 
-- **Kritisk (rod):** 429-rate > 10%, succes-rate < 80%, budget > 90%
-- **Advarsel (gul):** 429-rate > 5%, succes-rate < 95%, budget > 70%, ingen sync i > 30 min
-- **Info:** Integration har haft 3+ fejl i traek
+### 1. SystemStability.tsx -- Budget-beregning per provider
 
-Hver alert viser: ikon, integration-navn, besked, og tidspunkt.
+Erstat den globale budget-beregning (linje 165-179) med provider-grupperet logik:
 
-Banneret skjules automatisk naar der ingen aktive alerts er.
-
-### 2. Custom hook: `useStabilityAlerts.ts`
-
-Oprettes i `src/hooks/useStabilityAlerts.ts`.
-
-Modtager `integrationMetrics`, `budgetUsed15m`, `budgetUsed60m` og returnerer en liste af aktive alerts.
-
-Bruger `useRef` til at tracke "allerede vist"-alerts saa sonner-toasts kun fires een gang pr. ny kritisk tilstand (ikke ved hvert 30s refetch).
-
-**Taerskler (konfigurerbare):**
-
-| Metric | Advarsel | Kritisk |
-|--------|----------|---------|
-| 429-rate (15m) | > 5% | > 10% |
-| Succes-rate (1t) | < 95% | < 80% |
-| Budget brugt (15m) | > 70% | > 90% |
-| Budget brugt (60m) | > 70% | > 90% |
-| Tid siden sidste sync | > 30 min | > 60 min |
-| Konsekutive fejl | >= 3 | >= 5 |
-
-### 3. Sonner toast-notifikationer
-
-Naar en ny kritisk alert detekteres (ikke set foer), fyrer hooket en `toast.error()` eller `toast.warning()` via sonner, saa brugeren faar besked selv hvis de har scrollet vaek fra alert-banneret.
-
-### 4. Integration i SystemStability.tsx
-
-- Importer `useStabilityAlerts` hook og `AlertBanner` komponent
-- Placer `AlertBanner` lige under header-sektionen (foer status cards)
-- Pass integrationMetrics og budget-data til hooket
-
----
-
-## Tekniske detaljer
-
-### AlertBanner props interface
 ```typescript
-interface StabilityAlert {
-  id: string;           // unik noegle (fx "429-rate-{integrationId}")
-  level: "critical" | "warning" | "info";
-  integration: string;  // integration-navn
-  message: string;      // fx "429-rate er 12.3% (taerskel: 10%)"
-  metric: string;       // fx "rateLimitRate15m"
-  value: number;
-  threshold: number;
+const PROVIDER_BUDGETS: Record<string, { limitPerMin: number; limitPerHour: number }> = {
+  adversus: { limitPerMin: 60, limitPerHour: 1000 },
+  enreach: { limitPerMin: 240, limitPerHour: 10000 },
+};
+const DEFAULT_BUDGET = { limitPerMin: 60, limitPerHour: 1000 };
+```
+
+- Grupper sync runs/logs efter integration -> provider
+- Beregn apiCalls for sidste 1 minut og sidste 60 minutter per provider
+- Beregn procent brugt af hver providers faktiske limits
+- Byg et `providerBudgets`-array:
+
+```typescript
+interface ProviderBudget {
+  provider: string;
+  integrationNames: string[];
+  calls1m: number;
+  limit1m: number;
+  used1m: number;  // procent
+  calls60m: number;
+  limit60m: number;
+  used60m: number; // procent
 }
 ```
 
-### Filer der oprettes
-- `src/hooks/useStabilityAlerts.ts` -- hook der beregner alerts og fyrer toasts
-- `src/components/system-stability/AlertBanner.tsx` -- visuel alert-liste
+### 2. SystemStability.tsx -- UI opdeling (linje 282-316)
+
+Erstat den enkelte Card med en Card per provider:
+
+- Overskrift: Provider-navn (fx "Adversus") med faktiske limits i parentes
+- Under-tekst: Navne paa integrationer der deler API'et (fx "Lovablecph, Relatel_CPHSALES")
+- To progress bars: Per minut (burst) og per time
+- Farve-kodning som i dag (groen/gul/roed)
+
+### 3. useStabilityAlerts.ts -- Budget-alerts per provider
+
+Aendr hook-signaturen:
+
+```typescript
+interface ProviderBudget {
+  provider: string;
+  used1m: number;
+  used60m: number;
+}
+
+interface UseStabilityAlertsParams {
+  integrationMetrics: IntegrationMetric[];
+  providerBudgets: ProviderBudget[];
+}
+```
+
+- Fjern de gamle `budgetUsed15m`/`budgetUsed60m` parametre
+- Erstat de 4 globale budget-checks (linje 142-185) med et loop over `providerBudgets`
+- Alert-beskeder inkluderer provider-navn: fx "Adversus: Burst limit (1m) er 92% brugt"
+- Behold samme taerskler: warning ved 70%, critical ved 90%
 
 ### Filer der redigeres
-- `src/pages/SystemStability.tsx` -- tilfoej hook + banner i render
+- `src/pages/SystemStability.tsx` -- budget-beregning og UI
+- `src/hooks/useStabilityAlerts.ts` -- hook-parametre og budget-checks
 
-### Ingen database-aendringer
-Alt beregnes client-side fra eksisterende data (integrationMetrics + budget).
-
+### Ingen nye filer eller database-aendringer
