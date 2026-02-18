@@ -1,50 +1,37 @@
 
-# Fix: Lovablecph synkroniserer ikke TDC-salg
 
-## Rodaarsag
+# Koer Adversus Schedule Spacing Plan
 
-To separate problemer forhindrer Lovablecph i at synkronisere salg:
+## Hvad der skal goeres
 
-### Problem 1: Gammelt cron-job stjæler API-kvoten
-Det gamle job `adversus-sync-nightly` (jobid 1) koerer stadig:
-- Schedule: `0 0-6 * * *` (hver time kl. 00-06)
-- Kalder den **gamle** `sync-adversus` edge function
-- Bruger **samme Adversus API-credentials** som Lovablecph
-- Resultatet: API-kvoten er opbrugt inden Lovablecph naar at synkronisere
+Migrationen `20260218113000_adjust_adversus_schedule_spacing.sql` er klar og indeholder alt det noedvendige:
 
-Bevis: 16 ud af 20 sync-forsog i dag fejlede med "Rate Limit Adversus Excedido".
+1. **Forskyd cron-jobs** med 5 minutters mellemrum:
+   - Lovablecph: `1,11,21,31,41,51 * * * *` (koerer minut :01, :11, :21...)
+   - Relatel_CPHSALES: `6,16,26,36,46,56 * * * *` (koerer minut :06, :16, :26...)
 
-### Problem 2: Synkroniseringsvindue for kort
-Det nye cron-job sender `days: 1`, men efter en hel dag med rate-limit fejl er der et backlog. Salg fra i morges naar ikke at blive hentet med kun 1 dags vindue.
+2. **Opdater `dialer_integrations.config.sync_schedule`** saa fremtidige cron-genskabelser bruger de nye schedules.
 
----
+## Retry-delays
 
-## Loesning
+Retry-delays er **allerede rettet** til 5000ms base delay (linje 601 og 778 i `adversus.ts`). Ingen yderligere kodeaendringer er noedvendige.
 
-### Trin 1: Slet det gamle cron-job
-Fjern `adversus-sync-nightly` (jobid 1) via SQL:
-```text
-SELECT cron.unschedule(1);
-```
-Dette job er erstattet af de nye staggerede jobs og skal ikke koere laengere.
+## Teknisk sekvens
 
-### Trin 2: Udvid synkroniseringsvinduet midlertidigt
-Opdater Lovablecph cron-job til `days: 3` midlertidigt for at indhente backlog:
-```text
-UPDATE cron.job 
-SET command = '...(days: 3)...'
-WHERE jobid = 47;
-```
+1. Koer migrationen (opdaterer `cron.job` og `dialer_integrations.config`)
+2. Deploy `integration-engine` edge function (allerede opdateret med 5s retry)
+3. Koer manuel backfill for Lovablecph med `days: 3` for at hente manglende TDC-salg
+4. Koer manuel backfill for Relatel med `days: 1`
 
-### Trin 3: Koer en manuel sync nu
-Trigger en umiddelbar sync med `days: 3` for Lovablecph for at hente alle manglende TDC-salg med det samme.
+## Manuel backfill (efter deploy)
 
-### Trin 4: Sæt vinduet tilbage til 1 dag
-Naar backlogget er indhentet (efter 1-2 timer), saet `days` tilbage til `1` for at minimere API-belastning.
-
----
+Trigger sync via edge function kald:
+- Lovablecph: `POST integration-engine` med `{ source: "adversus", integration_id: "<lovablecph-uuid>", actions: ["campaigns","users","sales","sessions"], days: 3 }`
+- Relatel: `POST integration-engine` med `{ source: "adversus", integration_id: "<relatel-uuid>", actions: ["campaigns","users","sales","sessions"], days: 1 }`
 
 ## Forventet resultat
-- Ingen flere rate-limit fejl (det gamle job bruger ikke laengere API-kvoten)
-- Alle TDC Erhverv salg fra i dag synkroniseres inden for minutter
-- Fremadrettet stabil synkronisering hvert 5. minut
+
+- 5 minutters pause mellem Lovablecph og Relatel sync eliminerer samtidige API-kald
+- 5s exponential backoff haandterer eventuelle resterende 429-fejl
+- TDC-salg (Lovablecph) begynder at synkronisere igen
+
