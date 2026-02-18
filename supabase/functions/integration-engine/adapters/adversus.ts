@@ -1,4 +1,4 @@
-import { DialerAdapter } from "./interface.ts";
+import { DialerAdapter, ApiMetrics } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 import { RateLimiter } from "../utils/rate-limiter.ts";
 
@@ -13,6 +13,17 @@ export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io";
   private dialerName: string;
+
+  // API metrics tracking
+  private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
+
+  getMetrics(): ApiMetrics {
+    return { ...this._metrics };
+  }
+
+  resetMetrics(): void {
+    this._metrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
+  }
 
   // Debug data for calls
   private lastDebugData: {
@@ -72,14 +83,17 @@ export class AdversusAdapter implements DialerAdapter {
 
   private async get(endpoint: string, retries = 3, baseDelay = 5000): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
+      this._metrics.apiCalls++;
       const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
       });
 
       if (res.status === 429) {
+        this._metrics.rateLimitHits++;
         if (attempt === retries) {
           throw new Error("Rate Limit Adversus Excedido (after retries)");
         }
+        this._metrics.retries++;
         const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
         const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
         const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
@@ -143,6 +157,7 @@ export class AdversusAdapter implements DialerAdapter {
     }));
     
     const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
+    this._metrics.apiCalls++;
     const res = await fetch(url, {
       headers: { Authorization: `Basic ${this.authHeader}` },
     });
@@ -527,15 +542,18 @@ export class AdversusAdapter implements DialerAdapter {
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       try {
+        this._metrics.apiCalls++;
         const res = await fetch(url, {
           headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
         });
 
         if (res.status === 429) {
+          this._metrics.rateLimitHits++;
           if (attempt > maxRetries) {
             console.log(`[Adversus] Lead ${leadId}: 429 after ${maxRetries} retries, giving up`);
             return null;
           }
+          this._metrics.retries++;
           const retryAfter = res.headers.get("Retry-After");
           const retryAfterSec = retryAfter ? parseInt(retryAfter, 10) : NaN;
           const waitMs = !isNaN(retryAfterSec)
@@ -560,6 +578,7 @@ export class AdversusAdapter implements DialerAdapter {
           console.error(`[Adversus] Lead ${leadId}: error after ${maxRetries} retries:`, e);
           return null;
         }
+        this._metrics.retries++;
         await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));
       }
     }
@@ -589,15 +608,18 @@ export class AdversusAdapter implements DialerAdapter {
 
       while (retryAttempt < maxRetries) {
         try {
+          this._metrics.apiCalls++;
           const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
           if (res.status === 429) {
+            this._metrics.rateLimitHits++;
             retryAttempt++;
             if (retryAttempt >= maxRetries) {
               console.log(`[Adversus] Page ${page}: Rate limited, max retries reached`);
               hasMore = false;
               break;
             }
+            this._metrics.retries++;
             const delay = 5000 * Math.pow(2, retryAttempt - 1);
             console.log(`[Adversus] Rate limited on page ${page}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
             await new Promise(r => setTimeout(r, delay));
@@ -635,6 +657,7 @@ export class AdversusAdapter implements DialerAdapter {
             hasMore = false;
             break;
           }
+          this._metrics.retries++;
 
           const delay = 5000 * Math.pow(2, retryAttempt - 1);
           console.warn(`[Adversus] Error fetching page ${page}. Waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
@@ -653,6 +676,7 @@ export class AdversusAdapter implements DialerAdapter {
       const filters = JSON.stringify({ campaignId: { "$eq": Number(campaignId) } });
       const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=${pageSize}`;
 
+      this._metrics.apiCalls++;
       const res = await fetch(url, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
       });

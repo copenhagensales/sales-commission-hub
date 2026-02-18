@@ -1,4 +1,4 @@
-import { DialerAdapter } from "./interface.ts";
+import { DialerAdapter, ApiMetrics } from "./interface.ts";
 import {
   StandardSale,
   StandardUser,
@@ -35,6 +35,10 @@ export class EnreachAdapter implements DialerAdapter {
   private orgCode: string | null;
   private config: DialerIntegrationConfig | null;
   private callsOrgCodes: string[] | null;
+  private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
+
+  getMetrics(): ApiMetrics { return { ...this._metrics }; }
+  resetMetrics(): void { this._metrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 }; }
 
   constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null, callsOrgCodes?: string[] | null) {
     let providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
