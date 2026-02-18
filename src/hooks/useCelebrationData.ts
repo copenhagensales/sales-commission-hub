@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { formatNumber } from "@/lib/calculations";
 import { useDashboardAggregates } from "./useDashboardAggregates";
 
@@ -99,7 +99,7 @@ export function useCelebrationData({
 
   const data: CelebrationTriggerData = {
     employeeName: topPerformer?.name || null,
-    salesCount: todayData.sales,
+    salesCount: topPerformer?.data.sales ?? todayData.sales,
     commission: todayData.commission,
     metricValue: getMetricValue(metric),
     salesToday: todayData.sales,
@@ -120,6 +120,11 @@ export function useCelebrationData({
   };
 }
 
+function replaceVar(text: string, key: string, value: string): string {
+  const pattern = new RegExp(String.raw`\{{1,2}\s*${key}\s*\}{1,2}`, "gi");
+  return text.replace(pattern, value);
+}
+
 /**
  * Replace variables in celebration text with actual values
  */
@@ -127,25 +132,33 @@ export function replaceCelebrationVariables(
   text: string,
   data: CelebrationTriggerData | undefined
 ): string {
-  if (!text || !data) return text || "";
+  if (!text) return "";
+  if (!data) return text;
 
-  // formatNumber imported from @/lib/calculations
   const formatCurrencyLocal = (num: number) => `${formatNumber(num)} kr`;
 
-  return text
-    .replace(/{employee_name}/g, data.employeeName || "Medarbejder")
-    .replace(/{sales_count}/g, formatNumber(data.salesCount))
-    .replace(/{commission}/g, formatCurrencyLocal(data.commission))
-    .replace(/{metric_value}/g, formatNumber(data.metricValue))
-    .replace(/{sales_today}/g, formatNumber(data.salesToday))
-    .replace(/{sales_month}/g, formatNumber(data.salesMonth))
-    .replace(/{sales_week}/g, formatNumber(data.salesWeek))
-    .replace(/{total_sales}/g, formatNumber(data.totalSales))
-    .replace(/{commission_today}/g, formatCurrencyLocal(data.commissionToday))
-    .replace(/{commission_month}/g, formatCurrencyLocal(data.commissionMonth))
-    .replace(/{goal_progress}/g, `${data.goalProgress}%`)
-    .replace(/{goal_target}/g, formatCurrencyLocal(data.goalTarget))
-    .replace(/{goal_remaining}/g, formatCurrencyLocal(data.goalRemaining));
+  const replacements: Record<string, string> = {
+    employee_name: data.employeeName || "Medarbejder",
+    sales_count: formatNumber(data.salesCount),
+    commission: formatCurrencyLocal(data.commission),
+    metric_value: formatNumber(data.metricValue),
+    sales_today: formatNumber(data.salesToday),
+    sales_month: formatNumber(data.salesMonth),
+    sales_week: formatNumber(data.salesWeek),
+    total_sales: formatNumber(data.totalSales),
+    commission_today: formatCurrencyLocal(data.commissionToday),
+    commission_month: formatCurrencyLocal(data.commissionMonth),
+    goal_progress: `${data.goalProgress}%`,
+    goal_target: formatCurrencyLocal(data.goalTarget),
+    goal_remaining: formatCurrencyLocal(data.goalRemaining),
+  };
+
+  let output = text;
+  Object.entries(replacements).forEach(([key, value]) => {
+    output = replaceVar(output, key, value);
+  });
+
+  return output;
 }
 
 /**

@@ -88,11 +88,11 @@ const CELEBRATION_TRIGGER_CONDITIONS = [
 ];
 
 const DURATION_OPTIONS = [
-  { value: 2, label: "2 sekunder" },
-  { value: 3, label: "3 sekunder" },
-  { value: 5, label: "5 sekunder" },
-  { value: 8, label: "8 sekunder" },
-  { value: 10, label: "10 sekunder" },
+  { value: 2000, label: "2 sekunder" },
+  { value: 3000, label: "3 sekunder" },
+  { value: 5000, label: "5 sekunder" },
+  { value: 8000, label: "8 sekunder" },
+  { value: 10000, label: "10 sekunder" },
 ];
 
 const KPI_TYPES = [

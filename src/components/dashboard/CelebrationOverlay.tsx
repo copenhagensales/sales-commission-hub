@@ -73,7 +73,7 @@ export const CelebrationOverlay = ({
       const timer = setTimeout(() => {
         onClose();
         setShowContent(false);
-      }, duration * 1000);
+      }, duration);
 
       return () => clearTimeout(timer);
     } else {
@@ -563,7 +563,7 @@ export const CelebrationOverlay = ({
             style={{ animation: "text-reveal 0.8s ease-out 0.3s both" }}
           >
             <p 
-              className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg"
+              className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg whitespace-pre-line break-words"
               style={{
                 background: `linear-gradient(135deg, #fff 0%, ${colors[0]} 50%, ${colors[1]} 100%)`,
                 backgroundClip: 'text',

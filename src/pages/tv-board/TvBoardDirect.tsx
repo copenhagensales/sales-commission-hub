@@ -113,10 +113,13 @@ export default function TvBoardDirect() {
 
     // Set celebration settings
     if (tvData.celebration_enabled) {
+      const rawDuration = tvData.celebration_duration || 5000;
+      const normalizedDuration = rawDuration < 100 ? rawDuration * 1000 : rawDuration;
+
       setCelebrationSettings({
         enabled: true,
         effect: (tvData.celebration_effect as any) || "fireworks",
-        duration: tvData.celebration_duration || 5000,
+        duration: normalizedDuration,
         triggerCondition: tvData.celebration_trigger_condition || "new_sale",
         text: tvData.celebration_text || "🎉 Nyt salg!",
         metric: tvData.celebration_metric || "sales_today",
