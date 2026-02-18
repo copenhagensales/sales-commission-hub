@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, Wifi, RefreshCw, ArrowLeft, AlertTriangle, KeyRound } from "lucide-react";
-import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
+const cphSalesLogo = "/cph-sales-logo-dark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
 import { validatePassword } from "@/lib/password-validation";
@@ -615,6 +615,9 @@ export default function Auth() {
           <img 
             src={cphSalesLogo} 
             alt="CPH Sales" 
+            width={161}
+            height={96}
+            fetchPriority="high"
             className="mx-auto h-24 w-auto cursor-pointer"
           />
           <p className="mt-4 text-sm text-muted-foreground">

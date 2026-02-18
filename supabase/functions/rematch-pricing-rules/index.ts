@@ -328,6 +328,7 @@ serve(async (req) => {
 
     // Get unique campaign IDs and fetch their mapping IDs
     const campaignIds = [...new Set(saleItems.map((si) => normalizeJoinedSale(si.sales)?.dialer_campaign_id).filter(Boolean))];
+    const campaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.dialer_campaign_id).filter(Boolean))];
     const campaignMappingsMap = new Map<string, string>();
 
     if (campaignIds.length > 0) {
@@ -355,6 +356,7 @@ serve(async (req) => {
       // Extract raw_payload.data
       const sale = normalizeJoinedSale(item.sales);
       const rawPayload = sale?.raw_payload as Record<string, unknown> | null;
+      const rawPayload = (item.sales as any)?.raw_payload as Record<string, unknown> | null;
       let rawPayloadData = rawPayload?.data as Record<string, unknown> | undefined;
 
       // Merge leadResultFields and leadResultData into rawPayloadData
@@ -402,6 +404,7 @@ serve(async (req) => {
 
       // Determine correct product ID for ASE sales based on lead data
       const isAse = source === "ase" || sale?.source === "ase";
+      const isAse = source === "ase" || (item.sales as any)?.source === "ase";
       const originalProductId = item.product_id;
       const correctProductId = isAse ? determineAseProductId(rawPayloadData) : originalProductId;
       
@@ -412,6 +415,7 @@ serve(async (req) => {
 
       // Get campaign mapping ID
       const campaignId = sale?.dialer_campaign_id;
+      const campaignId = (item.sales as any)?.dialer_campaign_id;
       const campaignMappingId = campaignId ? campaignMappingsMap.get(campaignId) : null;
 
       // Get sale date for date-based rule filtering
