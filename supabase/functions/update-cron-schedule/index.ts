@@ -7,14 +7,14 @@ const corsHeaders = {
 
 // Map sync_frequency_minutes to cron expressions
 const frequencyToCron: Record<number, string> = {
-  5: "*/5 * * * *",        // Every 5 minutes
-  15: "*/15 * * * *",      // Every 15 minutes
-  30: "*/30 * * * *",      // Every 30 minutes
-  60: "0 * * * *",         // Every hour
-  120: "0 */2 * * *",      // Every 2 hours
-  360: "0 */6 * * *",      // Every 6 hours
-  720: "0 */12 * * *",     // Every 12 hours
-  1440: "0 6 * * *",       // Daily at 6 AM
+  5: "*/5 * * * *",
+  15: "*/15 * * * *",
+  30: "*/30 * * * *",
+  60: "0 * * * *",
+  120: "0 */2 * * *",
+  360: "0 */6 * * *",
+  720: "0 */12 * * *",
+  1440: "0 6 * * *",
 };
 
 const staggeredFiveMinuteSchedules: Record<string, string> = {
@@ -58,6 +58,30 @@ const getSyncDays = (integrationName?: string | null, config?: Record<string, un
   return 1;
 };
 
+async function insertAuditEntry(
+  supabase: any,
+  integrationId: string,
+  changeType: string,
+  oldSchedule: string | null,
+  newSchedule: string | null,
+  oldConfig: Record<string, unknown> | null,
+  newConfig: Record<string, unknown> | null,
+) {
+  try {
+    await supabase.from("integration_schedule_audit").insert({
+      integration_id: integrationId,
+      change_type: changeType,
+      old_schedule: oldSchedule,
+      new_schedule: newSchedule,
+      old_config: oldConfig,
+      new_config: newConfig,
+    });
+    console.log(`[update-cron-schedule] Audit entry created: ${changeType}`);
+  } catch (e) {
+    console.error(`[update-cron-schedule] Failed to create audit entry:`, e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -74,11 +98,11 @@ Deno.serve(async (req) => {
 
     console.log(`[update-cron-schedule] type=${integration_type}, id=${integration_id}, freq=${frequency_minutes}, active=${is_active}, custom=${custom_schedule}`);
 
-    // For dialer integrations, use integration_id in job name
     let jobName: string;
     let functionName: string;
     let payload: object;
     let integrationMetadata: { name?: string; config?: Record<string, unknown> | null } | null = null;
+    let previousSchedule: string | null = null;
 
     if (integration_type === "dialer") {
       if (!integration_id) {
@@ -92,7 +116,7 @@ Deno.serve(async (req) => {
 
       const { data: integrationData, error: integrationLookupError } = await supabase
         .from("dialer_integrations")
-        .select("name, config")
+        .select("name, config, sync_frequency_minutes")
         .eq("id", integration_id)
         .maybeSingle();
 
@@ -102,6 +126,15 @@ Deno.serve(async (req) => {
             config: (integrationData.config as Record<string, unknown> | null) ?? null,
           }
         : null;
+
+      // Capture previous schedule for audit
+      if (integrationData?.config) {
+        const cfg = integrationData.config as Record<string, unknown>;
+        previousSchedule = (cfg.sync_schedule as string) || null;
+      }
+      if (!previousSchedule && integrationData?.sync_frequency_minutes) {
+        previousSchedule = frequencyToCron[integrationData.sync_frequency_minutes] || null;
+      }
 
       if (integrationLookupError) {
         console.warn(`[update-cron-schedule] Could not load integration metadata for ${integration_id}: ${integrationLookupError.message}`);
@@ -116,7 +149,6 @@ Deno.serve(async (req) => {
         days: syncDays 
       };
     } else {
-      // Legacy support for other integration types
       const typeToFunction: Record<string, string> = {
         adversus: "integration-engine",
         economic: "sync-economic",
@@ -138,7 +170,7 @@ Deno.serve(async (req) => {
 
     console.log(`[update-cron-schedule] jobName=${jobName}, function=${functionName}`);
 
-    // First, try to unschedule any existing job with this name
+    // Unschedule existing job
     try {
       const { error: unscheduleError } = await supabase.rpc("unschedule_integration_sync", { 
         p_job_name: jobName 
@@ -156,18 +188,12 @@ Deno.serve(async (req) => {
       ? getDialerSchedule(integrationMetadata?.name, integrationMetadata?.config, frequency_minutes)
       : null;
 
-    // If active and has frequency or resolved custom schedule, create new cron job
     if (is_active && (custom_schedule || dialerSchedule || (frequency_minutes && frequencyToCron[frequency_minutes]))) {
       const cronExpression = custom_schedule || dialerSchedule || frequencyToCron[frequency_minutes];
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
       
       console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);
-      if (!custom_schedule && dialerSchedule) {
-        console.log(`[update-cron-schedule] Applied dialer staggered/config schedule for ${integrationMetadata?.name || integration_id}`);
-      }
-      console.log(`[update-cron-schedule] Payload: ${JSON.stringify(payload)}`);
 
-      // Schedule the new cron job using the RPC function with full payload
       const { data: scheduleData, error: scheduleError } = await supabase.rpc("schedule_integration_sync", {
         p_job_name: jobName,
         p_schedule: cronExpression,
@@ -182,6 +208,19 @@ Deno.serve(async (req) => {
       }
 
       console.log(`Scheduled new cron job: ${jobName} with schedule: ${cronExpression}, jobId: ${scheduleData}`);
+
+      // Audit log
+      if (integration_id) {
+        await insertAuditEntry(
+          supabase,
+          integration_id,
+          custom_schedule ? "schedule_update" : "frequency_change",
+          previousSchedule,
+          cronExpression,
+          integrationMetadata?.config ? { ...integrationMetadata.config } : null,
+          { sync_schedule: cronExpression, frequency_minutes },
+        );
+      }
       
       return new Response(
         JSON.stringify({ 
@@ -195,7 +234,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If not active or no frequency, just confirm the job was removed
+    // Disabled - audit the removal
+    if (integration_id) {
+      await insertAuditEntry(
+        supabase,
+        integration_id,
+        "schedule_update",
+        previousSchedule,
+        null,
+        integrationMetadata?.config ? { ...integrationMetadata.config } : null,
+        { is_active: false },
+      );
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
