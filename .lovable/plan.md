@@ -1,37 +1,64 @@
 
-# Plan: Genstart salgssynkroniseringen
 
-## Problemet
+# PR #5: Robust Absolut-Count KPI-arkitektur
 
-Siden 17. februar kl. ~16:00 er **0 salg** blevet registreret i systemet. Alle syncs rapporterer "0 sales" med 100% fejlrate paa upsert-operationen.
+## Oversigt
 
-## Rodaarsag
+Erstat den nuvaerende delta/watermark-strategi i `calculate-kpi-incremental` med direkte SQL-aggregeringer der beregner korrekte totaler hver gang. Udvid fra kun employee-scoped til ogsaa client-scoped og global-scoped KPI'er. Migrer alle dashboards til at bruge cached vaerdier.
 
-Den **deployede** version af `integration-engine` edge-funktionen (version 1477) refererer stadig kolonnen `sales.adversus_opp_number`, som blev droppet i en migration den 17. februar. Kildekoden i projektet er korrekt og refererer IKKE kolonnen -- men den deployede version er ikke synkroniseret med koden.
+## Hvorfor
 
-Sekundaert: Adversus-integrationen rammer ogsaa rate limits ("Rate Limit Adversus Excedido"), men det er et separat problem.
+- Delta-strategien er fejludsat: afviste/slettede salg traekkes aldrig fra
+- Client- og global-scoped KPI'er opdateres kun hvert 30. minut
+- Databasen kan beregne fuldstaendige totaler paa under 15 ms - delta er unoedvendigt
 
-## Evidens
+## Trin 1: Database - Opret `calculate_kpi_snapshot` RPC
 
-- Postgres fejllog: `column sales.adversus_opp_number does not exist` (gentages hvert minut)
-- `integration_logs`: Alle syncs viser `{ errors: 34-67, processed: 0 }`
-- `sales`-tabellen: 0 raekker for 18. februar
-- Sidste succesfulde sync med data: 17. feb kl. 15:51
-- Kildekoden (`supabase/functions/integration-engine/core/sales.ts`): Ingen reference til `adversus_opp_number`
+Ny SQL-funktion der i et kald returnerer alle KPI-vaerdier for alle scopes og perioder:
 
-## Loesning
+- Telesales aggregering per client_id (via client_campaigns + adversus_campaign_mappings)
+- FM-sales aggregering per client_id (source = 'fieldmarketing')
+- Employee-scoped aggregering (via agent_email -> agents -> employee_agent_mapping)
+- Global aggregering (sum af alt)
+- Perioder: today, this_week, this_month, payroll_period
+- KPI slugs: sales_count, total_commission, total_revenue
+- Returnerer `TABLE(kpi_slug, period_type, scope_type, scope_id, value)`
 
-**En enkelt handling:** Redeploy `integration-engine` edge-funktionen saa den deployede version matcher kildekoden.
+## Trin 2: Omskriv `calculate-kpi-incremental` Edge Function
 
-Det er alt. Ingen kodeaendringer er noedvendige -- koden er allerede korrekt.
+**Fil:** `supabase/functions/calculate-kpi-incremental/index.ts`
 
-## Forventet resultat
+- Fjern al watermark/delta-kode (~300 linjer)
+- Ny flow: kald RPC `calculate_kpi_snapshot()` -> formatter vaerdier -> upsert til `kpi_cached_values`
+- Ingen watermarks, ingen drift, altid korrekte tal
+- Estimeret koerselstid: < 500ms
 
-- Naeste cron-koersel vil upserte salg uden fejl
-- Enreach/Eesy: ~67 salg vil blive registreret per sync
-- Adversus: Vil stadig have rate-limit-problemer (separat issue, ikke relateret til denne fix)
+## Trin 3: Frontend-migration
 
-## Risici
+Migrer dashboards fra direkte database-queries til cache-hooks:
 
-1. Adversus rate limiting er et separat problem der kraever justering af API-kaldshastighed
-2. Salg fra 17. feb aften + 18. feb morgen vil blive backfilled ved naeste sync (da synk-vinduet er 1-3 dage)
+| Dashboard | Aendring |
+|-----------|----------|
+| `CphSalesDashboard.tsx` | Fjern 3 direkte sales-queries, brug `useClientDashboardKpis` |
+| `SalesOverviewAll.tsx` | Fjern 2 sales + FM queries, brug cached client KPI'er |
+| `UnitedDashboard.tsx` | Fjern 3 per-client sales-queries, brug `useClientDashboardKpis` |
+| `FieldmarketingDashboardFull.tsx` | Migrer KPI-kort til cache, behold seneste-salg-liste |
+| `MyProfile.tsx` | Migrer personlige KPI'er til employee-scoped cache |
+| `useDashboardKpiData.ts` | Refaktoriser til at delegere til cache-hooks |
+
+Behold direkte queries for: seneste-salg-lister, Excel-export, admin CRUD (MgTest), ImmediatePaymentASE (loenberegning), custom periode-leaderboard (CsTop20).
+
+## Trin 4: Reducér full refresh
+
+- `calculate-kpi-values` full refresh: fra hvert 30. minut til hvert 60. minut
+- Den er ikke laengere "ground truth" - den minutlige funktion er nu autoritativ
+
+## Implementeringsraekkefoelge
+
+1. Opret `calculate_kpi_snapshot` SQL-funktion (migration)
+2. Omskriv `calculate-kpi-incremental` edge function
+3. Deploy og verificer at cached vaerdier er korrekte
+4. Migrer frontend-dashboards en ad gangen (SalesOverviewAll -> CphSales -> United -> Fieldmarketing -> MyProfile)
+5. Refaktoriser `useDashboardKpiData.ts`
+6. Reducér full refresh frekvens
+
