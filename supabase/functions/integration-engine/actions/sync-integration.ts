@@ -234,6 +234,9 @@ export async function syncIntegration(
     const syncRunCompletedAt = new Date();
     const syncRunDurationMs = syncRunCompletedAt.getTime() - syncRunStartedAt.getTime();
 
+    // Get API metrics from adapter
+    const adapterMetrics = adapter.getMetrics();
+
     // Insert into integration_sync_runs
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,
@@ -243,9 +246,9 @@ export async function syncIntegration(
       status: "success",
       actions: actionList.filter(Boolean) as string[],
       records_processed: totalRecords,
-      api_calls_made: 0, // Will be populated when adapter tracking is added
-      retries: 0,
-      rate_limit_hits: 0,
+      api_calls_made: adapterMetrics.apiCalls,
+      retries: adapterMetrics.retries,
+      rate_limit_hits: adapterMetrics.rateLimitHits,
     });
 
     await supabase.from("integration_logs").insert({
@@ -272,6 +275,9 @@ export async function syncIntegration(
     const errorCompletedAt = new Date();
     const errorDurationMs = errorCompletedAt.getTime() - syncRunStartedAt.getTime();
 
+    // Get partial metrics from adapter (may have partial data before error)
+    const errorMetrics = adapter.getMetrics();
+
     // Insert error sync run
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,
@@ -281,9 +287,9 @@ export async function syncIntegration(
       status: "error",
       actions: (actions || (action ? [action] : [])) as string[],
       records_processed: 0,
-      api_calls_made: 0,
-      retries: 0,
-      rate_limit_hits: 0,
+      api_calls_made: errorMetrics.apiCalls,
+      retries: errorMetrics.retries,
+      rate_limit_hits: errorMetrics.rateLimitHits,
       error_message: errMsg,
     });
 
