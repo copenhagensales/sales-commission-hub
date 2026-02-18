@@ -12,6 +12,15 @@ function getStartOfDay(date: Date): Date {
   return d;
 }
 
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 function getPayrollPeriod(date: Date): { start: Date; end: Date } {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -42,42 +51,6 @@ function formatValue(value: number, category: string): string {
 }
 
 // ============= TYPES =============
-interface NewSale {
-  id: string;
-  agent_email: string | null;
-  agent_external_id: string | null;
-  sale_datetime: string;
-  created_at: string;
-}
-
-interface SaleItem {
-  sale_id: string;
-  quantity: number;
-  mapped_commission: number;
-  product_id: string | null;
-}
-
-interface FmSale {
-  id: string;
-  product_name: string | null;
-  seller_id: string | null;
-  registered_at: string;
-  created_at: string;
-}
-
-interface FmPricingRule {
-  product_name: string;
-  commission_dkk: number | null;
-}
-
-interface Watermark {
-  id: string;
-  period_type: string;
-  scope_type: string;
-  scope_id: string | null;
-  last_processed_at: string;
-}
-
 interface CachedValue {
   kpi_slug: string;
   period_type: string;
@@ -88,73 +61,130 @@ interface CachedValue {
   calculated_at: string;
 }
 
-// ============= FM COMMISSION MAP (Unified Pricing Service) =============
-// Implements two-tier fallback: product_pricing_rules -> products.commission_dkk/revenue_dkk
-// This ensures FM products (like Yousee) that don't have pricing rules still get their pricing
-async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, number>> {
-  const fullMap = new Map<string, { commission: number; source: string }>();
+interface SaleWithItems {
+  id: string;
+  agent_email: string | null;
+  agent_external_id: string | null;
+  sale_datetime: string;
+  client_campaign_id: string | null;
+  source: string | null;
+  sale_items: {
+    quantity: number;
+    mapped_commission: number;
+    mapped_revenue: number;
+    product_id: string | null;
+  }[];
+}
 
-  // 1. Load ALL products with base prices FIRST (fallback)
-  const { data: products, error: productsError } = await supabase
-    .from("products")
-    .select("id, name, commission_dkk");
+interface FmSaleUnified {
+  id: string;
+  sale_datetime: string;
+  agent_name: string | null;
+  raw_payload: {
+    fm_product_name?: string;
+    fm_seller_id?: string;
+    fm_client_id?: string;
+  } | null;
+}
 
-  if (productsError) {
-    console.error("[fetchFmCommissionMap] Error fetching products:", productsError);
+// ============= PAGINATED FETCH =============
+async function fetchAllSalesWithItems(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string
+): Promise<SaleWithItems[]> {
+  const PAGE_SIZE = 500;
+  const allSales: SaleWithItems[] = [];
+  let page = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("sales")
+      .select("id, agent_email, agent_external_id, sale_datetime, client_campaign_id, source, sale_items(quantity, mapped_commission, mapped_revenue, product_id)")
+      .neq("validation_status", "rejected")
+      .neq("source", "fieldmarketing")
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .order("sale_datetime", { ascending: true })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+    if (error) {
+      console.error(`[fetchAllSales] Error page ${page}:`, error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    allSales.push(...(data as SaleWithItems[]));
+    if (data.length < PAGE_SIZE) break;
+    page++;
   }
+  return allSales;
+}
 
-  // Set base prices from products table
-  for (const product of (products || [])) {
-    const key = product.name?.toLowerCase();
-    if (key && product.commission_dkk !== null) {
-      fullMap.set(key, {
-        commission: product.commission_dkk || 0,
-        source: 'product_base',
-      });
+async function fetchAllFmSales(
+  supabase: SupabaseClient,
+  startStr: string,
+  endStr: string
+): Promise<FmSaleUnified[]> {
+  const PAGE_SIZE = 500;
+  const allSales: FmSaleUnified[] = [];
+  let page = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("sales")
+      .select("id, sale_datetime, agent_name, raw_payload")
+      .eq("source", "fieldmarketing")
+      .neq("validation_status", "rejected")
+      .gte("sale_datetime", startStr)
+      .lte("sale_datetime", endStr)
+      .order("sale_datetime", { ascending: true })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+    if (error) {
+      console.error(`[fetchAllFmSales] Error page ${page}:`, error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    allSales.push(...(data as FmSaleUnified[]));
+    if (data.length < PAGE_SIZE) break;
+    page++;
+  }
+  return allSales;
+}
+
+// ============= FM COMMISSION MAP =============
+async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; revenue: number }>> {
+  const map = new Map<string, { commission: number; revenue: number }>();
+
+  // 1. Base prices from products table (fallback)
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, commission_dkk, revenue_dkk");
+
+  for (const p of (products || [])) {
+    const key = p.name?.toLowerCase();
+    if (key) {
+      map.set(key, { commission: p.commission_dkk || 0, revenue: p.revenue_dkk || 0 });
     }
   }
 
-  console.log(`[fetchFmCommissionMap] Loaded ${fullMap.size} products with base prices`);
-
-  // 2. Override with active pricing rules (higher priority)
-  const { data: rules, error: rulesError } = await supabase
+  // 2. Override with pricing rules (higher priority)
+  const { data: rules } = await supabase
     .from("product_pricing_rules")
-    .select(`
-      id,
-      product:products!inner(name),
-      commission_dkk,
-      priority
-    `)
+    .select("product:products!inner(name), commission_dkk, revenue_dkk, priority")
     .eq("is_active", true)
     .order("priority", { ascending: false, nullsFirst: true });
 
-  if (rulesError) {
-    console.error("[fetchFmCommissionMap] Error fetching pricing rules:", rulesError);
-  }
-
-  // Track which products have been set by pricing rules
-  const rulesApplied = new Set<string>();
-
+  const applied = new Set<string>();
   for (const rule of (rules || [])) {
-    const productData = rule.product as any;
-    const key = productData?.name?.toLowerCase();
-    if (key && !rulesApplied.has(key)) {
-      fullMap.set(key, {
-        commission: rule.commission_dkk || 0,
-        source: 'pricing_rule',
-      });
-      rulesApplied.add(key);
+    const key = (rule.product as any)?.name?.toLowerCase();
+    if (key && !applied.has(key)) {
+      map.set(key, { commission: rule.commission_dkk || 0, revenue: rule.revenue_dkk || 0 });
+      applied.add(key);
     }
   }
 
-  console.log(`[fetchFmCommissionMap] Applied ${rulesApplied.size} pricing rules. Final map size: ${fullMap.size}`);
-  
-  // Return simplified map (just commission values) for backwards compatibility
-  const result = new Map<string, number>();
-  for (const [key, value] of fullMap) {
-    result.set(key, value.commission);
-  }
-  return result;
+  return map;
 }
 
 // ============= MAIN FUNCTION =============
@@ -164,7 +194,7 @@ Deno.serve(async (req) => {
   }
 
   const startTime = Date.now();
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -172,475 +202,248 @@ Deno.serve(async (req) => {
 
     const now = new Date();
     const calculatedAt = now.toISOString();
-    
-    // Define periods we care about for incremental updates
-    const todayPeriod = { type: "today", start: getStartOfDay(now), end: now };
-    const payrollPeriod = { type: "payroll_period", ...getPayrollPeriod(now) };
-    const periods = [todayPeriod, payrollPeriod];
 
-    console.log(`[calculate-kpi-incremental] Starting incremental calculation...`);
-    console.log(`[calculate-kpi-incremental] Today: ${todayPeriod.start.toISOString()} - ${todayPeriod.end.toISOString()}`);
-    console.log(`[calculate-kpi-incremental] Payroll: ${payrollPeriod.start.toISOString()} - ${payrollPeriod.end.toISOString()}`);
+    // Periods to calculate
+    const periods = [
+      { type: "today", start: getStartOfDay(now), end: now },
+      { type: "this_week", start: getStartOfWeek(now), end: now },
+      { type: "payroll_period", ...getPayrollPeriod(now) },
+    ];
 
-    // ============= READ WATERMARKS =============
-    const { data: watermarks } = await supabase
-      .from("kpi_watermarks")
-      .select("*")
-      .in("period_type", ["today", "payroll_period"])
-      .eq("scope_type", "employee");
+    console.log(`[kpi-incremental] Starting absolute-count calculation...`);
 
-    const watermarkMap = new Map<string, string>();
-    for (const wm of (watermarks || []) as Watermark[]) {
-      watermarkMap.set(wm.period_type, wm.last_processed_at);
-    }
-
-    // Get watermarks (or use period start as default)
-    const todayWatermark = watermarkMap.get("today") || todayPeriod.start.toISOString();
-    const payrollWatermark = watermarkMap.get("payroll_period") || payrollPeriod.start.toISOString();
-
-    // Check if day changed - reset today watermark
-    const lastTodayWatermarkDate = new Date(todayWatermark).toISOString().split("T")[0];
-    const currentDate = now.toISOString().split("T")[0];
-    const effectiveTodayWatermark = lastTodayWatermarkDate !== currentDate 
-      ? todayPeriod.start.toISOString() 
-      : todayWatermark;
-
-    // Check if payroll period changed - reset payroll watermark
-    const lastPayrollWatermarkDate = new Date(payrollWatermark);
-    const effectivePayrollWatermark = lastPayrollWatermarkDate < payrollPeriod.start 
-      ? payrollPeriod.start.toISOString() 
-      : payrollWatermark;
-
-    console.log(`[calculate-kpi-incremental] Today watermark: ${effectiveTodayWatermark}`);
-    console.log(`[calculate-kpi-incremental] Payroll watermark: ${effectivePayrollWatermark}`);
-
-    // ============= FETCH NEW TELESALES =============
-    // Get sales created after the older watermark (covers both periods)
-    const olderWatermark = effectiveTodayWatermark < effectivePayrollWatermark 
-      ? effectiveTodayWatermark 
-      : effectivePayrollWatermark;
-
-    const { data: newSales, error: salesError } = await supabase
-      .from("sales")
-      .select("id, agent_email, agent_external_id, sale_datetime, created_at")
-      .neq("validation_status", "rejected")
-      .gt("created_at", olderWatermark)
-      .gte("sale_datetime", payrollPeriod.start.toISOString())
-      .lte("sale_datetime", payrollPeriod.end.toISOString())
-      .order("created_at", { ascending: true });
-
-    if (salesError) {
-      console.error("[calculate-kpi-incremental] Error fetching new sales:", salesError);
-      throw salesError;
-    }
-
-    console.log(`[calculate-kpi-incremental] Found ${(newSales || []).length} new telesales since watermark`);
-
-    // ============= FETCH NEW FM SALES (from unified sales table) =============
-    const { data: newFmSales, error: fmError } = await supabase
-      .from("sales")
-      .select("id, normalized_data, agent_name, sale_datetime, created_at")
-      .eq("source", "fieldmarketing")
-      .neq("validation_status", "rejected")
-      .gt("created_at", olderWatermark)
-      .gte("sale_datetime", payrollPeriod.start.toISOString())
-      .lte("sale_datetime", payrollPeriod.end.toISOString())
-      .order("created_at", { ascending: true });
-
-    if (fmError) {
-      console.error("[calculate-kpi-incremental] Error fetching new FM sales:", fmError);
-    }
-
-    console.log(`[calculate-kpi-incremental] Found ${(newFmSales || []).length} new FM sales since watermark`);
-
-    // If no new sales, just update watermarks and exit
-    if ((newSales || []).length === 0 && (newFmSales || []).length === 0) {
-      console.log("[calculate-kpi-incremental] No new sales - updating watermarks only");
-      
-      await upsertWatermarks(supabase, [
-        { period_type: "today", scope_type: "employee", scope_id: null, last_processed_at: calculatedAt },
-        { period_type: "payroll_period", scope_type: "employee", scope_id: null, last_processed_at: calculatedAt },
-      ]);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          newSales: 0,
-          affectedEmployees: 0,
-          updatedKpis: 0,
-          durationMs: Date.now() - startTime,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ============= FETCH SALE ITEMS FOR NEW SALES =============
-    const saleIds = (newSales || []).map((s: NewSale) => s.id);
-    let saleItemsMap = new Map<string, SaleItem[]>();
-
-    if (saleIds.length > 0) {
-      const { data: saleItems } = await supabase
-        .from("sale_items")
-        .select("sale_id, quantity, mapped_commission, product_id")
-        .in("sale_id", saleIds);
-
-      for (const item of (saleItems || []) as SaleItem[]) {
-        if (!saleItemsMap.has(item.sale_id)) {
-          saleItemsMap.set(item.sale_id, []);
-        }
-        saleItemsMap.get(item.sale_id)!.push(item);
-      }
-    }
-
-    // ============= GET PRODUCTS FOR COUNTS_AS_SALE CHECK =============
-    const allProductIds = [...new Set(
-      Array.from(saleItemsMap.values())
-        .flat()
-        .map(si => si.product_id)
-        .filter(Boolean)
-    )] as string[];
-
-    let countingProductIds = new Set<string>();
-    if (allProductIds.length > 0) {
-      const { data: products } = await supabase
-        .from("products")
-        .select("id, counts_as_sale")
-        .in("id", allProductIds);
-
-      countingProductIds = new Set(
-        (products || []).filter((p: any) => p.counts_as_sale !== false).map((p: any) => p.id)
-      );
-    }
-
-    // ============= GET AGENT MAPPINGS =============
-    const { data: allAgentMappings } = await supabase
-      .from("employee_agent_mapping")
-      .select("employee_id, agent_id, agents(email, external_dialer_id)");
-
-    // Build reverse lookup: agent identifier -> employee_id
-    const emailToEmployeeMap = new Map<string, string>();
-    const externalIdToEmployeeMap = new Map<string, string>();
-
-    for (const mapping of (allAgentMappings || [])) {
-      const empId = mapping.employee_id;
-      const email = (mapping.agents as any)?.email?.toLowerCase();
-      const externalId = (mapping.agents as any)?.external_dialer_id;
-
-      if (email) emailToEmployeeMap.set(email, empId);
-      if (externalId) externalIdToEmployeeMap.set(externalId, empId);
-    }
-
-    // ============= FM COMMISSION MAP =============
-    const fmCommissionMap = await fetchFmCommissionMap(supabase);
-
-    // ============= AGGREGATE DELTAS BY EMPLOYEE AND PERIOD =============
-    type EmployeeDelta = { salesCount: number; commission: number };
-    type PeriodDeltas = Map<string, EmployeeDelta>; // employee_id -> delta
-
-    const todayDeltas: PeriodDeltas = new Map();
-    const payrollDeltas: PeriodDeltas = new Map();
-
-    // Process telesales
-    for (const sale of (newSales || []) as NewSale[]) {
-      const saleEmail = sale.agent_email?.toLowerCase();
-      const saleExternalId = sale.agent_external_id;
-
-      // Find employee
-      let employeeId = saleEmail ? emailToEmployeeMap.get(saleEmail) : undefined;
-      if (!employeeId && saleExternalId) {
-        employeeId = externalIdToEmployeeMap.get(saleExternalId);
-      }
-
-      if (!employeeId) continue;
-
-      const saleDate = new Date(sale.sale_datetime);
-      const saleCreatedAt = new Date(sale.created_at);
-      const items = saleItemsMap.get(sale.id) || [];
-
-      let salesCount = 0;
-      let commission = 0;
-
-      for (const item of items) {
-        if (!item.product_id || countingProductIds.has(item.product_id)) {
-          salesCount += item.quantity || 1;
-        }
-        commission += item.mapped_commission || 0;
-      }
-
-      // If no items, count as 1 sale
-      if (items.length === 0) {
-        salesCount = 1;
-      }
-
-      // Add to today deltas if sale is today AND created after today watermark
-      if (saleDate >= todayPeriod.start && saleDate <= todayPeriod.end && saleCreatedAt > new Date(effectiveTodayWatermark)) {
-        const current = todayDeltas.get(employeeId) || { salesCount: 0, commission: 0 };
-        current.salesCount += salesCount;
-        current.commission += commission;
-        todayDeltas.set(employeeId, current);
-      }
-
-      // Add to payroll deltas if in payroll period AND created after payroll watermark
-      if (saleDate >= payrollPeriod.start && saleDate <= payrollPeriod.end && saleCreatedAt > new Date(effectivePayrollWatermark)) {
-        const current = payrollDeltas.get(employeeId) || { salesCount: 0, commission: 0 };
-        current.salesCount += salesCount;
-        current.commission += commission;
-        payrollDeltas.set(employeeId, current);
-      }
-    }
-
-    // Process FM sales
-    for (const fmSale of (newFmSales || []) as unknown as FmSale[]) {
-      const employeeId = fmSale.seller_id;
-      if (!employeeId) continue;
-
-      const saleDate = new Date(fmSale.registered_at);
-      const saleCreatedAt = new Date(fmSale.created_at);
-      const commission = fmCommissionMap.get(fmSale.product_name?.toLowerCase() || "") || 0;
-
-      // Add to today deltas
-      if (saleDate >= todayPeriod.start && saleDate <= todayPeriod.end && saleCreatedAt > new Date(effectiveTodayWatermark)) {
-        const current = todayDeltas.get(employeeId) || { salesCount: 0, commission: 0 };
-        current.salesCount += 1;
-        current.commission += commission;
-        todayDeltas.set(employeeId, current);
-      }
-
-      // Add to payroll deltas
-      if (saleDate >= payrollPeriod.start && saleDate <= payrollPeriod.end && saleCreatedAt > new Date(effectivePayrollWatermark)) {
-        const current = payrollDeltas.get(employeeId) || { salesCount: 0, commission: 0 };
-        current.salesCount += 1;
-        current.commission += commission;
-        payrollDeltas.set(employeeId, current);
-      }
-    }
-
-    const affectedEmployeeIds = new Set([...todayDeltas.keys(), ...payrollDeltas.keys()]);
-    console.log(`[calculate-kpi-incremental] Affected employees: ${affectedEmployeeIds.size}`);
-
-    if (affectedEmployeeIds.size === 0) {
-      console.log("[calculate-kpi-incremental] No employees affected by new sales");
-      
-      await upsertWatermarks(supabase, [
-        { period_type: "today", scope_type: "employee", scope_id: null, last_processed_at: calculatedAt },
-        { period_type: "payroll_period", scope_type: "employee", scope_id: null, last_processed_at: calculatedAt },
-      ]);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          newSales: (newSales || []).length + (newFmSales || []).length,
-          affectedEmployees: 0,
-          updatedKpis: 0,
-          durationMs: Date.now() - startTime,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ============= FETCH EXISTING CACHE VALUES FOR AFFECTED EMPLOYEES =============
-    const employeeIdsArray = [...affectedEmployeeIds];
-    
-    const { data: existingCache } = await supabase
-      .from("kpi_cached_values")
-      .select("kpi_slug, period_type, scope_type, scope_id, value")
-      .eq("scope_type", "employee")
-      .in("scope_id", employeeIdsArray)
-      .in("kpi_slug", ["sales_count", "total_commission"])
-      .in("period_type", ["today", "payroll_period"]);
-
-    // Build lookup map
-    type CacheKey = string;
-    const cacheKey = (slug: string, period: string, empId: string): CacheKey => 
-      `${slug}|${period}|${empId}`;
-
-    const existingCacheMap = new Map<CacheKey, number>();
-    for (const c of (existingCache || [])) {
-      existingCacheMap.set(cacheKey(c.kpi_slug, c.period_type, c.scope_id!), c.value);
-    }
-
-    // ============= CALCULATE NEW VALUES =============
-    const updatedValues: CachedValue[] = [];
-
-    // Process today deltas
-    for (const [empId, delta] of todayDeltas) {
-      const existingSales = existingCacheMap.get(cacheKey("sales_count", "today", empId)) || 0;
-      const existingCommission = existingCacheMap.get(cacheKey("total_commission", "today", empId)) || 0;
-
-      updatedValues.push({
-        kpi_slug: "sales_count",
-        period_type: "today",
-        scope_type: "employee",
-        scope_id: empId,
-        value: existingSales + delta.salesCount,
-        formatted_value: (existingSales + delta.salesCount).toString(),
-        calculated_at: calculatedAt,
-      });
-
-      updatedValues.push({
-        kpi_slug: "total_commission",
-        period_type: "today",
-        scope_type: "employee",
-        scope_id: empId,
-        value: existingCommission + delta.commission,
-        formatted_value: formatValue(existingCommission + delta.commission, "commission"),
-        calculated_at: calculatedAt,
-      });
-    }
-
-    // Process payroll deltas
-    for (const [empId, delta] of payrollDeltas) {
-      const existingSales = existingCacheMap.get(cacheKey("sales_count", "payroll_period", empId)) || 0;
-      const existingCommission = existingCacheMap.get(cacheKey("total_commission", "payroll_period", empId)) || 0;
-
-      updatedValues.push({
-        kpi_slug: "sales_count",
-        period_type: "payroll_period",
-        scope_type: "employee",
-        scope_id: empId,
-        value: existingSales + delta.salesCount,
-        formatted_value: (existingSales + delta.salesCount).toString(),
-        calculated_at: calculatedAt,
-      });
-
-      updatedValues.push({
-        kpi_slug: "total_commission",
-        period_type: "payroll_period",
-        scope_type: "employee",
-        scope_id: empId,
-        value: existingCommission + delta.commission,
-        formatted_value: formatValue(existingCommission + delta.commission, "commission"),
-        calculated_at: calculatedAt,
-      });
-    }
-
-    console.log(`[calculate-kpi-incremental] Upserting ${updatedValues.length} KPI values...`);
-
-    // ============= UPSERT UPDATED CACHE VALUES =============
-    if (updatedValues.length > 0) {
-      const { error: upsertError } = await supabase
-        .from("kpi_cached_values")
-        .upsert(updatedValues, {
-          onConflict: "kpi_slug,period_type,scope_type,scope_id",
-        });
-
-      if (upsertError) {
-        console.error("[calculate-kpi-incremental] Error upserting values:", upsertError);
-        throw upsertError;
-      }
-    }
-
-    // ============= UPDATE WATERMARKS =============
-    // Find the maximum created_at from processed sales
-    let maxTelesaleCreatedAt = olderWatermark;
-    for (const sale of (newSales || []) as NewSale[]) {
-      if (sale.created_at > maxTelesaleCreatedAt) {
-        maxTelesaleCreatedAt = sale.created_at;
-      }
-    }
-
-    let maxFmSaleCreatedAt = olderWatermark;
-    for (const sale of (newFmSales || []) as unknown as FmSale[]) {
-      if (sale.created_at > maxFmSaleCreatedAt) {
-        maxFmSaleCreatedAt = sale.created_at;
-      }
-    }
-
-    const newWatermark = maxTelesaleCreatedAt > maxFmSaleCreatedAt ? maxTelesaleCreatedAt : maxFmSaleCreatedAt;
-
-    await upsertWatermarks(supabase, [
-      { period_type: "today", scope_type: "employee", scope_id: null, last_processed_at: newWatermark },
-      { period_type: "payroll_period", scope_type: "employee", scope_id: null, last_processed_at: newWatermark },
+    // ============= FETCH REFERENCE DATA IN PARALLEL =============
+    const [
+      campaignsResult,
+      agentMappingsResult,
+      productsResult,
+      fmCommissionMap,
+      clientsResult,
+    ] = await Promise.all([
+      supabase.from("client_campaigns").select("id, client_id"),
+      supabase.from("employee_agent_mapping").select("employee_id, agent_id, agents(email, external_dialer_id)"),
+      supabase.from("products").select("id, counts_as_sale"),
+      fetchFmCommissionMap(supabase),
+      supabase.from("clients").select("id, name"),
     ]);
 
+    // Build campaign -> client_id map
+    const campaignToClient = new Map<string, string>();
+    for (const c of (campaignsResult.data || [])) {
+      campaignToClient.set(c.id, c.client_id);
+    }
+
+    // Build agent identifier -> employee_id maps
+    const emailToEmployee = new Map<string, string>();
+    const externalIdToEmployee = new Map<string, string>();
+    for (const m of (agentMappingsResult.data || [])) {
+      const email = (m.agents as any)?.email?.toLowerCase();
+      const extId = (m.agents as any)?.external_dialer_id;
+      if (email) emailToEmployee.set(email, m.employee_id);
+      if (extId) externalIdToEmployee.set(extId, m.employee_id);
+    }
+
+    // Build counting products set
+    const countingProductIds = new Set<string>(
+      (productsResult.data || [])
+        .filter((p: any) => p.counts_as_sale !== false)
+        .map((p: any) => p.id)
+    );
+
+    const clientIds = (clientsResult.data || []).map((c: any) => c.id);
+
+    // ============= PROCESS EACH PERIOD =============
+    const allValues: CachedValue[] = [];
+
+    for (const period of periods) {
+      const startStr = period.start.toISOString();
+      const endStr = period.end.toISOString();
+
+      console.log(`[kpi-incremental] Processing period ${period.type}: ${startStr} - ${endStr}`);
+
+      // Fetch all sales for this period
+      const [tmSales, fmSales] = await Promise.all([
+        fetchAllSalesWithItems(supabase, startStr, endStr),
+        fetchAllFmSales(supabase, startStr, endStr),
+      ]);
+
+      console.log(`[kpi-incremental] ${period.type}: ${tmSales.length} TM sales, ${fmSales.length} FM sales`);
+
+      // ============= AGGREGATE =============
+      // Accumulators: employee, client, global
+      const empSales = new Map<string, number>();
+      const empCommission = new Map<string, number>();
+      const clientSales = new Map<string, number>();
+      const clientCommission = new Map<string, number>();
+      const clientRevenue = new Map<string, number>();
+      let globalSales = 0;
+      let globalCommission = 0;
+      let globalRevenue = 0;
+
+      // Process TM sales
+      for (const sale of tmSales) {
+        const items = sale.sale_items || [];
+        let saleCount = 0;
+        let commission = 0;
+        let revenue = 0;
+
+        if (items.length > 0) {
+          for (const item of items) {
+            if (!item.product_id || countingProductIds.has(item.product_id)) {
+              saleCount += item.quantity || 1;
+            }
+            commission += item.mapped_commission || 0;
+            revenue += item.mapped_revenue || 0;
+          }
+        } else {
+          saleCount = 1;
+        }
+
+        // Resolve client_id
+        const clientId = sale.client_campaign_id
+          ? campaignToClient.get(sale.client_campaign_id) || null
+          : null;
+
+        // Resolve employee_id
+        const email = sale.agent_email?.toLowerCase();
+        const extId = sale.agent_external_id;
+        const employeeId = (email ? emailToEmployee.get(email) : undefined)
+          || (extId ? externalIdToEmployee.get(extId) : undefined);
+
+        // Employee aggregation
+        if (employeeId) {
+          empSales.set(employeeId, (empSales.get(employeeId) || 0) + saleCount);
+          empCommission.set(employeeId, (empCommission.get(employeeId) || 0) + commission);
+        }
+
+        // Client aggregation
+        if (clientId) {
+          clientSales.set(clientId, (clientSales.get(clientId) || 0) + saleCount);
+          clientCommission.set(clientId, (clientCommission.get(clientId) || 0) + commission);
+          clientRevenue.set(clientId, (clientRevenue.get(clientId) || 0) + revenue);
+        }
+
+        // Global aggregation
+        globalSales += saleCount;
+        globalCommission += commission;
+        globalRevenue += revenue;
+      }
+
+      // Process FM sales
+      for (const sale of fmSales) {
+        const productName = sale.raw_payload?.fm_product_name?.toLowerCase();
+        const pricing = productName ? fmCommissionMap.get(productName) : undefined;
+        const commission = pricing?.commission || 0;
+        const revenue = pricing?.revenue || 0;
+        const clientId = sale.raw_payload?.fm_client_id || null;
+        const sellerId = sale.raw_payload?.fm_seller_id || null;
+
+        // Employee aggregation (FM uses seller_id directly as employee_id)
+        if (sellerId) {
+          empSales.set(sellerId, (empSales.get(sellerId) || 0) + 1);
+          empCommission.set(sellerId, (empCommission.get(sellerId) || 0) + commission);
+        }
+
+        // Client aggregation
+        if (clientId) {
+          clientSales.set(clientId, (clientSales.get(clientId) || 0) + 1);
+          clientCommission.set(clientId, (clientCommission.get(clientId) || 0) + commission);
+          clientRevenue.set(clientId, (clientRevenue.get(clientId) || 0) + revenue);
+        }
+
+        // Global
+        globalSales += 1;
+        globalCommission += commission;
+        globalRevenue += revenue;
+      }
+
+      // ============= BUILD CACHED VALUES =============
+
+      // Global scope
+      allValues.push(
+        { kpi_slug: "sales_count", period_type: period.type, scope_type: "global", scope_id: null, value: globalSales, formatted_value: formatValue(globalSales, "count"), calculated_at: calculatedAt },
+        { kpi_slug: "total_commission", period_type: period.type, scope_type: "global", scope_id: null, value: globalCommission, formatted_value: formatValue(globalCommission, "commission"), calculated_at: calculatedAt },
+        { kpi_slug: "total_revenue", period_type: period.type, scope_type: "global", scope_id: null, value: globalRevenue, formatted_value: formatValue(globalRevenue, "revenue"), calculated_at: calculatedAt },
+      );
+
+      // Client scope
+      for (const cid of clientIds) {
+        const sales = clientSales.get(cid) || 0;
+        const comm = clientCommission.get(cid) || 0;
+        const rev = clientRevenue.get(cid) || 0;
+
+        allValues.push(
+          { kpi_slug: "sales_count", period_type: period.type, scope_type: "client", scope_id: cid, value: sales, formatted_value: formatValue(sales, "count"), calculated_at: calculatedAt },
+          { kpi_slug: "antal_salg", period_type: period.type, scope_type: "client", scope_id: cid, value: sales, formatted_value: formatValue(sales, "count"), calculated_at: calculatedAt },
+          { kpi_slug: "total_commission", period_type: period.type, scope_type: "client", scope_id: cid, value: comm, formatted_value: formatValue(comm, "commission"), calculated_at: calculatedAt },
+          { kpi_slug: "total_provision", period_type: period.type, scope_type: "client", scope_id: cid, value: comm, formatted_value: formatValue(comm, "commission"), calculated_at: calculatedAt },
+          { kpi_slug: "total_revenue", period_type: period.type, scope_type: "client", scope_id: cid, value: rev, formatted_value: formatValue(rev, "revenue"), calculated_at: calculatedAt },
+        );
+      }
+
+      // Employee scope (only today + payroll_period to keep volume manageable)
+      if (period.type === "today" || period.type === "payroll_period") {
+        for (const [empId, sales] of empSales) {
+          allValues.push({
+            kpi_slug: "sales_count",
+            period_type: period.type,
+            scope_type: "employee",
+            scope_id: empId,
+            value: sales,
+            formatted_value: sales.toString(),
+            calculated_at: calculatedAt,
+          });
+        }
+
+        for (const [empId, comm] of empCommission) {
+          allValues.push({
+            kpi_slug: "total_commission",
+            period_type: period.type,
+            scope_type: "employee",
+            scope_id: empId,
+            value: comm,
+            formatted_value: formatValue(comm, "commission"),
+            calculated_at: calculatedAt,
+          });
+        }
+      }
+    }
+
+    // ============= UPSERT ALL VALUES IN BATCHES =============
+    console.log(`[kpi-incremental] Upserting ${allValues.length} KPI values...`);
+
+    const BATCH_SIZE = 200;
+    let upsertErrors = 0;
+    for (let i = 0; i < allValues.length; i += BATCH_SIZE) {
+      const batch = allValues.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase
+        .from("kpi_cached_values")
+        .upsert(batch, { onConflict: "kpi_slug,period_type,scope_type,scope_id" });
+
+      if (error) {
+        console.error(`[kpi-incremental] Upsert error batch ${i / BATCH_SIZE}:`, error);
+        upsertErrors++;
+      }
+    }
+
     const durationMs = Date.now() - startTime;
-    console.log(`[calculate-kpi-incremental] Completed in ${durationMs}ms. Updated ${updatedValues.length} KPIs for ${affectedEmployeeIds.size} employees.`);
+    console.log(`[kpi-incremental] Done in ${durationMs}ms. ${allValues.length} values, ${upsertErrors} errors.`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        newSales: (newSales || []).length,
-        newFmSales: (newFmSales || []).length,
-        affectedEmployees: affectedEmployeeIds.size,
-        updatedKpis: updatedValues.length,
+        totalValues: allValues.length,
+        periods: periods.map(p => p.type),
+        upsertErrors,
         durationMs,
-        watermark: newWatermark,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("[calculate-kpi-incremental] Error:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[kpi-incremental] Error:", error);
     return new Response(
-      JSON.stringify({ error: message, durationMs: Date.now() - startTime }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", durationMs: Date.now() - startTime }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
-
-// ============= HELPER: UPSERT WATERMARKS =============
-async function upsertWatermarks(
-  supabase: SupabaseClient,
-  watermarks: { period_type: string; scope_type: string; scope_id: string | null; last_processed_at: string }[]
-) {
-  for (const wm of watermarks) {
-    const updatedAt = new Date().toISOString();
-    
-    // Handle NULL scope_id explicitly - Supabase upsert doesn't work with partial indexes on NULL
-    if (wm.scope_id === null) {
-      // First try to update existing row
-      const { data: updateData, error: updateError } = await supabase
-        .from("kpi_watermarks")
-        .update({ 
-          last_processed_at: wm.last_processed_at, 
-          updated_at: updatedAt 
-        })
-        .eq("period_type", wm.period_type)
-        .eq("scope_type", wm.scope_type)
-        .is("scope_id", null)
-        .select();
-      
-      if (updateError) {
-        console.error(`[upsertWatermarks] Update error for ${wm.period_type}:`, updateError);
-      }
-      
-      // If no rows were updated (updateData is empty), insert new row
-      if (!updateData || updateData.length === 0) {
-        const { error: insertError } = await supabase
-          .from("kpi_watermarks")
-          .insert({
-            period_type: wm.period_type,
-            scope_type: wm.scope_type,
-            scope_id: null,
-            last_processed_at: wm.last_processed_at,
-            updated_at: updatedAt,
-          });
-        
-        if (insertError) {
-          console.error(`[upsertWatermarks] Insert error for ${wm.period_type}:`, insertError);
-        } else {
-          console.log(`[upsertWatermarks] Inserted new watermark for ${wm.period_type}`);
-        }
-      } else {
-        console.log(`[upsertWatermarks] Updated watermark for ${wm.period_type} to ${wm.last_processed_at}`);
-      }
-    } else {
-      // Normal upsert for non-null scope_id
-      const { error } = await supabase
-        .from("kpi_watermarks")
-        .upsert({
-          period_type: wm.period_type,
-          scope_type: wm.scope_type,
-          scope_id: wm.scope_id,
-          last_processed_at: wm.last_processed_at,
-          updated_at: updatedAt,
-        }, {
-          onConflict: "period_type,scope_type,scope_id",
-        });
-
-      if (error) {
-        console.error(`[upsertWatermarks] Error upserting watermark for ${wm.period_type}:`, error);
-      }
-    }
-  }
-}
