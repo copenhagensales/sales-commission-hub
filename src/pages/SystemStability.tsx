@@ -173,29 +173,22 @@ export default function SystemStability() {
   const now60m = Date.now() - 60 * 60 * 1000;
   const allRuns = syncRuns.length > 0 ? syncRuns : recentLogs;
 
-  // Group integrations by provider
-  const providerMap = new Map<string, { names: string[]; ids: Set<string> }>();
+  // Per-integration rate limit budget (each integration has its own API credentials)
+  const integrationBudgets: (ProviderBudget & { providerType: string; calls1m: number; limit1m: number; calls60m: number; limit60m: number })[] = [];
   for (const int of integrations as any[]) {
-    const p = (int.provider || "unknown").toLowerCase();
-    if (!providerMap.has(p)) providerMap.set(p, { names: [], ids: new Set() });
-    providerMap.get(p)!.names.push(int.name);
-    providerMap.get(p)!.ids.add(int.id);
-  }
-
-  const providerBudgets: (ProviderBudget & { integrationNames: string[]; calls1m: number; limit1m: number; calls60m: number; limit60m: number })[] = [];
-  for (const [provider, { names, ids }] of providerMap) {
+    const provider = (int.provider || "unknown").toLowerCase();
     const limits = PROVIDER_LIMITS[provider] || DEFAULT_LIMITS;
-    const providerRuns = allRuns.filter((r: any) => ids.has(r.integration_id));
-    const calls1m = providerRuns
+    const intRuns = allRuns.filter((r: any) => r.integration_id === int.id);
+    const calls1m = intRuns
       .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now1m)
       .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
-    const calls60m = providerRuns
+    const calls60m = intRuns
       .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now60m)
       .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
 
-    providerBudgets.push({
-      provider,
-      integrationNames: names,
+    integrationBudgets.push({
+      provider: int.name,
+      providerType: provider,
       calls1m,
       limit1m: limits.limitPerMin,
       used1m: Math.min((calls1m / limits.limitPerMin) * 100, 100),
@@ -235,7 +228,7 @@ export default function SystemStability() {
 
   const alerts = useStabilityAlerts({
     integrationMetrics,
-    providerBudgets,
+    providerBudgets: integrationBudgets,
   });
 
   return (
@@ -305,17 +298,17 @@ export default function SystemStability() {
         })}
       </div>
 
-      {/* Rate Limit Budget per Provider */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {providerBudgets.map((pb) => (
+      {/* Rate Limit Budget per Integration */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {integrationBudgets.map((pb) => (
           <Card key={pb.provider}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Activity className="h-4 w-4" />
-                {pb.provider.charAt(0).toUpperCase() + pb.provider.slice(1)} Rate Limits
+                {pb.provider}
               </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {pb.integrationNames.join(", ")} — {pb.limit1m}/min, {pb.limit60m}/time
+              <p className="text-xs text-muted-foreground capitalize">
+                {pb.providerType} — {pb.limit1m}/min, {pb.limit60m}/time
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
