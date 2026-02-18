@@ -5839,6 +5839,111 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_dual_read_compare: {
+        Row: {
+          commission_delta_pct: number
+          contract_version: string
+          created_at: string
+          id: string
+          legacy_commission: number
+          legacy_data_as_of: string
+          legacy_revenue: number
+          legacy_sales: number
+          period_type: string
+          revenue_delta_pct: number
+          sales_delta_pct: number
+          scope_id: string | null
+          scope_type: string
+          unified_commission: number
+          unified_data_as_of: string
+          unified_revenue: number
+          unified_sales: number
+        }
+        Insert: {
+          commission_delta_pct: number
+          contract_version: string
+          created_at?: string
+          id?: string
+          legacy_commission: number
+          legacy_data_as_of: string
+          legacy_revenue: number
+          legacy_sales: number
+          period_type: string
+          revenue_delta_pct: number
+          sales_delta_pct: number
+          scope_id?: string | null
+          scope_type: string
+          unified_commission: number
+          unified_data_as_of: string
+          unified_revenue: number
+          unified_sales: number
+        }
+        Update: {
+          commission_delta_pct?: number
+          contract_version?: string
+          created_at?: string
+          id?: string
+          legacy_commission?: number
+          legacy_data_as_of?: string
+          legacy_revenue?: number
+          legacy_sales?: number
+          period_type?: string
+          revenue_delta_pct?: number
+          sales_delta_pct?: number
+          scope_id?: string | null
+          scope_type?: string
+          unified_commission?: number
+          unified_data_as_of?: string
+          unified_revenue?: number
+          unified_sales?: number
+        }
+        Relationships: []
+      }
+      kpi_health_snapshots: {
+        Row: {
+          contract_version: string
+          created_at: string
+          data_as_of: string
+          freshness_lag_seconds: number
+          id: string
+          period_type: string
+          scope_id: string | null
+          scope_type: string
+          source: string
+          total_commission: number
+          total_revenue: number
+          total_sales: number
+        }
+        Insert: {
+          contract_version: string
+          created_at?: string
+          data_as_of: string
+          freshness_lag_seconds?: number
+          id?: string
+          period_type: string
+          scope_id?: string | null
+          scope_type: string
+          source: string
+          total_commission?: number
+          total_revenue?: number
+          total_sales?: number
+        }
+        Update: {
+          contract_version?: string
+          created_at?: string
+          data_as_of?: string
+          freshness_lag_seconds?: number
+          id?: string
+          period_type?: string
+          scope_id?: string | null
+          scope_type?: string
+          source?: string
+          total_commission?: number
+          total_revenue?: number
+          total_sales?: number
+        }
+        Relationships: []
+      }
       kpi_leaderboard_cache: {
         Row: {
           calculated_at: string
@@ -5869,6 +5974,42 @@ export type Database = {
           scope_id?: string | null
           scope_type?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      kpi_reconcile_schedule: {
+        Row: {
+          cadence: string
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          lookback_window: string
+          reconcile_mode: string
+          schedule_name: string
+          updated_at: string
+        }
+        Insert: {
+          cadence: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lookback_window: string
+          reconcile_mode: string
+          schedule_name: string
+          updated_at?: string
+        }
+        Update: {
+          cadence?: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lookback_window?: string
+          reconcile_mode?: string
+          schedule_name?: string
+          updated_at?: string
         }
         Relationships: []
       }
