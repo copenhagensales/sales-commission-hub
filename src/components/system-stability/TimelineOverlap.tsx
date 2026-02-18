@@ -6,6 +6,7 @@ import { Clock } from "lucide-react";
 interface Integration {
   id: string;
   name: string;
+  provider: string;
   config: any;
   sync_frequency_minutes?: number;
 }
@@ -19,12 +20,13 @@ export function TimelineOverlap({ integrations }: TimelineOverlapProps) {
     integrations.map(int => ({
       id: int.id,
       name: int.name,
+      provider: int.provider,
       schedule: int.config?.sync_schedule || `*/${int.sync_frequency_minutes || 10} * * * *`,
     })),
     [integrations]
   );
 
-  const overlapWarnings = useMemo(() => detectOverlaps(jobs, 2), [jobs]);
+  const overlapWarnings = useMemo(() => detectOverlaps(jobs, 2, true), [jobs]);
   const conflictMinutesSet = useMemo(() => {
     const set = new Set<number>();
     overlapWarnings.forEach(w => w.conflictMinutes.forEach(m => set.add(m)));
