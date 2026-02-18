@@ -1,56 +1,73 @@
 
 
-# Luk de blinde punkter i SystemStability
+# Fix: "Gem tidsplan" gemmer ikke startminut
 
-## Problem
+## Problemet
 
-SystemStability-siden har 3 huller der betyder at ikke al API-aktivitet overvages, og at schedule-aendringer ikke altid er synkroniserede.
+Naar du trykker "Gem tidsplan", sker foelgende:
 
-## Hvad der mangler
+1. Cron-jobbet opdateres korrekt i databasen (det virker)
+2. Audit-loggen skrives korrekt (det virker)
+3. Men den nye tidsplan skrives IKKE tilbage til integrationen i `dialer_integrations.config.sync_schedule`
+4. Naar siden genindlaeser data, laeser den den gamle config -- og startminuttet nulstilles
 
-### 1. Gamle funktioner der rammer API uden overvagning
+## Loesning
 
-- `adversus-sync-v2` og `sync-adversus` er gamle edge functions der stadig kan kaldes fra Settings-siden
-- De bruger hardkodede environment variable credentials (ikke per-integration)
-- De logger IKKE til `integration_sync_runs`, saa SystemStability ser dem ikke
-- `customer-crm-syncer` koerer som cron job (hver time) uden at blive vist
+### 1. Edge function: Gem schedule i integrationsconfig
 
-**Loesning:** Fjern de gamle knapper fra Settings.tsx saa de ikke kan udloeses. Redirect al sync til `integration-engine`. Fjern det ubrugte `customer-crm-syncer` cron job.
+**Fil:** `supabase/functions/update-cron-schedule/index.ts`
 
-### 2. Webhooks tæelles ikke med i rate limit budget
+Efter at cron-jobbet er oprettet (linje ~210), tilfoej en UPDATE der gemmer den nye `sync_schedule` og `sync_frequency_minutes` paa integrationen:
 
-Adversus/Enreach webhooks (`dialer-webhook`, `adversus-webhook`) modtager data og kan lave API-kald, men de logger ikke til `integration_sync_runs` -- saa de taelles ikke med i burst/time-budgettet.
+```typescript
+// After scheduling, persist to integration config
+if (integration_type === "dialer" && integration_id) {
+  const currentConfig = integrationMetadata?.config || {};
+  const updatedConfig = { ...currentConfig, sync_schedule: cronExpression };
+  await supabase
+    .from("dialer_integrations")
+    .update({
+      config: updatedConfig,
+      sync_frequency_minutes: frequency_minutes,
+    })
+    .eq("id", integration_id);
+}
+```
 
-**Loesning:** Tilfoej en sektion paa SystemStability der viser webhook-aktivitet baseret paa `integration_logs` (der allerede logges). Alternativt: Webhooks er passiv modtagelse og rammer ikke eksternt API -- i saa fald er det ikke et rate limit problem, men det skal vaere tydeligt paa siden.
+### 2. Frontend: Synkroniser lokal state naar data genindlæses
 
-### 3. Cron jobs kan oprettes uden om Schedule Editor
+**Fil:** `src/components/system-stability/ScheduleEditor.tsx`
 
-Flere steder i koden kalder `update-cron-schedule` direkte (DialerIntegrations.tsx, Settings.tsx). Der er ingen validering af at `cron.job`-tabellen matcher det Schedule Editor viser.
+Tilfoej en `useEffect` der opdaterer `frequency` og `startMinute` naar `integrations`-prop'en aendrer sig (efter refetch):
 
-**Loesning:** Tilfoej en "Live cron status"-sektion der henter aktive jobs fra `cron.job`-tabellen og sammenligner dem med hvad Schedule Editor forventer. Vis en advarsel hvis der er uoverensstemmelser.
+```typescript
+useEffect(() => {
+  const int = integrations.find(i => i.id === selectedId);
+  if (int?.config?.sync_schedule) {
+    const freq = estimateFrequencyFromCron(int.config.sync_schedule);
+    setFrequency(String(freq));
+    const mins = parseCronMinutes(int.config.sync_schedule);
+    setStartMinute(String(mins[0] ?? 0));
+  }
+}, [integrations, selectedId]);
+```
 
-## Tekniske aendringer
+### 3. Invalidering af React Query cache
 
-### Fil 1: `src/pages/Settings.tsx`
-- Fjern "adversus-sync-v2" og "sync-adversus" fra manual function picker
-- Slet den gamle sync-knap der kalder `adversus-sync-v2`
-- Behold KUN `integration-engine` som sync-metode
+**Fil:** `src/components/system-stability/ScheduleEditor.tsx`
 
-### Fil 2: `src/pages/SystemStability.tsx`
-- Tilfoej en ny useQuery der henter aktive cron jobs via `supabase.rpc()` eller en ny edge function
-- Vis en "Aktive jobs"-oversigt med advarsel hvis der er jobs der ikke matcher en aktiv integration
-- Tilfoej webhook-aktivitet som en separat lille sektion (antal webhooks modtaget sidste 24 timer fra `integration_logs`)
+Tilfoej `useQueryClient` og invalider relevante queries efter succesfuld gem:
 
-### Fil 3: Database cleanup (migration)
-- Fjern det ubrugte `customer-crm-syncer` cron job via SQL: `SELECT cron.unschedule('sync-client-20744525-7466-4b2c-afa7-6ee09a9112b0')`
+```typescript
+const queryClient = useQueryClient();
+// ... i handleSave, efter success:
+queryClient.invalidateQueries({ queryKey: ["system-stability-integrations"] });
+```
 
-### Ingen nye edge functions noedvendige
+## Filer der aendres
 
-## Resultat
+- `supabase/functions/update-cron-schedule/index.ts` -- gem schedule i config
+- `src/components/system-stability/ScheduleEditor.tsx` -- synkroniser state + cache invalidering
 
-Efter denne aendring:
-- Al API-aktivitet er synlig paa SystemStability-siden
-- Gamle funktioner kan ikke laengere udloeses ved en fejl
-- Uoverensstemmelser mellem cron jobs og Schedule Editor bliver automatisk opdaget og vist
-- Webhook-aktivitet er synlig (selvom den typisk ikke pavirker rate limits)
+## Ingen database-aendringer
 
