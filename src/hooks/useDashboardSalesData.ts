@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, endOfDay, eachDayOfInterval, getDay } from "date-fns";
-import { fetchAllRows } from "@/utils/supabasePagination";
+import { chunk, fetchAllRows } from "@/utils/supabasePagination";
 import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
@@ -23,6 +23,7 @@ export interface DashboardSalesData {
   totalCommission: number;
   totalHours: number;
   employeeStats: DashboardEmployeeStats[];
+  dataAsOf: string | null;
   isLoading: boolean;
 }
 
@@ -61,6 +62,11 @@ export function useDashboardSalesData({
     ],
     refetchInterval,
     queryFn: () => trackFetch("dashboard-sales-data", async () => {
+      const AGENT_EMAIL_CHUNK_SIZE = 150;
+      const SALES_EMAIL_FILTER_CHUNK_SIZE = 75;
+      const SALES_FETCH_BATCH_SIZE = 3;
+      const MAX_SALES_ROWS = 20000;
+
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(endDate, "yyyy-MM-dd");
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -69,6 +75,23 @@ export function useDashboardSalesData({
       const { data: { session } } = await supabase.auth.getSession();
       const authToken = session?.access_token || supabaseKey;
       const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
+
+      const buildEmailOrFilter = (emails: string[]) =>
+        emails
+          .map((email) => `email.ilike.${encodeURIComponent(email)}`)
+          .join(",");
+
+      const fetchAgentsByEmails = async (emails: string[]) => {
+        const agentChunks = chunk(emails, AGENT_EMAIL_CHUNK_SIZE);
+        const results = await Promise.all(
+          agentChunks.map(async (emailChunk) => {
+            const agentsUrl = `${supabaseUrl}/rest/v1/agents?select=id,email,external_dialer_id&or=(${buildEmailOrFilter(emailChunk)})`;
+            return fetchAllPostgrestRows<{ id: string; email: string; external_dialer_id: string | null }>(agentsUrl, headers);
+          })
+        );
+
+        return results.flat();
+      };
 
       // Resolve clientId from clientName if provided
       let resolvedClientId = clientId;
@@ -91,7 +114,10 @@ export function useDashboardSalesData({
       if (resolvedClientId) {
         // Find employees who have sales for this client via agent mapping
         const salesUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${resolvedClientId}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
-        const salesForClient = await fetchAllPostgrestRows<any>(salesUrl, headers);
+        const salesForClient = await fetchAllPostgrestRows<any>(salesUrl, headers, {
+          maxRows: MAX_SALES_ROWS,
+          onMaxRowsExceeded: "error",
+        });
 
         const agentEmails = [
           ...new Set(
@@ -102,10 +128,7 @@ export function useDashboardSalesData({
         ] as string[];
 
         if (agentEmails.length > 0) {
-          const agentsData = await fetchAllRows<{id: string; email: string; external_dialer_id: string | null}>("agents", "id, email, external_dialer_id");
-          const matchingAgents = (agentsData || []).filter((a) =>
-            agentEmails.includes(a.email?.toLowerCase())
-          );
+          const matchingAgents = await fetchAgentsByEmails(agentEmails);
           const matchingAgentIds = matchingAgents.map((a) => a.id);
 
           if (matchingAgentIds.length > 0) {
@@ -244,17 +267,44 @@ export function useDashboardSalesData({
           "sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(counts_as_sale))",
         ];
         const selectClause = selectParts.join(",");
-        const emailOrFilter = emailIdentifiers.map((e) => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
+        const salesEmailChunks = chunk(emailIdentifiers, SALES_EMAIL_FILTER_CHUNK_SIZE);
+        const rowsById = new Map<string, any>();
 
-        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
-        salesUrl += `&or=(${emailOrFilter})`;
-        salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+        for (let i = 0; i < salesEmailChunks.length; i += SALES_FETCH_BATCH_SIZE) {
+          const batch = salesEmailChunks.slice(i, i + SALES_FETCH_BATCH_SIZE);
 
-        if (resolvedClientId) {
-          salesUrl += `&client_campaigns.client_id=eq.${resolvedClientId}`;
+          const batchRows = await Promise.all(
+            batch.map(async (emailChunk) => {
+              const emailOrFilter = emailChunk
+                .map((email) => `agent_email.ilike.${encodeURIComponent(email)}`)
+                .join(",");
+
+              let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
+              salesUrl += `&or=(${emailOrFilter})`;
+              salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+
+              if (resolvedClientId) {
+                salesUrl += `&client_campaigns.client_id=eq.${resolvedClientId}`;
+              }
+
+              return fetchAllPostgrestRows<any>(salesUrl, headers, {
+                maxRows: MAX_SALES_ROWS,
+                onMaxRowsExceeded: "error",
+                requestTimeoutMs: 20000,
+              });
+            })
+          );
+
+          batchRows.flat().forEach((row) => {
+            if (row?.id) rowsById.set(row.id, row);
+          });
+
+          if (rowsById.size > MAX_SALES_ROWS) {
+            throw new Error(`Dashboard sales fetch exceeded safe limit (${MAX_SALES_ROWS})`);
+          }
         }
 
-        return await fetchAllPostgrestRows<any>(salesUrl, headers);
+        return Array.from(rowsById.values());
       };
 
       // Step 5: Fetch fieldmarketing sales from unified sales table
@@ -557,9 +607,12 @@ export function useDashboardSalesData({
         totalCommission: Math.round(grandTotalCommission),
         totalHours: Math.round(grandTotalHours * 100) / 100,
         employeeStats,
+        dataAsOf: new Date().toISOString(),
       };
     }),
     enabled,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
     ...REFRESH_PROFILES.dashboard,
   });
 
@@ -569,6 +622,7 @@ export function useDashboardSalesData({
     totalCommission: data?.totalCommission || 0,
     totalHours: data?.totalHours || 0,
     employeeStats: data?.employeeStats || [],
+    dataAsOf: data?.dataAsOf || null,
     isLoading,
   };
 }

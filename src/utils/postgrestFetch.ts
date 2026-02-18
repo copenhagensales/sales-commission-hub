@@ -3,28 +3,68 @@ interface FetchAllPostgrestRowsOptions {
   retries?: number;
   retryDelayMs?: number;
   maxPages?: number;
+  maxRows?: number;
+  onMaxRowsExceeded?: "truncate" | "error";
+  requestTimeoutMs?: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchWithRetry(url: string, init: RequestInit, retries: number, retryDelayMs: number): Promise<Response> {
+function getRetryDelayMs(response: Response | null, attempt: number, retryDelayMs: number): number {
+  const retryAfterHeader = response?.headers.get("retry-after");
+  const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+
+  const expBackoff = retryDelayMs * 2 ** attempt;
+  const jitter = Math.floor(Math.random() * retryDelayMs);
+  return expBackoff + jitter;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries: number,
+  retryDelayMs: number,
+  requestTimeoutMs: number
+): Promise<Response> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const response = await fetch(url, init);
+      const controller = new AbortController();
+      const timeoutHandle = setTimeout(() => controller.abort(), requestTimeoutMs);
+      let response: Response;
+
+      try {
+        response = await fetch(url, {
+          ...init,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
+
       if (response.ok) return response;
 
-      if (response.status >= 500 && attempt < retries) {
-        await sleep(retryDelayMs * (attempt + 1));
+      const isRetryableStatus = response.status === 429 || response.status >= 500;
+      if (isRetryableStatus && attempt < retries) {
+        await sleep(getRetryDelayMs(response, attempt, retryDelayMs));
         continue;
       }
 
       return response;
     } catch (error) {
       lastError = error;
+
+      if (error instanceof DOMException && error.name === "AbortError") {
+        lastError = new Error(`PostgREST request timed out after ${requestTimeoutMs}ms`);
+      }
+
       if (attempt < retries) {
-        await sleep(retryDelayMs * (attempt + 1));
+        await sleep(getRetryDelayMs(null, attempt, retryDelayMs));
         continue;
       }
     }
@@ -50,7 +90,15 @@ export async function fetchAllPostgrestRows<T = unknown>(
   headers: Record<string, string>,
   options: FetchAllPostgrestRowsOptions = {}
 ): Promise<T[]> {
-  const { pageSize = 500, retries = 2, retryDelayMs = 250, maxPages = 10000 } = options;
+  const {
+    pageSize = 500,
+    retries = 4,
+    retryDelayMs = 500,
+    maxPages = 10000,
+    maxRows,
+    onMaxRowsExceeded = "error",
+    requestTimeoutMs = 30000,
+  } = options;
 
   const baseUrl = new URL(rawUrl);
   baseUrl.searchParams.delete("limit");
@@ -74,7 +122,8 @@ export async function fetchAllPostgrestRows<T = unknown>(
         },
       },
       retries,
-      retryDelayMs
+      retryDelayMs,
+      requestTimeoutMs
     );
 
     if (!response.ok) {
@@ -93,6 +142,13 @@ export async function fetchAllPostgrestRows<T = unknown>(
     }
 
     allRows.push(...rows);
+
+    if (maxRows && allRows.length >= maxRows) {
+      if (onMaxRowsExceeded === "error") {
+        throw new Error(`PostgREST fetch exceeded max rows (${maxRows}) for URL: ${baseUrl.toString()}`);
+      }
+      return allRows.slice(0, maxRows);
+    }
 
     if (rows.length < pageSize) {
       reachedMaxPages = false;
