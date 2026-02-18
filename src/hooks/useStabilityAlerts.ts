@@ -20,16 +20,20 @@ interface IntegrationMetric {
   lastRuns: { status: string }[];
 }
 
+export interface ProviderBudget {
+  provider: string;
+  used1m: number;
+  used60m: number;
+}
+
 interface UseStabilityAlertsParams {
   integrationMetrics: IntegrationMetric[];
-  budgetUsed15m: number;
-  budgetUsed60m: number;
+  providerBudgets: ProviderBudget[];
 }
 
 export function useStabilityAlerts({
   integrationMetrics,
-  budgetUsed15m,
-  budgetUsed60m,
+  providerBudgets,
 }: UseStabilityAlertsParams): StabilityAlert[] {
   const firedAlerts = useRef<Set<string>>(new Set());
 
@@ -139,53 +143,57 @@ export function useStabilityAlerts({
       }
     }
 
-    // Budget checks
-    if (budgetUsed15m > 90) {
-      result.push({
-        id: "budget-15m-critical",
-        level: "critical",
-        integration: "Samlet",
-        message: `Budget (15m) er ${budgetUsed15m.toFixed(0)}% brugt (tærskel: 90%)`,
-        metric: "budgetUsed15m",
-        value: budgetUsed15m,
-        threshold: 90,
-      });
-    } else if (budgetUsed15m > 70) {
-      result.push({
-        id: "budget-15m-warning",
-        level: "warning",
-        integration: "Samlet",
-        message: `Budget (15m) er ${budgetUsed15m.toFixed(0)}% brugt (tærskel: 70%)`,
-        metric: "budgetUsed15m",
-        value: budgetUsed15m,
-        threshold: 70,
-      });
-    }
+    // Per-provider budget checks
+    for (const pb of providerBudgets) {
+      const label = pb.provider.charAt(0).toUpperCase() + pb.provider.slice(1);
 
-    if (budgetUsed60m > 90) {
-      result.push({
-        id: "budget-60m-critical",
-        level: "critical",
-        integration: "Samlet",
-        message: `Budget (60m) er ${budgetUsed60m.toFixed(0)}% brugt (tærskel: 90%)`,
-        metric: "budgetUsed60m",
-        value: budgetUsed60m,
-        threshold: 90,
-      });
-    } else if (budgetUsed60m > 70) {
-      result.push({
-        id: "budget-60m-warning",
-        level: "warning",
-        integration: "Samlet",
-        message: `Budget (60m) er ${budgetUsed60m.toFixed(0)}% brugt (tærskel: 70%)`,
-        metric: "budgetUsed60m",
-        value: budgetUsed60m,
-        threshold: 70,
-      });
+      if (pb.used1m > 90) {
+        result.push({
+          id: `budget-1m-critical-${pb.provider}`,
+          level: "critical",
+          integration: label,
+          message: `Burst limit (1m) er ${pb.used1m.toFixed(0)}% brugt (tærskel: 90%)`,
+          metric: "budgetUsed1m",
+          value: pb.used1m,
+          threshold: 90,
+        });
+      } else if (pb.used1m > 70) {
+        result.push({
+          id: `budget-1m-warning-${pb.provider}`,
+          level: "warning",
+          integration: label,
+          message: `Burst limit (1m) er ${pb.used1m.toFixed(0)}% brugt (tærskel: 70%)`,
+          metric: "budgetUsed1m",
+          value: pb.used1m,
+          threshold: 70,
+        });
+      }
+
+      if (pb.used60m > 90) {
+        result.push({
+          id: `budget-60m-critical-${pb.provider}`,
+          level: "critical",
+          integration: label,
+          message: `Time-limit (60m) er ${pb.used60m.toFixed(0)}% brugt (tærskel: 90%)`,
+          metric: "budgetUsed60m",
+          value: pb.used60m,
+          threshold: 90,
+        });
+      } else if (pb.used60m > 70) {
+        result.push({
+          id: `budget-60m-warning-${pb.provider}`,
+          level: "warning",
+          integration: label,
+          message: `Time-limit (60m) er ${pb.used60m.toFixed(0)}% brugt (tærskel: 70%)`,
+          metric: "budgetUsed60m",
+          value: pb.used60m,
+          threshold: 70,
+        });
+      }
     }
 
     return result;
-  }, [integrationMetrics, budgetUsed15m, budgetUsed60m]);
+  }, [integrationMetrics, providerBudgets]);
 
   // Fire sonner toasts for new critical/warning alerts
   useEffect(() => {
