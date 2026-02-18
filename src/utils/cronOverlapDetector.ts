@@ -73,7 +73,8 @@ export function cronToFrequencyLabel(cronExpression: string): string {
  */
 export function detectOverlaps(
   jobs: CronJob[],
-  thresholdMinutes: number = 2
+  thresholdMinutes: number = 2,
+  providerFilter?: boolean
 ): OverlapWarning[] {
   const warnings: OverlapWarning[] = [];
 
@@ -81,6 +82,11 @@ export function detectOverlaps(
     for (let j = i + 1; j < jobs.length; j++) {
       const jobA = jobs[i];
       const jobB = jobs[j];
+
+      // Skip comparison if provider filter is on and providers differ
+      if (providerFilter && jobA.provider && jobB.provider && jobA.provider !== jobB.provider) {
+        continue;
+      }
 
       const minutesA = parseCronMinutes(jobA.schedule);
       const minutesB = parseCronMinutes(jobB.schedule);

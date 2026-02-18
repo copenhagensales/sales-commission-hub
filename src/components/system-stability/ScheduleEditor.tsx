@@ -76,7 +76,10 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
   const overlapWarnings = useMemo(() => {
     if (!showPreview) return [];
 
-    const jobs = integrations.map(int => {
+    const selectedProvider = selected?.provider;
+    const relevantIntegrations = integrations.filter(int => int.provider === selectedProvider);
+
+    const jobs = relevantIntegrations.map(int => {
       const schedule = int.id === selectedId
         ? newCronExpression
         : int.config?.sync_schedule || `*/${int.sync_frequency_minutes || 10} * * * *`;
