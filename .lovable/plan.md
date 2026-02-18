@@ -1,100 +1,56 @@
 
 
-# Smartere og mere brugervenlig Schedule Editor
+# Luk de blinde punkter i SystemStability
 
-## Hvad er problemet i dag?
+## Problem
 
-Den nuvaerende editor bruger tekniske begreber som "cron expression", "minut-offset" og "kommasepareret" -- det er svart at forstaa for folk der ikke er udviklere. Det er heller ikke tydeligt *hvorfor* man skal saette et offset, eller hvad konsekvensen er.
+SystemStability-siden har 3 huller der betyder at ikke al API-aktivitet overvages, og at schedule-aendringer ikke altid er synkroniserede.
 
-## Hvad gør de to indstillinger?
+## Hvad der mangler
 
-- **Sync-frekvens**: Hvor ofte data hentes fra API'et (fx hvert 10. minut = 6 gange i timen)
-- **Minut-offset**: *Hvornaar* i timen synkroniseringen starter. Hvis to integrationer begge koerer hvert 10. minut fra minut 0, rammer de API'et samtidig og risikerer at blive blokeret. Et offset paa fx 5 minutter forskyder den ene, saa de aldrig koerer paa samme tid.
+### 1. Gamle funktioner der rammer API uden overvagning
 
-## Forslag: Redesign med dagligdags sprog og automatisk anbefaling
+- `adversus-sync-v2` og `sync-adversus` er gamle edge functions der stadig kan kaldes fra Settings-siden
+- De bruger hardkodede environment variable credentials (ikke per-integration)
+- De logger IKKE til `integration_sync_runs`, saa SystemStability ser dem ikke
+- `customer-crm-syncer` koerer som cron job (hver time) uden at blive vist
 
-### 1. Ny overskrift og forklarende tekst
+**Loesning:** Fjern de gamle knapper fra Settings.tsx saa de ikke kan udloeses. Redirect al sync til `integration-engine`. Fjern det ubrugte `customer-crm-syncer` cron job.
 
-- Titel: "Planlæg synkronisering"
-- Undertekst: "Vælg hvor ofte data skal hentes, og hvornår. Systemet anbefaler automatisk en tidsplan der undgaar konflikter."
+### 2. Webhooks tæelles ikke med i rate limit budget
 
-### 2. Erstat "Minut-offset" med "Startminut"
+Adversus/Enreach webhooks (`dialer-webhook`, `adversus-webhook`) modtager data og kan lave API-kald, men de logger ikke til `integration_sync_runs` -- saa de taelles ikke med i burst/time-budgettet.
 
-- Label: **"Start ved minut"** med hjelpetekst: "Vælg hvilket minut i timen synkroniseringen begynder. Brug et andet minut end andre integrationer paa samme API for at undgaa konflikter."
-- I stedet for et frit tekstfelt, vis en Select med relevante vaerdier (0, 1, 2, 3, 4, 5) -- baseret paa frekvensen.
+**Loesning:** Tilfoej en sektion paa SystemStability der viser webhook-aktivitet baseret paa `integration_logs` (der allerede logges). Alternativt: Webhooks er passiv modtagelse og rammer ikke eksternt API -- i saa fald er det ikke et rate limit problem, men det skal vaere tydeligt paa siden.
 
-### 3. Automatisk anbefaling ("Anbefalet tidsplan")
+### 3. Cron jobs kan oprettes uden om Schedule Editor
 
-- Naar en integration vaelges, beregn automatisk det bedste offset der giver mest afstand til andre integrationer paa samme provider.
-- Vis en knap: **"Brug anbefalet"** der udfylder felterne automatisk.
-- Vis den anbefalede plan som tekst: fx "Hvert 10. minut, startende ved :03 -- giver 5 minutters afstand til Lovablecph"
+Flere steder i koden kalder `update-cron-schedule` direkte (DialerIntegrations.tsx, Settings.tsx). Der er ingen validering af at `cron.job`-tabellen matcher det Schedule Editor viser.
 
-### 4. Fjern teknisk cron-visning fra hovedflowet
-
-- Flyt "cron expression" ned i en sammenklappelig "Tekniske detaljer"-sektion (Collapsible)
-- I hovedvisningen vis i stedet en menneskelig beskrivelse: **"Koerer 6 gange i timen: :03, :13, :23, :33, :43, :53"**
-
-### 5. Tydeliggoer konflikttjek
-
-- Vis altid konflikttjek (fjern "Preview konflikter"-knappen)
-- Brug groen/roed feedback inline: "Ingen konflikter med andre integrationer paa dette API" eller "Advarsel: koerer samtidig med Lovablecph ved minut :01"
+**Loesning:** Tilfoej en "Live cron status"-sektion der henter aktive jobs fra `cron.job`-tabellen og sammenligner dem med hvad Schedule Editor forventer. Vis en advarsel hvis der er uoverensstemmelser.
 
 ## Tekniske aendringer
 
-### ScheduleEditor.tsx -- Komplet redesign af UI
+### Fil 1: `src/pages/Settings.tsx`
+- Fjern "adversus-sync-v2" og "sync-adversus" fra manual function picker
+- Slet den gamle sync-knap der kalder `adversus-sync-v2`
+- Behold KUN `integration-engine` som sync-metode
 
-**Nye imports:** Collapsible fra radix, Lightbulb-ikon fra lucide
+### Fil 2: `src/pages/SystemStability.tsx`
+- Tilfoej en ny useQuery der henter aktive cron jobs via `supabase.rpc()` eller en ny edge function
+- Vis en "Aktive jobs"-oversigt med advarsel hvis der er jobs der ikke matcher en aktiv integration
+- Tilfoej webhook-aktivitet som en separat lille sektion (antal webhooks modtaget sidste 24 timer fra `integration_logs`)
 
-**Ny funktion: `calculateRecommendedOffset()`**
-- Input: valgt integration, frekvens, liste af andre integrationer paa samme provider
-- Logik: for hvert muligt startminut (0 til frekvens-1), beregn minimum afstand til alle andre integrationers fire-minutter
-- Output: det startminut der giver stoerst minimum-afstand
+### Fil 3: Database cleanup (migration)
+- Fjern det ubrugte `customer-crm-syncer` cron job via SQL: `SELECT cron.unschedule('sync-client-20744525-7466-4b2c-afa7-6ee09a9112b0')`
 
-**UI-struktur:**
-```
-Planlæg synkronisering
-"Vælg hvor ofte data skal hentes..."
+### Ingen nye edge functions noedvendige
 
-[Integration v]  [Frekvens v]  [Start ved minut v]
+## Resultat
 
-[Lightbulb] Anbefalet: Hvert 10. min fra :03     [Brug anbefalet]
-
-Tidsplan: Kører 6 gange i timen: :03, :13, :23, :33, :43, :53
-
-[check] Ingen konflikter med andre integrationer på dette API
-  -- eller --
-[warning] Advarsel: Kører samtidig med Lovablecph ved minut :01
-
-<Collapsible> Tekniske detaljer
-  Cron expression: 3,13,23,33,43,53 * * * *
-</Collapsible>
-
-                                              [Gem tidsplan]
-```
-
-**Startminut-feltet:**
-- Select med vaerdier fra 0 til (frekvens - 1)
-- Naar frekvens er 10: muligheder er 0-9
-- Naar frekvens er 5: muligheder er 0-4
-- Default-vaerdi: det anbefalede offset
-
-**Cron-bygning:**
-- Baseret paa frekvens + startminut genereres de konkrete minutter
-- Fx frekvens=10, start=3 giver: 3,13,23,33,43,53
-
-### cronOverlapDetector.ts -- Ny hjelpefunktion
-
-```typescript
-export function findBestOffset(
-  frequencyMinutes: number,
-  otherSchedules: string[],
-  thresholdMinutes: number
-): { offset: number; minGap: number }
-```
-
-### Filer der aendres
-- `src/components/system-stability/ScheduleEditor.tsx` -- UI redesign
-- `src/utils/cronOverlapDetector.ts` -- ny `findBestOffset()` funktion
-
-### Ingen database-aendringer
+Efter denne aendring:
+- Al API-aktivitet er synlig paa SystemStability-siden
+- Gamle funktioner kan ikke laengere udloeses ved en fejl
+- Uoverensstemmelser mellem cron jobs og Schedule Editor bliver automatisk opdaget og vist
+- Webhook-aktivitet er synlig (selvom den typisk ikke pavirker rate limits)
 
