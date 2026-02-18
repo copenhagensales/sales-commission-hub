@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfWeek, endOfWeek, subWeeks, subDays, format, isWeekend, isToday, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 export interface PersonalWeekStats {
   weekTotal: number;
@@ -98,8 +99,7 @@ export function usePersonalWeeklyStats(employeeId: string | null | undefined) {
       };
     },
     enabled: !!employeeId,
-    staleTime: 60000,
-    refetchInterval: 120000,
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 

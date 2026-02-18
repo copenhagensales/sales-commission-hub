@@ -29,9 +29,9 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { integration_type, integration_id, provider, frequency_minutes, is_active } = await req.json();
+    const { integration_type, integration_id, provider, frequency_minutes, is_active, custom_schedule } = await req.json();
 
-    console.log(`[update-cron-schedule] type=${integration_type}, id=${integration_id}, freq=${frequency_minutes}, active=${is_active}`);
+    console.log(`[update-cron-schedule] type=${integration_type}, id=${integration_id}, freq=${frequency_minutes}, active=${is_active}, custom=${custom_schedule}`);
 
     // For dialer integrations, use integration_id in job name
     let jobName: string;
@@ -91,8 +91,8 @@ Deno.serve(async (req) => {
     }
 
     // If active and has frequency, create new cron job
-    if (is_active && frequency_minutes && frequencyToCron[frequency_minutes]) {
-      const cronExpression = frequencyToCron[frequency_minutes];
+    if (is_active && (custom_schedule || (frequency_minutes && frequencyToCron[frequency_minutes]))) {
+      const cronExpression = custom_schedule || frequencyToCron[frequency_minutes];
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
       
       console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);

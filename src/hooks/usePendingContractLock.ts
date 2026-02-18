@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 export function usePendingContractLock() {
   const { user, loading: authLoading } = useAuth();
@@ -52,9 +53,8 @@ export function usePendingContractLock() {
       }
     },
     enabled: !!user && !authLoading,
-    refetchInterval: 60000, // Check every minute
+    ...REFRESH_PROFILES.dashboard,
     retry: 1,
-    staleTime: 30000,
   });
 
   return {

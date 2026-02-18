@@ -11,7 +11,7 @@ import { Trophy, Calendar, Clock } from "lucide-react";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
-import { isTvMode, useAutoReload } from "@/utils/tvMode";
+import { isTvMode, useAutoReload, REFRESH_PROFILES } from "@/utils/tvMode";
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
@@ -181,8 +181,7 @@ function useCustomPeriodLeaderboard(
       return entries;
     },
     enabled: options.enabled,
-    staleTime: 60000,
-    refetchInterval: 120000,
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 
@@ -239,8 +238,7 @@ export default function CsTop20Dashboard() {
       return response.json();
     },
     enabled: tvMode && !cachedLeaderboard?.length && !customLeaderboard?.length,
-    refetchInterval: 120000,
-    staleTime: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 
   // Get the active leaderboard data

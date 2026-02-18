@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { trackFetch } from "@/utils/fetchPerformance";
 
 export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "current" | "last_24h" | "last_7d" | "last_30d";
 export type KpiScopeType = "global" | "client" | "team" | "employee";
@@ -27,7 +29,7 @@ export function usePrecomputedKpi(
 ) {
   return useQuery({
     queryKey: ["precomputed-kpi", kpiSlug, period, scopeType, scopeId],
-    queryFn: async (): Promise<CachedKpiValue | null> => {
+    queryFn: () => trackFetch(`kpi-${kpiSlug}`, async (): Promise<CachedKpiValue | null> => {
       if (!kpiSlug) return null;
 
       let query = supabase
@@ -51,10 +53,9 @@ export function usePrecomputedKpi(
       }
 
       return data;
-    },
+    }),
     enabled: !!kpiSlug,
-    staleTime: 30000, // 30 sekunder - værdier opdateres hvert minut
-    refetchInterval: 60000, // 1 minut
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 
@@ -74,7 +75,7 @@ export function usePrecomputedKpis(
 ) {
   return useQuery({
     queryKey: ["precomputed-kpis", kpiSlugs, period, scopeType, scopeId],
-    queryFn: async (): Promise<Record<string, CachedKpiValue>> => {
+    queryFn: () => trackFetch("kpis-batch", async (): Promise<Record<string, CachedKpiValue>> => {
       if (kpiSlugs.length === 0) return {};
 
       // Fetch the latest value per slug via separate queries to avoid hitting row limits
@@ -115,10 +116,9 @@ export function usePrecomputedKpis(
       );
 
       return results;
-    },
+    }),
     enabled: kpiSlugs.length > 0,
-    staleTime: 30000,
-    refetchInterval: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 
@@ -135,7 +135,7 @@ export function useClientDashboardKpis(
 ) {
   return useQuery({
     queryKey: ["client-dashboard-kpis", clientId, kpiSlugs],
-    queryFn: async () => {
+    queryFn: () => trackFetch("client-dashboard-kpis", async () => {
       if (!clientId) return null;
 
       const { data, error } = await supabase
@@ -173,10 +173,9 @@ export function useClientDashboardKpis(
       }
 
       return result;
-    },
+    }),
     enabled: !!clientId,
-    staleTime: 30000,
-    refetchInterval: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 

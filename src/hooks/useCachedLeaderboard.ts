@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 export type LeaderboardPeriod = "today" | "this_week" | "this_month" | "payroll_period";
 export type LeaderboardScope = { type: "global" | "client" | "team"; id?: string | null };
@@ -67,8 +68,7 @@ export function useCachedLeaderboard(
       return entries.slice(0, limit);
     },
     enabled,
-    staleTime: 60000, // 1 minute - matches backend update frequency
-    refetchInterval: 120000, // 2 minutes - reduces polling while staying responsive
+    ...REFRESH_PROFILES.dashboard,
   });
 }
 

@@ -10,6 +10,8 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
+import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -62,8 +64,7 @@ export default function SalesOverviewAll() {
       return response.data;
     },
     enabled: tvMode,
-    refetchInterval: 60000,
-    staleTime: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 
   // Per-client sales from cached KPIs (updated every minute by edge function)
@@ -107,8 +108,7 @@ export default function SalesOverviewAll() {
       return { byClient, total };
     },
     enabled: !tvMode,
-    staleTime: 30000,
-    refetchInterval: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 
   const cachedActiveEmployees = getKpiValue(globalKpis?.active_employees, 0);
@@ -125,8 +125,7 @@ export default function SalesOverviewAll() {
       return count || 0;
     },
     enabled: !tvMode && cachedActiveEmployees === 0,
-    refetchInterval: 300000,
-    staleTime: 120000,
+    ...REFRESH_PROFILES.config,
   });
 
   const activeEmployees = cachedActiveEmployees > 0 ? cachedActiveEmployees : activeEmployeesQuery;
@@ -234,9 +233,12 @@ export default function SalesOverviewAll() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Salgsoversigt alle</h1>
-          <p className="text-sm text-muted-foreground capitalize">
-            {format(today, "EEEE d. MMMM yyyy", { locale: da })}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground capitalize">
+              {format(today, "EEEE d. MMMM yyyy", { locale: da })}
+            </p>
+            <DataFreshnessBadge calculatedAt={globalKpis?.active_employees?.calculated_at} />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <TvBoardQuickGenerator dashboardSlug="sales-overview-all" />
