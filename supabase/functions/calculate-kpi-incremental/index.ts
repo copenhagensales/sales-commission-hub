@@ -390,7 +390,7 @@ Deno.serve(async (req) => {
     }
 
     // Process FM sales
-    for (const fmSale of (newFmSales || []) as FmSale[]) {
+    for (const fmSale of (newFmSales || []) as unknown as FmSale[]) {
       const employeeId = fmSale.seller_id;
       if (!employeeId) continue;
 
@@ -540,7 +540,7 @@ Deno.serve(async (req) => {
     }
 
     let maxFmSaleCreatedAt = olderWatermark;
-    for (const sale of (newFmSales || []) as FmSale[]) {
+    for (const sale of (newFmSales || []) as unknown as FmSale[]) {
       if (sale.created_at > maxFmSaleCreatedAt) {
         maxFmSaleCreatedAt = sale.created_at;
       }

@@ -307,7 +307,7 @@ serve(async (req) => {
     // Get fieldmarketing sales from unified sales table
     const { data: fmSalesData } = await supabase
       .from("sales")
-      .select("id, sale_datetime, raw_payload")
+      .select("id, sale_datetime, raw_payload, location_id, quantity, amount")
       .eq("source", "fieldmarketing")
       .gte("sale_datetime", `${startDateStr}T00:00:00`)
       .lte("sale_datetime", `${endDateStr}T23:59:59`);
