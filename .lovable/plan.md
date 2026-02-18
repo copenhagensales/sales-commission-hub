@@ -1,32 +1,37 @@
 
+# Plan: Genstart salgssynkroniseringen
 
-# Fix: generate_sales_internal_reference SECURITY DEFINER
+## Problemet
 
-## Problem
+Siden 17. februar kl. ~16:00 er **0 salg** blevet registreret i systemet. Alle syncs rapporterer "0 sales" med 100% fejlrate paa upsert-operationen.
 
-`generate_sales_internal_reference()` er den eneste trigger-funktion der skriver til en anden tabel (`sales_reference_sequence`) men koerer som SECURITY INVOKER. Tabellen har RLS aktiveret med nul policies, saa alle bruger-inserts paa `sales` fejler.
+## Rodaarsag
 
-## Undersoegelses-resultat
+Den **deployede** version af `integration-engine` edge-funktionen (version 1477) refererer stadig kolonnen `sales.adversus_opp_number`, som blev droppet i en migration den 17. februar. Kildekoden i projektet er korrekt og refererer IKKE kolonnen -- men den deployede version er ikke synkroniseret med koden.
 
-Alle 13 trigger-funktioner er gennemgaaet:
-- 8 bruger allerede SECURITY DEFINER (korrekt)
-- 4 bruger SECURITY INVOKER men er sikre (aendrer kun NEW-raekken)
-- 1 er problematisk: `generate_sales_internal_reference`
+Sekundaert: Adversus-integrationen rammer ogsaa rate limits ("Rate Limit Adversus Excedido"), men det er et separat problem.
 
-## Fix
+## Evidens
 
-En enkelt database-migration:
+- Postgres fejllog: `column sales.adversus_opp_number does not exist` (gentages hvert minut)
+- `integration_logs`: Alle syncs viser `{ errors: 34-67, processed: 0 }`
+- `sales`-tabellen: 0 raekker for 18. februar
+- Sidste succesfulde sync med data: 17. feb kl. 15:51
+- Kildekoden (`supabase/functions/integration-engine/core/sales.ts`): Ingen reference til `adversus_opp_number`
 
-```text
-CREATE OR REPLACE FUNCTION public.generate_sales_internal_reference()
-  RETURNS trigger
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = 'public'
-AS $function$
-  ... (samme logik som nu, kun SECURITY DEFINER tilføjet)
-$function$;
-```
+## Loesning
 
-Ingen andre filer eller funktioner skal aendres.
+**En enkelt handling:** Redeploy `integration-engine` edge-funktionen saa den deployede version matcher kildekoden.
 
+Det er alt. Ingen kodeaendringer er noedvendige -- koden er allerede korrekt.
+
+## Forventet resultat
+
+- Naeste cron-koersel vil upserte salg uden fejl
+- Enreach/Eesy: ~67 salg vil blive registreret per sync
+- Adversus: Vil stadig have rate-limit-problemer (separat issue, ikke relateret til denne fix)
+
+## Risici
+
+1. Adversus rate limiting er et separat problem der kraever justering af API-kaldshastighed
+2. Salg fra 17. feb aften + 18. feb morgen vil blive backfilled ved naeste sync (da synk-vinduet er 1-3 dage)
