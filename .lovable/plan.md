@@ -1,78 +1,50 @@
 
+# Fix: Lovablecph synkroniserer ikke TDC-salg
 
-# PR #5: Robust Absolut-Count KPI-arkitektur
+## Rodaarsag
 
-## Status: Trin 1-3 FÆRDIGE ✅
+To separate problemer forhindrer Lovablecph i at synkronisere salg:
 
-## Oversigt
+### Problem 1: Gammelt cron-job stjæler API-kvoten
+Det gamle job `adversus-sync-nightly` (jobid 1) koerer stadig:
+- Schedule: `0 0-6 * * *` (hver time kl. 00-06)
+- Kalder den **gamle** `sync-adversus` edge function
+- Bruger **samme Adversus API-credentials** som Lovablecph
+- Resultatet: API-kvoten er opbrugt inden Lovablecph naar at synkronisere
 
-Erstat den nuvaerende delta/watermark-strategi i `calculate-kpi-incremental` med direkte SQL-aggregeringer der beregner korrekte totaler hver gang. Udvid fra kun employee-scoped til ogsaa client-scoped og global-scoped KPI'er. Migrer alle dashboards til at bruge cached vaerdier.
+Bevis: 16 ud af 20 sync-forsog i dag fejlede med "Rate Limit Adversus Excedido".
 
-## Trin 1: Edge Function Rewrite ✅
-
-- Omskrev `calculate-kpi-incremental` til absolut-count arkitektur
-- Fjernede al watermark/delta-kode (~300 linjer → ~310 linjer)
-- Beregner nu Client, Global og Employee scoped KPI'er hvert minut
-- Deployeret og verificeret: 359 værdier opdateret på ~791ms
-
-## Trin 2: Frontend-migration ✅
-
-| Dashboard | Status | Detaljer |
-|-----------|--------|----------|
-| `UnitedDashboard.tsx` | ✅ Migreret | Per-client sales queries erstattet med cached KPI'er |
-| `SalesOverviewAll.tsx` | ✅ Migreret | 2 tunge queries (TM+FM) erstattet med en cached query |
-| `CphSalesDashboard.tsx` | ✅ Allerede cached | Bruger allerede usePrecomputedKpis + useCachedLeaderboard |
-| `FieldmarketingDashboardFull.tsx` | ⏭️ Skippet | Bruger FM-specifikke hooks med raw_payload logik |
-| `MyProfile.tsx` | ⏭️ Skippet | Behøver daglige commission-breakdowns, ikke kun totaler |
-| `useDashboardKpiData.ts` | ✅ Allerede cached | Har cache-first strategi med fallback |
-
-## Trin 4: Reducér full refresh ✅
-
-- `calculate-kpi-values` full refresh: ændret fra `*/30 * * * *` til `0 * * * *` (hvert 60. minut)
-- Den minutlige `calculate-kpi-incremental` er nu autoritativ for alle scopes
+### Problem 2: Synkroniseringsvindue for kort
+Det nye cron-job sender `days: 1`, men efter en hel dag med rate-limit fejl er der et backlog. Salg fra i morges naar ikke at blive hentet med kun 1 dags vindue.
 
 ---
 
-# PR #9: Plan Integration (Cron-staggering, REFRESH_PROFILES, trackFetch, Freshness Badges)
+## Loesning
 
-## Status: ALLE DELE FÆRDIGE ✅
+### Trin 1: Slet det gamle cron-job
+Fjern `adversus-sync-nightly` (jobid 1) via SQL:
+```text
+SELECT cron.unschedule(1);
+```
+Dette job er erstattet af de nye staggerede jobs og skal ikke koere laengere.
 
-## Del 1: Cron-staggering ✅
+### Trin 2: Udvid synkroniseringsvinduet midlertidigt
+Opdater Lovablecph cron-job til `days: 3` midlertidigt for at indhente backlog:
+```text
+UPDATE cron.job 
+SET command = '...(days: 3)...'
+WHERE jobid = 47;
+```
 
-Alle 5 dialer-integrationer er nu forskudt for at undgå 429 rate limits:
+### Trin 3: Koer en manuel sync nu
+Trigger en umiddelbar sync med `days: 3` for Lovablecph for at hente alle manglende TDC-salg med det samme.
 
-| Integration | Provider | Schedule |
-|---|---|---|
-| Eesy | enreach | `:00, :05, :10...` |
-| Lovablecph | adversus | `:01, :06, :11...` |
-| tryg | enreach | `:02, :07, :12...` |
-| Relatel_CPHSALES | adversus | `:03, :08, :13...` |
-| ase | enreach | `:04, :09, :14...` |
+### Trin 4: Sæt vinduet tilbage til 1 dag
+Naar backlogget er indhentet (efter 1-2 timer), saet `days` tilbage til `1` for at minimere API-belastning.
 
-Edge function `update-cron-schedule` udvidet med `custom_schedule` parameter.
+---
 
-## Del 2: REFRESH_PROFILES integration ✅
-
-Centraliserede `staleTime`/`refetchInterval` værdier i følgende filer:
-- `usePrecomputedKpi.ts` → `REFRESH_PROFILES.dashboard`
-- `useCachedLeaderboard.ts` → `REFRESH_PROFILES.dashboard`
-- `usePersonalWeeklyStats.ts` → `REFRESH_PROFILES.dashboard`
-- `useTvCelebrationData.ts` → `REFRESH_PROFILES.dashboard`
-- `useIntegrationDebugLog.ts` → `REFRESH_PROFILES.config`
-- `usePendingContractLock.ts` → `REFRESH_PROFILES.dashboard`
-- `useDashboardSalesData.ts` → `REFRESH_PROFILES.dashboard`
-- `CsTop20Dashboard.tsx` → `REFRESH_PROFILES.dashboard`
-- `SalesOverviewAll.tsx` → `REFRESH_PROFILES.dashboard` / `.config`
-
-## Del 3: trackFetch observability ✅
-
-Wrappet kritiske data-hooks med `trackFetch`:
-- `usePrecomputedKpi.ts` → alle 3 hooks (single, batch, client dashboard)
-- `useDashboardSalesData.ts` → hovedquery
-
-## Del 4: Freshness badges ✅
-
-- Ny komponent: `src/components/ui/DataFreshnessBadge.tsx`
-- Tilføjet til `CphSalesDashboard.tsx` header
-- Tilføjet til `SalesOverviewAll.tsx` header
-- Viser "Opdateret kl. HH:mm" med farvekodning (grøn/gul/rød)
+## Forventet resultat
+- Ingen flere rate-limit fejl (det gamle job bruger ikke laengere API-kvoten)
+- Alle TDC Erhverv salg fra i dag synkroniseres inden for minutter
+- Fremadrettet stabil synkronisering hvert 5. minut
