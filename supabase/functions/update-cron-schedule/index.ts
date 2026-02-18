@@ -209,6 +209,24 @@ Deno.serve(async (req) => {
 
       console.log(`Scheduled new cron job: ${jobName} with schedule: ${cronExpression}, jobId: ${scheduleData}`);
 
+      // Persist schedule to integration config
+      if (integration_type === "dialer" && integration_id) {
+        const currentConfig = integrationMetadata?.config || {};
+        const updatedConfig = { ...currentConfig, sync_schedule: cronExpression };
+        const { error: updateError } = await supabase
+          .from("dialer_integrations")
+          .update({
+            config: updatedConfig,
+            sync_frequency_minutes: frequency_minutes,
+          })
+          .eq("id", integration_id);
+        if (updateError) {
+          console.error(`[update-cron-schedule] Failed to persist config: ${updateError.message}`);
+        } else {
+          console.log(`[update-cron-schedule] Persisted sync_schedule to integration config`);
+        }
+      }
+
       // Audit log
       if (integration_id) {
         await insertAuditEntry(

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,11 +46,23 @@ function generateMinutesFromOffset(frequency: number, offset: number): number[] 
 }
 
 export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEditorProps) {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string>(integrations[0]?.id || "");
   const [frequency, setFrequency] = useState<string>("10");
   const [startMinute, setStartMinute] = useState<string>("0");
   const [saving, setSaving] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
+
+  // Sync local state when integrations prop updates (after refetch)
+  useEffect(() => {
+    const int = integrations.find(i => i.id === selectedId);
+    if (int?.config?.sync_schedule) {
+      const freq = estimateFrequencyFromCron(int.config.sync_schedule);
+      setFrequency(String(freq));
+      const mins = parseCronMinutes(int.config.sync_schedule);
+      setStartMinute(String(mins[0] ?? 0));
+    }
+  }, [integrations, selectedId]);
 
   const selected = integrations.find(i => i.id === selectedId);
 
@@ -153,6 +166,7 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
       toast.success(`Tidsplan opdateret for ${selected.name}`, {
         description: `Kører ${fireMinutes.length} gange i timen fra minut :${String(offset).padStart(2, "0")}`,
       });
+      queryClient.invalidateQueries({ queryKey: ["system-stability-integrations"] });
       onScheduleUpdated();
     } catch (err: any) {
       toast.error("Kunne ikke opdatere tidsplan", { description: err.message });
