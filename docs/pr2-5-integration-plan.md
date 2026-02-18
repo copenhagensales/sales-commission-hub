@@ -98,3 +98,11 @@ PR-beskrivelse skal indeholde:
 - KPI-flow følger fortsat PR 5-arkitektur.
 - Tekniske checks + gates er dokumenteret i PR.
 - Staging-observation er gennemført før fuld produktion.
+
+## Hvis Lovable ikke kan hente PR
+Hvis Lovable ikke kan hente PR’en direkte:
+1. Push branch igen og bekræft at commit-hash er synlig på remote.
+2. Opret en frisk PR fra samme branch med tydelig titel: `PR 2-5 integration (retry)`
+3. Del både PR-link, branch-navn og seneste commit-hash i samme besked til Lovable.
+4. Hvis fetch stadig fejler, opret en ny branch fra samme commit og åbn PR derfra (teknisk workaround for cache/fetch issues).
+
