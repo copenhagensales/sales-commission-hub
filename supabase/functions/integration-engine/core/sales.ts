@@ -635,13 +635,13 @@ export async function processSales(
     log("INFO", `Applied data mappings to ${normalizedCount} sales`);
   }
 
-  const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]))
-  const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]))
+  const productMapByName = new Map(dbProducts?.map((p: any) => [p.name.toLowerCase(), p]))
+  const productMapByExtId = new Map(dbMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
   
   // Build pricing rules map: product_id -> array of rules
   const pricingRulesMap = new Map<string, PricingRule[]>();
   if (pricingRules) {
-    for (const rule of pricingRules) {
+    for (const rule of pricingRules as any[]) {
       const existing = pricingRulesMap.get(rule.product_id) || [];
       existing.push(rule as PricingRule);
       pricingRulesMap.set(rule.product_id, existing);
@@ -654,7 +654,7 @@ export async function processSales(
   // Build campaign mappings map: adversus_campaign_id -> mapping id
   const campaignMappingsMap = new Map<string, string>();
   if (campaignMappings) {
-    for (const mapping of campaignMappings) {
+    for (const mapping of campaignMappings as any[]) {
       campaignMappingsMap.set(mapping.adversus_campaign_id, mapping.id);
     }
   }

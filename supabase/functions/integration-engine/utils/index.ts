@@ -10,3 +10,6 @@ export { makeLogger } from "./logging.ts";
 export { saveDebugLog, createDebugLogEntry } from "./debug-log.ts";
 export { RateLimiter } from "./rate-limiter.ts";
 export { getSyncState, upsertSyncState, recordSyncError } from "./sync-state.ts";
+
+
+export type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void;

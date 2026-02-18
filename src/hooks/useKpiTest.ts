@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
+import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { useToast } from "@/hooks/use-toast";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
@@ -168,7 +169,7 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
   const joinType = clientId ? "!inner" : "";
   const selectClause = `id,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,product_id,products(counts_as_sale))`;
   
-  // Note: Range header added below for pagination safety
+  // Note: fetched via shared pagination helper for >10k row safety
   let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
   salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
   salesUrl += `&source=neq.fieldmarketing`;
@@ -177,8 +178,7 @@ async function testSalesCount(start: Date, end: Date, clientId?: string): Promis
     salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
   }
   
-  const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
-  const salesData = salesRes.ok ? await salesRes.json() : [];
+  const salesData = await fetchAllPostgrestRows<any>(salesUrl, headers);
   
   // Count telesales: sum of quantities where counts_as_sale != false
   let telesalesCount = 0;
@@ -293,8 +293,7 @@ async function testTotalCommission(start: Date, end: Date, clientId?: string): P
     salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
   }
   
-  const salesRes = await fetch(salesUrl, { headers });
-  const salesData = salesRes.ok ? await salesRes.json() : [];
+  const salesData = await fetchAllPostgrestRows<any>(salesUrl, headers);
   
   let telesalesCommission = 0;
   let withOverride = 0;
@@ -444,8 +443,7 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
     salesUrl += `&client_campaigns.client_id=eq.${clientId}`;
   }
   
-  const salesRes = await fetch(salesUrl, { headers });
-  const salesData = salesRes.ok ? await salesRes.json() : [];
+  const salesData = await fetchAllPostgrestRows<any>(salesUrl, headers);
   
   let telesalesRevenue = 0;
   let withOverride = 0;

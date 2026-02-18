@@ -42,46 +42,73 @@ function cleanupCache(): void {
   }
 }
 
-// ============= PAGINATED FETCH HELPER =============
+// ============= PAGINATED FETCH HELPERS =============
 // Fetches all rows with automatic pagination to bypass 1000-row limit
+async function fetchAllRowsPaginated<T>(
+  supabase: any,
+  table: string,
+  selectFields: string,
+  applyFilters: (query: any) => any,
+  pageSize: number = 1000
+): Promise<T[]> {
+  let allData: T[] = [];
+  let page = 0;
+
+  while (true) {
+    let query = supabase
+      .from(table)
+      .select(selectFields)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    query = applyFilters(query);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`[fetchAllRowsPaginated] Error table=${table} page=${page}:`, error);
+      break;
+    }
+
+    if (!data || data.length === 0) break;
+
+    allData = [...allData, ...(data as T[])];
+
+    if (data.length < pageSize) break;
+    page += 1;
+  }
+
+  return allData;
+}
+
 async function fetchAllSales(
   supabase: any,
   selectFields: string,
   dateStart: string,
   dateEnd: string,
-  clientFilter?: { field: string; value: string }
+  clientFilter?: { field: string; value: string },
+  extraFilters?: (query: any) => any
 ): Promise<any[]> {
-  const pageSize = 1000;
-  let allData: any[] = [];
-  let page = 0;
-  
-  while (true) {
-    let query = supabase
-      .from("sales")
-      .select(selectFields)
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", dateStart)
-      .lte("sale_datetime", dateEnd)
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    
-    if (clientFilter) {
-      query = query.eq(clientFilter.field, clientFilter.value);
+  return fetchAllRowsPaginated<any>(
+    supabase,
+    "sales",
+    selectFields,
+    (query) => {
+      let next = query
+        .neq("validation_status", "rejected")
+        .gte("sale_datetime", dateStart)
+        .lte("sale_datetime", dateEnd);
+
+      if (clientFilter) {
+        next = next.eq(clientFilter.field, clientFilter.value);
+      }
+
+      if (extraFilters) {
+        next = extraFilters(next);
+      }
+
+      return next;
     }
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error(`[fetchAllSales] Error at page ${page}:`, error);
-      break;
-    }
-    
-    if (!data || data.length === 0) break;
-    allData = [...allData, ...data];
-    if (data.length < pageSize) break;
-    page++;
-  }
-  
-  return allData;
+  );
 }
 
 Deno.serve(async (req) => {
@@ -253,13 +280,13 @@ Deno.serve(async (req) => {
 
     // Default: CPH Sales dashboard logic
     // Fetch sales with sale_items to calculate correct counts using product mapping
-    const { data: salesWithItems, error: salesError } = await supabase
-      .from("sales")
-      .select(`
-        id, 
-        agent_name, 
-        sale_datetime, 
-        status, 
+    const sales = await fetchAllSales(
+      supabase,
+      `
+        id,
+        agent_name,
+        sale_datetime,
+        status,
         client_campaign_id,
         dialer_campaign_id,
         sale_items (
@@ -274,39 +301,29 @@ Deno.serve(async (req) => {
             client_campaign_id
           )
         )
-      `)
-      .gte("sale_datetime", startOfDay)
-      .lte("sale_datetime", endOfDay)
-      .neq("validation_status", "rejected")
-      .order("sale_datetime", { ascending: false });
-
-    if (salesError) {
-      console.error("Sales error:", salesError);
-    }
-
-    const sales = salesWithItems || [];
+      `,
+      startOfDay,
+      endOfDay,
+      undefined,
+      (q) => q.order("sale_datetime", { ascending: false })
+    );
     console.log(`Found ${sales.length} sales with items`);
 
     // Fetch fieldmarketing sales for today from unified sales table
     // NOTE: We now use the sales table with source='fieldmarketing'
-    const { data: fmSalesData, error: fmError } = await supabase
-      .from("sales")
-      .select(`
+    const fmSales = await fetchAllSales(
+      supabase,
+      `
         id,
         client_campaign_id,
         agent_name,
         sale_datetime
-      `)
-      .eq("source", "fieldmarketing")
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", startOfDay)
-      .lte("sale_datetime", endOfDay);
-
-    if (fmError) {
-      console.error("Fieldmarketing sales error:", fmError);
-    }
-
-    const fmSales = fmSalesData || [];
+      `,
+      startOfDay,
+      endOfDay,
+      undefined,
+      (q) => q.eq("source", "fieldmarketing")
+    );
     console.log(`Found ${fmSales.length} fieldmarketing sales`);
 
     // Fetch all clients with logo_url
@@ -679,23 +696,12 @@ async function fetchTeamPerformanceData(supabase: any, todayStr: string) {
     .select("team_id, client_id, clients(name)");
 
   // Get sales for the month with pagination
-  let salesData: any[] = [];
-  let page = 0;
-  const pageSize = 1000;
-  while (true) {
-    const { data: salesPage } = await supabase
-      .from("sales")
-      .select("id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))")
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", `${monthStart}T00:00:00`)
-      .lte("sale_datetime", `${todayStr}T23:59:59`)
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    
-    if (!salesPage || salesPage.length === 0) break;
-    salesData = [...salesData, ...salesPage];
-    if (salesPage.length < pageSize) break;
-    page++;
-  }
+  const salesData = await fetchAllSales(
+    supabase,
+    "id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))",
+    `${monthStart}T00:00:00`,
+    `${todayStr}T23:59:59`
+  );
 
   // Get sale_items with products - batch in chunks
   const saleIds = salesData.map((s) => s.id);
@@ -1096,21 +1102,24 @@ async function handleTeamDashboard(
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Fetch sales for these campaigns
-  const { data: sales } = await supabase
-    .from("sales")
-    .select(`
+  // Fetch sales for these campaigns with pagination
+  const sales = await fetchAllRowsPaginated<any>(
+    supabase,
+    "sales",
+    `
       id, agent_name, sale_datetime, client_campaign_id,
       sale_items (
         quantity,
         product_id,
         products (counts_as_sale, commission_dkk)
       )
-    `)
-    .in("client_campaign_id", campaignIds.length > 0 ? campaignIds : ['none'])
-    .neq("validation_status", "rejected")
-    .gte("sale_datetime", monthStart)
-    .order("sale_datetime", { ascending: false });
+    `,
+    (query) => query
+      .in("client_campaign_id", campaignIds.length > 0 ? campaignIds : ["none"])
+      .neq("validation_status", "rejected")
+      .gte("sale_datetime", monthStart)
+      .order("sale_datetime", { ascending: false })
+  );
 
   // Collect all unique agent emails to resolve names
   const allEmails = (sales || []).map((s: any) => s.agent_name).filter((n: any): n is string => typeof n === 'string' && n.length > 0);
@@ -1322,22 +1331,37 @@ async function handleCelebrationData(
   const monthData = calculateSalesAndCommission(salesMonth);
   const weekData = calculateSalesAndCommission(salesWeek);
 
-  // Find top performer today
+  // Resolve agent names once and derive both top performer + latest seller.
   let topEmployeeName: string | null = null;
   let topSales = 0;
-  
-  // Resolve agent names to employee names
+  let latestSellerName: string | null = null;
+  let latestSellerSalesCount = 0;
+
   const agentEmails = Object.keys(todayData.employeeSales);
-  if (agentEmails.length > 0) {
-    const nameMap = await resolveAgentNames(supabase, agentEmails);
-    
-    Object.entries(todayData.employeeSales).forEach(([email, empData]) => {
-      const resolvedName = nameMap.get(email.toLowerCase()) || empData.name;
-      if (empData.sales > topSales) {
-        topSales = empData.sales;
-        topEmployeeName = resolvedName;
-      }
-    });
+  const nameMap = agentEmails.length > 0
+    ? await resolveAgentNames(supabase, agentEmails)
+    : new Map<string, string>();
+
+  // Top performer fallback
+  Object.entries(todayData.employeeSales).forEach(([email, empData]) => {
+    const resolvedName = nameMap.get(email.toLowerCase()) || empData.name;
+    if (empData.sales > topSales) {
+      topSales = empData.sales;
+      topEmployeeName = resolvedName;
+    }
+  });
+
+  // Latest seller for celebration text (matches the most recent counted sale)
+  const latestCountedSale = [...(salesToday || [])]
+    .sort((a: any, b: any) => String(b.sale_datetime || "").localeCompare(String(a.sale_datetime || "")))
+    .find((sale: any) =>
+      (sale.sale_items || []).some((item: any) => item.products?.counts_as_sale !== false)
+    );
+
+  if (latestCountedSale?.agent_email) {
+    const email = String(latestCountedSale.agent_email).toLowerCase();
+    latestSellerName = nameMap.get(email) || email.split("@")[0] || null;
+    latestSellerSalesCount = todayData.employeeSales[email]?.sales || 0;
   }
 
   // Fetch goal data if relevant
@@ -1381,8 +1405,8 @@ async function handleCelebrationData(
   };
 
   const result = {
-    employeeName: topEmployeeName,
-    salesCount: todayData.totalSales,
+    employeeName: latestSellerName || topEmployeeName,
+    salesCount: latestSellerSalesCount || topSales || todayData.totalSales,
     commission: todayData.totalCommission,
     metricValue: getMetricValue(metric),
     salesToday: todayData.totalSales,
@@ -1825,11 +1849,14 @@ async function handleTdcErhvervData(
         if (hoursSource === "timestamp") {
           const empTimestamp = timeStampsData.find((ts: any) => ts.employee_id === empId && ts.date === dateStr);
           if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
-            const [inH, inM] = empTimestamp.clock_in.split(":").map(Number);
-            const [outH, outM] = empTimestamp.clock_out.split(":").map(Number);
-            const rawHours = outH + outM / 60 - (inH + inM / 60);
-            const breakMins = empTimestamp.break_minutes || 0;
-            hours = Math.max(0, rawHours - breakMins / 60);
+            const clockIn = new Date(empTimestamp.clock_in);
+            const clockOut = new Date(empTimestamp.clock_out);
+
+            if (!Number.isNaN(clockIn.getTime()) && !Number.isNaN(clockOut.getTime())) {
+              const rawHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+              const breakMins = empTimestamp.break_minutes || 0;
+              hours = Math.max(0, rawHours - breakMins / 60);
+            }
           }
         } else {
           if (shiftForDay?.start_time && shiftForDay?.end_time) {
@@ -2271,87 +2298,42 @@ async function handleCsTop20Data(
   }
 
   // ============= FETCH FM SALES (from unified sales table) =============
-  // Fetch FM sales for all three periods
-  const { data: fmSalesToday } = await supabase
-    .from("sales")
-    .select("id, agent_name, normalized_data, sale_datetime")
-    .eq("source", "fieldmarketing")
-    .neq("validation_status", "rejected")
-    .gte("sale_datetime", `${todayStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-  const { data: fmSalesWeek } = await supabase
-    .from("sales")
-    .select("id, agent_name, normalized_data, sale_datetime")
-    .eq("source", "fieldmarketing")
-    .neq("validation_status", "rejected")
-    .gte("sale_datetime", `${weekStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
-
-  const { data: fmSalesPayroll } = await supabase
-    .from("sales")
-    .select("id, agent_name, normalized_data, sale_datetime")
-    .eq("source", "fieldmarketing")
-    .neq("validation_status", "rejected")
-    .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
-    .lte("sale_datetime", `${todayStr}T23:59:59`);
+  // Fetch FM sales for all three periods (paginated for growth safety)
+  const [fmSalesToday, fmSalesWeek, fmSalesPayroll] = await Promise.all([
+    fetchAllSales(
+      supabase,
+      "id, agent_name, normalized_data, sale_datetime",
+      `${todayStr}T00:00:00`,
+      `${todayStr}T23:59:59`,
+      undefined,
+      (q) => q.eq("source", "fieldmarketing")
+    ),
+    fetchAllSales(
+      supabase,
+      "id, agent_name, normalized_data, sale_datetime",
+      `${weekStartStr}T00:00:00`,
+      `${todayStr}T23:59:59`,
+      undefined,
+      (q) => q.eq("source", "fieldmarketing")
+    ),
+    fetchAllSales(
+      supabase,
+      "id, agent_name, normalized_data, sale_datetime",
+      `${payrollStartStr}T00:00:00`,
+      `${todayStr}T23:59:59`,
+      undefined,
+      (q) => q.eq("source", "fieldmarketing")
+    ),
+  ]);
 
   console.log(`[CsTop20Data] FM sales: today=${(fmSalesToday || []).length}, week=${(fmSalesWeek || []).length}, payroll=${(fmSalesPayroll || []).length}`);
 
-  // Fetch today's sales - all clients with pagination
-  let salesToday: any[] = [];
-  let page = 0;
-  const pageSize = 1000;
-  while (true) {
-    const { data: salesPage } = await supabase
-      .from("sales")
-      .select(selectFields)
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", `${todayStr}T00:00:00`)
-      .lte("sale_datetime", `${todayStr}T23:59:59`)
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    
-    if (!salesPage || salesPage.length === 0) break;
-    salesToday = [...salesToday, ...salesPage];
-    if (salesPage.length < pageSize) break;
-    page++;
-  }
-
-  // Fetch week's sales - all clients with pagination
-  let salesWeek: any[] = [];
-  page = 0;
-  while (true) {
-    const { data: salesPage } = await supabase
-      .from("sales")
-      .select(selectFields)
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", `${weekStartStr}T00:00:00`)
-      .lte("sale_datetime", `${todayStr}T23:59:59`)
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    
-    if (!salesPage || salesPage.length === 0) break;
-    salesWeek = [...salesWeek, ...salesPage];
-    if (salesPage.length < pageSize) break;
-    page++;
-  }
-
-  // Fetch payroll period sales - all clients with pagination
-  let salesPayroll: any[] = [];
-  page = 0;
-  while (true) {
-    const { data: salesPage } = await supabase
-      .from("sales")
-      .select(selectFields)
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", `${payrollStartStr}T00:00:00`)
-      .lte("sale_datetime", `${todayStr}T23:59:59`)
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    
-    if (!salesPage || salesPage.length === 0) break;
-    salesPayroll = [...salesPayroll, ...salesPage];
-    if (salesPage.length < pageSize) break;
-    page++;
-  }
+  // Fetch telesales for all periods with shared paginated helper
+  const [salesToday, salesWeek, salesPayroll] = await Promise.all([
+    fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`),
+    fetchAllSales(supabase, selectFields, `${weekStartStr}T00:00:00`, `${todayStr}T23:59:59`),
+    fetchAllSales(supabase, selectFields, `${payrollStartStr}T00:00:00`, `${todayStr}T23:59:59`),
+  ]);
 
   console.log(`[CsTop20Data] Telesales: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesPayroll.length}`);
 

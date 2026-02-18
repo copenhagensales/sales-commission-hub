@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useKpiDefinitions } from "@/hooks/useKpiDefinitions";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from "date-fns";
 import { calculateHoursByType } from "@/hooks/useKpiTest";
+import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 
 type TestPeriod = "today" | "yesterday" | "this_week" | "this_month" | "last_30_days";
 
@@ -400,7 +401,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build sales query with agent_email filter
-      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))&limit=10000`;
+      let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(quantity,products(counts_as_sale))`;
       salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       salesUrl += `&source=neq.fieldmarketing`;
       
@@ -415,8 +416,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const salesRes = await fetch(salesUrl, { headers: { ...headers, Range: "0-9999" } });
-      const salesData = salesRes.ok ? await salesRes.json() : [];
+      const salesData = await fetchAllPostgrestRows<any>(salesUrl, headers);
       
       // 3. Count only products where counts_as_sale = true
       salesData.forEach((sale: any) => {
@@ -461,7 +461,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build query with agent_email filter
-      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)&limit=10000`;
+      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_commission)`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       url += `&source=neq.fieldmarketing`;
       
@@ -474,8 +474,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const res = await fetch(url, { headers: { ...headers, Range: "0-9999" } });
-      const data = res.ok ? await res.json() : [];
+      const data = await fetchAllPostgrestRows<any>(url, headers);
       
       let total = 0;
       data.forEach((sale: any) => {
@@ -604,7 +603,7 @@ async function fetchKpiValue(
       }
       
       // 2. Build query with agent_email filter for telesales revenue
-      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_revenue)&limit=10000`;
+      let url = `${supabaseUrl}/rest/v1/sales?select=id,sale_items(mapped_revenue)`;
       url += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
       
       if (employeeId && agentEmails.length > 0) {
@@ -617,8 +616,7 @@ async function fetchKpiValue(
         return 0;
       }
       
-      const res = await fetch(url, { headers: { ...headers, Range: "0-9999" } });
-      const data = res.ok ? await res.json() : [];
+      const data = await fetchAllPostgrestRows<any>(url, headers);
       
       let total = 0;
       data.forEach((sale: any) => {
