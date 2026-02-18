@@ -62,7 +62,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
@@ -989,6 +989,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Lock className="h-4 w-4" />
                     {t("sidebar.security")}
+                  </NavLink>
+                )}
+                {p.canViewSecurityDashboard && (
+                  <NavLink to="/system-stability" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/system-stability" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Activity className="h-4 w-4" />
+                    Systemstabilitet
                   </NavLink>
                 )}
                 {p.canViewCarQuizAdmin && (

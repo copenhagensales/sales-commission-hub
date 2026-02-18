@@ -35,7 +35,7 @@ export async function syncIntegration(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ): Promise<SyncResult> {
   const { source, action, actions, days = 3, campaignId, from, to, maxRecords = 50 } = options;
-
+  const syncRunStartedAt = new Date();
   try {
     log("INFO", `Processing integration: ${integration.name}`);
 
@@ -227,12 +227,34 @@ export async function syncIntegration(
       ? `Sync completed: ${messageParts.join(", ")}`
       : "Sync completed: No data processed";
 
+    // Calculate total records processed
+    const totalRecords = Object.values(runResults).reduce((sum: number, r: any) => sum + (r?.processed || 0), 0);
+
+    // Calculate sync run duration
+    const syncRunCompletedAt = new Date();
+    const syncRunDurationMs = syncRunCompletedAt.getTime() - syncRunStartedAt.getTime();
+
+    // Insert into integration_sync_runs
+    await supabase.from("integration_sync_runs").insert({
+      integration_id: integration.id,
+      started_at: syncRunStartedAt.toISOString(),
+      completed_at: syncRunCompletedAt.toISOString(),
+      duration_ms: syncRunDurationMs,
+      status: "success",
+      actions: actionList.filter(Boolean) as string[],
+      records_processed: totalRecords,
+      api_calls_made: 0, // Will be populated when adapter tracking is added
+      retries: 0,
+      rate_limit_hits: 0,
+    });
+
     await supabase.from("integration_logs").insert({
       integration_type: "dialer",
       integration_id: integration.id,
       integration_name: integration.name,
       status: "success",
       message: syncMessage,
+      duration_ms: syncRunDurationMs,
       details: {
         source,
         days,
@@ -246,6 +268,25 @@ export async function syncIntegration(
     const errMsg = e instanceof Error ? e.message : String(e);
     log("ERROR", `Error in integration ${integration.name}: ${errMsg}`);
 
+    // Calculate error run duration
+    const errorCompletedAt = new Date();
+    const errorDurationMs = errorCompletedAt.getTime() - syncRunStartedAt.getTime();
+
+    // Insert error sync run
+    await supabase.from("integration_sync_runs").insert({
+      integration_id: integration.id,
+      started_at: syncRunStartedAt.toISOString(),
+      completed_at: errorCompletedAt.toISOString(),
+      duration_ms: errorDurationMs,
+      status: "error",
+      actions: (actions || (action ? [action] : [])) as string[],
+      records_processed: 0,
+      api_calls_made: 0,
+      retries: 0,
+      rate_limit_hits: 0,
+      error_message: errMsg,
+    });
+
     // Log error to integration_logs
     await supabase.from("integration_logs").insert({
       integration_type: "dialer",
@@ -253,6 +294,7 @@ export async function syncIntegration(
       integration_name: integration.name,
       status: "error",
       message: `Sync failed: ${errMsg}`,
+      duration_ms: errorDurationMs,
       details: {
         source: options.source,
         days: options.days,

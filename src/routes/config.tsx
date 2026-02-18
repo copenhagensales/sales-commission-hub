@@ -117,6 +117,7 @@ import {
   EconomicBudget,
   EconomicMapping,
   Cancellations,
+  SystemStability,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -347,6 +348,9 @@ export const routes: RouteConfig[] = [
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },
+
+  // System Stability (integration health dashboard)
+  { path: "/system-stability", component: SystemStability, access: "role", positionPermission: "menu_security_dashboard" },
 
   // League Admin
   { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },

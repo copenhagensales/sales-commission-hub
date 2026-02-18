@@ -173,3 +173,6 @@ export const ImmediatePaymentASE = lazyPage(() => import("@/pages/ImmediatePayme
 
 // Salary pages
 export const Cancellations = lazyPage(() => import("@/pages/salary/Cancellations"));
+
+// System Stability
+export const SystemStability = lazyPage(() => import("@/pages/SystemStability"));

@@ -1,0 +1,442 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { RefreshCcw, Activity, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatDistanceToNow, format } from "date-fns";
+import { da } from "date-fns/locale";
+
+interface IntegrationWithMetrics {
+  id: string;
+  name: string;
+  provider: string;
+  last_sync_at: string | null;
+  last_status: string | null;
+  is_active: boolean;
+  config: any;
+  // Computed metrics
+  successRate1h: number;
+  rateLimitRate15m: number;
+  avgDurationMs: number;
+  totalApiCalls15m: number;
+  lastRuns: SyncRun[];
+}
+
+interface SyncRun {
+  id: string;
+  integration_id: string;
+  integration_name?: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  status: string;
+  actions: string[] | null;
+  records_processed: number;
+  api_calls_made: number;
+  retries: number;
+  rate_limit_hits: number;
+  error_message: string | null;
+}
+
+interface AuditEntry {
+  id: string;
+  integration_id: string;
+  changed_by: string | null;
+  change_type: string;
+  old_config: any;
+  new_config: any;
+  old_schedule: string | null;
+  new_schedule: string | null;
+  created_at: string;
+}
+
+function getStatusColor(successRate: number, rateLimitRate: number): "green" | "yellow" | "red" {
+  if (successRate < 80 || rateLimitRate > 10) return "red";
+  if (successRate < 95 || rateLimitRate > 5) return "yellow";
+  return "green";
+}
+
+const statusColorMap = {
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-red-500",
+};
+
+const statusLabelMap = {
+  green: "OK",
+  yellow: "Advarsel",
+  red: "Kritisk",
+};
+
+export default function SystemStability() {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch integrations
+  const { data: integrations = [] } = useQuery({
+    queryKey: ["system-stability-integrations"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("dialer_integrations")
+        .select("id, name, provider, last_sync_at, last_status, is_active, config")
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
+  // Fetch recent sync runs (last 24h)
+  const { data: syncRuns = [], refetch: refetchRuns } = useQuery({
+    queryKey: ["system-stability-sync-runs"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("integration_sync_runs")
+        .select("*")
+        .gte("started_at", since)
+        .order("started_at", { ascending: false })
+        .limit(200);
+      return (data || []) as SyncRun[];
+    },
+    refetchInterval: 30000,
+  });
+
+  // Fetch integration logs as fallback metrics (last 24h) 
+  const { data: recentLogs = [], refetch: refetchLogs } = useQuery({
+    queryKey: ["system-stability-logs"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("integration_logs")
+        .select("id, integration_id, integration_name, status, message, created_at, duration_ms, api_calls, retries, rate_limit_hits")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
+  // Fetch audit log
+  const { data: auditLog = [], refetch: refetchAudit } = useQuery({
+    queryKey: ["system-stability-audit"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("integration_schedule_audit")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data || []) as AuditEntry[];
+    },
+    refetchInterval: 60000,
+  });
+
+  // Compute metrics per integration
+  const integrationMetrics: IntegrationWithMetrics[] = integrations.map((int: any) => {
+    const now = Date.now();
+    const fifteenMinAgo = now - 15 * 60 * 1000;
+    const oneHourAgo = now - 60 * 60 * 1000;
+
+    // Use sync_runs if available, otherwise fall back to logs
+    const intRuns = syncRuns.filter(r => r.integration_id === int.id);
+    const intLogs = recentLogs.filter((l: any) => l.integration_id === int.id);
+
+    // Success rate (1h) - from sync_runs or logs
+    const runs1h = intRuns.length > 0
+      ? intRuns.filter(r => new Date(r.started_at).getTime() > oneHourAgo)
+      : intLogs.filter((l: any) => new Date(l.created_at).getTime() > oneHourAgo);
+    const successCount = runs1h.filter((r: any) => r.status === "success").length;
+    const successRate1h = runs1h.length > 0 ? (successCount / runs1h.length) * 100 : 100;
+
+    // Rate limit rate (15m)
+    const runs15m = intRuns.length > 0
+      ? intRuns.filter(r => new Date(r.started_at).getTime() > fifteenMinAgo)
+      : intLogs.filter((l: any) => new Date(l.created_at).getTime() > fifteenMinAgo);
+    const totalApiCalls = runs15m.reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
+    const totalRateLimitHits = runs15m.reduce((sum: number, r: any) => sum + (r.rate_limit_hits || 0), 0);
+    const rateLimitRate15m = totalApiCalls > 0 ? (totalRateLimitHits / totalApiCalls) * 100 : 0;
+
+    // Avg duration
+    const withDuration = intRuns.length > 0
+      ? intRuns.filter(r => r.duration_ms != null)
+      : intLogs.filter((l: any) => l.duration_ms != null);
+    const avgDurationMs = withDuration.length > 0
+      ? withDuration.reduce((sum: number, r: any) => sum + (r.duration_ms || 0), 0) / withDuration.length
+      : 0;
+
+    return {
+      ...int,
+      successRate1h,
+      rateLimitRate15m,
+      avgDurationMs,
+      totalApiCalls15m: totalApiCalls,
+      lastRuns: intRuns.slice(0, 5),
+    };
+  });
+
+  // Rate limit budget estimation (shared credentials = sum all)
+  const now15m = Date.now() - 15 * 60 * 1000;
+  const now60m = Date.now() - 60 * 60 * 1000;
+  const allRuns = syncRuns.length > 0 ? syncRuns : recentLogs;
+  const apiCalls15m = allRuns
+    .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now15m)
+    .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
+  const apiCalls60m = allRuns
+    .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now60m)
+    .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
+  
+  // Adversus rate limit: ~300 requests/15min estimated budget
+  const rateLimitBudget15m = 300;
+  const rateLimitBudget60m = 1200;
+  const budgetUsed15m = Math.min((apiCalls15m / rateLimitBudget15m) * 100, 100);
+  const budgetUsed60m = Math.min((apiCalls60m / rateLimitBudget60m) * 100, 100);
+
+  // Build flat runs table from sync_runs or logs
+  const runsTableData = syncRuns.length > 0
+    ? syncRuns.slice(0, 30).map(r => ({
+        ...r,
+        integration_name: integrations.find((i: any) => i.id === r.integration_id)?.name || "Ukendt",
+      }))
+    : recentLogs.slice(0, 30).map((l: any) => ({
+        id: l.id,
+        integration_id: l.integration_id,
+        integration_name: l.integration_name || "Ukendt",
+        started_at: l.created_at,
+        completed_at: null,
+        duration_ms: l.duration_ms,
+        status: l.status,
+        actions: null,
+        records_processed: 0,
+        api_calls_made: l.api_calls || 0,
+        retries: l.retries || 0,
+        rate_limit_hits: l.rate_limit_hits || 0,
+        error_message: l.status === "error" ? l.message : null,
+      }));
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([refetchRuns(), refetchLogs(), refetchAudit()]);
+    setIsRefreshing(false);
+  };
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Systemstabilitet</h1>
+          <p className="text-sm text-muted-foreground">Realtids-overblik over integrationers sundhed</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          Opdater
+        </Button>
+      </div>
+
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {integrationMetrics.map(int => {
+          const color = getStatusColor(int.successRate1h, int.rateLimitRate15m);
+          return (
+            <Card key={int.id} className="relative overflow-hidden">
+              <div className={`absolute top-0 left-0 w-1 h-full ${statusColorMap[color]}`} />
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold">{int.name}</CardTitle>
+                  <Badge variant={color === "green" ? "default" : color === "yellow" ? "secondary" : "destructive"} className="text-xs">
+                    {statusLabelMap[color]}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">429-rate (15m)</span>
+                  <span className={int.rateLimitRate15m > 5 ? "text-red-500 font-medium" : "text-foreground"}>
+                    {int.rateLimitRate15m.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Succes (1t)</span>
+                  <span className={int.successRate1h < 95 ? "text-amber-500 font-medium" : "text-foreground"}>
+                    {int.successRate1h.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sidste sync</span>
+                  <span className="text-foreground">
+                    {int.last_sync_at ? formatDistanceToNow(new Date(int.last_sync_at), { addSuffix: true, locale: da }) : "Aldrig"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Gns. varighed</span>
+                  <span className="text-foreground">
+                    {int.avgDurationMs > 0 ? `${(int.avgDurationMs / 1000).toFixed(1)}s` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Provider</span>
+                  <span className="text-foreground capitalize">{int.provider}</span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Rate Limit Budget Gauge */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Rate Limit Budget (estimeret)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Sidste 15 min</span>
+              <span className="font-medium">{apiCalls15m} / {rateLimitBudget15m} kald ({budgetUsed15m.toFixed(0)}%)</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${budgetUsed15m > 80 ? "bg-red-500" : budgetUsed15m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                style={{ width: `${budgetUsed15m}%` }}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Sidste 60 min</span>
+              <span className="font-medium">{apiCalls60m} / {rateLimitBudget60m} kald ({budgetUsed60m.toFixed(0)}%)</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${budgetUsed60m > 80 ? "bg-red-500" : budgetUsed60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                style={{ width: `${budgetUsed60m}%` }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Runs Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Seneste Sync Runs
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tid</TableHead>
+                <TableHead>Integration</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Varighed</TableHead>
+                <TableHead className="text-right">API</TableHead>
+                <TableHead className="text-right">429s</TableHead>
+                <TableHead className="text-right">Retries</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {runsTableData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Ingen sync runs endnu. Data vises når integration-engine begynder at logge.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                runsTableData.map((run: any) => (
+                  <TableRow key={run.id}>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {format(new Date(run.started_at), "dd/MM HH:mm:ss")}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium">{run.integration_name}</TableCell>
+                    <TableCell>
+                      {run.status === "success" ? (
+                        <Badge variant="default" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> OK
+                        </Badge>
+                      ) : run.status === "error" ? (
+                        <Badge variant="destructive" className="text-xs">
+                          <XCircle className="h-3 w-3 mr-1" /> Fejl
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" /> {run.status}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-right">
+                      {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-right">{run.api_calls_made || 0}</TableCell>
+                    <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-red-500 font-medium" : ""}`}>
+                      {run.rate_limit_hits || 0}
+                    </TableCell>
+                    <TableCell className={`text-xs text-right ${(run.retries || 0) > 0 ? "text-amber-500 font-medium" : ""}`}>
+                      {run.retries || 0}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Audit Log */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Audit Log (Schedule-ændringer)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tid</TableHead>
+                <TableHead>Integration</TableHead>
+                <TableHead>Ændring</TableHead>
+                <TableHead>Gammel schedule</TableHead>
+                <TableHead>Ny schedule</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {auditLog.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    Ingen schedule-ændringer logget endnu.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                auditLog.map(entry => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {format(new Date(entry.created_at), "dd/MM HH:mm")}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium">
+                      {integrations.find((i: any) => i.id === entry.integration_id)?.name || entry.integration_id}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">{entry.change_type}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs font-mono">{entry.old_schedule || "—"}</TableCell>
+                    <TableCell className="text-xs font-mono">{entry.new_schedule || "—"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -5662,36 +5662,148 @@ export type Database = {
       }
       integration_logs: {
         Row: {
+          api_calls: number | null
           created_at: string
           details: Json | null
+          duration_ms: number | null
           id: string
           integration_id: string | null
           integration_name: string | null
           integration_type: string
           message: string
+          rate_limit_hits: number | null
+          retries: number | null
           status: string
         }
         Insert: {
+          api_calls?: number | null
           created_at?: string
           details?: Json | null
+          duration_ms?: number | null
           id?: string
           integration_id?: string | null
           integration_name?: string | null
           integration_type: string
           message: string
+          rate_limit_hits?: number | null
+          retries?: number | null
           status: string
         }
         Update: {
+          api_calls?: number | null
           created_at?: string
           details?: Json | null
+          duration_ms?: number | null
           id?: string
           integration_id?: string | null
           integration_name?: string | null
           integration_type?: string
           message?: string
+          rate_limit_hits?: number | null
+          retries?: number | null
           status?: string
         }
         Relationships: []
+      }
+      integration_schedule_audit: {
+        Row: {
+          change_type: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          integration_id: string | null
+          new_config: Json | null
+          new_schedule: string | null
+          old_config: Json | null
+          old_schedule: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          new_config?: Json | null
+          new_schedule?: string | null
+          old_config?: Json | null
+          old_schedule?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          new_config?: Json | null
+          new_schedule?: string | null
+          old_config?: Json | null
+          old_schedule?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_schedule_audit_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_sync_runs: {
+        Row: {
+          actions: string[] | null
+          api_calls_made: number | null
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          integration_id: string | null
+          rate_limit_hits: number | null
+          records_processed: number | null
+          retries: number | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          actions?: string[] | null
+          api_calls_made?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          integration_id?: string | null
+          rate_limit_hits?: number | null
+          records_processed?: number | null
+          retries?: number | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          actions?: string[] | null
+          api_calls_made?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          integration_id?: string | null
+          rate_limit_hits?: number | null
+          records_processed?: number | null
+          retries?: number | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_sync_runs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       job_positions: {
         Row: {
