@@ -26,7 +26,7 @@ Erstat den nuvaerende delta/watermark-strategi i `calculate-kpi-incremental` med
 | `MyProfile.tsx` | ⏭️ Skippet | Behøver daglige commission-breakdowns, ikke kun totaler |
 | `useDashboardKpiData.ts` | ✅ Allerede cached | Har cache-first strategi med fallback |
 
-## Trin 3: TODO - Reducér full refresh
+## Trin 4: Reducér full refresh ✅
 
-- `calculate-kpi-values` full refresh: fra hvert 30. minut til hvert 60. minut
-- Den er ikke længere "ground truth" - den minutlige funktion er nu autoritativ
+- `calculate-kpi-values` full refresh: ændret fra `*/30 * * * *` til `0 * * * *` (hvert 60. minut)
+- Den minutlige `calculate-kpi-incremental` er nu autoritativ for alle scopes
