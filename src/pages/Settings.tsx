@@ -412,23 +412,18 @@ export default function Settings() {
   const syncSalesToDb = async () => {
     setLoading("sync");
     try {
-      // Usamos la nueva función adversus-sync-v2
-      // Primero sincronizamos campañas y usuarios para asegurar integridad referencial
-      await supabase.functions.invoke("adversus-sync-v2", { body: { action: "sync-campaigns" } });
-      await supabase.functions.invoke("adversus-sync-v2", { body: { action: "sync-users" } });
-      
-      // Luego sincronizamos las ventas
-      const { data, error } = await supabase.functions.invoke("adversus-sync-v2", {
-        body: { action: "sync-sales", days: syncDays },
+      // Al sync kører via integration-engine nu
+      const { data, error } = await supabase.functions.invoke("integration-engine", {
+        body: { source: "adversus", action: "repair-history", days: syncDays },
       });
       
       if (error) throw error;
       
       setResults({ type: "sync", data });
-      toast.success(data.message || "Sincronización completada exitosamente");
+      toast.success("Synkronisering gennemført via integration-engine");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "La sincronización falló");
+      toast.error(err.message || "Synkronisering fejlede");
     } finally {
       setLoading(null);
     }

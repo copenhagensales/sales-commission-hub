@@ -520,8 +520,6 @@ export function DialerIntegrations() {
         body.source = "adversus";
         body.action = "repair-history";
         body.days = parseInt(manualDays) || 30;
-      } else if (manualFunction === "sync-adversus") {
-        body.days = parseInt(manualDays) || 7;
       }
 
       const { data, error } = await supabase.functions.invoke(manualFunction, { body });
@@ -2377,16 +2375,15 @@ export function DialerIntegrations() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                 <SelectContent>
                   <SelectItem value="integration-engine">integration-engine (repair)</SelectItem>
-                  <SelectItem value="sync-adversus">sync-adversus</SelectItem>
                   <SelectItem value="cleanup-inactive-employees">cleanup-inactive-employees</SelectItem>
                   <SelectItem value="send-contract-reminders">send-contract-reminders</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {(manualFunction === "integration-engine" || manualFunction === "sync-adversus") && (
+            {manualFunction === "integration-engine" && (
               <div className="space-y-2">
                 <Label>Días (days)</Label>
                 <Input
