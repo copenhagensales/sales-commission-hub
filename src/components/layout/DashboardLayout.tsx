@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { cn } from "@/lib/utils";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
+import { isTvMode } from "@/utils/tvMode";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -22,13 +23,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Detect TV mode - skip all auth-dependent components
-  const isTvMode = typeof window !== 'undefined' && 
-    (window.location.pathname.startsWith('/t/') || 
-     window.location.pathname.startsWith('/tv/') ||
-     sessionStorage.getItem('tv_board_code') !== null);
+  const tvMode = isTvMode();
 
   // In TV mode, render only children without auth wrappers
-  if (isTvMode) {
+  if (tvMode) {
     return (
       <div className="min-h-screen bg-background">
         {children}

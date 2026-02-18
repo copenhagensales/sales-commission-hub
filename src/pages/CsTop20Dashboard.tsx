@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -11,25 +11,7 @@ import { Trophy, Calendar, Clock } from "lucide-react";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
-
-// Check if we're in TV mode
-const isTvMode = () => {
-  if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/tv/') || 
-         window.location.pathname.startsWith('/t/') || 
-         sessionStorage.getItem('tv_board_code') !== null;
-};
-
-// Auto-reload page every 5 minutes to pick up code/layout changes
-const useAutoReload = (enabled: boolean, intervalMs = 5 * 60 * 1000) => {
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = setInterval(() => {
-      window.location.reload();
-    }, intervalMs);
-    return () => clearInterval(timer);
-  }, [enabled, intervalMs]);
-};
+import { isTvMode, useAutoReload } from "@/utils/tvMode";
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
