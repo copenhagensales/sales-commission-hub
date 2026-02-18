@@ -172,3 +172,47 @@ export function estimateFrequencyFromCron(cronExpression: string): number {
   }
   return Math.round(totalGap / (minutes.length - 1));
 }
+
+/**
+ * Find the best start-minute offset for a given frequency,
+ * maximizing the minimum gap to other schedules on the same provider.
+ */
+export function findBestOffset(
+  frequencyMinutes: number,
+  otherSchedules: string[],
+  thresholdMinutes: number = 2
+): { offset: number; minGap: number } {
+  const otherMinuteSets = otherSchedules.map(s => parseCronMinutes(s));
+
+  let bestOffset = 0;
+  let bestMinGap = -1;
+
+  for (let candidate = 0; candidate < frequencyMinutes; candidate++) {
+    // Generate fire minutes for this candidate offset
+    const candidateMinutes: number[] = [];
+    for (let m = candidate; m < 60; m += frequencyMinutes) {
+      candidateMinutes.push(m);
+    }
+
+    // Find the minimum gap to any other schedule's fire minutes
+    let worstGap = Infinity;
+    for (const otherMins of otherMinuteSets) {
+      for (const cm of candidateMinutes) {
+        for (const om of otherMins) {
+          const diff = Math.abs(cm - om);
+          const circularDiff = Math.min(diff, 60 - diff);
+          if (circularDiff < worstGap) {
+            worstGap = circularDiff;
+          }
+        }
+      }
+    }
+
+    if (worstGap > bestMinGap) {
+      bestMinGap = worstGap;
+      bestOffset = candidate;
+    }
+  }
+
+  return { offset: bestOffset, minGap: otherSchedules.length === 0 ? frequencyMinutes : bestMinGap };
+}

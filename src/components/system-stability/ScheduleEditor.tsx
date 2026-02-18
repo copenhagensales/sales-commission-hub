@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Save, Eye, Settings2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AlertTriangle, Save, Settings2, Lightbulb, CheckCircle2, ChevronDown, Code } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
   buildCronExpression,
   detectOverlaps,
   estimateFrequencyFromCron,
+  findBestOffset,
 } from "@/utils/cronOverlapDetector";
 
 interface Integration {
@@ -28,21 +29,47 @@ interface ScheduleEditorProps {
 }
 
 const FREQUENCY_OPTIONS = [
-  { value: "5", label: "Hvert 5. minut" },
-  { value: "10", label: "Hvert 10. minut" },
-  { value: "15", label: "Hvert 15. minut" },
-  { value: "30", label: "Hvert 30. minut" },
-  { value: "60", label: "Hver time" },
+  { value: "5", label: "Hvert 5. minut", timesPerHour: 12 },
+  { value: "10", label: "Hvert 10. minut", timesPerHour: 6 },
+  { value: "15", label: "Hvert 15. minut", timesPerHour: 4 },
+  { value: "30", label: "Hvert 30. minut", timesPerHour: 2 },
+  { value: "60", label: "Én gang i timen", timesPerHour: 1 },
 ];
+
+function generateMinutesFromOffset(frequency: number, offset: number): number[] {
+  const mins: number[] = [];
+  for (let m = offset; m < 60; m += frequency) {
+    mins.push(m);
+  }
+  return mins;
+}
 
 export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEditorProps) {
   const [selectedId, setSelectedId] = useState<string>(integrations[0]?.id || "");
   const [frequency, setFrequency] = useState<string>("10");
-  const [offsetInput, setOffsetInput] = useState<string>("");
+  const [startMinute, setStartMinute] = useState<string>("0");
   const [saving, setSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showTechnical, setShowTechnical] = useState(false);
 
   const selected = integrations.find(i => i.id === selectedId);
+
+  // Other integrations on the same provider (for recommendations)
+  const sameProviderIntegrations = useMemo(() => {
+    if (!selected) return [];
+    return integrations.filter(i => i.id !== selectedId && i.provider === selected.provider);
+  }, [integrations, selectedId, selected]);
+
+  const otherSchedules = useMemo(() => {
+    return sameProviderIntegrations.map(int =>
+      int.config?.sync_schedule || `*/${int.sync_frequency_minutes || 10} * * * *`
+    );
+  }, [sameProviderIntegrations]);
+
+  // Recommended offset
+  const recommendation = useMemo(() => {
+    const freq = parseInt(frequency);
+    return findBestOffset(freq, otherSchedules);
+  }, [frequency, otherSchedules]);
 
   // When integration changes, load its current schedule
   const handleIntegrationChange = (id: string) => {
@@ -54,52 +81,68 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
         const freq = estimateFrequencyFromCron(currentSchedule);
         setFrequency(String(freq));
         const mins = parseCronMinutes(currentSchedule);
-        setOffsetInput(mins.join(","));
+        setStartMinute(String(mins[0] ?? 0));
       } else {
         const freq = int.sync_frequency_minutes || 10;
         setFrequency(String(freq));
-        setOffsetInput("");
+        setStartMinute("0");
       }
     }
   };
 
-  // Build the new cron expression
-  const newCronExpression = useMemo(() => {
-    const offsets = offsetInput
-      .split(",")
-      .map(s => parseInt(s.trim(), 10))
-      .filter(n => !isNaN(n) && n >= 0 && n < 60);
-    return buildCronExpression(parseInt(frequency), offsets.length > 0 ? offsets : []);
-  }, [frequency, offsetInput]);
+  // Start minute options based on frequency
+  const startMinuteOptions = useMemo(() => {
+    const freq = parseInt(frequency);
+    return Array.from({ length: freq }, (_, i) => i);
+  }, [frequency]);
 
-  // Preview conflicts
+  // Ensure startMinute is valid when frequency changes
+  useEffect(() => {
+    const freq = parseInt(frequency);
+    const current = parseInt(startMinute);
+    if (current >= freq) {
+      setStartMinute("0");
+    }
+  }, [frequency]);
+
+  // The fire minutes and cron expression
+  const freq = parseInt(frequency);
+  const offset = parseInt(startMinute);
+  const fireMinutes = generateMinutesFromOffset(freq, offset);
+  const newCronExpression = fireMinutes.length > 0 ? `${fireMinutes.join(",")} * * * *` : `*/${freq} * * * *`;
+
+  // Always-on conflict check
   const overlapWarnings = useMemo(() => {
-    if (!showPreview) return [];
+    if (sameProviderIntegrations.length === 0) return [];
 
-    const selectedProvider = selected?.provider;
-    const relevantIntegrations = integrations.filter(int => int.provider === selectedProvider);
+    const jobs = [
+      { id: selectedId, name: selected?.name || "", schedule: newCronExpression, provider: selected?.provider },
+      ...sameProviderIntegrations.map(int => ({
+        id: int.id,
+        name: int.name,
+        schedule: int.config?.sync_schedule || `*/${int.sync_frequency_minutes || 10} * * * *`,
+        provider: int.provider,
+      })),
+    ];
 
-    const jobs = relevantIntegrations.map(int => {
-      const schedule = int.id === selectedId
-        ? newCronExpression
-        : int.config?.sync_schedule || `*/${int.sync_frequency_minutes || 10} * * * *`;
-      return { id: int.id, name: int.name, schedule, provider: int.provider };
-    });
+    return detectOverlaps(jobs, 2, true);
+  }, [sameProviderIntegrations, selectedId, selected, newCronExpression]);
 
-    return detectOverlaps(jobs, 2);
-  }, [showPreview, integrations, selectedId, newCronExpression]);
+  const handleUseRecommended = () => {
+    setStartMinute(String(recommendation.offset));
+  };
 
   const handleSave = async () => {
     if (!selected) return;
     setSaving(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("update-cron-schedule", {
+      const { error } = await supabase.functions.invoke("update-cron-schedule", {
         body: {
           integration_type: "dialer",
           integration_id: selected.id,
           provider: selected.provider,
-          frequency_minutes: parseInt(frequency),
+          frequency_minutes: freq,
           is_active: true,
           custom_schedule: newCronExpression,
         },
@@ -107,30 +150,39 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
 
       if (error) throw error;
 
-      toast.success(`Schedule opdateret for ${selected.name}`, {
-        description: `Ny schedule: ${newCronExpression}`,
+      toast.success(`Tidsplan opdateret for ${selected.name}`, {
+        description: `Kører ${fireMinutes.length} gange i timen fra minut :${String(offset).padStart(2, "0")}`,
       });
       onScheduleUpdated();
     } catch (err: any) {
-      toast.error("Kunne ikke opdatere schedule", { description: err.message });
+      toast.error("Kunne ikke opdatere tidsplan", { description: err.message });
     } finally {
       setSaving(false);
     }
   };
 
-  const fireMinutes = parseCronMinutes(newCronExpression);
+  const freqOption = FREQUENCY_OPTIONS.find(o => o.value === frequency);
+  const humanSchedule = `Kører ${fireMinutes.length} gang${fireMinutes.length !== 1 ? "e" : ""} i timen: ${fireMinutes.map(m => `:${String(m).padStart(2, "0")}`).join(", ")}`;
+
+  const recommendedMinutes = generateMinutesFromOffset(freq, recommendation.offset);
+  const recommendedLabel = `Hvert ${freq}. min fra :${String(recommendation.offset).padStart(2, "0")} — giver ${recommendation.minGap} minutters afstand${sameProviderIntegrations.length > 0 ? ` til ${sameProviderIntegrations.map(i => i.name).join(", ")}` : ""}`;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Settings2 className="h-4 w-4" />
-          Styring af Sync-schedule
-        </CardTitle>
+        <div>
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Settings2 className="h-4 w-4" />
+            Planlæg synkronisering
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Vælg hvor ofte data skal hentes, og hvornår. Systemet anbefaler automatisk en tidsplan der undgår konflikter.
+          </p>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Controls row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Integration selector */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Integration</label>
             <Select value={selectedId} onValueChange={handleIntegrationChange}>
@@ -145,9 +197,8 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
             </Select>
           </div>
 
-          {/* Frequency */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Sync-frekvens</label>
+            <label className="text-xs font-medium text-muted-foreground">Hvor ofte skal data hentes?</label>
             <Select value={frequency} onValueChange={setFrequency}>
               <SelectTrigger>
                 <SelectValue />
@@ -160,71 +211,99 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
             </Select>
           </div>
 
-          {/* Minute offset */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              Minut-offset (kommasepareret)
+              Start ved minut
             </label>
-            <Input
-              value={offsetInput}
-              onChange={e => setOffsetInput(e.target.value)}
-              placeholder="f.eks. 1,11,21,31,41,51"
-              className="font-mono text-xs"
-            />
+            <Select value={startMinute} onValueChange={setStartMinute}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {startMinuteOptions.map(m => (
+                  <SelectItem key={m} value={String(m)}>
+                    :{String(m).padStart(2, "0")}
+                    {m === recommendation.offset && sameProviderIntegrations.length > 0 ? " (anbefalet)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Hvilket minut i timen synkroniseringen begynder
+            </p>
           </div>
         </div>
 
-        {/* Preview of cron expression */}
-        <div className="flex items-center justify-between bg-muted/50 rounded-md p-3">
-          <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Ny cron expression</p>
-            <p className="text-sm font-mono font-medium">{newCronExpression}</p>
-            <p className="text-xs text-muted-foreground">
-              Kører ved minut: {fireMinutes.slice(0, 12).join(", ")}
-              {fireMinutes.length > 12 ? ` (+${fireMinutes.length - 12} mere)` : ""}
-            </p>
-          </div>
-          <div className="flex gap-2">
+        {/* Recommendation */}
+        {sameProviderIntegrations.length > 0 && (
+          <div className="flex items-center justify-between bg-accent/50 rounded-md p-3 border border-accent">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-foreground">Anbefalet tidsplan</p>
+                <p className="text-xs text-muted-foreground">{recommendedLabel}</p>
+              </div>
+            </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowPreview(!showPreview)}
+              className="shrink-0 text-xs"
+              onClick={handleUseRecommended}
+              disabled={parseInt(startMinute) === recommendation.offset}
             >
-              <Eye className="h-4 w-4 mr-1" />
-              {showPreview ? "Skjul" : "Preview konflikter"}
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? "Gemmer..." : "Gem"}
+              Brug anbefalet
             </Button>
           </div>
+        )}
+
+        {/* Human-readable schedule */}
+        <div className="bg-muted/50 rounded-md p-3 space-y-2">
+          <p className="text-sm font-medium">{humanSchedule}</p>
+
+          {/* Conflict status — always visible */}
+          {overlapWarnings.length === 0 ? (
+            <div className="flex items-center gap-2 text-xs text-primary">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {sameProviderIntegrations.length > 0
+                ? "Ingen konflikter med andre integrationer på dette API"
+                : "Ingen andre integrationer på dette API"}
+            </div>
+          ) : (
+            overlapWarnings.map((w, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Kører samtidig med <strong>{w.jobA === selected?.name ? w.jobB : w.jobA}</strong> ved minut {w.conflictMinutes.map(m => `:${String(m).padStart(2, "0")}`).join(", ")}
+                </span>
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Overlap warnings */}
-        {showPreview && overlapWarnings.length > 0 && (
-          <div className="space-y-2">
-            {overlapWarnings.map((w, i) => (
-              <div key={i} className="flex items-start gap-2 bg-destructive/10 rounded-md p-3 text-xs">
-                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-destructive">
-                    Overlap: {w.jobA} ↔ {w.jobB}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Jobs kører inden for {w.minutesApart} min af hinanden ved minut: {w.conflictMinutes.join(", ")}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Technical details (collapsible) */}
+        <Collapsible open={showTechnical} onOpenChange={setShowTechnical}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1 px-0">
+              <Code className="h-3 w-3" />
+              Tekniske detaljer
+              <ChevronDown className={`h-3 w-3 transition-transform ${showTechnical ? "rotate-180" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="bg-muted/30 rounded-md p-3 mt-1 space-y-1">
+              <p className="text-xs text-muted-foreground">Cron expression</p>
+              <p className="text-sm font-mono">{newCronExpression}</p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
-        {showPreview && overlapWarnings.length === 0 && (
-          <div className="bg-emerald-500/10 rounded-md p-3 text-xs text-emerald-600 flex items-center gap-2">
-            <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 border-emerald-300">✓</Badge>
-            Ingen konflikter detekteret. Alle jobs har mindst 2 minutters afstand.
-          </div>
-        )}
+        {/* Save */}
+        <div className="flex justify-end">
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-1" />
+            {saving ? "Gemmer..." : "Gem tidsplan"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
