@@ -1,309 +1,270 @@
 
-# Adversus Rate-Limit Fix: Komplet Implementeringsplan
 
-## 1. Validation af nuværende state
+# Systemstabilitet -- Adversus Integrations Dashboard
 
-### Aktive cron jobs
+## Oversigt
 
-| JobID | Jobnavn | Schedule | Actions | Integration |
-|-------|---------|----------|---------|-------------|
-| 47 | `dialer-26fac751-sync` | `1,11,21,31,41,51 * * * *` (hvert 10 min) | `campaigns,users,sales,sessions` | Lovablecph (TDC) |
-| 48 | `dialer-657c2050-sync` | `6,16,26,36,46,56 * * * *` (hvert 10 min) | `campaigns,users,sales,sessions` | Relatel_CPHSALES |
-
-**Bekræftet:** Begge kører ALLE 4 actions hvert 10. minut med kun 5 minutters offset.
-
-### Fejlrate (sidste 24 timer)
-
-| Integration | Succes | Fejl | Fejlrate |
-|-------------|--------|------|----------|
-| Lovablecph | 3 | 22 | **88%** |
-| Relatel_CPHSALES | 228 | 23 | 9% |
-
-**Lovablecph:** Sidste succesfulde sync: `2026-02-18 14:52` — alle fejl er `Rate Limit Adversus Excedido (after retries)`.
-**Relatel:** Kører stabilt (10 sales pr. run), men bidrager til samlet credential-load.
-
-### Sessions 403
-
-**Bekræftet:** Lovablecph (TDC) returnerer HTTP 403 på `/v1/sessions`. Sessions-action skal fjernes permanent for denne integration.
-
-### Credential-deling
-
-Begge integrationer deler Adversus API-credentials. Med 5 min offset og ~2-4 min runtime per run overlapper de regelmæssigt → 429.
+En ny underside under `/system-stability` der giver realtids-overblik over alle Adversus (og Enreach) integrationers sundhed, med visuelle metrics, tidslinje-overlap-detektion og direkte styring af sync-frekvens og scheduling -- alt sammen med audit log og rollback.
 
 ---
 
-## 2. Final Change Plan (lav risiko)
+## 1. Datamodel og nye tabeller
 
-### Princip
-- **Sales:** Hyppigt (det kritiske data) — separate jobs
-- **Metadata** (campaigns, users): Sjældent (1x/time) — ændrer sig sjældent
-- **Sessions:** Kun for Relatel (hvor endpoint virker), 1x/time i metadata-job
-- **Minimum gap:** 12+ minutter mellem jobs der deler credentials
+### 1a. `integration_sync_runs` (ny tabel)
 
-### Nye schedules
+Lagrer hvert sync-run med detaljerede metrics. Udfyldes af `integration-engine` ved afslutning af hvert run.
 
-| Job | Integration | Schedule | Actions | API-kald/run |
-|-----|------------|----------|---------|-------------|
-| `dialer-26fac751-sync` | Lovablecph sales | `4,19,34,49 * * * *` (hvert 15 min) | `sales` | ~15-25 |
-| `dialer-657c2050-sync` | Relatel sales | `1,11,21,31,41,51 * * * *` (hvert 10 min) | `sales` | ~15-25 |
-| `dialer-26fac751-meta` | Lovablecph meta | `5 * * * *` (1x/time) | `campaigns,users` | ~3 |
-| `dialer-657c2050-meta` | Relatel meta | `35 * * * *` (1x/time) | `campaigns,users,sessions` | ~5 |
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| integration_id | uuid FK | Reference til `dialer_integrations.id` |
+| started_at | timestamptz | |
+| completed_at | timestamptz | |
+| duration_ms | integer | Beregnet varighed |
+| status | text | `success`, `error`, `partial` |
+| actions | text[] | Hvilke actions blev krt |
+| records_processed | integer | Antal records |
+| api_calls_made | integer | Antal API-kald |
+| retries | integer | Antal retries i dette run |
+| rate_limit_hits | integer | Antal 429-responses |
+| error_message | text | Evt. fejlbesked |
 
-### Frekvens-valg: Lovablecph 15 min (ikke 10 min)
+### 1b. `integration_schedule_audit` (ny tabel)
 
-**Begrundelse:**
-- TDC har lavere salgsvolumen end Relatel → 15 min er tilstrækkeligt
-- Giver bedre separation fra Relatel-runs
-- Reducerer samlet API-load med 33% for denne integration
-- Kan justeres til 10 min senere hvis nødvendigt
+Audit log for alle scheduling-andringer.
+
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| integration_id | uuid | |
+| changed_by | uuid | auth.uid() |
+| change_type | text | `schedule_update`, `frequency_change`, `rollback` |
+| old_config | jsonb | Tidligere config snapshot |
+| new_config | jsonb | Ny config |
+| old_schedule | text | Tidligere cron expression |
+| new_schedule | text | Ny cron expression |
+| created_at | timestamptz | |
+
+### 1c. Udvidelse af `integration_logs`
+
+Tilf felter til eksisterende tabel via migration:
+
+- `duration_ms` (integer, nullable)
+- `api_calls` (integer, nullable)
+- `retries` (integer, nullable)
+- `rate_limit_hits` (integer, nullable)
 
 ---
 
-## 3. Executable SQL
+## 2. Beregnede Metrics (hentet via SQL/hooks)
 
-### Trin 1: Unschedule gamle jobs
+Alle metrics beregnes fra `integration_sync_runs` + `integration_logs`:
 
-```sql
-SELECT cron.unschedule('dialer-26fac751-sync');
-SELECT cron.unschedule('dialer-657c2050-sync');
-```
+- **Succes-rate (%)**: `COUNT(status=success) / COUNT(*)` for sidste 1h / 24h
+- **429-rate (%)**: `SUM(rate_limit_hits) / SUM(api_calls)` for sidste 15/60 min
+- **Gennemsnitlig varighed**: `AVG(duration_ms)` pr. integration
+- **Estimeret budget-forbrug**: `SUM(api_calls sidste 15 min) / rate_limit_budget * 100`
+- **Overlap-score**: Beregnet i frontend ud fra cron-expressions
 
-### Trin 2: Schedule nye jobs
+---
 
-```sql
--- Lovablecph: KUN sales, hvert 15 min, offset :04
-SELECT cron.schedule(
-  'dialer-26fac751-sync',
-  '4,19,34,49 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["sales"], "integration_id": "26fac751-c2d8-4b5b-a6df-e33a32e3c6e7"}'::jsonb
-  ) AS request_id;$$
-);
+## 3. UI-wireframe (kort)
 
--- Relatel: KUN sales, hvert 10 min, offset :01
-SELECT cron.schedule(
-  'dialer-657c2050-sync',
-  '1,11,21,31,41,51 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["sales"], "integration_id": "657c2050-1faa-4233-a964-900fb9e7b8c6"}'::jsonb
-  ) AS request_id;$$
-);
-
--- Lovablecph metadata: campaigns+users, 1x/time, minut :05
-SELECT cron.schedule(
-  'dialer-26fac751-meta',
-  '5 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users"], "integration_id": "26fac751-c2d8-4b5b-a6df-e33a32e3c6e7"}'::jsonb
-  ) AS request_id;$$
-);
-
--- Relatel metadata: campaigns+users+sessions, 1x/time, minut :35
-SELECT cron.schedule(
-  'dialer-657c2050-meta',
-  '35 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users", "sessions"], "integration_id": "657c2050-1faa-4233-a964-900fb9e7b8c6"}'::jsonb
-  ) AS request_id;$$
-);
-```
-
-### Trin 3: Opdater dialer_integrations config
-
-```sql
--- Lovablecph: ny sync_schedule + marker at sessions er disabled
-UPDATE dialer_integrations
-SET config = jsonb_set(
-  jsonb_set(
-    COALESCE(config, '{}'::jsonb),
-    '{sync_schedule}',
-    '"4,19,34,49 * * * *"'
-  ),
-  '{sync_actions}',
-  '["sales"]'
-),
-updated_at = now()
-WHERE id = '26fac751-c2d8-4b5b-a6df-e33a32e3c6e7';
-
--- Relatel: ny sync_schedule
-UPDATE dialer_integrations
-SET config = jsonb_set(
-  COALESCE(config, '{}'::jsonb),
-  '{sync_schedule}',
-  '"1,11,21,31,41,51 * * * *"'
-),
-updated_at = now()
-WHERE id = '657c2050-1faa-4233-a964-900fb9e7b8c6';
+```text
++---------------------------------------------------------------+
+| Systemstabilitet                                    [Opdater]  |
++---------------------------------------------------------------+
+|                                                                |
+|  +-- Status Cards (1 per integration) ---+                     |
+|  | [Lovablecph]      [Relatel]     [Eesy] ...                  |
+|  | Status: OK (gron) | OK (gron) | OK (gron)                  |
+|  | 429-rate: 2%      | 0%        | 0%                         |
+|  | Succes: 95%       | 100%      | 100%                       |
+|  | Sidste sync: 2m   | 1m        | 30s                        |
+|  | Varighed: 4.2s    | 2.1s      | 3.8s                       |
+|  +--------------------------------------------+               |
+|                                                                |
+|  +-- Rate Limit Budget Gauge ---+                              |
+|  | [===-------] 23% brugt (15 min)                             |
+|  | [====------] 41% brugt (60 min)                             |
+|  +------------------------------+                              |
+|                                                                |
+|  +-- Tidslinje (60 min) ---------------------------+           |
+|  | :00 :05 :10 :15 :20 :25 :30 :35 :40 :45 :50 :55|           |
+|  | Lovablecph  [=]      [=]      [=]      [=]      |           |
+|  | Relatel  [=]   [=]   [=]   [=]   [=]   [=]      |           |
+|  | Eesy  [=][=][=][=][=][=][=][=][=][=][=][=]       |           |
+|  | Overlap-advarsler markeret med rod               |           |
+|  +--------------------------------------------------+          |
+|                                                                |
+|  +-- Styring --------------------------------+                 |
+|  | Integration: [Lovablecph v]               |                 |
+|  | Sync-frekvens: [15 min v]                 |                 |
+|  | Minut-offset: [4,19,34,49]  (redigerbar)  |                 |
+|  | Actions: [x] Sales [ ] Campaigns [x] Meta |                 |
+|  | [Preview konflikter]  [Gem]               |                 |
+|  +-------------------------------------------+                 |
+|                                                                |
+|  +-- Seneste Runs (tabel) ---+                                 |
+|  | Tid | Integration | Status | Varighed | API | 429s | Retry  |
+|  +-------------------------------------------+                 |
+|                                                                |
+|  +-- Audit Log ---+                                            |
+|  | Tid | Bruger | Andring | Gammel | Ny | [Rollback]           |
+|  +-----------------+                                           |
++---------------------------------------------------------------+
 ```
 
 ---
 
-## 4. Backfill Steps
+## 4. Implementeringsplan i faser
 
-### Manuel kørsel for Lovablecph (kør efter cron-ændring)
+### Fase 1 -- MVP (datalager + skrivbar)
 
-```sql
-SELECT net.http_post(
-  url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-  headers := jsonb_build_object(
-    'Content-Type', 'application/json',
-    'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI'
-  ),
-  body := '{"source": "adversus", "integration_id": "26fac751-c2d8-4b5b-a6df-e33a32e3c6e7", "actions": ["campaigns", "users", "sales"], "days": 1}'::jsonb
-);
-```
+**Database:**
+- Opret `integration_sync_runs` tabel
+- Opret `integration_schedule_audit` tabel
+- Tilf `duration_ms`, `api_calls`, `retries`, `rate_limit_hits` kolonner til `integration_logs`
+- RLS policies: kun `is_owner()` eller `is_teamleder_or_above()` kan lase og skrive
 
-**Hvornår `days: 3`:** Kun hvis backfill med `days: 1` viser manglende sales fra 2+ dage. Ellers hold `days: 1`.
+**Edge function (integration-engine):**
+- Ved afslutning af hvert sync-run: INSERT i `integration_sync_runs` med alle metrics
+- Tal retries og 429-hits i AdversusAdapter og pass dem op
 
-### Verificer backfill
+**Edge function (update-cron-schedule):**
+- Tilf audit log INSERT ved hver schedule-andring (gammel/ny config + schedule)
 
-```sql
-SELECT DATE(sale_datetime) as dag, COUNT(*) as antal
-FROM sales
-WHERE created_at > now() - interval '3 days'
-  AND source = 'adversus'
-  AND dialer_campaign_id IN (
-    SELECT adversus_campaign_id FROM adversus_campaign_mappings
-    WHERE client_campaign_id IN (
-      SELECT id FROM client_campaigns WHERE client_id = (
-        SELECT id FROM clients WHERE name ILIKE '%TDC%' LIMIT 1
-      )
-    )
-  )
-GROUP BY DATE(sale_datetime)
-ORDER BY dag DESC;
-```
+**Frontend:**
+- Ny side-komponent: `src/pages/SystemStability.tsx`
+- Route: `/system-stability`, tilgangelig for `ejer` og `teamleder`
+- Status-kort pr. integration med farve-indikator (gron/gul/rod baseret pa 429-rate og succes-rate)
+- Tabel med seneste runs
+- Simpel audit log visning
 
----
+### Fase 2 -- Visuel styring
 
-## 5. Verification Checklist (24-48 timer)
+**Frontend:**
+- Frekvens-dropdown (5/10/15/30/60 min) pr. integration
+- Redigerbar minut-offset (cron expression input)
+- Preview-funktion: beregn overlap mellem alle aktive cron jobs for de deles API-credentials
+- Advarsel hvis jobs overlapper inden for 2 minutter
+- Gem-knap kalder `update-cron-schedule` edge function
+- Automatisk INSERT i `integration_schedule_audit` (via edge function)
 
-### Success criteria
-- [ ] Lovablecph 429-rate < 5% (ned fra 88%)
-- [ ] Lovablecph sales > 0 pr. sync-run
-- [ ] Relatel succes-rate forbliver > 90%
-- [ ] Ingen overlap-relaterede fejl i logs
+### Fase 3 -- Avanceret visualisering
 
-### SQL monitoring queries
-
-```sql
--- 429-rate pr. integration (sidste 24 timer)
-SELECT 
-  integration_name,
-  COUNT(*) FILTER (WHERE status = 'success') as success,
-  COUNT(*) FILTER (WHERE status = 'error') as errors,
-  ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'error') / NULLIF(COUNT(*), 0), 1) as error_pct
-FROM integration_logs
-WHERE integration_name IN ('Lovablecph', 'Relatel_CPHSALES')
-  AND created_at > now() - interval '24 hours'
-GROUP BY integration_name;
-
--- Sales importeret pr. run (sidste 6 timer)
-SELECT 
-  integration_name, created_at, message,
-  details->'results'->'sales'->>'processed' as sales_processed
-FROM integration_logs
-WHERE integration_name IN ('Lovablecph', 'Relatel_CPHSALES')
-  AND status = 'success'
-  AND created_at > now() - interval '6 hours'
-ORDER BY created_at DESC LIMIT 20;
-
--- Bekræft nye cron jobs
-SELECT jobid, jobname, schedule, 
-  CASE 
-    WHEN command LIKE '%"sales"%' AND command NOT LIKE '%"campaigns"%' THEN 'sales-only'
-    WHEN command LIKE '%"campaigns"%' THEN 'metadata'
-    ELSE 'unknown'
-  END as job_type
-FROM cron.job 
-WHERE jobname LIKE '%26fac751%' OR jobname LIKE '%657c2050%'
-ORDER BY jobname;
-```
+**Frontend:**
+- Tidslinje-komponent (Recharts / custom SVG) der viser alle jobs pa en 60-min akse
+- Rate limit budget gauge (progress bar: % af estimeret budget brugt)
+- Trend-graf: 429-rate over tid (sidste 24h)
+- Rollback-knap i audit log (kalder `update-cron-schedule` med `old_config`)
 
 ---
 
-## 6. Rollback
+## 5. SQL/API-andringer
+
+### Nye migrationer:
 
 ```sql
--- 1. Fjern nye jobs
-SELECT cron.unschedule('dialer-26fac751-sync');
-SELECT cron.unschedule('dialer-657c2050-sync');
-SELECT cron.unschedule('dialer-26fac751-meta');
-SELECT cron.unschedule('dialer-657c2050-meta');
-
--- 2. Genskab originale jobs
-SELECT cron.schedule(
-  'dialer-26fac751-sync',
-  '1,11,21,31,41,51 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users", "sales", "sessions"], "integration_id": "26fac751-c2d8-4b5b-a6df-e33a32e3c6e7"}'::jsonb
-  ) AS request_id;$$
+-- Tabel: integration_sync_runs
+CREATE TABLE integration_sync_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  integration_id uuid REFERENCES dialer_integrations(id),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  duration_ms integer,
+  status text NOT NULL DEFAULT 'running',
+  actions text[],
+  records_processed integer DEFAULT 0,
+  api_calls_made integer DEFAULT 0,
+  retries integer DEFAULT 0,
+  rate_limit_hits integer DEFAULT 0,
+  error_message text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
-SELECT cron.schedule(
-  'dialer-657c2050-sync',
-  '6,16,26,36,46,56 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bGltbWVpanBmbWFrc3ZtdXJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzQ1MjMsImV4cCI6MjA4MDI1MDUyM30.LbC-t03QXt5FJUHyD5fVff3OHdqYv7uWD-tFOBNyOVI"}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users", "sales", "sessions"], "integration_id": "657c2050-1faa-4233-a964-900fb9e7b8c6"}'::jsonb
-  ) AS request_id;$$
+-- Tabel: integration_schedule_audit
+CREATE TABLE integration_schedule_audit (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  integration_id uuid REFERENCES dialer_integrations(id),
+  changed_by uuid,
+  change_type text NOT NULL,
+  old_config jsonb,
+  new_config jsonb,
+  old_schedule text,
+  new_schedule text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- 3. Revert config
-UPDATE dialer_integrations
-SET config = jsonb_set(
-  COALESCE(config, '{}'::jsonb) - 'sync_actions',
-  '{sync_schedule}',
-  '"1,11,21,31,41,51 * * * *"'
-),
-updated_at = now()
-WHERE id = '26fac751-c2d8-4b5b-a6df-e33a32e3c6e7';
+-- Udvid integration_logs
+ALTER TABLE integration_logs
+  ADD COLUMN IF NOT EXISTS duration_ms integer,
+  ADD COLUMN IF NOT EXISTS api_calls integer,
+  ADD COLUMN IF NOT EXISTS retries integer,
+  ADD COLUMN IF NOT EXISTS rate_limit_hits integer;
 
-UPDATE dialer_integrations
-SET config = jsonb_set(
-  COALESCE(config, '{}'::jsonb),
-  '{sync_schedule}',
-  '"6,16,26,36,46,56 * * * *"'
-),
-updated_at = now()
-WHERE id = '657c2050-1faa-4233-a964-900fb9e7b8c6';
+-- Index for hurtige opslag
+CREATE INDEX idx_sync_runs_integration_time
+  ON integration_sync_runs (integration_id, started_at DESC);
+CREATE INDEX idx_schedule_audit_integration_time
+  ON integration_schedule_audit (integration_id, created_at DESC);
+
+-- RLS
+ALTER TABLE integration_sync_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integration_schedule_audit ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Managers can read sync runs"
+  ON integration_sync_runs FOR SELECT
+  USING (is_teamleder_or_above(auth.uid()));
+
+CREATE POLICY "Managers can read audit log"
+  ON integration_schedule_audit FOR SELECT
+  USING (is_teamleder_or_above(auth.uid()));
+
+CREATE POLICY "Service role inserts sync runs"
+  ON integration_sync_runs FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Service role inserts audit"
+  ON integration_schedule_audit FOR INSERT
+  WITH CHECK (true);
 ```
 
----
+### API (edge function) andringer:
 
-## 7. Phase 2: maxRecords optimering (separat, ikke blokerende)
-
-### Problem
-`maxRecords` (200) filtrerer EFTER `adapter.fetchSales()` → `buildLeadDataMap()` kalder stadig Adversus API for ALLE leads.
-
-### Minimal patch-plan
-1. Tilføj `maxRecords` parameter til `AdversusAdapter.fetchSales()`
-2. I `buildLeadDataMap()`: stop efter `maxRecords` unikke leads er hentet
-3. Return early fra lead-fetching loop
-
-### Risikovurdering
-- **Lav risiko** — ændrer kun fetch-volumen, ikke data-behandling
-- **Kræver test** at sortering + limit giver korrekte nyeste sales
-- **Anbefaling:** Implementer efter Phase 1 er bekræftet stabil (24-48 timer)
+- `integration-engine/actions/sync-integration.ts`: Tilf tracking af `api_calls`, `retries`, `rate_limit_hits` og INSERT i `integration_sync_runs`
+- `update-cron-schedule/index.ts`: INSERT i `integration_schedule_audit` med `old_config`/`new_config` ved alle schedule-andringer
 
 ---
 
-## Eksekveringsrækkefølge
+## 6. Acceptance Criteria for "Stabil Drift"
 
-1. Kør "Unschedule gamle jobs" SQL
-2. Kør "Schedule nye jobs" SQL (alle 4 statements)
-3. Kør "Opdater config" SQL
-4. Kør backfill for Lovablecph
-5. Monitorér i 24-48 timer via verification queries
-6. Phase 2: maxRecords optimering (efter stabilitet bekræftet)
+| Metric | Terskel | Beskrivelse |
+|--------|---------|-------------|
+| 429-rate | < 5% | Andel af API-kald der far 429 over 1 time |
+| Succes-rate | > 95% | Andel af sync-runs der fuldforer uden fejl |
+| Max overlap | < 2 min | Minimum afstand mellem jobs der deler credentials |
+| Sync latency | < 15 min | Tid fra salg registreres i Adversus til det vises i systemet |
+| Varighed pr. run | < 30s | Gennemsnitlig run-varighed (ekskl. outliers) |
+| Audit trail | 100% | Alle schedule-andringer logges med rollback-mulighed |
+
+---
+
+## 7. Teknisk arkitektur
+
+**Nye filer:**
+- `src/pages/SystemStability.tsx` -- hovedside
+- `src/components/system-stability/IntegrationStatusCards.tsx`
+- `src/components/system-stability/SyncRunsTable.tsx`
+- `src/components/system-stability/ScheduleEditor.tsx`
+- `src/components/system-stability/TimelineOverlap.tsx`
+- `src/components/system-stability/RateLimitGauge.tsx`
+- `src/components/system-stability/AuditLog.tsx`
+- `src/hooks/useIntegrationSyncRuns.ts`
+- `src/hooks/useScheduleAudit.ts`
+- `src/utils/cronOverlapDetector.ts` -- parser cron expressions og finder overlap
+
+**Rute:** Tilf `/system-stability` i `src/routes/config.tsx` med `access: "role"` og `roles: ["ejer", "teamleder"]`
+
+**Datahentning:** React Query hooks med 30s auto-refetch for realtids-folelse
+
