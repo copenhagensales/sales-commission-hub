@@ -48,8 +48,29 @@ export class AdversusAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
-  // OPTIMIZED: Reduced retries from 3 to 2, delays from 1-4s to 500ms-1s
-  private async get(endpoint: string, retries = 2, baseDelay = 500): Promise<any> {
+  private parseRetryAfterMs(headerValue: string | null): number | null {
+    if (!headerValue) return null;
+
+    const asSeconds = Number(headerValue);
+    if (!Number.isNaN(asSeconds) && asSeconds >= 0) {
+      return asSeconds * 1000;
+    }
+
+    const asDate = Date.parse(headerValue);
+    if (!Number.isNaN(asDate)) {
+      return Math.max(0, asDate - Date.now());
+    }
+
+    return null;
+  }
+
+  private addJitter(delayMs: number): number {
+    const jitterFactor = 0.2; // ±20%
+    const randomOffset = (Math.random() * 2 - 1) * jitterFactor;
+    return Math.max(250, Math.round(delayMs * (1 + randomOffset)));
+  }
+
+  private async get(endpoint: string, retries = 3, baseDelay = 5000): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
@@ -59,9 +80,13 @@ export class AdversusAdapter implements DialerAdapter {
         if (attempt === retries) {
           throw new Error("Rate Limit Adversus Excedido (after retries)");
         }
-        // Reduced exponential backoff: 500ms, 1s
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.log(`[Adversus] Rate limited, waiting ${delay}ms before retry ${attempt}/${retries}`);
+        const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
+        const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+        const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
+
+        console.log(
+          `[Adversus] Rate limited (429), waiting ${delay}ms before retry ${attempt}/${retries}${retryAfterMs ? " (Retry-After honored)" : ""}`,
+        );
         await new Promise(r => setTimeout(r, delay));
         continue;
       }

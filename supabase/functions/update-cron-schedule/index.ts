@@ -17,6 +17,47 @@ const frequencyToCron: Record<number, string> = {
   1440: "0 6 * * *",       // Daily at 6 AM
 };
 
+const staggeredFiveMinuteSchedules: Record<string, string> = {
+  lovablecph: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *",
+  relatel_cphsales: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *",
+  eesy: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *",
+  tryg: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *",
+  ase: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *",
+};
+
+const getDialerSchedule = (
+  integrationName?: string | null,
+  config?: Record<string, unknown> | null,
+  frequencyMinutes?: number | null,
+): string | null => {
+  const configSchedule = config?.sync_schedule;
+  if (typeof configSchedule === "string" && configSchedule.trim()) {
+    return configSchedule.trim();
+  }
+
+  if (frequencyMinutes === 5) {
+    const normalizedName = (integrationName || "").trim().toLowerCase();
+    if (staggeredFiveMinuteSchedules[normalizedName]) {
+      return staggeredFiveMinuteSchedules[normalizedName];
+    }
+  }
+
+  return null;
+};
+
+const getSyncDays = (integrationName?: string | null, config?: Record<string, unknown> | null): number => {
+  const configDays = config?.sync_days;
+  if (typeof configDays === "number" && Number.isFinite(configDays) && configDays >= 1) {
+    return Math.floor(configDays);
+  }
+
+  if ((integrationName || "").toLowerCase().includes("ase")) {
+    return 3;
+  }
+
+  return 1;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,6 +78,7 @@ Deno.serve(async (req) => {
     let jobName: string;
     let functionName: string;
     let payload: object;
+    let integrationMetadata: { name?: string; config?: Record<string, unknown> | null } | null = null;
 
     if (integration_type === "dialer") {
       if (!integration_id) {
@@ -47,11 +89,31 @@ Deno.serve(async (req) => {
       }
       jobName = `dialer-${integration_id.slice(0, 8)}-sync`;
       functionName = "integration-engine";
+
+      const { data: integrationData, error: integrationLookupError } = await supabase
+        .from("dialer_integrations")
+        .select("name, config")
+        .eq("id", integration_id)
+        .maybeSingle();
+
+      integrationMetadata = integrationData
+        ? {
+            name: integrationData.name,
+            config: (integrationData.config as Record<string, unknown> | null) ?? null,
+          }
+        : null;
+
+      if (integrationLookupError) {
+        console.warn(`[update-cron-schedule] Could not load integration metadata for ${integration_id}: ${integrationLookupError.message}`);
+      }
+
+      const syncDays = getSyncDays(integrationMetadata?.name, integrationMetadata?.config);
+
       payload = { 
         source: provider || "adversus", 
         integration_id, 
         actions: ["campaigns", "users", "sales", "sessions"], 
-        days: 1 
+        days: syncDays 
       };
     } else {
       // Legacy support for other integration types
@@ -90,12 +152,19 @@ Deno.serve(async (req) => {
       console.log(`No existing job to unschedule: ${jobName}`);
     }
 
-    // If active and has frequency, create new cron job
-    if (is_active && (custom_schedule || (frequency_minutes && frequencyToCron[frequency_minutes]))) {
-      const cronExpression = custom_schedule || frequencyToCron[frequency_minutes];
+    const dialerSchedule = integration_type === "dialer"
+      ? getDialerSchedule(integrationMetadata?.name, integrationMetadata?.config, frequency_minutes)
+      : null;
+
+    // If active and has frequency or resolved custom schedule, create new cron job
+    if (is_active && (custom_schedule || dialerSchedule || (frequency_minutes && frequencyToCron[frequency_minutes]))) {
+      const cronExpression = custom_schedule || dialerSchedule || frequencyToCron[frequency_minutes];
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
       
       console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);
+      if (!custom_schedule && dialerSchedule) {
+        console.log(`[update-cron-schedule] Applied dialer staggered/config schedule for ${integrationMetadata?.name || integration_id}`);
+      }
       console.log(`[update-cron-schedule] Payload: ${JSON.stringify(payload)}`);
 
       // Schedule the new cron job using the RPC function with full payload
