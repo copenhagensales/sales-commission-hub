@@ -598,7 +598,7 @@ export class AdversusAdapter implements DialerAdapter {
               hasMore = false;
               break;
             }
-            const delay = 2000 * Math.pow(2, retryAttempt - 1);
+            const delay = 5000 * Math.pow(2, retryAttempt - 1);
             console.log(`[Adversus] Rate limited on page ${page}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
             await new Promise(r => setTimeout(r, delay));
             continue;
@@ -629,9 +629,17 @@ export class AdversusAdapter implements DialerAdapter {
           }
           break; // Success, exit retry loop
         } catch (e) {
-          console.error(`[Adversus] Error fetching page ${page}:`, e);
-          hasMore = false;
-          break;
+          retryAttempt++;
+          if (retryAttempt >= maxRetries) {
+            console.error(`[Adversus] Error fetching page ${page} after ${maxRetries} attempts:`, e);
+            hasMore = false;
+            break;
+          }
+
+          const delay = 5000 * Math.pow(2, retryAttempt - 1);
+          console.warn(`[Adversus] Error fetching page ${page}. Waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
         }
       }
     }
@@ -767,7 +775,7 @@ export class AdversusAdapter implements DialerAdapter {
             });
 
             if (res.status === 429) {
-              const waitTime = 2000 * Math.pow(2, retries);
+              const waitTime = Math.min(5000 * Math.pow(2, retries), 60000);
               console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s...`);
               await new Promise(r => setTimeout(r, waitTime));
               retries++;
