@@ -127,78 +127,50 @@ export default function UnitedDashboard() {
     { enabled: !!unitedTeamId, limit: 30 }
   );
 
-  // Fetch per-client sales data
+  // Fetch per-client sales data from cached KPIs (updated every minute)
   const { data: clientSalesData } = useQuery({
-    queryKey: ["united-client-sales-v2", teamClients?.map((c: any) => c.id), today.toISOString(), payrollPeriod.start.toISOString()],
+    queryKey: ["united-client-sales-cached", teamClients?.map((c: any) => c.id)],
     queryFn: async () => {
       if (!teamClients || teamClients.length === 0) return [];
+      const clientIds = teamClients.map((c: any) => c.id);
 
-      const results = await Promise.all(
-        teamClients.map(async (client: any) => {
-          const { data: campaigns } = await supabase
-            .from("client_campaigns")
-            .select("id")
-            .eq("client_id", client.id);
+      const { data, error } = await supabase
+        .from("kpi_cached_values")
+        .select("period_type, scope_id, value")
+        .eq("kpi_slug", "sales_count")
+        .eq("scope_type", "client")
+        .in("scope_id", clientIds)
+        .in("period_type", ["today", "this_week", "payroll_period"]);
 
-          if (!campaigns || campaigns.length === 0) {
-            return { clientId: client.id, clientName: client.name, salesToday: 0, salesWeek: 0, salesMonth: 0, hoursMonth: 0 };
-          }
+      if (error) throw error;
 
-          const campaignIds = campaigns.map(c => c.id);
+      const clientMap = new Map<string, { today: number; week: number; payroll: number }>();
+      for (const row of data || []) {
+        if (!row.scope_id) continue;
+        if (!clientMap.has(row.scope_id)) {
+          clientMap.set(row.scope_id, { today: 0, week: 0, payroll: 0 });
+        }
+        const entry = clientMap.get(row.scope_id)!;
+        if (row.period_type === "today") entry.today = row.value;
+        else if (row.period_type === "this_week") entry.week = row.value;
+        else if (row.period_type === "payroll_period") entry.payroll = row.value;
+      }
 
-          const [todaySales, weekSales, monthSales] = await Promise.all([
-            supabase
-              .from("sales")
-              .select("sale_items(quantity, products(counts_as_sale))")
-              .in("client_campaign_id", campaignIds)
-              .neq("source", "fieldmarketing")
-              .neq("validation_status", "rejected")
-              .gte("sale_datetime", today.toISOString()),
-            supabase
-              .from("sales")
-              .select("sale_items(quantity, products(counts_as_sale))")
-              .in("client_campaign_id", campaignIds)
-              .neq("source", "fieldmarketing")
-              .neq("validation_status", "rejected")
-              .gte("sale_datetime", weekStart.toISOString()),
-            fetchAllRows<any>(
-              "sales",
-              "sale_items(quantity, products(counts_as_sale))",
-              (q) => q.in("client_campaign_id", campaignIds)
-                .neq("source", "fieldmarketing")
-                .neq("validation_status", "rejected")
-                .gte("sale_datetime", payrollPeriod.start.toISOString()),
-              { orderBy: "sale_datetime", ascending: false }
-            )
-          ]);
-
-          const countSales = (data: any) => {
-            const rows = Array.isArray(data) ? data : data?.data || [];
-            return rows.reduce((total: number, sale: any) => {
-              const saleCount = (sale.sale_items || []).reduce((sum: number, item: any) => {
-                if (item.products?.counts_as_sale !== false) {
-                  return sum + (item.quantity || 1);
-                }
-                return sum;
-              }, 0);
-              return total + saleCount;
-            }, 0);
-          };
-
-          return {
-            clientId: client.id,
-            clientName: client.name,
-            salesToday: countSales(todaySales),
-            salesWeek: countSales(weekSales),
-            salesMonth: countSales(monthSales),
-            hoursMonth: 0
-          };
-        })
-      );
-
-      return results.sort((a, b) => b.salesMonth - a.salesMonth);
+      return teamClients.map((client: any) => {
+        const cached = clientMap.get(client.id);
+        return {
+          clientId: client.id,
+          clientName: client.name,
+          salesToday: cached?.today || 0,
+          salesWeek: cached?.week || 0,
+          salesMonth: cached?.payroll || 0,
+          hoursMonth: 0,
+        };
+      }).sort((a, b) => b.salesMonth - a.salesMonth);
     },
-    enabled: !!teamClients && teamClients.length > 0
+    enabled: !!teamClients && teamClients.length > 0,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   // Fetch actual hours per client

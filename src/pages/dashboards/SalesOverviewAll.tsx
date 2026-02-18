@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,117 +66,50 @@ export default function SalesOverviewAll() {
     staleTime: 60000,
   });
 
-  // Today's sales (TM)
-  const { data: todaySalesData } = useQuery({
-    queryKey: ["sales-overview-all-today-sales", todayStr],
+  // Per-client sales from cached KPIs (updated every minute by edge function)
+  const { data: cachedClientSales } = useQuery({
+    queryKey: ["sales-overview-all-cached-clients", todayStr],
     queryFn: async () => {
-      const startOfDay = `${todayStr}T00:00:00`;
-      const endOfDay = `${todayStr}T23:59:59`;
+      // Fetch all client-scoped sales_count for today
+      const { data: kpiData, error } = await supabase
+        .from("kpi_cached_values")
+        .select("scope_id, value")
+        .eq("kpi_slug", "sales_count")
+        .eq("scope_type", "client")
+        .eq("period_type", "today");
 
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          id, agent_name, sale_datetime, status, client_campaign_id,
-          sale_items (
-            quantity,
-            product_id,
-            mapped_commission,
-            products (counts_as_sale)
-          )
-        `)
-        .gte("sale_datetime", startOfDay)
-        .lte("sale_datetime", endOfDay)
-        .neq("validation_status", "rejected")
-        .order("created_at", { ascending: false });
       if (error) throw error;
 
-      const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))] as string[];
-      let campaignClientMap: Record<string, string> = {};
-      let clientLogoMap: Record<string, string | null> = {};
+      // Fetch client logos
+      const clientIds = (kpiData || []).map(k => k.scope_id).filter(Boolean) as string[];
+      let clientMap: Record<string, { name: string; logo_url: string | null }> = {};
 
-      if (campaignIds.length > 0) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id, name, client_id")
-          .in("id", campaignIds);
-
-        const clientIds = [...new Set((campaigns || []).map(c => c.client_id).filter(Boolean))];
-        let clientMap: Record<string, string> = {};
-
-        if (clientIds.length > 0) {
-          const { data: clients } = await supabase
-            .from("clients")
-            .select("id, name, logo_url")
-            .in("id", clientIds);
-          clientMap = Object.fromEntries((clients || []).map(c => [c.id, c.name]));
-          clientLogoMap = Object.fromEntries((clients || []).map(c => [c.name, c.logo_url]));
+      if (clientIds.length > 0) {
+        const { data: clients } = await supabase
+          .from("clients")
+          .select("id, name, logo_url")
+          .in("id", clientIds);
+        for (const c of clients || []) {
+          clientMap[c.id] = { name: c.name, logo_url: c.logo_url };
         }
-
-        campaignClientMap = Object.fromEntries(
-          (campaigns || []).map(c => [c.id, clientMap[c.client_id] || "Ukendt"])
-        );
       }
 
-      return {
-        sales: (data || []).map(s => ({
-          ...s,
-          client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
-        })),
-        clientLogos: clientLogoMap
-      };
+      const byClient: Record<string, { count: number; logoUrl: string | null }> = {};
+      for (const row of kpiData || []) {
+        if (!row.scope_id || row.value <= 0) continue;
+        const client = clientMap[row.scope_id];
+        if (client) {
+          byClient[client.name] = { count: row.value, logoUrl: client.logo_url };
+        }
+      }
+
+      const total = Object.values(byClient).reduce((sum, c) => sum + c.count, 0);
+      return { byClient, total };
     },
     enabled: !tvMode,
-    refetchInterval: 60000,
     staleTime: 30000,
-  });
-
-  // FM sales today
-  const { data: fmTodaySales = [] } = useQuery({
-    queryKey: ["sales-overview-all-fm-sales", todayStr],
-    queryFn: async () => {
-      const startOfDay = `${todayStr}T00:00:00`;
-      const endOfDay = `${todayStr}T23:59:59`;
-
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`id, agent_name, normalized_data, sale_datetime, client_campaign_id`)
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", startOfDay)
-        .lte("sale_datetime", endOfDay)
-        .neq("validation_status", "rejected");
-
-      if (error) throw error;
-
-      const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))];
-      let fmClientMap: Record<string, { name: string; logo_url: string | null }> = {};
-
-      if (campaignIds.length > 0) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id, name, client_id, clients(id, name, logo_url)")
-          .in("id", campaignIds);
-
-        for (const c of campaigns || []) {
-          const clientData = c.clients as any;
-          if (clientData) {
-            fmClientMap[c.id] = { name: clientData.name, logo_url: clientData.logo_url };
-          }
-        }
-      }
-
-      return (data || []).map(sale => ({
-        ...sale,
-        _clientName: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.name : null,
-        _clientLogo: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.logo_url : null,
-        _sellerName: sale.agent_name || (sale.normalized_data as any)?.seller_name || null,
-      }));
-    },
-    enabled: !tvMode,
     refetchInterval: 60000,
   });
-
-  const todaySales = todaySalesData?.sales || [];
-  const clientLogos = todaySalesData?.clientLogos || {};
 
   const cachedActiveEmployees = getKpiValue(globalKpis?.active_employees, 0);
 
@@ -198,120 +131,13 @@ export default function SalesOverviewAll() {
 
   const activeEmployees = cachedActiveEmployees > 0 ? cachedActiveEmployees : activeEmployeesQuery;
 
-  const knownClientSales = todaySales.filter(sale =>
-    sale.client_name && sale.client_name !== "Ukendt"
-  );
-
-  const calculateCountedSales = (sales: typeof todaySales) => {
-    return sales.reduce((total, sale) => {
-      const saleItems = (sale as any).sale_items || [];
-      for (const item of saleItems) {
-        if (item.products?.counts_as_sale === true) {
-          total += item.quantity || 1;
-        }
-      }
-      return total;
-    }, 0);
-  };
-
-  const calculateSalesByClient = (sales: typeof todaySales) => {
-    const result: Record<string, number> = {};
-    for (const sale of sales) {
-      const saleItems = (sale as any).sale_items || [];
-      let saleCount = 0;
-      for (const item of saleItems) {
-        if (item.products?.counts_as_sale === true) {
-          saleCount += item.quantity || 1;
-        }
-      }
-      if (saleCount > 0) {
-        const clientName = sale.client_name;
-        if (clientName && clientName !== "Ukendt") {
-          result[clientName] = (result[clientName] || 0) + saleCount;
-        }
-      }
-    }
-    return result;
-  };
-
-  const calculateConfirmedSales = (sales: typeof todaySales) => {
-    return sales.filter((s: any) => s.status === "confirmed").reduce((total, sale) => {
-      const saleItems = (sale as any).sale_items || [];
-      for (const item of saleItems) {
-        if (item.products?.counts_as_sale === true) {
-          total += item.quantity || 1;
-        }
-      }
-      return total;
-    }, 0);
-  };
-
-  const calculatePendingSales = (sales: typeof todaySales) => {
-    return sales.filter((s: any) => s.status === "pending").reduce((total, sale) => {
-      const saleItems = (sale as any).sale_items || [];
-      for (const item of saleItems) {
-        if (item.products?.counts_as_sale === true) {
-          total += item.quantity || 1;
-        }
-      }
-      return total;
-    }, 0);
-  };
-
-  const calculateSellersOnBoard = (sales: typeof todaySales) => {
-    const sellersWithSales = new Set<string>();
-    for (const sale of sales) {
-      const saleItems = (sale as any).sale_items || [];
-      const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
-      if (hasCountedSale && sale.agent_name) {
-        sellersWithSales.add(sale.agent_name.toLowerCase());
-      }
-    }
-    for (const fmSale of fmTodaySales) {
-      const sellerName = (fmSale as any)._sellerName;
-      if (sellerName) {
-        sellersWithSales.add(sellerName.toLowerCase());
-      }
-    }
-    return sellersWithSales.size;
-  };
-
-  const getSalesByClientWithLogos = (): Record<string, { count: number; logoUrl: string | null }> => {
-    const byClient = calculateSalesByClient(knownClientSales);
-
-    for (const fmSale of fmTodaySales) {
-      const clientName = (fmSale as any)._clientName;
-      if (clientName) {
-        byClient[clientName] = (byClient[clientName] || 0) + 1;
-      }
-    }
-
-    const result: Record<string, { count: number; logoUrl: string | null }> = {};
-    for (const [client, count] of Object.entries(byClient)) {
-      const fmClientLogo = fmTodaySales.find(s => (s as any)._clientName === client)?._clientLogo;
-      result[client] = {
-        count,
-        logoUrl: clientLogos[client] || fmClientLogo || null
-      };
-    }
-    return result;
-  };
-
-  const filterTvSalesByClient = (byClient: Record<string, { count: number; logoUrl: string | null }>) => {
-    const result: Record<string, { count: number; logoUrl: string | null }> = {};
-    for (const [client, data] of Object.entries(byClient)) {
-      if (client !== "Ukendt") {
-        result[client] = data;
-      }
-    }
-    return result;
-  };
-
-  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales) + fmTodaySales.length;
-  const displaySalesByClientToday = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
-  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : calculateConfirmedSales(knownClientSales);
-  const displayPending = tvMode && tvData ? tvData.sales.pending : calculatePendingSales(knownClientSales);
-  const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : calculateSellersOnBoard(knownClientSales);
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : (cachedClientSales?.total || 0);
+  const displaySalesByClientToday = tvMode && tvData
+    ? Object.fromEntries(Object.entries(tvData.sales.byClient).filter(([k]) => k !== "Ukendt"))
+    : (cachedClientSales?.byClient || {});
+  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : 0;
+  const displayPending = tvMode && tvData ? tvData.sales.pending : 0;
+  const displaySellersOnBoard = tvMode && tvData ? tvData.sellersOnBoard : 0;
   const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
 
   const clientColors = [
