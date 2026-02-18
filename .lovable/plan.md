@@ -1,89 +1,48 @@
 
-# Rate Limit Budget opdelt per API-provider med faktiske limits
 
-## Oversigt
+# Rate Limit Budget per integration (ikke per provider)
 
-Opdel Rate Limit Budget-sektionen fra en enkelt global gauge til separate gauges per API-provider, med de faktiske rate limits fra Adversus og Enreach.
+## Problem
 
-## Faktiske API-graenser
+Den nuvaerende implementering grupperer integrationer per provider-type (alle Adversus sammen, alle Enreach sammen). Men i virkeligheden har hver integration sine egne API-credentials og dermed sit eget uafhaengige rate limit:
 
-**Adversus:**
-- 60 requests/minut (burst)
-- 1.000 requests/time
-- Max 2 samtidige requests
+- **Lovablecph** (Adversus / TDC) -- eget API, eget budget
+- **Relatel_CPHSALES** (Adversus / Relatel) -- eget API, eget budget
+- **ASE** (Enreach) -- eget API, eget budget
+- **Eesy** (Enreach) -- eget API, eget budget
+- **Tryg** (Enreach) -- eget API, eget budget
 
-**Enreach:**
-- Dynamiske daglige limits per service (hentes fra `/api/myaccount/request/limits`)
-- Per-minut limit = Max(Ceiling(daglig limit / 1440), 240) naar fair use header sendes
-- Kald taeller 8x i produktionstid (08-21) uden fair use header
+## Loesning
 
-Da vi ikke henter Enreach-limits dynamisk endnu, bruger vi konservative estimater som standard.
+Aendr budgetberegningen fra provider-gruppering til **per-integration**, hvor hver integration faar sin egen gauge med de korrekte limits baseret paa dens provider-type.
 
 ## Aendringer
 
-### 1. SystemStability.tsx -- Budget-beregning per provider
+### 1. SystemStability.tsx -- Beregning per integration
 
-Erstat den globale budget-beregning (linje 165-179) med provider-grupperet logik:
+Erstat `providerMap`-grupperingen (linje 176-200) med et loop over hver enkelt integration:
 
-```typescript
-const PROVIDER_BUDGETS: Record<string, { limitPerMin: number; limitPerHour: number }> = {
-  adversus: { limitPerMin: 60, limitPerHour: 1000 },
-  enreach: { limitPerMin: 240, limitPerHour: 10000 },
-};
-const DEFAULT_BUDGET = { limitPerMin: 60, limitPerHour: 1000 };
-```
+- Hver integration faar sin egen budget-entry
+- Limits bestemmes stadig af provider-type (Adversus: 60/min, 1000/time; Enreach: 240/min, 10000/time)
+- `calls1m` og `calls60m` beregnes kun fra den paagaeldende integrations sync runs
 
-- Grupper sync runs/logs efter integration -> provider
-- Beregn apiCalls for sidste 1 minut og sidste 60 minutter per provider
-- Beregn procent brugt af hver providers faktiske limits
-- Byg et `providerBudgets`-array:
+### 2. SystemStability.tsx -- UI
 
-```typescript
-interface ProviderBudget {
-  provider: string;
-  integrationNames: string[];
-  calls1m: number;
-  limit1m: number;
-  used1m: number;  // procent
-  calls60m: number;
-  limit60m: number;
-  used60m: number; // procent
-}
-```
+Aendr Rate Limit Budget sektionen:
 
-### 2. SystemStability.tsx -- UI opdeling (linje 282-316)
+- Vis en Card per integration (ikke per provider)
+- Overskrift: Integrationsnavn (fx "Lovablecph")
+- Under-tekst: Provider-type og limits (fx "Adversus -- 60/min, 1000/time")
+- To progress bars: Burst (1 min) og Time (60 min)
 
-Erstat den enkelte Card med en Card per provider:
+### 3. useStabilityAlerts.ts -- Alerts per integration
 
-- Overskrift: Provider-navn (fx "Adversus") med faktiske limits i parentes
-- Under-tekst: Navne paa integrationer der deler API'et (fx "Lovablecph, Relatel_CPHSALES")
-- To progress bars: Per minut (burst) og per time
-- Farve-kodning som i dag (groen/gul/roed)
-
-### 3. useStabilityAlerts.ts -- Budget-alerts per provider
-
-Aendr hook-signaturen:
-
-```typescript
-interface ProviderBudget {
-  provider: string;
-  used1m: number;
-  used60m: number;
-}
-
-interface UseStabilityAlertsParams {
-  integrationMetrics: IntegrationMetric[];
-  providerBudgets: ProviderBudget[];
-}
-```
-
-- Fjern de gamle `budgetUsed15m`/`budgetUsed60m` parametre
-- Erstat de 4 globale budget-checks (linje 142-185) med et loop over `providerBudgets`
-- Alert-beskeder inkluderer provider-navn: fx "Adversus: Burst limit (1m) er 92% brugt"
-- Behold samme taerskler: warning ved 70%, critical ved 90%
+- `providerBudgets`-arrayet indeholder nu en entry per integration
+- Alert-beskeder bruger integrationsnavnet (fx "Lovablecph: Burst limit (1m) er 92% brugt")
 
 ### Filer der redigeres
 - `src/pages/SystemStability.tsx` -- budget-beregning og UI
-- `src/hooks/useStabilityAlerts.ts` -- hook-parametre og budget-checks
+- `src/hooks/useStabilityAlerts.ts` -- type-opdatering (provider -> integrationsnavn)
 
 ### Ingen nye filer eller database-aendringer
+
