@@ -11,6 +11,8 @@ import { da } from "date-fns/locale";
 import { ScheduleEditor } from "@/components/system-stability/ScheduleEditor";
 import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
 import { AuditLog } from "@/components/system-stability/AuditLog";
+import { AlertBanner } from "@/components/system-stability/AlertBanner";
+import { useStabilityAlerts } from "@/hooks/useStabilityAlerts";
 
 interface SyncRun {
   id: string;
@@ -204,6 +206,12 @@ export default function SystemStability() {
     setIsRefreshing(false);
   };
 
+  const alerts = useStabilityAlerts({
+    integrationMetrics,
+    budgetUsed15m,
+    budgetUsed60m,
+  });
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -217,6 +225,9 @@ export default function SystemStability() {
           Opdater
         </Button>
       </div>
+
+      {/* Alert Banner */}
+      <AlertBanner alerts={alerts} />
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
