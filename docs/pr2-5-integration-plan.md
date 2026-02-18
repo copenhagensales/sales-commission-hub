@@ -15,6 +15,46 @@ PR 5 er source-of-truth for KPI-flow:
 
 ---
 
+
+## Når PR 2–4 endnu ikke er synkroniseret i Lovable (gør dette nu)
+Brug denne sekvens for at hente de manglende GitHub-ændringer ind i Lovable-miljøet, **før** du merge’r:
+
+1. Tilføj/fix `origin` remote til GitHub-repoet.
+2. Hent PR refs direkte fra GitHub.
+3. Cherry-pick PR 2–4 commits ind på integrations-branch.
+4. Verificér at filer fra PR 2–4 faktisk er til stede lokalt.
+
+Eksempelkommandoer:
+```bash
+# 1) Tilføj remote (hvis mangler)
+git remote add origin <github-repo-url>
+
+# 2) Hent nyeste refs + PR refs
+git fetch origin
+git fetch origin pull/2/head:pr-2
+git fetch origin pull/3/head:pr-3
+git fetch origin pull/4/head:pr-4
+
+# 3) Opret integration branch fra base
+git checkout <lovable-base-branch>
+git pull --ff-only origin <lovable-base-branch>
+git checkout -b integration/pr-2-5
+
+# 4) Integrér PR 2-4
+# (vælg enten merge eller cherry-pick)
+git merge pr-2
+git merge pr-3
+git merge pr-4
+
+# 5) Verificér at ændringer kom med
+git log --oneline --decorate -n 30
+git diff --name-only <lovable-base-branch>...HEAD
+```
+
+Hvis `pull/<nr>/head` refs ikke er tilladt i jeres Git-hosting, så brug branch-navne eller hent patch fra PR’en og anvend med `git am`.
+
+---
+
 ## Konkrete trin til den nye integrations-PR
 
 ### 1) Opret integrations-branch fra Lovable’s aktuelle deploy-base
