@@ -8,22 +8,9 @@ import { RefreshCcw, Activity, AlertTriangle, CheckCircle2, XCircle, Clock } fro
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDistanceToNow, format } from "date-fns";
 import { da } from "date-fns/locale";
-
-interface IntegrationWithMetrics {
-  id: string;
-  name: string;
-  provider: string;
-  last_sync_at: string | null;
-  last_status: string | null;
-  is_active: boolean;
-  config: any;
-  // Computed metrics
-  successRate1h: number;
-  rateLimitRate15m: number;
-  avgDurationMs: number;
-  totalApiCalls15m: number;
-  lastRuns: SyncRun[];
-}
+import { ScheduleEditor } from "@/components/system-stability/ScheduleEditor";
+import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
+import { AuditLog } from "@/components/system-stability/AuditLog";
 
 interface SyncRun {
   id: string;
@@ -75,12 +62,12 @@ export default function SystemStability() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch integrations
-  const { data: integrations = [] } = useQuery({
+  const { data: integrations = [], refetch: refetchIntegrations } = useQuery({
     queryKey: ["system-stability-integrations"],
     queryFn: async () => {
       const { data } = await supabase
         .from("dialer_integrations")
-        .select("id, name, provider, last_sync_at, last_status, is_active, config")
+        .select("id, name, provider, last_sync_at, last_status, is_active, config, sync_frequency_minutes")
         .eq("is_active", true)
         .order("name");
       return data || [];
@@ -104,7 +91,7 @@ export default function SystemStability() {
     refetchInterval: 30000,
   });
 
-  // Fetch integration logs as fallback metrics (last 24h) 
+  // Fetch integration logs as fallback metrics (last 24h)
   const { data: recentLogs = [], refetch: refetchLogs } = useQuery({
     queryKey: ["system-stability-logs"],
     queryFn: async () => {
@@ -135,23 +122,20 @@ export default function SystemStability() {
   });
 
   // Compute metrics per integration
-  const integrationMetrics: IntegrationWithMetrics[] = integrations.map((int: any) => {
+  const integrationMetrics = integrations.map((int: any) => {
     const now = Date.now();
     const fifteenMinAgo = now - 15 * 60 * 1000;
     const oneHourAgo = now - 60 * 60 * 1000;
 
-    // Use sync_runs if available, otherwise fall back to logs
     const intRuns = syncRuns.filter(r => r.integration_id === int.id);
     const intLogs = recentLogs.filter((l: any) => l.integration_id === int.id);
 
-    // Success rate (1h) - from sync_runs or logs
     const runs1h = intRuns.length > 0
       ? intRuns.filter(r => new Date(r.started_at).getTime() > oneHourAgo)
       : intLogs.filter((l: any) => new Date(l.created_at).getTime() > oneHourAgo);
     const successCount = runs1h.filter((r: any) => r.status === "success").length;
     const successRate1h = runs1h.length > 0 ? (successCount / runs1h.length) * 100 : 100;
 
-    // Rate limit rate (15m)
     const runs15m = intRuns.length > 0
       ? intRuns.filter(r => new Date(r.started_at).getTime() > fifteenMinAgo)
       : intLogs.filter((l: any) => new Date(l.created_at).getTime() > fifteenMinAgo);
@@ -159,7 +143,6 @@ export default function SystemStability() {
     const totalRateLimitHits = runs15m.reduce((sum: number, r: any) => sum + (r.rate_limit_hits || 0), 0);
     const rateLimitRate15m = totalApiCalls > 0 ? (totalRateLimitHits / totalApiCalls) * 100 : 0;
 
-    // Avg duration
     const withDuration = intRuns.length > 0
       ? intRuns.filter(r => r.duration_ms != null)
       : intLogs.filter((l: any) => l.duration_ms != null);
@@ -177,7 +160,7 @@ export default function SystemStability() {
     };
   });
 
-  // Rate limit budget estimation (shared credentials = sum all)
+  // Rate limit budget
   const now15m = Date.now() - 15 * 60 * 1000;
   const now60m = Date.now() - 60 * 60 * 1000;
   const allRuns = syncRuns.length > 0 ? syncRuns : recentLogs;
@@ -187,14 +170,13 @@ export default function SystemStability() {
   const apiCalls60m = allRuns
     .filter((r: any) => new Date(r.started_at || r.created_at).getTime() > now60m)
     .reduce((sum: number, r: any) => sum + (r.api_calls_made || r.api_calls || 0), 0);
-  
-  // Adversus rate limit: ~300 requests/15min estimated budget
+
   const rateLimitBudget15m = 300;
   const rateLimitBudget60m = 1200;
   const budgetUsed15m = Math.min((apiCalls15m / rateLimitBudget15m) * 100, 100);
   const budgetUsed60m = Math.min((apiCalls60m / rateLimitBudget60m) * 100, 100);
 
-  // Build flat runs table from sync_runs or logs
+  // Runs table data
   const runsTableData = syncRuns.length > 0
     ? syncRuns.slice(0, 30).map(r => ({
         ...r,
@@ -218,7 +200,7 @@ export default function SystemStability() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refetchRuns(), refetchLogs(), refetchAudit()]);
+    await Promise.all([refetchRuns(), refetchLogs(), refetchAudit(), refetchIntegrations()]);
     setIsRefreshing(false);
   };
 
@@ -238,7 +220,7 @@ export default function SystemStability() {
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {integrationMetrics.map(int => {
+        {integrationMetrics.map((int: any) => {
           const color = getStatusColor(int.successRate1h, int.rateLimitRate15m);
           return (
             <Card key={int.id} className="relative overflow-hidden">
@@ -254,7 +236,7 @@ export default function SystemStability() {
               <CardContent className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">429-rate (15m)</span>
-                  <span className={int.rateLimitRate15m > 5 ? "text-red-500 font-medium" : "text-foreground"}>
+                  <span className={int.rateLimitRate15m > 5 ? "text-destructive font-medium" : "text-foreground"}>
                     {int.rateLimitRate15m.toFixed(1)}%
                   </span>
                 </div>
@@ -302,7 +284,7 @@ export default function SystemStability() {
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all ${budgetUsed15m > 80 ? "bg-red-500" : budgetUsed15m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                className={`h-2 rounded-full transition-all ${budgetUsed15m > 80 ? "bg-destructive" : budgetUsed15m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
                 style={{ width: `${budgetUsed15m}%` }}
               />
             </div>
@@ -314,13 +296,19 @@ export default function SystemStability() {
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all ${budgetUsed60m > 80 ? "bg-red-500" : budgetUsed60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                className={`h-2 rounded-full transition-all ${budgetUsed60m > 80 ? "bg-destructive" : budgetUsed60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
                 style={{ width: `${budgetUsed60m}%` }}
               />
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Timeline Overlap Visualization */}
+      <TimelineOverlap integrations={integrations as any} />
+
+      {/* Schedule Editor */}
+      <ScheduleEditor integrations={integrations as any} onScheduleUpdated={handleRefresh} />
 
       {/* Recent Runs Table */}
       <Card>
@@ -347,7 +335,7 @@ export default function SystemStability() {
               {runsTableData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Ingen sync runs endnu. Data vises når integration-engine begynder at logge.
+                    Ingen sync runs endnu.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -376,7 +364,7 @@ export default function SystemStability() {
                       {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
                     </TableCell>
                     <TableCell className="text-xs text-right">{run.api_calls_made || 0}</TableCell>
-                    <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-red-500 font-medium" : ""}`}>
+                    <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-destructive font-medium" : ""}`}>
                       {run.rate_limit_hits || 0}
                     </TableCell>
                     <TableCell className={`text-xs text-right ${(run.retries || 0) > 0 ? "text-amber-500 font-medium" : ""}`}>
@@ -390,53 +378,12 @@ export default function SystemStability() {
         </CardContent>
       </Card>
 
-      {/* Audit Log */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Audit Log (Schedule-ændringer)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tid</TableHead>
-                <TableHead>Integration</TableHead>
-                <TableHead>Ændring</TableHead>
-                <TableHead>Gammel schedule</TableHead>
-                <TableHead>Ny schedule</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {auditLog.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    Ingen schedule-ændringer logget endnu.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                auditLog.map(entry => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="text-xs whitespace-nowrap">
-                      {format(new Date(entry.created_at), "dd/MM HH:mm")}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium">
-                      {integrations.find((i: any) => i.id === entry.integration_id)?.name || entry.integration_id}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">{entry.change_type}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs font-mono">{entry.old_schedule || "—"}</TableCell>
-                    <TableCell className="text-xs font-mono">{entry.new_schedule || "—"}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Audit Log with Rollback */}
+      <AuditLog
+        auditLog={auditLog}
+        integrations={integrations as any}
+        onRollback={handleRefresh}
+      />
     </div>
   );
 }
