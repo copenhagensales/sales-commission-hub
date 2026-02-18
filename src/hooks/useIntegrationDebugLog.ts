@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 export interface DebugLogItem {
   raw: Record<string, unknown>;
@@ -40,8 +41,7 @@ export function useIntegrationDebugLogs() {
       if (error) throw error;
       return (data || []) as unknown as IntegrationDebugLog[];
     },
-    refetchInterval: 120000, // 2 minutter - reduceret fra 30s
-    staleTime: 60000,
+    ...REFRESH_PROFILES.config,
   });
 }
 
@@ -59,7 +59,6 @@ export function useIntegrationDebugLog(provider: string, syncType: string) {
       if (error && error.code !== "PGRST116") throw error;
       return data as unknown as IntegrationDebugLog | null;
     },
-    refetchInterval: 120000, // 2 minutter
-    staleTime: 60000,
+    ...REFRESH_PROFILES.config,
   });
 }

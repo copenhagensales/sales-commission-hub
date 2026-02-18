@@ -4,6 +4,8 @@ import { format, startOfDay, endOfDay, eachDayOfInterval, getDay } from "date-fn
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { trackFetch } from "@/utils/fetchPerformance";
 
 export interface DashboardEmployeeStats {
   employeeId: string;
@@ -58,7 +60,7 @@ export function useDashboardSalesData({
       teamId,
     ],
     refetchInterval,
-    queryFn: async () => {
+    queryFn: () => trackFetch("dashboard-sales-data", async () => {
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(endDate, "yyyy-MM-dd");
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -556,9 +558,9 @@ export function useDashboardSalesData({
         totalHours: Math.round(grandTotalHours * 100) / 100,
         employeeStats,
       };
-    },
+    }),
     enabled,
-    staleTime: 30000,
+    ...REFRESH_PROFILES.dashboard,
   });
 
   return {

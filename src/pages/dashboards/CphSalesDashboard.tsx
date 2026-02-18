@@ -8,6 +8,7 @@ import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, star
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
@@ -1195,6 +1196,9 @@ export default function CphSalesDashboard() {
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
+        rightContent={
+          <DataFreshnessBadge calculatedAt={globalKpis?.sales_count?.calculated_at} />
+        }
       />
 
       {/* Sales by Client - Cards with colors - MOVED TO TOP */}

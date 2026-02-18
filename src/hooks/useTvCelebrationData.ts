@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { REFRESH_PROFILES } from "@/utils/tvMode";
 
 export interface CelebrationTriggerData {
   employeeName: string | null;
@@ -51,8 +52,7 @@ export function useTvCelebrationData({
       return result;
     },
     enabled: enabled && !!dashboardSlug,
-    refetchInterval: 120000, // 2 minutes - reduced from 30s to lower DB load
-    staleTime: 60000,
+    ...REFRESH_PROFILES.dashboard,
   });
 
   return {
