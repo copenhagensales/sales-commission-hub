@@ -94,3 +94,11 @@ Vi bygger et system, hvor salg bliver synligt næsten med det samme, API-kald er
 
 ## “World-class” sluttilstand
 Systemet er bygget til vækst: store datamængder, flere dashboards, højere opdateringsfrekvens — uden at kompromittere korrekthed, stabilitet eller brugeroplevelse.
+
+
+## Rettigheder (stabilitet og ensartethed)
+- Brug én konsistent permissions-kilde i kritiske brugerflows (route guards + side/tab-visibility må ikke bruge divergerende hooks).
+- Standardiser cache-håndtering med versioneret nøgle og kontrolleret invalidation ved ændringer i permissions-model.
+- Indfør fast driftstjek for roller med hyppige issues (fx fieldmarketing-roller), inkl. verificering af menu + tab adgang i samme session.
+- Kræv deploy-verificering af permissions efter hver større release (smoke-test: login -> route access -> tab access -> action access).
+- Dokumentér fallback-procedure: cache reset + hard refresh + release checksum verificering.

@@ -109,13 +109,14 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
 };
 
 // localStorage cache key for permissions
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v3';
+const PERMISSIONS_CACHE_KEY = 'cached-permissions-v4';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Force-clear old cache versions on load
 try {
   localStorage.removeItem('cached-permissions-v1');
   localStorage.removeItem('cached-permissions-v2');
+  localStorage.removeItem('cached-permissions-v3');
 } catch (e) {
   // Ignore errors
 }

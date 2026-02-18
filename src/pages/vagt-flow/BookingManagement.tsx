@@ -4,7 +4,7 @@ import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent } from "lucid
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
-import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 // Lazy load tab contents
 const BookWeekContent = lazy(() => import("./BookWeekContent"));
@@ -25,7 +25,7 @@ const allTabs = [
 export default function BookingManagement() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canView, isLoading, isReady, role, pagePermissions } = useUnifiedPermissions();
+  const { canView, isLoading, isReady, position, permissions } = usePermissions();
   
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => 
@@ -51,10 +51,10 @@ export default function BookingManagement() {
 
   // Debug logging for permission issues
   console.log('[BookingManagement] Permission check:', {
-    role,
+    role: position?.name,
     isLoading,
     isReady,
-    pagePermissionsCount: pagePermissions?.length,
+    permissionKeysCount: Object.keys(permissions || {}).length,
     tabChecks: allTabs.map(t => ({ key: t.permissionKey, hasAccess: canView(t.permissionKey) })),
     visibleTabsCount: visibleTabs.length
   });

@@ -18,6 +18,23 @@ interface NumericCondition {
   values?: number[];
 }
 
+
+interface SaleJoinData {
+  id?: string;
+  source?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  dialer_campaign_id?: string | null;
+  sale_datetime?: string | null;
+}
+
+function normalizeJoinedSale(sales: unknown): SaleJoinData | null {
+  if (Array.isArray(sales)) {
+    const first = sales[0];
+    return first && typeof first === "object" ? (first as SaleJoinData) : null;
+  }
+  return sales && typeof sales === "object" ? (sales as SaleJoinData) : null;
+}
+
 interface PricingRule {
   id: string;
   product_id: string;
@@ -310,6 +327,7 @@ serve(async (req) => {
     console.log(`[rematch-pricing-rules] Loaded ${productsMap.size} products with base prices for fallback`);
 
     // Get unique campaign IDs and fetch their mapping IDs
+    const campaignIds = [...new Set(saleItems.map((si) => normalizeJoinedSale(si.sales)?.dialer_campaign_id).filter(Boolean))];
     const campaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.dialer_campaign_id).filter(Boolean))];
     const campaignMappingsMap = new Map<string, string>();
 
@@ -336,6 +354,8 @@ serve(async (req) => {
 
     for (const item of saleItems) {
       // Extract raw_payload.data
+      const sale = normalizeJoinedSale(item.sales);
+      const rawPayload = sale?.raw_payload as Record<string, unknown> | null;
       const rawPayload = (item.sales as any)?.raw_payload as Record<string, unknown> | null;
       let rawPayloadData = rawPayload?.data as Record<string, unknown> | undefined;
 
@@ -383,6 +403,7 @@ serve(async (req) => {
       }
 
       // Determine correct product ID for ASE sales based on lead data
+      const isAse = source === "ase" || sale?.source === "ase";
       const isAse = source === "ase" || (item.sales as any)?.source === "ase";
       const originalProductId = item.product_id;
       const correctProductId = isAse ? determineAseProductId(rawPayloadData) : originalProductId;
@@ -393,11 +414,12 @@ serve(async (req) => {
       }
 
       // Get campaign mapping ID
+      const campaignId = sale?.dialer_campaign_id;
       const campaignId = (item.sales as any)?.dialer_campaign_id;
       const campaignMappingId = campaignId ? campaignMappingsMap.get(campaignId) : null;
 
       // Get sale date for date-based rule filtering
-      const saleDate = (item.sales as { sale_datetime?: string })?.sale_datetime || null;
+      const saleDate = sale?.sale_datetime || null;
 
       // Try to match a pricing rule with the correct product ID and sale date
       const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId, saleDate);
