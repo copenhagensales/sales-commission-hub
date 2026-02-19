@@ -1,26 +1,38 @@
 
-# Tilfoej manglende parent-child grupper i Permission Editor
 
-## Problem
+# Implementer manglende dele fra Adversus rate-limit runbook
 
-`permissionKeys.ts` definerer at `menu_cancellations` har 3 child-faner (`tab_cancellations_manual`, `tab_cancellations_upload`, `tab_cancellations_duplicates`), men `PERMISSION_GROUPS` i `permissionGroups.ts` inkluderer ikke denne gruppe. Derfor viser rettighedseditoren ikke fanerne som en udvidbar gruppe, og de kan ikke redigeres individuelt.
+## Status
 
-## Loesning
+Stoerstedelen af runbook'en er allerede implementeret:
+- Rate-limiting med Retry-After, exponential backoff og jitter er i adapterne
+- update-cron-schedule har al logik for staggering, days-beregning og split-jobs
+- Cron schedules er allerede staggerede korrekt i databasen
+- Lovablecph har split jobs (sync + meta)
 
-Tilfoej `menu_cancellations` til `PERMISSION_GROUPS` i `permissionGroups.ts` saa fanerne vises korrekt under "Annulleringer" som en collapsible gruppe med individuelle toggles.
+## Manglende del
+
+ASE-integrationen mangler `sync_days: 3` i sin config. Selvom `update-cron-schedule` koden beregner `days=3` for ASE via navn-matching, er vaerdien ikke persisteret i `config`-kolonnen. Dette boer goeres for at sikre at vaerdien er eksplicit og ikke kun afhaengig af navne-konventionen.
 
 ## Tekniske detaljer
 
-**Fil:** `src/components/employees/permissions/permissionGroups.ts`
+### 1. SQL data-opdatering (via insert tool, IKKE migration)
 
-Tilfoej foelgende entry til `PERMISSION_GROUPS` objektet (efter den eksisterende `menu_fm_overview` entry):
+Opdater ASE-integrationens config til at inkludere `sync_days: 3`:
 
-```typescript
-// Annulleringer tabs
-'menu_cancellations': {
-  label: 'Annulleringer',
-  children: ['tab_cancellations_manual', 'tab_cancellations_upload', 'tab_cancellations_duplicates']
-},
+```sql
+UPDATE public.dialer_integrations
+SET config = jsonb_set(
+  COALESCE(config, '{}'::jsonb),
+  '{sync_days}',
+  '3'::jsonb
+),
+updated_at = now()
+WHERE lower(name) = 'ase';
 ```
 
-Ingen andre filer behoever aendring -- `PermissionRowWithChildren` og `buildCategoryTree` bruger allerede `PERMISSION_GROUPS` til at opdage og vise parent-child relationer.
+### 2. Verificer cron job payloads
+
+Trig en genberegning af ASE's cron job saa payload'en faar `days: 3` ved at kalde update-cron-schedule edge function med ASE's aktuelle indstillinger. Dette sikrer at det koerenede cron job bruger den korrekte vaerdi.
+
+Ingen kodeaendringer er noedvendige -- al logik er allerede paa plads i edge functions.
