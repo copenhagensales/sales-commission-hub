@@ -58,8 +58,12 @@ const getEffectiveActionList = (
   const cfgMeta = normalizeActions(config.meta_sync_actions);
   const allowed = new Set<string>(LOVABLE_ACTIONS);
 
-  const merged = unique([...requested, ...cfgSync, ...cfgMeta]).filter((item) => allowed.has(item));
-  return merged.length > 0 ? merged : [...LOVABLE_ACTIONS];
+  // Exclude "sessions" for Lovablecph – Adversus returns HTTP 403 for this endpoint
+  const excludedActions = new Set<string>(normalizeActions(config.excluded_actions ?? ["sessions"]));
+
+  const merged = unique([...requested, ...cfgSync, ...cfgMeta])
+    .filter((item) => allowed.has(item) && !excludedActions.has(item));
+  return merged.length > 0 ? merged : [...LOVABLE_ACTIONS].filter((a) => !excludedActions.has(a));
 };
 
 interface SyncResult {
