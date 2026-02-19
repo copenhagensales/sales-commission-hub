@@ -10136,6 +10136,7 @@ export type Database = {
       is_some: { Args: { _user_id: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
+      jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
       recalculate_coaching_due_dates_for_employee: {
         Args: { p_employee_id: string }
         Returns: number
