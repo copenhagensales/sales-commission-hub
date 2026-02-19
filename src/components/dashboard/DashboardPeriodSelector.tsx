@@ -31,21 +31,7 @@ interface DashboardPeriodSelectorProps {
   disabled?: boolean;
 }
 
-// Calculate payroll period (15th to 14th)
-function calculatePayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  if (currentDay >= 15) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 15);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    return { start, end };
-  } else {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const end = new Date(today.getFullYear(), today.getMonth(), 14);
-    return { start, end };
-  }
-}
+import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
 
 export function getDefaultPeriod(type: PeriodType = "payroll_period"): PeriodSelection {
   const now = new Date();
