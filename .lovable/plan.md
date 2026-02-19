@@ -1,77 +1,179 @@
 
 
-# Fieldmarketing Dashboard: Standardisering + Systemoptimeringer
+# System Stability: To faner + Komplet live arkitekturdiagram
 
-## Hvad aendres
+## Oversigt
 
-### 1. `src/pages/dashboards/FieldmarketingDashboardFull.tsx`
+Opdel `/system-stability` i to faner og byg et visuelt laekker arkitekturdiagram der viser ALLE grene i systemet -- med live statusfarver og advarsel naar data-throughput er for hoejt.
 
-Omskrives fra 542 linjer til ~50 linjer:
+## Fane 1: "Systemstabilitet"
 
-- Fjern custom `ClientDashboard` komponent med 5-6 langsomme live-queries
-- Fjern `handleExportExcel` og XLSX-import
-- Fjern `DashboardDateRangePicker`, `fetchAllRows`, `getPayrollPeriod`
-- Behold tabs (Eesy FM / Yousee) som simpel state
-- Render den generiske `ClientDashboard` fra `@/components/dashboard/ClientDashboard` per tab -- praecis som Eesy TM, TDC Erhverv og Relatel allerede goer
+Alt eksisterende indhold flyttes hertil uaendret:
+- Status-kort, budget gauges, timeline, schedule editor, sync runs, data health, audit log
 
-Cached data eksisterer allerede for begge FM-klienter (verificeret i databasen):
-- Eesy FM (`9a92ea4c`): KPI'er + leaderboards for today/week/month/payroll
-- Yousee (`5011a7cd`): KPI'er + leaderboards for today/week/month/payroll
+## Fane 2: "System Opsaetning"
 
-### 2. Ingen andre filer roeres
+### Nyt: `SystemArchitectureDiagram.tsx`
 
-- `src/routes/pages.ts` og `config.tsx` -- uaendret (import + rute forbliver)
-- `src/hooks/useFieldmarketingSales.ts` -- beholdes (bruges i vagt-flow)
-- TV board imports -- virker stadig
-- `xlsx` dependency -- bruges i andre filer
+Et visuelt diagram der viser hele systemets dataflow med alle grene. Bygget med CSS Grid + glassmorphism cards + animerede SVG-forbindelseslinjer.
 
-## 3 Systemoptimeringer
+### Alle grene i diagrammet
 
-### Forbedring 1: GIN-index paa `raw_payload`
-
-Der er **ingen index paa `raw_payload` JSONB-kolonnen**. Alle FM-queries (ogsaa i edge functions som `calculate-kpi-values`) bruger `.contains("raw_payload", { fm_client_id: ... })` eller `.filter("raw_payload->>fm_client_id", ...)`. Med 23.000+ raekker i `sales`-tabellen laver dette fulde table scans hver gang.
-
-**Aendring:** Opret GIN-index via SQL migration:
+**Lag 1 -- Eksterne kilder (venstre):**
 
 ```text
-CREATE INDEX idx_sales_raw_payload ON sales USING gin (raw_payload jsonb_path_ops);
+Adversus API        (brugt af: Lovablecph, Relatel)
+Enreach API         (brugt af: ASE, Eesy, Tryg)
+---
+Adversus Webhook    (passiv indgaaende)
+Dialer Webhook      (passiv indgaaende)
+Economic Webhook    (e-conomic faktura)
+Zapier Webhook      (rekruttering)
+Twilio              (opkald/SMS)
 ```
 
-Dette accelererer ALLE JSONB-forespørgsler paa tvaers af hele systemet -- ikke kun FM dashboardet, men ogsaa edge functions (`calculate-kpi-values`, `calculate-leaderboard-incremental`) der koerer hvert minut.
-
-### Forbedring 2: Composite index for FM-specifikke queries
-
-Edge functions og dashboards filtrerer naesten altid paa `source = 'fieldmarketing' AND sale_datetime >= X`. Der mangler et composite index for dette moenster.
-
-**Aendring:** Opret composite index:
+**Lag 2 -- Processing (midte):**
 
 ```text
-CREATE INDEX idx_sales_source_datetime ON sales (source, sale_datetime DESC);
+Integration Engine  (edge function -- central orchestrator)
+  - Adversus Adapter
+  - Enreach Adapter
+  - Rate Limiter
+  - Smart Backfill
+
+Webhook Processors
+  - adversus-webhook
+  - dialer-webhook
+  - economic-webhook
+  - zapier-webhook
+  - twilio-webhook
 ```
 
-Dette goer det muligt for Postgres at bruge en enkelt index-scan i stedet for at kombinere to separate indexes. Gavner baade live-queries og de minutlige cache-beregninger.
-
-### Forbedring 3: Oprydning af duplikerede leaderboard-cache raekker
-
-`useCachedLeaderboard` hooket henter allerede med `.order("calculated_at", { ascending: false }).limit(1)` for at haandtere duplikater. Men dette betyder at der potentielt ligger gamle raekker i `kpi_leaderboard_cache` der aldrig laeses.
-
-**Aendring:** Tilfoej `UNIQUE`-constraint paa `kpi_leaderboard_cache` saa edge functions bruger `UPSERT` i stedet for at oprette nye raekker:
+**Lag 3 -- Database (midte-hoejre):**
 
 ```text
-CREATE UNIQUE INDEX IF NOT EXISTS idx_leaderboard_cache_unique 
-ON kpi_leaderboard_cache (period_type, scope_type, COALESCE(scope_id, '00000000-0000-0000-0000-000000000000'));
+sales + sale_items
+integration_logs
+integration_sync_runs
+adversus_events
 ```
 
-Dette reducerer tabelstorrelsen og eliminerer behovet for `.order().limit(1)` workarounds.
+**Lag 4 -- Scheduling + KPI Engine:**
 
-## Forventet effekt
+```text
+pg_cron Scheduler
+  - Triggers integration-engine per integration
+  - Triggers KPI-beregning
 
-| Metrik | Foer | Efter |
-|--------|------|-------|
-| FM Dashboard queries | 5-6 live (JSONB scans) | 4 cache-lookups |
-| FM Dashboard latency | 2-4 sekunder | Under 200ms |
-| JSONB query performance (systemwidt) | Full table scan | GIN index scan |
-| Edge function KPI-beregning | Seq scan paa 23k raekker | Index scan |
-| Leaderboard cache raekker | Voksende (duplikater) | 1 per scope/period |
-| Kodelinjer i FM dashboard | 542 | ~50 |
+KPI Engine (edge functions)
+  - calculate-kpi-incremental
+  - calculate-kpi-values
+  - calculate-leaderboard-incremental
+```
+
+**Lag 5 -- Output:**
+
+```text
+Cache tabeller
+  - kpi_cached_values
+  - kpi_leaderboard_cache
+
+Klient Dashboards
+  - Eesy TM / FM
+  - TDC Erhverv
+  - Relatel / Tryg
+  - TV Boards
+```
+
+### Live data i hvert kort
+
+Hvert kort i diagrammet faar:
+- **Statusfarve** (emerald/amber/red glow-border) baseret paa realtidsdata
+- **Mini-metriker**: API-kald, succes-rate, seneste koersel
+- **Pulserende animation** paa aktive forbindelser
+
+### Throughput-advarsel (nyt)
+
+Diagrammet viser advarsler naar data-throughput er for hoejt:
+
+1. **Per-integration overload**: Hvis `used1m > 80%` eller `used60m > 80%`, faar forbindelseslinjen fra den integration en roed pulserende animation + et advarselsbadge "Overbelastet"
+2. **Systemwid throughput**: Summer alle API-kald paa tvaers af integrationer. Vis et samlet throughput-gauge oeverst i diagrammet med:
+   - Graen: < 50% af samlet kapacitet
+   - Amber: 50-80%
+   - Roed: > 80% -- med tekst "System naermer sig kapacitetsgraense"
+3. **Database-belastning**: Vis antal records processed (fra sync runs) per time som en mini-graf, saa man kan se om der skydes for meget data ind
+
+### UI-design
+
+- **Glassmorphism cards**: `backdrop-blur-xl bg-card/60 border border-border/50` med farvet glow
+- **Animerede SVG-linjer**: Dashed stroke med CSS `stroke-dashoffset` animation. Farve matcher status
+- **Pulserende noder**: Aktive integrationer har en bloed pulse-ring animation
+- **Gradient header** paa hvert lag med subtil baggrund
+- **Hover-effekt**: Hover paa et kort highlighter alle forbundne linjer og kort
+- **Responsivt**: Desktop = horisontal flow, tablet/mobil = vertikal stack
+
+### Supplerende komponenter under diagrammet
+
+- `<LiveCronStatus />` -- viser pg_cron jobs vs. konfiguration
+- `<WebhookActivity />` -- viser webhook-trafik (24t)
+
+## Teknisk implementering
+
+### Filer der aendres
+
+| Fil | Aendring |
+|-----|----------|
+| `src/pages/SystemStability.tsx` | Tilfoej Tabs wrapper, flyt indhold til fane 1, tilfoej fane 2 |
+| `src/components/system-stability/SystemArchitectureDiagram.tsx` | **NY** -- hele diagrammet |
+
+### Ingen andre filer roeres
+
+- Alle eksisterende komponenter forbliver uaendrede
+- Hooks og data-fetching forbliver i `SystemStability.tsx` og deles mellem faner
+- Ingen nye dependencies -- bruger Tailwind, Lucide icons, native SVG
+
+### Data til diagrammet
+
+Genbruger eksisterende queries fra `SystemStability.tsx`:
+- `integrations` -- liste over aktive integrationer med provider-type
+- `integrationMetrics` -- succes-rate, 429-rate, varighed per integration
+- `integrationBudgets` -- API-forbrug vs. limits per integration
+- `syncRuns` -- seneste koersler (records processed, api calls)
+
+Props til `SystemArchitectureDiagram`:
+
+```text
+interface Props {
+  integrations: Array<{ id, name, provider, last_sync_at, last_status }>
+  metrics: Array<{ id, successRate1h, rateLimitRate15m, avgDurationMs, totalApiCalls15m }>
+  budgets: Array<{ provider, providerType, used1m, used60m, calls1m, calls60m, limit1m, limit60m }>
+  syncRuns: Array<{ records_processed, api_calls_made, rate_limit_hits, started_at }>
+}
+```
+
+### Throughput-beregning
+
+```text
+// Samlet system-throughput
+totalCalls1m = sum(budgets.map(b => b.calls1m))
+totalLimit1m = sum(budgets.map(b => b.limit1m))
+systemUsage = totalCalls1m / totalLimit1m * 100
+
+// Records per time (fra sync runs)
+recordsLastHour = syncRuns
+  .filter(r => r.started_at > 1hAgo)
+  .reduce((sum, r) => sum + r.records_processed, 0)
+```
+
+## Forventet resultat
+
+| Element | Foer | Efter |
+|---------|------|-------|
+| Sidestruktur | 1 lang side | 2 faner |
+| Arkitekturoverblik | Intet | Live diagram med alle grene |
+| Throughput-advarsel | Kun per-integration | Systemwid + per-forbindelse |
+| LiveCronStatus | Ubrugt | Vist i fane 2 |
+| WebhookActivity | Ubrugt | Vist i fane 2 |
+| Webhook-grene | Ikke synlige | Alle 5 webhooks vist |
+| KPI Engine | Ikke synlig | Vist som separat lag |
 
