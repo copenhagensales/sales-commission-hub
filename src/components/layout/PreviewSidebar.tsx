@@ -295,7 +295,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
               onClick={() => navigate("/")} 
               className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-16 w-auto object-contain" />
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-20 w-auto object-contain" />
             </div>
           </div>
         )}
