@@ -16,6 +16,50 @@ interface SyncOptions {
   maxRecords?: number;
 }
 
+const LOVABLE_ACTIONS = ["campaigns", "users", "sales", "calls"] as const;
+
+const normalizeActions = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+};
+
+const unique = (items: string[]): string[] => items.filter((item, idx) => items.indexOf(item) === idx);
+
+const isLovableTdcIntegration = (integration: any): boolean => {
+  const integrationName = String(integration?.name || "").trim().toLowerCase();
+  if (!integrationName) return false;
+
+  if (integrationName.includes("lovablecph") || integrationName.includes("tdc")) {
+    return true;
+  }
+
+  return integration?.config?.use_split_sync_jobs === true;
+};
+
+const getEffectiveActionList = (
+  integration: any,
+  actions: string[] | undefined,
+  action: string | undefined,
+): string[] => {
+  const requested = unique((actions || (action === "sync" ? ["campaigns", "users", "sales", "sessions"] : [action]))
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean));
+
+  if (!isLovableTdcIntegration(integration)) return requested;
+
+  const config = (integration?.config || {}) as Record<string, unknown>;
+  const cfgSync = normalizeActions(config.sync_actions);
+  const cfgMeta = normalizeActions(config.meta_sync_actions);
+  const allowed = new Set<string>(LOVABLE_ACTIONS);
+
+  const merged = unique([...requested, ...cfgSync, ...cfgMeta]).filter((item) => allowed.has(item));
+  return merged.length > 0 ? merged : [...LOVABLE_ACTIONS];
+};
+
 interface SyncResult {
   name: string;
   status: "success" | "error";
@@ -35,6 +79,7 @@ export async function syncIntegration(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ): Promise<SyncResult> {
   const { source, action, actions, days = 3, campaignId, from, to, maxRecords = 50 } = options;
+  const actionList = getEffectiveActionList(integration, actions, action);
   const syncRunStartedAt = new Date();
   try {
     log("INFO", `Processing integration: ${integration.name}`);
@@ -57,8 +102,7 @@ export async function syncIntegration(
 
     const runResults: Record<string, unknown> = {};
 
-    // Support both 'action' (legacy) and 'actions' (new array)
-    const actionList = actions || (action === "sync" ? ["campaigns", "users", "sales", "sessions"] : [action]);
+    // Support both 'action' (legacy) and 'actions' (new array), with Lovablecph self-healing merge
 
     // Process campaigns
     if (actionList.includes("campaigns")) {
@@ -213,22 +257,23 @@ export async function syncIntegration(
       .eq("id", integration.id);
 
     // Log success to integration_logs
-    const salesData = runResults["sales"] as { processed?: number } | undefined;
-    const callsData = runResults["calls"] as { processed?: number; matched?: number } | undefined;
-
-    const messageParts: string[] = [];
-    if (salesData?.processed !== undefined) {
-      messageParts.push(`${salesData.processed} sales`);
-    }
-    if (callsData?.processed !== undefined) {
-      messageParts.push(`${callsData.processed} calls (${callsData.matched || 0} matched)`);
-    }
-    const syncMessage = messageParts.length > 0
-      ? `Sync completed: ${messageParts.join(", ")}`
-      : "Sync completed: No data processed";
+    const actionSummary = Object.entries(runResults)
+      .map(([name, result]) => {
+        const typedResult = result as { processed?: number; matched?: number } | undefined;
+        if (typedResult?.processed === undefined) return null;
+        if (name === "calls") {
+          return `${typedResult.processed} calls (${typedResult.matched || 0} matched)`;
+        }
+        return `${typedResult.processed} ${name}`;
+      })
+      .filter((part): part is string => Boolean(part));
 
     // Calculate total records processed
     const totalRecords = Object.values(runResults).reduce((sum: number, r: any) => sum + (r?.processed || 0), 0);
+
+    const syncMessage = actionSummary.length > 0
+      ? `Sync completed: ${actionSummary.join(", ")} (total ${totalRecords})`
+      : "Sync completed: No data processed";
 
     // Calculate sync run duration
     const syncRunCompletedAt = new Date();
@@ -260,6 +305,7 @@ export async function syncIntegration(
       duration_ms: syncRunDurationMs,
       details: {
         source,
+        actions: actionList.filter(Boolean) as string[],
         days,
         campaignId: campaignId || null,
         results: runResults,
@@ -285,7 +331,7 @@ export async function syncIntegration(
       completed_at: errorCompletedAt.toISOString(),
       duration_ms: errorDurationMs,
       status: "error",
-      actions: (actions || (action ? [action] : [])) as string[],
+      actions: actionList,
       records_processed: 0,
       api_calls_made: errorMetrics.apiCalls,
       retries: errorMetrics.retries,
@@ -303,6 +349,7 @@ export async function syncIntegration(
       duration_ms: errorDurationMs,
       details: {
         source: options.source,
+        actions: actionList,
         days: options.days,
         campaignId: options.campaignId || null,
         error: errMsg,

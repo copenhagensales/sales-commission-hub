@@ -25,6 +25,25 @@ const staggeredFiveMinuteSchedules: Record<string, string> = {
   ase: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *",
 };
 
+const LOVABLE_ALLOWED_ACTIONS = ["campaigns", "users", "sales", "calls"] as const;
+const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "3,8,13,18,23,28,33,38,43,48,53,58 * * * *";
+
+const isLovableTdcIntegration = (
+  integrationName?: string | null,
+  config?: Record<string, unknown> | null,
+): boolean => {
+  const normalizedName = (integrationName || "").trim().toLowerCase();
+  if (!normalizedName) return false;
+
+  if (normalizedName.includes("lovablecph") || normalizedName.includes("tdc")) {
+    return true;
+  }
+
+  const explicit = config?.use_split_sync_jobs;
+  return explicit === true;
+};
+
+
 const getDialerSchedule = (
   integrationName?: string | null,
   config?: Record<string, unknown> | null,
@@ -35,11 +54,15 @@ const getDialerSchedule = (
     return configSchedule.trim();
   }
 
-  if (frequencyMinutes === 5) {
-    const normalizedName = (integrationName || "").trim().toLowerCase();
-    if (staggeredFiveMinuteSchedules[normalizedName]) {
-      return staggeredFiveMinuteSchedules[normalizedName];
-    }
+  const normalizedName = (integrationName || "").trim().toLowerCase();
+
+  // Lovable/TDC should always run sales sync every 5 minutes unless explicitly overridden
+  if (isLovableTdcIntegration(integrationName, config)) {
+    return staggeredFiveMinuteSchedules.lovablecph;
+  }
+
+  if (frequencyMinutes === 5 && staggeredFiveMinuteSchedules[normalizedName]) {
+    return staggeredFiveMinuteSchedules[normalizedName];
   }
 
   return null;
@@ -64,6 +87,27 @@ type DialerJobConfig = {
   payload: Record<string, unknown>;
 };
 
+const getActionConfig = (
+  config: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback: string[],
+): string[] => {
+  const raw = config?.[key];
+  if (!Array.isArray(raw)) return fallback;
+
+  const actions = raw
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return actions.length > 0 ? actions : fallback;
+};
+
+const toAllowedActions = (actions: string[], allowed: readonly string[]): string[] => {
+  const allowedSet = new Set(allowed);
+  return actions.filter((action, idx) => allowedSet.has(action) && actions.indexOf(action) === idx);
+};
+
 const getNumberConfig = (
   config: Record<string, unknown> | null | undefined,
   key: string,
@@ -84,8 +128,8 @@ const getMetaSyncSchedule = (
     return configured.trim();
   }
 
-  if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
-    return "*/30 * * * *";
+  if (isLovableTdcIntegration(integrationName, config)) {
+    return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
   }
 
   return null;
@@ -99,13 +143,17 @@ const buildDialerJobs = (
   frequencyMinutes?: number | null,
   primarySchedule?: string | null,
 ): DialerJobConfig[] => {
-  const normalizedName = (integrationName || "").trim().toLowerCase();
   const syncDays = getSyncDays(integrationName, config);
 
-  if (normalizedName === "lovablecph") {
+  if (isLovableTdcIntegration(integrationName, config)) {
     const salesMaxRecords = getNumberConfig(config, "sales_max_records") ?? 20;
     const salesSchedule = primarySchedule || frequencyToCron[frequencyMinutes || 5] || "*/5 * * * *";
     const metaSchedule = getMetaSyncSchedule(integrationName, config) || "*/30 * * * *";
+    const salesActions = toAllowedActions(getActionConfig(config, "sync_actions", ["sales"]), LOVABLE_ALLOWED_ACTIONS);
+    const metaActions = toAllowedActions(
+      getActionConfig(config, "meta_sync_actions", ["campaigns", "users", "calls"]),
+      LOVABLE_ALLOWED_ACTIONS,
+    );
 
     return [
       {
@@ -114,7 +162,7 @@ const buildDialerJobs = (
         payload: {
           source: provider,
           integration_id: integrationId,
-          actions: ["sales"],
+          actions: salesActions.length > 0 ? salesActions : ["sales"],
           days: syncDays,
           maxRecords: salesMaxRecords,
         },
@@ -125,7 +173,7 @@ const buildDialerJobs = (
         payload: {
           source: provider,
           integration_id: integrationId,
-          actions: ["campaigns", "users", "sessions"],
+          actions: metaActions.length > 0 ? metaActions : ["campaigns", "users", "calls"],
           days: syncDays,
         },
       },
