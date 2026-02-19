@@ -1,75 +1,114 @@
 
 
-# Fix: Lovablecph cron-job -- ret UUID, payload og tilfoej calls
+# Lovablecph: Smart Sync med automatisk backfill (stopper ved 15. januar)
 
-## Baggrund og kendte udfordringer
+## Oversigt
 
-Vi har haft flere problemer med Lovablecph-synkroniseringen:
+To cron-jobs der begge bruger samme integration-engine, men med forskellig opgave:
 
-1. **Forkert UUID**: Job 86 bruger `26fac751-f4b2-...` som ikke matcher den faktiske integration (`26fac751-c2d8-...`)
-2. **Forkert payload-noegle**: `integrationId` i stedet for `integration_id` (med underscore)
-3. **Sessions-crash**: Adversus returnerer HTTP 403 for sessions-endpointet for denne integration
-4. **Calls stoppet**: Sidste kald synkroniseret 5. januar 2026 (7.397 historiske kald)
+1. **Standard-sync (hvert 5. minut)**: Henter nye salg med `days:1, maxRecords:30` -- ultralet (~3-5 API-kald)
+2. **Smart backfill (hver time)**: Arbejder sig dag-for-dag fra 15. januar 2026 frem til i dag. Tjekker API-budget foerst, reserverer kapacitet til standard-sync, og **stopper automatisk naar den naar dags dato**.
 
-**Nuvaerende tilstand (bekraeftet lige nu):**
-- Job 86 koerer hvert 5. minut, men pga. forkert UUID rammer den ALDRIG Lovablecph
-- Integration-engine falder tilbage til en generisk provider-soegning og synkroniserer kun campaigns + users (80 poster pr. koersel)
-- **0 salg** og **0 kald** synkroniseres for Lovablecph
-- Sidste kald i databasen: 5. januar 2026
+## Backfill-logik i detaljer
 
-## Plan
+Backfill-jobbet goer foelgende ved hver koersel:
 
-### Trin 1: Slet Job 86
+1. Laeser `dialer_sync_state` (dataset: `"backfill"`) for at finde senest behandlede dato via `cursor`-feltet
+2. Hvis ingen cursor: starter fra `2026-01-15`
+3. Hvis cursor >= i dag: **stopper** -- al data er hentet, jobbet goer ingenting
+4. Laeser `integration_sync_runs` for seneste 10 minutter for at se hvor mange API-kald der er brugt
+5. Beregner sikkert antal dage at hente: `(60 - brugt_pr_min - 15_reserveret) / ~8_kald_pr_dag`
+6. Henter sales + calls for naeste N dage via `fetchSalesRange` og `fetchCallsRange` (fra/til)
+7. Opdaterer cursor til senest behandlede dato
+8. Logger resultater til `integration_sync_runs`
 
-Fjern det fejlbeheftede cron-job.
+Naar cursor naar dags dato, returnerer backfill blot `{ processed: 0, message: "Backfill complete" }` og goer ingenting -- sikkert at lade jobbet koere videre uden spild.
+
+## Teknisk implementering
+
+### Ny fil: `supabase/functions/integration-engine/actions/smart-backfill.ts`
+
+Indeholder en eksporteret funktion `smartBackfill(supabase, integrationId, log)` der:
+- Laeser cursor fra `dialer_sync_state` (dataset `"backfill"`, default startdato `2026-01-15`)
+- Returnerer tidligt hvis cursor >= i dag (backfill faerdig)
+- Beregner API-budget fra `integration_sync_runs` (seneste 10 min)
+- Reserverer 15 kald til standard-sync
+- Kalder `syncIntegration()` med `from`/`to` for hver dag inden for budgettet
+- Opdaterer cursor efter hver succesfuld dag
+
+### AEndring: `supabase/functions/integration-engine/index.ts`
+
+Tilfoej routing for `action === "backfill"`:
+- Importerer `smartBackfill` fra actions
+- Koerer i baggrunden via `EdgeRuntime.waitUntil()`
+- Returnerer straks med status
+
+### Database-aendringer (SQL, ingen migrering)
 
 ```text
-SELECT cron.unschedule(86);
-```
+-- 1. Slet det tunge Job 87
+SELECT cron.unschedule(87);
 
-### Trin 2: Opret nyt korrekt cron-job
-
-Nyt job med alle rettelser:
-- Korrekt UUID: `26fac751-c2d8-4b5b-a6df-e33a32e3c6e7`
-- Korrekt noegle: `integration_id` (underscore)
-- Actions: `["campaigns", "users", "sales", "calls"]`
-- Sessions bevidst udeladt (Adversus returnerer 403)
-- `days: 21` for at indhente manglende data fra de seneste uger
-- Schedule: hvert 5. minut, staggered paa minut 1,6,11... (undgaar overlap med Relatel paa 0,10,20...)
-
-```text
+-- 2. Opret standard-sync (hvert 5. min, offset minut 3)
 SELECT cron.schedule(
   'dialer-26fac751-sync',
-  '1,6,11,16,21,26,31,36,41,46,51,56 * * * *',
-  $$
-  SELECT net.http_post(
-    url := '<edge-function-url>/integration-engine',
-    headers := '<auth-headers>'::jsonb,
-    body := '{"source":"adversus","actions":["campaigns","users","sales","calls"],"days":21,"integration_id":"26fac751-c2d8-4b5b-a6df-e33a32e3c6e7"}'::jsonb
-  ) AS request_id;
-  $$
+  '3,8,13,18,23,28,33,38,43,48,53,58 * * * *',
+  -- payload: actions:["sales"], days:1, maxRecords:30
 );
+
+-- 3. Opret smart backfill (hver time, minut 35)
+SELECT cron.schedule(
+  'dialer-26fac751-backfill',
+  '35 * * * *',
+  -- payload: action:"backfill", background:true
+);
+
+-- 4. Opdater integration config
+UPDATE dialer_integrations SET config = config || '{
+  "sync_actions": ["sales"],
+  "backfill_start_date": "2026-01-15",
+  "excluded_actions": ["sessions"]
+}'::jsonb
+WHERE id = '26fac751-c2d8-4b5b-a6df-e33a32e3c6e7';
 ```
 
-### Trin 3: Verifikation
+## Stopmekanisme
 
-1. Koer integration-engine manuelt med korrekt payload for at bekraefte at salg og kald hentes
-2. Tjek `integration_sync_runs` -- actions skal nu vise `["campaigns","users","sales","calls"]` i stedet for kun `["campaigns","users"]`
-3. Tjek `dialer_calls` for nye poster efter 5. januar
-4. Tjek `sales` for nye Lovablecph-poster
+Backfill tracker sin fremgang i `dialer_sync_state`:
+- `dataset`: `"backfill"`
+- `cursor`: den senest behandlede dato som ISO-streng (fx `"2026-01-22"`)
+- Naar cursor >= dags dato -> return tidligt, ingen API-kald
 
-## Ingen kodeaendringer
+Naar backfill er faerdig, kan jobbet enten:
+- Forblive aktivt (koerer hver time, finder 0 nye poster, bruger 0 API-kald)
+- Fjernes manuelt via `SELECT cron.unschedule('dialer-26fac751-backfill');`
 
-Koden i `sync-integration.ts` haandterer allerede alt korrekt:
-- `LOVABLE_ACTIONS` inkluderer "calls"
-- Sessions filtreres automatisk fra for Lovablecph via `excluded_actions`
-- Calls-adapteren har fungeret historisk (7.397 kald bevist)
+## Filer der aendres/oprettes
 
-Kun cron-jobbet i databasen skal rettes.
+| Fil | Type | Beskrivelse |
+|-----|------|-------------|
+| `actions/smart-backfill.ts` | Ny | Backfill-logik med budgetberegning og cursor-tracking |
+| `index.ts` | AEndring | Tilfoej `action === "backfill"` routing |
+| Database (SQL) | AEndring | Slet Job 87, opret 2 nye jobs, opdater config |
+
+## Tidslinje
+
+```text
+Nu -> Slet Job 87 (stopper belastning)
++3 min:  Standard-sync starter (kun sales, days:1)
++35 min: Foerste backfill koerer
+         Tjekker budget -> henter fx 5 dage (15-19 jan)
++95 min: Anden backfill -> henter 20-24 jan
+...
++8-12 timer: Cursor naar dags dato -> backfill stopper automatisk
+Derefter: Standard-sync koerer normalt, backfill er passivt
+```
 
 ## Risiko
 
-- **Lav**: Calls-endpointet virkede frem til januar -- det stoppede kun fordi cron-jobbet gik i stykker
-- **Beskyttelse**: Sessions-403-crashet kan ikke ske, da koden automatisk filtrerer sessions fra
-- **Backfill**: `days: 21` sikrer at vi faar manglende data med. Kan saettes hoejere ved foerste koersel for at indhente mere historik
+- **Lav**: Standard-sync med `days:1` og `maxRecords:30` er ~3-5 API-kald
+- **Rate limit**: Backfill reserverer altid 15 kald til standard-sync -- kan aldrig blokere den
+- **Idempotent**: Upsert-logik forhindrer duplikater
+- **Auto-stop**: Cursor-check sikrer at backfill stopper naar den naar i dag
+- **Startforsinkelse**: Minut 3 og 35 giver rate limit tid til at nulstille
 
