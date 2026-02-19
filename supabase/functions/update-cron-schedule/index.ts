@@ -58,13 +58,14 @@ const getDialerSchedule = (
 
   // Lovable/TDC should always run sales sync every 5 minutes unless explicitly overridden
   if (isLovableTdcIntegration(integrationName, config)) {
-  // Lovablecph should always run sales sync every 5 minutes unless explicitly overridden
-  if (normalizedName === "lovablecph") {
-    return staggeredFiveMinuteSchedules.lovablecph;
-  }
+    // Lovablecph should always run sales sync every 5 minutes unless explicitly overridden
+    if (normalizedName === "lovablecph") {
+      return staggeredFiveMinuteSchedules.lovablecph;
+    }
 
-  if (frequencyMinutes === 5 && staggeredFiveMinuteSchedules[normalizedName]) {
-    return staggeredFiveMinuteSchedules[normalizedName];
+    if (frequencyMinutes === 5 && staggeredFiveMinuteSchedules[normalizedName]) {
+      return staggeredFiveMinuteSchedules[normalizedName];
+    }
   }
 
   return null;
@@ -131,8 +132,9 @@ const getMetaSyncSchedule = (
   }
 
   if (isLovableTdcIntegration(integrationName, config)) {
-  if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
-    return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
+    if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
+      return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
+    }
   }
 
   return null;
