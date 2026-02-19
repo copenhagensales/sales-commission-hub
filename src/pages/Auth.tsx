@@ -618,7 +618,7 @@ export default function Auth() {
             width={161}
             height={96}
             fetchPriority="high"
-            className="mx-auto h-24 w-auto cursor-pointer"
+            className="mx-auto h-32 w-auto cursor-pointer"
           />
           <p className="mt-4 text-sm text-muted-foreground">
             Løn- og performance-system
