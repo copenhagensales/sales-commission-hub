@@ -1,34 +1,18 @@
 
 
-## Fix: Build-fejl i sync-integration.ts + Deploy update-cron-schedule
+## Deploy Edge Functions
 
-### Problem
-`adapter` er defineret inde i `try`-blokken (linje 49), men bruges i `catch`-blokken (linje 279), hvor den er uden for scope. Det giver TS2304-fejlen.
+Deployer de to edge functions til produktion:
 
-### Rettelse
+1. **integration-engine** — Synkroniseringsmotor med alle adapters, actions og core-logik
+2. **update-cron-schedule** — Cron-job management (opret/opdater/slet schedules)
 
-**Fil: `supabase/functions/integration-engine/actions/sync-integration.ts`**
+### Hvad sker der
+- Begge funktioner deployes med deres nuværende kode
+- Ingen kodeændringer er nødvendige — det er et rent deploy af eksisterende filer
+- Efter deploy er funktionerne live og kan kaldes via HTTP eller pg_cron
 
-1. Flyt `adapter`-variablen ud foran `try`-blokken som `let adapter: any = null;` (linje ~38).
-2. I `catch`-blokken (linje 278-293): Brug optional chaining for at hente metrics sikkert, med fallback til `{ apiCalls: 0, retries: 0, rateLimitHits: 0 }` hvis adapter ikke blev oprettet.
-
-### Tekniske detaljer
-
-```text
-Linje 38 (efter syncRunStartedAt):
-  + let adapter: any = null;
-
-Linje 49 (inde i try):
-  - const adapter = getAdapter(...)
-  + adapter = getAdapter(...)
-
-Linje 279 (i catch):
-  - const errorMetrics = adapter.getMetrics();
-  + const errorMetrics = adapter?.getMetrics?.() ?? { apiCalls: 0, retries: 0, rateLimitHits: 0 };
-```
-
-### Deploy
-Efter rettelsen deployes begge edge functions:
-- `integration-engine` (fix build-fejl)
-- `update-cron-schedule` (uændret, men skal deployes som requested)
+### Teknisk detalje
+- `integration-engine`: Indeholder `index.ts`, `actions/sync-integration.ts`, `adapters/`, `core.ts`, `utils/`, `types.ts`
+- `update-cron-schedule`: Enkelt `index.ts` med CORS, auth og cron.schedule/cron.unschedule logik
 
