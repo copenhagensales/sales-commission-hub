@@ -76,7 +76,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           )}
           
           {/* Mobile header with burger menu */}
-          <div className={`md:hidden fixed left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10" : "top-0"}`}>
+          <div className={`md:hidden fixed left-0 right-0 z-50 h-16 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10" : "top-0"}`}>
             <div 
               onClick={() => navigate("/")} 
               className="flex items-center cursor-pointer"
@@ -106,7 +106,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <main className={cn(
             "min-h-screen transition-all duration-300 ease-in-out",
             isCollapsed ? "md:ml-0" : "md:ml-64",
-            isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"
+            isPreviewMode ? "pt-26 md:pt-10" : "pt-16 md:pt-0"
           )}>
             <div className="p-4 md:p-8">
               {children}
