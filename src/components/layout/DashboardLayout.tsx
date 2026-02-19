@@ -69,7 +69,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             onClick={() => navigate("/")} 
             className="flex items-center cursor-pointer"
           >
-            <img src={cphSalesLogo} alt="CPH Sales" className="h-8 w-auto object-contain" />
+            <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
           </div>
           
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
