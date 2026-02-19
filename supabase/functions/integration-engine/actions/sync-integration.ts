@@ -28,6 +28,17 @@ const normalizeActions = (value: unknown): string[] => {
 
 const unique = (items: string[]): string[] => items.filter((item, idx) => items.indexOf(item) === idx);
 
+const isLovableTdcIntegration = (integration: any): boolean => {
+  const integrationName = String(integration?.name || "").trim().toLowerCase();
+  if (!integrationName) return false;
+
+  if (integrationName.includes("lovablecph") || integrationName.includes("tdc")) {
+    return true;
+  }
+
+  return integration?.config?.use_split_sync_jobs === true;
+};
+
 const getEffectiveActionList = (
   integration: any,
   actions: string[] | undefined,
@@ -38,6 +49,7 @@ const getEffectiveActionList = (
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean));
 
+  if (!isLovableTdcIntegration(integration)) return requested;
   const integrationName = String(integration?.name || "").trim().toLowerCase();
   if (integrationName !== "lovablecph") return requested;
 

@@ -28,6 +28,21 @@ const staggeredFiveMinuteSchedules: Record<string, string> = {
 const LOVABLE_ALLOWED_ACTIONS = ["campaigns", "users", "sales", "calls"] as const;
 const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "3,8,13,18,23,28,33,38,43,48,53,58 * * * *";
 
+const isLovableTdcIntegration = (
+  integrationName?: string | null,
+  config?: Record<string, unknown> | null,
+): boolean => {
+  const normalizedName = (integrationName || "").trim().toLowerCase();
+  if (!normalizedName) return false;
+
+  if (normalizedName.includes("lovablecph") || normalizedName.includes("tdc")) {
+    return true;
+  }
+
+  const explicit = config?.use_split_sync_jobs;
+  return explicit === true;
+};
+
 
 const getDialerSchedule = (
   integrationName?: string | null,
@@ -41,6 +56,8 @@ const getDialerSchedule = (
 
   const normalizedName = (integrationName || "").trim().toLowerCase();
 
+  // Lovable/TDC should always run sales sync every 5 minutes unless explicitly overridden
+  if (isLovableTdcIntegration(integrationName, config)) {
   // Lovablecph should always run sales sync every 5 minutes unless explicitly overridden
   if (normalizedName === "lovablecph") {
     return staggeredFiveMinuteSchedules.lovablecph;
@@ -113,6 +130,7 @@ const getMetaSyncSchedule = (
     return configured.trim();
   }
 
+  if (isLovableTdcIntegration(integrationName, config)) {
   if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
     return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
   }
@@ -128,10 +146,9 @@ const buildDialerJobs = (
   frequencyMinutes?: number | null,
   primarySchedule?: string | null,
 ): DialerJobConfig[] => {
-  const normalizedName = (integrationName || "").trim().toLowerCase();
   const syncDays = getSyncDays(integrationName, config);
 
-  if (normalizedName === "lovablecph") {
+  if (isLovableTdcIntegration(integrationName, config)) {
     const salesMaxRecords = getNumberConfig(config, "sales_max_records") ?? 20;
     const salesSchedule = primarySchedule || frequencyToCron[frequencyMinutes || 5] || "*/5 * * * *";
     const metaSchedule = getMetaSyncSchedule(integrationName, config) || "*/30 * * * *";
