@@ -76,7 +76,8 @@ export default function SystemStability() {
         .order("name");
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Fetch recent sync runs (last 24h)
@@ -92,7 +93,8 @@ export default function SystemStability() {
         .limit(200);
       return (data || []) as SyncRun[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Fetch integration logs as fallback metrics (last 24h)
@@ -108,7 +110,8 @@ export default function SystemStability() {
         .limit(500);
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Fetch audit log

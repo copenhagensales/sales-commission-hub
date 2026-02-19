@@ -132,20 +132,33 @@ export default function CphSalesDashboard() {
     staleTime: 60000,
   });
 
-  // Fetch candidates for recruitment KPI (only in non-TV mode)
-  const { data: candidates = [] } = useQuery({
-    queryKey: ["cph-dashboard-candidates"],
+  // Fetch candidate counts for recruitment KPI (only in non-TV mode)
+  const { data: candidateCounts } = useQuery({
+    queryKey: ["cph-dashboard-candidate-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("id, created_at")
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
+      const now = new Date();
+      const [last24h, prev24h, last7d, prev7d] = await Promise.all([
+        supabase.from("candidates").select("*", { count: "exact", head: true })
+          .gte("created_at", subDays(now, 1).toISOString()),
+        supabase.from("candidates").select("*", { count: "exact", head: true })
+          .gte("created_at", subDays(now, 2).toISOString())
+          .lt("created_at", subDays(now, 1).toISOString()),
+        supabase.from("candidates").select("*", { count: "exact", head: true })
+          .gte("created_at", subDays(now, 7).toISOString()),
+        supabase.from("candidates").select("*", { count: "exact", head: true })
+          .gte("created_at", subDays(now, 14).toISOString())
+          .lt("created_at", subDays(now, 7).toISOString()),
+      ]);
+      return {
+        last24h: last24h.count || 0,
+        prev24h: prev24h.count || 0,
+        last7d: last7d.count || 0,
+        prev7d: prev7d.count || 0,
+      };
     },
     enabled: !tvMode,
     refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Fetch upcoming cohorts and starters (only in non-TV mode)
@@ -192,30 +205,19 @@ export default function CphSalesDashboard() {
     },
     enabled: !tvMode,
     refetchInterval: 60000,
+    staleTime: 30000,
   });
 
-  // Calculate recruitment KPIs
+  // Calculate recruitment KPIs from count queries
   const recruitmentKpis = useMemo(() => {
-    const now = new Date();
+    if (!candidateCounts) return { last24h: 0, trend24h: 0, last7d: 0, trend7d: 0 };
     
-    // Last 24 hours
-    const last24h = candidates.filter(c => new Date(c.created_at) >= subDays(now, 1)).length;
-    const prev24h = candidates.filter(c => {
-      const created = new Date(c.created_at);
-      return created >= subDays(now, 2) && created < subDays(now, 1);
-    }).length;
+    const { last24h, prev24h, last7d, prev7d } = candidateCounts;
     const trend24h = prev24h > 0 ? Math.round(((last24h - prev24h) / prev24h) * 100) : last24h > 0 ? 100 : 0;
-
-    // Last 7 days
-    const last7d = candidates.filter(c => new Date(c.created_at) >= subDays(now, 7)).length;
-    const prev7d = candidates.filter(c => {
-      const created = new Date(c.created_at);
-      return created >= subDays(now, 14) && created < subDays(now, 7);
-    }).length;
     const trend7d = prev7d > 0 ? Math.round(((last7d - prev7d) / prev7d) * 100) : last7d > 0 ? 100 : 0;
 
     return { last24h, trend24h, last7d, trend7d };
-  }, [candidates]);
+  }, [candidateCounts]);
 
   // Regular authenticated queries for non-TV mode
   const { data: todaySalesData } = useQuery({
@@ -504,6 +506,7 @@ export default function CphSalesDashboard() {
     },
     enabled: !tvMode,
     refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Team Performance Overview - data for day, week, month
@@ -811,6 +814,7 @@ export default function CphSalesDashboard() {
       }));
     },
     refetchInterval: 60000,
+    staleTime: 30000,
   });
   const knownClientSales = todaySales.filter(sale => 
     sale.client_name && sale.client_name !== "Ukendt"

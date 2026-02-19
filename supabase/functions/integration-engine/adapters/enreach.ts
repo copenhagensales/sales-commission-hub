@@ -14,6 +14,7 @@ import {
   DataFilterRule,
   DataFilterGroup,
 } from "../types.ts";
+import { enreachToUTC } from "../../_shared/enreach-timezone.ts";
 
 interface EnreachCredentials {
   username?: string;
@@ -722,7 +723,7 @@ export class EnreachAdapter implements DialerAdapter {
       externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
     }
 
-    const saleDate = this.getStr(lead, ["firstProcessedTime", "lastModifiedTime"]) || new Date().toISOString();
+    const saleDate = enreachToUTC(this.getStr(lead, ["firstProcessedTime", "lastModifiedTime"]));
 
     return {
       externalId,
