@@ -397,12 +397,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
       <aside className={sidebarClasses}>
         <div className="flex h-full flex-col">
           {!isMobile && (
-            <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-4">
+            <div className="flex h-24 items-center justify-center border-b border-sidebar-border px-4">
               <div 
                 onClick={() => navigate("/")} 
                 className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
               >
-                <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
+                <img src={cphSalesLogo} alt="CPH Sales" className="h-16 w-auto object-contain" />
               </div>
             </div>
           )}
@@ -482,12 +482,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
         {!isMobile && (
-          <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-3 relative">
+          <div className="flex h-24 items-center justify-center border-b border-sidebar-border px-3 relative">
             <div 
               onClick={() => navigate("/")} 
               className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-16 w-auto object-contain" />
             </div>
             
             {/* Collapse button */}
