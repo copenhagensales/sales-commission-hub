@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCcw, Activity, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDistanceToNow, format } from "date-fns";
@@ -13,6 +14,9 @@ import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
 import { AuditLog } from "@/components/system-stability/AuditLog";
 import { DataHealthChecks } from "@/components/system-stability/DataHealthChecks";
 import { AlertBanner } from "@/components/system-stability/AlertBanner";
+import { SystemArchitectureDiagram } from "@/components/system-stability/SystemArchitectureDiagram";
+import { LiveCronStatus } from "@/components/system-stability/LiveCronStatus";
+import { WebhookActivity } from "@/components/system-stability/WebhookActivity";
 import { useStabilityAlerts, type ProviderBudget } from "@/hooks/useStabilityAlerts";
 import { MainLayout } from "@/components/layout/MainLayout";
 
@@ -238,199 +242,225 @@ export default function SystemStability() {
 
   return (
     <MainLayout>
-    <div className="container mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Systemstabilitet</h1>
-          <p className="text-sm text-muted-foreground">Realtids-overblik over integrationers sundhed</p>
+      <div className="container mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Systemstabilitet</h1>
+            <p className="text-sm text-muted-foreground">Realtids-overblik over integrationers sundhed</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            Opdater
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-          <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-          Opdater
-        </Button>
-      </div>
 
-      {/* Alert Banner */}
-      <AlertBanner alerts={alerts} />
+        {/* Alert Banner */}
+        <AlertBanner alerts={alerts} />
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {integrationMetrics.map((int: any) => {
-          const color = getStatusColor(int.successRate1h, int.rateLimitRate15m);
-          return (
-            <Card key={int.id} className="relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-1 h-full ${statusColorMap[color]}`} />
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold">{int.name}</CardTitle>
-                  <Badge variant={color === "green" ? "default" : color === "yellow" ? "secondary" : "destructive"} className="text-xs">
-                    {statusLabelMap[color]}
-                  </Badge>
-                </div>
+        {/* Tabs */}
+        <Tabs defaultValue="stability" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="stability">Systemstabilitet</TabsTrigger>
+            <TabsTrigger value="setup">System Opsætning</TabsTrigger>
+          </TabsList>
+
+          {/* Tab 1: Existing stability content */}
+          <TabsContent value="stability" className="space-y-6">
+            {/* Status Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {integrationMetrics.map((int: any) => {
+                const color = getStatusColor(int.successRate1h, int.rateLimitRate15m);
+                return (
+                  <Card key={int.id} className="relative overflow-hidden">
+                    <div className={`absolute top-0 left-0 w-1 h-full ${statusColorMap[color]}`} />
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-semibold">{int.name}</CardTitle>
+                        <Badge variant={color === "green" ? "default" : color === "yellow" ? "secondary" : "destructive"} className="text-xs">
+                          {statusLabelMap[color]}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">429-rate (15m)</span>
+                        <span className={int.rateLimitRate15m > 5 ? "text-destructive font-medium" : "text-foreground"}>
+                          {int.rateLimitRate15m.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Succes (1t)</span>
+                        <span className={int.successRate1h < 95 ? "text-amber-500 font-medium" : "text-foreground"}>
+                          {int.successRate1h.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sidste sync</span>
+                        <span className="text-foreground">
+                          {int.last_sync_at ? formatDistanceToNow(new Date(int.last_sync_at), { addSuffix: true, locale: da }) : "Aldrig"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Gns. varighed</span>
+                        <span className="text-foreground">
+                          {int.avgDurationMs > 0 ? `${(int.avgDurationMs / 1000).toFixed(1)}s` : "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Provider</span>
+                        <span className="text-foreground capitalize">{int.provider}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Rate Limit Budget per Integration */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {integrationBudgets.map((pb) => (
+                <Card key={pb.provider}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      {pb.provider}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {pb.providerType} — {pb.limit1m}/min, {pb.limit60m}/time
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Burst (1 min)</span>
+                        <span className="font-medium">{pb.calls1m} / {pb.limit1m} ({pb.used1m.toFixed(0)}%)</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${pb.used1m > 80 ? "bg-destructive" : pb.used1m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                          style={{ width: `${pb.used1m}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Time (60 min)</span>
+                        <span className="font-medium">{pb.calls60m} / {pb.limit60m} ({pb.used60m.toFixed(0)}%)</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${pb.used60m > 80 ? "bg-destructive" : pb.used60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
+                          style={{ width: `${pb.used60m}%` }}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Timeline Overlap Visualization */}
+            <TimelineOverlap integrations={integrations as any} />
+
+            {/* Schedule Editor */}
+            <ScheduleEditor integrations={integrations as any} onScheduleUpdated={handleRefresh} />
+
+            {/* Recent Runs Table */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Seneste Sync Runs
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">429-rate (15m)</span>
-                  <span className={int.rateLimitRate15m > 5 ? "text-destructive font-medium" : "text-foreground"}>
-                    {int.rateLimitRate15m.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Succes (1t)</span>
-                  <span className={int.successRate1h < 95 ? "text-amber-500 font-medium" : "text-foreground"}>
-                    {int.successRate1h.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sidste sync</span>
-                  <span className="text-foreground">
-                    {int.last_sync_at ? formatDistanceToNow(new Date(int.last_sync_at), { addSuffix: true, locale: da }) : "Aldrig"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Gns. varighed</span>
-                  <span className="text-foreground">
-                    {int.avgDurationMs > 0 ? `${(int.avgDurationMs / 1000).toFixed(1)}s` : "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Provider</span>
-                  <span className="text-foreground capitalize">{int.provider}</span>
-                </div>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tid</TableHead>
+                      <TableHead>Integration</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Varighed</TableHead>
+                      <TableHead className="text-right">API</TableHead>
+                      <TableHead className="text-right">429s</TableHead>
+                      <TableHead className="text-right">Retries</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {runsTableData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          Ingen sync runs endnu.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      runsTableData.map((run: any) => (
+                        <TableRow key={run.id}>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {format(new Date(run.started_at), "dd/MM HH:mm:ss")}
+                          </TableCell>
+                          <TableCell className="text-xs font-medium">{run.integration_name}</TableCell>
+                          <TableCell>
+                            {run.status === "success" ? (
+                              <Badge variant="default" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> OK
+                              </Badge>
+                            ) : run.status === "error" ? (
+                              <Badge variant="destructive" className="text-xs">
+                                <XCircle className="h-3 w-3 mr-1" /> Fejl
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                <AlertTriangle className="h-3 w-3 mr-1" /> {run.status}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-right">{run.api_calls_made || 0}</TableCell>
+                          <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-destructive font-medium" : ""}`}>
+                            {run.rate_limit_hits || 0}
+                          </TableCell>
+                          <TableCell className={`text-xs text-right ${(run.retries || 0) > 0 ? "text-amber-500 font-medium" : ""}`}>
+                            {run.retries || 0}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
-          );
-        })}
+
+            {/* Data Health Checks */}
+            <DataHealthChecks />
+
+            {/* Audit Log with Rollback */}
+            <AuditLog
+              auditLog={auditLog}
+              integrations={integrations as any}
+              onRollback={handleRefresh}
+            />
+          </TabsContent>
+
+          {/* Tab 2: System Setup */}
+          <TabsContent value="setup" className="space-y-6">
+            <SystemArchitectureDiagram
+              integrations={integrations as any}
+              metrics={integrationMetrics}
+              budgets={integrationBudgets}
+              syncRuns={syncRuns}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <LiveCronStatus integrations={integrations as any} />
+              <WebhookActivity />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Rate Limit Budget per Integration */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {integrationBudgets.map((pb) => (
-          <Card key={pb.provider}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                {pb.provider}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground capitalize">
-                {pb.providerType} — {pb.limit1m}/min, {pb.limit60m}/time
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Burst (1 min)</span>
-                  <span className="font-medium">{pb.calls1m} / {pb.limit1m} ({pb.used1m.toFixed(0)}%)</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${pb.used1m > 80 ? "bg-destructive" : pb.used1m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
-                    style={{ width: `${pb.used1m}%` }}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Time (60 min)</span>
-                  <span className="font-medium">{pb.calls60m} / {pb.limit60m} ({pb.used60m.toFixed(0)}%)</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${pb.used60m > 80 ? "bg-destructive" : pb.used60m > 50 ? "bg-amber-500" : "bg-emerald-500"}`}
-                    style={{ width: `${pb.used60m}%` }}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Timeline Overlap Visualization */}
-      <TimelineOverlap integrations={integrations as any} />
-
-      {/* Schedule Editor */}
-      <ScheduleEditor integrations={integrations as any} onScheduleUpdated={handleRefresh} />
-
-      {/* Recent Runs Table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Seneste Sync Runs
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tid</TableHead>
-                <TableHead>Integration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Varighed</TableHead>
-                <TableHead className="text-right">API</TableHead>
-                <TableHead className="text-right">429s</TableHead>
-                <TableHead className="text-right">Retries</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {runsTableData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Ingen sync runs endnu.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                runsTableData.map((run: any) => (
-                  <TableRow key={run.id}>
-                    <TableCell className="text-xs whitespace-nowrap">
-                      {format(new Date(run.started_at), "dd/MM HH:mm:ss")}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium">{run.integration_name}</TableCell>
-                    <TableCell>
-                      {run.status === "success" ? (
-                        <Badge variant="default" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">
-                          <CheckCircle2 className="h-3 w-3 mr-1" /> OK
-                        </Badge>
-                      ) : run.status === "error" ? (
-                        <Badge variant="destructive" className="text-xs">
-                          <XCircle className="h-3 w-3 mr-1" /> Fejl
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          <AlertTriangle className="h-3 w-3 mr-1" /> {run.status}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-right">
-                      {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-right">{run.api_calls_made || 0}</TableCell>
-                    <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-destructive font-medium" : ""}`}>
-                      {run.rate_limit_hits || 0}
-                    </TableCell>
-                    <TableCell className={`text-xs text-right ${(run.retries || 0) > 0 ? "text-amber-500 font-medium" : ""}`}>
-                      {run.retries || 0}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Data Health Checks */}
-      <DataHealthChecks />
-
-      {/* Audit Log with Rollback */}
-      <AuditLog
-        auditLog={auditLog}
-        integrations={integrations as any}
-        onRollback={handleRefresh}
-      />
-    </div>
     </MainLayout>
   );
 }
