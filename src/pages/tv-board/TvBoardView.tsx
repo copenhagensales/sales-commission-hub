@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 // Import dashboard components
 import CphSalesDashboard from "@/pages/dashboards/CphSalesDashboard";
@@ -12,8 +13,7 @@ import RelatelDashboard from "@/pages/RelatelDashboard";
 import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 import UnitedDashboard from "@/pages/UnitedDashboard";
 import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
-import { Loader2 } from "lucide-react";
-// Map dashboard slugs to components
+
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
   "fieldmarketing": FieldmarketingDashboardFull,
@@ -37,13 +37,11 @@ export default function TvBoardView() {
       const storedCode = sessionStorage.getItem("tv_board_code");
       const storedSlug = sessionStorage.getItem("tv_board_slug");
 
-      // Check if user has valid session for this dashboard
       if (!storedCode || storedSlug !== slug) {
         navigate(`/tv?returnTo=${slug}`);
         return;
       }
 
-      // Verify the code is still valid
       const { data, error } = await supabase
         .from("tv_board_access")
         .select("id, dashboard_slug, is_active")
@@ -65,25 +63,17 @@ export default function TvBoardView() {
     verifyAccess();
   }, [slug, navigate]);
 
-  // Auto-refresh queries every 30 seconds (instead of full page reload)
+  // Auto-refresh queries every 30 seconds
   useEffect(() => {
     if (!isVerified) return;
-
-    const interval = setInterval(() => {
-      // Invalidate all queries to trigger fresh data fetch
-      queryClient.invalidateQueries();
-    }, 30000);
-
+    const interval = setInterval(() => queryClient.invalidateQueries(), 30000);
     return () => clearInterval(interval);
   }, [isVerified, queryClient]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-slate-400">Indlæser dashboard...</p>
-        </div>
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
       </div>
     );
   }
@@ -95,7 +85,7 @@ export default function TvBoardView() {
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Dashboard ikke fundet</h1>
-          <p className="text-slate-400">Dashboardet "{slug}" findes ikke.</p>
+          <p className="text-slate-400">"{slug}" findes ikke.</p>
         </div>
       </div>
     );
@@ -103,15 +93,7 @@ export default function TvBoardView() {
 
   return (
     <div className="tv-board-wrapper min-h-screen">
-      {/* Hide cursor after inactivity for cleaner TV display */}
-      <style>{`
-        .tv-board-wrapper {
-          cursor: none;
-        }
-        .tv-board-wrapper:hover {
-          cursor: default;
-        }
-      `}</style>
+      <style>{`.tv-board-wrapper { cursor: none; } .tv-board-wrapper:hover { cursor: default; }`}</style>
       <DashboardComponent />
     </div>
   );
