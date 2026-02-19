@@ -43,6 +43,18 @@ select net.http_post(
 
 > For ikke-ASE integrationer kan `days` sættes til 1.
 
+
+## Lovablecph hotfix: split cron payload
+For Lovablecph oprettes nu to separate dialer-jobs via `update-cron-schedule`:
+
+1. `dialer-<id>-sync-sales` (primær frekvens, typisk hver 5. min)
+   - payload: `actions=["sales"]`
+   - inkluderer `maxRecords` fra `dialer_integrations.config.sales_max_records` (default 20)
+2. `dialer-<id>-sync-meta` (default hver 30. min eller `config.meta_sync_schedule`)
+   - payload: `actions=["campaigns","users","sessions"]`
+
+Dette reducerer timeout-risiko for sales-sync markant, fordi lead-enrichment ikke konkurrerer med campaigns/users/sessions i samme edge-kald.
+
 ## Verifikation (24-48 timer)
 Overvåg følgende pr. integration:
 - 429-rate i edge function logs (`integration-engine` / Adversus calls)

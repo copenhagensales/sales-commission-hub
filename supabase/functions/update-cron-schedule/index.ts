@@ -58,6 +58,94 @@ const getSyncDays = (integrationName?: string | null, config?: Record<string, un
   return 1;
 };
 
+type DialerJobConfig = {
+  jobName: string;
+  schedule: string;
+  payload: Record<string, unknown>;
+};
+
+const getNumberConfig = (
+  config: Record<string, unknown> | null | undefined,
+  key: string,
+): number | undefined => {
+  const value = config?.[key];
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  return undefined;
+};
+
+const getMetaSyncSchedule = (
+  integrationName?: string | null,
+  config?: Record<string, unknown> | null,
+): string | null => {
+  const configured = config?.meta_sync_schedule;
+  if (typeof configured === "string" && configured.trim()) {
+    return configured.trim();
+  }
+
+  if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
+    return "*/30 * * * *";
+  }
+
+  return null;
+};
+
+const buildDialerJobs = (
+  integrationId: string,
+  provider: string,
+  integrationName?: string | null,
+  config?: Record<string, unknown> | null,
+  frequencyMinutes?: number | null,
+  primarySchedule?: string | null,
+): DialerJobConfig[] => {
+  const normalizedName = (integrationName || "").trim().toLowerCase();
+  const syncDays = getSyncDays(integrationName, config);
+
+  if (normalizedName === "lovablecph") {
+    const salesMaxRecords = getNumberConfig(config, "sales_max_records") ?? 20;
+    const salesSchedule = primarySchedule || frequencyToCron[frequencyMinutes || 5] || "*/5 * * * *";
+    const metaSchedule = getMetaSyncSchedule(integrationName, config) || "*/30 * * * *";
+
+    return [
+      {
+        jobName: `dialer-${integrationId.slice(0, 8)}-sync-sales`,
+        schedule: salesSchedule,
+        payload: {
+          source: provider,
+          integration_id: integrationId,
+          actions: ["sales"],
+          days: syncDays,
+          maxRecords: salesMaxRecords,
+        },
+      },
+      {
+        jobName: `dialer-${integrationId.slice(0, 8)}-sync-meta`,
+        schedule: metaSchedule,
+        payload: {
+          source: provider,
+          integration_id: integrationId,
+          actions: ["campaigns", "users", "sessions"],
+          days: syncDays,
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      jobName: `dialer-${integrationId.slice(0, 8)}-sync`,
+      schedule: primarySchedule || frequencyToCron[frequencyMinutes || 5] || "*/5 * * * *",
+      payload: {
+        source: provider,
+        integration_id: integrationId,
+        actions: ["campaigns", "users", "sales", "sessions"],
+        days: syncDays,
+      },
+    },
+  ];
+};
+
 async function insertAuditEntry(
   supabase: any,
   integrationId: string,
@@ -101,6 +189,7 @@ Deno.serve(async (req) => {
     let jobName: string;
     let functionName: string;
     let payload: object;
+    let dialerJobConfigs: DialerJobConfig[] = [];
     let integrationMetadata: { name?: string; config?: Record<string, unknown> | null } | null = null;
     let previousSchedule: string | null = null;
 
@@ -140,13 +229,21 @@ Deno.serve(async (req) => {
         console.warn(`[update-cron-schedule] Could not load integration metadata for ${integration_id}: ${integrationLookupError.message}`);
       }
 
-      const syncDays = getSyncDays(integrationMetadata?.name, integrationMetadata?.config);
+      const dialerSchedule = getDialerSchedule(integrationMetadata?.name, integrationMetadata?.config, frequency_minutes);
+      dialerJobConfigs = buildDialerJobs(
+        integration_id,
+        provider || "adversus",
+        integrationMetadata?.name,
+        integrationMetadata?.config,
+        frequency_minutes,
+        dialerSchedule,
+      );
 
-      payload = { 
-        source: provider || "adversus", 
-        integration_id, 
-        actions: ["campaigns", "users", "sales", "sessions"], 
-        days: syncDays 
+      payload = dialerJobConfigs[0]?.payload || {
+        source: provider || "adversus",
+        integration_id,
+        actions: ["campaigns", "users", "sales", "sessions"],
+        days: 1,
       };
     } else {
       const typeToFunction: Record<string, string> = {
@@ -170,18 +267,28 @@ Deno.serve(async (req) => {
 
     console.log(`[update-cron-schedule] jobName=${jobName}, function=${functionName}`);
 
-    // Unschedule existing job
-    try {
-      const { error: unscheduleError } = await supabase.rpc("unschedule_integration_sync", { 
-        p_job_name: jobName 
-      });
-      if (unscheduleError) {
-        console.log(`Could not unschedule existing job (may not exist): ${unscheduleError.message}`);
-      } else {
-        console.log(`Unscheduled existing job: ${jobName}`);
+    // Unschedule existing job(s)
+    const jobsToUnschedule = integration_type === "dialer" && integration_id
+      ? [
+          `dialer-${integration_id.slice(0, 8)}-sync`,
+          `dialer-${integration_id.slice(0, 8)}-sync-sales`,
+          `dialer-${integration_id.slice(0, 8)}-sync-meta`,
+        ]
+      : [jobName];
+
+    for (const candidateJobName of jobsToUnschedule) {
+      try {
+        const { error: unscheduleError } = await supabase.rpc("unschedule_integration_sync", {
+          p_job_name: candidateJobName,
+        });
+        if (unscheduleError) {
+          console.log(`Could not unschedule existing job (may not exist): ${candidateJobName} -> ${unscheduleError.message}`);
+        } else {
+          console.log(`Unscheduled existing job: ${candidateJobName}`);
+        }
+      } catch (_e) {
+        console.log(`No existing job to unschedule: ${candidateJobName}`);
       }
-    } catch (e) {
-      console.log(`No existing job to unschedule: ${jobName}`);
     }
 
     const dialerSchedule = integration_type === "dialer"
@@ -191,23 +298,35 @@ Deno.serve(async (req) => {
     if (is_active && (custom_schedule || dialerSchedule || (frequency_minutes && frequencyToCron[frequency_minutes]))) {
       const cronExpression = custom_schedule || dialerSchedule || frequencyToCron[frequency_minutes];
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-      
-      console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);
+      const jobsToSchedule = integration_type === "dialer"
+        ? dialerJobConfigs.map((job, index) => {
+            if (index === 0 && custom_schedule) {
+              return { ...job, schedule: custom_schedule };
+            }
+            return job;
+          })
+        : [{ jobName, schedule: cronExpression, payload }];
 
-      const { data: scheduleData, error: scheduleError } = await supabase.rpc("schedule_integration_sync", {
-        p_job_name: jobName,
-        p_schedule: cronExpression,
-        p_function_url: functionUrl,
-        p_anon_key: anonKey,
-        p_payload: payload,
-      });
+      const scheduledJobs: Array<{ jobName: string; schedule: string; jobId: unknown }> = [];
+      for (const jobConfig of jobsToSchedule) {
+        console.log(`[update-cron-schedule] Scheduling: ${jobConfig.jobName} @ ${jobConfig.schedule} -> ${functionUrl}`);
 
-      if (scheduleError) {
-        console.error("Error scheduling cron job via RPC:", scheduleError);
-        throw new Error(`Failed to schedule cron job: ${scheduleError.message}`);
+        const { data: scheduleData, error: scheduleError } = await supabase.rpc("schedule_integration_sync", {
+          p_job_name: jobConfig.jobName,
+          p_schedule: jobConfig.schedule,
+          p_function_url: functionUrl,
+          p_anon_key: anonKey,
+          p_payload: jobConfig.payload,
+        });
+
+        if (scheduleError) {
+          console.error("Error scheduling cron job via RPC:", scheduleError);
+          throw new Error(`Failed to schedule cron job ${jobConfig.jobName}: ${scheduleError.message}`);
+        }
+
+        scheduledJobs.push({ jobName: jobConfig.jobName, schedule: jobConfig.schedule, jobId: scheduleData });
+        console.log(`Scheduled new cron job: ${jobConfig.jobName} with schedule: ${jobConfig.schedule}, jobId: ${scheduleData}`);
       }
-
-      console.log(`Scheduled new cron job: ${jobName} with schedule: ${cronExpression}, jobId: ${scheduleData}`);
 
       // Persist schedule to integration config
       if (integration_type === "dialer" && integration_id) {
@@ -246,7 +365,7 @@ Deno.serve(async (req) => {
           message: `Cron job updated: ${jobName}`,
           schedule: cronExpression,
           function: functionName,
-          jobId: scheduleData,
+          jobs: scheduledJobs,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
