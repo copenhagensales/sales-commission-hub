@@ -713,16 +713,7 @@ export default function Auth() {
           </div>
         )}
 
-        {/* Connection Status */}
-
-        {connectionStatus === 'connected' && (
-          <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3">
-            <div className="flex items-center gap-2 text-green-600">
-              <Wifi className="h-4 w-4" />
-              <span className="text-sm font-medium">Forbundet til server</span>
-            </div>
-          </div>
-        )}
+        {/* Connection Status - hidden */}
 
         {connectionStatus === 'checking' && (
           <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
