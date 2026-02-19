@@ -1,28 +1,26 @@
 
-
-# Ensret Relatel Dashboard og TV-skærm visning
+# Tilfoej manglende parent-child grupper i Permission Editor
 
 ## Problem
 
-Relatel dashboardet viser **Salg**, **Switch** og **Provision** kolonner i leaderboard-tabellerne, men TV-skærmen skjuler Switch-kolonnen. Dette skyldes at `showCrossSales` er sat til `{!tvMode}` -- altsaa kun synlig naar man IKKE er i TV-tilstand.
+`permissionKeys.ts` definerer at `menu_cancellations` har 3 child-faner (`tab_cancellations_manual`, `tab_cancellations_upload`, `tab_cancellations_duplicates`), men `PERMISSION_GROUPS` i `permissionGroups.ts` inkluderer ikke denne gruppe. Derfor viser rettighedseditoren ikke fanerne som en udvidbar gruppe, og de kan ikke redigeres individuelt.
 
 ## Loesning
 
-Aendr `showCrossSales` fra `{!tvMode}` til `{true}` paa alle tre `TvLeaderboardTable`-komponenter i `RelatelDashboard.tsx`, saa Switch-kolonnen altid vises -- baade paa det normale board og paa TV-skaermen.
+Tilfoej `menu_cancellations` til `PERMISSION_GROUPS` i `permissionGroups.ts` saa fanerne vises korrekt under "Annulleringer" som en collapsible gruppe med individuelle toggles.
 
 ## Tekniske detaljer
 
-**Fil:** `src/pages/RelatelDashboard.tsx`
+**Fil:** `src/components/employees/permissions/permissionGroups.ts`
 
-Tre steder (linje 243, 250, 257) aendres:
+Tilfoej foelgende entry til `PERMISSION_GROUPS` objektet (efter den eksisterende `menu_fm_overview` entry):
 
-```
-showCrossSales={!tvMode}
-```
-til:
-```
-showCrossSales={true}
+```typescript
+// Annulleringer tabs
+'menu_cancellations': {
+  label: 'Annulleringer',
+  children: ['tab_cancellations_manual', 'tab_cancellations_upload', 'tab_cancellations_duplicates']
+},
 ```
 
-`TvDashboardComponents.tsx` behoever ingen aendringer -- den understotter allerede `showCrossSales` i TV-mode med korrekt styling.
-
+Ingen andre filer behoever aendring -- `PermissionRowWithChildren` og `buildCategoryTree` bruger allerede `PERMISSION_GROUPS` til at opdage og vise parent-child relationer.
