@@ -309,23 +309,6 @@ Deno.serve(async (req) => {
     );
     console.log(`Found ${sales.length} sales with items`);
 
-    // Fetch fieldmarketing sales for today from unified sales table
-    // NOTE: We now use the sales table with source='fieldmarketing'
-    const fmSales = await fetchAllSales(
-      supabase,
-      `
-        id,
-        client_campaign_id,
-        agent_name,
-        sale_datetime
-      `,
-      startOfDay,
-      endOfDay,
-      undefined,
-      (q) => q.eq("source", "fieldmarketing")
-    );
-    console.log(`Found ${fmSales.length} fieldmarketing sales`);
-
     // Fetch all clients with logo_url
     const { data: allClients } = await supabase
       .from("clients")
@@ -357,6 +340,7 @@ Deno.serve(async (req) => {
     );
 
     // Calculate sales by client and track sellers with sales (for sellersOnBoard count)
+    // NOTE: FM sales now have sale_items via trigger, so all sources are processed uniformly
     const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
     const sellersWithSales = new Set<string>();
     let totalCountedSales = 0;
@@ -384,7 +368,7 @@ Deno.serve(async (req) => {
         clientName = clientMap[clientId] || "Ukendt";
       }
 
-      // Count sale items
+      // Count sale items (unified for TM + FM)
       let saleItemCount = 0;
       let saleCommission = 0;
       const saleItems = (sale as any).sale_items || [];
@@ -427,33 +411,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Process fieldmarketing sales and add to salesByClient
-    // NOTE: FM sales don't have sale_items relation, so each FM sale counts as 1
-    for (const fmSale of fmSales) {
-      // Resolve client via client_campaign_id -> campaignToClientMap -> clientMap
-      let clientName = "Ukendt FM";
-      if (fmSale.client_campaign_id) {
-        const resolvedClientId = campaignToClientMap[fmSale.client_campaign_id];
-        if (resolvedClientId) {
-          clientName = clientMap[resolvedClientId] || "Ukendt FM";
-        }
-      }
-
-      // FM salg tælles som 1 (ingen sale_items relation)
-      if (!salesByClient[clientName]) {
-        salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
-      }
-      salesByClient[clientName].count += 1;
-      totalCountedSales += 1;
-
-      // Track FM seller for sellersOnBoard count
-      if (fmSale.agent_name) {
-        sellersWithSales.add(fmSale.agent_name.toLowerCase());
-      }
-    }
-
-    console.log(`Sales by client (incl. FM):`, salesByClient);
-    console.log(`Total counted sales (incl. FM): ${totalCountedSales}`);
+    console.log(`Sales by client:`, salesByClient);
+    console.log(`Total counted sales: ${totalCountedSales}`);
     console.log(`Sellers on board: ${sellersWithSales.size}`);
 
     // ============= TOP SELLERS FROM CACHED LEADERBOARD =============
@@ -2209,7 +2168,7 @@ async function handleCsTop20Data(
   corsHeaders: Record<string, string>,
   cacheKey?: string
 ) {
-  console.log("[CsTop20Data] Fetching data for all clients (telesales + fieldmarketing)");
+  console.log("[CsTop20Data] Fetching data for all sellers (unified via sale_items)");
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -2231,113 +2190,19 @@ async function handleCsTop20Data(
   }
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
+  // All sales (TM + FM) now have sale_items with mapped_commission via triggers
   const selectFields = "id, agent_email, sale_datetime, sale_items(quantity, mapped_commission, products(counts_as_sale))";
 
-  // ============= FM PRICING MAP (Unified Pricing Service) =============
-  // Implements two-tier fallback: product_pricing_rules -> products.commission_dkk
-  // This ensures FM products (like Yousee) that don't have pricing rules still get their pricing
-  const fmPricingMap = new Map<string, number>();
-  
-  // 1. Load ALL products with base prices FIRST (fallback)
-  const { data: allProducts } = await supabase
-    .from("products")
-    .select("id, name, commission_dkk");
-
-  for (const product of allProducts || []) {
-    const key = product.name?.toLowerCase();
-    if (key && product.commission_dkk !== null) {
-      fmPricingMap.set(key, product.commission_dkk || 0);
-    }
-  }
-  console.log(`[CsTop20Data] Loaded ${fmPricingMap.size} products with base prices`);
-
-  // 2. Override with active pricing rules (higher priority)
-  const { data: pricingRules } = await supabase
-    .from("product_pricing_rules")
-    .select(`product:products!inner(name), commission_dkk, priority`)
-    .eq("is_active", true)
-    .order("priority", { ascending: false, nullsFirst: true });
-
-  const rulesApplied = new Set<string>();
-  for (const rule of pricingRules || []) {
-    const key = (rule.product as any)?.name?.toLowerCase();
-    if (key && !rulesApplied.has(key)) {
-      fmPricingMap.set(key, rule.commission_dkk || 0);
-      rulesApplied.add(key);
-    }
-  }
-  console.log(`[CsTop20Data] Applied ${rulesApplied.size} pricing rules. Final map size: ${fmPricingMap.size}`);
-
-
-  // ============= FETCH FM EMPLOYEE DATA =============
-  // Get all FM employees (seller_id -> employee data)
-  const { data: fmEmployees } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name, avatar_url")
-    .eq("is_active", true);
-  
-  const fmEmployeeMap = new Map<string, { name: string; avatarUrl: string | null }>();
-  for (const emp of fmEmployees || []) {
-    const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
-    fmEmployeeMap.set(emp.id, { name: fullName, avatarUrl: emp.avatar_url });
-  }
-
-  // Get team memberships for FM employees
-  const fmEmployeeIds = Array.from(fmEmployeeMap.keys());
-  const { data: fmTeamMembers } = await supabase
-    .from("team_members")
-    .select("employee_id, teams(name)")
-    .in("employee_id", fmEmployeeIds);
-  
-  const fmEmployeeTeams: Record<string, string> = {};
-  for (const tm of fmTeamMembers || []) {
-    const teamName = (tm.teams as any)?.name;
-    if (teamName && tm.employee_id) {
-      fmEmployeeTeams[tm.employee_id] = teamName;
-    }
-  }
-
-  // ============= FETCH FM SALES (from unified sales table) =============
-  // Fetch FM sales for all three periods (paginated for growth safety)
-  const [fmSalesToday, fmSalesWeek, fmSalesPayroll] = await Promise.all([
-    fetchAllSales(
-      supabase,
-      "id, agent_name, normalized_data, sale_datetime",
-      `${todayStr}T00:00:00`,
-      `${todayStr}T23:59:59`,
-      undefined,
-      (q) => q.eq("source", "fieldmarketing")
-    ),
-    fetchAllSales(
-      supabase,
-      "id, agent_name, normalized_data, sale_datetime",
-      `${weekStartStr}T00:00:00`,
-      `${todayStr}T23:59:59`,
-      undefined,
-      (q) => q.eq("source", "fieldmarketing")
-    ),
-    fetchAllSales(
-      supabase,
-      "id, agent_name, normalized_data, sale_datetime",
-      `${payrollStartStr}T00:00:00`,
-      `${todayStr}T23:59:59`,
-      undefined,
-      (q) => q.eq("source", "fieldmarketing")
-    ),
-  ]);
-
-  console.log(`[CsTop20Data] FM sales: today=${(fmSalesToday || []).length}, week=${(fmSalesWeek || []).length}, payroll=${(fmSalesPayroll || []).length}`);
-
-  // Fetch telesales for all periods with shared paginated helper
+  // Fetch sales for all periods (unified - includes both TM and FM)
   const [salesToday, salesWeek, salesPayroll] = await Promise.all([
     fetchAllSales(supabase, selectFields, `${todayStr}T00:00:00`, `${todayStr}T23:59:59`),
     fetchAllSales(supabase, selectFields, `${weekStartStr}T00:00:00`, `${todayStr}T23:59:59`),
     fetchAllSales(supabase, selectFields, `${payrollStartStr}T00:00:00`, `${todayStr}T23:59:59`),
   ]);
 
-  console.log(`[CsTop20Data] Telesales: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesPayroll.length}`);
+  console.log(`[CsTop20Data] Sales: today=${salesToday.length}, week=${salesWeek.length}, payroll=${salesPayroll.length}`);
 
-  // Get unique agent emails from all telesales
+  // Get unique agent emails from all sales
   const allAgentEmails = new Set<string>();
   [...salesToday, ...salesWeek, ...salesPayroll].forEach((sale: any) => {
     if (sale.agent_email) {
@@ -2446,11 +2311,11 @@ async function handleCsTop20Data(
     console.log("[CsTop20Data] Fetched teams for", Object.keys(employeeTeams).length, "employees");
   }
 
-  // Calculate totals and seller stats from telesales
-  const calculateTelesalesTotals = (sales: any[]) => {
+  // Calculate totals and seller stats (unified for all sources)
+  const calculateSalesTotals = (sales: any[]) => {
     let totalSales = 0;
     let totalCommission = 0;
-    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; isFieldmarketing?: boolean }> = {};
+    const sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }> = {};
 
     sales?.forEach((sale) => {
       const agentEmail = sale.agent_email || "Unknown";
@@ -2465,7 +2330,6 @@ async function handleCsTop20Data(
           commission: 0,
           avatarUrl: emailToAvatarMap.get(emailLower),
           employeeId: emailToIdMap.get(emailLower),
-          isFieldmarketing: false
         };
       }
 
@@ -2483,58 +2347,18 @@ async function handleCsTop20Data(
     return { totalSales, totalCommission, sellerStats };
   };
 
-  // Add FM sales to seller stats
-  const addFmSalesToStats = (
-    sellerStats: Record<string, { email: string; name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; isFieldmarketing?: boolean }>,
-    fmSales: any[]
-  ) => {
-    for (const sale of fmSales || []) {
-      const sellerId = sale.seller_id;
-      if (!sellerId) continue;
-      
-      const empData = fmEmployeeMap.get(sellerId);
-      if (!empData) continue;
-      
-      // Use employee ID as key for FM sellers (they don't have email-based sales)
-      const key = `fm_${sellerId}`;
-      
-      if (!sellerStats[key]) {
-        sellerStats[key] = {
-          email: '',
-          name: empData.name,
-          sales: 0,
-          commission: 0,
-          avatarUrl: empData.avatarUrl || undefined,
-          employeeId: sellerId,
-          isFieldmarketing: true
-        };
-      }
-      
-      // Add the sale
-      sellerStats[key].sales += 1;
-      const commission = fmPricingMap.get(sale.product_name?.toLowerCase()) || 0;
-      sellerStats[key].commission += commission;
-    }
-  };
-
-  const todayData = calculateTelesalesTotals(salesToday);
-  const weekData = calculateTelesalesTotals(salesWeek);
-  const payrollData = calculateTelesalesTotals(salesPayroll);
-
-  // Add FM sales to each period
-  addFmSalesToStats(todayData.sellerStats, fmSalesToday);
-  addFmSalesToStats(weekData.sellerStats, fmSalesWeek);
-  addFmSalesToStats(payrollData.sellerStats, fmSalesPayroll);
+  const todayData = calculateSalesTotals(salesToday);
+  const weekData = calculateSalesTotals(salesWeek);
+  const payrollData = calculateSalesTotals(salesPayroll);
 
   // Build sorted seller arrays for each period with goal and team info - TOP 20
-  // Combines both telesales and fieldmarketing sellers
-  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string; isFieldmarketing?: boolean }>) => {
+  const buildSellerArray = (sellerStats: Record<string, { name: string; sales: number; commission: number; avatarUrl?: string; employeeId?: string }>) => {
     return Object.values(sellerStats)
       .filter(s => s.sales > 0)
       .map(s => ({
         ...s,
         goalTarget: s.employeeId ? employeeGoals[s.employeeId] || null : null,
-        teamName: s.employeeId ? (employeeTeams[s.employeeId] || fmEmployeeTeams[s.employeeId] || null) : null
+        teamName: s.employeeId ? (employeeTeams[s.employeeId] || null) : null
       }))
       .sort((a, b) => b.commission - a.commission)
       .slice(0, 20);
@@ -2544,7 +2368,7 @@ async function handleCsTop20Data(
   const sellersWeek = buildSellerArray(weekData.sellerStats);
   const sellersPayroll = buildSellerArray(payrollData.sellerStats);
 
-  console.log(`[CsTop20Data] Combined rankings - FM sellers in payroll: ${Object.keys(payrollData.sellerStats).filter(k => k.startsWith('fm_')).length}`);
+  console.log(`[CsTop20Data] Seller counts - today: ${sellersToday.length}, payroll: ${sellersPayroll.length}`);
 
   const result = {
     sellersToday,
