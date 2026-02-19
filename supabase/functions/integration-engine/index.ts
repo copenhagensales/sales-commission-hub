@@ -5,6 +5,7 @@ import { fetchSampleFields } from "./actions/fetch-sample-fields.ts";
 import { repairHistory } from "./actions/repair-history.ts";
 import { syncIntegration } from "./actions/sync-integration.ts";
 import { makeLogger } from "./utils/index.ts";
+import { smartBackfill } from "./actions/smart-backfill.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -69,6 +70,32 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Handle smart backfill action
+    if (action === "backfill") {
+      const effectiveIntegrationId = integrationId || integration_id;
+      if (!effectiveIntegrationId) {
+        return new Response(JSON.stringify({ success: false, error: "integration_id is required for backfill" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (background) {
+        EdgeRuntime.waitUntil(smartBackfill(supabase, effectiveIntegrationId, log));
+        return new Response(JSON.stringify({
+          success: true,
+          action: "backfill",
+          background: true,
+          message: "Started background backfill. Check logs for progress.",
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const result = await smartBackfill(supabase, effectiveIntegrationId, log);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Initialize engine and fetch campaign mappings
