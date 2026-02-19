@@ -168,7 +168,7 @@ export class AdversusAdapter implements DialerAdapter {
     return sales;
   }
 
-  async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
+  async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -185,12 +185,18 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
 
     // Fetch secuencial con pageSize grande (1000) - más estable que paralelo
-    const rawSales = await this.fetchSalesSequential(filterStr);
+    let rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales`);
 
-    console.log(`[Adversus] Fetched ${rawSales.length} sales, now building lead data map from leads...`);
+    // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
+    if (maxRecords && rawSales.length > maxRecords) {
+      rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      rawSales = rawSales.slice(0, maxRecords);
+      console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords})`);
+    }
 
-    // NUEVA ESTRATEGIA: Obtener todos los resultFields desde /leads con filtros por campaña
+    console.log(`[Adversus] Building lead data map from ${rawSales.length} leads...`);
+
     const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
 
@@ -323,7 +329,7 @@ export class AdversusAdapter implements DialerAdapter {
 
     return validSales;
   }
-  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
+  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]> {
     const hasTimeFrom = range.from.includes("T")
     const hasTimeTo = range.to.includes("T")
     const fromDate = new Date(range.from)
@@ -339,8 +345,16 @@ export class AdversusAdapter implements DialerAdapter {
     const userMap = new Map<string, StandardUser>();
     users.forEach(u => userMap.set(u.externalId, u));
     console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
-    const rawSales = await this.fetchSalesSequential(filterStr);
+    let rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales (range)`);
+
+    // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
+    if (maxRecords && rawSales.length > maxRecords) {
+      rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      rawSales = rawSales.slice(0, maxRecords);
+      console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords})`);
+    }
+
     const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
     // Valid email domains for syncing (same as fetchSales)

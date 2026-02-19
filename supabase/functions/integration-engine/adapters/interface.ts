@@ -8,8 +8,8 @@ export interface ApiMetrics {
 
 export interface DialerAdapter {
   // Campaign mappings are passed to fetchSales so the adapter can extract external references
-  fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]>;
-  fetchSalesRange?(range: DateRange, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]>;
+  fetchSales(days: number, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]>;
+  fetchSalesRange?(range: DateRange, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]>;
   fetchUsers(): Promise<StandardUser[]>;
   fetchCampaigns(): Promise<StandardCampaign[]>;
   fetchProducts?(): Promise<StandardProduct[]>;
