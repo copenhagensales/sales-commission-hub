@@ -36,6 +36,11 @@ export const PERMISSION_GROUPS: Record<string, { label: string; children: string
   'menu_fm_overview': {
     label: 'FM Oversigt',
     children: ['tab_fm_eesy', 'tab_fm_yousee']
+  },
+  // Annulleringer tabs
+  'menu_cancellations': {
+    label: 'Annulleringer',
+    children: ['tab_cancellations_manual', 'tab_cancellations_upload', 'tab_cancellations_duplicates']
   }
 };
 
