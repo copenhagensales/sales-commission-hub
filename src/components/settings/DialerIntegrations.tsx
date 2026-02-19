@@ -1629,55 +1629,20 @@ export function DialerIntegrations() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={String(integration.sync_frequency_minutes || "0")}
-                            onValueChange={async (value) => {
-                              const freq = parseInt(value);
-                              try {
-                                await supabase
-                                  .from("dialer_integrations")
-                                  .update({ 
-                                    sync_frequency_minutes: freq || null,
-                                    is_active: freq > 0
-                                  })
-                                  .eq("id", integration.id);
-                                
-                                await supabase.functions.invoke("update-cron-schedule", {
-                                  body: {
-                                    integration_type: "dialer",
-                                    integration_id: integration.id,
-                                    provider: integration.provider,
-                                    frequency_minutes: freq,
-                                    is_active: freq > 0,
-                                  },
-                                });
-                                
-                                toast.success(freq > 0 ? t("dialerIntegrations.autoSyncSet", { minutes: freq }) : t("dialerIntegrations.autoSyncDisabled"));
-                                queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
-                              } catch (err) {
-                                toast.error(t("dialerIntegrations.syncFrequencyError"));
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="w-[130px] h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">{t("dialerIntegrations.disabled")}</SelectItem>
-                              <SelectItem value="5">{t("dialerIntegrations.every5min")}</SelectItem>
-                              <SelectItem value="15">{t("dialerIntegrations.every15min")}</SelectItem>
-                              <SelectItem value="30">{t("dialerIntegrations.every30min")}</SelectItem>
-                              <SelectItem value="60">{t("dialerIntegrations.everyHour")}</SelectItem>
-                              <SelectItem value="120">{t("dialerIntegrations.every2hours")}</SelectItem>
-                              <SelectItem value="360">{t("dialerIntegrations.every6hours")}</SelectItem>
-                              <SelectItem value="720">{t("dialerIntegrations.every12hours")}</SelectItem>
-                              <SelectItem value="1440">{t("dialerIntegrations.daily")}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
-                            {integration.is_active && integration.sync_frequency_minutes ? t("dialerIntegrations.active") : t("dialerIntegrations.manual")}
-                          </Badge>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                              {integration.sync_frequency_minutes
+                                ? `Hvert ${integration.sync_frequency_minutes} min`
+                                : "Deaktiveret"}
+                            </span>
+                            <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
+                              {integration.is_active && integration.sync_frequency_minutes ? t("dialerIntegrations.active") : t("dialerIntegrations.manual")}
+                            </Badge>
+                          </div>
+                          <a href="/system-stability" className="text-xs text-primary hover:underline">
+                            Ændr i Systemstabilitet
+                          </a>
                         </div>
                       </TableCell>
                       <TableCell>
