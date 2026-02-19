@@ -101,7 +101,11 @@ export class EnreachAdapter implements DialerAdapter {
     const url = `${this.baseUrl}/projects`;
     console.log(`[EnreachAdapter] Fetching accessible projects: ${url}`);
     try {
+      this._metrics.apiCalls++;
       const res = await fetch(url, { headers: this.headers });
+      if (res.status === 429) {
+        this._metrics.rateLimitHits++;
+      }
       if (!res.ok) {
         console.warn(`[EnreachAdapter] /projects returned ${res.status}`);
         return [];
@@ -147,15 +151,35 @@ export class EnreachAdapter implements DialerAdapter {
 
   private async get(endpoint: string): Promise<unknown> {
     const url = `${this.baseUrl}${endpoint}`;
-    const response = await fetch(url, { method: "GET", headers: this.headers });
+    const maxRetries = 3;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[EnreachAdapter] API Error ${response.status}: ${errorText.substring(0, 200)}`);
-      throw new Error(`Enreach API error: ${response.status}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      this._metrics.apiCalls++;
+
+      const response = await fetch(url, { method: "GET", headers: this.headers });
+
+      if (response.status === 429) {
+        this._metrics.rateLimitHits++;
+        if (attempt < maxRetries) {
+          this._metrics.retries++;
+          const retryAfter = parseInt(response.headers.get("Retry-After") || "5", 10);
+          const delay = Math.min(retryAfter * 1000, 30000);
+          console.warn(`[EnreachAdapter] 429 Rate limited on ${endpoint}. Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[EnreachAdapter] API Error ${response.status}: ${errorText.substring(0, 200)}`);
+        throw new Error(`Enreach API error: ${response.status}`);
+      }
+
+      return response.json();
     }
 
-    return response.json();
+    throw new Error(`Enreach API error: max retries exceeded for ${endpoint}`);
   }
 
   // Helper para procesar páginas una por una SIN acumular todo en memoria
