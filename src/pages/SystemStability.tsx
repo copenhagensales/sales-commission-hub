@@ -17,6 +17,7 @@ import { AlertBanner } from "@/components/system-stability/AlertBanner";
 import { SystemArchitectureDiagram } from "@/components/system-stability/SystemArchitectureDiagram";
 import { LiveCronStatus } from "@/components/system-stability/LiveCronStatus";
 import { WebhookActivity } from "@/components/system-stability/WebhookActivity";
+import { SystemStatusMap } from "@/components/system-stability/SystemStatusMap";
 import { useStabilityAlerts, type ProviderBudget } from "@/hooks/useStabilityAlerts";
 import { MainLayout } from "@/components/layout/MainLayout";
 
@@ -263,6 +264,7 @@ export default function SystemStability() {
           <TabsList>
             <TabsTrigger value="stability">Systemstabilitet</TabsTrigger>
             <TabsTrigger value="setup">System Opsætning</TabsTrigger>
+            <TabsTrigger value="map">System Kort</TabsTrigger>
           </TabsList>
 
           {/* Tab 1: Existing stability content */}
@@ -458,6 +460,16 @@ export default function SystemStability() {
               <LiveCronStatus integrations={integrations as any} />
               <WebhookActivity />
             </div>
+          </TabsContent>
+
+          {/* Tab 3: System Map */}
+          <TabsContent value="map" className="space-y-6">
+            <SystemStatusMap
+              integrations={integrations as any}
+              metrics={integrationMetrics}
+              budgets={integrationBudgets}
+              syncRuns={syncRuns}
+            />
           </TabsContent>
         </Tabs>
       </div>
