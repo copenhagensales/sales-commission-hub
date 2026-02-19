@@ -13,6 +13,7 @@ import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
 import { AuditLog } from "@/components/system-stability/AuditLog";
 import { AlertBanner } from "@/components/system-stability/AlertBanner";
 import { useStabilityAlerts, type ProviderBudget } from "@/hooks/useStabilityAlerts";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 interface SyncRun {
   id: string;
@@ -232,7 +233,8 @@ export default function SystemStability() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <MainLayout>
+    <div className="container mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -422,5 +424,6 @@ export default function SystemStability() {
         onRollback={handleRefresh}
       />
     </div>
+    </MainLayout>
   );
 }
