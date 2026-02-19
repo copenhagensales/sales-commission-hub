@@ -12,30 +12,8 @@ import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from 
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
-
-// Calculate payroll period (15th to 14th)
-function calculatePayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  if (currentDay >= 15) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 15);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    return { start, end };
-  } else {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const end = new Date(today.getFullYear(), today.getMonth(), 14);
-    return { start, end };
-  }
-}
-
-const getDisplayName = (name: string) => {
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return name;
-};
+import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { getDisplayName } from "@/utils/formatting";
 
 export default function EesyTmDashboard() {
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm");

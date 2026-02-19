@@ -4,7 +4,6 @@ import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatNumber } from "@/lib/calculations";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { getClientId } from "@/utils/clientIds";
@@ -13,31 +12,8 @@ import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from 
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
-
-// Calculate payroll period (15th to 14th)
-function calculatePayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  if (currentDay >= 15) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 15);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    return { start, end };
-  } else {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const end = new Date(today.getFullYear(), today.getMonth(), 14);
-    return { start, end };
-  }
-}
-
-// Format name for display: "Kasper M" (first name + last initial)
-const getDisplayName = (name: string) => {
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return name;
-};
+import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { getDisplayName } from "@/utils/formatting";
 
 export default function TdcErhvervDashboard() {
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("tdc-erhverv");

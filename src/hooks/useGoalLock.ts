@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
 
 interface PayrollPeriod {
   start: Date;
@@ -10,21 +11,8 @@ interface PayrollPeriod {
   endStr: string;
 }
 
-function calculatePayrollPeriod(): PayrollPeriod {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  let start: Date;
-  let end: Date;
-  
-  if (currentDay >= 15) {
-    start = new Date(today.getFullYear(), today.getMonth(), 15);
-    end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-  } else {
-    start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    end = new Date(today.getFullYear(), today.getMonth(), 14);
-  }
-  
+function getPayrollPeriodWithStrings(): PayrollPeriod {
+  const { start, end } = calculatePayrollPeriod();
   return {
     start,
     end,
@@ -62,7 +50,7 @@ export function useGoalLock() {
         return { isLocked: false, employeeId: employee.id, payrollPeriod: null };
       }
       
-      const payrollPeriod = calculatePayrollPeriod();
+      const payrollPeriod = getPayrollPeriodWithStrings();
       
       // Check if goal exists for current period
       const { data: existingGoal, error: goalError } = await supabase
