@@ -6,19 +6,31 @@
  */
 
 /**
- * Calculate the current payroll period (15th to 14th).
+ * Calculate the payroll period (15th to 14th) for a given base date.
+ * If no date is provided, uses today.
+ */
+export function getPayrollPeriod(baseDate?: Date): { start: Date; end: Date } {
+  const date = baseDate || new Date();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const month = date.getMonth();
+
+  if (day >= 15) {
+    return {
+      start: new Date(year, month, 15),
+      end: new Date(year, month + 1, 14, 23, 59, 59),
+    };
+  } else {
+    return {
+      start: new Date(year, month - 1, 15),
+      end: new Date(year, month, 14, 23, 59, 59),
+    };
+  }
+}
+
+/**
+ * @deprecated Use getPayrollPeriod() instead. Kept for backwards compatibility.
  */
 export function calculatePayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  
-  if (currentDay >= 15) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 15);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    return { start, end };
-  } else {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    const end = new Date(today.getFullYear(), today.getMonth(), 14);
-    return { start, end };
-  }
+  return getPayrollPeriod(new Date());
 }

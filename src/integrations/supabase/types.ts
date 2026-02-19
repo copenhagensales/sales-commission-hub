@@ -9899,6 +9899,17 @@ export type Database = {
           total_tasks: number
         }[]
       }
+      get_cs_top20_custom_period_leaderboard: {
+        Args: { p_from: string; p_limit?: number; p_to: string }
+        Returns: {
+          avatar_url: string
+          commission: number
+          employee_id: string
+          employee_name: string
+          sales_count: number
+          team_name: string
+        }[]
+      }
       get_current_employee_id: { Args: never; Returns: string }
       get_customer_credentials: {
         Args: { p_client_id: string; p_encryption_key: string }

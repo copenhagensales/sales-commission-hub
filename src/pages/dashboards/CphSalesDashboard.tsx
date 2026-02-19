@@ -19,25 +19,7 @@ import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRa
 import { DateRange } from "react-day-picker";
 import { countWorkDaysInPeriod } from "@/lib/calculations";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
-
-// Calculate payroll period (15th to 14th)
-function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
-  const day = baseDate.getDate();
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  
-  if (day >= 15) {
-    return {
-      start: new Date(year, month, 15),
-      end: new Date(year, month + 1, 14, 23, 59, 59),
-    };
-  } else {
-    return {
-      start: new Date(year, month - 1, 15),
-      end: new Date(year, month, 14, 23, 59, 59),
-    };
-  }
-}
+import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
 interface TopSeller {
   name: string;
@@ -299,54 +281,8 @@ export default function CphSalesDashboard() {
     staleTime: 30000,
   });
 
-  // Fetch fieldmarketing sales for today (Eesy FM, YouSee FM) from unified sales table
-  const { data: fmTodaySales = [] } = useQuery({
-    queryKey: ["cph-dashboard-fm-sales", todayStr],
-    queryFn: async () => {
-      const startOfDay = `${todayStr}T00:00:00`;
-      const endOfDay = `${todayStr}T23:59:59`;
-      
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          id, agent_name, normalized_data, sale_datetime, client_campaign_id
-        `)
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", startOfDay)
-        .lte("sale_datetime", endOfDay)
-        .neq("validation_status", "rejected");
-      
-      if (error) throw error;
-      
-      // Get client info for FM sales via client_campaign_id
-      const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))];
-      let fmClientMap: Record<string, { name: string; logo_url: string | null }> = {};
-      
-      if (campaignIds.length > 0) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id, name, client_id, clients(id, name, logo_url)")
-          .in("id", campaignIds);
-        
-        for (const c of campaigns || []) {
-          const clientData = c.clients as any;
-          if (clientData) {
-            fmClientMap[c.id] = { name: clientData.name, logo_url: clientData.logo_url };
-          }
-        }
-      }
-      
-      // Map FM sales to include client info
-      return (data || []).map(sale => ({
-        ...sale,
-        _clientName: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.name : null,
-        _clientLogo: sale.client_campaign_id ? fmClientMap[sale.client_campaign_id]?.logo_url : null,
-        _sellerName: sale.agent_name || (sale.normalized_data as any)?.seller_name || null,
-      }));
-    },
-    enabled: !tvMode,
-    refetchInterval: 60000,
-  });
+
+
 
   // Fetch sales for selected date range (for "Salg per opgave" section)
   const salesPeriodStart = salesDateRange?.from ? format(salesDateRange.from, "yyyy-MM-dd") : format(todayStart, "yyyy-MM-dd");
@@ -400,23 +336,10 @@ export default function CphSalesDashboard() {
         );
       }
       
-      // Fetch FM sales for period from unified sales table
-      const fmSales = await fetchAllRows<{
-        id: string; agent_name: string; normalized_data: any;
-        sale_datetime: string; client_campaign_id: string | null;
-      }>(
-        "sales",
-        "id, agent_name, normalized_data, sale_datetime, client_campaign_id",
-        (q) => q.eq("source", "fieldmarketing")
-          .gte("sale_datetime", startOfPeriod)
-          .lte("sale_datetime", endOfPeriod),
-        { orderBy: "sale_datetime", ascending: false }
-      );
-      
       // Calculate sales by client
       const salesByClient: Record<string, { count: number; logoUrl: string | null }> = {};
       
-      // TM sales
+      // All sales (TM + FM are now unified via sale_items)
       for (const sale of salesData) {
         const saleItems = sale.sale_items || [];
         let saleCount = 0;
@@ -433,17 +356,6 @@ export default function CphSalesDashboard() {
             }
             salesByClient[clientName].count += saleCount;
           }
-        }
-      }
-      
-      // FM sales - resolve client name via client_campaign_id (same as TM sales)
-      for (const fmSale of (fmSales || [])) {
-        const clientName = fmSale.client_campaign_id ? campaignClientMap[fmSale.client_campaign_id] || null : null;
-        if (clientName) {
-          if (!salesByClient[clientName]) {
-            salesByClient[clientName] = { count: 0, logoUrl: clientLogoMap[clientName] || null };
-          }
-          salesByClient[clientName].count += 1;
         }
       }
       
@@ -637,7 +549,10 @@ export default function CphSalesDashboard() {
       const salesData = await fetchAllRows<any>(
         "sales",
         "id, agent_name, agent_email, sale_datetime, client_campaign_id, client_campaigns(client_id, clients(name))",
-        (q) => q.gte("sale_datetime", `${monthStart}T00:00:00`).lte("sale_datetime", `${todayStr}T23:59:59`),
+        (q) => q
+          .gte("sale_datetime", `${monthStart}T00:00:00`)
+          .lte("sale_datetime", `${todayStr}T23:59:59`)
+          .neq("validation_status", "rejected"),
         { orderBy: "sale_datetime", ascending: false }
       );
 
@@ -795,78 +710,19 @@ export default function CphSalesDashboard() {
         }
       });
 
-      // ============ FIELDMARKETING SALES INTEGRATION ============
-      // Fetch FM sales from unified sales table for the month and add to team totals
-      const fmSalesData = await fetchAllRows<{
-        id: string; agent_name: string; raw_payload: any; sale_datetime: string;
-      }>(
-        "sales",
-        "id, agent_name, raw_payload, sale_datetime",
-        (q) => q.eq("source", "fieldmarketing")
-          .gte("sale_datetime", `${monthStart}T00:00:00`)
-          .lte("sale_datetime", `${todayStr}T23:59:59`),
-        { orderBy: "sale_datetime", ascending: false }
-      );
-
-      // Build seller_id -> team_id map (seller_id from raw_payload is the employee_id)
-      (fmSalesData || []).forEach((fmSale: any) => {
-        const rawPayload = fmSale.raw_payload as any;
-        const sellerId = rawPayload?.fm_seller_id;
-        const clientId = rawPayload?.fm_client_id;
-        const teamId = employeeToTeam[sellerId];
-        if (!teamId || !teamSales[teamId]) return;
-        
-        const saleDate = fmSale.sale_datetime?.split("T")[0];
-        if (!saleDate) return;
-        
-        // Month (always add)
-        teamSales[teamId].month += 1;
-        
-        // Find client name for this FM sale via client_id from raw_payload
-        const fmClientInfo = teamToClients[teamId]?.find(c => c.clientId === clientId);
-        if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
-          teamClientSales[teamId][fmClientInfo.clientName].month += 1;
-        }
-        
-        // Week (if >= weekStart)
-        if (saleDate >= weekStart) {
-          teamSales[teamId].week += 1;
-          if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
-            teamClientSales[teamId][fmClientInfo.clientName].week += 1;
-          }
-        }
-        
-        // Day (if == today)
-        if (saleDate === todayStr) {
-          teamSales[teamId].day += 1;
-          if (fmClientInfo && teamClientSales[teamId][fmClientInfo.clientName]) {
-            teamClientSales[teamId][fmClientInfo.clientName].day += 1;
-          }
-        }
-      });
-
+      // FM sales are now included in the main salesData query (source-agnostic via sale_items)
       // Helper function to count work days (excluding weekends) within a period overlap
       const countWorkDaysInOverlap = (
-        absenceStart: string, 
-        absenceEnd: string, 
-        periodStart: string, 
-        periodEnd: string
+        absenceStart: string, absenceEnd: string, periodStart: string, periodEnd: string
       ): number => {
-        // Calculate overlap
         const overlapStart = absenceStart > periodStart ? absenceStart : periodStart;
         const overlapEnd = absenceEnd < periodEnd ? absenceEnd : periodEnd;
-        
         if (overlapStart > overlapEnd) return 0;
-        
         let count = 0;
         const current = new Date(overlapStart);
         const end = new Date(overlapEnd);
-        
         while (current <= end) {
-          const dayOfWeek = current.getDay();
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not weekend
-            count++;
-          }
+          if (current.getDay() !== 0 && current.getDay() !== 6) count++;
           current.setDate(current.getDate() + 1);
         }
         return count;
@@ -1017,11 +873,10 @@ export default function CphSalesDashboard() {
     }, 0);
   };
 
-  // Calculate sellers on board (unique sellers with at least 1 sale - including FM sellers)
+  // Calculate sellers on board (unique sellers with at least 1 counted sale)
   const calculateSellersOnBoard = (sales: typeof todaySales) => {
     const sellersWithSales = new Set<string>();
     
-    // Telesales sellers
     for (const sale of sales) {
       const saleItems = (sale as any).sale_items || [];
       const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
@@ -1030,55 +885,11 @@ export default function CphSalesDashboard() {
       }
     }
     
-    // FM sellers - use _sellerName from mapped data
-    for (const fmSale of fmTodaySales) {
-      const sellerName = (fmSale as any)._sellerName;
-      if (sellerName) {
-        sellersWithSales.add(sellerName.toLowerCase());
-      }
-    }
-    
     return sellersWithSales.size;
   };
 
-  // Calculate top 20 sellers by commission
-  const calculateTopSellers = (sales: typeof todaySales): TopSeller[] => {
-    const sellerCommission = new Map<string, number>();
-    
-    for (const sale of sales) {
-      const agentName = sale.agent_name || "Ukendt";
-      const saleItems = (sale as any).sale_items || [];
-      
-      const hasCountedSale = saleItems.some((item: any) => item.products?.counts_as_sale === true);
-      if (!hasCountedSale) continue;
-      
-      const commission = saleItems.reduce(
-        (sum: number, item: any) => sum + (item.mapped_commission || 0), 0
-      );
-      
-      sellerCommission.set(
-        agentName.toLowerCase(), 
-        (sellerCommission.get(agentName.toLowerCase()) || 0) + commission
-      );
-    }
-    
-    const nameMap = new Map<string, string>();
-    for (const sale of sales) {
-      if (sale.agent_name) {
-        nameMap.set(sale.agent_name.toLowerCase(), sale.agent_name);
-      }
-    }
-    
-    return Array.from(sellerCommission.entries())
-      .map(([lowerName, commission]) => ({ 
-        name: nameMap.get(lowerName) || lowerName, 
-        commission,
-        rank: 0
-      }))
-      .sort((a, b) => b.commission - a.commission)
-      .slice(0, 20)
-      .map((seller, index) => ({ ...seller, rank: index + 1 }));
-  };
+
+
 
   // Calculate recent sales with commission
   const calculateRecentSalesWithCommission = (sales: typeof todaySales): RecentSale[] => {
@@ -1115,26 +926,16 @@ export default function CphSalesDashboard() {
     return result;
   };
 
-  // Convert regular sales by client to include logo (merged with FM sales)
+  // Convert regular sales by client to include logo
   const getSalesByClientWithLogos = (): Record<string, { count: number; logoUrl: string | null }> => {
     const byClient = calculateSalesByClient(knownClientSales);
-    
-    // Add FM sales to client counts - use _clientName from mapped data
-    for (const fmSale of fmTodaySales) {
-      const clientName = (fmSale as any)._clientName;
-      if (clientName) {
-        byClient[clientName] = (byClient[clientName] || 0) + 1;
-      }
-    }
     
     // Convert to format with logos
     const result: Record<string, { count: number; logoUrl: string | null }> = {};
     for (const [client, count] of Object.entries(byClient)) {
-      // Check for FM client logo if not in regular clientLogos
-      const fmClientLogo = fmTodaySales.find(s => (s as any)._clientName === client)?._clientLogo;
       result[client] = { 
         count, 
-        logoUrl: clientLogos[client] || fmClientLogo || null 
+        logoUrl: clientLogos[client] || null 
       };
     }
     return result;
@@ -1142,8 +943,7 @@ export default function CphSalesDashboard() {
 
   // Use TV data if in TV mode, otherwise use regular queries
   const displaySales = tvMode && tvData ? filterTvSales(tvData.sales.recent) : calculateRecentSalesWithCommission(knownClientSales);
-  // Include FM sales in total count
-  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales) + fmTodaySales.length;
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : calculateCountedSales(knownClientSales);
   const displaySalesByClientToday = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : getSalesByClientWithLogos();
   // Use period data for "Salg per opgave" section
   const displaySalesByClientPeriod = tvMode && tvData ? filterTvSalesByClient(tvData.sales.byClient) : (periodSalesData || {});
