@@ -36,6 +36,7 @@ export async function syncIntegration(
 ): Promise<SyncResult> {
   const { source, action, actions, days = 3, campaignId, from, to, maxRecords = 50 } = options;
   const syncRunStartedAt = new Date();
+  let adapter: any = null;
   try {
     log("INFO", `Processing integration: ${integration.name}`);
 
@@ -46,7 +47,7 @@ export async function syncIntegration(
       p_encryption_key: encryptionKey,
     });
 
-    const adapter = getAdapter(
+    adapter = getAdapter(
       source || integration.provider,
       credentials,
       integration.name,
@@ -276,7 +277,7 @@ export async function syncIntegration(
     const errorDurationMs = errorCompletedAt.getTime() - syncRunStartedAt.getTime();
 
     // Get partial metrics from adapter (may have partial data before error)
-    const errorMetrics = adapter.getMetrics();
+    const errorMetrics = adapter?.getMetrics?.() ?? { apiCalls: 0, retries: 0, rateLimitHits: 0 };
 
     // Insert error sync run
     await supabase.from("integration_sync_runs").insert({
