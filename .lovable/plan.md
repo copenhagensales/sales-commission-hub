@@ -1,73 +1,40 @@
 
 
-# Fix: "Gem tidsplan" gemmer ikke startminut
+# Fix: Enreach-adapter tæller ikke API-kald
 
-## Problemet
+## Problem
 
-Naar du trykker "Gem tidsplan", sker foelgende:
+Enreach-adapteren (`enreach.ts`) initialiserer `_metrics.apiCalls = 0` men incrementerer den aldrig ved API-kald. Adversus-adapteren goer det korrekt med `this._metrics.apiCalls++` foer hvert `fetch()`.
 
-1. Cron-jobbet opdateres korrekt i databasen (det virker)
-2. Audit-loggen skrives korrekt (det virker)
-3. Men den nye tidsplan skrives IKKE tilbage til integrationen i `dialer_integrations.config.sync_schedule`
-4. Naar siden genindlaeser data, laeser den den gamle config -- og startminuttet nulstilles
+Derfor viser Rate Limit Budget altid 0/240 og 0/10000 for alle Enreach-integrationer (Eesy, ASE, Tryg).
 
 ## Loesning
 
-### 1. Edge function: Gem schedule i integrationsconfig
+Tilfoej `this._metrics.apiCalls++` foer hvert `fetch()`-kald i Enreach-adapteren, og `this._metrics.rateLimitHits++` ved 429-responses samt `this._metrics.retries++` ved genforsog.
 
-**Fil:** `supabase/functions/update-cron-schedule/index.ts`
+## Teknisk aendring
 
-Efter at cron-jobbet er oprettet (linje ~210), tilfoej en UPDATE der gemmer den nye `sync_schedule` og `sync_frequency_minutes` paa integrationen:
+**Fil:** `supabase/functions/integration-engine/adapters/enreach.ts`
 
-```typescript
-// After scheduling, persist to integration config
-if (integration_type === "dialer" && integration_id) {
-  const currentConfig = integrationMetadata?.config || {};
-  const updatedConfig = { ...currentConfig, sync_schedule: cronExpression };
-  await supabase
-    .from("dialer_integrations")
-    .update({
-      config: updatedConfig,
-      sync_frequency_minutes: frequency_minutes,
-    })
-    .eq("id", integration_id);
-}
-```
-
-### 2. Frontend: Synkroniser lokal state naar data genindlæses
-
-**Fil:** `src/components/system-stability/ScheduleEditor.tsx`
-
-Tilfoej en `useEffect` der opdaterer `frequency` og `startMinute` naar `integrations`-prop'en aendrer sig (efter refetch):
+Find alle steder hvor adapteren laver HTTP-kald (typisk `fetch(...)`) og tilfoej metrics-tracking:
 
 ```typescript
-useEffect(() => {
-  const int = integrations.find(i => i.id === selectedId);
-  if (int?.config?.sync_schedule) {
-    const freq = estimateFrequencyFromCron(int.config.sync_schedule);
-    setFrequency(String(freq));
-    const mins = parseCronMinutes(int.config.sync_schedule);
-    setStartMinute(String(mins[0] ?? 0));
-  }
-}, [integrations, selectedId]);
+// Foer hvert fetch-kald:
+this._metrics.apiCalls++;
+
+// Ved 429-response:
+this._metrics.rateLimitHits++;
+
+// Ved retry:
+this._metrics.retries++;
 ```
 
-### 3. Invalidering af React Query cache
-
-**Fil:** `src/components/system-stability/ScheduleEditor.tsx`
-
-Tilfoej `useQueryClient` og invalider relevante queries efter succesfuld gem:
-
-```typescript
-const queryClient = useQueryClient();
-// ... i handleSave, efter success:
-queryClient.invalidateQueries({ queryKey: ["system-stability-integrations"] });
-```
+Dette skal goeres i alle fetch-metoder i adapteren (fetchSales, fetchUsers, fetchCampaigns, fetchSessions, osv.).
 
 ## Filer der aendres
 
-- `supabase/functions/update-cron-schedule/index.ts` -- gem schedule i config
-- `src/components/system-stability/ScheduleEditor.tsx` -- synkroniser state + cache invalidering
+- `supabase/functions/integration-engine/adapters/enreach.ts` -- tilfoej metrics tracking
+- Redeploy `integration-engine` edge function
 
 ## Ingen database-aendringer
 
