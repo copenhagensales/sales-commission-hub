@@ -240,21 +240,21 @@ export default function RelatelDashboard() {
                 sellers={sortedPayrollSellers} 
                 isLoading={isLoading} 
                 tvMode={tvMode}
-                showCrossSales={!tvMode}
+showCrossSales={true}
               />
               <TvLeaderboardTable 
                 title="Top Uge" 
                 sellers={sortedWeeklySellers} 
                 isLoading={isLoading} 
                 tvMode={tvMode}
-                showCrossSales={!tvMode}
+showCrossSales={true}
               />
               <TvLeaderboardTable 
                 title="Top Dag" 
                 sellers={sortedDailySellers} 
                 isLoading={isLoading} 
                 tvMode={tvMode}
-                showCrossSales={!tvMode}
+                showCrossSales={true}
               />
             </div>
           </>
