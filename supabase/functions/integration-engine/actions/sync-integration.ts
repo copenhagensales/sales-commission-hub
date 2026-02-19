@@ -50,6 +50,8 @@ const getEffectiveActionList = (
     .filter(Boolean));
 
   if (!isLovableTdcIntegration(integration)) return requested;
+  const integrationName = String(integration?.name || "").trim().toLowerCase();
+  if (integrationName !== "lovablecph") return requested;
 
   const config = (integration?.config || {}) as Record<string, unknown>;
   const cfgSync = normalizeActions(config.sync_actions);
@@ -81,6 +83,7 @@ export async function syncIntegration(
   const { source, action, actions, days = 3, campaignId, from, to, maxRecords = 50 } = options;
   const actionList = getEffectiveActionList(integration, actions, action);
   const syncRunStartedAt = new Date();
+  let adapter: any = null;
   try {
     log("INFO", `Processing integration: ${integration.name}`);
 
@@ -91,7 +94,7 @@ export async function syncIntegration(
       p_encryption_key: encryptionKey,
     });
 
-    const adapter = getAdapter(
+    adapter = getAdapter(
       source || integration.provider,
       credentials,
       integration.name,
@@ -322,7 +325,7 @@ export async function syncIntegration(
     const errorDurationMs = errorCompletedAt.getTime() - syncRunStartedAt.getTime();
 
     // Get partial metrics from adapter (may have partial data before error)
-    const errorMetrics = adapter.getMetrics();
+    const errorMetrics = adapter?.getMetrics?.() ?? { apiCalls: 0, retries: 0, rateLimitHits: 0 };
 
     // Insert error sync run
     await supabase.from("integration_sync_runs").insert({

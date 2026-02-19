@@ -108,7 +108,7 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
         <img 
           src={cphSalesLogo} 
           alt="CPH Sales" 
-          className="h-8 sm:h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+          className="h-10 sm:h-12 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           onClick={handleGoToMenu}
         />
         <div className="min-w-0">
