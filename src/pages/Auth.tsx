@@ -620,9 +620,6 @@ export default function Auth() {
             fetchPriority="high"
             className="mx-auto h-32 w-auto cursor-pointer"
           />
-          <p className="mt-4 text-sm text-muted-foreground">
-            Løn- og performance-system
-          </p>
         </div>
         
         {/* DIAGNOSTIC SUMMARY - Always visible after login attempt */}
