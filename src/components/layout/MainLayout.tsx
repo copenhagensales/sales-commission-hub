@@ -81,7 +81,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               onClick={() => navigate("/")} 
               className="flex items-center cursor-pointer"
             >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-12 w-auto object-contain" />
             </div>
             
             <div className="flex items-center gap-2">
