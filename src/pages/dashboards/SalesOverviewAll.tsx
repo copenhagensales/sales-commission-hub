@@ -193,7 +193,7 @@ export default function SalesOverviewAll() {
                   className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 animate-fade-in"
                 >
                   {data.logoUrl && (
-                    <div className="flex items-center justify-center rounded-xl bg-white h-16 w-32 p-3">
+                    <div className="flex items-center justify-center rounded-xl h-16 w-32 p-3" style={{ backgroundColor: '#ffffff', colorScheme: 'light' }}>
                       <img
                         src={data.logoUrl}
                         alt={client}
@@ -268,7 +268,7 @@ export default function SalesOverviewAll() {
                 >
                   <CardContent className="flex flex-col items-center justify-center p-3">
                     {data.logoUrl && (
-                      <div className="flex items-center justify-center rounded-xl shadow-sm bg-white h-16 w-32 mb-3 p-2.5">
+                      <div className="flex items-center justify-center rounded-xl shadow-sm h-16 w-32 mb-3 p-2.5" style={{ backgroundColor: '#ffffff', colorScheme: 'light' }}>
                         <img
                           src={data.logoUrl}
                           alt={client}
