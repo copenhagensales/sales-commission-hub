@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
@@ -816,6 +816,37 @@ export default function CphSalesDashboard() {
     refetchInterval: 60000,
     staleTime: 30000,
   });
+
+  // Side-by-side RPC validation (Trin 5 - temporary)
+  const { data: rpcTeamData } = useQuery({
+    queryKey: ["team-perf-rpc", todayStr],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_team_performance_summary", { p_date: todayStr } as any);
+      if (error) {
+        console.error("[TeamPerf] RPC error:", error);
+        return null;
+      }
+      return data;
+    },
+    staleTime: 30000,
+    enabled: !tvMode,
+  });
+
+  // Log comparison for validation
+  useEffect(() => {
+    if (teamPerformanceData && rpcTeamData) {
+      console.log("[TeamPerf] Client-side:", JSON.stringify(teamPerformanceData));
+      console.log("[TeamPerf] RPC:", JSON.stringify(rpcTeamData));
+      // Quick diff check
+      const clientTeams = teamPerformanceData.map((t: any) => ({ name: t.name, sales: t.sales, sick: t.sick, vacation: t.vacation }));
+      const rpcParsed = (Array.isArray(rpcTeamData) ? rpcTeamData : []).map((t: any) => ({ name: t.name, sales: t.sales, sick: t.sick, vacation: t.vacation }));
+      const match = JSON.stringify(clientTeams) === JSON.stringify(rpcParsed);
+      console.log("[TeamPerf] Match:", match);
+      if (!match) {
+        console.warn("[TeamPerf] MISMATCH detected - compare outputs above");
+      }
+    }
+  }, [teamPerformanceData, rpcTeamData]);
   const knownClientSales = todaySales.filter(sale => 
     sale.client_name && sale.client_name !== "Ukendt"
   );

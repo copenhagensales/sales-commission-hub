@@ -10098,6 +10098,7 @@ export type Database = {
           work_email: string
         }[]
       }
+      get_team_performance_summary: { Args: { p_date: string }; Returns: Json }
       get_unread_message_count: {
         Args: { p_employee_id: string }
         Returns: number
