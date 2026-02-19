@@ -3,6 +3,7 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboards, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { DashboardPeriodSelector, getDefaultPeriod, canUseCachedKpis, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
@@ -191,10 +192,11 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const liveSalesCount = liveData?.totals.sales ?? 0;
 
   return (
-    <div className={tvMode
-      ? 'w-[1920px] h-[1080px] bg-background p-6 flex flex-col overflow-hidden'
-      : 'min-h-screen bg-background p-6'
-    }>
+    <DashboardShell>
+      <div className={tvMode
+        ? 'w-[1920px] h-[1080px] bg-background p-6 flex flex-col overflow-hidden'
+        : ''
+      }>
       <DashboardHeader
         title={config.title}
         subtitle={useCached
@@ -280,5 +282,6 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         )}
       </div>
     </div>
+    </DashboardShell>
   );
 }
