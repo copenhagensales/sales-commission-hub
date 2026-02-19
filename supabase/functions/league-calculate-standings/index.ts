@@ -14,15 +14,7 @@ interface StandingResult {
   projected_rank: number;
 }
 
-interface CampaignOverride {
-  product_id: string;
-  campaign_mapping_id: string;
-  commission_dkk: number | null;
-  revenue_dkk: number | null;
-}
-
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -63,9 +55,8 @@ Deno.serve(async (req) => {
     const playersPerDivision = season.config?.players_per_division || 10;
 
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
-    console.log(`[league-calculate-standings] Players per division: ${playersPerDivision}`);
 
-    // 2. Get all active enrollments (exclude spectators - they can see but not appear in standings)
+    // 2. Get all active enrollments (exclude spectators)
     const { data: enrollments, error: enrollError } = await supabase
       .from("league_enrollments")
       .select("employee_id")
@@ -102,7 +93,6 @@ Deno.serve(async (req) => {
       console.error("[league-calculate-standings] Failed to fetch agent mappings:", mappingError);
     }
 
-    // Get agent emails
     const agentIds = (agentMappings || []).map((m) => m.agent_id).filter(Boolean);
     const { data: agents, error: agentsError } = await supabase
       .from("agents")
@@ -122,8 +112,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Also get work_email directly from employee_master_data as fallback
-    const { data: employees, error: empError } = await supabase
+    // Fallback: work_email/private_email from employee_master_data
+    const { data: empData, error: empError } = await supabase
       .from("employee_master_data")
       .select("id, work_email, private_email")
       .in("id", employeeIds);
@@ -132,12 +122,10 @@ Deno.serve(async (req) => {
       console.error("[league-calculate-standings] Failed to fetch employees:", empError);
     }
 
-    // Add work_email as fallback if no agent mapping
-    for (const emp of employees || []) {
+    for (const emp of empData || []) {
       if (!employeeToAgentEmail[emp.id] && emp.work_email) {
         employeeToAgentEmail[emp.id] = emp.work_email.toLowerCase();
       }
-      // Also try private_email
       if (!employeeToAgentEmail[emp.id] && emp.private_email) {
         employeeToAgentEmail[emp.id] = emp.private_email.toLowerCase();
       }
@@ -145,34 +133,7 @@ Deno.serve(async (req) => {
 
     console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmail).length} employees`);
 
-    // 4. Get product campaign overrides (same as DailyReports)
-    const { data: productCampaignOverrides } = await supabase
-      .from("product_campaign_overrides")
-      .select("product_id, campaign_mapping_id, commission_dkk, revenue_dkk");
-
-    // Build override map: product_id + campaign_mapping_id -> { commission, revenue }
-    const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-    (productCampaignOverrides || []).forEach((o: CampaignOverride) => {
-      const key = `${o.product_id}_${o.campaign_mapping_id}`;
-      campaignOverrideMap.set(key, {
-        commission: o.commission_dkk ?? 0,
-        revenue: o.revenue_dkk ?? 0
-      });
-    });
-
-    console.log(`[league-calculate-standings] Loaded ${campaignOverrideMap.size} campaign overrides`);
-
-    // 5. Get adversus campaign mappings to resolve campaign_mapping_id
-    const { data: campaignMappings } = await supabase
-      .from("adversus_campaign_mappings")
-      .select("id, adversus_campaign_id");
-
-    const dialerToCampaignMappingId: Record<string, string> = {};
-    (campaignMappings || []).forEach((m: { id: string; adversus_campaign_id: string }) => {
-      dialerToCampaignMappingId[m.adversus_campaign_id] = m.id;
-    });
-
-    // 6. Get all sales in the qualification period with campaign info
+    // 4. Fetch ALL sales in qualification period (TM + FM unified)
     // Paginate to avoid the 1000 row limit
     let allSales: any[] = [];
     const SALES_PAGE_SIZE = 1000;
@@ -182,7 +143,7 @@ Deno.serve(async (req) => {
     while (hasMoreSales) {
       const { data: salesBatch, error: salesError } = await supabase
         .from("sales")
-        .select("id, agent_email, dialer_campaign_id, client_campaign_id")
+        .select("id, agent_email")
         .neq("validation_status", "rejected")
         .gte("sale_datetime", sourceStart)
         .lte("sale_datetime", sourceEnd)
@@ -205,109 +166,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    const sales = allSales;
-    console.log(`[league-calculate-standings] Found ${sales.length} telesales in period (paginated)`);
+    console.log(`[league-calculate-standings] Found ${allSales.length} total sales in period (TM + FM unified)`);
 
-    // 6b. Get fieldmarketing sales in the qualification period from unified sales table
-    const { data: fmSalesRaw, error: fmSalesError } = await supabase
-      .from("sales")
-      .select("id, sale_datetime, raw_payload")
-      .eq("source", "fieldmarketing")
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", sourceStart)
-      .lte("sale_datetime", sourceEnd);
-
-    if (fmSalesError) {
-      console.error("[league-calculate-standings] Failed to fetch fieldmarketing sales:", fmSalesError);
-    }
-    
-    // Transform to expected format
-    const fmSales = (fmSalesRaw || []).map((s: any) => ({
-      id: s.id,
-      seller_id: s.raw_payload?.fm_seller_id || null,
-      product_name: s.raw_payload?.fm_product_name || null,
-      registered_at: s.sale_datetime,
-    }));
-
-    // Build product commission map by name (same logic as DailyReports)
-    // Get all products and campaign overrides
-    const { data: allProducts } = await supabase
-      .from("products")
-      .select("id, name, commission_dkk");
-
-    const { data: allCampaignOverrides } = await supabase
-      .from("product_campaign_overrides")
-      .select("product_id, commission_dkk");
-
-    // Build override map: prefer highest override commission per product
-    const overrideByProductId = new Map<string, number>();
-    (allCampaignOverrides || []).forEach((o: any) => {
-      const existing = overrideByProductId.get(o.product_id);
-      if (!existing || (o.commission_dkk ?? 0) > existing) {
-        overrideByProductId.set(o.product_id, o.commission_dkk ?? 0);
-      }
-    });
-
-    // Build product name -> commission map (prefer override, fallback to base)
-    const productCommissionByName = new Map<string, number>();
-    (allProducts || []).forEach((p: any) => {
-      if (p.name) {
-        const override = overrideByProductId.get(p.id);
-        const commission = override ?? p.commission_dkk ?? 0;
-        productCommissionByName.set(p.name.toLowerCase(), commission);
-      }
-    });
-
-    console.log(`[league-calculate-standings] Built commission map for ${productCommissionByName.size} products`);
-
-    // Build seller_id -> email map for FM sales attribution
-    const fmSellerIds = [...new Set((fmSales || []).map((s: any) => s.seller_id).filter(Boolean))];
-    const sellerIdToEmail: Record<string, string> = {};
-    
-    if (fmSellerIds.length > 0) {
-      const { data: fmEmployees } = await supabase
-        .from("employee_master_data")
-        .select("id, work_email, private_email")
-        .in("id", fmSellerIds);
-      
-      for (const emp of fmEmployees || []) {
-        // Prefer work_email, fallback to private_email
-        const email = emp.work_email || emp.private_email;
-        if (email) {
-          sellerIdToEmail[emp.id] = email.toLowerCase();
-        }
-      }
-    }
-
-    // Build email -> FM commission/deals map
-    const fmEmailStats: Record<string, { commission: number; deals: number }> = {};
-    for (const fmSale of fmSales || []) {
-      const email = sellerIdToEmail[fmSale.seller_id];
-      if (email) {
-        if (!fmEmailStats[email]) {
-          fmEmailStats[email] = { commission: 0, deals: 0 };
-        }
-        // Match product_name to get commission (same as DailyReports)
-        const productName = (fmSale.product_name || "").toLowerCase();
-        fmEmailStats[email].commission += productCommissionByName.get(productName) || 0;
-        fmEmailStats[email].deals += 1;
-      }
-    }
-
-    console.log(`[league-calculate-standings] FM stats for ${Object.keys(fmEmailStats).length} unique sellers`);
-
-    // Build sale_id -> campaign_mapping_id map for override lookup
-    const saleToCampaignMappingId: Record<string, string | null> = {};
-    for (const sale of sales || []) {
-      const campaignMappingId = sale.dialer_campaign_id 
-        ? dialerToCampaignMappingId[sale.dialer_campaign_id] || null
-        : null;
-      saleToCampaignMappingId[sale.id] = campaignMappingId;
-    }
-
-    // Build email -> sale_ids map
+    // 5. Build email -> sale_ids map
     const emailToSaleIds: Record<string, string[]> = {};
-    for (const sale of sales || []) {
+    for (const sale of allSales) {
       const email = sale.agent_email?.toLowerCase();
       if (email) {
         if (!emailToSaleIds[email]) {
@@ -317,13 +180,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7. Get sale_items with mapped_commission and product_id for all sales
-    // Batch in chunks of 100 to avoid URL length limits
-    const allSaleIds = (sales || []).map((s) => s.id);
-    let saleItemsMap: Record<string, { total_commission: number; deals_count: number }> = {};
+    // 6. Get sale_items with mapped_commission - use it directly (authoritative source)
+    const allSaleIds = allSales.map((s) => s.id);
+    const saleItemsMap: Record<string, { total_commission: number; deals_count: number }> = {};
 
     if (allSaleIds.length > 0) {
-      // Batch fetch sale_items in chunks to avoid URL length limits
       const BATCH_SIZE = 100;
       const saleItems: any[] = [];
       
@@ -331,7 +192,7 @@ Deno.serve(async (req) => {
         const batchIds = allSaleIds.slice(i, i + BATCH_SIZE);
         const { data: batchItems, error: batchError } = await supabase
           .from("sale_items")
-          .select("sale_id, mapped_commission, product_id, quantity")
+          .select("sale_id, mapped_commission, quantity")
           .in("sale_id", batchIds);
         
         if (batchError) {
@@ -343,31 +204,16 @@ Deno.serve(async (req) => {
       
       console.log(`[league-calculate-standings] Fetched ${saleItems.length} sale_items for ${allSaleIds.length} sales`);
 
-      // Calculate commission per sale using campaign overrides (same as DailyReports)
+      // Calculate commission per sale using mapped_commission directly (authoritative source)
       const saleToCommission: Record<string, number> = {};
-      for (const item of saleItems || []) {
+      for (const item of saleItems) {
         if (!saleToCommission[item.sale_id]) {
           saleToCommission[item.sale_id] = 0;
         }
-
-        // Check for campaign override - use it if exists, otherwise fallback to mapped_commission
-        // IMPORTANT: Match DailyReports logic exactly - override is NOT multiplied by quantity
-        const campaignMappingId = saleToCampaignMappingId[item.sale_id];
-        const overrideKey = campaignMappingId && item.product_id 
-          ? `${item.product_id}_${campaignMappingId}` 
-          : null;
-        const override = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
-
-        if (override) {
-          // Use campaign-specific commission (per-item, NOT multiplied by quantity - same as DailyReports)
-          saleToCommission[item.sale_id] += override.commission;
-        } else {
-          // Fallback to mapped values from sale_items (same as DailyReports)
-          saleToCommission[item.sale_id] += Number(item.mapped_commission) || 0;
-        }
+        saleToCommission[item.sale_id] += Number(item.mapped_commission) || 0;
       }
 
-      // Map email -> commission/deals (telesales only first)
+      // Map email -> commission/deals
       for (const [email, saleIds] of Object.entries(emailToSaleIds)) {
         let totalCommission = 0;
         let dealsCount = 0;
@@ -379,19 +225,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7b. Merge fieldmarketing stats into saleItemsMap
-    for (const [email, stats] of Object.entries(fmEmailStats)) {
-      if (saleItemsMap[email]) {
-        saleItemsMap[email].total_commission += stats.commission;
-        saleItemsMap[email].deals_count += stats.deals;
-      } else {
-        saleItemsMap[email] = { total_commission: stats.commission, deals_count: stats.deals };
-      }
-    }
+    console.log(`[league-calculate-standings] Stats for ${Object.keys(saleItemsMap).length} unique sellers`);
 
-    console.log(`[league-calculate-standings] Combined stats for ${Object.keys(saleItemsMap).length} unique sellers (telesales + FM)`);
-
-    // 8. Calculate standings for each employee
+    // 7. Calculate standings for each employee
     const standingsData: StandingResult[] = [];
 
     for (const employeeId of employeeIds) {
@@ -407,7 +243,6 @@ Deno.serve(async (req) => {
         console.log(`[league-calculate-standings] Employee ${employeeId}: No agent email or no sales found (email: ${agentEmail || 'none'})`);
       }
 
-      // ALWAYS add standing for enrolled players, even with 0 provision
       standingsData.push({
         employee_id: employeeId,
         current_provision: currentProvision,
@@ -420,7 +255,7 @@ Deno.serve(async (req) => {
 
     console.log(`[league-calculate-standings] Total standings to save: ${standingsData.length}`);
 
-    // 9. Sort by provision (highest first) and calculate ranks
+    // 8. Sort by provision (highest first) and calculate ranks
     standingsData.sort((a, b) => b.current_provision - a.current_provision);
 
     for (let i = 0; i < standingsData.length; i++) {
@@ -430,9 +265,7 @@ Deno.serve(async (req) => {
       s.projected_rank = (i % playersPerDivision) + 1;
     }
 
-    console.log(`[league-calculate-standings] Calculated standings for ${standingsData.length} players`);
-
-    // 10. Get previous ranks for tracking movement
+    // 9. Get previous ranks for tracking movement
     const { data: existingStandings } = await supabase
       .from("league_qualification_standings")
       .select("employee_id, overall_rank")
@@ -443,7 +276,7 @@ Deno.serve(async (req) => {
       previousRankMap[existing.employee_id] = existing.overall_rank;
     }
 
-    // 11. Upsert standings
+    // 10. Upsert standings
     const upsertData = standingsData.map((s) => ({
       season_id: seasonId,
       employee_id: s.employee_id,
@@ -468,7 +301,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 12. Delete standings for unenrolled players (is_active = false)
+    // 11. Delete standings for unenrolled players
     const { data: inactiveEnrollments } = await supabase
       .from("league_enrollments")
       .select("employee_id")
@@ -496,7 +329,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: `Updated standings for ${upsertData.length} players`,
-        standings: standingsData.slice(0, 10), // Return top 10 for preview
+        standings: standingsData.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
