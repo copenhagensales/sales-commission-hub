@@ -70,9 +70,9 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
       <aside className={sidebarClasses}>
         <div className="flex h-full flex-col">
           {!isMobile && (
-            <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+            <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-4">
               <div className="flex items-center px-3 py-2 rounded-lg">
-                <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+                <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
               </div>
             </div>
           )}
@@ -89,7 +89,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
       <div className="flex h-full flex-col">
         {/* Header with centered logo and collapse button */}
         {!isMobile && (
-          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-3">
+          <div className="flex h-20 items-center justify-between border-b border-sidebar-border px-3">
             {/* Spacer for symmetry */}
             <div className="w-9" />
             
@@ -98,7 +98,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
               onClick={() => navigate("/dashboards")} 
               className="flex items-center justify-center px-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
             >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
             </div>
             
             {/* Collapse button */}
@@ -136,7 +136,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
         {/* Mobile: Show home button at top */}
         {isMobile && (
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-            <img src={cphSalesLogo} alt="CPH Sales" className="h-8 w-auto object-contain" />
+            <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
             <Button 
               variant="outline" 
               size="sm" 
