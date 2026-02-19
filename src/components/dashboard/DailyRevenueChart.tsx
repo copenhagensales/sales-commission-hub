@@ -141,27 +141,8 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         revenueByDay[saleDate] = (revenueByDay[saleDate] || 0) + saleRevenue;
       });
 
-      // Get fieldmarketing sales revenue from unified sales table
-      const { data: fmSales } = await supabase
-        .from("sales")
-        .select("id, sale_datetime, raw_payload")
-        .eq("source", "fieldmarketing")
-        .gte("sale_datetime", `${startDateStr}T00:00:00`)
-        .lte("sale_datetime", `${todayStr}T23:59:59`)
-        .neq("validation_status", "rejected");
-
-      // Get FM pricing using the shared helper (respects pricing rules hierarchy)
-      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
-      const fmPricingMap = await buildFmPricingMap();
-
-      // Add FM revenue
-      fmSales?.forEach((sale) => {
-        const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
-        const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
-        const pricing = fmPricingMap.get(productName);
-        const revenue = pricing?.revenue || 0;
-        revenueByDay[saleDate] = (revenueByDay[saleDate] || 0) + revenue;
-      });
+      // FM sales revenue is now included in the main query above via sale_items
+      // (DB trigger creates sale_items with mapped_revenue for FM sales)
 
       return revenueByDay;
     },
