@@ -1,4 +1,5 @@
 import { WebhookParser, StandardWebhookPayload } from "./interface.ts";
+import { enreachToUTC } from "../../_shared/enreach-timezone.ts";
 
 /**
  * HeroBase SimpleLead webhook payload structure
@@ -264,28 +265,11 @@ export class EnreachWebhookParser implements WebhookParser {
   }
   
   /**
-   * Parse HeroBase date format (DD-MM-YYYY HH:mm:ss) to ISO string
+   * Parse HeroBase date format (DD-MM-YYYY HH:mm:ss) to ISO string in UTC.
+   * Delegates to shared enreachToUTC which handles CET/CEST → UTC conversion.
    */
   private parseHeroBaseDate(dateStr: string): string | null {
     if (!dateStr) return null;
-    
-    // Try parsing DD-MM-YYYY HH:mm:ss format
-    const match = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
-    if (match) {
-      const [, day, month, year, hour, minute, second] = match;
-      return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`).toISOString();
-    }
-    
-    // Try parsing as ISO or other standard format
-    try {
-      const date = new Date(dateStr);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    
-    return null;
+    return enreachToUTC(dateStr);
   }
 }
