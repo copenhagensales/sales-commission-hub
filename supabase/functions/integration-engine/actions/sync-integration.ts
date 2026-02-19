@@ -131,9 +131,9 @@ export async function syncIntegration(
       
       if (useRange && (adapter as any).fetchSalesRange) {
         log("INFO", `Fetching sales by range ${from} -> ${to}`);
-        sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings);
+        sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings, maxRecords);
       } else {
-        sales = await adapter.fetchSales(days, campaignMappings);
+        sales = await adapter.fetchSales(days, campaignMappings, maxRecords);
       }
       
       if (campaignId) {
