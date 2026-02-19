@@ -8,25 +8,7 @@ interface PayrollPeriodSelectorProps {
   onChange: (periodStart: Date, periodEnd: Date) => void;
 }
 
-function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
-  const day = baseDate.getDate();
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  
-  if (day >= 15) {
-    // Period: 15th of this month to 14th of next month
-    return {
-      start: new Date(year, month, 15),
-      end: new Date(year, month + 1, 14, 23, 59, 59),
-    };
-  } else {
-    // Period: 15th of last month to 14th of this month
-    return {
-      start: new Date(year, month - 1, 15),
-      end: new Date(year, month, 14, 23, 59, 59),
-    };
-  }
-}
+import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
 export function PayrollPeriodSelector({ onChange }: PayrollPeriodSelectorProps) {
   const [currentBaseDate, setCurrentBaseDate] = useState(() => new Date());

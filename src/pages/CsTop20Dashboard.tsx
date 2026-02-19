@@ -69,7 +69,7 @@ const getTeamBadgeStyle = (teamName: string | null | undefined): string => {
   return 'bg-slate-500 text-white';
 };
 
-// Hook for fetching custom period leaderboard data directly from database
+// Hook for fetching custom period leaderboard data through RPC (bypasses sales RLS for dashboard users)
 function useCustomPeriodLeaderboard(
   period: PeriodSelection,
   options: { enabled: boolean; limit: number }
@@ -77,108 +77,28 @@ function useCustomPeriodLeaderboard(
   return useQuery({
     queryKey: ["custom-leaderboard", period.from.toISOString(), period.to.toISOString(), options.limit],
     queryFn: async (): Promise<LeaderboardEntry[]> => {
-      // Get all sales in the custom period
-      const { data: sales, error } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_email,
-          sale_datetime,
-          sale_items (
-            quantity,
-            employee_commission,
-            products (counts_as_sale)
-          )
-        `)
-        .gte("sale_datetime", period.from.toISOString())
-        .lte("sale_datetime", period.to.toISOString())
-        .neq("validation_status", "rejected")
-        .order("sale_datetime", { ascending: false });
-      
+      const { data, error } = await supabase.rpc("get_cs_top20_custom_period_leaderboard", {
+        p_from: period.from.toISOString(),
+        p_to: period.to.toISOString(),
+        p_limit: options.limit,
+      });
+
       if (error) {
-        console.error("Error fetching custom period sales:", error);
+        console.error("Error fetching custom period leaderboard:", error);
         return [];
       }
 
-      // Get agent to employee mapping
-      const agentEmails = [...new Set((sales || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean))];
-      
-      if (agentEmails.length === 0) return [];
-
-      const { data: agents } = await supabase
-        .from("agents")
-        .select("id, email")
-        .in("email", agentEmails as string[]);
-
-      const agentIds = (agents || []).map(a => a.id);
-
-      const { data: mappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(email)")
-        .in("agent_id", agentIds);
-
-      // Get employee details
-      const employeeIds = [...new Set((mappings || []).map(m => m.employee_id))];
-      
-      const { data: employees } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, avatar_url, teams(name)")
-        .in("id", employeeIds);
-
-      // Create email to employee map
-      const emailToEmployee = new Map<string, { id: string; name: string; avatar: string | null; team: string | null }>();
-      (mappings || []).forEach(m => {
-        const agent = (m as any).agents;
-        const emp = (employees || []).find(e => e.id === m.employee_id);
-        if (agent?.email && emp) {
-          emailToEmployee.set(agent.email.toLowerCase(), {
-            id: emp.id,
-            name: `${emp.first_name} ${emp.last_name}`,
-            avatar: emp.avatar_url,
-            team: (emp as any).teams?.name || null,
-          });
-        }
-      });
-
-      // Aggregate by employee
-      const employeeStats = new Map<string, { salesCount: number; commission: number; name: string; avatar: string | null; team: string | null }>();
-      
-      (sales || []).forEach(sale => {
-        const email = sale.agent_email?.toLowerCase();
-        if (!email) return;
-        
-        const emp = emailToEmployee.get(email);
-        if (!emp) return;
-
-        const current = employeeStats.get(emp.id) || { salesCount: 0, commission: 0, name: emp.name, avatar: emp.avatar, team: emp.team };
-        
-        (sale.sale_items || []).forEach((item: any) => {
-          if (item.products?.counts_as_sale !== false) {
-            current.salesCount += item.quantity || 1;
-          }
-          current.commission += item.employee_commission || 0;
-        });
-        
-        employeeStats.set(emp.id, current);
-      });
-
-      // Convert to leaderboard entries
-      const entries: LeaderboardEntry[] = Array.from(employeeStats.entries())
-        .map(([employeeId, stats]) => ({
-          employeeId,
-          employeeName: stats.name,
-          displayName: formatDisplayName(stats.name),
-          avatarUrl: stats.avatar,
-          teamName: stats.team,
-          salesCount: stats.salesCount,
-          crossSaleCount: 0,
-          commission: stats.commission,
-          goalTarget: null,
-        }))
-        .sort((a, b) => b.commission - a.commission)
-        .slice(0, options.limit);
-
-      return entries;
+      return (data || []).map((row: any) => ({
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        displayName: formatDisplayName(row.employee_name),
+        avatarUrl: row.avatar_url,
+        teamName: row.team_name,
+        salesCount: row.sales_count || 0,
+        crossSaleCount: 0,
+        commission: row.commission || 0,
+        goalTarget: null,
+      }));
     },
     enabled: options.enabled,
     ...REFRESH_PROFILES.dashboard,

@@ -27,26 +27,7 @@ interface DBPeriodSelectorProps {
   onPresetLabelChange?: (label: string | undefined) => void;
 }
 
-// Get payroll period (15th to 14th)
-function getPayrollPeriod(baseDate: Date): { start: Date; end: Date } {
-  const day = baseDate.getDate();
-  const month = baseDate.getMonth();
-  const year = baseDate.getFullYear();
-
-  if (day >= 15) {
-    // Current period: 15th of this month to 14th of next month
-    const start = new Date(year, month, 15);
-    const nextMonth = addMonths(new Date(year, month, 1), 1);
-    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 14, 23, 59, 59);
-    return { start, end };
-  } else {
-    // Current period: 15th of previous month to 14th of this month
-    const prevMonth = subMonths(new Date(year, month, 1), 1);
-    const start = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 15);
-    const end = new Date(year, month, 14, 23, 59, 59);
-    return { start, end };
-  }
-}
+import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
 export function DBPeriodSelector({
   periodStart,

@@ -26,11 +26,7 @@ export interface FieldmarketingSale {
   };
 }
 
-// Client ID mapping for FM
-const FM_CLIENT_CAMPAIGN_MAP: Record<string, string> = {
-  "9a92ea4c-6404-4b58-be08-065e7552d552": "c527b6a1-2aaa-42c9-a290-4933675c3800", // Eesy FM -> Eesy gaden
-  "5011a7cd-bf07-4838-a63f-55a12c604b40": "743980b0-1a1e-411e-a952-ec7f52681a54", // YouSee -> Yousee gaden
-};
+// FM client_campaign_id mapping is now handled by the enrich_fm_sale database trigger
 
 export function useFieldmarketingSales(clientId?: string) {
   return useQuery({
@@ -224,9 +220,7 @@ export function useCreateFieldmarketingSale() {
         }
         console.log("[FM-SALES] Employee lookup result:", employee?.first_name, employee?.last_name);
 
-        // Map client_id to client_campaign_id
-        const clientCampaignId = FM_CLIENT_CAMPAIGN_MAP[sale.client_id] || null;
-        console.log("[FM-SALES] Client mapping:", sale.client_id, "->", clientCampaignId);
+        // client_campaign_id is set automatically by the enrich_fm_sale trigger
 
         return {
           source: 'fieldmarketing' as const,
@@ -235,7 +229,7 @@ export function useCreateFieldmarketingSale() {
           customer_phone: sale.phone_number,
           agent_name: employee ? `${employee.first_name} ${employee.last_name}` : null,
           agent_email: employee?.work_email || null,
-          client_campaign_id: clientCampaignId,
+          client_campaign_id: null, // Set by enrich_fm_sale trigger
           validation_status: 'pending',
           raw_payload: {
             fm_seller_id: sale.seller_id,
