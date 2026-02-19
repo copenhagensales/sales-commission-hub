@@ -1,38 +1,74 @@
 
+# Udvidet soegning paa alle kundeoplysninger
 
-# Implementer manglende dele fra Adversus rate-limit runbook
+## Problem
+Soegefeltet soeger kun paa `customer_phone` og `customer_company` server-side. Brugeren vil ogsaa kunne soege paa navn, adresse, postnummer, by, e-mail, medlemsnummer, CVR, lead-ID, produktnavn m.m. fra baade `normalized_data` og `raw_payload`.
 
-## Status
-
-Stoerstedelen af runbook'en er allerede implementeret:
-- Rate-limiting med Retry-After, exponential backoff og jitter er i adapterne
-- update-cron-schedule har al logik for staggering, days-beregning og split-jobs
-- Cron schedules er allerede staggerede korrekt i databasen
-- Lovablecph har split jobs (sync + meta)
-
-## Manglende del
-
-ASE-integrationen mangler `sync_days: 3` i sin config. Selvom `update-cron-schedule` koden beregner `days=3` for ASE via navn-matching, er vaerdien ikke persisteret i `config`-kolonnen. Dette boer goeres for at sikre at vaerdien er eksplicit og ikke kun afhaengig af navne-konventionen.
+## Loesning
+Flyt soegning til client-side og soeg paa tvaers af alle relevante felter.
 
 ## Tekniske detaljer
 
-### 1. SQL data-opdatering (via insert tool, IKKE migration)
+**Fil:** `src/components/cancellations/ManualCancellationsTab.tsx`
 
-Opdater ASE-integrationens config til at inkludere `sync_days: 3`:
+### 1. Tilfoej `normalized_data` til select
+Udvid select-strengen til ogsaa at hente `normalized_data`.
 
-```sql
-UPDATE public.dialer_integrations
-SET config = jsonb_set(
-  COALESCE(config, '{}'::jsonb),
-  '{sync_days}',
-  '3'::jsonb
-),
-updated_at = now()
-WHERE lower(name) = 'ase';
+### 2. Fjern server-side soegning
+Fjern `.or(...)` filteret fra queryen og fjern `searchTerm` fra queryKey (da filtrering nu sker client-side).
+
+### 3. Tilfoej matchesSearch helper
+Soeg case-insensitivt i alle disse felter:
+
+**Fra kolonner:** `customer_phone`, `customer_company`, `agent_name`
+
+**Fra normalized_data:** `customer_name`, `customer_email`, `customer_address`, `customer_city`, `customer_zip`, `phone_number`, `external_reference`, `lead_id`, `member_number`, `product_name`, `subscription_type`, `campaign_name`, `akasse_type`, `current_akasse`, `association_type`, `lonsikring_type`, `coverage_amount`
+
+**Fra raw_payload:** `CustomerName`, `CustomerPhone`, `CustomerCompany`, `uniqueId`, `leadId`, samt nested `leadResultFields` (alle vaerdier gennemsoeges)
+
+```typescript
+const matchesSearch = (sale, term) => {
+  const lower = term.toLowerCase();
+  const nd = sale.normalized_data as Record<string, unknown> | null;
+  const rp = sale.raw_payload as Record<string, unknown> | null;
+
+  // Direkte kolonner
+  const directFields = [sale.customer_phone, sale.customer_company, sale.agent_name];
+
+  // Normalized data felter
+  const ndKeys = [
+    'customer_name', 'customer_email', 'customer_address',
+    'customer_city', 'customer_zip', 'phone_number',
+    'external_reference', 'lead_id', 'member_number',
+    'product_name', 'subscription_type', 'campaign_name',
+    'akasse_type', 'current_akasse', 'association_type',
+    'lonsikring_type', 'coverage_amount'
+  ];
+  const ndFields = ndKeys.map(k => nd?.[k]);
+
+  // Raw payload top-level + leadResultFields
+  const rpDirect = ['CustomerName','CustomerPhone','CustomerCompany','uniqueId','leadId'].map(k => rp?.[k]);
+  const lrf = rp?.leadResultFields as Record<string, unknown> | null;
+  const lrfValues = lrf ? Object.values(lrf) : [];
+
+  const all = [...directFields, ...ndFields, ...rpDirect, ...lrfValues];
+  return all.some(f => f != null && String(f).toLowerCase().includes(lower));
+};
 ```
 
-### 2. Verificer cron job payloads
+### 4. Opdater filteredSales memo
+Kombiner agent-filter og soege-filter i samme memo:
 
-Trig en genberegning af ASE's cron job saa payload'en faar `days: 3` ved at kalde update-cron-schedule edge function med ASE's aktuelle indstillinger. Dette sikrer at det koerenede cron job bruger den korrekte vaerdi.
+```typescript
+const filteredSales = useMemo(() => {
+  let result = sales;
+  if (selectedAgent) result = result.filter(s => s.agent_name === selectedAgent);
+  if (searchTerm.trim()) result = result.filter(s => matchesSearch(s, searchTerm.trim()));
+  return result;
+}, [sales, selectedAgent, searchTerm]);
+```
 
-Ingen kodeaendringer er noedvendige -- al logik er allerede paa plads i edge functions.
+### 5. Opdater label
+Aendr fra "Soeg (telefon/virksomhed)" til "Soeg (alle felter)".
+
+Ingen database-aendringer er noedvendige.
