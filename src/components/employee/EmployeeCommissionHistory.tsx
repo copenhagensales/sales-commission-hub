@@ -172,52 +172,24 @@ export function EmployeeCommissionHistory({
     enabled: agentEmails.length > 0,
   });
 
-  // Fetch fieldmarketing sales for period
-  // Fetch FM sales from unified sales table
+  // Fetch fieldmarketing sales for period (sale_items created by DB trigger)
   const { data: fmSales = [] } = useQuery({
     queryKey: ["employee-fm-sales-period", employeeId, periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
       const startStr = periodStart.toISOString().split("T")[0];
       const endStr = periodEnd.toISOString().split("T")[0];
-      const data = await fetchAllRows<any>(
+      return fetchAllRows<any>(
         "sales",
-        "id, sale_datetime, raw_payload, client_campaign_id",
+        "id, sale_datetime, sale_items(mapped_commission)",
         (q) => q.eq("source", "fieldmarketing")
           .contains("raw_payload", { fm_seller_id: employeeId })
           .gte("sale_datetime", `${startStr}T00:00:00`)
           .lte("sale_datetime", `${endStr}T23:59:59`),
         { orderBy: "sale_datetime", ascending: false }
       );
-      return (data || []).map(s => ({
-        id: s.id,
-        registered_at: s.sale_datetime,
-        seller_id: (s.raw_payload as any)?.fm_seller_id,
-        client_id: (s.raw_payload as any)?.fm_client_id,
-        product_name: (s.raw_payload as any)?.fm_product_name,
-      }));
     },
     enabled: !!employeeId,
   });
-
-  // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
-  const { data: fmPricingMap } = useQuery({
-    queryKey: ["fm-pricing-map"],
-    queryFn: async () => {
-      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
-      return buildFmPricingMap();
-    },
-  });
-
-  // Build product commission map for FM from pricing map
-  const productCommissionMap = useMemo(() => {
-    const map = new Map<string, number>();
-    if (fmPricingMap) {
-      fmPricingMap.forEach((pricing, name) => {
-        map.set(name, pricing.commission);
-      });
-    }
-    return map;
-  }, [fmPricingMap]);
 
   // Process daily data - using vagtplan leder as source of truth
   const dailyData = useMemo(() => {
@@ -305,17 +277,11 @@ export function EmployeeCommissionHistory({
         });
       });
       
-      // Add fieldmarketing sales
-      const dayFmSales = fmSales.filter(s => {
-        if (!s.registered_at) return false;
-        return s.registered_at.startsWith(dateStr);
-      });
-      dayFmSales.forEach(sale => {
-        // Client name would require separate lookup - skip for now since we're using client_id
+      // Add fieldmarketing sales (commission from sale_items, created by DB trigger)
+      const dayFmSales = fmSales.filter((s: any) => s.sale_datetime?.startsWith(dateStr));
+      dayFmSales.forEach((sale: any) => {
         salesCount++;
-        // Look up commission from products
-        const productName = sale.product_name?.toLowerCase() || "";
-        commission += productCommissionMap.get(productName) ?? 0;
+        commission += sale.sale_items?.reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0) || 0;
       });
       
       // Determine status - only show "Vagt mangler" if NO planned shift exists
@@ -336,7 +302,7 @@ export function EmployeeCommissionHistory({
     });
     
     return result;
-  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, productCommissionMap, primaryShiftData, specialShiftData]);
+  }, [periodStart, periodEnd, timeStamps, sales, fmSales, absences, primaryShiftData, specialShiftData]);
 
   // Calculate chart data with cumulative commission
   const chartData = useMemo(() => {

@@ -11,6 +11,7 @@ import { da } from "date-fns/locale";
 import { ScheduleEditor } from "@/components/system-stability/ScheduleEditor";
 import { TimelineOverlap } from "@/components/system-stability/TimelineOverlap";
 import { AuditLog } from "@/components/system-stability/AuditLog";
+import { DataHealthChecks } from "@/components/system-stability/DataHealthChecks";
 import { AlertBanner } from "@/components/system-stability/AlertBanner";
 import { useStabilityAlerts, type ProviderBudget } from "@/hooks/useStabilityAlerts";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -416,6 +417,9 @@ export default function SystemStability() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Data Health Checks */}
+      <DataHealthChecks />
 
       {/* Audit Log with Rollback */}
       <AuditLog

@@ -250,27 +250,9 @@ export default function RevenueByClient() {
         saleItemsBySaleId[si.sale_id].push(si);
       });
 
-      // Get FM sales from unified sales table
-      const fmSales = await fetchAllRows<any>(
-        "sales",
-        "id, sale_datetime, raw_payload",
-        (q) => q.eq("source", "fieldmarketing")
-          .gte("sale_datetime", `${startDateStr}T00:00:00`)
-          .lte("sale_datetime", `${endDateStr}T23:59:59`),
-        { orderBy: "sale_datetime", ascending: false }
-      );
-
-      // Get FM pricing using the shared helper (respects pricing rules hierarchy)
-      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
-      const fmPricingMap = await buildFmPricingMap();
-
-      // productRevenueMap/productCommissionMap now use pricing rules
-      const productRevenueMap = new Map<string, number>();
-      const productCommissionMap = new Map<string, number>();
-      fmPricingMap.forEach((pricing, name) => {
-        productRevenueMap.set(name, pricing.revenue);
-        productCommissionMap.set(name, pricing.commission);
-      });
+      // FM sales are now included in the main TM query above since they have
+      // sale_items with mapped_revenue/mapped_commission (created by DB trigger).
+      // No separate FM query needed.
 
       // Aggregate per client and date (now includes commission)
       const revenueByClientAndDate: Record<string, Record<string, { count: number; revenue: number; commission: number }>> = {};
@@ -326,30 +308,8 @@ export default function RevenueByClient() {
         revenueByClientAndDate[clientId][saleDate].commission += saleCommission;
       });
 
-      // Process FM sales (from unified sales table)
-      fmSales?.forEach((sale) => {
-        const rawPayload = sale.raw_payload as any;
-        const clientId = rawPayload?.fm_client_id;
-        const clientName = clients?.find(c => c.id === clientId)?.name || "Ukendt FM";
-        if (!clientId) return;
-        
-        // Apply client filter
-        if (selectedClientId !== "all" && clientId !== selectedClientId) return;
-
-        clientNames[clientId] = clientName;
-        const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
-        const productName = (rawPayload?.fm_product_name || "").toLowerCase();
-        const revenue = productRevenueMap.get(productName) || 0;
-        const commission = productCommissionMap.get(productName) || 0;
-
-        if (!revenueByClientAndDate[clientId]) revenueByClientAndDate[clientId] = {};
-        if (!revenueByClientAndDate[clientId][saleDate]) {
-          revenueByClientAndDate[clientId][saleDate] = { count: 0, revenue: 0, commission: 0 };
-        }
-        revenueByClientAndDate[clientId][saleDate].count += 1;
-        revenueByClientAndDate[clientId][saleDate].revenue += revenue;
-        revenueByClientAndDate[clientId][saleDate].commission += commission;
-      });
+      // FM sales are included in the main query above (no source filter)
+      // Their sale_items contain mapped_revenue/mapped_commission from DB trigger
 
       // Fetch booking data for Eesy FM and Yousee location costs
       const { data: bookings } = await supabase

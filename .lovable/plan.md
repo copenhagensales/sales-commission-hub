@@ -16,25 +16,28 @@
 | CphSalesDashboard FM-oprydning | DONE |
 | CsTop20Dashboard RPC-migration | DONE |
 | Remaining payroll-duplikater | DONE |
-| MyProfile FM dobbelt-logik | MANGLER |
-| Del F: fmPricing migration (4 filer til sale_items) | MANGLER |
-| Fase 6: Observability | MANGLER |
+| MyProfile FM dobbelt-logik | DONE |
+| Del F: fmPricing migration (4 filer til sale_items) | DONE |
+| Fase 6: Observability | DONE |
 
 ---
 
-## Resterende opgaver
+## Afsluttede opgaver (seneste iteration)
 
 ### Del E: MyProfile FM dobbelt-logik
-`MyProfile.tsx` henter FM-salg separat via `raw_payload->fm_seller_id` og beregner commission manuelt. Skal erstattes med `sale_items.mapped_commission`.
+Erstattet manuel FM commission-beregning via `products.commission_dkk` med `sale_items.mapped_commission` (oprettet af DB trigger).
 
 ### Del F: fmPricing migration (4 filer)
-Disse filer bruger stadig `buildFmPricingMap()` til read-only formaal og kan migreres til `sale_items`:
-- `DailyRevenueChart.tsx`
-- `RevenueByClient.tsx`
-- `EmployeeCommissionHistory.tsx`
-- `ClientDBTab.tsx`
+- `DailyRevenueChart.tsx`: Fjernet separat FM-blok (main query inkluderer allerede FM via sale_items)
+- `RevenueByClient.tsx`: Fjernet `buildFmPricingMap` import og FM processing-blok
+- `EmployeeCommissionHistory.tsx`: Erstattet FM raw_payload + fmPricingMap med sale_items.mapped_commission
+- `ClientDBTab.tsx`: Fjernet `.neq("source", "fieldmarketing")` filter og separat FM-blok i begge queries
 
 (`EditSalesRegistrations.tsx` beholder `buildFmPricingMap()` til CRUD)
 
 ### Del H: Observability
-Health checks i System Stability-panelet.
+Tilføjet `DataHealthChecks` komponent til System Stability med:
+- Salg uden sale_items (24t)
+- FM trigger success rate (24t)
+- Ukendte produkter (24t)
+- Afvist-rate (24t)

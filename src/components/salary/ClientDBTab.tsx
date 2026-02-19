@@ -473,33 +473,17 @@ export function ClientDBTab() {
   const { data: chartSalesByClient } = useQuery({
     queryKey: ["chart-sales-by-client", chartPeriodStart.toISOString(), chartPeriodEnd.toISOString()],
     queryFn: async () => {
-      const telesalesData = await fetchAllRows<any>(
+      // Fetch all sales (TM + FM) - FM sales have sale_items created by DB trigger
+      const salesData = await fetchAllRows<any>(
         "sales",
         `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
-        (q) => q.neq("source", "fieldmarketing")
-                .gte("sale_datetime", chartPeriodStart.toISOString())
+        (q) => q.gte("sale_datetime", chartPeriodStart.toISOString())
                 .lte("sale_datetime", chartPeriodEnd.toISOString()),
         { orderBy: "sale_datetime", ascending: false }
       );
-      const rawFmSalesData = await fetchAllRows<any>(
-        "sales",
-        `id, raw_payload, sale_datetime`,
-        (q) => q.eq("source", "fieldmarketing")
-                .gte("sale_datetime", chartPeriodStart.toISOString())
-                .lte("sale_datetime", chartPeriodEnd.toISOString()),
-        { orderBy: "sale_datetime", ascending: false }
-      );
-      const fmSalesData = (rawFmSalesData || []).map((s: any) => ({
-        id: s.id,
-        client_id: (s.raw_payload as any)?.fm_client_id,
-        product_name: (s.raw_payload as any)?.fm_product_name,
-      }));
-      // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
-      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
-      const fmPricingMap = await buildFmPricingMap();
       
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
-      for (const sale of telesalesData || []) {
+      for (const sale of salesData || []) {
         const clientId = (sale.client_campaigns as any)?.client_id;
         if (!clientId) continue;
         if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
@@ -509,17 +493,6 @@ export function ClientDBTab() {
           if (countsAsSale) byClient[clientId].sales += qty;
           byClient[clientId].commission += Number(item.mapped_commission) || 0;
           byClient[clientId].revenue += Number(item.mapped_revenue) || 0;
-        }
-      }
-      for (const fmSale of fmSalesData || []) {
-        const clientId = fmSale.client_id;
-        if (!clientId) continue;
-        if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
-        byClient[clientId].sales += 1;
-        const pricing = fmPricingMap.get(fmSale.product_name?.toLowerCase());
-        if (pricing) {
-          byClient[clientId].commission += pricing.commission;
-          byClient[clientId].revenue += pricing.revenue;
         }
       }
       return byClient;
@@ -706,70 +679,27 @@ export function ClientDBTab() {
   const { data: salesByClientDirect, isLoading: directSalesLoading } = useQuery({
     queryKey: ["sales-by-client-direct", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
-      // Use paginated fetch to handle >1000 rows
-      const telesalesData = await fetchAllRows<any>(
+      // Fetch all sales (TM + FM) - FM sales have sale_items created by DB trigger
+      const salesData = await fetchAllRows<any>(
         "sales",
         `id, client_campaign_id, client_campaigns!inner(client_id), sale_items(quantity, mapped_commission, mapped_revenue, products(counts_as_sale))`,
-        (q) => q.neq("source", "fieldmarketing")
-                .gte("sale_datetime", periodStart.toISOString())
+        (q) => q.gte("sale_datetime", periodStart.toISOString())
                 .lte("sale_datetime", periodEnd.toISOString()),
         { orderBy: "sale_datetime", ascending: false }
       );
-
-      // Fetch FM sales from unified sales table
-      const rawFmSalesData = await fetchAllRows<any>(
-        "sales",
-        `id, raw_payload, sale_datetime`,
-        (q) => q.eq("source", "fieldmarketing")
-                .gte("sale_datetime", periodStart.toISOString())
-                .lte("sale_datetime", periodEnd.toISOString()),
-        { orderBy: "sale_datetime", ascending: false }
-      );
-      
-      // Transform to expected format
-      const fmSalesData = (rawFmSalesData || []).map((s: any) => ({
-        id: s.id,
-        client_id: (s.raw_payload as any)?.fm_client_id,
-        product_name: (s.raw_payload as any)?.fm_product_name,
-      }));
-
-      // Fetch FM pricing using shared helper (respects pricing rules hierarchy)
-      const { buildFmPricingMap } = await import("@/lib/calculations/fmPricing");
-      const fmPricingMap = await buildFmPricingMap();
 
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
       
-      for (const sale of telesalesData || []) {
+      for (const sale of salesData || []) {
         const clientId = (sale.client_campaigns as any)?.client_id;
         if (!clientId) continue;
-
-        if (!byClient[clientId]) {
-          byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
-        }
-
+        if (!byClient[clientId]) byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
         for (const item of sale.sale_items || []) {
           const countsAsSale = (item.products as any)?.counts_as_sale !== false;
           const qty = Number(item.quantity) || 1;
           if (countsAsSale) byClient[clientId].sales += qty;
           byClient[clientId].commission += Number(item.mapped_commission) || 0;
           byClient[clientId].revenue += Number(item.mapped_revenue) || 0;
-        }
-      }
-
-      for (const fmSale of fmSalesData || []) {
-        const clientId = fmSale.client_id;
-        if (!clientId) continue;
-
-        if (!byClient[clientId]) {
-          byClient[clientId] = { sales: 0, commission: 0, revenue: 0 };
-        }
-
-        byClient[clientId].sales += 1;
-        
-        const pricing = fmPricingMap.get(fmSale.product_name?.toLowerCase());
-        if (pricing) {
-          byClient[clientId].commission += pricing.commission;
-          byClient[clientId].revenue += pricing.revenue;
         }
       }
 
