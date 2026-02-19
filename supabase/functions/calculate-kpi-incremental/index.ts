@@ -76,18 +76,8 @@ interface SaleWithItems {
   }[];
 }
 
-interface FmSaleUnified {
-  id: string;
-  sale_datetime: string;
-  agent_name: string | null;
-  raw_payload: {
-    fm_product_name?: string;
-    fm_seller_id?: string;
-    fm_client_id?: string;
-  } | null;
-}
-
-// ============= PAGINATED FETCH =============
+// ============= UNIFIED PAGINATED FETCH =============
+// FM sales now have sale_items via trigger, so we fetch ALL sources uniformly
 async function fetchAllSalesWithItems(
   supabase: SupabaseClient,
   startStr: string,
@@ -102,7 +92,6 @@ async function fetchAllSalesWithItems(
       .from("sales")
       .select("id, agent_email, agent_external_id, sale_datetime, client_campaign_id, source, sale_items(quantity, mapped_commission, mapped_revenue, product_id)")
       .neq("validation_status", "rejected")
-      .neq("source", "fieldmarketing")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -118,73 +107,6 @@ async function fetchAllSalesWithItems(
     page++;
   }
   return allSales;
-}
-
-async function fetchAllFmSales(
-  supabase: SupabaseClient,
-  startStr: string,
-  endStr: string
-): Promise<FmSaleUnified[]> {
-  const PAGE_SIZE = 500;
-  const allSales: FmSaleUnified[] = [];
-  let page = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("sales")
-      .select("id, sale_datetime, agent_name, raw_payload")
-      .eq("source", "fieldmarketing")
-      .neq("validation_status", "rejected")
-      .gte("sale_datetime", startStr)
-      .lte("sale_datetime", endStr)
-      .order("sale_datetime", { ascending: true })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-    if (error) {
-      console.error(`[fetchAllFmSales] Error page ${page}:`, error);
-      break;
-    }
-    if (!data || data.length === 0) break;
-    allSales.push(...(data as FmSaleUnified[]));
-    if (data.length < PAGE_SIZE) break;
-    page++;
-  }
-  return allSales;
-}
-
-// ============= FM COMMISSION MAP =============
-async function fetchFmCommissionMap(supabase: SupabaseClient): Promise<Map<string, { commission: number; revenue: number }>> {
-  const map = new Map<string, { commission: number; revenue: number }>();
-
-  // 1. Base prices from products table (fallback)
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, name, commission_dkk, revenue_dkk");
-
-  for (const p of (products || [])) {
-    const key = p.name?.toLowerCase();
-    if (key) {
-      map.set(key, { commission: p.commission_dkk || 0, revenue: p.revenue_dkk || 0 });
-    }
-  }
-
-  // 2. Override with pricing rules (higher priority)
-  const { data: rules } = await supabase
-    .from("product_pricing_rules")
-    .select("product:products!inner(name), commission_dkk, revenue_dkk, priority")
-    .eq("is_active", true)
-    .order("priority", { ascending: false, nullsFirst: true });
-
-  const applied = new Set<string>();
-  for (const rule of (rules || [])) {
-    const key = (rule.product as any)?.name?.toLowerCase();
-    if (key && !applied.has(key)) {
-      map.set(key, { commission: rule.commission_dkk || 0, revenue: rule.revenue_dkk || 0 });
-      applied.add(key);
-    }
-  }
-
-  return map;
 }
 
 // ============= MAIN FUNCTION =============
@@ -217,13 +139,11 @@ Deno.serve(async (req) => {
       campaignsResult,
       agentMappingsResult,
       productsResult,
-      fmCommissionMap,
       clientsResult,
     ] = await Promise.all([
       supabase.from("client_campaigns").select("id, client_id"),
       supabase.from("employee_agent_mapping").select("employee_id, agent_id, agents(email, external_dialer_id)"),
       supabase.from("products").select("id, counts_as_sale"),
-      fetchFmCommissionMap(supabase),
       supabase.from("clients").select("id, name"),
     ]);
 
@@ -261,16 +181,12 @@ Deno.serve(async (req) => {
 
       console.log(`[kpi-incremental] Processing period ${period.type}: ${startStr} - ${endStr}`);
 
-      // Fetch all sales for this period
-      const [tmSales, fmSales] = await Promise.all([
-        fetchAllSalesWithItems(supabase, startStr, endStr),
-        fetchAllFmSales(supabase, startStr, endStr),
-      ]);
+      // Fetch all sales (TM + FM unified via sale_items)
+      const allSales = await fetchAllSalesWithItems(supabase, startStr, endStr);
 
-      console.log(`[kpi-incremental] ${period.type}: ${tmSales.length} TM sales, ${fmSales.length} FM sales`);
+      console.log(`[kpi-incremental] ${period.type}: ${allSales.length} total sales`);
 
       // ============= AGGREGATE =============
-      // Accumulators: employee, client, global
       const empSales = new Map<string, number>();
       const empCommission = new Map<string, number>();
       const clientSales = new Map<string, number>();
@@ -280,8 +196,8 @@ Deno.serve(async (req) => {
       let globalCommission = 0;
       let globalRevenue = 0;
 
-      // Process TM sales
-      for (const sale of tmSales) {
+      // Process all sales uniformly (TM and FM both have sale_items now)
+      for (const sale of allSales) {
         const items = sale.sale_items || [];
         let saleCount = 0;
         let commission = 0;
@@ -325,34 +241,6 @@ Deno.serve(async (req) => {
 
         // Global aggregation
         globalSales += saleCount;
-        globalCommission += commission;
-        globalRevenue += revenue;
-      }
-
-      // Process FM sales
-      for (const sale of fmSales) {
-        const productName = sale.raw_payload?.fm_product_name?.toLowerCase();
-        const pricing = productName ? fmCommissionMap.get(productName) : undefined;
-        const commission = pricing?.commission || 0;
-        const revenue = pricing?.revenue || 0;
-        const clientId = sale.raw_payload?.fm_client_id || null;
-        const sellerId = sale.raw_payload?.fm_seller_id || null;
-
-        // Employee aggregation (FM uses seller_id directly as employee_id)
-        if (sellerId) {
-          empSales.set(sellerId, (empSales.get(sellerId) || 0) + 1);
-          empCommission.set(sellerId, (empCommission.get(sellerId) || 0) + commission);
-        }
-
-        // Client aggregation
-        if (clientId) {
-          clientSales.set(clientId, (clientSales.get(clientId) || 0) + 1);
-          clientCommission.set(clientId, (clientCommission.get(clientId) || 0) + commission);
-          clientRevenue.set(clientId, (clientRevenue.get(clientId) || 0) + revenue);
-        }
-
-        // Global
-        globalSales += 1;
         globalCommission += commission;
         globalRevenue += revenue;
       }
