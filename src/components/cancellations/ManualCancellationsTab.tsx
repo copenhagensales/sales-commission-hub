@@ -58,7 +58,7 @@ export function ManualCancellationsTab() {
 
   // Fetch sales based on filters
   const { data: sales = [], isLoading: isLoadingSales } = useQuery({
-    queryKey: ["sales-for-cancellations", selectedClientId, searchTerm, dateFrom, dateTo],
+    queryKey: ["sales-for-cancellations", selectedClientId, dateFrom, dateTo],
     queryFn: async () => {
       if (!selectedClientId) return [];
 
@@ -72,7 +72,7 @@ export function ManualCancellationsTab() {
 
       let query = supabase
         .from("sales")
-        .select("id, created_at, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload")
+        .select("id, created_at, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload, normalized_data")
         .in("client_campaign_id", campaignIds)
         .order("sale_datetime", { ascending: false })
         .limit(1000);
@@ -82,9 +82,6 @@ export function ManualCancellationsTab() {
       }
       if (dateTo) {
         query = query.lte("sale_datetime", format(dateTo, "yyyy-MM-dd") + "T23:59:59");
-      }
-      if (searchTerm) {
-        query = query.or(`customer_phone.ilike.%${searchTerm}%,customer_company.ilike.%${searchTerm}%`);
       }
 
       const { data, error } = await query;
@@ -103,11 +100,38 @@ export function ManualCancellationsTab() {
     return Array.from(names).sort((a, b) => a.localeCompare(b, "da"));
   }, [sales]);
 
-  // Filter sales by selected agent
+  const matchesSearch = (sale: typeof sales[number], term: string): boolean => {
+    const lower = term.toLowerCase();
+    const nd = sale.normalized_data as Record<string, unknown> | null;
+    const rp = sale.raw_payload as Record<string, unknown> | null;
+
+    const directFields = [sale.customer_phone, sale.customer_company, sale.agent_name];
+
+    const ndKeys = [
+      'customer_name', 'customer_email', 'customer_address',
+      'customer_city', 'customer_zip', 'phone_number',
+      'external_reference', 'lead_id', 'member_number',
+      'product_name', 'subscription_type', 'campaign_name',
+      'akasse_type', 'current_akasse', 'association_type',
+      'lonsikring_type', 'coverage_amount'
+    ];
+    const ndFields = ndKeys.map(k => nd?.[k]);
+
+    const rpDirect = ['CustomerName','CustomerPhone','CustomerCompany','uniqueId','leadId'].map(k => rp?.[k]);
+    const lrf = rp?.leadResultFields as Record<string, unknown> | null;
+    const lrfValues = lrf ? Object.values(lrf) : [];
+
+    const all = [...directFields, ...ndFields, ...rpDirect, ...lrfValues];
+    return all.some(f => f != null && String(f).toLowerCase().includes(lower));
+  };
+
+  // Filter sales by selected agent and search term
   const filteredSales = useMemo(() => {
-    if (!selectedAgent) return sales;
-    return sales.filter((s) => s.agent_name === selectedAgent);
-  }, [sales, selectedAgent]);
+    let result = sales;
+    if (selectedAgent) result = result.filter(s => s.agent_name === selectedAgent);
+    if (searchTerm.trim()) result = result.filter(s => matchesSearch(s, searchTerm.trim()));
+    return result;
+  }, [sales, selectedAgent, searchTerm]);
 
   const getCompanyDisplay = (sale: typeof filteredSales[number]) => {
     if (sale.customer_company) return sale.customer_company;
@@ -185,7 +209,7 @@ export function ManualCancellationsTab() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="search">Søg (telefon/virksomhed)</Label>
+          <Label htmlFor="search">Søg (alle felter)</Label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
