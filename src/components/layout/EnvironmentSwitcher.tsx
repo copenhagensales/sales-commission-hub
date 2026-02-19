@@ -22,16 +22,15 @@ export function EnvironmentSwitcher({ className, compact = false }: EnvironmentS
     return (
       <Button
         variant="default"
-        size="sm"
         onClick={isMainMode ? switchToDashboard : switchToMain}
         className={cn(
-          "gap-2 bg-primary hover:bg-primary/90 transition-all duration-200",
+          "gap-2 bg-primary hover:bg-primary/90 transition-all duration-200 h-12 px-4",
           className
         )}
         title={isMainMode ? "Gå til Dashboards" : "Gå til Hovedsystem"}
       >
-        <LayoutDashboard className="h-4 w-4" />
-        <span className="text-xs font-medium">Dashboards</span>
+        <LayoutDashboard className="h-5 w-5" />
+        <span className="text-sm font-medium">Dashboards</span>
       </Button>
     );
   }
