@@ -290,7 +290,7 @@ export default function SalesOverviewAll() {
 
   if (tvMode) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] p-4" style={{ background: 'radial-gradient(ellipse at center, #111111 0%, #0a0a0a 70%)' }}>
+      <div className="min-h-screen p-4" style={{ background: 'radial-gradient(ellipse at center, #0f1729 0%, #0a1628 70%)' }}>
         {tvContent}
       </div>
     );
