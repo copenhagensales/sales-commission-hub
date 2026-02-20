@@ -27,32 +27,38 @@ serve(async (req) => {
 
     const baseUrl = "https://wshero01.herobase.com/api";
     
-    // Use stored credentials
+    // Trim credentials
+    const username = credentials?.username?.trim();
+    const password = credentials?.password?.trim();
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (credentials?.username && credentials?.password) {
-      headers["Authorization"] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
-      console.log("[TestASE] Using stored creds, username:", credentials.username);
+    if (username && password) {
+      headers["Authorization"] = `Basic ${btoa(`${username}:${password}`)}`;
+      console.log("[TestASE] Trimmed username:", JSON.stringify(username), "len:", username.length);
+      console.log("[TestASE] Trimmed password len:", password.length);
     }
 
     const today = new Date().toISOString().slice(0, 10);
     
-    // Try the leads endpoint variations
+    // Try multiple approaches
     const urls = [
+      // 1. Without searchName - just ModifiedFrom
+      `${baseUrl}/leads?ModifiedFrom=${today}`,
+      // 2. With cphsales2
       `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}`,
-      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}&PageSize=10`,
-      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}&take=10`,
+      // 3. With DialTimeFrom instead of ModifiedFrom
+      `${baseUrl}/leads?searchName=cphsales2&DialTimeFrom=${today}`,
+      // 4. Try campaigns endpoint to verify auth works at all
+      `${baseUrl}/campaigns`,
     ];
 
     const results: Record<string, unknown>[] = [];
-
-    // First log what user the API is using
-    results.push({ storedUsername: credentials?.username ?? "N/A" });
+    results.push({ storedUsername: username ?? "N/A", passwordLen: password?.length ?? 0 });
 
     for (const url of urls) {
       console.log("[TestASE] Trying:", url);
       const resp = await fetch(url, { headers });
       const text = await resp.text();
-      console.log("[TestASE]", resp.status, text.slice(0, 300));
+      console.log("[TestASE]", resp.status, text.slice(0, 500));
       
       const entry: Record<string, unknown> = {
         url: url.replace(baseUrl, ""),
@@ -74,19 +80,16 @@ serve(async (req) => {
             }
           } else {
             entry.topKeys = Object.keys(parsed);
-            // Check nested arrays
             for (const k of Object.keys(parsed)) {
               if (Array.isArray(parsed[k])) {
                 entry[`${k}_count`] = parsed[k].length;
                 if (parsed[k].length > 0) {
                   entry[`${k}_firstKeys`] = Object.keys(parsed[k][0]);
-                  entry[`${k}_first`] = parsed[k][0];
                 }
               }
             }
           }
         } catch { /* skip */ }
-        break;
       }
 
       results.push(entry);
