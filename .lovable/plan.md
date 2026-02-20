@@ -1,47 +1,38 @@
 
 
-# Synliggør ubrugte TV-links (5+ dage)
+# Heartbeat: Daglig opdatering af `last_accessed_at` (nat)
 
-## Hvad vi laver
-Tilfoej en visuel advarsel i TV Board Admin-tabellen for links der ikke er blevet brugt i 5+ dage (eller aldrig er blevet brugt).
+## Tilgang
+I stedet for en 5-minutters heartbeat, saet intervallet til 24 timer. Naar et TV-board henter config (hvert 30. sekund via `useTvBoardConfig`), tjekker vi om der er gaaet 24+ timer siden sidste heartbeat. Hvis ja, opdateres `last_accessed_at`.
 
-## Aendringer
+Da TV-boards koerer 24/7, vil den foerste refresh efter midnat automatisk trigge opdateringen -- saa det sker naturligt om natten.
 
-### Fil: `src/pages/tv-board/TvBoardAdmin.tsx`
+## Aendring
 
-1. **Tilfoej en helper-funktion** der beregner om et link er "stale" (ubrugt i 5+ dage):
-   - Hvis `last_accessed_at` er `null` OG linket er oprettet for mere end 5 dage siden -> stale
-   - Hvis `last_accessed_at` er mere end 5 dage gammel -> stale
+### Fil: `src/hooks/tv-board/useTvBoardConfig.ts`
 
-2. **Tilfoej visuel indikator i "Sidst brugt"-kolonnen**:
-   - Stale links faar en orange/amber advarselsbadge: "Ubrugt i X dage" eller "Aldrig brugt"
-   - Rækken faar en subtle baggrundfarve (amber/warning tint) saa den skiller sig ud
-
-3. **Tilfoej et `AlertTriangle`-ikon** fra lucide-react ved stale links for ekstra synlighed
-
-### Konkret logik
+Tilfoej i `refresh()` efter succesfuld datahentning:
 
 ```text
-function isStale(board): { stale: boolean, daysSince: number | null } {
-  const STALE_DAYS = 5;
-  const now = new Date();
+const HEARTBEAT_INTERVAL = 24 * 60 * 60 * 1000; // 24 timer
+const lastHeartbeatRef = useRef(0);
 
-  if (!board.last_accessed_at) {
-    // Aldrig brugt - tjek om oprettet for 5+ dage siden
-    const createdDaysAgo = (now - new Date(board.created_at)) / (1000*60*60*24);
-    return { stale: createdDaysAgo >= STALE_DAYS, daysSince: null };
-  }
-
-  const daysSince = (now - new Date(board.last_accessed_at)) / (1000*60*60*24);
-  return { stale: daysSince >= STALE_DAYS, daysSince: Math.floor(daysSince) };
+// I refresh(), efter setTvData(data):
+const now = Date.now();
+if (now - lastHeartbeatRef.current > HEARTBEAT_INTERVAL) {
+  lastHeartbeatRef.current = now;
+  supabase
+    .from("tv_board_access")
+    .update({
+      last_accessed_at: new Date().toISOString(),
+      access_count: (data.access_count || 0) + 1,
+    })
+    .eq("id", data.id)
+    .then(); // fire-and-forget
 }
 ```
 
-### Visuel output
-- **Stale + aldrig brugt**: Amber badge "Aldrig brugt" med AlertTriangle-ikon
-- **Stale + X dage siden**: Amber badge "Ubrugt i X dage" med AlertTriangle-ikon
-- **Aktiv (under 5 dage)**: Ingen ekstra indikator, viser dato som nu
-
-### Ingen database-aendringer
-Alt data (`last_accessed_at`, `created_at`) findes allerede i tabellen. Kun UI-aendring.
+### Ingen andre aendringer
+- Stale-indikatorer i `TvLinksSettingsTab.tsx` og `TvBoardAdmin.tsx` forbliver som de er
+- Ingen database-aendringer
 
