@@ -71,7 +71,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
         <div className="flex h-full flex-col">
           {!isMobile && (
             <div className="flex h-24 items-center justify-center border-b border-sidebar-border px-4">
-              <div className="flex items-center px-3 py-2 rounded-lg">
+              <div className="flex items-center px-3 py-2 rounded-lg cursor-pointer transition-transform duration-200 hover:scale-105">
                 <img src={cphSalesLogo} alt="CPH Sales" className="h-20 w-auto object-contain" />
               </div>
             </div>
