@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2 } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, Eye, AlertTriangle } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
+import { da } from "date-fns/locale";
 import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +28,16 @@ function generateCode(): string {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+}
+
+const STALE_DAYS = 5;
+
+function getStaleInfo(code: { last_accessed_at?: string | null; created_at?: string | null; access_count?: number | null }) {
+  const ref = code.last_accessed_at || code.created_at;
+  if (!ref) return { isStale: true, label: "Aldrig brugt" };
+  const days = differenceInDays(new Date(), new Date(ref));
+  if (days >= STALE_DAYS) return { isStale: true, label: `Ubrugt i ${days} dage` };
+  return { isStale: false, label: null };
 }
 
 export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorProps) {
@@ -137,6 +149,26 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
                       <span className="text-xs font-mono text-muted-foreground">
                         {code.access_code}
                       </span>
+                      {(() => {
+                        const stale = getStaleInfo(code);
+                        return (
+                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <Eye className="h-3 w-3" />
+                              {code.access_count || 0} visninger
+                            </span>
+                            {code.last_accessed_at && (
+                              <span>• Sidst: {format(new Date(code.last_accessed_at), "d. MMM HH:mm", { locale: da })}</span>
+                            )}
+                            {stale.isStale && (
+                              <span className="flex items-center gap-1 text-orange-500">
+                                <AlertTriangle className="h-3 w-3" />
+                                {stale.label}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex gap-1">
                       <Button
