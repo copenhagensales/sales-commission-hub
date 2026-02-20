@@ -1,21 +1,23 @@
 
 
-# Fix: Opdater stale `last_accessed_at` data
+# Fjern hover-effekt fra logo
 
 ## Problem
-Databasen viser at `last_accessed_at` sidst blev opdateret d. 22. januar for de aktive boards. Heartbeat-koden vi tilfoejede vil holde det opdateret fremover, men de nuvaerende data er foraeeldede -- derfor viser alle boards "Ubrugt i X dage".
+Logo-elementet i sidebaren er pakket ind i en `div` med klassen `hover:bg-sidebar-accent/50`, som viser en synlig baggrundskasse naar musen holdes over logoet.
 
 ## Loesning
+Fjern `hover:bg-sidebar-accent/50` fra begge logo-wrapper `div`-elementer i `src/components/layout/AppSidebar.tsx` (linje 403 og 488).
 
-### 1. Engangs-databaseopdatering
-Koer en SQL-migration der saetter `last_accessed_at` til nu for alle aktive boards:
+## Tekniske detaljer
 
-```text
-UPDATE tv_board_access 
-SET last_accessed_at = now() 
-WHERE is_active = true;
-```
+### Fil: `src/components/layout/AppSidebar.tsx`
 
-### 2. Ingen kodeaendringer
-Heartbeat-logikken i `useTvBoardConfig.ts` er allerede implementeret og vil holde `last_accessed_at` opdateret dagligt fremover. RLS-policies tillader allerede public updates paa aktive boards.
+**Linje 403** (desktop-visning):
+- Fra: `className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"`
+- Til: `className="flex items-center justify-center px-3 py-2"`
+
+**Linje 488** (mobil-visning):
+- Samme aendring som ovenfor.
+
+Ingen andre filer eller databaseaendringer er noedvendige.
 
