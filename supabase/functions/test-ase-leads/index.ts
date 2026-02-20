@@ -38,9 +38,9 @@ serve(async (req) => {
     
     // Try the leads endpoint variations
     const urls = [
-      `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}`,
-      `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}&PageSize=10`,
-      `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}&take=10`,
+      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}`,
+      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}&PageSize=10`,
+      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}&take=10`,
     ];
 
     const results: Record<string, unknown>[] = [];
