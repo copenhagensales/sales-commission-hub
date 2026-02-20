@@ -105,12 +105,16 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
     >
       {/* Left side - Logo with home button and title */}
       <div className="flex items-center gap-3 min-w-0">
-        <img 
-          src={cphSalesLogo} 
-          alt="CPH Sales" 
-          className="h-10 sm:h-12 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+        <div 
+          className="bg-[#1a1a2e] rounded-lg p-2 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           onClick={handleGoToMenu}
-        />
+        >
+          <img 
+            src={cphSalesLogo} 
+            alt="CPH Sales" 
+            className="h-8 sm:h-10 w-auto object-contain"
+          />
+        </div>
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">{title}</h1>
           {subtitle && (
