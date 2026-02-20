@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Monitor, Plus, Copy, Trash2, ExternalLink, Eye } from "lucide-react";
+import { Monitor, Plus, Copy, Trash2, ExternalLink, Eye, AlertTriangle } from "lucide-react";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -120,6 +120,19 @@ export default function TvBoardAdmin() {
     return DASHBOARD_LIST.find(d => d.slug === slug)?.name || slug;
   };
 
+  const getStaleInfo = (board: TvBoardAccess) => {
+    const STALE_DAYS = 5;
+    const now = new Date();
+
+    if (!board.last_accessed_at) {
+      const createdDaysAgo = (now.getTime() - new Date(board.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      return { stale: createdDaysAgo >= STALE_DAYS, daysSince: null };
+    }
+
+    const daysSince = (now.getTime() - new Date(board.last_accessed_at).getTime()) / (1000 * 60 * 60 * 24);
+    return { stale: daysSince >= STALE_DAYS, daysSince: Math.floor(daysSince) };
+  };
+
   const handleCreate = () => {
     if (!newBoardName.trim() || !selectedDashboard) {
       toast.error("Udfyld venligst alle felter");
@@ -217,8 +230,10 @@ export default function TvBoardAdmin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {boards.map((board) => (
-                    <TableRow key={board.id}>
+                  {boards.map((board) => {
+                    const { stale, daysSince } = getStaleInfo(board);
+                    return (
+                    <TableRow key={board.id} className={stale ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                       <TableCell className="font-medium">
                         {board.name || <span className="text-muted-foreground">Ikke navngivet</span>}
                       </TableCell>
@@ -251,9 +266,18 @@ export default function TvBoardAdmin() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {board.last_accessed_at
-                          ? format(new Date(board.last_accessed_at), "d. MMM yyyy HH:mm", { locale: da })
-                          : "-"}
+                        {stale ? (
+                          <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700">
+                              {daysSince === null ? "Aldrig brugt" : `Ubrugt i ${daysSince} dage`}
+                            </Badge>
+                          </div>
+                        ) : (
+                          board.last_accessed_at
+                            ? format(new Date(board.last_accessed_at), "d. MMM yyyy HH:mm", { locale: da })
+                            : "-"
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -286,7 +310,8 @@ export default function TvBoardAdmin() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
