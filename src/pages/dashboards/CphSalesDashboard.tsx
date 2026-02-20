@@ -1067,7 +1067,7 @@ export default function CphSalesDashboard() {
                     <CardContent className="flex flex-col items-center justify-center p-3">
                       {/* Client logo with consistent dark background */}
                       {clientData.logoUrl && (
-                        <div className="flex items-center justify-center rounded-xl shadow-sm bg-zinc-700/90 h-16 w-32 mb-3 p-2.5">
+                        <div className="flex items-center justify-center rounded-xl shadow-sm bg-white/90 h-16 w-32 mb-3 p-2.5">
                           <img 
                             src={clientData.logoUrl} 
                             alt={client} 
