@@ -1,44 +1,47 @@
 
 
-# Fix: Adversus sales-filter med `lastModifiedTime` og 7-dages cap
+# Synliggør ubrugte TV-links (5+ dage)
 
-## Overblik over aktive jobs der er ramt
+## Hvad vi laver
+Tilfoej en visuel advarsel i TV Board Admin-tabellen for links der ikke er blevet brugt i 5+ dage (eller aldrig er blevet brugt).
 
-| Job | Integration | Frekvens | Bruger |
-|-----|------------|----------|--------|
-| `dialer-26fac751-sync` | Lovablecph | Hvert 5. min | `fetchSales(days=2)` |
-| `dialer-26fac751-backfill` | Lovablecph | Hver time | `fetchSalesRange(from, to)` |
-| `dialer-657c2050-sync` | Relatel | Hvert 10. min | `fetchSales(days=1)` |
+## Aendringer
 
-Alle 3 jobs bruger `closedTime`-filteret som giver HTTP 500. Fixet loeser dem alle uden at aendre cron-konfigurationen.
+### Fil: `src/pages/tv-board/TvBoardAdmin.tsx`
 
-## Aendringer i `adversus.ts`
+1. **Tilfoej en helper-funktion** der beregner om et link er "stale" (ubrugt i 5+ dage):
+   - Hvis `last_accessed_at` er `null` OG linket er oprettet for mere end 5 dage siden -> stale
+   - Hvis `last_accessed_at` er mere end 5 dage gammel -> stale
 
-### 1. `fetchSalesRaw` (linje 155-156)
-Aendr filter fra `closedTime` til `lastModifiedTime`. Beholder 7-dages vindue (allerede hardcoded).
+2. **Tilfoej visuel indikator i "Sidst brugt"-kolonnen**:
+   - Stale links faar en orange/amber advarselsbadge: "Ubrugt i X dage" eller "Aldrig brugt"
+   - Rækken faar en subtle baggrundfarve (amber/warning tint) saa den skiller sig ud
 
-### 2. `fetchSales` (linje 171-175)
-- Aendr filter fra `closedTime` til `lastModifiedTime`
-- Tilfoej 7-dages cap: hvis `days > 7`, begraens `startDate` til 7 dage tilbage
-- Sortering paa linje 192 beholdes som `closedTime` (klient-side)
+3. **Tilfoej et `AlertTriangle`-ikon** fra lucide-react ved stale links for ekstra synlighed
 
-### 3. `fetchSalesRange` (linje 346)
-- Aendr filter fra `closedTime` til `lastModifiedTime`
-- Ret `$gte` til `$gt` og `$lte` til `$lt` (kun understottede operatorer)
-- Tilfoej 7-dages cap: hvis `fromDate` er mere end 7 dage tilbage, flyt den frem
-- Sortering paa linje 358 beholdes som `closedTime` (klient-side)
+### Konkret logik
 
-## Hvorfor cron-jobs ikke skal aendres
+```text
+function isStale(board): { stale: boolean, daysSince: number | null } {
+  const STALE_DAYS = 5;
+  const now = new Date();
 
-- Lovablecph sync sender `days: 2` -- under 7-dages cap, fungerer uaendret
-- Relatel sync sender `days: 1` -- under 7-dages cap, fungerer uaendret
-- Backfill sender dag-for-dag ranges via cursor -- hver range er 1 dag, under 7-dages cap
+  if (!board.last_accessed_at) {
+    // Aldrig brugt - tjek om oprettet for 5+ dage siden
+    const createdDaysAgo = (now - new Date(board.created_at)) / (1000*60*60*24);
+    return { stale: createdDaysAgo >= STALE_DAYS, daysSince: null };
+  }
 
-## Fil der aendres
+  const daysSince = (now - new Date(board.last_accessed_at)) / (1000*60*60*24);
+  return { stale: daysSince >= STALE_DAYS, daysSince: Math.floor(daysSince) };
+}
+```
 
-1. `supabase/functions/integration-engine/adapters/adversus.ts` -- 3 filter-aendringer + 7-dages cap
+### Visuel output
+- **Stale + aldrig brugt**: Amber badge "Aldrig brugt" med AlertTriangle-ikon
+- **Stale + X dage siden**: Amber badge "Ubrugt i X dage" med AlertTriangle-ikon
+- **Aktiv (under 5 dage)**: Ingen ekstra indikator, viser dato som nu
 
-## Deploy
-
-Edge function `integration-engine` deployes automatisk. Naeste sync-run (inden for 5 minutter) vil bruge det korrekte filter og hente salg igen.
+### Ingen database-aendringer
+Alt data (`last_accessed_at`, `created_at`) findes allerede i tabellen. Kun UI-aendring.
 
