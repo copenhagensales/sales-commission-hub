@@ -7428,8 +7428,10 @@ export type Database = {
           created_at: string | null
           external_product_code: string | null
           id: string
+          is_active: boolean
           is_hidden: boolean | null
           name: string
+          priority: number | null
           revenue_dkk: number | null
           updated_at: string | null
         }
@@ -7441,8 +7443,10 @@ export type Database = {
           created_at?: string | null
           external_product_code?: string | null
           id?: string
+          is_active?: boolean
           is_hidden?: boolean | null
           name: string
+          priority?: number | null
           revenue_dkk?: number | null
           updated_at?: string | null
         }
@@ -7454,8 +7458,10 @@ export type Database = {
           created_at?: string | null
           external_product_code?: string | null
           id?: string
+          is_active?: boolean
           is_hidden?: boolean | null
           name?: string
+          priority?: number | null
           revenue_dkk?: number | null
           updated_at?: string | null
         }
