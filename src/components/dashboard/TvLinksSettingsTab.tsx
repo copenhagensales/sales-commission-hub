@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings, AlertTriangle } from "lucide-react";
 import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,8 @@ interface TvBoardAccess {
   name: string | null;
   is_active: boolean;
   created_at: string;
+  last_accessed_at?: string | null;
+  access_count?: number;
   expires_at?: string | null;
   auto_rotate?: boolean | null;
   rotate_interval_seconds?: number | null;
@@ -79,6 +81,19 @@ interface TvBoardAccess {
   celebration_text?: string | null;
   celebration_metric?: string | null;
   celebration_source_dashboard?: string | null;
+}
+
+function getStaleInfo(board: TvBoardAccess): { stale: boolean; daysSince: number | null } {
+  const STALE_DAYS = 5;
+  const now = new Date();
+
+  if (!board.last_accessed_at) {
+    const createdDaysAgo = (now.getTime() - new Date(board.created_at).getTime()) / (1000 * 60 * 60 * 24);
+    return { stale: createdDaysAgo >= STALE_DAYS, daysSince: null };
+  }
+
+  const daysSince = (now.getTime() - new Date(board.last_accessed_at).getTime()) / (1000 * 60 * 60 * 24);
+  return { stale: daysSince >= STALE_DAYS, daysSince: Math.floor(daysSince) };
 }
 
 interface DashboardRotateTime {
@@ -810,12 +825,14 @@ export function TvLinksSettingsTab() {
               {accessCodes.map((code) => {
                 const slugs = getDashboardSlugs(code);
                 const expired = isExpired(code.expires_at);
+                const { stale, daysSince } = getStaleInfo(code);
                 return (
                   <div
                     key={code.id}
                     className={cn(
                       "flex items-start justify-between gap-4 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors",
-                      expired && "opacity-60"
+                      expired && "opacity-60",
+                      stale && !expired && "border-amber-400/50 bg-amber-500/5"
                     )}
                   >
                     <div className="flex-1 min-w-0">
@@ -835,6 +852,12 @@ export function TvLinksSettingsTab() {
                           <Badge variant="outline" className="text-xs">
                             Udløber {format(new Date(code.expires_at), "d. MMM yyyy", { locale: da })}
                           </Badge>
+                        )}
+                        {stale && !expired && (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {daysSince === null ? "Aldrig brugt" : `Ubrugt i ${daysSince} dage`}
+                          </span>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-1">
