@@ -188,11 +188,16 @@ export class AdversusAdapter implements DialerAdapter {
     let rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales`);
 
+    // Sort newest first so we always prioritize recent sales
+    rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
+    
     // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
+    // NOTE: maxRecords is now set higher (60) to ensure today's sales are included
     if (maxRecords && rawSales.length > maxRecords) {
-      rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
       rawSales = rawSales.slice(0, maxRecords);
-      console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords})`);
+      console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords}), discarded ${rawSales.length} older`);
+    } else {
+      console.log(`[Adversus] All ${rawSales.length} sales within maxRecords limit (${maxRecords || 'unlimited'})`);
     }
 
     console.log(`[Adversus] Building lead data map from ${rawSales.length} leads...`);
