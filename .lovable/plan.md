@@ -1,79 +1,44 @@
 
 
-# Fix: KPI `active_employees` og leaderboard skal inkludere inaktive medarbejdere med data
+# Fix: Adversus sales-filter med `lastModifiedTime` og 7-dages cap
 
-## Problem
+## Overblik over aktive jobs der er ramt
 
-I dag taller `active_employees` KPI'et kun medarbejdere hvor `is_active = true`. Hvis en medarbejder har salgsdata i perioden men er blevet deaktiveret, taller de ikke med. Det samme galder leaderboardet, som kun henter navne for aktive medarbejdere.
+| Job | Integration | Frekvens | Bruger |
+|-----|------------|----------|--------|
+| `dialer-26fac751-sync` | Lovablecph | Hvert 5. min | `fetchSales(days=2)` |
+| `dialer-26fac751-backfill` | Lovablecph | Hver time | `fetchSalesRange(from, to)` |
+| `dialer-657c2050-sync` | Relatel | Hvert 10. min | `fetchSales(days=1)` |
 
-## Berarte steder
+Alle 3 jobs bruger `closedTime`-filteret som giver HTTP 500. Fixet loeser dem alle uden at aendre cron-konfigurationen.
 
-### Backend (Edge Functions)
+## Aendringer i `adversus.ts`
 
-1. **`calculate-kpi-values/index.ts`** (linje 2009-2019)
-   - `calculateActiveEmployees()` taller pt. kun `is_active = true, is_staff_employee = false`
-   - Skal aendres til at talle unikke medarbejdere der har salgsdata i perioden PLUS aktive medarbejdere
-   - Funktionen modtager ikke periode-parametre i dag -- skal tilfojes
+### 1. `fetchSalesRaw` (linje 155-156)
+Aendr filter fra `closedTime` til `lastModifiedTime`. Beholder 7-dages vindue (allerede hardcoded).
 
-2. **`calculate-kpi-incremental/index.ts`**
-   - Allerede aggregerer salg per employee -- kan udlede "sellers on board" fra `empSales` map'et
-   - Skal tilfoeje et nyt cached KPI `sellers_with_data` eller aendre `active_employees` til at inkludere inaktive med data
+### 2. `fetchSales` (linje 171-175)
+- Aendr filter fra `closedTime` til `lastModifiedTime`
+- Tilfoej 7-dages cap: hvis `days > 7`, begraens `startDate` til 7 dage tilbage
+- Sortering paa linje 192 beholdes som `closedTime` (klient-side)
 
-3. **`calculate-leaderboard-incremental/index.ts`** (linje 261-264)
-   - Henter kun `is_active = true` medarbejdere til navneopslag
-   - Inaktive medarbejdere med salg faar ingen navn i leaderboardet
-   - Skal fjerne `is_active`-filteret saa alle medarbejdere kan slaaes op
+### 3. `fetchSalesRange` (linje 346)
+- Aendr filter fra `closedTime` til `lastModifiedTime`
+- Ret `$gte` til `$gt` og `$lte` til `$lt` (kun understottede operatorer)
+- Tilfoej 7-dages cap: hvis `fromDate` er mere end 7 dage tilbage, flyt den frem
+- Sortering paa linje 358 beholdes som `closedTime` (klient-side)
 
-### Frontend (Dashboards)
+## Hvorfor cron-jobs ikke skal aendres
 
-4. **`SalesOverviewAll.tsx`**, **`CphSalesDashboard.tsx`**, **`EmployeeMasterData.tsx`**
-   - Bruger `usePrecomputedKpis(["active_employees"])` -- disse faar automatisk korrekte tal naar backend er rettet
-   - Fallback-queries i SalesOverviewAll og CphSalesDashboard filtrerer ogsaa paa `is_active = true` -- skal opdateres
+- Lovablecph sync sender `days: 2` -- under 7-dages cap, fungerer uaendret
+- Relatel sync sender `days: 1` -- under 7-dages cap, fungerer uaendret
+- Backfill sender dag-for-dag ranges via cursor -- hver range er 1 dag, under 7-dages cap
 
-## Loesning
+## Fil der aendres
 
-### 1. Ret `calculateActiveEmployees` i `calculate-kpi-values`
+1. `supabase/functions/integration-engine/adapters/adversus.ts` -- 3 filter-aendringer + 7-dages cap
 
-Aendr funktionen til at tage periode-parametre og talle unikke medarbejdere med salg i perioden:
+## Deploy
 
-```text
-Nuvaerende:
-  SELECT count(*) FROM employee_master_data WHERE is_active = true AND is_staff_employee = false
-
-Ny logik:
-  1. Hent aktive medarbejdere (is_active = true, is_staff_employee = false) -> Set A
-  2. Hent unikke employee_ids fra sale_items/sales i perioden -> Set B
-  3. Return størrelsen af A UNION B (unikke medarbejdere)
-```
-
-### 2. Tilfoej `sellers_with_data` i `calculate-kpi-incremental`
-
-Efter aggregeringen af `empSales` map'et, tilfoej et nyt KPI der taller antallet af unikke medarbejdere med mindst 1 salg:
-
-```text
-const sellersWithData = empSales.size;
-// Tilfoej som cached value med slug "sellers_with_data"
-```
-
-### 3. Fjern `is_active`-filter i leaderboard
-
-I `calculate-leaderboard-incremental.ts` linje 264, fjern `.eq("is_active", true)` saa inaktive medarbejdere ogsaa kan slaaes op med navn og avatar.
-
-### 4. Opdater frontend fallback-queries
-
-I `SalesOverviewAll.tsx` og `CphSalesDashboard.tsx`, fjern `is_active = true` filteret fra fallback-queries der taller medarbejdere.
-
-## Filer der aendres
-
-1. `supabase/functions/calculate-kpi-values/index.ts` -- ny logik i `calculateActiveEmployees()`
-2. `supabase/functions/calculate-kpi-incremental/index.ts` -- tilfoej `sellers_with_data` KPI
-3. `supabase/functions/calculate-leaderboard-incremental/index.ts` -- fjern `is_active` filter
-4. `src/pages/dashboards/SalesOverviewAll.tsx` -- opdater fallback query
-5. `src/pages/dashboards/CphSalesDashboard.tsx` -- opdater fallback query
-
-## Risiko
-
-- Lav: Aendringen er additiv -- vi tilfojer medarbejdere, fjerner ingen
-- Leaderboard-navneopslag bliver lidt stoerre (alle medarbejdere i stedet for kun aktive), men ubetydeligt for performance
-- Eksisterende KPI-slug `active_employees` beholder sit navn for kompatibilitet, men logikken bag aendres
+Edge function `integration-engine` deployes automatisk. Naeste sync-run (inden for 5 minutter) vil bruge det korrekte filter og hente salg igen.
 
