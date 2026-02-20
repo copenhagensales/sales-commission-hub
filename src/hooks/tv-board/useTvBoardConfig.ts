@@ -41,6 +41,9 @@ export function useTvBoardConfig(accessCode: string | undefined) {
 
   const refreshTimerRef = useRef<number | null>(null);
   const failuresRef = useRef(0);
+  const lastHeartbeatRef = useRef(0);
+
+  const HEARTBEAT_INTERVAL = 24 * 60 * 60 * 1000; // 24 timer
 
   const normalizedCode = useMemo(() => (accessCode || "").trim().toUpperCase(), [accessCode]);
 
@@ -163,6 +166,21 @@ export function useTvBoardConfig(accessCode: string | undefined) {
       setHardError(null);
       setTransientError(null);
       setLoading(false);
+
+      // Daglig heartbeat: opdater last_accessed_at højst én gang per 24 timer
+      const now = Date.now();
+      if (now - lastHeartbeatRef.current > HEARTBEAT_INTERVAL) {
+        lastHeartbeatRef.current = now;
+        supabase
+          .from("tv_board_access")
+          .update({
+            last_accessed_at: new Date().toISOString(),
+            access_count: (data.access_count || 0) + 1,
+          })
+          .eq("id", data.id)
+          .then(); // fire-and-forget
+      }
+
       scheduleNextRefresh(true);
     } catch (e) {
       const transient = isLikelyTransient(e);
