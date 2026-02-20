@@ -25,60 +25,71 @@ serve(async (req) => {
       p_encryption_key: encryptionKey,
     });
 
-    if (!credentials) {
-      return new Response(JSON.stringify({ error: "no_credentials" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
     const baseUrl = "https://wshero01.herobase.com/api";
+    
+    // Use stored credentials
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (credentials.username && credentials.password) {
+    if (credentials?.username && credentials?.password) {
       headers["Authorization"] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+      console.log("[TestASE] Using stored creds, username:", credentials.username);
     }
 
     const today = new Date().toISOString().slice(0, 10);
     
-    // Try multiple URL variations
+    // Try the leads endpoint variations
     const urls = [
       `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}`,
-      `${baseUrl}/leads?SearchName=cphsales&ModifiedFrom=${today}`,
-      `${baseUrl}/leads?searchName=cphsales&modifiedFrom=${today}`,
-      `${baseUrl}/leads?searchName=cphsales`,
-      `${baseUrl}/leads/cphsales?ModifiedFrom=${today}`,
+      `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}&PageSize=10`,
+      `${baseUrl}/leads?searchName=cphsales&ModifiedFrom=${today}&take=10`,
     ];
 
     const results: Record<string, unknown>[] = [];
+
+    // First log what user the API is using
+    results.push({ storedUsername: credentials?.username ?? "N/A" });
 
     for (const url of urls) {
       console.log("[TestASE] Trying:", url);
       const resp = await fetch(url, { headers });
       const text = await resp.text();
-      console.log("[TestASE] Status:", resp.status, "Body:", text.slice(0, 500));
+      console.log("[TestASE]", resp.status, text.slice(0, 300));
       
-      results.push({
+      const entry: Record<string, unknown> = {
         url: url.replace(baseUrl, ""),
         status: resp.status,
-        bodyPreview: text.slice(0, 500),
+        bodyPreview: text.slice(0, 1000),
         bodyLength: text.length,
-      });
+      };
 
-      // If we got a 200, parse and analyze
       if (resp.status === 200) {
         try {
           const parsed = JSON.parse(text);
           const isArr = Array.isArray(parsed);
-          const count = isArr ? parsed.length : (parsed.Results?.length ?? parsed.results?.length ?? "N/A");
-          results[results.length - 1].parsed = {
-            isArray: isArr,
-            count,
-            topKeys: isArr ? (parsed.length > 0 ? Object.keys(parsed[0]) : []) : Object.keys(parsed),
-            firstItem: isArr ? parsed[0] : (parsed.Results?.[0] ?? parsed.results?.[0] ?? null),
-            secondItem: isArr && parsed.length > 1 ? parsed[1] : null,
-          };
+          entry.isArray = isArr;
+          if (isArr) {
+            entry.count = parsed.length;
+            if (parsed.length > 0) {
+              entry.firstItemKeys = Object.keys(parsed[0]);
+              entry.firstItem = parsed[0];
+            }
+          } else {
+            entry.topKeys = Object.keys(parsed);
+            // Check nested arrays
+            for (const k of Object.keys(parsed)) {
+              if (Array.isArray(parsed[k])) {
+                entry[`${k}_count`] = parsed[k].length;
+                if (parsed[k].length > 0) {
+                  entry[`${k}_firstKeys`] = Object.keys(parsed[k][0]);
+                  entry[`${k}_first`] = parsed[k][0];
+                }
+              }
+            }
+          }
         } catch { /* skip */ }
-        break; // Stop on first success
+        break;
       }
+
+      results.push(entry);
     }
 
     return new Response(JSON.stringify(results, null, 2), {
