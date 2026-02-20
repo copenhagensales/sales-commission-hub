@@ -402,7 +402,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 onClick={() => navigate("/")} 
                 className="flex items-center justify-center px-3 py-2"
               >
-                <img src={cphSalesLogo} alt="CPH Sales" className="h-16 w-auto object-contain" />
+                <img src={cphSalesLogo} alt="CPH Sales" className="h-20 w-auto object-contain" />
               </div>
             </div>
           )}
@@ -487,7 +487,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               onClick={() => navigate("/")} 
               className="flex items-center justify-center px-3 py-2"
             >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-16 w-auto object-contain" />
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-20 w-auto object-contain" />
             </div>
             
             {/* Collapse button */}
