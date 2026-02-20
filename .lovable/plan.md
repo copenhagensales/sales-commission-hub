@@ -1,62 +1,79 @@
 
 
-# Fix: Skift Adversus filter fra `created` til `closedTime` + nulstil backfill
+# Fix: KPI `active_employees` og leaderboard skal inkludere inaktive medarbejdere med data
 
 ## Problem
-Adversus API-filteret bruger `created` (hvornaar leadet blev oprettet), men TDC-leads oprettes uger/maaneder foer de lukkes som salg. Salg lukket i dag fanges derfor ikke af `created.$gt` med et 2-dages vindue.
 
-## Lovablecph's to cron jobs
+I dag taller `active_employees` KPI'et kun medarbejdere hvor `is_active = true`. Hvis en medarbejder har salgsdata i perioden men er blevet deaktiveret, taller de ikke med. Det samme galder leaderboardet, som kun henter navne for aktive medarbejdere.
 
-Integrationen har to aktive jobs:
+## Berarte steder
 
-| Job | Schedule | Formaal |
-|---|---|---|
-| `dialer-26fac751-sync` | Hvert 5. min (minut 3,8,13...) | Synkroniserer salg (days=2, maxRecords=60) |
-| `dialer-26fac751-backfill` | Hver time (minut 35) | Indhenter historisk data dag-for-dag fra startdato |
+### Backend (Edge Functions)
 
-Begge jobs bruger `adversus.ts` adapteren og er derfor begge ramt af `created`-filteret. Begge skal bruge `closedTime` i stedet.
+1. **`calculate-kpi-values/index.ts`** (linje 2009-2019)
+   - `calculateActiveEmployees()` taller pt. kun `is_active = true, is_staff_employee = false`
+   - Skal aendres til at talle unikke medarbejdere der har salgsdata i perioden PLUS aktive medarbejdere
+   - Funktionen modtager ikke periode-parametre i dag -- skal tilfojes
 
-## Aendringer
+2. **`calculate-kpi-incremental/index.ts`**
+   - Allerede aggregerer salg per employee -- kan udlede "sellers on board" fra `empSales` map'et
+   - Skal tilfoeje et nyt cached KPI `sellers_with_data` eller aendre `active_employees` til at inkludere inaktive med data
 
-### 1. Skift API-filter i `adversus.ts` (3 steder)
+3. **`calculate-leaderboard-incremental/index.ts`** (linje 261-264)
+   - Henter kun `is_active = true` medarbejdere til navneopslag
+   - Inaktive medarbejdere med salg faar ingen navn i leaderboardet
+   - Skal fjerne `is_active`-filteret saa alle medarbejdere kan slaaes op
 
-**Fil:** `supabase/functions/integration-engine/adapters/adversus.ts`
+### Frontend (Dashboards)
 
-- **Linje 156** (`fetchSalesRaw`): `created` -> `closedTime`
-- **Linje 175** (`fetchSales`): `created` -> `closedTime`  
-- **Linje 346** (`fetchSalesRange` - brugt af backfill): `created` -> `closedTime`
+4. **`SalesOverviewAll.tsx`**, **`CphSalesDashboard.tsx`**, **`EmployeeMasterData.tsx`**
+   - Bruger `usePrecomputedKpis(["active_employees"])` -- disse faar automatisk korrekte tal naar backend er rettet
+   - Fallback-queries i SalesOverviewAll og CphSalesDashboard filtrerer ogsaa paa `is_active = true` -- skal opdateres
 
-### 2. Opdater sortering til `closedTime`
+## Loesning
 
-- **Linje 192** (`fetchSales` sort): Brug `closedTime` med fallback til `created`
-- **Linje 358** (`fetchSalesRange` sort): Samme aendring
+### 1. Ret `calculateActiveEmployees` i `calculate-kpi-values`
 
-### 3. Nulstil backfill-cursor i databasen
-
-Backfill-cursoren staar pt. paa `2026-02-20` (faerdig). For at starte forfra og hente al historisk data med det nye `closedTime`-filter, nulstilles cursoren til startdatoen `2026-01-15`:
+Aendr funktionen til at tage periode-parametre og talle unikke medarbejdere med salg i perioden:
 
 ```text
-UPDATE dialer_sync_state 
-SET cursor = '2026-01-15', updated_at = now()
-WHERE integration_id = '26fac751-c2d8-4b5b-a6df-e33a32e3c6e7' 
-AND dataset = 'backfill';
+Nuvaerende:
+  SELECT count(*) FROM employee_master_data WHERE is_active = true AND is_staff_employee = false
+
+Ny logik:
+  1. Hent aktive medarbejdere (is_active = true, is_staff_employee = false) -> Set A
+  2. Hent unikke employee_ids fra sale_items/sales i perioden -> Set B
+  3. Return størrelsen af A UNION B (unikke medarbejdere)
 ```
 
-Dette goer at det time-baserede backfill-job automatisk starter forfra naeste gang det koerer (minut 35) og gennemgaar alle dage fra 15. januar med det korrekte filter.
+### 2. Tilfoej `sellers_with_data` i `calculate-kpi-incremental`
 
-### 4. Deploy og verificer
+Efter aggregeringen af `empSales` map'et, tilfoej et nyt KPI der taller antallet af unikke medarbejdere med mindst 1 salg:
 
-- Deploy `integration-engine` med det opdaterede filter
-- Backfill-jobbet starter automatisk forfra ved naeste koersel
-- Sales-sync jobbet fanger nye salg fra i dag med det samme
+```text
+const sellersWithData = empSales.size;
+// Tilfoej som cached value med slug "sellers_with_data"
+```
 
-## Risiko
+### 3. Fjern `is_active`-filter i leaderboard
 
-- Lav: `closedTime` er standard-feltet i Adversus for hvornaar et salg afsluttes. Alle lukkede salg har dette felt.
-- Backfill starter forfra, men koerer kun 5-7 dage per time -- det tager ca. 5-6 timer at gennemloebe alle 36 dage igen.
-- Andre integrationer (Relatel, ASE, Tryg) bruger samme adapter og faar ogsaa det forbedrede filter.
+I `calculate-leaderboard-incremental.ts` linje 264, fjern `.eq("is_active", true)` saa inaktive medarbejdere ogsaa kan slaaes op med navn og avatar.
+
+### 4. Opdater frontend fallback-queries
+
+I `SalesOverviewAll.tsx` og `CphSalesDashboard.tsx`, fjern `is_active = true` filteret fra fallback-queries der taller medarbejdere.
 
 ## Filer der aendres
 
-1. `supabase/functions/integration-engine/adapters/adversus.ts` -- filter + sortering (5 linjer)
-2. Database: nulstil backfill-cursor til `2026-01-15`
+1. `supabase/functions/calculate-kpi-values/index.ts` -- ny logik i `calculateActiveEmployees()`
+2. `supabase/functions/calculate-kpi-incremental/index.ts` -- tilfoej `sellers_with_data` KPI
+3. `supabase/functions/calculate-leaderboard-incremental/index.ts` -- fjern `is_active` filter
+4. `src/pages/dashboards/SalesOverviewAll.tsx` -- opdater fallback query
+5. `src/pages/dashboards/CphSalesDashboard.tsx` -- opdater fallback query
+
+## Risiko
+
+- Lav: Aendringen er additiv -- vi tilfojer medarbejdere, fjerner ingen
+- Leaderboard-navneopslag bliver lidt stoerre (alle medarbejdere i stedet for kun aktive), men ubetydeligt for performance
+- Eksisterende KPI-slug `active_employees` beholder sit navn for kompatibilitet, men logikken bag aendres
+
