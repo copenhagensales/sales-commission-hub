@@ -1,38 +1,21 @@
 
 
-# Heartbeat: Daglig opdatering af `last_accessed_at` (nat)
+# Fix: Opdater stale `last_accessed_at` data
 
-## Tilgang
-I stedet for en 5-minutters heartbeat, saet intervallet til 24 timer. Naar et TV-board henter config (hvert 30. sekund via `useTvBoardConfig`), tjekker vi om der er gaaet 24+ timer siden sidste heartbeat. Hvis ja, opdateres `last_accessed_at`.
+## Problem
+Databasen viser at `last_accessed_at` sidst blev opdateret d. 22. januar for de aktive boards. Heartbeat-koden vi tilfoejede vil holde det opdateret fremover, men de nuvaerende data er foraeeldede -- derfor viser alle boards "Ubrugt i X dage".
 
-Da TV-boards koerer 24/7, vil den foerste refresh efter midnat automatisk trigge opdateringen -- saa det sker naturligt om natten.
+## Loesning
 
-## Aendring
-
-### Fil: `src/hooks/tv-board/useTvBoardConfig.ts`
-
-Tilfoej i `refresh()` efter succesfuld datahentning:
+### 1. Engangs-databaseopdatering
+Koer en SQL-migration der saetter `last_accessed_at` til nu for alle aktive boards:
 
 ```text
-const HEARTBEAT_INTERVAL = 24 * 60 * 60 * 1000; // 24 timer
-const lastHeartbeatRef = useRef(0);
-
-// I refresh(), efter setTvData(data):
-const now = Date.now();
-if (now - lastHeartbeatRef.current > HEARTBEAT_INTERVAL) {
-  lastHeartbeatRef.current = now;
-  supabase
-    .from("tv_board_access")
-    .update({
-      last_accessed_at: new Date().toISOString(),
-      access_count: (data.access_count || 0) + 1,
-    })
-    .eq("id", data.id)
-    .then(); // fire-and-forget
-}
+UPDATE tv_board_access 
+SET last_accessed_at = now() 
+WHERE is_active = true;
 ```
 
-### Ingen andre aendringer
-- Stale-indikatorer i `TvLinksSettingsTab.tsx` og `TvBoardAdmin.tsx` forbliver som de er
-- Ingen database-aendringer
+### 2. Ingen kodeaendringer
+Heartbeat-logikken i `useTvBoardConfig.ts` er allerede implementeret og vil holde `last_accessed_at` opdateret dagligt fremover. RLS-policies tillader allerede public updates paa aktive boards.
 
