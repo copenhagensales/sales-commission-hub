@@ -124,7 +124,7 @@ export default function DailyReports() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
   const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "clients", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"active" | "inactive" | "all">("all");
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<string | null>(null);
