@@ -747,7 +747,7 @@ export default function CphSalesDashboard() {
         if (!teamId || !teamAbsences[teamId]) return;
 
         const isSick = absence.type === "sick";
-        const isVacation = absence.type === "vacation";
+        const isVacation = absence.type === "vacation" || absence.type === "day_off";
         if (!isSick && !isVacation) return;
 
         const startDate = absence.start_date;
