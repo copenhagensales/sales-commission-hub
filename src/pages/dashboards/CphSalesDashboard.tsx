@@ -380,7 +380,6 @@ export default function CphSalesDashboard() {
       const { count, error } = await supabase
         .from("employee_master_data")
         .select("*", { count: "exact", head: true })
-        .eq("is_active", true)
         .eq("is_staff_employee", false);
       if (error) throw error;
       return count || 0;
