@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings, AlertTriangle } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play, Settings, AlertTriangle, Eye } from "lucide-react";
 import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -876,6 +876,16 @@ export function TvLinksSettingsTab() {
                             <PartyPopper className="h-3 w-3 mr-1" />
                             Fejring
                           </Badge>
+                        )}
+                      </div>
+                      {/* Usage stats */}
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                        <span className="flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          {code.access_count || 0} visninger
+                        </span>
+                        {code.last_accessed_at && (
+                          <span>• Sidst: {format(new Date(code.last_accessed_at), "d. MMM HH:mm", { locale: da })}</span>
                         )}
                       </div>
                     </div>
