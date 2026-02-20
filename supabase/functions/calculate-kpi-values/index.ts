@@ -2009,13 +2009,77 @@ async function calculateTotalHours(
 async function calculateActiveEmployees(
   supabase: SupabaseClient
 ): Promise<number> {
-  const { count } = await supabase
+  // Count currently active non-staff employees
+  const { count: activeCount } = await supabase
     .from("employee_master_data")
     .select("*", { count: "exact", head: true })
     .eq("is_active", true)
     .eq("is_staff_employee", false);
 
-  return count || 0;
+  // Also count inactive employees who have sales data in the current payroll period
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+  const payrollStart = day >= 15
+    ? new Date(year, month, 15)
+    : new Date(year, month - 1, 15);
+
+  const { data: inactiveWithSales } = await supabase
+    .from("employee_master_data")
+    .select("id")
+    .eq("is_active", false)
+    .eq("is_staff_employee", false);
+
+  if (!inactiveWithSales || inactiveWithSales.length === 0) {
+    return activeCount || 0;
+  }
+
+  // Check which inactive employees have sales via their agent mappings
+  const inactiveIds = inactiveWithSales.map(e => e.id);
+  const { data: mappings } = await supabase
+    .from("employee_agent_mapping")
+    .select("employee_id, agents(email)")
+    .in("employee_id", inactiveIds);
+
+  if (!mappings || mappings.length === 0) {
+    return activeCount || 0;
+  }
+
+  const emails = mappings
+    .map(m => (m.agents as any)?.email?.toLowerCase())
+    .filter(Boolean);
+
+  if (emails.length === 0) {
+    return activeCount || 0;
+  }
+
+  // Count distinct inactive employees with sales in the payroll period
+  const { data: salesData } = await supabase
+    .from("sales")
+    .select("agent_email")
+    .in("agent_email", emails)
+    .gte("sale_datetime", payrollStart.toISOString())
+    .neq("validation_status", "rejected");
+
+  const uniqueEmails = new Set(
+    (salesData || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean)
+  );
+
+  // Map back to employee IDs to count unique employees
+  const emailToEmpId = new Map<string, string>();
+  for (const m of mappings) {
+    const email = (m.agents as any)?.email?.toLowerCase();
+    if (email) emailToEmpId.set(email, m.employee_id);
+  }
+
+  const inactiveWithData = new Set<string>();
+  for (const email of uniqueEmails) {
+    const empId = emailToEmpId.get(email as string);
+    if (empId) inactiveWithData.add(empId);
+  }
+
+  return (activeCount || 0) + inactiveWithData.size;
 }
 
 async function calculateStaffEmployees(

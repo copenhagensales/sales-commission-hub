@@ -260,8 +260,7 @@ Deno.serve(async (req) => {
     // ============= FETCH EMPLOYEE DATA =============
     const { data: employees } = await supabase
       .from("employee_master_data")
-      .select("id, first_name, last_name, avatar_url")
-      .eq("is_active", true);
+      .select("id, first_name, last_name, avatar_url");
     
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
     (employees || []).forEach(emp => {

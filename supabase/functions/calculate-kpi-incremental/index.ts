@@ -247,11 +247,15 @@ Deno.serve(async (req) => {
 
       // ============= BUILD CACHED VALUES =============
 
+      // Count unique sellers with data in this period
+      const sellersWithData = empSales.size;
+
       // Global scope
       allValues.push(
         { kpi_slug: "sales_count", period_type: period.type, scope_type: "global", scope_id: null, value: globalSales, formatted_value: formatValue(globalSales, "count"), calculated_at: calculatedAt },
         { kpi_slug: "total_commission", period_type: period.type, scope_type: "global", scope_id: null, value: globalCommission, formatted_value: formatValue(globalCommission, "commission"), calculated_at: calculatedAt },
         { kpi_slug: "total_revenue", period_type: period.type, scope_type: "global", scope_id: null, value: globalRevenue, formatted_value: formatValue(globalRevenue, "revenue"), calculated_at: calculatedAt },
+        { kpi_slug: "sellers_with_data", period_type: period.type, scope_type: "global", scope_id: null, value: sellersWithData, formatted_value: formatValue(sellersWithData, "count"), calculated_at: calculatedAt },
       );
 
       // Client scope
