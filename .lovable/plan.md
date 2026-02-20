@@ -1,20 +1,20 @@
 
-# Tilpas logo-størrelse i sidebaren
+# Fix: Gør logoet synligt igen i sidebaren
 
 ## Problem
-Logoet har klassen `h-40` (160px højt) men sidder i en header-container der kun er `h-24` (96px). Det flyder derfor ud over kanten og dækker bl.a. dashboard-knappen, så den ikke kan klikkes ordentligt.
+Logoet blev reduceret fra `h-40` (160px) til `h-16` (64px), hvilket kan gøre det for lille til at være tydeligt synligt. Derudover kan `overflow-hidden` på containeren klippe logoet uhensigtsmæssigt.
 
 ## Løsning
-Reducer logoets højde til `h-16` (64px) så det passer inden for headeren med lidt luft, og tilføj `overflow-hidden` på containeren som sikkerhedsnet.
+Øg logoets højde til `h-20` (80px) -- et kompromis der passer inden for `h-24` containeren uden at flyde ud over kanten. Behold `overflow-hidden` som sikkerhedsnet.
 
 ## Tekniske detaljer
 
 ### Fil: `src/components/layout/AppSidebar.tsx`
 
-**3 steder med `h-40` ændres til `h-16`:**
+**3 ændringer:**
 
-1. **Linje 405** (loading-state, desktop): `className="h-40 w-auto object-contain"` til `className="h-16 w-auto object-contain"`
-2. **Linje 490** (desktop-visning): Samme ændring
-3. Tjek om der også findes en mobilversion med samme problem
+1. **Linje 405** (loading-state, desktop): Ændr `h-16` til `h-20`
+2. **Linje 490** (desktop-visning): Ændr `h-16` til `h-20`
+3. Evt. mobilversionen hvis den også bruger `h-16`
 
-Derudover tilføjes `overflow-hidden` på header-containerne (linje 400 og 485) for at forhindre overflow.
+Resultat: Logoet fylder 80px i højden, passer fint i den 96px høje header, og er tydeligt synligt.
