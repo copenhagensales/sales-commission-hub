@@ -1,26 +1,34 @@
 
+# Tilfoej brugsstatistik til TV Links-fanen
 
-# Tilføj brugsdata til TV Links-dialogen
+## Problem
+TV Links-fanen paa `/dashboards/settings` viser ikke visningstal eller "sidst brugt" som synlig tekst. Den har kun en indirekte stale-advarsel. Brugeren kan ikke se om et link er aktivt brugt.
 
-## Hvad ændres
-TV Links-dialogen (den der åbnes fra dashboard-indstillinger) udvides med brugsstatistik for hver adgangskode, så du hurtigt kan se hvilke der bruges aktivt.
-
-## Synlige ændringer
-For hver adgangskode i listen vises nu:
-- Antal visninger (fx "41 visninger")
-- Sidst brugt tidspunkt (fx "i dag kl. 12:09" eller "22. jan")
-- Orange advarsel hvis koden ikke er brugt i 5+ dage eller aldrig er brugt
+## Loesning
+Tilfoej en synlig statistiklinje under hvert TV-link med:
+- Oeje-ikon + antal visninger (fx "41 visninger")
+- Sidst brugt tidspunkt (fx "Sidst: 20. feb 12:09")
+- Orange advarsel hvis ubrugt i 5+ dage (allerede implementeret)
 
 ## Tekniske detaljer
 
-### Fil: `src/components/dashboard/TvBoardQuickGenerator.tsx`
+### Fil: `src/components/dashboard/TvLinksSettingsTab.tsx`
 
-1. Tilføj imports: `Eye`, `AlertTriangle` fra lucide-react, `format` og `da` fra date-fns
-2. Tilføj `getStaleInfo`-hjælpefunktion (samme logik som i TvBoardAdmin)
-3. Udvid hvert kode-element i listen med en ekstra linje der viser:
-   - Et øje-ikon med `access_count`
-   - Sidst brugt dato formateret med dansk locale
-   - Orange badge hvis stale (5+ dage uden brug)
+**Tilfoej import**: `Eye` fra `lucide-react` (linje 15)
 
-Queryen henter allerede `*` fra tabellen, så `access_count` og `last_accessed_at` er tilgængelige uden ændringer i data-laget.
+**Tilfoej statistiklinje** efter badges-raekkerne (efter linje 880, foer `</div>` for flex-1):
 
+```typescript
+{/* Usage stats */}
+<div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+  <span className="flex items-center gap-1">
+    <Eye className="h-3 w-3" />
+    {code.access_count || 0} visninger
+  </span>
+  {code.last_accessed_at && (
+    <span>• Sidst: {format(new Date(code.last_accessed_at), "d. MMM HH:mm", { locale: da })}</span>
+  )}
+</div>
+```
+
+Ingen database- eller backend-aendringer er noedvendige -- dataen hentes allerede via `select("*")`.
