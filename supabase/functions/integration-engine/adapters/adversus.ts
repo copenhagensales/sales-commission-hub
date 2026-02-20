@@ -153,7 +153,7 @@ export class AdversusAdapter implements DialerAdapter {
     startDate.setDate(startDate.getDate() - 7);
     
     const filterStr = encodeURIComponent(JSON.stringify({ 
-      created: { $gt: startDate.toISOString() } 
+      closedTime: { $gt: startDate.toISOString() } 
     }));
     
     const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
@@ -172,7 +172,7 @@ export class AdversusAdapter implements DialerAdapter {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: startDate.toISOString() } }));
+    const filterStr = encodeURIComponent(JSON.stringify({ closedTime: { $gt: startDate.toISOString() } }));
 
     // Build campaign lookup maps
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
@@ -189,7 +189,7 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Fetched ${rawSales.length} sales`);
 
     // Sort newest first so we always prioritize recent sales
-    rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
+    rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
     
     // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
     // NOTE: maxRecords is now set higher (60) to ensure today's sales are included
@@ -343,7 +343,7 @@ export class AdversusAdapter implements DialerAdapter {
     if (!hasTimeTo) toDate.setHours(23, 59, 59, 999)
     const fromISO = fromDate.toISOString()
     const toISO = toDate.toISOString()
-    const filterStr = encodeURIComponent(JSON.stringify({ created: { $gte: fromISO, $lte: toISO } }));
+    const filterStr = encodeURIComponent(JSON.stringify({ closedTime: { $gte: fromISO, $lte: toISO } }));
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
     const users = await this.fetchUsers();
@@ -355,7 +355,7 @@ export class AdversusAdapter implements DialerAdapter {
 
     // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
     if (maxRecords && rawSales.length > maxRecords) {
-      rawSales.sort((a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
       rawSales = rawSales.slice(0, maxRecords);
       console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords})`);
     }
