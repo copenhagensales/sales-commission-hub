@@ -127,7 +127,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                     </TableHead>
                   )}
                   <TableHead className="text-center font-semibold text-foreground w-20">Syg</TableHead>
-                  <TableHead className="text-center font-semibold text-foreground w-20 pr-4">Ferie</TableHead>
+                  <TableHead className="text-center font-semibold text-foreground w-20 pr-4">Ferie/fri</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,7 +215,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{getVacationValue(team)} feriedage af {possibleDays} mulige</p>
+                            <p>{getVacationValue(team)} ferie-/fridage af {possibleDays} mulige</p>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
@@ -274,7 +274,7 @@ export function TeamPerformanceTabs({ data }: TeamPerformanceTabsProps) {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{totalVacation} feriedage af {totalPossibleDays} mulige</p>
+                        <p>{totalVacation} ferie-/fridage af {totalPossibleDays} mulige</p>
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
