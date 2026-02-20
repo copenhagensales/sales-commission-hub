@@ -153,7 +153,7 @@ export class AdversusAdapter implements DialerAdapter {
     startDate.setDate(startDate.getDate() - 7);
     
     const filterStr = encodeURIComponent(JSON.stringify({ 
-      closedTime: { $gt: startDate.toISOString() } 
+      lastModifiedTime: { $gt: startDate.toISOString() } 
     }));
     
     const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
@@ -169,10 +169,19 @@ export class AdversusAdapter implements DialerAdapter {
   }
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]> {
-    const startDate = new Date();
+    let startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const filterStr = encodeURIComponent(JSON.stringify({ closedTime: { $gt: startDate.toISOString() } }));
+    // Cap lookback to max 7 days to avoid fetching stale data
+    const MAX_MODIFIED_DAYS = 7;
+    const maxLookback = new Date();
+    maxLookback.setDate(maxLookback.getDate() - MAX_MODIFIED_DAYS);
+    if (startDate < maxLookback) {
+      console.log(`[Adversus] fetchSales: Capping startDate from ${startDate.toISOString()} to ${maxLookback.toISOString()} (max ${MAX_MODIFIED_DAYS} days)`);
+      startDate = maxLookback;
+    }
+
+    const filterStr = encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: startDate.toISOString() } }));
 
     // Build campaign lookup maps
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
@@ -343,7 +352,16 @@ export class AdversusAdapter implements DialerAdapter {
     if (!hasTimeTo) toDate.setHours(23, 59, 59, 999)
     const fromISO = fromDate.toISOString()
     const toISO = toDate.toISOString()
-    const filterStr = encodeURIComponent(JSON.stringify({ closedTime: { $gte: fromISO, $lte: toISO } }));
+    // Cap lookback to max 7 days
+    const MAX_MODIFIED_DAYS = 7;
+    const maxLookback = new Date();
+    maxLookback.setDate(maxLookback.getDate() - MAX_MODIFIED_DAYS);
+    if (fromDate < maxLookback) {
+      console.log(`[Adversus] fetchSalesRange: Capping fromDate from ${fromISO} to ${maxLookback.toISOString()} (max ${MAX_MODIFIED_DAYS} days)`);
+      fromDate.setTime(maxLookback.getTime());
+    }
+    const cappedFromISO = fromDate.toISOString();
+    const filterStr = encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: cappedFromISO, $lt: toISO } }));
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
     const users = await this.fetchUsers();
