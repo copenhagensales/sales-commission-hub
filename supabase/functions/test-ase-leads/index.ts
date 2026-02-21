@@ -93,42 +93,44 @@ serve(async (req) => {
       }
     }
 
-    // Try different API base URLs
-    const altBases = [
-      "https://wshero01.herobase.com/api",
-      "https://wshero01.herobase.com/api/v1",
-      "https://wshero01.herobase.com/api/v2",
-      "https://api.herobase.com/api",
-    ];
+    const now = new Date();
+    const yesterdayFull = new Date(now.getTime() - 86400000).toISOString();
+    const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
     
-    for (const base of altBases) {
-      await testEndpoint(`leads_${base.split('/').pop()}`, `${base}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
-    }
+    // Try lowercase parameter names (maybe case-sensitive)
+    await testEndpoint("leads_lower_params", `${baseUrl}/leads?searchName=cphsales2&modifiedFrom=${yesterday}`);
+    await testEndpoint("leads_lower_searchname", `${baseUrl}/leads?searchname=cphsales2&ModifiedFrom=${yesterday}`);
     
-    // Try with explicit Accept and Content-Type headers
-    console.log(`[TestASE] leads_explicit_headers`);
-    try {
-      const r = await fetch(`${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`, {
-        headers: { 
-          Authorization: authHeader, 
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        }
-      });
-      const t = await r.text();
-      results.push({ name: "leads_explicit_headers", status: r.status, preview: t.slice(0, 300) });
-    } catch (e) { results.push({ name: "leads_explicit_headers", error: (e as Error).message }); }
+    // Try with full ISO datetime instead of date-only
+    await testEndpoint("leads_iso_datetime", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterdayFull}`);
     
-    // Try activities endpoint (similar to leads)
-    await testEndpoint("activities", `${baseUrl}/activities?ModifiedFrom=${yesterday}`);
+    // Try with wider date range (week ago)
+    await testEndpoint("leads_week_ago", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${weekAgo}`);
     
-    // Try webhooks
-    await testEndpoint("webhooks", `${baseUrl}/webhooks`);
+    // Try with European date format (dd.MM.yyyy as shown in screenshot)
+    const eurDate = `${yesterday.slice(8,10)}.${yesterday.slice(5,7)}.${yesterday.slice(0,4)}`;
+    await testEndpoint("leads_eu_date", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${eurDate}`);
     
-    // Try the rawleads (non-csv) JSON endpoint variants
-    await testEndpoint("rawleads_json_project", `${baseUrl}/rawleads?Projects=${encodeURIComponent("Nysalg - Eksterne")}&ModifiedFrom=${yesterday}`);
-    await testEndpoint("rawleads_csv_project", `${baseUrl}/rawleads/csv?Projects=${encodeURIComponent("Nysalg - Eksterne")}&ModifiedFrom=${yesterday}`, "text/csv");
+    // Try searchName as path segment instead of query param
+    await testEndpoint("leads_path_segment", `${baseUrl}/leads/cphsales2?ModifiedFrom=${yesterday}`);
+    
+    // Try with view parameter (maybe it's called view not SearchName)
+    await testEndpoint("leads_view", `${baseUrl}/leads?View=cphsales2&ModifiedFrom=${yesterday}`);
+    await testEndpoint("leads_filter", `${baseUrl}/leads?Filter=cphsales2&ModifiedFrom=${yesterday}`);
+    await testEndpoint("leads_name", `${baseUrl}/leads?Name=cphsales2&ModifiedFrom=${yesterday}`);
+    
+    // Try /leads/search endpoint
+    await testEndpoint("leads_search_ep", `${baseUrl}/leads/search?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
+    await testEndpoint("leads_search_ep2", `${baseUrl}/leads/search/cphsales2?ModifiedFrom=${yesterday}`);
+    
+    // Try /export endpoint
+    await testEndpoint("leads_export", `${baseUrl}/export/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
+    
+    // Try requesting as streamable format
+    await testEndpoint("leads_stream", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}&format=stream`);
+    
+    // Try rawleads with SearchName (maybe this param works there)
+    await testEndpoint("rawleads_csv_search", `${baseUrl}/rawleads/csv?SearchName=cphsales2&ModifiedFrom=${yesterday}`, "text/csv");
 
     return new Response(JSON.stringify(results, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
