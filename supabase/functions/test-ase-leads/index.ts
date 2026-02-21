@@ -26,73 +26,77 @@ serve(async (req) => {
     });
 
     const baseUrl = "https://wshero01.herobase.com/api";
-    
-    // Trim credentials
     const username = credentials?.username?.trim();
     const password = credentials?.password?.trim();
     const headers: Record<string, string> = { Accept: "application/json" };
     if (username && password) {
       headers["Authorization"] = `Basic ${btoa(`${username}:${password}`)}`;
-      console.log("[TestASE] Trimmed username:", JSON.stringify(username), "len:", username.length);
-      console.log("[TestASE] Trimmed password len:", password.length);
     }
 
     const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     
-    // Try multiple approaches
-    const urls = [
-      // 1. Without searchName - just ModifiedFrom
-      `${baseUrl}/leads?ModifiedFrom=${today}`,
-      // 2. With cphsales2
-      `${baseUrl}/leads?searchName=cphsales2&ModifiedFrom=${today}`,
-      // 3. With DialTimeFrom instead of ModifiedFrom
-      `${baseUrl}/leads?searchName=cphsales2&DialTimeFrom=${today}`,
-      // 4. Try campaigns endpoint to verify auth works at all
-      `${baseUrl}/campaigns`,
+    const results: Record<string, unknown>[] = [];
+    results.push({ user: username, passwordLen: password?.length ?? 0 });
+
+    // Test 1: /leads with SearchName=cphsales2 + ModifiedFrom (required combo per docs)
+    const tests: [string, string, Record<string, string>?][] = [
+      ["leads_searchName_modifiedFrom", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`, undefined],
+      ["leads_searchName_dialTimeFrom", `${baseUrl}/leads?SearchName=cphsales2&DialTimeFrom=${yesterday}`, undefined],
+      ["leads_csv_searchName", `${baseUrl}/leads/csv?SearchName=cphsales2&ModifiedFrom=${yesterday}`, { Accept: "text/csv" }],
+      ["rawleads_csv_projects_star", `${baseUrl}/rawleads/csv?Projects=*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`, { Accept: "text/csv" }],
+      ["rawleads_csv_project_nysalg", `${baseUrl}/rawleads/csv?Projects=Nysalg*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`, { Accept: "text/csv" }],
+      ["rawleads_csv_statuses_userprocessed", `${baseUrl}/rawleads/csv?Projects=*&ModifiedFrom=${yesterday}&Statuses=UserProcessed`, { Accept: "text/csv" }],
+      ["leaddefinitions", `${baseUrl}/leaddefinitions`, undefined],
+      ["leadsegments", `${baseUrl}/leadsegments`, undefined],
+      ["users", `${baseUrl}/users`, undefined],
+      ["calls_csv_today", `${baseUrl}/calls/csv?OrgCode=${username}&StartTime=${today}&TimeSpan=1.00:00:00`, { Accept: "text/csv" }],
+      ["reporting_examples", `${baseUrl}/reporting/examples`, undefined],
+      ["myaccount", `${baseUrl}/myaccount`, undefined],
+      ["organizationalunits", `${baseUrl}/organizationalunits`, undefined],
+      ["leads_export_example", `${baseUrl}/leads/export_example?CampaignCode=CAMP5396S3012`, undefined],
     ];
 
-    const results: Record<string, unknown>[] = [];
-    results.push({ storedUsername: username ?? "N/A", passwordLen: password?.length ?? 0 });
+    for (const [name, url, extraHeaders] of tests) {
+      console.log(`[TestASE] Testing: ${name} -> ${url}`);
+      try {
+        const reqHeaders = { ...headers, ...(extraHeaders || {}) };
+        const resp = await fetch(url, { headers: reqHeaders });
+        const text = await resp.text();
+        console.log(`[TestASE] ${name}: ${resp.status} (${text.length} bytes)`);
+        
+        const entry: Record<string, unknown> = {
+          name,
+          url: url.replace(baseUrl, ""),
+          status: resp.status,
+          contentType: resp.headers.get("content-type"),
+          bodyLength: text.length,
+          bodyPreview: text.slice(0, 500),
+        };
 
-    for (const url of urls) {
-      console.log("[TestASE] Trying:", url);
-      const resp = await fetch(url, { headers });
-      const text = await resp.text();
-      console.log("[TestASE]", resp.status, text.slice(0, 500));
-      
-      const entry: Record<string, unknown> = {
-        url: url.replace(baseUrl, ""),
-        status: resp.status,
-        bodyPreview: text.slice(0, 1000),
-        bodyLength: text.length,
-      };
-
-      if (resp.status === 200) {
-        try {
-          const parsed = JSON.parse(text);
-          const isArr = Array.isArray(parsed);
-          entry.isArray = isArr;
-          if (isArr) {
-            entry.count = parsed.length;
-            if (parsed.length > 0) {
-              entry.firstItemKeys = Object.keys(parsed[0]);
-              entry.firstItem = parsed[0];
+        if (resp.status === 200 && text.length > 0) {
+          try {
+            const parsed = JSON.parse(text);
+            entry.isArray = Array.isArray(parsed);
+            if (Array.isArray(parsed)) {
+              entry.count = parsed.length;
+              if (parsed.length > 0) entry.firstItemKeys = Object.keys(parsed[0]);
+              if (parsed.length > 0) entry.firstItem = parsed[0];
+            } else {
+              entry.topKeys = Object.keys(parsed);
             }
-          } else {
-            entry.topKeys = Object.keys(parsed);
-            for (const k of Object.keys(parsed)) {
-              if (Array.isArray(parsed[k])) {
-                entry[`${k}_count`] = parsed[k].length;
-                if (parsed[k].length > 0) {
-                  entry[`${k}_firstKeys`] = Object.keys(parsed[k][0]);
-                }
-              }
-            }
+          } catch {
+            // CSV or other format - count lines
+            const lines = text.split("\n");
+            entry.lineCount = lines.length;
+            entry.firstLines = lines.slice(0, 5);
           }
-        } catch { /* skip */ }
-      }
+        }
 
-      results.push(entry);
+        results.push(entry);
+      } catch (e) {
+        results.push({ name, error: (e as Error).message });
+      }
     }
 
     return new Response(JSON.stringify(results, null, 2), {
