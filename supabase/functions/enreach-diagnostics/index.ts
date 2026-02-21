@@ -184,35 +184,59 @@ Deno.serve(async (req) => {
       results.simpleleads_unfiltered = { error: (e as Error).message };
     }
 
-    // ============ TEST 3: Fetch leads endpoint ============
-    console.log("[Enreach-Diagnostics] TEST 3: Fetching /leads...");
-    try {
-      const leadsUrl = `${baseUrl}/leads?ModifiedFrom=${modifiedFrom}&PageSize=50`;
-      console.log(`[Enreach-Diagnostics] URL: ${leadsUrl}`);
-      
-      const res3 = await fetch(leadsUrl, { headers });
-      
-      if (res3.ok) {
-        const data3 = await res3.json();
-        const dataArray = Array.isArray(data3) ? data3 : (data3.Results || data3.results || data3.Leads || data3.leads || data3.Data || data3.data || []);
-        
-        results.leads = {
-          status: res3.status,
-          success: true,
-          totalRecords: dataArray.length,
-          topLevelKeys: Object.keys(data3 || {}),
-          sampleRecords: dataArray.slice(0, sampleSize),
-          fieldAnalysis: analyzeFieldStructure(dataArray.slice(0, 50)),
-        };
-        console.log(`[Enreach-Diagnostics] /leads returned ${dataArray.length} records`);
-      } else {
-        results.leads = {
-          status: res3.status,
-          error: (await res3.text()).substring(0, 300),
-        };
+    // ============ TEST 3: Try /leads with MANY different parameter combos ============
+    console.log("[Enreach-Diagnostics] TEST 3: Testing /leads with multiple parameter combinations...");
+    const leadsVariants: Record<string, string> = {
+      "leads_bare": `${baseUrl}/leads`,
+      "leads_modifiedFrom": `${baseUrl}/leads?ModifiedFrom=${modifiedFrom}`,
+      "leads_modifiedFrom_pageSize": `${baseUrl}/leads?ModifiedFrom=${modifiedFrom}&PageSize=50`,
+      "leads_searchName_cphsales2": `${baseUrl}/leads?searchName=cphsales2`,
+      "leads_searchName_cphsales": `${baseUrl}/leads?searchName=cphsales`,
+      "leads_searchName_CPH_API": `${baseUrl}/leads?searchName=CPH_API`,
+      "leads_project_id": `${baseUrl}/leads?Projects=PRJ2340S3012`,
+      "leads_project_star": `${baseUrl}/leads?Projects=*`,
+      "leads_project_name": `${baseUrl}/leads?Projects=Nysalg - Eksterne`,
+      "leads_campaign": `${baseUrl}/leads?Campaigns=CAMP5396S3012`,
+      "leads_dialTimeFrom": `${baseUrl}/leads?DialTimeFrom=${modifiedFrom}`,
+      "leads_statuses": `${baseUrl}/leads?Statuses=UserProcessed`,
+      "leads_closures": `${baseUrl}/leads?LeadClosures=Success`,
+      "leads_pageSize_only": `${baseUrl}/leads?PageSize=10`,
+      "leads_project_modifiedFrom": `${baseUrl}/leads?Projects=PRJ2340S3012&ModifiedFrom=${modifiedFrom}`,
+      "leads_searchName_star": `${baseUrl}/leads?searchName=*`,
+    };
+
+    results.leadsVariants = {};
+    for (const [variantName, url] of Object.entries(leadsVariants)) {
+      console.log(`[Enreach-Diagnostics] Testing variant: ${variantName} -> ${url}`);
+      try {
+        const res = await fetch(url, { headers });
+        const status = res.status;
+        if (res.ok) {
+          const data = await res.json();
+          const isArray = Array.isArray(data);
+          const dataArray = isArray ? data : (data.Results || data.results || data.Leads || data.leads || data.Data || data.data || []);
+          (results.leadsVariants as Record<string, unknown>)[variantName] = {
+            status,
+            success: true,
+            totalRecords: isArray ? dataArray.length : `keys: ${Object.keys(data).join(',')}`,
+            recordCount: dataArray.length,
+            sampleRecord: dataArray.length > 0 ? dataArray[0] : null,
+            topLevelKeys: isArray ? null : Object.keys(data),
+          };
+          console.log(`[Enreach-Diagnostics] ✅ ${variantName}: ${status} - ${dataArray.length} records`);
+        } else {
+          const errorText = await res.text();
+          (results.leadsVariants as Record<string, unknown>)[variantName] = {
+            status,
+            success: false,
+            error: errorText.substring(0, 200),
+          };
+          console.log(`[Enreach-Diagnostics] ❌ ${variantName}: ${status}`);
+        }
+      } catch (e) {
+        (results.leadsVariants as Record<string, unknown>)[variantName] = { error: (e as Error).message };
+        console.log(`[Enreach-Diagnostics] ❌ ${variantName}: exception`);
       }
-    } catch (e) {
-      results.leads = { error: (e as Error).message };
     }
 
     // ============ TEST 4: Fetch campaigns ============
