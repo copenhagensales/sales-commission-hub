@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCog } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { EmployeeProfileDialog } from "@/components/employee/EmployeeProfileDialog";
@@ -17,6 +18,7 @@ interface NewEmployee {
   job_title: string | null;
   employment_start_date: string | null;
   is_staff_employee: boolean | null;
+  is_active: boolean | null;
   team_members: Array<{
     teams: {
       name: string;
@@ -52,11 +54,11 @@ export function NewEmployeesTab() {
           job_title,
           employment_start_date,
           is_staff_employee,
+          is_active,
           team_members(teams(name))
         `)
         .gte("employment_start_date", startStr)
         .lte("employment_start_date", endStr)
-        .eq("is_active", true)
         .order("employment_start_date", { ascending: true });
 
       if (error) throw error;
@@ -124,7 +126,12 @@ export function NewEmployeesTab() {
                   onClick={() => handleRowClick(employee.id)}
                 >
                   <TableCell className="font-medium">
-                    {employee.first_name} {employee.last_name}
+                    <span className="flex items-center gap-2">
+                      {employee.first_name} {employee.last_name}
+                      {employee.is_active === false && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inaktiv</Badge>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell>{employee.job_title ?? "-"}</TableCell>
                   <TableCell>{formatStartDate(employee.employment_start_date)}</TableCell>
