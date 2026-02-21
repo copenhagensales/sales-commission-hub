@@ -620,6 +620,7 @@ export default function Auth() {
             fetchPriority="high"
             className="mx-auto h-40 w-auto cursor-pointer"
           />
+          <h2 className="mt-4 text-2xl font-bold text-foreground">Velkommen til Stork</h2>
         </div>
         
         {/* DIAGNOSTIC SUMMARY - Always visible after login attempt */}
