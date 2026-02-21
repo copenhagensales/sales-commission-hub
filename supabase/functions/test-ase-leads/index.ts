@@ -93,44 +93,75 @@ serve(async (req) => {
       }
     }
 
-    const now = new Date();
-    const yesterdayFull = new Date(now.getTime() - 86400000).toISOString();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     
-    // Try lowercase parameter names (maybe case-sensitive)
-    await testEndpoint("leads_lower_params", `${baseUrl}/leads?searchName=cphsales2&modifiedFrom=${yesterday}`);
-    await testEndpoint("leads_lower_searchname", `${baseUrl}/leads?searchname=cphsales2&ModifiedFrom=${yesterday}`);
+    // Trailing slash variations
+    await testEndpoint("leads_trailing", `${baseUrl}/leads/?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
     
-    // Try with full ISO datetime instead of date-only
-    await testEndpoint("leads_iso_datetime", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterdayFull}`);
+    // Without any query params at all - just the endpoint
+    await testEndpoint("leads_bare", `${baseUrl}/leads/`);
+    await testEndpoint("leads_bare2", `${baseUrl}/leads`);
     
-    // Try with wider date range (week ago)
-    await testEndpoint("leads_week_ago", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${weekAgo}`);
+    // Try with Include as first param (maybe order matters)
+    await testEndpoint("leads_include_first", `${baseUrl}/leads?Include=campaign,lastModifiedByUser,firstProcessedByUser&SearchName=cphsales2&ModifiedFrom=${yesterday}`);
     
-    // Try with European date format (dd.MM.yyyy as shown in screenshot)
-    const eurDate = `${yesterday.slice(8,10)}.${yesterday.slice(5,7)}.${yesterday.slice(0,4)}`;
-    await testEndpoint("leads_eu_date", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${eurDate}`);
+    // Try the Tryg integration credentials on /leads to see if it's user-specific
+    const trygIntegrationId = "a5068f85-da1c-43e1-8e57-92cc5c4749f1";
+    const { data: trygCreds } = await supabase.rpc("get_dialer_credentials", {
+      p_integration_id: trygIntegrationId,
+      p_encryption_key: encryptionKey,
+    });
+    const trygUser = trygCreds?.username?.trim();
+    const trygPass = trygCreds?.password?.trim();
+    if (trygUser && trygPass) {
+      const trygAuth = `Basic ${btoa(`${trygUser}:${trygPass}`)}`;
+      // Try /leads on wshero01 with Tryg credentials
+      console.log(`[TestASE] Testing /leads with Tryg user: ${trygUser}`);
+      try {
+        const r = await fetch(`${baseUrl}/leads?ModifiedFrom=${yesterday}`, {
+          headers: { Authorization: trygAuth, Accept: "application/json" }
+        });
+        const t = await r.text();
+        results.push({ name: "leads_tryg_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: trygUser });
+      } catch (e) { results.push({ name: "leads_tryg_user", error: (e as Error).message }); }
+      
+      // Try /simpleleads on wshero01 with Tryg credentials  
+      try {
+        const r = await fetch(`${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`, {
+          headers: { Authorization: trygAuth, Accept: "application/json" }
+        });
+        const t = await r.text();
+        results.push({ name: "simpleleads_tryg_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: trygUser });
+      } catch (e) { results.push({ name: "simpleleads_tryg_user", error: (e as Error).message }); }
+    } else {
+      results.push({ name: "tryg_creds", note: "No Tryg credentials found" });
+    }
     
-    // Try searchName as path segment instead of query param
-    await testEndpoint("leads_path_segment", `${baseUrl}/leads/cphsales2?ModifiedFrom=${yesterday}`);
+    // Try Eesy integration credentials on /leads (different server wshero06)
+    const eesyIntegrationId = "d79b9632-1cac-4744-ab30-7768e580c794";
+    const { data: eesyCreds } = await supabase.rpc("get_dialer_credentials", {
+      p_integration_id: eesyIntegrationId,
+      p_encryption_key: encryptionKey,
+    });
+    const eesyUser = eesyCreds?.username?.trim();
+    const eesyPass = eesyCreds?.password?.trim();
+    if (eesyUser && eesyPass) {
+      const eesyAuth = `Basic ${btoa(`${eesyUser}:${eesyPass}`)}`;
+      // Try /leads on wshero06 with Eesy credentials
+      console.log(`[TestASE] Testing /leads with Eesy user: ${eesyUser}`);
+      try {
+        const r = await fetch(`https://wshero06.herobase.com/api/leads?ModifiedFrom=${yesterday}`, {
+          headers: { Authorization: eesyAuth, Accept: "application/json" }
+        });
+        const t = await r.text();
+        results.push({ name: "leads_eesy_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: eesyUser });
+      } catch (e) { results.push({ name: "leads_eesy_user", error: (e as Error).message }); }
+    } else {
+      results.push({ name: "eesy_creds", note: "No Eesy credentials found" });
+    }
     
-    // Try with view parameter (maybe it's called view not SearchName)
-    await testEndpoint("leads_view", `${baseUrl}/leads?View=cphsales2&ModifiedFrom=${yesterday}`);
-    await testEndpoint("leads_filter", `${baseUrl}/leads?Filter=cphsales2&ModifiedFrom=${yesterday}`);
-    await testEndpoint("leads_name", `${baseUrl}/leads?Name=cphsales2&ModifiedFrom=${yesterday}`);
-    
-    // Try /leads/search endpoint
-    await testEndpoint("leads_search_ep", `${baseUrl}/leads/search?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
-    await testEndpoint("leads_search_ep2", `${baseUrl}/leads/search/cphsales2?ModifiedFrom=${yesterday}`);
-    
-    // Try /export endpoint
-    await testEndpoint("leads_export", `${baseUrl}/export/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
-    
-    // Try requesting as streamable format
-    await testEndpoint("leads_stream", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}&format=stream`);
-    
-    // Try rawleads with SearchName (maybe this param works there)
-    await testEndpoint("rawleads_csv_search", `${baseUrl}/rawleads/csv?SearchName=cphsales2&ModifiedFrom=${yesterday}`, "text/csv");
+    // Standard test for reference
+    await testEndpoint("leads_standard", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}&Include=campaign,lastModifiedByUser,firstProcessedByUser`);
 
     return new Response(JSON.stringify(results, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
