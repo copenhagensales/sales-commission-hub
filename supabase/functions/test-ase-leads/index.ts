@@ -93,23 +93,42 @@ serve(async (req) => {
       }
     }
 
-    // 1. /leads WITHOUT SearchName (just ModifiedFrom) 
-    await testEndpoint("leads_no_search", `${baseUrl}/leads?ModifiedFrom=${yesterday}&Include=campaign,lastModifiedByUser,firstProcessedByUser`);
-
-    // 2. /leads with different SearchName variations
-    await testEndpoint("leads_cphsales", `${baseUrl}/leads?SearchName=cphsales&ModifiedFrom=${yesterday}`);
-    await testEndpoint("leads_CPHsales2", `${baseUrl}/leads?SearchName=CPHsales2&ModifiedFrom=${yesterday}`);
+    // Try different API base URLs
+    const altBases = [
+      "https://wshero01.herobase.com/api",
+      "https://wshero01.herobase.com/api/v1",
+      "https://wshero01.herobase.com/api/v2",
+      "https://api.herobase.com/api",
+    ];
     
-    // 3. /rawleads JSON (not CSV)
-    await testEndpoint("rawleads_json", `${baseUrl}/rawleads?Projects=*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`);
-
-    // 4. /rawleads/csv with Include (if supported)
-    await testEndpoint("rawleads_csv_yesterday", `${baseUrl}/rawleads/csv?Projects=*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`, "text/csv");
-
-    // 5. List saved searches / lead segments
-    await testEndpoint("leadsegments", `${baseUrl}/leadsegments`);
-    await testEndpoint("searches", `${baseUrl}/searches`);
-    await testEndpoint("savedsearches", `${baseUrl}/savedsearches`);
+    for (const base of altBases) {
+      await testEndpoint(`leads_${base.split('/').pop()}`, `${base}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
+    }
+    
+    // Try with explicit Accept and Content-Type headers
+    console.log(`[TestASE] leads_explicit_headers`);
+    try {
+      const r = await fetch(`${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}`, {
+        headers: { 
+          Authorization: authHeader, 
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      });
+      const t = await r.text();
+      results.push({ name: "leads_explicit_headers", status: r.status, preview: t.slice(0, 300) });
+    } catch (e) { results.push({ name: "leads_explicit_headers", error: (e as Error).message }); }
+    
+    // Try activities endpoint (similar to leads)
+    await testEndpoint("activities", `${baseUrl}/activities?ModifiedFrom=${yesterday}`);
+    
+    // Try webhooks
+    await testEndpoint("webhooks", `${baseUrl}/webhooks`);
+    
+    // Try the rawleads (non-csv) JSON endpoint variants
+    await testEndpoint("rawleads_json_project", `${baseUrl}/rawleads?Projects=${encodeURIComponent("Nysalg - Eksterne")}&ModifiedFrom=${yesterday}`);
+    await testEndpoint("rawleads_csv_project", `${baseUrl}/rawleads/csv?Projects=${encodeURIComponent("Nysalg - Eksterne")}&ModifiedFrom=${yesterday}`, "text/csv");
 
     return new Response(JSON.stringify(results, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
