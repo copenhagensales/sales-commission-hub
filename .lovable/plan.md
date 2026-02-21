@@ -1,13 +1,17 @@
 
+# Vis inaktive medarbejdere i "Nye medarbejdere"-listen
 
-# Test med visningsnavnet "cphsales2"
+## Hvad skal aendres
+Listen over nye medarbejdere filtrerer i dag kun aktive medarbejdere fra. Vi fjerner dette filter, saa baade aktive og inaktive medarbejdere vises.
 
-## Ændring
-Opdater `supabase/functions/test-ase-leads/index.ts` til at bruge `cphsales2` i stedet for `cphsales` i alle URL'er.
+For at goere det tydeligt hvem der er inaktiv, tilfojer vi en visuel indikator (badge) paa inaktive medarbejdere.
 
-## Teknisk detalje
-Linje 48-50 i `test-ase-leads/index.ts` ændres:
-- `searchName=cphsales` erstattes med `searchName=cphsales2` i alle tre URL-variationer.
+## Tekniske aendringer
 
-Derefter deployes funktionen og testes med det samme.
+**Fil: `src/components/salary/NewEmployeesTab.tsx`**
 
+1. Tilfoej `is_active` til SELECT-query og NewEmployee-interface
+2. Fjern `.eq("is_active", true)` filteret (linje 59)
+3. Tilfoej en badge/markering ved inaktive medarbejdere i tabellen, saa de er lette at skelne fra aktive
+
+Resultatet er at alle medarbejdere med startdato i den valgte periode vises -- baade aktive og inaktive -- med en tydelig markering af status.
