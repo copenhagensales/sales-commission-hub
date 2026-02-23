@@ -416,6 +416,26 @@ async function processSalesBatch(
       const adversusState = rawPayload?.state as string | undefined
       const isCancelledSale = adversusState === 'cancelled'
       
+      // Determine enrichment status based on provider data completeness
+      let enrichmentStatus = 'complete'
+      
+      if (sale.integrationType === 'adversus') {
+        const leadResultFields = rawPayload?.leadResultFields as Record<string, unknown> | undefined
+        if (!leadResultFields || typeof leadResultFields !== 'object' || Object.keys(leadResultFields).length === 0) {
+          enrichmentStatus = 'pending'
+        }
+      } else if (sale.integrationType === 'enreach') {
+        const externalId = String(sale.externalId || '')
+        if (externalId.startsWith('enreach-')) {
+          enrichmentStatus = 'pending' // Webhook-created, needs enrichment
+        } else {
+          const payloadData = rawPayload?.data as Record<string, unknown> | undefined
+          if (!payloadData || typeof payloadData !== 'object' || Object.keys(payloadData).length === 0) {
+            enrichmentStatus = 'pending'
+          }
+        }
+      }
+      
       const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
         sale_datetime: sale.saleDate,
@@ -430,6 +450,9 @@ async function processSalesBatch(
         raw_payload: sale.rawPayload || null,
         normalized_data: sale.normalizedData || null,
         updated_at: new Date().toISOString(),
+        enrichment_status: enrichmentStatus,
+        enrichment_attempts: 0,
+        enrichment_error: null,
       }
       
       // Set validation_status to cancelled if dialer reports cancelled state

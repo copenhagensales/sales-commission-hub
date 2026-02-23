@@ -31,18 +31,25 @@ export function LiveCronStatus({ integrations }: LiveCronStatusProps) {
     refetchInterval: 60000,
   });
 
+  // Known provider-level job names
+  const KNOWN_PROVIDER_JOBS = ["provider-adversus-sync", "provider-enreach-sync", "enrichment-healer"];
+
   // Filter to integration-engine related jobs
   const integrationJobs = cronJobs.filter(
     (job) =>
       job.command?.includes("integration-engine") ||
-      job.jobname?.startsWith("dialer-")
+      job.command?.includes("enrichment-healer") ||
+      job.jobname?.startsWith("dialer-") ||
+      job.jobname?.startsWith("provider-") ||
+      job.jobname === "enrichment-healer"
   );
 
-  // Check for unexpected jobs (not matching known integrations)
+  // Check for unexpected jobs (not matching known integrations or provider jobs)
   const knownPrefixes = integrations.map((i) => `dialer-${i.id.slice(0, 8)}`);
   const unexpectedJobs = integrationJobs.filter(
     (job) =>
       !knownPrefixes.some((prefix) => job.jobname?.startsWith(prefix)) &&
+      !KNOWN_PROVIDER_JOBS.includes(job.jobname) &&
       !["integration-engine"].includes(job.jobname)
   );
 

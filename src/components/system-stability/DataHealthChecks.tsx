@@ -124,6 +124,38 @@ export function DataHealthChecks() {
         status: rejectedRatio > 25 ? "critical" : rejectedRatio > 15 ? "warning" : "ok",
       });
 
+      // 5. Adversus enrichment pending (all time)
+      const { count: adversusPending } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .eq("integration_type", "adversus")
+        .not("enrichment_status", "in", '("complete","healed","skipped")');
+
+      const advPending = adversusPending || 0;
+      results.push({
+        label: "Adversus manglende enrichment",
+        value: advPending,
+        threshold: 10,
+        unit: "stk",
+        status: advPending > 50 ? "critical" : advPending > 10 ? "warning" : "ok",
+      });
+
+      // 6. Enreach enrichment pending (all time)
+      const { count: enreachPending } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .eq("integration_type", "enreach")
+        .not("enrichment_status", "in", '("complete","healed","skipped")');
+
+      const enrPending = enreachPending || 0;
+      results.push({
+        label: "Enreach manglende enrichment",
+        value: enrPending,
+        threshold: 20,
+        unit: "stk",
+        status: enrPending > 100 ? "critical" : enrPending > 20 ? "warning" : "ok",
+      });
+
       return results;
     },
     refetchInterval: 120000,
