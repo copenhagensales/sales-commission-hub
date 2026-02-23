@@ -7094,6 +7094,8 @@ export type Database = {
           created_at: string
           description: string
           employee_id: string
+          error_date_end: string | null
+          error_date_start: string | null
           id: string
           payroll_period_end: string
           payroll_period_start: string
@@ -7104,6 +7106,8 @@ export type Database = {
           created_at?: string
           description: string
           employee_id: string
+          error_date_end?: string | null
+          error_date_start?: string | null
           id?: string
           payroll_period_end: string
           payroll_period_start: string
@@ -7114,6 +7118,8 @@ export type Database = {
           created_at?: string
           description?: string
           employee_id?: string
+          error_date_end?: string | null
+          error_date_start?: string | null
           id?: string
           payroll_period_end?: string
           payroll_period_start?: string
