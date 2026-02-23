@@ -1,110 +1,48 @@
 
 
-# Plan: Sikker backfill med budget-awareness og dedup-garanti
+# Fix: Dobbelt-tælling af FM-salg i KPI-cache
 
 ## Problem
-~2.044 salg fra 16.-20. februar mangler `sale_items`. Backfill skal ske uden at:
-1. Overskride API-grænser (Adversus: 60/min, 1000/hr; Enreach: 240/min, 10.000/hr)
-2. Skabe duplikerede salg (sikret via `onConflict: "adversus_external_id"`)
-3. Blokere for den løbende synkronisering (cron-jobs kører hvert 5.-15. minut)
+FM-salg (fieldmarketing) tælles **to gange** i `calculate-kpi-values` funktionen, som producerer `this_month` KPI-cachen. ClientDBTab bruger denne cache og viser derfor dobbelte tal.
 
-## Berørte integrationer
-
-| Integration | Provider | Missing items | Limit/hr | Nuv. forbrug/hr | Ledig kapacitet |
-|---|---|---|---|---|---|
-| Tryg | Enreach | ~1.984 | 10.000 | ~144 | ~9.800 |
-| Lovablecph | Adversus | ~58 | 1.000 | ~601 | ~400 |
-| Relatel | Adversus | ~1 | 1.000 | ~48 | delt med Lovablecph |
-
-## Strategi
-
-### 1. Ny action: `safe-backfill` i integration-engine
-
-En ny action der kombinerer `repair-history`-logikken med `smart-backfill`-budgetteringen:
-
-**Inden hentning:**
-- Tjek aktuelt API-forbrug fra `integration_sync_runs` (seneste 10 min)
-- Beregn ledig kapacitet per provider (ikke per integration, da de deler credentials)
-- Reserver 30% af budgettet til løbende cron-sync (aldrig bruge mere end 70%)
-- Beregn `maxRecords` baseret på tilgængelig kapacitet
-
-**Under hentning:**
-- Kør dag-for-dag (en dag ad gangen) for kontrolleret forbrug
-- Brug `fetchSalesRange` med eksplicitte date ranges i stedet for `days`-parameter
-- Stop automatisk hvis budget er opbrugt
-- Log API-forbrug per dag til `integration_sync_runs`
-
-**Dedup-garanti:**
-- Eksisterende `onConflict: "adversus_external_id"` i `processSalesBatch` sikrer allerede at salg ikke duplikeres
-- Idempotent `generate_sales_internal_reference` trigger bevarer eksisterende MG-numre
-- Items slettes og genindsættes atomisk (allerede implementeret)
-
-### 2. Provider-level budget tracking
-
-Tilføj en hjælpefunktion der aggregerer API-forbrug per **provider** (ikke per integration), fordi:
-- Lovablecph og Relatel deler Adversus' 60/min + 1000/hr budget
-- Tryg, Eesy og ASE deler Enreach' 240/min + 10.000/hr budget
+### Rodårsag
+Da FM-salg fik `sale_items` via en database-trigger (og blev knyttet til `client_campaigns`), begyndte de at blive talt via `fetchAllSaleIds` + `sale_items`-logikken. Men den **gamle FM-tæller** (`raw_payload->>fm_client_id`) blev aldrig fjernet. Resultatet er:
 
 ```text
-Provider Budget Beregning:
-  ledig = provider_limit - sum(api_calls seneste 10 min) - reserve(30%)
-  max_records = floor(ledig / api_calls_per_record)
+sales_count = telesalesCount (inkl. FM via sale_items) + fmCount (FM igen via raw_payload)
+            = 1.551 + 1.562 = 3.113  (for Eesy FM)
 ```
 
-### 3. Kald-sekvens (automatisk)
+Det korrekte tal er ca. 1.551.
 
-Backfill skal køres i baggrunden (`background: true`) for at undgå edge function timeout:
+Samme problem rammer `total_commission` og `total_revenue` - begge adderer TM + FM separat, selvom FM allerede indgår i TM-beregningen via `sale_items`.
 
-**Tryg (Enreach - rigeligt budget):**
-- 5 dage (16.-20. feb), ~400 salg/dag
-- Enreach har ~9.800 ledig kapacitet/hr -- ingen risiko
-- Kan køre alle 5 dage i et kald med `maxRecords: 600` per dag
+### Berørte perioder
+Kun `this_month` er fejlagtig (beregnet af `calculate-kpi-values`). Perioderne `today`, `this_week` og `payroll_period` beregnes af `calculate-kpi-incremental`, som korrekt behandler alle salg ensartet uden FM-dobbelt-tælling.
 
-**Lovablecph (Adversus - stramt budget):**
-- 2 dage (19.-20. feb), ~58 salg total
-- Adversus har ~400 ledig kapacitet -- OK men skal koordineres med cron
-- Kør med `maxRecords: 60` og `background: true`
+## Rettelse
 
-## Tekniske ændringer
+### Fil: `supabase/functions/calculate-kpi-values/index.ts`
 
-### Fil: `supabase/functions/integration-engine/actions/safe-backfill.ts` (ny)
+I `calculateClientKpiValue`-funktionen skal de tre FM-additioner fjernes for `sales_count`, `total_commission` og `total_revenue`:
 
-Ny action med:
-- `getProviderBudget(supabase, provider)` -- aggregerer forbrug across alle integrationer der bruger samme provider
-- `calculateSafeMaxRecords(budget, reservePct)` -- beregner sikker grænse
-- Dag-for-dag loop med budget-check inden hver dag
-- Brug af eksisterende `syncIntegration()` med `from`/`to` date ranges
-- Logging af forbrug per kald til `integration_sync_runs`
+**sales_count / antal_salg** (linje ~2232-2241):
+- Fjern den separate FM-count query (`raw_payload->>fm_client_id`)
+- Returner kun `telesalesCount` (som allerede inkluderer FM via sale_items)
 
-### Fil: `supabase/functions/integration-engine/index.ts` (opdatering)
+**total_commission / total_provision** (linje ~2261-2277):
+- Fjern den separate FM-commission beregning via `raw_payload` + `fmCommissionMap`
+- Returner kun `telesalesCommission`
 
-Tilføj ny `action === "safe-backfill"` route der:
-- Accepterer `integration_id` og `date_range` (from/to)
-- Kalder `safe-backfill` action
-- Understøtter `background: true`
+**total_revenue** (linje ~2297+):
+- Fjern den separate FM-revenue beregning via `raw_payload` + `fmCommissionMap`
+- Returner kun `telesalesRevenue`
 
-### Provider budget-konstanter
-
-```text
-PROVIDER_LIMITS = {
-  adversus: { perMin: 60, perHour: 1000 },
-  enreach:  { perMin: 240, perHour: 10000 }
-}
-
-RESERVE_PCT = 0.30  // 30% reserveret til cron-sync
-BUDGET_WINDOW = 10  // minutter
-```
-
-### Dedup-sikring (allerede implementeret, ingen ændringer)
-
-- `sales.adversus_external_id` UNIQUE constraint + `onConflict` upsert
-- `generate_sales_internal_reference` trigger: idempotent (bevarer eksisterende ref)
-- `processSalesBatch`: sletter items atomisk og genindsætter
+### Verifikation
+Efter deploy: Trigger `calculate-kpi-values` og bekraft at Eesy FM viser ~1.551 og Yousee ~286.
 
 ## Forventet resultat
-
-- Tryg: ~1.984 salg får items genindlæst inden for 1-2 timer (ingen budget-risiko)
-- Lovablecph: ~58 salg genindlæst inden for 30 minutter (budget-aware)
-- Ingen dobbelt-salg, ingen overskredne API-grænser
-- Cron-jobs kører uforstyrret med 30% reserveret kapacitet
-
+- Eesy FM: 3.113 --> ~1.551 salg
+- Yousee: 572 --> ~286 salg
+- Omsætning og provision korrigeres tilsvarende for alle FM-klienter
+- Ingen ændring for rene TM-klienter (Tryg, Relatel, TDC Erhverv, etc.)
