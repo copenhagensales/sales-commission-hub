@@ -664,7 +664,15 @@ export class EnreachAdapter implements DialerAdapter {
 
     // --- FIX: CAMPAIGN NAME DETECTION ---
     let campaignCode = campaignObj ? this.getStr(campaignObj, ["code", "Code"]) : "";
-    const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
+    let dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
+
+    // Normalize lowercase keys from /leads endpoint to match pricing rules
+    if (this.usesLeadsEndpoint && dataObj) {
+      dataObj = this.normalizeLeadsData(dataObj as Record<string, string>) as Record<string, unknown>;
+      // Update raw lead.data so raw_payload gets normalized keys
+      if (lead.data) lead.data = dataObj;
+      if (lead.Data) lead.Data = dataObj;
+    }
 
     // Fallback: buscar en data.Kampagne si el objeto campaña no tiene nombre
     if ((!campaignCode || campaignCode.trim() === "") && dataObj) {
@@ -1707,5 +1715,49 @@ export class EnreachAdapter implements DialerAdapter {
       console.error("[EnreachAdapter] Critical error in fetchSessionsRange:", error);
       return [];
     }
+  }
+
+  /**
+   * Normalize lowercase data keys from /leads endpoint to match pricing rule conditions.
+   * The /leads endpoint returns keys like "a-kasse salg" but pricing rules expect "A-kasse salg".
+   */
+  private normalizeLeadsData(data: Record<string, string>): Record<string, string> {
+    const KNOWN_KEY_MAP: Record<string, string> = {
+      "a-kasse salg": "A-kasse salg",
+      "a-kasse type": "A-kasse type",
+      "dækningssum": "Dækningssum",
+      "daekningssum": "Dækningssum",
+      "forening": "Forening",
+      "lønsikring": "Lønsikring",
+      "loensikring": "Lønsikring",
+      "eksisterende medlem": "Eksisterende medlem",
+      "medlemsnummer": "Medlemsnummer",
+      "nuværende a-kasse": "Nuværende a-kasse",
+      "nuvaerende a-kasse": "Nuværende a-kasse",
+      "resultat af samtalen": "Resultat af samtalen",
+      "ja - afdeling": "Ja - Afdeling",
+      "leadudfald": "Leadudfald",
+      "navn1": "Navn1",
+      "navn2": "Navn2",
+      "telefon1": "Telefon1",
+    };
+
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data)) {
+      const lowerKey = key.toLowerCase();
+      const mappedKey = KNOWN_KEY_MAP[lowerKey];
+      if (mappedKey) {
+        normalized[mappedKey] = value;
+      } else if (key !== lowerKey) {
+        // Already has some casing, keep as-is
+        normalized[key] = value;
+      } else {
+        // Unknown lowercase key: capitalize first letter
+        normalized[key.charAt(0).toUpperCase() + key.slice(1)] = value;
+      }
+    }
+
+    console.log(`[EnreachAdapter] Normalized ${Object.keys(data).length} data keys for /leads endpoint`);
+    return normalized;
   }
 }
