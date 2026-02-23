@@ -7088,6 +7088,61 @@ export type Database = {
           },
         ]
       }
+      payroll_error_reports: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          employee_id: string
+          id: string
+          payroll_period_end: string
+          payroll_period_start: string
+          status: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          employee_id: string
+          id?: string
+          payroll_period_end: string
+          payroll_period_start: string
+          status?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          employee_id?: string
+          id?: string
+          payroll_period_end?: string
+          payroll_period_start?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_error_reports_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_error_reports_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_error_reports_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_reviews: {
         Row: {
           comments: string | null

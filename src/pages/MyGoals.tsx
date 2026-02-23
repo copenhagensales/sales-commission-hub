@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { PayrollErrorReportDialog } from "@/components/my-profile/PayrollErrorReportDialog";
 
 type EmployeeData = {
   id: string;
@@ -241,6 +242,13 @@ export default function MyGoals() {
             <div className="space-y-4">
               <div className="flex justify-center">
                 <PayrollPeriodSelector onChange={handleLonPeriodChange} />
+              </div>
+              <div className="flex justify-end">
+                <PayrollErrorReportDialog
+                  employeeId={employee.id}
+                  payrollPeriodStart={lonPeriod.start}
+                  payrollPeriodEnd={lonPeriod.end}
+                />
               </div>
               <PayrollDayByDay
                 employeeId={employee.id}
