@@ -6,7 +6,8 @@ import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Package } from "lucide-react";
+import { Clock, Package, TrendingUp, Palmtree, XCircle, Utensils, Star, Gift } from "lucide-react";
+import { getVacationPayRate, VacationType } from "@/lib/calculations/vacation-pay";
 
 interface PayrollDayByDayProps {
   employeeId: string;
@@ -72,6 +73,78 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
     enabled: !!employeeId,
   });
 
+  // 4. Get employee master data (vacation_type, referral_bonus)
+  const { data: employeeData } = useQuery({
+    queryKey: ["payroll-employee-data", employeeId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("vacation_type, referral_bonus")
+        .eq("id", employeeId)
+        .single();
+      return data;
+    },
+    enabled: !!employeeId,
+  });
+
+  // 5. Get cancelled sales commission
+  const { data: cancelledTotal = 0 } = useQuery({
+    queryKey: ["payroll-cancelled", employeeId, startStr, endStr, agentEmails],
+    queryFn: async () => {
+      if (!agentEmails.length) return 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("sales")
+        .select("sale_items(mapped_commission)")
+        .in("agent_email", agentEmails)
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`)
+        .eq("validation_status", "cancelled");
+      if (!data) return 0;
+      let sum = 0;
+      for (const sale of data) {
+        for (const item of sale.sale_items || []) {
+          sum += item.mapped_commission || 0;
+        }
+      }
+      return sum;
+    },
+    enabled: agentEmails.length > 0,
+  });
+
+  // 6. Get diet (booking_diet) for the period
+  const { data: dietTotal = 0 } = useQuery({
+    queryKey: ["payroll-diet", employeeId, startStr, endStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("booking_diet")
+        .select("amount")
+        .eq("employee_id", employeeId)
+        .gte("date", startStr)
+        .lte("date", endStr);
+      if (!data) return 0;
+      return data.reduce((sum, d) => sum + (d.amount || 0), 0);
+    },
+    enabled: !!employeeId,
+  });
+
+  // 7. Get dagsbonus (daily_bonus_payouts) for the period
+  const { data: dagsbonusTotal = 0 } = useQuery({
+    queryKey: ["payroll-dagsbonus", employeeId, startStr, endStr],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("daily_bonus_payouts")
+        .select("amount")
+        .eq("employee_id", employeeId)
+        .gte("date", startStr)
+        .lte("date", endStr);
+      if (!data) return 0;
+      return data.reduce((sum: number, d: { amount: number }) => sum + (d.amount || 0), 0);
+    },
+    enabled: !!employeeId,
+  });
+
   // Build day-by-day data
   const days: DayData[] = useMemo(() => {
     const allDays = eachDayOfInterval({ start: payrollPeriod.start, end: payrollPeriod.end });
@@ -113,8 +186,25 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
 
   const periodTotal = days.reduce((sum, d) => sum + d.totalCommission, 0);
 
+  // Calculated summary values
+  const vacationRate = getVacationPayRate((employeeData?.vacation_type as VacationType) ?? null);
+  const feriepengeTotal = periodTotal * vacationRate;
+  const referralBonus = employeeData?.referral_bonus ?? 0;
+
+  const fmtKr = (v: number) => `${v.toLocaleString("da-DK")} kr`;
+
   return (
     <div className="space-y-4">
+      {/* Summary stat boxes */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <StatCard icon={TrendingUp} label="Provision" value={fmtKr(periodTotal)} />
+        <StatCard icon={Palmtree} label="Feriepenge" value={fmtKr(feriepengeTotal)} />
+        <StatCard icon={XCircle} label="Annullering" value={fmtKr(cancelledTotal)} variant="destructive" />
+        {dietTotal > 0 && <StatCard icon={Utensils} label="Diet" value={fmtKr(dietTotal)} />}
+        {dagsbonusTotal > 0 && <StatCard icon={Star} label="Dagsbonus" value={fmtKr(dagsbonusTotal)} />}
+        {referralBonus > 0 && <StatCard icon={Gift} label="Henvisningsbonus" value={fmtKr(referralBonus)} />}
+      </div>
+
       {days.map((day) => {
         const hasActivity = day.shift || day.sales.length > 0;
         return (
@@ -185,5 +275,31 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  variant,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  variant?: "destructive";
+}) {
+  return (
+    <Card>
+      <CardContent className="py-3 px-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+          <Icon className={`h-3.5 w-3.5 ${variant === "destructive" ? "text-destructive" : ""}`} />
+          {label}
+        </div>
+        <p className={`text-base font-semibold ${variant === "destructive" ? "text-destructive" : ""}`}>
+          {value}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
