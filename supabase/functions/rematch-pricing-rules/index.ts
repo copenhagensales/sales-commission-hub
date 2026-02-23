@@ -9,6 +9,62 @@ const corsHeaders = {
 // Correct product IDs for ASE
 const ASE_SALG_PRODUCT_ID = "1ad52862-2102-472e-9cdf-52f9c76997a2";
 const ASE_LEAD_PRODUCT_ID = "e360f3c2-b448-474b-bbf8-e7dc629a0d2a";
+const ASE_LOENSIKRING_PRODUCT_ID = "f9a8362f-3839-4247-961c-d5cd1e7cd37d";
+
+// All Lønsikring variant product IDs that should be normalized to the standard one
+const LOENSIKRING_VARIANT_IDS = new Set([
+  "fb4763a0-ae8e-4abf-85da-30da06a56294",  // Lønsikring Udvidet - 6000
+  "e1d43ddb-4340-4066-a1b8-b699d837f4ce",  // Lønsikring Udvidet
+  "b75db9ae-f486-4385-ae9e-a065b51e2481",  // Lønsikring Udvidet - 18000
+  "acc29102-1e2c-495e-b5e6-feb90ef932b6",  // Lønsikring Udvidet - 16000
+  "fe1fc1e7-2fbb-4f84-8679-3f032864213a",  // Lønsikring Udvidet - 19000
+  "379be89f-4e17-4a22-ac65-136ba0d421d2",  // Lønsikring Udvidet - 50000
+  "ca2730b0-97f3-4133-8f6d-1b22a9236bb9",  // Lønsikring Super
+  "7cd5a845-3ffb-4696-857d-8d4499b5216f",  // Lønsikring Super - 6000
+  "bfd4c21f-76db-4450-b928-3ae6a5deeb0c",  // Lønsikring under 5000
+  "965abda5-5ae8-4fe6-acd8-2ec4dcc9b603",  // Fagforening med lønsikring
+]);
+
+// Key normalization map for ASE raw_payload data (lowercase -> correct casing)
+const ASE_KEY_MAP: Record<string, string> = {
+  "a-kasse salg": "A-kasse salg",
+  "a-kasse type": "A-kasse type",
+  "dækningssum": "Dækningssum",
+  "daekningssum": "Dækningssum",
+  "forening": "Forening",
+  "lønsikring": "Lønsikring",
+  "loensikring": "Lønsikring",
+  "eksisterende medlem": "Eksisterende medlem",
+  "medlemsnummer": "Medlemsnummer",
+  "nuværende a-kasse": "Nuværende a-kasse",
+  "nuvaerende a-kasse": "Nuværende a-kasse",
+  "resultat af samtalen": "Resultat af samtalen",
+  "ja - afdeling": "Ja - Afdeling",
+  "leadudfald": "Leadudfald",
+  "navn1": "Navn1",
+  "navn2": "Navn2",
+  "telefon1": "Telefon1",
+};
+
+/**
+ * Normalize raw_payload keys for ASE sales to ensure correct casing.
+ * Historical records may have lowercase keys from the /leads endpoint.
+ */
+function normalizeRawPayloadKeys(data: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    const mappedKey = ASE_KEY_MAP[lowerKey];
+    if (mappedKey) {
+      normalized[mappedKey] = value;
+    } else if (key !== lowerKey) {
+      normalized[key] = value;
+    } else {
+      normalized[key.charAt(0).toUpperCase() + key.slice(1)] = value;
+    }
+  }
+  return normalized;
+}
 
 // Types for pricing rules
 interface NumericCondition {
@@ -84,7 +140,16 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
  * - If 'Ja - Afdeling' is 'Lead', it's a Lead product
  * - Otherwise it's a Salg product (A-kasse sales)
  */
-function determineAseProductId(rawPayloadData: Record<string, unknown> | undefined): string {
+function determineAseProductId(rawPayloadData: Record<string, unknown> | undefined, originalProductId?: string): string {
+  // Check if this is a Lønsikring variant - normalize to standard Lønsikring ID
+  if (originalProductId && LOENSIKRING_VARIANT_IDS.has(originalProductId)) {
+    return ASE_LOENSIKRING_PRODUCT_ID;
+  }
+  // If it's already the standard Lønsikring product, keep it
+  if (originalProductId === ASE_LOENSIKRING_PRODUCT_ID) {
+    return ASE_LOENSIKRING_PRODUCT_ID;
+  }
+  
   if (!rawPayloadData) return ASE_SALG_PRODUCT_ID;
   
   const jaAfdeling = rawPayloadData["Ja - Afdeling"];
@@ -402,8 +467,14 @@ serve(async (req) => {
 
       // Determine correct product ID for ASE sales based on lead data
       const isAse = source === "ase" || (item.sales as any)?.source === "ase";
+      
+      // Normalize raw_payload keys for ASE sales (historical records may have lowercase keys)
+      if (isAse && rawPayloadData) {
+        rawPayloadData = normalizeRawPayloadKeys(rawPayloadData);
+      }
+      
       const originalProductId = item.product_id;
-      const correctProductId = isAse ? determineAseProductId(rawPayloadData) : originalProductId;
+      const correctProductId = isAse ? determineAseProductId(rawPayloadData, originalProductId) : originalProductId;
       
       const productWasCorrected = correctProductId !== originalProductId;
       if (productWasCorrected) {
