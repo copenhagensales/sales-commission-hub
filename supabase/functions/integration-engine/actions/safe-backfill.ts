@@ -27,6 +27,7 @@ interface SafeBackfillParams {
   from: string; // YYYY-MM-DD
   to: string;   // YYYY-MM-DD
   maxRecordsPerDay?: number;
+  datasets?: ("sales" | "calls")[];
 }
 
 interface SafeBackfillResult {
@@ -136,7 +137,7 @@ export async function safeBackfill(
   params: SafeBackfillParams,
   log: Logger,
 ): Promise<SafeBackfillResult> {
-  const { integrationId, from, to, maxRecordsPerDay = 600 } = params;
+  const { integrationId, from, to, maxRecordsPerDay = 600, datasets = ["sales", "calls"] } = params;
 
   // 1. Load integration
   const { data: integration } = await supabase
@@ -219,7 +220,7 @@ export async function safeBackfill(
     try {
       // Fetch sales
       let salesCount = 0;
-      if ((adapter as any).fetchSalesRange) {
+      if (datasets.includes("sales") && (adapter as any).fetchSalesRange) {
         const sales = await (adapter as any).fetchSalesRange(
           { from: dayStart, to: dayEnd },
           campaignMappings,
@@ -234,7 +235,7 @@ export async function safeBackfill(
 
       // Fetch calls
       let callsCount = 0;
-      if ((adapter as any).fetchCallsRange) {
+      if (datasets.includes("calls") && (adapter as any).fetchCallsRange) {
         const calls = await (adapter as any).fetchCallsRange({ from: dayStart, to: dayEnd });
         if (calls.length > 0) {
           const result = await engine.processCalls(calls, integrationId, 200);
