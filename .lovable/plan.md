@@ -1,36 +1,55 @@
 
 
-# Tilfoej sammenfatningsbokse oeverst i Loen-fanen
+# Tilfoej "Indberet fejl"-knap med dialogboks i Loen-fanen
 
 ## Oversigt
 
-Tilfoej opsummeringskort oeverst i Loen-fanen med totaler for den valgte loenperiode.
+Tilfoej en knap over loensektionen i Loen-fanen, hvor medarbejderen kan indberette fejl i sin loen. Klik paa knappen aabner en dialogboks med et formular.
 
-## Bokse (altid synlige)
+## Nye elementer
 
-1. **Provision** -- Sum af `mapped_commission` fra `sale_items` i perioden
-2. **Feriepenge** -- Provision x feriepengesats (fra `employee_master_data.vacation_type`)
-3. **Annullering** -- Sum af `mapped_commission` fra salg med `validation_status = 'cancelled'`
+### Database: Ny tabel `payroll_error_reports`
 
-## Betingede bokse (kun synlige hvis > 0)
+Opretter en tabel til at gemme indberettede fejl:
 
-4. **Diet** -- Sum af `booking_diet.amount` for medarbejderen i perioden
-5. **Dagsbonus** -- Sum af `daily_bonus_payouts.amount` for medarbejderen i perioden
-6. **Henvisningsbonus** -- `employee_master_data.referral_bonus` (fast beloeb)
+- `id` (uuid, PK)
+- `employee_id` (uuid, FK til employee_master_data)
+- `payroll_period_start` (date) -- periodens startdato
+- `payroll_period_end` (date) -- periodens slutdato
+- `category` (text) -- type fejl, f.eks. "Provision", "Vagt", "Diet", "Andet"
+- `description` (text) -- fritekstbeskrivelse
+- `status` (text, default 'pending') -- pending / resolved
+- `created_at` (timestamptz)
 
-## Tekniske detaljer
+RLS: Medarbejdere kan oprette og se egne indberetninger. Teamledere+ kan se alle.
 
-### Fil: `src/components/my-profile/PayrollDayByDay.tsx`
+### Fil: `src/components/my-profile/PayrollErrorReportDialog.tsx` (ny)
 
-**Nye queries:**
-- `employee_master_data` for `vacation_type` og `referral_bonus`
-- `sales` + `sale_items` med `validation_status = 'cancelled'` for annulleringssum
-- `booking_diet` summeret paa `amount` i perioden
-- `daily_bonus_payouts` summeret paa `amount` i perioden
+En Dialog-komponent med:
+- Trigger-knap med ikon (AlertTriangle) og tekst "Indberet fejl"
+- Formular med:
+  - **Kategori** (Select): Provision, Vagt, Diet, Dagsbonus, Feriepenge, Andet
+  - **Beskrivelse** (Textarea): Fritekst til at forklare fejlen
+- "Send" knap der gemmer til `payroll_error_reports` med den aktuelle periodes datoer og medarbejder-id
+- Toast-besked ved succes
 
-**Feriepenge:** Importer `getVacationPayRate` og beregn `periodTotal * rate`
+### Fil: `src/pages/MyGoals.tsx` (aendres)
 
-**UI:** Responsiv grid (`grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3`) med Card-komponenter placeret mellem periodeselector og dagsoversigt. Alle beloeb formateres som "X kr" uden antal.
+- Importer `PayrollErrorReportDialog`
+- Placer knappen i Loen-fanen mellem periodeselector og PayrollDayByDay, hoejrestillet:
 
-**Raekkefoelge:** Provision | Feriepenge | Annullering | Diet* | Dagsbonus* | Henvisningsbonus*
+```text
+  [ < 15. jan - 14. feb > ]
+                              [ Indberet fejl ]
+  +-----------+-----------+---
+  | Provision | Feriepenge| ...
+```
+
+Knappen faar `employeeId`, `payrollPeriod` (start/end) som props.
+
+## Raekkefoelge
+
+1. Opret `payroll_error_reports`-tabel med RLS
+2. Opret `PayrollErrorReportDialog.tsx`
+3. Integrer i `MyGoals.tsx`
 
