@@ -6,6 +6,7 @@ import { repairHistory } from "./actions/repair-history.ts";
 import { syncIntegration } from "./actions/sync-integration.ts";
 import { makeLogger } from "./utils/index.ts";
 import { smartBackfill } from "./actions/smart-backfill.ts";
+import { safeBackfill } from "./actions/safe-backfill.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -93,6 +94,34 @@ serve(async (req) => {
       }
 
       const result = await smartBackfill(supabase, effectiveIntegrationId, log);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle safe-backfill action (budget-aware, provider-level)
+    if (action === "safe-backfill") {
+      const effectiveIntegrationId = integrationId || integration_id;
+      if (!effectiveIntegrationId || !from || !to) {
+        return new Response(JSON.stringify({ success: false, error: "integration_id, from, and to are required for safe-backfill" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const params = { integrationId: effectiveIntegrationId, from, to, maxRecordsPerDay: maxRecords || 600 };
+
+      if (background) {
+        EdgeRuntime.waitUntil(safeBackfill(supabase, params, log));
+        return new Response(JSON.stringify({
+          success: true,
+          action: "safe-backfill",
+          background: true,
+          message: `Started background safe-backfill for ${from} -> ${to}. Check logs for progress.`,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const result = await safeBackfill(supabase, params, log);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
