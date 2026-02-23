@@ -387,7 +387,7 @@ export class AdversusAdapter implements DialerAdapter {
       console.log(`[Adversus] UNCAPPED: processing ALL ${rawSales.length} sales (no maxRecords limit)`);
     }
 
-    const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
+    const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap, { fast: uncapped });
     console.log(`[Adversus] Built lead data map with ${leadIdToData.size} entries`);
     // Valid email domains for syncing (same as fetchSales)
     const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
@@ -538,7 +538,8 @@ export class AdversusAdapter implements DialerAdapter {
   // Build lead data map by fetching only the leads referenced in sales (individually via fetchLeadById)
   private async buildLeadDataMap(
     sales: any[],
-    campaignConfigMap: Map<string, CampaignMappingConfig>
+    campaignConfigMap: Map<string, CampaignMappingConfig>,
+    options?: { fast?: boolean }
   ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>> {
     const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>();
 
@@ -555,9 +556,11 @@ export class AdversusAdapter implements DialerAdapter {
     let fetchSuccess = 0;
     let fetchFailed = 0;
 
-    // 2. Fetch leads sequentially (one at a time) to avoid 429s when multiple integrations share the same API account
-    const delayMs = 2000; // 2 sec between each request = max 30 req/min
-    const rateLimiter = new RateLimiter(25, 900); // 25 req/min - very conservative since multiple syncs share the account
+    // 2. Fetch leads — use faster rate limiting in "fast" mode (backfill)
+    const fast = options?.fast ?? false;
+    const delayMs = fast ? 500 : 2000; // 500ms in fast mode vs 2s normal
+    const rateLimiter = new RateLimiter(fast ? 50 : 25, 900); // 50 req/min fast vs 25 normal
+    console.log(`[Adversus] buildLeadDataMap: mode=${fast ? 'FAST' : 'normal'}, delay=${delayMs}ms, ${uniqueLeadIds.length} leads`);
 
     for (let i = 0; i < uniqueLeadIds.length; i++) {
       const leadId = uniqueLeadIds[i];
@@ -595,6 +598,11 @@ export class AdversusAdapter implements DialerAdapter {
 
         leadIdToData.set(leadId, { opp, resultData, resultFields });
         fetchSuccess++;
+      }
+
+      // Log progress every 50 leads in fast mode
+      if (fast && (i + 1) % 50 === 0) {
+        console.log(`[Adversus] buildLeadDataMap progress: ${i + 1}/${uniqueLeadIds.length} (${fetchSuccess} ok, ${fetchFailed} failed)`);
       }
 
       // Delay between each request
