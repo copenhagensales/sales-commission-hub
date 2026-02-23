@@ -28,148 +28,63 @@ serve(async (req) => {
     const baseUrl = "https://wshero01.herobase.com/api";
     const username = credentials?.username?.trim();
     const password = credentials?.password?.trim();
-    const authHeader = username && password ? `Basic ${btoa(`${username}:${password}`)}` : "";
+    const authHeader = `Basic ${btoa(`${username}:${password}`)}`;
 
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    
-    const results: Record<string, unknown>[] = [];
-    results.push({ user: username, passwordLen: password?.length ?? 0 });
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
 
-    // deno-lint-ignore no-explicit-any
-    async function testEndpoint(name: string, url: string, accept = "application/json"): Promise<any> {
-      console.log(`[TestASE] ${name}: ${url}`);
-      try {
-        const resp = await fetch(url, { headers: { Authorization: authHeader, Accept: accept } });
-        const text = await resp.text();
-        console.log(`[TestASE] ${name}: ${resp.status} (${text.length} bytes)`);
-        
-        const entry: Record<string, unknown> = { name, status: resp.status, bytes: text.length };
+    // Step 1: Fetch list with Include=data
+    const listUrl = `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${threeDaysAgo}&Include=data,campaign,lastModifiedByUser,firstProcessedByUser`;
+    console.log(`[TestASE] List: ${listUrl}`);
+    const listResp = await fetch(listUrl, { headers: { Authorization: authHeader, Accept: "application/json" } });
+    const listText = await listResp.text();
+    const leads = JSON.parse(listText);
 
-        if (resp.status === 200 && text.length > 0) {
-          if (accept === "text/csv") {
-            const lines = text.split("\n");
-            entry.lineCount = lines.length;
-            entry.headerRow = lines[0]?.slice(0, 300);
-            entry.sampleRow = lines[1]?.slice(0, 300);
-          } else {
-            try {
-              const parsed = JSON.parse(text);
-              if (Array.isArray(parsed)) {
-                entry.count = parsed.length;
-                if (parsed.length > 0) {
-                  const first = parsed[0];
-                  entry.keys = Object.keys(first);
-                  entry.sample = {
-                    uniqueId: first.uniqueId,
-                    status: first.status,
-                    closure: first.closure,
-                    lastModifiedTime: first.lastModifiedTime,
-                    firstProcessedTime: first.firstProcessedTime,
-                    dataKeys: first.data ? Object.keys(first.data) : null,
-                    dataSample: first.data ? Object.fromEntries(Object.entries(first.data).slice(0, 8)) : null,
-                    campaign: first.campaign,
-                    lastModifiedByUser: first.lastModifiedByUser,
-                    firstProcessedByUser: first.firstProcessedByUser,
-                  };
-                  // Closure distribution
-                  const cl: Record<string, number> = {};
-                  for (const l of parsed) cl[l.closure || "null"] = (cl[l.closure || "null"] || 0) + 1;
-                  entry.closures = cl;
-                }
-              } else {
-                entry.topKeys = Object.keys(parsed);
-                entry.preview = text.slice(0, 300);
-              }
-            } catch {
-              entry.preview = text.slice(0, 300);
-            }
-          }
-        } else {
-          entry.preview = text.slice(0, 300);
-        }
-        results.push(entry);
-      } catch (e) {
-        results.push({ name, error: (e as Error).message });
+    const successLeads = leads.filter((l: any) => l.closure === "Success");
+    const firstSuccess = successLeads[0];
+
+    const result: Record<string, unknown> = {
+      totalLeads: leads.length,
+      successCount: successLeads.length,
+      firstSuccessFromList: firstSuccess ? {
+        uniqueId: firstSuccess.uniqueId,
+        closure: firstSuccess.closure,
+        data: firstSuccess.data,
+        dataKeys: firstSuccess.data ? Object.keys(firstSuccess.data) : null,
+        campaign: firstSuccess.campaign,
+      } : null,
+    };
+
+    // Step 2: Fetch single lead detail
+    if (firstSuccess?.uniqueId) {
+      const detailUrl = `${baseUrl}/leads/${firstSuccess.uniqueId}?Include=data,campaign,lastModifiedByUser,firstProcessedByUser`;
+      console.log(`[TestASE] Detail: ${detailUrl}`);
+      const detailResp = await fetch(detailUrl, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      const detailText = await detailResp.text();
+
+      if (detailResp.status === 200) {
+        const detail = JSON.parse(detailText);
+        result.singleLeadDetail = {
+          status: detailResp.status,
+          allKeys: Object.keys(detail),
+          uniqueId: detail.uniqueId,
+          closure: detail.closure,
+          dataKeys: detail.data ? Object.keys(detail.data) : null,
+          dataFull: detail.data,
+          campaign: detail.campaign,
+          lastModifiedByUser: detail.lastModifiedByUser,
+          firstProcessedByUser: detail.firstProcessedByUser,
+        };
+      } else {
+        result.singleLeadDetail = { status: detailResp.status, body: detailText.slice(0, 500) };
       }
     }
 
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-    
-    // Trailing slash variations
-    await testEndpoint("leads_trailing", `${baseUrl}/leads/?SearchName=cphsales2&ModifiedFrom=${yesterday}`);
-    
-    // Without any query params at all - just the endpoint
-    await testEndpoint("leads_bare", `${baseUrl}/leads/`);
-    await testEndpoint("leads_bare2", `${baseUrl}/leads`);
-    
-    // Try with Include as first param (maybe order matters)
-    await testEndpoint("leads_include_first", `${baseUrl}/leads?Include=campaign,lastModifiedByUser,firstProcessedByUser&SearchName=cphsales2&ModifiedFrom=${yesterday}`);
-    
-    // Try the Tryg integration credentials on /leads to see if it's user-specific
-    const trygIntegrationId = "a5068f85-da1c-43e1-8e57-92cc5c4749f1";
-    const { data: trygCreds } = await supabase.rpc("get_dialer_credentials", {
-      p_integration_id: trygIntegrationId,
-      p_encryption_key: encryptionKey,
+    return new Response(JSON.stringify(result, null, 2), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-    const trygUser = trygCreds?.username?.trim();
-    const trygPass = trygCreds?.password?.trim();
-    if (trygUser && trygPass) {
-      const trygAuth = `Basic ${btoa(`${trygUser}:${trygPass}`)}`;
-      // Try /leads on wshero01 with Tryg credentials
-      console.log(`[TestASE] Testing /leads with Tryg user: ${trygUser}`);
-      try {
-        const r = await fetch(`${baseUrl}/leads?ModifiedFrom=${yesterday}`, {
-          headers: { Authorization: trygAuth, Accept: "application/json" }
-        });
-        const t = await r.text();
-        results.push({ name: "leads_tryg_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: trygUser });
-      } catch (e) { results.push({ name: "leads_tryg_user", error: (e as Error).message }); }
-      
-      // Try /simpleleads on wshero01 with Tryg credentials  
-      try {
-        const r = await fetch(`${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${yesterday}&AllClosedStatuses=true`, {
-          headers: { Authorization: trygAuth, Accept: "application/json" }
-        });
-        const t = await r.text();
-        results.push({ name: "simpleleads_tryg_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: trygUser });
-      } catch (e) { results.push({ name: "simpleleads_tryg_user", error: (e as Error).message }); }
-    } else {
-      results.push({ name: "tryg_creds", note: "No Tryg credentials found" });
-    }
-    
-    // Try Eesy integration credentials on /leads (different server wshero06)
-    const eesyIntegrationId = "d79b9632-1cac-4744-ab30-7768e580c794";
-    const { data: eesyCreds } = await supabase.rpc("get_dialer_credentials", {
-      p_integration_id: eesyIntegrationId,
-      p_encryption_key: encryptionKey,
-    });
-    const eesyUser = eesyCreds?.username?.trim();
-    const eesyPass = eesyCreds?.password?.trim();
-    if (eesyUser && eesyPass) {
-      const eesyAuth = `Basic ${btoa(`${eesyUser}:${eesyPass}`)}`;
-      // Try /leads on wshero06 with Eesy credentials
-      console.log(`[TestASE] Testing /leads with Eesy user: ${eesyUser}`);
-      try {
-        const r = await fetch(`https://wshero06.herobase.com/api/leads?ModifiedFrom=${yesterday}`, {
-          headers: { Authorization: eesyAuth, Accept: "application/json" }
-        });
-        const t = await r.text();
-        results.push({ name: "leads_eesy_user", status: r.status, bytes: t.length, preview: t.slice(0, 300), user: eesyUser });
-      } catch (e) { results.push({ name: "leads_eesy_user", error: (e as Error).message }); }
-    } else {
-      results.push({ name: "eesy_creds", note: "No Eesy credentials found" });
-    }
-    
-    // Standard test for reference
-    await testEndpoint("leads_standard", `${baseUrl}/leads?SearchName=cphsales2&ModifiedFrom=${yesterday}&Include=campaign,lastModifiedByUser,firstProcessedByUser`);
-
-    return new Response(JSON.stringify(results, null, 2), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
-
   } catch (e) {
-    return new Response(JSON.stringify({ error: String((e as Error).message) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
