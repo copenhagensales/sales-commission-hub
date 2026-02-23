@@ -1,55 +1,44 @@
 
-
-# Tilfoej "Indberet fejl"-knap med dialogboks i Loen-fanen
+# Udvid "Indberet fejl"-dialogen med validering og datofelt
 
 ## Oversigt
 
-Tilfoej en knap over loensektionen i Loen-fanen, hvor medarbejderen kan indberette fejl i sin loen. Klik paa knappen aabner en dialogboks med et formular.
+Opdater PayrollErrorReportDialog med:
+- Nyt obligatorisk datofelt (enkelt dato eller periode)
+- Alle felter markeret som obligatoriske med visuel feedback
+- Beskrivelse kraever minimum 30 tegn
 
-## Nye elementer
+## Database-aendring
 
-### Database: Ny tabel `payroll_error_reports`
+Ny migration der tilfojer kolonner til `payroll_error_reports`:
+- `error_date_start date` (nullable for bagudkompatibilitet, men kraevet i UI)
+- `error_date_end date` (nullable -- kun udfyldt hvis bruger vaelger en periode)
 
-Opretter en tabel til at gemme indberettede fejl:
+## Fil: `src/components/my-profile/PayrollErrorReportDialog.tsx`
 
-- `id` (uuid, PK)
-- `employee_id` (uuid, FK til employee_master_data)
-- `payroll_period_start` (date) -- periodens startdato
-- `payroll_period_end` (date) -- periodens slutdato
-- `category` (text) -- type fejl, f.eks. "Provision", "Vagt", "Diet", "Andet"
-- `description` (text) -- fritekstbeskrivelse
-- `status` (text, default 'pending') -- pending / resolved
-- `created_at` (timestamptz)
+### Nye felter og validering
 
-RLS: Medarbejdere kan oprette og se egne indberetninger. Teamledere+ kan se alle.
+1. **Datofelt** med toggle mellem "Enkelt dato" og "Periode":
+   - Enkelt dato: en datepicker (Calendar/Popover)
+   - Periode: to datepickers (fra/til)
+   - Obligatorisk -- mindst startdato skal vaelges
+   - Begroenset til den valgte loenperiode (min/max)
 
-### Fil: `src/components/my-profile/PayrollErrorReportDialog.tsx` (ny)
+2. **Validering med fejlmeddelelser**:
+   - Kategori: Viser "Vaelg en kategori" hvis tom ved submit-forsoeg
+   - Dato: Viser "Vaelg en dato" hvis tom
+   - Beskrivelse: Viser "Minimum 30 tegn (X/30)" med tegntaeller
+   - Submit-knap disabled indtil alle krav er opfyldt
 
-En Dialog-komponent med:
-- Trigger-knap med ikon (AlertTriangle) og tekst "Indberet fejl"
-- Formular med:
-  - **Kategori** (Select): Provision, Vagt, Diet, Dagsbonus, Feriepenge, Andet
-  - **Beskrivelse** (Textarea): Fritekst til at forklare fejlen
-- "Send" knap der gemmer til `payroll_error_reports` med den aktuelle periodes datoer og medarbejder-id
-- Toast-besked ved succes
+3. **Visuelt**:
+   - Obligatoriske felter markeret med roed stjerne (*)
+   - Fejlmeddelelser vises i roedt under felter efter foerste submit-forsoeg
+   - Tegntaeller under textarea der viser aktuel laengde vs. minimum
 
-### Fil: `src/pages/MyGoals.tsx` (aendres)
+### Teknisk tilgang
 
-- Importer `PayrollErrorReportDialog`
-- Placer knappen i Loen-fanen mellem periodeselector og PayrollDayByDay, hoejrestillet:
-
-```text
-  [ < 15. jan - 14. feb > ]
-                              [ Indberet fejl ]
-  +-----------+-----------+---
-  | Provision | Feriepenge| ...
-```
-
-Knappen faar `employeeId`, `payrollPeriod` (start/end) som props.
-
-## Raekkefoelge
-
-1. Opret `payroll_error_reports`-tabel med RLS
-2. Opret `PayrollErrorReportDialog.tsx`
-3. Integrer i `MyGoals.tsx`
-
+- Tilfoej `errorDateStart`, `errorDateEnd`, `isRange` state
+- Brug eksisterende Calendar + Popover komponenter til datepicker
+- Tilfoej `attempted` state for at vise fejl foerst efter foerste klik paa Send
+- Insert sender `error_date_start` og `error_date_end` til databasen
+- Validering: `category !== ""`, `errorDateStart !== null`, `description.trim().length >= 30`
