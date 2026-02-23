@@ -241,6 +241,9 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const maxBatch = body.maxBatch || 20;
+    const saleExternalId = typeof body.saleExternalId === "string" ? body.saleExternalId.trim() : "";
+    const providerFilter = typeof body.provider === "string" ? body.provider.trim() : "";
+    const integrationIdFilter = typeof body.integrationId === "string" ? body.integrationId.trim() : "";
     const supabase = getSupabase();
     const logs: string[] = [];
     const log = (msg: string) => {
@@ -248,16 +251,32 @@ serve(async (req) => {
       logs.push(msg);
     };
 
-    log(`Starting enrichment healer (maxBatch=${maxBatch})`);
+    log(`Starting enrichment healer (maxBatch=${maxBatch}, saleExternalId=${saleExternalId || "none"})`);
 
     // Fetch sales needing healing
-    const { data: pendingSales, error } = await supabase
+    let salesQuery = supabase
       .from("sales")
-      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
-      .in("enrichment_status", ["pending", "failed"])
-      .lt("enrichment_attempts", 5)
+      .select("id, integration_id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
       .order("sale_datetime", { ascending: false })
       .limit(maxBatch);
+
+    if (saleExternalId) {
+      salesQuery = salesQuery.eq("adversus_external_id", saleExternalId);
+    } else {
+      salesQuery = salesQuery
+        .in("enrichment_status", ["pending", "failed"])
+        .lt("enrichment_attempts", 5);
+    }
+
+    if (providerFilter) {
+      salesQuery = salesQuery.eq("integration_type", providerFilter);
+    }
+
+    if (integrationIdFilter) {
+      salesQuery = salesQuery.eq("integration_id", integrationIdFilter);
+    }
+
+    const { data: pendingSales, error } = await salesQuery;
 
     if (error) throw error;
 

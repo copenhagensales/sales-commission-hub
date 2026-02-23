@@ -10,15 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye, AlertTriangle, X } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye, AlertTriangle, X, CalendarDays, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "react-i18next";
-import { BatchMigrationDialog } from "./BatchMigrationDialog";
+import { SyncDateRangeDialog } from "./SyncDateRangeDialog";
+import { SyncSingleSaleDialog } from "./SyncSingleSaleDialog";
 
 // Data filter rule
 interface DataFilterRule {
@@ -154,8 +155,8 @@ export function DialerIntegrations() {
     dataFilterGroupsLogic: 'AND',
   });
 
-  // Per-integration sync days state
-  const [syncDays, setSyncDays] = useState<Record<string, string>>({});
+  const [syncDateRangeDialogId, setSyncDateRangeDialogId] = useState<string | null>(null);
+  const [syncSingleSaleDialogId, setSyncSingleSaleDialogId] = useState<string | null>(null);
 
   // Manual function execution state
   const [manualFunction, setManualFunction] = useState("integration-engine");
@@ -206,7 +207,7 @@ export function DialerIntegrations() {
 
   // Fetch calls state
   const [fetchingCallsId, setFetchingCallsId] = useState<string | null>(null);
-  const [callsDays, setCallsDays] = useState<Record<string, string>>({});
+  
 
   // Delete sales state
   const [deleteSalesDialogOpen, setDeleteSalesDialogOpen] = useState(false);
@@ -369,42 +370,40 @@ export function DialerIntegrations() {
     },
   });
 
-  // Trigger Sync - uses background mode to avoid CPU timeout
-  const syncMutation = useMutation({
-    mutationFn: async ({ integrationId, dialerName, days }: { integrationId: string; dialerName: string; days: number }) => {
-      setSyncingId(integrationId);
+  const triggerManualSync = async (integrationId: string, dialerName: string, days = 7) => {
+    setSyncingId(integrationId);
+
+    try {
       const { data, error } = await supabase.functions.invoke("integration-engine", {
         body: {
           integration_id: integrationId,
           action: "sync",
           days,
-          background: true, // Run in background to avoid CPU timeout
+          background: true,
         },
       });
 
       if (error) throw error;
-      return { ...data, dialerName };
-    },
-    onSuccess: (data) => {
-      if (data.background) {
-        toast.success(`${data.dialerName}: Synkronisering startet i baggrunden`, {
+
+      if (data?.background) {
+        toast.success(`${dialerName}: Synkronisering startet i baggrunden`, {
           description: "Tjek logs for fremdrift",
         });
       } else {
-        const salesCount = data.results?.[0]?.data?.sales?.processed || 0;
-        toast.success(`${data.dialerName}: Synkronisering gennemført`, {
+        const salesCount = data?.results?.[0]?.data?.sales?.processed || 0;
+        toast.success(`${dialerName}: Synkronisering gennemført`, {
           description: `${salesCount} salg behandlet`,
         });
       }
+
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
-    },
-    onError: (error) => {
-      toast.error(`Synkronisering fejlede: ${error.message}`);
-    },
-    onSettled: () => {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Synkronisering fejlede: ${message}`);
+    } finally {
       setSyncingId(null);
-    },
-  });
+    }
+  };
 
   // Fetch Calls - uses background mode to avoid CPU timeout
   const fetchCallsMutation = useMutation({
@@ -1637,7 +1636,11 @@ export function DialerIntegrations() {
                                 : "Deaktiveret"}
                             </span>
                             <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
-                              {integration.is_active && integration.sync_frequency_minutes ? t("dialerIntegrations.active") : t("dialerIntegrations.manual")}
+                              {integration.is_active && integration.sync_frequency_minutes
+                                ? integration.last_sync_at
+                                  ? `Aktiv - sidst ${new Date(integration.last_sync_at).toLocaleString("da-DK")}`
+                                  : "Aktiv - aldrig synkroniseret"
+                                : "Deaktiveret"}
                             </Badge>
                           </div>
                           <a href="/system-stability" className="text-xs text-primary hover:underline">
@@ -1654,165 +1657,43 @@ export function DialerIntegrations() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Input
-                            type="number"
-                            className="w-16 h-8 text-xs"
-                            placeholder="7"
-                            min="1"
-                            max="365"
-                            value={syncDays[integration.id] || ""}
-                            onChange={(e) => setSyncDays((prev) => ({ ...prev, [integration.id]: e.target.value }))}
-                          />
-                          <span className="text-xs text-muted-foreground">d</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={syncingId === integration.id}
-                            onClick={() => syncMutation.mutate({ 
-                              integrationId: integration.id, 
-                              dialerName: integration.name,
-                              days: parseInt(syncDays[integration.id]) || 7
-                            })}
-                          >
-                            {syncingId === integration.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Play className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <BatchMigrationDialog
-                            integrationId={integration.id}
-                            integrationName={integration.name}
-                            provider={integration.provider}
-                          />
-                          {integration.provider === 'adversus' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                title="Opret Webhook"
-                                onClick={() => {
-                                  setWebhookIntegrationId(integration.id);
-                                  setWebhookIntegrationName(integration.name);
-                                  setWebhookDialogOpen(true);
-                                }}
-                              >
-                                <Webhook className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                title="Administrer Webhooks"
-                                onClick={() => openManageWebhooksDialog(integration.id, integration.name)}
-                              >
-                                <List className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          {integration.provider === 'enreach' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                title="Opret Webhook"
-                                onClick={() => {
-                                  setEnreachWebhookIntegrationId(integration.id);
-                                  setEnreachWebhookIntegrationName(integration.name);
-                                  setEnreachWebhookDescription("");
-                                  setEnreachWebhookCampaignCode("");
-                                  setEnreachCampaigns([]);
-                                  loadEnreachCampaigns(integration.id);
-                                  setEnreachWebhookDialogOpen(true);
-                                }}
-                              >
-                                <Webhook className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                title="Administrer Webhooks"
-                                onClick={() => openManageEnreachWebhooksDialog(integration.id, integration.name)}
-                              >
-                                <List className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Kopier Webhook URL"
-                            onClick={() => copyWebhookUrl(integration.id)}
-                          >
-                            {copiedUrl ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingId(integration.id);
-                              const extractionConfig = integration.config?.productExtraction;
-                              setFormData({
-                                name: integration.name,
-                                provider: integration.provider,
-                                username: "",
-                                password: "",
-                                api_url: integration.api_url || "",
-                                org_code: "",
-                                calls_org_codes: integration.calls_org_codes?.join(", ") || "",
-                                productExtractionStrategy: extractionConfig?.strategy || "standard_closure",
-                                productRegexPattern: extractionConfig?.regexPattern || "",
-                                productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",
-                                productDefaultName: extractionConfig?.defaultName || "",
-                                productValidationKey: extractionConfig?.validationKey || "",
-                                conditionalRules: extractionConfig?.conditionalRules || [],
-                                dataFilters: extractionConfig?.dataFilters || [],
-                                dataFilterGroups: extractionConfig?.dataFilterGroups || [],
-                                dataFilterGroupsLogic: extractionConfig?.dataFilterGroupsLogic || 'AND',
-                              });
-                              setIsDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteMutation.mutate(integration.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-64">
-                              <div className="px-2 py-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs text-muted-foreground">Calls (dage)</span>
-                                  <Input
-                                    type="number"
-                                    inputMode="numeric"
-                                    className="h-7 w-20 text-xs"
-                                    placeholder={syncDays[integration.id] || "7"}
-                                    min="1"
-                                    max="365"
-                                    value={callsDays[integration.id] || ""}
-                                    onChange={(e) =>
-                                      setCallsDays((prev) => ({ ...prev, [integration.id]: e.target.value }))
-                                    }
-                                  />
-                                </div>
-                              </div>
-                              <Separator />
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel>Sync</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                disabled={syncingId === integration.id}
+                                onClick={() => triggerManualSync(integration.id, integration.name, 7)}
+                              >
+                                {syncingId === integration.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Play className="h-4 w-4 mr-2" />
+                                )}
+                                Sync nu
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setSyncDateRangeDialogId(integration.id)}>
+                                <CalendarDays className="h-4 w-4 mr-2" />
+                                Sync bestemte datoer...
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setSyncSingleSaleDialogId(integration.id)}>
+                                <Search className="h-4 w-4 mr-2" />
+                                Sync enkelt salg...
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Calls</DropdownMenuLabel>
                               <DropdownMenuItem
                                 disabled={fetchingCallsId === integration.id}
                                 onClick={() =>
                                   fetchCallsMutation.mutate({
                                     integrationId: integration.id,
                                     dialerName: integration.name,
-                                    days: parseInt(callsDays[integration.id] || syncDays[integration.id] || "") || 7,
+                                    days: 7,
                                   })
                                 }
                               >
@@ -1823,12 +1704,97 @@ export function DialerIntegrations() {
                                 )}
                                 Hent Calls
                               </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Webhooks</DropdownMenuLabel>
+                              {integration.provider === "adversus" && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setWebhookIntegrationId(integration.id);
+                                      setWebhookIntegrationName(integration.name);
+                                      setWebhookDialogOpen(true);
+                                    }}
+                                  >
+                                    <Webhook className="h-4 w-4 mr-2" />
+                                    Opret Webhook
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openManageWebhooksDialog(integration.id, integration.name)}>
+                                    <List className="h-4 w-4 mr-2" />
+                                    Administrer Webhooks
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {integration.provider === "enreach" && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setEnreachWebhookIntegrationId(integration.id);
+                                      setEnreachWebhookIntegrationName(integration.name);
+                                      setEnreachWebhookDescription("");
+                                      setEnreachWebhookCampaignCode("");
+                                      setEnreachCampaigns([]);
+                                      loadEnreachCampaigns(integration.id);
+                                      setEnreachWebhookDialogOpen(true);
+                                    }}
+                                  >
+                                    <Webhook className="h-4 w-4 mr-2" />
+                                    Opret Webhook
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openManageEnreachWebhooksDialog(integration.id, integration.name)}>
+                                    <List className="h-4 w-4 mr-2" />
+                                    Administrer Webhooks
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuItem onClick={() => copyWebhookUrl(integration.id)}>
+                                {copiedUrl ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+                                Kopier Webhook URL
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingId(integration.id);
+                                  const extractionConfig = integration.config?.productExtraction;
+                                  setFormData({
+                                    name: integration.name,
+                                    provider: integration.provider,
+                                    username: "",
+                                    password: "",
+                                    api_url: integration.api_url || "",
+                                    org_code: "",
+                                    calls_org_codes: integration.calls_org_codes?.join(", ") || "",
+                                    productExtractionStrategy: extractionConfig?.strategy || "standard_closure",
+                                    productRegexPattern: extractionConfig?.regexPattern || "",
+                                    productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",
+                                    productDefaultName: extractionConfig?.defaultName || "",
+                                    productValidationKey: extractionConfig?.validationKey || "",
+                                    conditionalRules: extractionConfig?.conditionalRules || [],
+                                    dataFilters: extractionConfig?.dataFilters || [],
+                                    dataFilterGroups: extractionConfig?.dataFilterGroups || [],
+                                    dataFilterGroupsLogic: extractionConfig?.dataFilterGroupsLogic || "AND",
+                                  });
+                                  setIsDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Rediger
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onClick={() => openDeleteSalesDialog(integration)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                {t('dialerIntegrations.deleteAllSales')}
+                                {t("dialerIntegrations.deleteAllSales")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => deleteMutation.mutate(integration.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Slet integration
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1924,6 +1890,30 @@ export function DialerIntegrations() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {syncDateRangeDialogId && (
+          <SyncDateRangeDialog
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) setSyncDateRangeDialogId(null);
+            }}
+            integrationId={syncDateRangeDialogId}
+            integrationName={integrations?.find((i) => i.id === syncDateRangeDialogId)?.name || ""}
+            provider={integrations?.find((i) => i.id === syncDateRangeDialogId)?.provider || ""}
+          />
+        )}
+
+        {syncSingleSaleDialogId && (
+          <SyncSingleSaleDialog
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) setSyncSingleSaleDialogId(null);
+            }}
+            integrationId={syncSingleSaleDialogId}
+            integrationName={integrations?.find((i) => i.id === syncSingleSaleDialogId)?.name || ""}
+            provider={integrations?.find((i) => i.id === syncSingleSaleDialogId)?.provider || ""}
+          />
+        )}
 
         {/* Webhook Creation Dialog */}
         <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
