@@ -7,6 +7,7 @@ import { syncIntegration } from "./actions/sync-integration.ts";
 import { makeLogger } from "./utils/index.ts";
 import { smartBackfill } from "./actions/smart-backfill.ts";
 import { safeBackfill } from "./actions/safe-backfill.ts";
+import { providerSync } from "./actions/provider-sync.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -94,6 +95,32 @@ serve(async (req) => {
       }
 
       const result = await smartBackfill(supabase, effectiveIntegrationId, log);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle provider-sync action (consolidated provider-level sync)
+    if (action === "provider-sync") {
+      if (!source) {
+        return new Response(JSON.stringify({ success: false, error: "source (provider) is required for provider-sync" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (background) {
+        EdgeRuntime.waitUntil(providerSync(supabase, source, log));
+        return new Response(JSON.stringify({
+          success: true,
+          action: "provider-sync",
+          provider: source,
+          background: true,
+          message: `Started background provider-sync for ${source}. Check logs for progress.`,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const result = await providerSync(supabase, source, log);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

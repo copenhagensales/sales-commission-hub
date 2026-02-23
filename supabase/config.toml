@@ -213,3 +213,6 @@ verify_jwt = false
 
 [functions.rematch-pricing-rules]
 verify_jwt = false
+
+[functions.enrichment-healer]
+verify_jwt = false

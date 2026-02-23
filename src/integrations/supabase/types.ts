@@ -7475,6 +7475,27 @@ export type Database = {
           },
         ]
       }
+      provider_sync_locks: {
+        Row: {
+          expires_at: string
+          locked_at: string
+          locked_by: string | null
+          provider: string
+        }
+        Insert: {
+          expires_at?: string
+          locked_at?: string
+          locked_by?: string | null
+          provider: string
+        }
+        Update: {
+          expires_at?: string
+          locked_at?: string
+          locked_by?: string | null
+          provider?: string
+        }
+        Relationships: []
+      }
       pulse_survey_completions: {
         Row: {
           completed_at: string
@@ -7943,6 +7964,10 @@ export type Database = {
           customer_company: string | null
           customer_phone: string | null
           dialer_campaign_id: string | null
+          enrichment_attempts: number | null
+          enrichment_error: string | null
+          enrichment_last_attempt: string | null
+          enrichment_status: string | null
           id: string
           integration_type: string | null
           internal_reference: string | null
@@ -7965,6 +7990,10 @@ export type Database = {
           customer_company?: string | null
           customer_phone?: string | null
           dialer_campaign_id?: string | null
+          enrichment_attempts?: number | null
+          enrichment_error?: string | null
+          enrichment_last_attempt?: string | null
+          enrichment_status?: string | null
           id?: string
           integration_type?: string | null
           internal_reference?: string | null
@@ -7987,6 +8016,10 @@ export type Database = {
           customer_company?: string | null
           customer_phone?: string | null
           dialer_campaign_id?: string | null
+          enrichment_attempts?: number | null
+          enrichment_error?: string | null
+          enrichment_last_attempt?: string | null
+          enrichment_status?: string | null
           id?: string
           integration_type?: string | null
           internal_reference?: string | null
