@@ -367,7 +367,7 @@ async function processSalesBatch(
 
   const { data: existingSales } = await supabase
     .from("sales")
-    .select("id, adversus_external_id, customer_phone")
+    .select("id, adversus_external_id, customer_phone, internal_reference")
     .in("adversus_external_id", externalIds)
   const existingSalesMap = new Map(existingSales?.map((s) => [s.adversus_external_id, s]) || [])
 
@@ -438,6 +438,10 @@ async function processSalesBatch(
         log("INFO", `Sale ${sale.externalId} marked as cancelled from dialer state`)
       }
       
+      // Lag 2: Bevar eksisterende internal_reference ved upsert
+      const existingRef = existingSalesMap.get(sale.externalId)?.internal_reference;
+      if (existingRef) saleData.internal_reference = existingRef;
+
       allSalesData.push(saleData)
       if (existingSale) existingSaleIds.push(existingSale.id)
       processed++
@@ -521,9 +525,11 @@ async function processSalesBatch(
       if (itemsError) throw itemsError
     }
   } catch (e) {
-    const errMsg = e instanceof Error ? e.message : String(e)
-    const errDetails = e instanceof Error && "details" in e ? (e as any).details : undefined
-    log("ERROR", `Error en operaciones bulk: ${errMsg}`, { details: errDetails, hint: (e as any)?.hint })
+    const errMsg = (e as any)?.message || (e instanceof Error ? e.message : JSON.stringify(e))
+    const errCode = (e as any)?.code
+    const errDetails = (e as any)?.details
+    const errHint = (e as any)?.hint
+    log("ERROR", `Error en operaciones bulk: ${errMsg}`, { code: errCode, details: errDetails, hint: errHint })
     errors += sales.length
     processed = 0
   }
