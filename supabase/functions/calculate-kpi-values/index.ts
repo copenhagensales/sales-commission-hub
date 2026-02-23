@@ -800,7 +800,7 @@ Deno.serve(async (req) => {
     // Fetch employee data for leaderboards
     const { data: employees } = await supabase
       .from("employee_master_data")
-      .select("id, first_name, last_name, avatar_url")
+      .select("id, first_name, last_name, avatar_url, work_email")
       .eq("is_active", true);
     
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
@@ -813,6 +813,14 @@ Deno.serve(async (req) => {
       });
     });
     
+    // Build work_email -> employee_id fallback map
+    const workEmailToEmployeeId = new Map<string, string>();
+    (employees || []).forEach(emp => {
+      if ((emp as any).work_email) {
+        workEmailToEmployeeId.set((emp as any).work_email.toLowerCase(), emp.id);
+      }
+    });
+
     // Fetch team memberships
     const { data: teamMembers } = await supabase
       .from("team_members")
@@ -837,7 +845,8 @@ Deno.serve(async (req) => {
           employeeMap,
           employeeTeamMap,
           fmCommissionMap,
-          30
+          30,
+          workEmailToEmployeeId
         );
         
         globalLeaderboards.push({
@@ -1093,7 +1102,8 @@ async function calculateGlobalLeaderboard(
   employeeMap: Map<string, { id: string; name: string; avatarUrl: string | null }>,
   employeeTeamMap: Map<string, string>,
   fmCommissionMap: Map<string, { commission: number; price: number }>,
-  limit: number = 30
+  limit: number = 30,
+  workEmailToEmployeeId?: Map<string, string>
 ): Promise<LeaderboardEntry[]> {
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
@@ -1238,8 +1248,8 @@ async function calculateGlobalLeaderboard(
   for (const [agentKey, stats] of agentStats) {
     if (stats.sales === 0) continue;
     
-    // Try to find employee via email -> agent -> mapping -> employee
-    const employeeId = emailToEmployeeId.get(agentKey) || "";
+    // Try to find employee via email -> agent -> mapping -> employee, fallback to work_email
+    const employeeId = emailToEmployeeId.get(agentKey) || (workEmailToEmployeeId ? workEmailToEmployeeId.get(agentKey) : "") || "";
     const empInfo = employeeId ? employeeMap.get(employeeId) : null;
     const teamName = employeeId ? employeeTeamMap.get(employeeId) || null : null;
     
@@ -1302,6 +1312,24 @@ async function calculateTeamLeaderboard(
       if (email) {
         teamAgentEmails.add(email);
         emailToEmployeeId.set(email, mapping.employee_id);
+      }
+    }
+  }
+
+  // Add work_email fallback for team members
+
+  // Get work_emails for team members to use as fallback for agent matching
+  const { data: teamEmpEmails } = await supabase
+    .from("employee_master_data")
+    .select("id, work_email")
+    .in("id", [...teamEmployeeIds]);
+  
+  for (const emp of (teamEmpEmails || [])) {
+    if (emp.work_email) {
+      const email = emp.work_email.toLowerCase();
+      if (!emailToEmployeeId.has(email)) {
+        emailToEmployeeId.set(email, emp.id);
+        teamAgentEmails.add(email);
       }
     }
   }

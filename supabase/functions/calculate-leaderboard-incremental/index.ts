@@ -260,9 +260,10 @@ Deno.serve(async (req) => {
     // ============= FETCH EMPLOYEE DATA =============
     const { data: employees } = await supabase
       .from("employee_master_data")
-      .select("id, first_name, last_name, avatar_url");
+      .select("id, first_name, last_name, avatar_url, work_email");
     
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
+    const workEmailToEmployeeId = new Map<string, string>();
     (employees || []).forEach(emp => {
       const fullName = `${emp.first_name} ${emp.last_name}`;
       employeeMap.set(emp.id, {
@@ -270,6 +271,9 @@ Deno.serve(async (req) => {
         name: fullName,
         avatarUrl: emp.avatar_url,
       });
+      if ((emp as any).work_email) {
+        workEmailToEmployeeId.set((emp as any).work_email.toLowerCase(), emp.id);
+      }
     });
 
     // Fetch team memberships
@@ -323,6 +327,13 @@ Deno.serve(async (req) => {
       const employeeId = agentIdToEmployeeId.get(agentId);
       if (employeeId) {
         emailToEmployeeId.set(email, employeeId);
+      }
+    }
+
+    // Add work_email fallback: if agent mapping didn't find an employee, try work_email
+    for (const [workEmail, empId] of workEmailToEmployeeId) {
+      if (!emailToEmployeeId.has(workEmail)) {
+        emailToEmployeeId.set(workEmail, empId);
       }
     }
 
