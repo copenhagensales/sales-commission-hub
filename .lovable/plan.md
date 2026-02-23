@@ -1,34 +1,42 @@
 
 
-# Genstart Lovablecph backfill (2026-02-12 til i dag)
+# Fix manglende TDC Erhverv salg (Feb 16-21)
 
-## Status
-- Smart-backfill cursor sidder på **2026-02-12** (stoppet 20. feb)
-- 11 dages calls-data mangler (sales synkroniseres allerede via normal cron)
-- Adversus API-forbrug er lavt: **291/1000 pr. time** -- perfekt vindue
-- Cron jobs 89/94 er slettet og skal ikke genskabes (smart-backfill var midlertidigt)
+## Problem
+Den oprindelige smart-backfill (cron jobs 89/94) processerede kun **calls** -- 0 salg for alle dage. Normal sync med `maxRecords: 60` fanger kun 2-6 TDC Erhverv salg/dag i stedet for de forventede 17-26.
+
+| Dato | Forventet (ca.) | Faktisk | Mangler |
+|------|-----------------|---------|---------|
+| Feb 16 | ~17 | 5 | ~12 |
+| Feb 17 | ~17 | 4 | ~13 |
+| Feb 18 | ~17 | 5 | ~12 |
+| Feb 19 | ~17 | 6 | ~11 |
+| Feb 20 | ~17 | 6 | ~11 |
 
 ## Plan
 
-### Trin 1: Kør safe-backfill manuelt
-Trigger `safe-backfill` via edge function med:
-- **integration_id**: `26fac751-c2d8-4b5b-a6df-e33a32e3c6e7`
-- **from**: `2026-02-12`
-- **to**: `2026-02-23`
-- **background**: `true` (kører dag-for-dag uden at blokere)
+### Trin 1: Vent på API-budget (5-10 min)
+Adversus API rammer 429 rate limits. Vi skal vente til budgettet genopbygges.
 
-Safe-backfill tjekker budget automatisk og stopper tidligt hvis grænsen nærmer sig.
+### Trin 2: Kor safe-backfill dag-for-dag
+Kor safe-backfill for hver manglende dag individuelt for at undga timeouts:
+- Feb 16-17
+- Feb 17-18
+- Feb 18-19
+- Feb 19-20
+- Feb 20-21
 
-### Trin 2: Verificer
-Tjek `integration_logs` og `integration_sync_runs` for at bekræfte at alle 11 dage er processeret.
+### Trin 3: Verificer data
+Tjaek at TDC Erhverv salgstal per dag nu matcher forventede niveauer (~17-26/dag).
 
-### Trin 3: Opdater smart-backfill cursor
-Opdater sync_state cursoren til `2026-02-23` så smart-backfill ved at alt er hentet.
+### Trin 4: Genberegn KPIs
+Trigger `calculate-kpi-incremental` og `calculate-kpi-values` for at opdatere cached vaerdier.
+
+### Trin 5: Forebyg fremtidigt datatab
+Overvej at oge `sales_max_records` fra 60 til 150 i Lovablecph integration config, sa normal sync kan folge med volumen.
 
 ## Teknisk detalje
-- Safe-backfill reserverer 30% kapacitet til løbende synkronisering
-- Med kun 291 kald brugt er der ~409 kald tilgængelige til backfill
-- 11 dage kræver ca. 88 API-kald (8 pr. dag) -- langt inden for budget
+- Safe-backfill bruger `fetchSalesRange` som henter ALLE salg for en given dag (ikke begranset af maxRecords)
+- Adversus rate limit er ~60 kald/minut -- vi skal holde os under dette
+- Hvert salg kraver et ekstra API-kald for produkt-detaljer (lead enrichment)
 
-## Risiko
-Ingen -- safe-backfill stopper automatisk ved budgetgrænsen.
