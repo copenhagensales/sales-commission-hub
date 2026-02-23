@@ -30,7 +30,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 3, campaignId, integration_id, integrationId, background = false, from, to, maxRecords, datasets } = body;
+    const { source, action, actions, days = 3, campaignId, integration_id, integrationId, background = false, from, to, maxRecords, datasets, campaignIds, uncapped } = body;
     
     // Balanced limit: 50 records per sync to handle backlog while preventing CPU timeout
     const effectiveMaxRecords = maxRecords ?? 200;
@@ -109,7 +109,7 @@ serve(async (req) => {
         });
       }
 
-      const params = { integrationId: effectiveIntegrationId, from, to, maxRecordsPerDay: maxRecords || 600, datasets };
+      const params = { integrationId: effectiveIntegrationId, from, to, maxRecordsPerDay: maxRecords || 600, datasets, campaignIds, uncapped };
 
       if (background) {
         EdgeRuntime.waitUntil(safeBackfill(supabase, params, log));
