@@ -343,7 +343,8 @@ export class AdversusAdapter implements DialerAdapter {
 
     return validSales;
   }
-  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[], maxRecords?: number): Promise<StandardSale[]> {
+  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[], maxRecords?: number, options?: { uncapped?: boolean }): Promise<StandardSale[]> {
+    const uncapped = options?.uncapped ?? false;
     const hasTimeFrom = range.from.includes("T")
     const hasTimeTo = range.to.includes("T")
     const fromDate = new Date(range.from)
@@ -352,14 +353,20 @@ export class AdversusAdapter implements DialerAdapter {
     if (!hasTimeTo) toDate.setHours(23, 59, 59, 999)
     const fromISO = fromDate.toISOString()
     const toISO = toDate.toISOString()
-    // Cap lookback to max 7 days
-    const MAX_MODIFIED_DAYS = 7;
-    const maxLookback = new Date();
-    maxLookback.setDate(maxLookback.getDate() - MAX_MODIFIED_DAYS);
-    if (fromDate < maxLookback) {
-      console.log(`[Adversus] fetchSalesRange: Capping fromDate from ${fromISO} to ${maxLookback.toISOString()} (max ${MAX_MODIFIED_DAYS} days)`);
-      fromDate.setTime(maxLookback.getTime());
+
+    // Cap lookback to max 7 days — UNLESS uncapped mode
+    if (!uncapped) {
+      const MAX_MODIFIED_DAYS = 7;
+      const maxLookback = new Date();
+      maxLookback.setDate(maxLookback.getDate() - MAX_MODIFIED_DAYS);
+      if (fromDate < maxLookback) {
+        console.log(`[Adversus] fetchSalesRange: Capping fromDate from ${fromISO} to ${maxLookback.toISOString()} (max ${MAX_MODIFIED_DAYS} days)`);
+        fromDate.setTime(maxLookback.getTime());
+      }
+    } else {
+      console.log(`[Adversus] fetchSalesRange: UNCAPPED mode — no lookback cap, fromDate=${fromISO}`);
     }
+
     const cappedFromISO = fromDate.toISOString();
     const filterStr = encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: cappedFromISO, $lt: toISO } }));
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
@@ -369,13 +376,15 @@ export class AdversusAdapter implements DialerAdapter {
     users.forEach(u => userMap.set(u.externalId, u));
     console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
     let rawSales = await this.fetchSalesSequential(filterStr);
-    console.log(`[Adversus] Fetched ${rawSales.length} sales (range)`);
+    console.log(`[Adversus] Fetched ${rawSales.length} sales (range, uncapped=${uncapped})`);
 
-    // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
-    if (maxRecords && rawSales.length > maxRecords) {
+    // Pre-enrichment limit — SKIP if uncapped
+    if (!uncapped && maxRecords && rawSales.length > maxRecords) {
       rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
       rawSales = rawSales.slice(0, maxRecords);
       console.log(`[Adversus] Pre-enrichment limit: kept ${rawSales.length} newest (maxRecords=${maxRecords})`);
+    } else if (uncapped) {
+      console.log(`[Adversus] UNCAPPED: processing ALL ${rawSales.length} sales (no maxRecords limit)`);
     }
 
     const leadIdToData = await this.buildLeadDataMap(rawSales, campaignConfigMap);
@@ -483,7 +492,37 @@ export class AdversusAdapter implements DialerAdapter {
     skippedInvalidEmail = rawSales.length - validSales.length;
     
     if (skippedInvalidEmail > 0) {
+      // In uncapped mode, log per-campaign breakdown of skipped sales
+      if (uncapped) {
+        const skippedByCampaign = new Map<string, number>();
+        rawSales.forEach((s: any) => {
+          const agentObj = s.ownedBy || s.createdBy;
+          let email: string | null = null;
+          if (typeof agentObj === "object" && agentObj) {
+            email = agentObj.email || agentObj.mail || null;
+          }
+          if (!email && userMap.has(String(typeof agentObj === "object" ? agentObj?.id : agentObj))) {
+            email = userMap.get(String(typeof agentObj === "object" ? agentObj?.id : agentObj))!.email;
+          }
+          const isValid = email && (["kongtelling@gmail.com", "rasmusventura700@gmail.com"].includes(email.toLowerCase()) || ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"].some(d => email!.toLowerCase().endsWith(d)));
+          if (!isValid) {
+            const cId = s.campaignId ? String(s.campaignId) : "unknown";
+            skippedByCampaign.set(cId, (skippedByCampaign.get(cId) || 0) + 1);
+          }
+        });
+        console.log(`[Adversus] UNCAPPED skipped breakdown by campaign:`, Object.fromEntries(skippedByCampaign));
+      }
       console.log(`[Adversus] Skipped ${skippedInvalidEmail} sales with invalid/missing email (range, whitelist filter)`);
+    }
+
+    // In uncapped mode, log per-campaign breakdown of VALID sales
+    if (uncapped) {
+      const validByCampaign = new Map<string, number>();
+      validSales.forEach(s => {
+        const cId = s.campaignId || "unknown";
+        validByCampaign.set(cId, (validByCampaign.get(cId) || 0) + 1);
+      });
+      console.log(`[Adversus] UNCAPPED valid sales breakdown by campaign:`, Object.fromEntries(validByCampaign));
     }
 
     return validSales;

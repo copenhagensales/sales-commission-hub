@@ -28,6 +28,8 @@ interface SafeBackfillParams {
   to: string;   // YYYY-MM-DD
   maxRecordsPerDay?: number;
   datasets?: ("sales" | "calls")[];
+  campaignIds?: string[];
+  uncapped?: boolean;
 }
 
 interface SafeBackfillResult {
@@ -137,7 +139,7 @@ export async function safeBackfill(
   params: SafeBackfillParams,
   log: Logger,
 ): Promise<SafeBackfillResult> {
-  const { integrationId, from, to, maxRecordsPerDay = 600, datasets = ["sales", "calls"] } = params;
+  const { integrationId, from, to, maxRecordsPerDay = 600, datasets = ["sales", "calls"], campaignIds, uncapped = false } = params;
 
   // 1. Load integration
   const { data: integration } = await supabase
@@ -155,7 +157,7 @@ export async function safeBackfill(
   }
 
   const provider = integration.provider;
-  log("INFO", `Safe backfill: ${integration.name} (${provider}), range ${from} -> ${to}`);
+  log("INFO", `Safe backfill: ${integration.name} (${provider}), range ${from} -> ${to}, uncapped=${uncapped}, campaignIds=${campaignIds?.join(",") || "all"}`);
 
   // 2. Check provider-level budget
   const providerUsage = await getProviderApiUsage(supabase, provider, BUDGET_WINDOW_MINUTES);
@@ -224,13 +226,20 @@ export async function safeBackfill(
         const sales = await (adapter as any).fetchSalesRange(
           { from: dayStart, to: dayEnd },
           campaignMappings,
-          effectiveMaxRecords,
+          uncapped ? undefined : effectiveMaxRecords,
+          { uncapped },
         );
-        if (sales.length > 0) {
-          const result = await engine.processSales(sales, 200);
+
+        // Filter by campaignIds if specified
+        const filteredSales = campaignIds && campaignIds.length > 0
+          ? sales.filter((s: any) => s.campaignId && campaignIds.includes(s.campaignId))
+          : sales;
+
+        if (filteredSales.length > 0) {
+          const result = await engine.processSales(filteredSales, 200);
           salesCount = (result as any)?.processed || 0;
         }
-        log("INFO", `Day ${dayStart}: ${sales.length} sales fetched, ${salesCount} processed`);
+        log("INFO", `Day ${dayStart}: ${sales.length} sales fetched${campaignIds ? `, ${filteredSales.length} after campaign filter` : ""}, ${salesCount} processed`);
       }
 
       // Fetch calls
