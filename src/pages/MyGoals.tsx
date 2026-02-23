@@ -4,7 +4,9 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { SalesGoalTracker } from "@/components/my-profile/SalesGoalTracker";
+import { PayrollDayByDay } from "@/components/my-profile/PayrollDayByDay";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wallet, AlertCircle, ArrowLeft } from "lucide-react";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { Button } from "@/components/ui/button";
@@ -204,20 +206,36 @@ export default function MyGoals() {
           </p>
         </div>
 
-        <SalesGoalTracker
-          employeeId={employee.id}
-          payrollPeriod={payrollPeriod}
-          commissionStats={{
-            periodTotal: periodCommission,
-            periodSales: periodSalesCount,
-            monthTotal: periodCommission,
-            monthSales: periodSalesCount,
-            todayTotal: todayCommission,
-            todaySales: todaySalesCount,
-          }}
-          absences={absences}
-          danishHolidays={danishHolidays}
-        />
+        <Tabs defaultValue="maal" className="w-full">
+          <TabsList>
+            <TabsTrigger value="maal">Mål</TabsTrigger>
+            <TabsTrigger value="lon">Løn</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="maal">
+            <SalesGoalTracker
+              employeeId={employee.id}
+              payrollPeriod={payrollPeriod}
+              commissionStats={{
+                periodTotal: periodCommission,
+                periodSales: periodSalesCount,
+                monthTotal: periodCommission,
+                monthSales: periodSalesCount,
+                todayTotal: todayCommission,
+                todaySales: todaySalesCount,
+              }}
+              absences={absences}
+              danishHolidays={danishHolidays}
+            />
+          </TabsContent>
+
+          <TabsContent value="lon">
+            <PayrollDayByDay
+              employeeId={employee.id}
+              payrollPeriod={payrollPeriod}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
