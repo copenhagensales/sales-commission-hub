@@ -1,64 +1,110 @@
 
 
-## Fix: Kritisk sync-fejl - Duplikerede internal_reference ved upsert
+# Plan: Sikker backfill med budget-awareness og dedup-garanti
 
-### Problem
-Alle Lovablecph/Tryg salgs-synkroniseringer fejler siden kl. 07:53 med `duplicate key value violates unique constraint "idx_sales_internal_reference"`. Triggeren genererer nye referencenumre for eksisterende salg ved upsert, og disse kolliderer med andre rækker.
+## Problem
+~2.044 salg fra 16.-20. februar mangler `sale_items`. Backfill skal ske uden at:
+1. Overskride API-grænser (Adversus: 60/min, 1000/hr; Enreach: 240/min, 10.000/hr)
+2. Skabe duplikerede salg (sikret via `onConflict: "adversus_external_id"`)
+3. Blokere for den løbende synkronisering (cron-jobs kører hvert 5.-15. minut)
 
-### Strategi: 2-lags defensiv løsning
+## Berørte integrationer
 
----
+| Integration | Provider | Missing items | Limit/hr | Nuv. forbrug/hr | Ledig kapacitet |
+|---|---|---|---|---|---|
+| Tryg | Enreach | ~1.984 | 10.000 | ~144 | ~9.800 |
+| Lovablecph | Adversus | ~58 | 1.000 | ~601 | ~400 |
+| Relatel | Adversus | ~1 | 1.000 | ~48 | delt med Lovablecph |
 
-### Lag 1: Database-migration
+## Strategi
 
-Erstat `generate_sales_internal_reference()` med idempotent version:
+### 1. Ny action: `safe-backfill` i integration-engine
+
+En ny action der kombinerer `repair-history`-logikken med `smart-backfill`-budgetteringen:
+
+**Inden hentning:**
+- Tjek aktuelt API-forbrug fra `integration_sync_runs` (seneste 10 min)
+- Beregn ledig kapacitet per provider (ikke per integration, da de deler credentials)
+- Reserver 30% af budgettet til løbende cron-sync (aldrig bruge mere end 70%)
+- Beregn `maxRecords` baseret på tilgængelig kapacitet
+
+**Under hentning:**
+- Kør dag-for-dag (en dag ad gangen) for kontrolleret forbrug
+- Brug `fetchSalesRange` med eksplicitte date ranges i stedet for `days`-parameter
+- Stop automatisk hvis budget er opbrugt
+- Log API-forbrug per dag til `integration_sync_runs`
+
+**Dedup-garanti:**
+- Eksisterende `onConflict: "adversus_external_id"` i `processSalesBatch` sikrer allerede at salg ikke duplikeres
+- Idempotent `generate_sales_internal_reference` trigger bevarer eksisterende MG-numre
+- Items slettes og genindsættes atomisk (allerede implementeret)
+
+### 2. Provider-level budget tracking
+
+Tilføj en hjælpefunktion der aggregerer API-forbrug per **provider** (ikke per integration), fordi:
+- Lovablecph og Relatel deler Adversus' 60/min + 1000/hr budget
+- Tryg, Eesy og ASE deler Enreach' 240/min + 10.000/hr budget
 
 ```text
-Logik:
-  a) Hvis NEW.internal_reference allerede er sat -> RETURN NEW (uændret)
-  b) Hvis NEW.adversus_external_id findes i sales-tabellen -> genbrug eksisterende reference
-  c) Ellers -> generér nyt MG-YYYYMM-NNNNN nummer via sekvens (som i dag)
+Provider Budget Beregning:
+  ledig = provider_limit - sum(api_calls seneste 10 min) - reserve(30%)
+  max_records = floor(ledig / api_calls_per_record)
 ```
 
-Triggeren forbliver `BEFORE INSERT ... WHEN (NEW.internal_reference IS NULL)`, men nu har funktionen et ekstra sikkerhedsnet for upsert-scenarier.
+### 3. Kald-sekvens (automatisk)
 
-### Lag 2: Application-kode (`core/sales.ts`)
+Backfill skal køres i baggrunden (`background: true`) for at undgå edge function timeout:
 
-3 ændringer i `supabase/functions/integration-engine/core/sales.ts`:
+**Tryg (Enreach - rigeligt budget):**
+- 5 dage (16.-20. feb), ~400 salg/dag
+- Enreach har ~9.800 ledig kapacitet/hr -- ingen risiko
+- Kan køre alle 5 dage i et kald med `maxRecords: 600` per dag
 
-**a) Hent `internal_reference` ved eksisterende-salg lookup (linje 370)**
-- Ændr `.select("id, adversus_external_id, customer_phone")` til `.select("id, adversus_external_id, customer_phone, internal_reference")`
+**Lovablecph (Adversus - stramt budget):**
+- 2 dage (19.-20. feb), ~58 salg total
+- Adversus har ~400 ledig kapacitet -- OK men skal koordineres med cron
+- Kør med `maxRecords: 60` og `background: true`
 
-**b) Bevar reference i upsert-data (linje 419-433)**
-- Tilføj efter `saleData`-objektet:
-  ```text
-  const existingRef = existingSalesMap.get(sale.externalId)?.internal_reference;
-  if (existingRef) saleData.internal_reference = existingRef;
-  ```
-- Triggeren springer automatisk over når `internal_reference` ikke er null.
+## Tekniske ændringer
 
-**c) Fix fejl-logning (linje 524)**
-- Erstat `String(e)` med `(e as any)?.message || JSON.stringify(e)` så PostgreSQL-fejl vises korrekt i stedet for `[object Object]`.
+### Fil: `supabase/functions/integration-engine/actions/safe-backfill.ts` (ny)
 
-### Afgrænsning
-- Ingen ændring af referenceformat (`MG-YYYYMM-NNNNN`).
-- Ingen ændring af eksisterende references på gamle rækker.
-- `onConflict: "adversus_external_id"` bevares.
-- Ingen brede refactors uden for de to filer.
+Ny action med:
+- `getProviderBudget(supabase, provider)` -- aggregerer forbrug across alle integrationer der bruger samme provider
+- `calculateSafeMaxRecords(budget, reservePct)` -- beregner sikker grænse
+- Dag-for-dag loop med budget-check inden hver dag
+- Brug af eksisterende `syncIntegration()` med `from`/`to` date ranges
+- Logging af forbrug per kald til `integration_sync_runs`
 
-### Acceptkriterier
-- Triggeren er idempotent: upsert af kendt `adversus_external_id` bevarer samme `internal_reference`.
-- Nye salg får fortsat gyldigt `MG-YYYYMM-NNNNN`.
-- Næste sync-runs fejler ikke med duplicate key.
-- Fejl-logning viser læsbar tekst.
+### Fil: `supabase/functions/integration-engine/index.ts` (opdatering)
 
-### Verifikation efter deploy
-1. Deploy migration + edge function
-2. Vent på næste sync (hvert 5. minut)
-3. Tjek `integration_sync_runs` for Lovablecph: `records_processed > 0`, `errors_count = 0`
-4. Bekræft at dagens 5 salg vises i dashboardet
+Tilføj ny `action === "safe-backfill"` route der:
+- Accepterer `integration_id` og `date_range` (from/to)
+- Kalder `safe-backfill` action
+- Understøtter `background: true`
 
-### Rollback-plan
-- **Database**: Kør migration der gendanner den originale `generate_sales_internal_reference()` funktion (uden adversus_external_id-lookup).
-- **Kode**: Fjern `internal_reference` fra select-query og saleData-tildelingen i `core/sales.ts`.
+### Provider budget-konstanter
+
+```text
+PROVIDER_LIMITS = {
+  adversus: { perMin: 60, perHour: 1000 },
+  enreach:  { perMin: 240, perHour: 10000 }
+}
+
+RESERVE_PCT = 0.30  // 30% reserveret til cron-sync
+BUDGET_WINDOW = 10  // minutter
+```
+
+### Dedup-sikring (allerede implementeret, ingen ændringer)
+
+- `sales.adversus_external_id` UNIQUE constraint + `onConflict` upsert
+- `generate_sales_internal_reference` trigger: idempotent (bevarer eksisterende ref)
+- `processSalesBatch`: sletter items atomisk og genindsætter
+
+## Forventet resultat
+
+- Tryg: ~1.984 salg får items genindlæst inden for 1-2 timer (ingen budget-risiko)
+- Lovablecph: ~58 salg genindlæst inden for 30 minutter (budget-aware)
+- Ingen dobbelt-salg, ingen overskredne API-grænser
+- Cron-jobs kører uforstyrret med 30% reserveret kapacitet
 
