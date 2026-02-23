@@ -1,53 +1,34 @@
 
 
-# Komplet KPI-rettelse: NULL backfill + filter fix + FM dobbelt-tælling
+# Genstart Lovablecph backfill (2026-02-12 til i dag)
 
-## Oversigt
-Tre sammenhængende problemer løses i ét sweep, så alle dashboards matcher Dagsrapporter.
+## Status
+- Smart-backfill cursor sidder på **2026-02-12** (stoppet 20. feb)
+- 11 dages calls-data mangler (sales synkroniseres allerede via normal cron)
+- Adversus API-forbrug er lavt: **291/1000 pr. time** -- perfekt vindue
+- Cron jobs 89/94 er slettet og skal ikke genskabes (smart-backfill var midlertidigt)
 
----
+## Plan
 
-## Del 1: Database — Backfill NULL og sæt default
+### Trin 1: Kør safe-backfill manuelt
+Trigger `safe-backfill` via edge function med:
+- **integration_id**: `26fac751-c2d8-4b5b-a6df-e33a32e3c6e7`
+- **from**: `2026-02-12`
+- **to**: `2026-02-23`
+- **background**: `true` (kører dag-for-dag uden at blokere)
 
-**Migration SQL:**
-```sql
--- Backfill eksisterende NULL-rækker til 'pending'
-UPDATE sales SET validation_status = 'pending' WHERE validation_status IS NULL;
+Safe-backfill tjekker budget automatisk og stopper tidligt hvis grænsen nærmer sig.
 
--- Sæt default så fremtidige rækker aldrig er NULL
-ALTER TABLE sales ALTER COLUMN validation_status SET DEFAULT 'pending';
-```
+### Trin 2: Verificer
+Tjek `integration_logs` og `integration_sync_runs` for at bekræfte at alle 11 dage er processeret.
 
-Dette eliminerer NULL-problemet permanent (1.845 rækker opdateres).
+### Trin 3: Opdater smart-backfill cursor
+Opdater sync_state cursoren til `2026-02-23` så smart-backfill ved at alt er hentet.
 
----
+## Teknisk detalje
+- Safe-backfill reserverer 30% kapacitet til løbende synkronisering
+- Med kun 291 kald brugt er der ~409 kald tilgængelige til backfill
+- 11 dage kræver ca. 88 API-kald (8 pr. dag) -- langt inden for budget
 
-## Del 2: Edge Functions — Fjern FM dobbelt-tælling
-
-I `calculate-kpi-values/index.ts`, fjern redundant FM-processing fra:
-
-1. **Employee-scoped KPIs** (~linje 614-618): Fjern `empFmSales`-loop
-2. **Team-scoped KPIs** (~linje 699-704): Fjern FM commission-addition til `teamCommission`
-3. **Global leaderboard** (~linje 1221-1243): Fjern "Process FM sales" blok
-4. **Client leaderboard** (~linje 1413-1426): Fjern FM sales processing
-5. **Team leaderboard** (~linje 1590-1593): Fjern FM sales processing
-
----
-
-## Del 3: Genberegn og genaktiver
-
-1. Deploy alle 3 edge functions
-2. Trigger `calculate-kpi-values` (chunk: kpis) og (chunk: leaderboards)
-3. Trigger `calculate-kpi-incremental` og `calculate-leaderboard-incremental`
-4. Genaktiver Lovablecph cron jobs (89 og 94)
-5. Verificer at dashboards matcher Dagsrapporter
-
----
-
-## Rækkefølge
-1. Kør migration (backfill + default)
-2. Implementer FM dobbelt-tællings-fix i calculate-kpi-values
-3. Deploy alle edge functions
-4. Genberegn KPIs
-5. Genaktiver cron jobs
-
+## Risiko
+Ingen -- safe-backfill stopper automatisk ved budgetgrænsen.
