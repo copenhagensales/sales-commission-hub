@@ -1,65 +1,26 @@
 
 
-# Ret sync-frekvenser via edge function kald (ikke migration)
+# Ret overlap-tærskel for 3-minutters integrationer
 
-## Hvorfor ikke migrationen?
+## Problem
+Overlap-detektoren bruger en fast tærskel paa `< 2 minutter` for alle integrationer. Med 3-minutters frekvens er den maksimalt mulige stagger kun 1 minut (offsets 0, 1, 2). Derfor viser tidslinjen altid "4 overlaps" for Enreach-integrationerne, selvom de er optimalt staggered.
 
-Migrationen har tre problemer der goer den upaalidelig:
+## Loesning
+Goer overlap-taersklen dynamisk baseret paa den laveste frekvens blandt de sammenlignede jobs. Hvis to jobs begge koerer hvert 3. minut, er den bedst mulige afstand 1 minut -- saa taersklen skal vaere 1, ikke 2.
 
-1. **Lovablecph har ingen cron-jobs i databasen** -- UPDATE paa ikke-eksisterende raekker goer ingenting
-2. **Job-navne matcher ikke** -- migrationen soeger efter `-sync-sales` og `-sync-meta`, men kun `-sync` eksisterer
-3. **Migration kan ikke oprette nye cron-jobs** -- den kan kun opdatere eksisterende
+## Aendringer
 
-## Korrekt tilgang: Kald update-cron-schedule for hver integration
+### `src/utils/cronOverlapDetector.ts`
+I `detectOverlaps`-funktionen: naar to jobs sammenlignes, beregn den effektive taeerskel som `Math.min(thresholdMinutes, minFrequency / jobCount)` for jobs paa samme provider. Alternativt (simplere): sænk bare taersklen til 1 for job-par hvor begge har frekvens <= 3 minutter.
 
-Edge-funktionen `update-cron-schedule` haandterer alt automatisk:
-- Fjerner gamle jobs (uanset navngivning)
-- Opretter nye jobs med korrekt schedule
-- Opretter split-jobs (sales + meta) for Lovablecph
-- Persisterer config og frequency i dialer_integrations
+Konkret aendring i loopet (linje 81-117):
+- Estimer frekvens for jobA og jobB via `estimateFrequencyFromCron`
+- Hvis begge har frekvens <= 3, brug taeerskel = 1 i stedet for den globale taeerskel
+- Ellers behold den eksisterende taeerskel
 
-### 5 kald der skal laves
+### `src/components/system-stability/TimelineOverlap.tsx`
+Opdater legend-teksten fra "Overlap (<2 min)" til "Overlap" (uden hardcodet taeerskel, da den nu er dynamisk).
 
-| Integration | ID | Provider | Ny frekvens | Staggered schedule |
-|---|---|---|---|---|
-| Lovablecph | 26fac751-... | adversus | 5 min | `1,6,11,16,21,26,31,36,41,46,51,56 * * * *` |
-| Relatel_CPHSALES | 657c2050-... | adversus | 5 min | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` |
-| Eesy | d79b9632-... | enreach | 3 min | `0,3,6,9,...,57 * * * *` |
-| Tryg | a5068f85-... | enreach | 3 min | `1,4,7,10,...,58 * * * *` |
-| ASE | a76cf63a-... | enreach | 3 min | `2,5,8,11,...,59 * * * *` |
-
-### Implementering
-
-Ingen kodeaendringer -- kun 5 kald til `update-cron-schedule` edge-funktionen med:
-```text
-{
-  integration_type: "dialer",
-  integration_id: "<uuid>",
-  provider: "<adversus|enreach>",
-  frequency_minutes: <5|3>,
-  is_active: true
-}
-```
-
-Edge-funktionen beregner automatisk staggered schedules via den eksisterende `staggeredFiveMinuteSchedules` logik for Adversus, og standard `frequencyToCron` for Enreach (som vi eventuelt tilpasser med `custom_schedule` for 3-min stagger).
-
-### Note om 3-minutters frekvens
-
-`frequencyToCron` tabellen i `update-cron-schedule` har ikke en entry for `3` minutter. Vi har to muligheder:
-
-1. **Tilfoej `3` til `frequencyToCron`** i edge-funktionen: `3: "*/3 * * * *"` -- men dette giver ikke stagger
-2. **Send `custom_schedule`** med staggerede 3-min schedules for hver Enreach-integration
-
-Option 2 er bedre for at undgaa samtidige API-kald. Vi sender `custom_schedule` direkte.
-
-### Filer der aendres
-
-| Fil | Aendring |
-|---|---|
-| `supabase/functions/update-cron-schedule/index.ts` | Tilfoej `3` til `frequencyToCron` mapping |
-| Ingen migration | Slet den foreslaaede migration -- den virker ikke korrekt |
-
-### Eksekvering
-
-Efter deploy af opdateret edge-funktion, kalder vi den 5 gange via curl/invoke med korrekte parametre for hver integration.
+### Ingen backend-aendringer
+Alt er rent frontend-logik.
 
