@@ -95,7 +95,7 @@ export function TimelineOverlap({ integrations }: TimelineOverlapProps) {
             <div className="w-2 h-2 rounded-sm bg-primary" /> Sync-tidspunkt
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm bg-destructive" /> Overlap (&lt;2 min)
+            <div className="w-2 h-2 rounded-sm bg-destructive" /> Overlap
           </div>
         </div>
       </CardContent>

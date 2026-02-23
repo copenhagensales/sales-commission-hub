@@ -91,13 +91,18 @@ export function detectOverlaps(
       const minutesA = parseCronMinutes(jobA.schedule);
       const minutesB = parseCronMinutes(jobB.schedule);
 
+      // Dynamic threshold: lower to 1 for high-frequency jobs (≤3 min)
+      const freqA = estimateFrequencyFromCron(jobA.schedule);
+      const freqB = estimateFrequencyFromCron(jobB.schedule);
+      const effectiveThreshold = (freqA <= 3 && freqB <= 3) ? 1 : thresholdMinutes;
+
       const conflictMinutes: number[] = [];
 
       for (const mA of minutesA) {
         for (const mB of minutesB) {
           const diff = Math.abs(mA - mB);
           const circularDiff = Math.min(diff, 60 - diff);
-          if (circularDiff < thresholdMinutes) {
+          if (circularDiff < effectiveThreshold) {
             conflictMinutes.push(mA);
           }
         }
