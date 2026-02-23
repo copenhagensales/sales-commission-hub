@@ -343,8 +343,9 @@ export class AdversusAdapter implements DialerAdapter {
 
     return validSales;
   }
-  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[], maxRecords?: number, options?: { uncapped?: boolean }): Promise<StandardSale[]> {
+  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[], maxRecords?: number, options?: { uncapped?: boolean; campaignIds?: string[] }): Promise<StandardSale[]> {
     const uncapped = options?.uncapped ?? false;
+    const campaignIds = options?.campaignIds;
     const hasTimeFrom = range.from.includes("T")
     const hasTimeTo = range.to.includes("T")
     const fromDate = new Date(range.from)
@@ -377,6 +378,14 @@ export class AdversusAdapter implements DialerAdapter {
     console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
     let rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales (range, uncapped=${uncapped})`);
+
+    // PRE-ENRICHMENT campaign filter: remove sales from irrelevant campaigns
+    // BEFORE buildLeadDataMap to drastically reduce API calls and avoid timeout
+    if (campaignIds && campaignIds.length > 0) {
+      const before = rawSales.length;
+      rawSales = rawSales.filter((s: any) => s.campaignId && campaignIds.includes(String(s.campaignId)));
+      console.log(`[Adversus] Pre-enrichment campaign filter: ${before} -> ${rawSales.length} sales (campaigns: ${campaignIds.join(",")})`);
+    }
 
     // Pre-enrichment limit — SKIP if uncapped
     if (!uncapped && maxRecords && rawSales.length > maxRecords) {

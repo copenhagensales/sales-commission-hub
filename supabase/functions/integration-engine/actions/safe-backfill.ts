@@ -227,10 +227,11 @@ export async function safeBackfill(
           { from: dayStart, to: dayEnd },
           campaignMappings,
           uncapped ? undefined : effectiveMaxRecords,
-          { uncapped },
+          { uncapped, campaignIds },
         );
 
-        // Filter by campaignIds if specified
+        // campaignIds filtering now also happens pre-enrichment in adapter,
+        // but keep post-filter as safety net
         const filteredSales = campaignIds && campaignIds.length > 0
           ? sales.filter((s: any) => s.campaignId && campaignIds.includes(s.campaignId))
           : sales;
