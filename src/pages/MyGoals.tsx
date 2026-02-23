@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,8 @@ import { Wallet, AlertCircle, ArrowLeft } from "lucide-react";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { Button } from "@/components/ui/button";
 import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
+import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
+import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
 type EmployeeData = {
   id: string;
@@ -22,6 +24,12 @@ type EmployeeData = {
 export default function MyGoals() {
   const { employeeId: urlEmployeeId } = useParams<{ employeeId?: string }>();
   const { previewEmployee } = useRolePreview();
+  
+  // Payroll period state for Løn tab
+  const [lonPeriod, setLonPeriod] = useState(() => getPayrollPeriod());
+  const handleLonPeriodChange = useCallback((start: Date, end: Date) => {
+    setLonPeriod({ start, end });
+  }, []);
 
   // Get current user
   const { data: currentUser } = useQuery({
@@ -230,10 +238,15 @@ export default function MyGoals() {
           </TabsContent>
 
           <TabsContent value="lon">
-            <PayrollDayByDay
-              employeeId={employee.id}
-              payrollPeriod={payrollPeriod}
-            />
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <PayrollPeriodSelector onChange={handleLonPeriodChange} />
+              </div>
+              <PayrollDayByDay
+                employeeId={employee.id}
+                payrollPeriod={lonPeriod}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
