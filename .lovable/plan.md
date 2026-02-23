@@ -1,26 +1,25 @@
 
 
-# Ret overlap-tærskel for 3-minutters integrationer
+# Test ASE /leads: Hent et enkelt Success-lead med fuld data
 
-## Problem
-Overlap-detektoren bruger en fast tærskel paa `< 2 minutter` for alle integrationer. Med 3-minutters frekvens er den maksimalt mulige stagger kun 1 minut (offsets 0, 1, 2). Derfor viser tidslinjen altid "4 overlaps" for Enreach-integrationerne, selvom de er optimalt staggered.
+## Formaal
 
-## Loesning
-Goer overlap-taersklen dynamisk baseret paa den laveste frekvens blandt de sammenlignede jobs. Hvis to jobs begge koerer hvert 3. minut, er den bedst mulige afstand 1 minut -- saa taersklen skal vaere 1, ikke 2.
+Teste om `/leads/{uniqueId}` (enkelt-lead endpoint) returnerer `data`-feltet med kundeinfo, da list-endpointet returnerer `data: {}` for alle leads.
 
-## Aendringer
+## Aendring
 
-### `src/utils/cronOverlapDetector.ts`
-I `detectOverlaps`-funktionen: naar to jobs sammenlignes, beregn den effektive taeerskel som `Math.min(thresholdMinutes, minFrequency / jobCount)` for jobs paa samme provider. Alternativt (simplere): sænk bare taersklen til 1 for job-par hvor begge har frekvens <= 3 minutter.
+### `supabase/functions/test-ase-leads/index.ts` - Omskriv til fokuseret test
 
-Konkret aendring i loopet (linje 81-117):
-- Estimer frekvens for jobA og jobB via `estimateFrequencyFromCron`
-- Hvis begge har frekvens <= 3, brug taeerskel = 1 i stedet for den globale taeerskel
-- Ellers behold den eksisterende taeerskel
+Erstat hele indholdet med en simpel 2-trins test:
 
-### `src/components/system-stability/TimelineOverlap.tsx`
-Opdater legend-teksten fra "Overlap (<2 min)" til "Overlap" (uden hardcodet taeerskel, da den nu er dynamisk).
+1. **Hent liste**: `/leads?SearchName=cphsales2&ModifiedFrom={3dageBack}&Include=data,campaign,lastModifiedByUser,firstProcessedByUser` -- find Success-leads og vis deres `data`-felt
+2. **Hent enkelt lead**: `/leads/{uniqueId}?Include=data,campaign,lastModifiedByUser,firstProcessedByUser` -- hent fuld detalje for foerste Success-lead og vis ALLE felter og data
 
-### Ingen backend-aendringer
-Alt er rent frontend-logik.
+Returnerer et JSON-objekt med:
+- `totalLeads`, `successCount` -- oversigt
+- `firstSuccessFromList` -- data-feltet som listen returnerer (forventet tomt)
+- `singleLeadDetail` -- data-feltet fra enkelt-lead endpoint (muligvis udfyldt)
 
+### Deploy og kald
+
+Efter deploy, kald funktionen og analyser om `singleLeadDetail.dataFull` indeholder kundefelter (Navn1, Telefon1, A-kasse salg osv.).
