@@ -97,6 +97,30 @@ export class EnreachAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
+  /**
+   * Returns true if this integration uses the /leads endpoint (ASE)
+   * instead of /simpleleads (Eesy, Tryg, etc.)
+   */
+  private get usesLeadsEndpoint(): boolean {
+    return this.dialerName.toLowerCase() === "ase";
+  }
+
+  /**
+   * Build the correct leads list endpoint based on the integration.
+   * ASE uses /leads?SearchName=cphsales2&Include=data,campaign,...
+   * Other Enreach integrations use /simpleleads?Projects=*
+   */
+  private buildLeadsEndpoint(modifiedFrom: string, modifiedTo?: string): string {
+    if (this.usesLeadsEndpoint) {
+      let ep = `/leads?SearchName=cphsales2&ModifiedFrom=${modifiedFrom}&Include=data,campaign,lastModifiedByUser,firstProcessedByUser`;
+      if (modifiedTo) ep += `&ModifiedTo=${modifiedTo}`;
+      return ep;
+    }
+    let ep = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
+    if (modifiedTo) ep += `&ModifiedTo=${modifiedTo}`;
+    return ep;
+  }
+
   /** Fetch all projects accessible to this API user */
   async fetchAccessibleProjects(): Promise<{ uniqueId: string; name: string; active: boolean }[]> {
     const url = `${this.baseUrl}/projects`;
@@ -293,7 +317,7 @@ export class EnreachAdapter implements DialerAdapter {
     const modifiedFrom = cutoffDate.toISOString().split("T")[0];
     
     // Simple fetch with limit - no complex filtering or pagination
-    const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&take=${limit}`;
+    const endpoint = `${this.buildLeadsEndpoint(modifiedFrom)}&take=${limit}`;
     
     try {
       const data = await this.get(endpoint);
@@ -333,7 +357,7 @@ export class EnreachAdapter implements DialerAdapter {
       console.log(`[EnreachAdapter] Date range: ${modifiedFrom} to ${today}`);
 
       // NO usar LeadClosures=Success - filtrar client-side como hace el simulador
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
+      const endpoint = this.buildLeadsEndpoint(modifiedFrom);
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -500,7 +524,7 @@ export class EnreachAdapter implements DialerAdapter {
       const toStr = range.to.split("T")[0];
       console.log(`[EnreachAdapter] Fetching leads for range ${fromStr} -> ${toStr} (will filter closure=success client-side)`);
 
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true`;
+      const endpoint = this.buildLeadsEndpoint(fromStr, toStr);
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -1202,7 +1226,7 @@ export class EnreachAdapter implements DialerAdapter {
       cutoffDate.setDate(cutoffDate.getDate() - 7);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
 
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
+      const endpoint = this.buildLeadsEndpoint(modifiedFrom);
 
       const userMap = new Map<string, StandardUser>();
       let skip = 0;
@@ -1574,7 +1598,7 @@ export class EnreachAdapter implements DialerAdapter {
       const toStr = range.to.split("T")[0];
       console.log(`[EnreachAdapter] Fetching ALL sessions (all closures) for range ${fromStr} -> ${toStr}`);
 
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true`;
+      const endpoint = this.buildLeadsEndpoint(fromStr, toStr);
 
       const allSessions: StandardSession[] = [];
       const seenIds = new Set<string>();
