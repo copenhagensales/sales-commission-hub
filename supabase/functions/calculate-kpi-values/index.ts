@@ -2229,16 +2229,9 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM sales count for this client (from unified sales table)
-      const { count: fmCount } = await supabase
-        .from("sales")
-        .select("*", { count: "exact", head: true })
-        .eq("source", "fieldmarketing")
-        .filter("raw_payload->>fm_client_id", "eq", clientId)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
-      
-      return telesalesCount + (fmCount || 0);
+      // FM sales are now included via sale_items (campaign-linked),
+      // so no separate FM count is needed.
+      return telesalesCount;
     }
 
     case "total_commission":
@@ -2258,23 +2251,9 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM commission for this client (from unified sales table)
-      const { data: fmSales } = await supabase
-        .from("sales")
-        .select("raw_payload")
-        .eq("source", "fieldmarketing")
-        .filter("raw_payload->>fm_client_id", "eq", clientId)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
-      
-      let fmCommission = 0;
-      for (const sale of (fmSales || [])) {
-        const productName = (sale as any).raw_payload?.fm_product_name;
-        const pricing = fmCommissionMap.get(productName?.toLowerCase());
-        fmCommission += pricing?.commission || 0;
-      }
-      
-      return telesalesCommission + fmCommission;
+      // FM commission is now included via sale_items.mapped_commission,
+      // so no separate FM calculation is needed.
+      return telesalesCommission;
     }
 
     case "total_revenue":
@@ -2294,23 +2273,9 @@ async function calculateClientKpiValue(
         }
       }
       
-      // FM revenue for this client (from unified sales table)
-      const { data: fmSales } = await supabase
-        .from("sales")
-        .select("raw_payload")
-        .eq("source", "fieldmarketing")
-        .filter("raw_payload->>fm_client_id", "eq", clientId)
-        .gte("sale_datetime", startStr)
-        .lte("sale_datetime", endStr);
-      
-      let fmRevenue = 0;
-      for (const sale of (fmSales || [])) {
-        const productName = (sale as any).raw_payload?.fm_product_name;
-        const pricing = fmCommissionMap.get(productName?.toLowerCase());
-        fmRevenue += pricing?.price || 0;
-      }
-      
-      return telesalesRevenue + fmRevenue;
+      // FM revenue is now included via sale_items.mapped_revenue,
+      // so no separate FM calculation is needed.
+      return telesalesRevenue;
     }
 
     case "total_hours":
