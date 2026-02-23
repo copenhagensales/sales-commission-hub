@@ -1,89 +1,79 @@
 
 
-# Fix: ASE data og omsaetning mangler efter /leads migration
+# Fix: 408 manglende Lønsikring sale_items i ASE-salg
 
-## Resumé
+## Problem
 
-Migrationen til `/leads` endpointet har introduceret 3 problemer pga. lowercase data-keys:
+408 ASE-salg har Lønsikring-data i deres `raw_payload` (f.eks. `"Lønsikring": "Lønsikring Udvidet"`), men integration-engine oprettede aldrig et Lønsikring sale_item for dem. Kun Salg/Lead-item blev oprettet.
 
-1. **Kundedata mangler**: `customer_phone` og `customer_name` er tomme fordi `getStr()` soeger efter `Telefon1`, `Navn1` osv., men `/leads` returnerer `telefon1`, `navn1`
-2. **Pricing rules matcher ikke**: Regler forventer `A-kasse salg`, `Daekningssum`, `Forening` -- men data har `a-kasse salg`, `daekningssum`, `forening`
-3. **Loensikring produkt-mismatch**: Extraction-reglen henter vaerdien "Loensikring Udvidet" som produktnavn, men pricing rules kun findes for "Loensikring"
+Det betyder ca. 326.400 kr i manglende omsætning (408 x 800 kr per Lønsikring).
 
-## Loesung
+### Årsag
+Salgene blev processeret af integration-engine FØR de korrekte conditional rules var konfigureret (eller mens extraction logikken ikke matchede). Da engine bruger `ON CONFLICT` og springer over eksisterende salg ved re-sync, bliver de manglende Lønsikring-items aldrig oprettet efterfølgende.
 
-### Trin 1: Tilfoej key-normalisering i enreach.ts adapteren
+### Fordeling af de 408 salg
+- 360 stk: A-kasse salg = Ja, Forening = Fagforening med lønsikring
+- 16 stk: A-kasse salg = Ja, Forening = Ase Lønmodtager
+- 15 stk: A-kasse salg = Nej, Forening = null (solo Lønsikring)
+- 12 stk: A-kasse salg = Nej, Forening = Fagforening med lønsikring (solo Lønsikring)
+- 5 stk: Andre kombinationer
 
-Tilfoej en `normalizeLeadsData()` metode der Title Case-konverterer alle data-keys naar `/leads` endpointet bruges. Kald den i `buildStandardSale()` foer data bruges.
+## Løsning
 
-```text
-Input:   { "a-kasse salg": "Ja", "daekningssum": "6000", "telefon1": "12345678" }
-Output:  { "A-Kasse Salg": "Ja", "Daekningssum": "6000", "Telefon1": "12345678" }
+### Trin 1: Opret manglende Lønsikring sale_items
+
+Indsæt nye `sale_items` for de 408 salg med:
+- `product_id = 'f9a8362f-3839-4247-961c-d5cd1e7cd37d'` (Lønsikring)
+- `quantity = 1`
+- `mapped_commission = 0` (sættes af rematch)
+- `mapped_revenue = 0` (sættes af rematch)
+
+SQL:
+```sql
+INSERT INTO sale_items (sale_id, product_id, quantity, mapped_commission, mapped_revenue, needs_mapping)
+SELECT s.id, 'f9a8362f-3839-4247-961c-d5cd1e7cd37d', 1, 0, 0, true
+FROM sales s
+WHERE s.source = 'ase'
+AND s.sale_datetime >= '2025-09-01'
+AND (
+  (s.raw_payload->'data'->>'Lønsikring' IS NOT NULL AND s.raw_payload->'data'->>'Lønsikring' != '')
+  OR (s.raw_payload->'data'->>'lønsikring' IS NOT NULL AND s.raw_payload->'data'->>'lønsikring' != '')
+)
+AND NOT EXISTS (
+  SELECT 1 FROM sale_items si 
+  JOIN products p ON p.id = si.product_id
+  WHERE si.sale_id = s.id AND p.name ILIKE '%lønsikring%'
+);
 ```
 
-Vigtig detalje: Brug en praecis mapping for kendte felter i stedet for generisk Title Case, da `A-kasse salg` (kun foerste ord capitalized) er det format pricing rules forventer -- ikke `A-Kasse Salg`.
+### Trin 2: Opdater rematch-pricing-rules for case-insensitive key normalisering
 
-Kendte felter der skal mappes:
-- `a-kasse salg` -> `A-kasse salg`
-- `a-kasse type` -> `A-kasse type`
-- `daekningssum` -> `Dækningssum`
-- `forening` -> `Forening`
-- `loensikring` -> `Lønsikring`
-- `eksisterende medlem` -> `Eksisterende medlem`
-- `medlemsnummer` -> `Medlemsnummer`
-- `nuvaerende a-kasse` -> `Nuværende a-kasse`
-- `resultat af samtalen` -> `Resultat af samtalen`
-- `ja - afdeling` -> `Ja - Afdeling`
-- `leadudfald` -> `Leadudfald`
-- `navn1` -> `Navn1`
-- `navn2` -> `Navn2`
-- `telefon1` -> `Telefon1`
+Tilføj en `normalizeRawPayloadKeys()` funktion i `rematch-pricing-rules/index.ts` med samme key-mapping som i enreach.ts-adapteren. Denne køres på `rawPayloadData` for ASE-salg FØR enrichment og pricing rule matching.
 
-Fallback for ukendte keys: capitalize foerste bogstav.
+Tilføj også Lønsikring-variant-korrektion i `determineAseProductId()` så alle Lønsikring-varianter korrigeres til standard-ID'et.
 
-Normaliseringen skal ogsaa gemmes i `raw_payload.data` saa rematch-pricing-rules kan matche korrekt.
+### Trin 3: Kør rematch-pricing-rules
 
-### Trin 2: Opdater ASE integration config (Loensikring)
+Kald funktionen med `source: "ase"` for at beregne korrekt commission og revenue for alle nye og eksisterende Lønsikring sale_items. Forventet resultat: 400 kr commission / 800 kr revenue per Lønsikring (for dem med Dækningssum >= 6000).
 
-Opdater `dialer_integrations.config` for ASE (id: `a76cf63a-4b02-4d99-b6b5-20a8e4552ba5`). AEndr conditional rule #2:
-
-- **Fra**: `extractionType: "specific_fields"` med `targetKeys: ["Loensikring"]`
-- **Til**: `extractionType: "static_value"` med `staticProductName: "Loensikring"`
-
-### Trin 3: Ret eksisterende data
-
-1. Opdater `sale_items` med `product_id = 'e1d43ddb-4340-4066-a1b8-b699d837f4ce'` (Loensikring Udvidet) til `product_id = 'f9a8362f-3839-4247-961c-d5cd1e7cd37d'` (Loensikring)
-2. Normaliser `raw_payload.data` keys for eksisterende ASE-salg der har lowercase keys (de nyeste ~623 salg uden telefon)
-3. Koer `rematch-pricing-rules` for at genberegne commission/revenue
-
-### Trin 4: Deploy og test
-
-1. Deploy opdateret `integration-engine`
-2. Trigger ASE sync og verificer at nye salg faar:
-   - `customer_phone` udfyldt
-   - `customer_name` udfyldt
-   - Korrekt `mapped_commission` og `mapped_revenue`
-   - Loensikring-items med product_id `f9a8362f`
+### Forventet effekt
+- 408 nye Lønsikring sale_items oprettes
+- Ca. 326.400 kr ekstra omsætning synliggøres i dagssedler og dashboards
+- Fremtidige syncs opretter automatisk Lønsikring-items korrekt (fix fra forrige ændring)
 
 ## Tekniske detaljer
 
-### Fil: `supabase/functions/integration-engine/adapters/enreach.ts`
+### Fil: `supabase/functions/rematch-pricing-rules/index.ts`
 
-Tilfoej ny metode `normalizeLeadsData(data: Record<string, string>): Record<string, string>` med explicit key-mapping. Kald den i `buildStandardSale()` efter linje ~707 naar `this.usesLeadsEndpoint` er true:
+1. Tilføj en `KNOWN_KEY_MAP` og `normalizeRawPayloadKeys()` funktion (identisk mapping som i enreach.ts-adapteren)
+2. Tilføj `ASE_LOENSIKRING_PRODUCT_ID` konstant og `LOENSIKRING_VARIANT_IDS` Set
+3. Udvid `determineAseProductId()` til at tjekke om `originalProductId` er en Lønsikring-variant
+4. I processing-loopet: kør normalisering af rawPayloadData for ASE-salg før enrichment
 
-```text
-if (this.usesLeadsEndpoint && dataObj) {
-  dataObj = this.normalizeLeadsData(dataObj);
-  // Also update the raw lead.data so raw_payload gets normalized keys
-  lead.data = dataObj;
-}
-```
+### Database: INSERT manglende sale_items
 
-### Database: Opdater eksisterende salg
+Direkte SQL insert af 408 nye sale_items med `needs_mapping = true` så rematch fanger dem.
 
-SQL til at normalisere lowercase keys i eksisterende raw_payload og rette Loensikring product_id.
+### Edge function kald
 
-### Edge function kald: rematch-pricing-rules
-
-Kald med `source: "ase"` for at genberegne alle ASE sale_items.
-
+Kør `rematch-pricing-rules` med `source: "ase"` efter deployment.
