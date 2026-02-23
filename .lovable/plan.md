@@ -1,43 +1,65 @@
 
 
-# Implementering af Sync UI-forenkling
+# Ret sync-frekvenser via edge function kald (ikke migration)
 
-Diffet er korrekt og klar til implementering. Alle tekniske problemer er adresseret.
+## Hvorfor ikke migrationen?
 
-## Hvad skal implementeres
+Migrationen har tre problemer der goer den upaalidelig:
 
-### 1. Ny fil: `src/components/settings/SyncDateRangeDialog.tsx`
-- Controlled dialog med `open`/`onOpenChange` props
-- Fra/til dato-vaelgere + dataset checkboxes (Salg, Calls)
-- Kalder `safe-backfill` action via integration-engine
-- Validering af datoer og mindst et valgt dataset
+1. **Lovablecph har ingen cron-jobs i databasen** -- UPDATE paa ikke-eksisterende raekker goer ingenting
+2. **Job-navne matcher ikke** -- migrationen soeger efter `-sync-sales` og `-sync-meta`, men kun `-sync` eksisterer
+3. **Migration kan ikke oprette nye cron-jobs** -- den kan kun opdatere eksisterende
 
-### 2. Ny fil: `src/components/settings/SyncSingleSaleDialog.tsx`
-- Controlled dialog med `open`/`onOpenChange` props
-- External ID input felt
-- Kalder `enrichment-healer` med `saleExternalId`, `provider`, `integrationId` filtre
-- Viser resultat inline (healed/failed/skipped)
+## Korrekt tilgang: Kald update-cron-schedule for hver integration
 
-### 3. Opdater: `src/components/settings/DialerIntegrations.tsx`
-- Fjern `syncDays` og `callsDays` state
-- Tilfoej `syncDateRangeDialogId` og `syncSingleSaleDialogId` state
-- Erstat `syncMutation` med `triggerManualSync` async funktion
-- Fjern inline sync-knapper (dage-input, Play, BatchMigrationDialog)
-- Udvid dropdown-menu med sektioner: Sync, Calls, Webhooks, Administration
-- Render `SyncDateRangeDialog` og `SyncSingleSaleDialog` udenfor dropdown via conditional rendering
-- Opdater auto-sync status badge med sidste sync-tidspunkt
-- Erstat `BatchMigrationDialog` import med de to nye dialogs
+Edge-funktionen `update-cron-schedule` haandterer alt automatisk:
+- Fjerner gamle jobs (uanset navngivning)
+- Opretter nye jobs med korrekt schedule
+- Opretter split-jobs (sales + meta) for Lovablecph
+- Persisterer config og frequency i dialer_integrations
 
-### 4. Opdater: `supabase/functions/enrichment-healer/index.ts`
-- Tilfoej `saleExternalId`, `providerFilter`, `integrationIdFilter` parsing
-- Betinget query-building: spring status/attempts-filtre over naar `saleExternalId` er angivet
-- Tilfoej `integration_id` til select-kolonner
+### 5 kald der skal laves
 
-### Ingen sletninger endnu
-- `BatchMigrationDialog.tsx` beholdes i kodebasen men importeres ikke laengere fra `DialerIntegrations`
+| Integration | ID | Provider | Ny frekvens | Staggered schedule |
+|---|---|---|---|---|
+| Lovablecph | 26fac751-... | adversus | 5 min | `1,6,11,16,21,26,31,36,41,46,51,56 * * * *` |
+| Relatel_CPHSALES | 657c2050-... | adversus | 5 min | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` |
+| Eesy | d79b9632-... | enreach | 3 min | `0,3,6,9,...,57 * * * *` |
+| Tryg | a5068f85-... | enreach | 3 min | `1,4,7,10,...,58 * * * *` |
+| ASE | a76cf63a-... | enreach | 3 min | `2,5,8,11,...,59 * * * *` |
 
-## Tekniske noter
-- Controlled dialog pattern undgaar Radix UI portal-konflikten mellem DropdownMenu og Dialog
-- Conditional rendering (`{syncDateRangeDialogId && ...}`) sikrer at state nulstilles ved unmount/remount
-- `triggerManualSync` bruger `async/await` i stedet for `useMutation` -- dette er korrekt da funktionen kun kaldes fra dropdown onClick
+### Implementering
+
+Ingen kodeaendringer -- kun 5 kald til `update-cron-schedule` edge-funktionen med:
+```text
+{
+  integration_type: "dialer",
+  integration_id: "<uuid>",
+  provider: "<adversus|enreach>",
+  frequency_minutes: <5|3>,
+  is_active: true
+}
+```
+
+Edge-funktionen beregner automatisk staggered schedules via den eksisterende `staggeredFiveMinuteSchedules` logik for Adversus, og standard `frequencyToCron` for Enreach (som vi eventuelt tilpasser med `custom_schedule` for 3-min stagger).
+
+### Note om 3-minutters frekvens
+
+`frequencyToCron` tabellen i `update-cron-schedule` har ikke en entry for `3` minutter. Vi har to muligheder:
+
+1. **Tilfoej `3` til `frequencyToCron`** i edge-funktionen: `3: "*/3 * * * *"` -- men dette giver ikke stagger
+2. **Send `custom_schedule`** med staggerede 3-min schedules for hver Enreach-integration
+
+Option 2 er bedre for at undgaa samtidige API-kald. Vi sender `custom_schedule` direkte.
+
+### Filer der aendres
+
+| Fil | Aendring |
+|---|---|
+| `supabase/functions/update-cron-schedule/index.ts` | Tilfoej `3` til `frequencyToCron` mapping |
+| Ingen migration | Slet den foreslaaede migration -- den virker ikke korrekt |
+
+### Eksekvering
+
+Efter deploy af opdateret edge-funktion, kalder vi den 5 gange via curl/invoke med korrekte parametre for hver integration.
 
