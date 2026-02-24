@@ -232,7 +232,8 @@ export default function LocationDetail() {
                       <SelectValue placeholder="Vælg type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Butik">Butik</SelectItem>
+                      <SelectItem value="Coop butik">Coop butik</SelectItem>
+                      <SelectItem value="Meny butik">Meny butik</SelectItem>
                       <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
                       <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
                       <SelectItem value="Markeder">Markeder</SelectItem>
