@@ -34,11 +34,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const LOCATION_TYPES = [
-  "Butik",
+  "Coop butik",
+  "Meny butik",
   "Danske Shoppingcentre",
   "Markeder",
   "Ocean Outdoor",
-  "Storcenter",
+  "Messer",
+  "Anden lokation",
 ];
 
 export function SupplierContactsTab() {
