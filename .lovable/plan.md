@@ -1,44 +1,52 @@
 
-# Udvid "Indberet fejl"-dialogen med validering og datofelt
+
+# Tilfoej "Slet dag"-knap paa hver dag i booking-oversigten
 
 ## Oversigt
 
-Opdater PayrollErrorReportDialog med:
-- Nyt obligatorisk datofelt (enkelt dato eller periode)
-- Alle felter markeret som obligatoriske med visuel feedback
-- Beskrivelse kraever minimum 30 tegn
+Tilfoej en slet-knap paa hver booket dag i booking-griddet, saa man kan fjerne en enkelt dag fra en booking. Naar dagen fjernes, slettes ogsaa alle medarbejder-tildelinger paa den dag, og dagen fjernes fra `booked_days`-arrayet.
 
-## Database-aendring
+## Aendringer
 
-Ny migration der tilfojer kolonner til `payroll_error_reports`:
-- `error_date_start date` (nullable for bagudkompatibilitet, men kraevet i UI)
-- `error_date_end date` (nullable -- kun udfyldt hvis bruger vaelger en periode)
+### Fil: `src/pages/vagt-flow/BookingsContent.tsx`
 
-## Fil: `src/components/my-profile/PayrollErrorReportDialog.tsx`
+**Ny state:**
+- `deleteDayData` -- holder info om den dag der skal slettes (booking id, day index, dato-label, antal tildelinger)
 
-### Nye felter og validering
+**Ny mutation: `removeDayMutation`**
+1. Slet alle `booking_assignment` poster for den paagaeldende booking + dato
+2. Opdater `booking.booked_days` og fjern det paagaeldende day-index fra arrayet via Supabase update
+3. Hvis `booked_days` bliver tomt efter fjernelse, slet hele bookingen
+4. Invalidere queries og vis toast
 
-1. **Datofelt** med toggle mellem "Enkelt dato" og "Periode":
-   - Enkelt dato: en datepicker (Calendar/Popover)
-   - Periode: to datepickers (fra/til)
-   - Obligatorisk -- mindst startdato skal vaelges
-   - Begroenset til den valgte loenperiode (min/max)
+**UI-aendring i dag-cellen:**
+- Naar `canEditFmBookings` er true og dagen er booket (`isBooked`), vis en lille slet-ikon (Trash2 eller X) i hjoernet af dag-cellen -- synlig ved hover
+- Klik aabner en bekraeftelses-dialog (AlertDialog):
+  - "Fjern [Dag] d. [dato] fra denne booking?"
+  - Viser antal medarbejdere der ogsaa fjernes
+  - "Annuller" / "Fjern dag" knapper
 
-2. **Validering med fejlmeddelelser**:
-   - Kategori: Viser "Vaelg en kategori" hvis tom ved submit-forsoeg
-   - Dato: Viser "Vaelg en dato" hvis tom
-   - Beskrivelse: Viser "Minimum 30 tegn (X/30)" med tegntaeller
-   - Submit-knap disabled indtil alle krav er opfyldt
+**Bekraeftelses-dialog:**
+- Genbruger eksisterende AlertDialog-moenster allerede i filen
+- Tekst: "Vil du fjerne [Man 9/2] fra denne booking? [X] medarbejder(e) vil ogsaa blive fjernet."
 
-3. **Visuelt**:
-   - Obligatoriske felter markeret med roed stjerne (*)
-   - Fejlmeddelelser vises i roedt under felter efter foerste submit-forsoeg
-   - Tegntaeller under textarea der viser aktuel laengde vs. minimum
+## Tekniske detaljer
 
-### Teknisk tilgang
+```text
+Dag-celle (hover):
++------------------+
+|  Man        [X]  |  <-- slet-knap synlig ved hover
+|  9/2             |
+|  Alexander       |
+|  Nora            |
++------------------+
+```
 
-- Tilfoej `errorDateStart`, `errorDateEnd`, `isRange` state
-- Brug eksisterende Calendar + Popover komponenter til datepicker
-- Tilfoej `attempted` state for at vise fejl foerst efter foerste klik paa Send
-- Insert sender `error_date_start` og `error_date_end` til databasen
-- Validering: `category !== ""`, `errorDateStart !== null`, `description.trim().length >= 30`
+Mutation flow:
+1. `DELETE FROM booking_assignment WHERE booking_id = ? AND date = ?`
+2. `UPDATE booking SET booked_days = (fjern index) WHERE id = ?`
+3. Hvis nye `booked_days` er tom: `DELETE FROM booking WHERE id = ?`
+4. Invalidate `["vagt-bookings-list"]`
+
+Ingen database-migration noedvendig -- bruger eksisterende kolonner og tabeller.
+
