@@ -1,102 +1,61 @@
 
 
-# Plan: Leverandør-kontaktpersoner og "Send til leverandør"-funktion
+# Plan: Lønperiode-vælger + nye kolonner i Sælgerlønninger
 
-## Baggrund
+## Overblik
 
-Fakturerings-siden (`/vagt-flow/billing`) har i dag 3 faner: **Oversigt**, **Leverandørrapport** og **Rabataftaler**. Der mangler en fane til at administrere leverandør-kontaktpersoner og sende godkendte rapporter direkte til leverandøren via e-mail.
-
-Der er 5 leverandørtyper i systemet: Butik, Danske Shoppingcentre, Markeder, Ocean Outdoor, Storcenter.
+Udvid `SellerSalariesTab` med:
+1. En lønperiode-vælger (genbruge `PayrollPeriodSelector`)
+2. Fire nye kolonner: **Diet**, **Sygdom** (sygedage), **Dagsbonus**, **Henvisningsbonus**
 
 ---
 
-## Nye funktioner
+## Ændringer
 
-### 1. Ny databasetabel: `supplier_contacts`
+### 1. `useSellerSalariesCached.ts` - Udvid hook med periode-parametre og nye data
 
-Gemmer kontaktpersoner per leverandørtype (location_type):
+**Nuværende:** Hook'en har ingen periode-parameter - den henter kun `payroll_period` fra KPI cache.
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid (PK) | Auto-genereret |
-| location_type | text | Leverandørtype (fx "Danske Shoppingcentre") |
-| name | text | Kontaktpersonens navn |
-| email | text | E-mail adresse |
-| phone | text (nullable) | Telefonnummer |
-| role | text (nullable) | Stilling/rolle |
-| is_primary | boolean | Primær kontakt for denne type |
-| is_active | boolean | Aktiv/inaktiv |
-| created_at | timestamptz | Oprettelsestidspunkt |
+**Ændringer:**
+- Tilfoej `periodStart` og `periodEnd` parametre
+- Tilfoej queries for:
+  - **Diet**: Sum af `booking_diet.amount` per medarbejder i perioden
+  - **Sygdom**: Antal godkendte fravaersanmodninger med type `sick` fra `absence_request_v2` i perioden
+  - **Dagsbonus**: Sum af `daily_bonus_payouts.amount` per medarbejder i perioden
+  - **Henvisningsbonus**: `employee_master_data.referral_bonus` (allerede tilgaengelig, er en fast vaerdi)
+- Udvid `SellerData` interface med: `diet: number`, `sickDays: number`, `dailyBonus: number`, `referralBonus: number`
 
-RLS policies for authenticated users (read/insert/update/delete).
+### 2. `SellerSalariesTab.tsx` - Tilfoej periodeselector og kolonner
 
-### 2. Ny fane: "Kontaktpersoner"
-
-Tilføjes som 4. fane på Fakturerings-siden.
-
-**Indhold:**
-- Vælg leverandørtype (dropdown med de 5 typer)
-- Tabel med kontaktpersoner for den valgte type: Navn, E-mail, Telefon, Rolle, Primær (badge)
-- Knapper til at tilføje, redigere og slette kontaktpersoner
-- Dialog til oprettelse/redigering med formularfelter
-
-### 3. "Send til leverandør"-knap på Leverandørrapporten
-
-Tilføjes ved siden af "Download PDF" og "Godkend rapport" knapperne i `SupplierReportTab`:
-
-- Knappen er kun aktiv når rapporten er **godkendt**
-- Ved klik: Viser en dialog med:
-  - Forhåndsvisning af modtagere (kontaktpersoner for den valgte leverandørtype)
-  - Mulighed for at tilføje ekstra e-mail-adresser
-  - Emne og besked (forudfyldt med "Leverandørrapport: [Type] - [Måned]")
-  - Send-knap
-- Sender via en ny edge function (`send-supplier-report`) der bruger Microsoft Graph (M365) ligesom `send-recruitment-email`
-- Vedhæfter PDF-rapporten som genereres server-side
+**Ændringer:**
+- Tilfoej state for `periodStart`/`periodEnd` med default fra `getPayrollPeriod()`
+- Indsaet `PayrollPeriodSelector` oeverst ved filtere
+- Send `periodStart`/`periodEnd` til `useSellerSalariesCached`
+- Tilfoej 4 nye `TableHead`/`TableCell` kolonner i tabellen: Diet, Sygdom, Dagsbonus, Henvisning
+- Opdater mobile list-view med de nye felter
+- Opdater total-raekken med sum af de nye kolonner
 
 ---
 
 ## Tekniske detaljer
 
-### Nye filer
+### Nye data-queries i hook'en
 
-| Fil | Beskrivelse |
-|-----|-------------|
-| `src/components/billing/SupplierContactsTab.tsx` | Ny fane-komponent med CRUD for kontaktpersoner |
-| `src/components/billing/SupplierContactDialog.tsx` | Dialog til oprettelse/redigering af kontaktperson |
-| `src/components/billing/SendToSupplierDialog.tsx` | Dialog til at sende rapport via e-mail |
-| `supabase/functions/send-supplier-report/index.ts` | Edge function til e-mail-afsendelse via M365 |
+```text
+Diet:         SELECT amount FROM booking_diet WHERE employee_id IN (...) AND date BETWEEN start AND end
+Sygdom:       SELECT employee_id, date FROM absence_request_v2 WHERE status='approved' AND type='sick' AND date BETWEEN start AND end
+Dagsbonus:    SELECT amount FROM daily_bonus_payouts WHERE employee_id IN (...) AND date BETWEEN start AND end
+Henvisning:   Allerede i employee_master_data.referral_bonus (enkelt vaerdi, ikke periode-baseret)
+```
 
-### Ændrede filer
+### Filændringer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/Billing.tsx` | Tilføj 4. fane "Kontaktpersoner" |
-| `src/components/billing/SupplierReportTab.tsx` | Tilføj "Send til leverandør"-knap (kræver godkendt rapport) |
+| `src/hooks/useSellerSalariesCached.ts` | Tilfoej periode-parametre, 3 nye queries, udvid SellerData |
+| `src/components/salary/SellerSalariesTab.tsx` | Tilfoej PayrollPeriodSelector, 4 nye tabel-kolonner |
 
-### Edge function: `send-supplier-report`
+### Ingen database-ændringer
 
-- Modtager: `{ locationType, month, recipients[], subject, message, reportData }`
-- Genererer PDF server-side (eller modtager rapport-data til HTML-formatering)
-- Sender via Microsoft Graph med eksisterende M365-credentials
-- Logger afsendelse i `supplier_invoice_reports` (tilføj `sent_at` og `sent_to` kolonner)
-
-### Database-migrering
-
-```text
-1. CREATE TABLE supplier_contacts (...)
-2. ADD COLUMN sent_at, sent_to TO supplier_invoice_reports
-3. RLS policies for supplier_contacts
-```
-
-## Implementeringsrækkefølge
-
-```text
-1. Opret supplier_contacts tabel + RLS
-2. Tilføj sent_at/sent_to kolonner til supplier_invoice_reports
-3. Opret SupplierContactsTab + SupplierContactDialog
-4. Tilføj fanen til Billing.tsx
-5. Opret SendToSupplierDialog
-6. Opret send-supplier-report edge function
-7. Integrer "Send til leverandør"-knap i SupplierReportTab
-```
+Alle tabeller eksisterer allerede (`booking_diet`, `daily_bonus_payouts`, `absence_request_v2`, `employee_master_data`).
 
