@@ -69,6 +69,14 @@ export default function BookingsContent() {
   } | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
+  const [deleteDayData, setDeleteDayData] = useState<{
+    bookingId: string;
+    dayIndex: number;
+    dateLabel: string;
+    date: string;
+    assignmentCount: number;
+    currentBookedDays: number[];
+  } | null>(null);
 
   // Update URL when week/year changes
   useEffect(() => {
@@ -321,6 +329,41 @@ export default function BookingsContent() {
     },
   });
 
+  const removeDayMutation = useMutation({
+    mutationFn: async ({ bookingId, dayIndex, date, currentBookedDays }: {
+      bookingId: string; dayIndex: number; date: string; currentBookedDays: number[];
+    }) => {
+      const { error: delErr } = await supabase
+        .from("booking_assignment")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("date", date);
+      if (delErr) throw delErr;
+
+      const newBookedDays = currentBookedDays.filter(d => d !== dayIndex);
+
+      if (newBookedDays.length === 0) {
+        const { error: bookErr } = await supabase.from("booking").delete().eq("id", bookingId);
+        if (bookErr) throw bookErr;
+      } else {
+        const { error: updErr } = await supabase
+          .from("booking")
+          .update({ booked_days: newBookedDays })
+          .eq("id", bookingId);
+        if (updErr) throw updErr;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Dag fjernet fra booking" });
+      setDeleteDayData(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      setDeleteDayData(null);
+    },
+  });
+
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
     return matchesClient;
@@ -521,10 +564,33 @@ export default function BookingsContent() {
                           return (
                             <div
                               key={idx}
-                              className={`p-2 rounded-lg text-center text-xs ${
+                              className={cn(
+                                "p-2 rounded-lg text-center text-xs relative group/day",
                                 isBooked ? "bg-primary/10 border border-primary/20" : "bg-muted/50"
-                              }`}
+                              )}
                             >
+                              {/* Delete day button - hover only */}
+                              {canEditFmBookings && isBooked && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteDayData({
+                                      bookingId: booking.id,
+                                      dayIndex: idx,
+                                      dateLabel: `${day} d. ${format(dayDate, "d/M")}`,
+                                      date: format(dayDate, "yyyy-MM-dd"),
+                                      assignmentCount: dayAssignments?.length || 0,
+                                      currentBookedDays: booking.booked_days || [],
+                                    });
+                                  }}
+                                  className="absolute top-1 right-1 opacity-0 group-hover/day:opacity-100 
+                                             bg-destructive text-destructive-foreground rounded-full p-0.5
+                                             hover:bg-destructive/90 transition-opacity z-10"
+                                  title="Fjern denne dag fra bookingen"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
                               <p className="font-medium">{day}</p>
                               <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                               {isBooked && dayAssignments?.length > 0 && (
@@ -637,7 +703,41 @@ export default function BookingsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Booking Dialog - now includes employee and vehicle tabs */}
+      {/* Delete day from booking confirmation */}
+      <AlertDialog open={!!deleteDayData} onOpenChange={() => setDeleteDayData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern dag fra booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vil du fjerne <strong>{deleteDayData?.dateLabel}</strong> fra denne booking?
+              {(deleteDayData?.assignmentCount ?? 0) > 0 && (
+                <>
+                  <br /><br />
+                  {deleteDayData?.assignmentCount} medarbejder{deleteDayData?.assignmentCount !== 1 ? 'e' : ''} vil også blive fjernet.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteDayData) {
+                  removeDayMutation.mutate({
+                    bookingId: deleteDayData.bookingId,
+                    dayIndex: deleteDayData.dayIndex,
+                    date: deleteDayData.date,
+                    currentBookedDays: deleteDayData.currentBookedDays,
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern dag
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <EditBookingDialog
         open={!!editBookingDialogBooking}
         onOpenChange={(open) => !open && setEditBookingDialogBooking(null)}
