@@ -79,11 +79,13 @@ async function healAdversus(
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
-  const apiKey = credentials?.api_key || credentials?.apiKey;
-  if (!apiKey) {
-    log("No Adversus API key found, skipping all");
+  const user = credentials?.username || credentials?.ADVERSUS_API_USERNAME;
+  const pass = credentials?.password || credentials?.ADVERSUS_API_PASSWORD;
+  if (!user || !pass) {
+    log("No Adversus credentials found (need username+password), skipping all");
     return { healed: 0, failed: 0, skipped: sales.length };
   }
+  const authHeader = "Basic " + btoa(`${user}:${pass}`);
 
   for (const sale of sales) {
     const rawPayload = sale.raw_payload || {};
@@ -102,7 +104,7 @@ async function healAdversus(
 
     try {
       const response = await fetch(`https://api.adversus.io/v1/leads/${leadId}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: authHeader },
       });
 
       if (!response.ok) {
