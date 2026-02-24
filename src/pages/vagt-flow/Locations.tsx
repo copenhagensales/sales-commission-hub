@@ -179,6 +179,17 @@ export default function VagtLocations() {
     },
   });
 
+  const updateLocation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+      const { error } = await supabase.from("location").update(data).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
+      toast({ title: "Lokation opdateret" });
+    },
+  });
+
   const handleCsvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -360,9 +371,61 @@ export default function VagtLocations() {
                           <Star className={`h-4 w-4 ${loc.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">{loc.name}</TableCell>
-                      <TableCell>{loc.type || "-"}</TableCell>
-                      <TableCell>{loc.address_city || "-"}</TableCell>
+                      <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
+                        {canEditLocation ? (
+                          <Input
+                            className="h-8 w-40"
+                            defaultValue={loc.name || ""}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val && val !== loc.name) {
+                                updateLocation.mutate({ id: loc.id, data: { name: val } });
+                              }
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                          />
+                        ) : loc.name}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {canEditLocation ? (
+                          <Select
+                            value={loc.type || ""}
+                            onValueChange={(v) => {
+                              if (v !== loc.type) {
+                                updateLocation.mutate({ id: loc.id, data: { type: v } });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-44">
+                              <SelectValue placeholder="Vælg type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Coop butik">Coop butik</SelectItem>
+                              <SelectItem value="Meny butik">Meny butik</SelectItem>
+                              <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
+                              <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
+                              <SelectItem value="Markeder">Markeder</SelectItem>
+                              <SelectItem value="Messer">Messer</SelectItem>
+                              <SelectItem value="Anden lokation">Anden lokation</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (loc.type || "-")}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {canEditLocation ? (
+                          <Input
+                            className="h-8 w-32"
+                            defaultValue={loc.address_city || ""}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val !== (loc.address_city || "")) {
+                                updateLocation.mutate({ id: loc.id, data: { address_city: val } });
+                              }
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                          />
+                        ) : (loc.address_city || "-")}
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           <Input
@@ -467,17 +530,20 @@ export default function VagtLocations() {
                   onValueChange={(v) => setNewLocation({ 
                     ...newLocation, 
                     type: v,
-                    daily_rate: v === "Storcenter" ? 1500 : 1000
+                    daily_rate: v === "Danske Shoppingcentre" ? 1500 : 1000
                   })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Butik">Butik</SelectItem>
-                    <SelectItem value="Storcenter">Storcenter</SelectItem>
+                    <SelectItem value="Coop butik">Coop butik</SelectItem>
+                    <SelectItem value="Meny butik">Meny butik</SelectItem>
+                    <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
+                    <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
                     <SelectItem value="Markeder">Markeder</SelectItem>
                     <SelectItem value="Messer">Messer</SelectItem>
+                    <SelectItem value="Anden lokation">Anden lokation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
