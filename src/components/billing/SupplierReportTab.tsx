@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp } from "lucide-react";
+import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp, Download } from "lucide-react";
 import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import {
@@ -24,6 +24,7 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
 
 interface DiscountRule {
   id: string;
@@ -640,10 +641,55 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
-          {/* Approve button */}
-          <div className="flex justify-end">
+          {/* Actions */}
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const monthLabel = format(monthStart, "MMMM yyyy", { locale: da });
+                const staircaseSteps = discountType === "annual_revenue" && discountRules
+                  ? [...discountRules].sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0)).map(r => ({ minRevenue: r.min_revenue ?? 0, discountPercent: r.discount_percent }))
+                  : [];
+
+                downloadSupplierReportPdf({
+                  locationType: selectedLocationType,
+                  month: monthLabel,
+                  locations: locationDiscounts.map((loc: any) => ({
+                    locationName: loc.location?.name || "",
+                    city: loc.location?.address_city || "",
+                    client: loc.client?.name || "",
+                    period: formatDateRange(loc.minDate, loc.maxDate),
+                    days: loc.totalDays,
+                    dailyRate: loc.usesTotalPrice ? "samlet" : loc.dailyRate,
+                    amount: loc.totalAmount,
+                    discount: loc.discount,
+                    discountAmount: loc.discountAmount,
+                    finalAmount: loc.finalAmount,
+                    isExcluded: loc.isExcluded,
+                    maxDiscount: loc.maxDiscount,
+                  })),
+                  discountType,
+                  totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
+                  discountInfo: {
+                    uniquePlacements: uniqueLocations,
+                    discountPercent: appliedDiscount,
+                    discountDescription: appliedRule?.description ?? null,
+                    ytdRevenue,
+                    staircaseSteps,
+                  },
+                  exceptions: (locationExceptions || []).map(exc => ({
+                    name: exc.location_name,
+                    type: exc.exception_type,
+                    maxDiscount: exc.max_discount_percent,
+                  })),
+                });
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
             {isApproved ? (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground flex items-center">
                 Godkendt {existingReport?.approved_at
                   ? format(new Date(existingReport.approved_at), "dd/MM/yyyy HH:mm", { locale: da })
                   : ""}
