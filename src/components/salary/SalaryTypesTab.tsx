@@ -70,7 +70,7 @@ export function SalaryTypesTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<SalaryType | null>(null);
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<Record<string, string | null>>({});
   const [employeePopoverOpen, setEmployeePopoverOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -102,13 +102,15 @@ export function SalaryTypesTab() {
     if (editingType) {
       supabase
         .from("salary_type_employees")
-        .select("employee_id")
+        .select("employee_id, effective_from")
         .eq("salary_type_id", editingType.id)
         .then(({ data }) => {
-          setSelectedEmployeeIds(data?.map((d) => d.employee_id) || []);
+          const record: Record<string, string | null> = {};
+          data?.forEach((d: any) => { record[d.employee_id] = d.effective_from || null; });
+          setSelectedEmployees(record);
         });
     } else {
-      setSelectedEmployeeIds([]);
+      setSelectedEmployees({});
     }
   }, [editingType]);
 
@@ -124,13 +126,18 @@ export function SalaryTypesTab() {
     },
   });
 
-  const saveEmployeeAssignments = async (salaryTypeId: string, employeeIds: string[]) => {
+  const saveEmployeeAssignments = async (salaryTypeId: string, emps: Record<string, string | null>) => {
     // Delete existing
     await supabase.from("salary_type_employees").delete().eq("salary_type_id", salaryTypeId);
     // Insert new
-    if (employeeIds.length > 0) {
-      const rows = employeeIds.map((eid) => ({ salary_type_id: salaryTypeId, employee_id: eid }));
-      await supabase.from("salary_type_employees").insert(rows);
+    const entries = Object.entries(emps);
+    if (entries.length > 0) {
+      const rows = entries.map(([eid, effectiveFrom]) => ({
+        salary_type_id: salaryTypeId,
+        employee_id: eid,
+        effective_from: effectiveFrom || null,
+      }));
+      await supabase.from("salary_type_employees").insert(rows as any);
     }
   };
 
@@ -148,8 +155,8 @@ export function SalaryTypesTab() {
         payout_frequency: data.payout_frequency,
       }).select("id").single();
       if (error) throw error;
-      if (inserted && selectedEmployeeIds.length > 0) {
-        await saveEmployeeAssignments(inserted.id, selectedEmployeeIds);
+      if (inserted && Object.keys(selectedEmployees).length > 0) {
+        await saveEmployeeAssignments(inserted.id, selectedEmployees);
       }
     },
     onSuccess: () => {
@@ -179,7 +186,7 @@ export function SalaryTypesTab() {
         })
         .eq("id", id);
       if (error) throw error;
-      await saveEmployeeAssignments(id, selectedEmployeeIds);
+      await saveEmployeeAssignments(id, selectedEmployees);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-types"] });
@@ -220,7 +227,7 @@ export function SalaryTypesTab() {
       group_restriction_type: "all",
       payout_frequency: "monthly",
     });
-    setSelectedEmployeeIds([]);
+    setSelectedEmployees({});
     setEditingType(null);
     setIsDialogOpen(false);
   };
@@ -457,9 +464,9 @@ export function SalaryTypesTab() {
                         className="w-full justify-between font-normal"
                         type="button"
                       >
-                        {selectedEmployeeIds.length === 0
+                        {Object.keys(selectedEmployees).length === 0
                           ? "Vælg medarbejdere..."
-                          : `${selectedEmployeeIds.length} medarbejder${selectedEmployeeIds.length > 1 ? "e" : ""} valgt`}
+                          : `${Object.keys(selectedEmployees).length} medarbejder${Object.keys(selectedEmployees).length > 1 ? "e" : ""} valgt`}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -474,15 +481,19 @@ export function SalaryTypesTab() {
                                 key={emp.id}
                                 value={`${emp.first_name} ${emp.last_name}`}
                                 onSelect={() => {
-                                  setSelectedEmployeeIds((prev) =>
-                                    prev.includes(emp.id)
-                                      ? prev.filter((id) => id !== emp.id)
-                                      : [...prev, emp.id]
-                                  );
+                                  setSelectedEmployees((prev) => {
+                                    const next = { ...prev };
+                                    if (emp.id in next) {
+                                      delete next[emp.id];
+                                    } else {
+                                      next[emp.id] = null;
+                                    }
+                                    return next;
+                                  });
                                 }}
                               >
                                 <Checkbox
-                                  checked={selectedEmployeeIds.includes(emp.id)}
+                                  checked={emp.id in selectedEmployees}
                                   className="mr-2"
                                 />
                                 {emp.first_name} {emp.last_name}
@@ -493,22 +504,44 @@ export function SalaryTypesTab() {
                       </Command>
                     </PopoverContent>
                   </Popover>
-                  {selectedEmployeeIds.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {selectedEmployeeIds.map((eid) => {
+                  {Object.keys(selectedEmployees).length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {Object.entries(selectedEmployees).map(([eid, effectiveFrom]) => {
                         const emp = employees.find((e) => e.id === eid);
                         if (!emp) return null;
                         return (
-                          <Badge key={eid} variant="secondary" className="gap-1">
-                            {emp.first_name} {emp.last_name}
+                          <div key={eid} className="flex items-center gap-2 rounded-md border p-2">
+                            <span className="text-sm font-medium flex-shrink-0">
+                              {emp.first_name} {emp.last_name}
+                            </span>
+                            <div className="flex items-center gap-1 ml-auto">
+                              <Label className="text-xs text-muted-foreground flex-shrink-0">Fra:</Label>
+                              <Input
+                                type="date"
+                                value={effectiveFrom || ""}
+                                onChange={(e) =>
+                                  setSelectedEmployees((prev) => ({
+                                    ...prev,
+                                    [eid]: e.target.value || null,
+                                  }))
+                                }
+                                className="h-8 w-[150px] text-sm"
+                              />
+                            </div>
                             <button
                               type="button"
-                              onClick={() => setSelectedEmployeeIds((prev) => prev.filter((id) => id !== eid))}
-                              className="ml-1 hover:text-destructive"
+                              onClick={() =>
+                                setSelectedEmployees((prev) => {
+                                  const next = { ...prev };
+                                  delete next[eid];
+                                  return next;
+                                })
+                              }
+                              className="hover:text-destructive flex-shrink-0"
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-4 w-4" />
                             </button>
-                          </Badge>
+                          </div>
                         );
                       })}
                     </div>

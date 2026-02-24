@@ -1,0 +1,1 @@
+ALTER TABLE salary_type_employees ADD COLUMN effective_from date DEFAULT NULL;
