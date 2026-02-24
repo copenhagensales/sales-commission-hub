@@ -1,76 +1,88 @@
 
-Mest sandsynlige årsag er fundet, og den er konkret:
 
-1) Der kører dobbelt sync-arkitektur samtidig
-- Både per-integration jobs er aktive:
-  - `dialer-d79b9632-sync` (Eesy)
-  - `dialer-a5068f85-sync` (tryg)
-  - `dialer-a76cf63a-sync` (ase)
-  - `dialer-657c2050-sync` (Relatel)
-  - `dialer-26fac751-sync-sales` + `dialer-26fac751-sync-meta` (Lovablecph)
-- Og provider-jobs er også aktive:
-  - `provider-enreach-sync` (*/3)
-  - `provider-adversus-sync` (*/5)
+## Diagnose: Hvad er galt med ASE-priserne?
 
-Det betyder i praksis at samme integrationer bliver trigget flere gange inden for samme få sekunder/minutter.
+### Prisreglerne ER korrekte i databasen
 
-2) Data bekræfter dobbelt-kørsler
-- Enreach-runs har gennemgående dobbeltkørsler:
-  - Fx Eesy har 2 runs samme minut igen og igen.
-- Hver Enreach-run ligger på:
-  - `api_calls_made=12`
-  - `rate_limit_hits=12`
-  - `retries=9`
-  - Altså ren 429-loop.
-- PostgreSQL logs viser også lock-konflikt på `provider_sync_locks`:
-  - `duplicate key value violates unique constraint "provider_sync_locks_pkey"`
-  - Det er et tegn på overlap i provider-sync triggere.
+| Regel | Provision | Med straksbetaling | Status |
+|---|---|---|---|
+| A-kasse Lønmodtager | 400 kr | 1.000 kr | Korrekt konfigureret |
+| Akasse Selvstændige | 400 kr | 1.000 kr | Korrekt konfigureret |
+| Lønsikring Basis (<6000) | 200 kr | - | Korrekt konfigureret |
+| Lønsikring Udvidet (≥6000) | 400 kr | - | Korrekt konfigureret |
 
-3) “Var det ændringer i dag?”
-- Der er ingen schedule-audit entries i dag; seneste schedule-ændringer ligger i går (2026-02-23 omkring 17:47 UTC).
-- Så problemet ligner ikke en ny kodeændring i dag, men en eksisterende konfiguration der nu giver burst/overlap under belastning.
-- At det virkede i morges passer med dette: lavere load tidligere + senere overlap/burst => 429-storm.
+### Problemet: 50 sale_items (20 hos Alexander) har aldrig fået en prisregel matched
 
-4) Sekundær design-fejl der forværrer problemet
-- Budgetstyring er primært per time (fx Enreach 10.000/time), men fejlmønstret er per-minut burst.
-- Derfor “ser budget fint ud” samtidig med at alle kald bliver afvist.
+Disse items har `matched_pricing_rule_id = NULL` og forkerte provisioner fra en gammel beregning:
 
-Implementeringsplan (jeg udfører den efter godkendelse)
-Fase A — Stop blødningen (hurtig stabilisering)
-1. Deaktivér én af de to sync-strategier, så kun én orkestrering er aktiv.
-   - Anbefaling nu: behold per-integration jobs, deaktivér `provider-enreach-sync` og `provider-adversus-sync`.
-   - Begrundelse: nuværende dialer-jobs har allerede fine offsets + Lovablecph split sales/meta.
-2. Verificér at kun ét job per integration er aktivt i `cron.job`.
-3. Overvåg 15-30 min:
-   - 429-rate skal falde markant.
-   - `last_sync_at` må ikke stagnere.
-   - `integration_sync_runs` må ikke have dublet-runs samme minut for samme integration.
+| Forkert provision | Antal items | Forklaring |
+|---|---|---|
+| 1.400 kr | 25 (11 hos Alexander) | Gammel logik der summerede a-kasse + lønsikring i ét item |
+| 800 kr | 13 (2 hos Alexander) | Gammel kombination (400+400) |
+| NULL / 0 kr | 12 (4 hos Alexander) | Aldrig beregnet |
+| 400 kr | 1 | Tilfældigt korrekt |
 
-Fase B — Gør løsningen robust (så det ikke kommer igen)
-4. Indfør “mutual exclusivity guard” i scheduler-logik:
-   - Når provider-mode er ON: ingen dialer-* sync jobs må eksistere.
-   - Når dialer-mode er ON: ingen provider-* jobs må eksistere.
-5. Opdatér System Stability visning:
-   - Vis kritisk advarsel hvis både provider-jobs og dialer-jobs er aktive samtidig.
-6. Tilføj per-minute budget gate (ikke kun per-hour):
-   - Enreach/Adversus stop eller skip tidligt hvis minute-window er over threshold.
-7. Stram retry/backoff for Enreach:
-   - Mere jitter + adaptiv cooldown efter gentagne 429.
-   - Undgå at alle integrations løber i samme retry-rytme.
+Hvert af de 11 salg med 1.400 kr provision har faktisk OGSÅ et separat korrekt Lønsikring-item (400 kr). Så provisionen tælles dobbelt.
 
-Fase C — Verifikation og acceptkriterier
-8. Acceptance checks:
-   - Enreach 429-rate < 10% over 30 min.
-   - Adversus 429-rate signifikant ned ift. nu.
-   - Ingen “duplicate minute runs” for samme integration.
-   - Lovablecph sync recovers (ingen “ingen sync i 37 min”).
-9. Hvis stadig høje 429:
-   - Midlertidigt sænk actions pr. run (fx split metadata/sales mere aggressivt)
-   - Øg interval for de mest tunge integrationer.
+### Eksempel: Et Alexander-salg (sale_id: 18d58174)
 
-Teknisk note
-- Rodårsag er ikke “pricing rule rematch” eller løn-siderne.
-- Rodårsag er scheduler-konflikt + minute-burst mod eksterne API’er.
-- Det er derfor helt konsistent med “virkede i morges, men brød senere”.
+| Item | Produkt | Provision | Regel matched? |
+|---|---|---|---|
+| "Salg" | Salg | **1.400 kr** (FORKERT) | Nej - NULL |
+| Lønsikring | Lønsikring | 400 kr (korrekt) | Ja - Lønsikring Udvidet |
 
-Når du godkender, tager jeg Fase A først (hurtig stabilisering), og derefter Fase B hardening.
+Korrekt total for dette salg: 400 kr (a-kasse) + 400 kr (lønsikring) = **800 kr**
+Nuværende total: 1.400 + 400 = **1.800 kr** (1.000 kr for meget)
+
+### Rod-årsag
+
+Rematch-funktionen processer kun items med `matched_pricing_rule_id IS NULL`. Disse 50 items ER umatched, men rematch er ikke blevet kørt siden de korrekte prisregler blev opsat. Dataen i items stammer fra en ældre beregningslogik.
+
+### Yderligere problem: Forkert produkt-mapping
+
+3 items har `adversus_product_title = "Lønsikring Udvidet"` men `product_id = Salg`. Rematch-funktionens `determineAseProductId` tjekker kun `product_id` mod LOENSIKRING_VARIANT_IDS -- den ser ikke på `adversus_product_title`. Disse items vil derfor fejlagtigt matches mod A-kasse-regler i stedet for Lønsikring-regler.
+
+---
+
+## Plan: Fix i to trin
+
+### Trin 1: Fix rematch-funktionens product-detection (kodeændring)
+
+**Fil: `supabase/functions/rematch-pricing-rules/index.ts`**
+
+Udvid `determineAseProductId` til også at tjekke `adversus_product_title` fra sale_items:
+
+```text
+FØR: Tjekker kun product_id mod LOENSIKRING_VARIANT_IDS
+EFTER: Tjekker OGSÅ adversus_product_title for "Lønsikring" patterns
+```
+
+Konkret: Hvis `adversus_product_title` indeholder "Lønsikring" (case-insensitive), og produktet IKKE allerede er Lønsikring, skal det korrigeres til `ASE_LOENSIKRING_PRODUCT_ID`.
+
+Desuden skal `adversus_product_title` tilføjes til select-query'en (linje 293) så rematch har adgang til denne data.
+
+### Trin 2: Kør rematch for alle ASE sale_items
+
+Deploy den opdaterede funktion og kør rematch med `source: 'ase'` for at genberegne alle 50 umatched items. Resultatet:
+
+```text
+FØR (Alexander, 20 umatched "Salg" items):
+  11 × 1.400 kr + 2 × 800 kr + 4 × 0 kr + 1 × 400 kr = 18.200 kr (forkert)
+
+EFTER:
+  Items UDEN straksbetaling → 400 kr hver
+  Items MED straksbetaling → 1.000 kr hver  
+  Lønsikring-items forbliver korrekte (200/400 kr)
+```
+
+### Samlet effekt på Alexanders provision
+
+| Kategori | Antal | Nu | Korrekt |
+|---|---|---|---|
+| A-kasse med straksbetaling | 79 | 83.400 kr | 79.000 kr (79 × 1.000) |
+| A-kasse uden straksbetaling | 1 + 20 umatched | 8.800 kr | 8.400 kr (21 × 400) |
+| Lønsikring Udvidet | 56 | 22.400 kr | 22.400 kr (uændret) |
+| **Total** | | **114.600 kr** | **109.800 kr** |
+
+Bemærk: Den præcise korrektion afhænger af hvor mange af de 20 umatched items der skal have straksbetaling vs. standard provision. De 11 items med 1.400 kr er den største fejl, da lønsikring-provisionen er talt dobbelt.
+
