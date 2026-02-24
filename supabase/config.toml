@@ -219,3 +219,6 @@ verify_jwt = false
 
 [functions.send-supplier-report]
 verify_jwt = true
+
+[functions.snapshot-payroll-period]
+verify_jwt = false

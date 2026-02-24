@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
-import { fetchAllRows } from "@/utils/supabasePagination";
 
 interface SellerData {
   id: string;
@@ -26,6 +25,42 @@ interface UseSellerSalariesCachedResult {
   lastUpdated: Date | null;
 }
 
+/**
+ * Determines whether a given period matches the current payroll period.
+ */
+function isCurrentPayrollPeriod(periodStart: Date | null, periodEnd: Date | null): boolean {
+  if (!periodStart || !periodEnd) return false;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+
+  let currentStart: Date;
+  let currentEnd: Date;
+
+  if (day >= 15) {
+    currentStart = new Date(year, month, 15);
+    currentEnd = new Date(year, month + 1, 14, 23, 59, 59);
+  } else {
+    currentStart = new Date(year, month - 1, 15);
+    currentEnd = new Date(year, month, 14, 23, 59, 59);
+  }
+
+  const startMatch = periodStart.toISOString().split("T")[0] === currentStart.toISOString().split("T")[0];
+  const endMatch = periodEnd.toISOString().split("T")[0] === currentEnd.toISOString().split("T")[0];
+
+  return startMatch && endMatch;
+}
+
+/**
+ * Builds a period_key for kpi_period_snapshots from a period start date.
+ * Format: "payroll_YYYY-MM-DD"
+ */
+function buildPeriodKey(periodStart: Date): string {
+  return `payroll_${periodStart.toISOString().split("T")[0]}`;
+}
+
 export function useSellerSalariesCached(
   selectedTeam?: string | null,
   periodStart?: Date | null,
@@ -34,7 +69,10 @@ export function useSellerSalariesCached(
   const periodStartISO = periodStart ? periodStart.toISOString().split("T")[0] : null;
   const periodEndISO = periodEnd ? periodEnd.toISOString().split("T")[0] : null;
 
-  // Query 1: Get all non-staff employees (active + inactive) with team info
+  const isCurrent = isCurrentPayrollPeriod(periodStart ?? null, periodEnd ?? null);
+  const periodKey = periodStart ? buildPeriodKey(periodStart) : null;
+
+  // Query 1: Get all non-staff employees with team info
   const { data: employees, isLoading: employeesLoading } = useQuery({
     queryKey: ["seller-employees-cached"],
     queryFn: async () => {
@@ -61,44 +99,40 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 2: Get employee_agent_mapping with agent emails
-  const { data: agentMappings, isLoading: mappingsLoading } = useQuery({
-    queryKey: ["seller-agent-mappings"],
+  // Query 2: Commission from KPI cache (current period) OR snapshots (historical)
+  const { data: commissionData, isLoading: commissionLoading } = useQuery({
+    queryKey: ["seller-commission-kpi", isCurrent ? "current" : periodKey],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(email)");
-      
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 60000,
-  });
+      if (isCurrent) {
+        // Current period: read from kpi_cached_values
+        const { data, error } = await supabase
+          .from("kpi_cached_values")
+          .select("scope_id, value")
+          .eq("kpi_slug", "total_commission")
+          .eq("period_type", "payroll_period")
+          .eq("scope_type", "employee");
 
-  // Query 3: Get sales with mapped_commission for the period
-  const { data: salesData, isLoading: salesLoading } = useQuery({
-    queryKey: ["seller-sales-commission", periodStartISO, periodEndISO],
-    queryFn: async () => {
-      if (!periodStartISO || !periodEndISO) return [];
-      
-      const periodStartDT = `${periodStartISO}T00:00:00`;
-      const periodEndDT = `${periodEndISO}T23:59:59`;
-      
-      return await fetchAllRows<any>(
-        "sales",
-        "id, agent_email, sale_datetime, status, sale_items(mapped_commission)",
-        (q) => q
-          .gte("sale_datetime", periodStartDT)
-          .lte("sale_datetime", periodEndDT)
-          .neq("status", "rejected"),
-        { orderBy: "sale_datetime", ascending: false }
-      );
+        if (error) throw error;
+        return data || [];
+      } else {
+        // Historical period: read from kpi_period_snapshots
+        if (!periodKey) return [];
+        const { data, error } = await (supabase
+          .from("kpi_period_snapshots") as any)
+          .select("scope_id, value")
+          .eq("kpi_slug", "total_commission")
+          .eq("period_key", periodKey)
+          .eq("scope_type", "employee");
+
+        if (error) throw error;
+        return data || [];
+      }
     },
     enabled: !!periodStartISO && !!periodEndISO,
-    staleTime: 60000,
+    staleTime: isCurrent ? 30000 : 300000, // Current: 30s, historical: 5min
   });
 
-  // Query 4: Feriepenge salary type rates
+  // Query 3: Feriepenge salary type rates
   const { data: salaryTypes, isLoading: salaryTypesLoading } = useQuery({
     queryKey: ["feriepenge-rates"],
     queryFn: async () => {
@@ -114,7 +148,7 @@ export function useSellerSalariesCached(
     staleTime: 300000,
   });
 
-  // Query 5: Diet (booking_diet) for the period
+  // Query 4: Diet (booking_diet) for the period
   const { data: dietData, isLoading: dietLoading } = useQuery({
     queryKey: ["seller-diet", periodStartISO, periodEndISO],
     queryFn: async () => {
@@ -132,7 +166,7 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 6: Sick days (absence_request_v2) for the period
+  // Query 5: Sick days (absence_request_v2) for the period
   const { data: sickData, isLoading: sickLoading } = useQuery({
     queryKey: ["seller-sick-days", periodStartISO, periodEndISO],
     queryFn: async () => {
@@ -152,7 +186,7 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 7: Daily bonus payouts for the period
+  // Query 6: Daily bonus payouts for the period
   const { data: dailyBonusData, isLoading: dailyBonusLoading } = useQuery({
     queryKey: ["seller-daily-bonus", periodStartISO, periodEndISO],
     queryFn: async () => {
@@ -187,33 +221,18 @@ export function useSellerSalariesCached(
     return matchingType?.amount ? matchingType.amount / 100 : 0;
   };
 
-  // Combine employees with their sales data
+  // Combine employees with their KPI commission data
   const { sellerData, lastUpdated } = useMemo(() => {
     if (!employees) {
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build email -> employee_id map from agent mappings
-    const emailToEmployeeId: Record<string, string> = {};
-    for (const mapping of agentMappings || []) {
-      const email = (mapping as any).agents?.email;
-      if (email && mapping.employee_id) {
-        emailToEmployeeId[email.toLowerCase()] = mapping.employee_id;
-      }
-    }
-
-    // Build commission map from sales data: employee_id -> total commission
+    // Build commission map from KPI data: scope_id (employee_id) -> value
     const commissionMap: Record<string, number> = {};
-    for (const sale of salesData || []) {
-      const agentEmail = sale.agent_email?.toLowerCase();
-      if (!agentEmail) continue;
-      const employeeId = emailToEmployeeId[agentEmail];
-      if (!employeeId) continue;
-      
-      const saleCommission = (sale.sale_items || []).reduce(
-        (sum: number, item: any) => sum + (item.mapped_commission || 0), 0
-      );
-      commissionMap[employeeId] = (commissionMap[employeeId] || 0) + saleCommission;
+    for (const entry of commissionData || []) {
+      if (entry.scope_id) {
+        commissionMap[entry.scope_id] = Number(entry.value) || 0;
+      }
     }
 
     // Build diet map
@@ -272,11 +291,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, agentMappings, salesData, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
+  }, [employees, commissionData, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || mappingsLoading || salesLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading,
     lastUpdated,
   };
 }
