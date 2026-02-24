@@ -7929,6 +7929,56 @@ export type Database = {
         }
         Relationships: []
       }
+      salary_type_employees: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          salary_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          salary_type_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          salary_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_type_employees_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_type_employees_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_type_employees_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_type_employees_salary_type_id_fkey"
+            columns: ["salary_type_id"]
+            isOneToOne: false
+            referencedRelation: "salary_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_types: {
         Row: {
           activation_condition: string | null
