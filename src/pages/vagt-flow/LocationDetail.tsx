@@ -224,7 +224,7 @@ export default function LocationDetail() {
                     onValueChange={(v) => setFormData({ 
                       ...formData, 
                       type: v,
-                      daily_rate: formData.daily_rate || (v === "Storcenter" ? 1500 : 1000)
+                      daily_rate: formData.daily_rate || (v === "Danske Shoppingcentre" ? 1500 : 1000)
                     })}
                     disabled={!canEditLocation}
                   >
@@ -233,7 +233,8 @@ export default function LocationDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Butik">Butik</SelectItem>
-                      <SelectItem value="Storcenter">Storcenter</SelectItem>
+                      <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
+                      <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
                       <SelectItem value="Markeder">Markeder</SelectItem>
                       <SelectItem value="Messer">Messer</SelectItem>
                     </SelectContent>
