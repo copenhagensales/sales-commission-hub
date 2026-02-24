@@ -396,7 +396,7 @@ export default function VagtLocations() {
                               }
                             }}
                           >
-                            <SelectTrigger className="h-8 w-44">
+                            <SelectTrigger className="h-8 w-44 text-center [&>span]:w-full [&>span]:text-center">
                               <SelectValue placeholder="Vælg type" />
                             </SelectTrigger>
                             <SelectContent>
