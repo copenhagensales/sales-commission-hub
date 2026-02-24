@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, MapPin, Phone, Mail, User, Building } from "lucide-react";
+import { ArrowLeft, Save, MapPin, Phone, Mail, User, Building, Trash2, Plus } from "lucide-react";
 import { PhoneButton } from "@/components/ui/phone-link";
 import { useState, useEffect } from "react";
 import {
@@ -129,6 +129,58 @@ export default function LocationDetail() {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
+
+  // Fetch placements for this location
+  const { data: placements = [] } = useQuery({
+    queryKey: ["location-placements", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("location_placements")
+        .select("*")
+        .eq("location_id", id)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  const createPlacementMutation = useMutation({
+    mutationFn: async (p: { name: string; daily_rate: number }) => {
+      const { error } = await supabase
+        .from("location_placements")
+        .insert({ location_id: id, name: p.name, daily_rate: p.daily_rate });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["location-placements", id] });
+      toast({ title: "Placering tilføjet" });
+      setNewPlacement({ name: "", daily_rate: 1000 });
+      setIsAddingPlacement(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deletePlacementMutation = useMutation({
+    mutationFn: async (placementId: string) => {
+      const { error } = await supabase
+        .from("location_placements")
+        .delete()
+        .eq("id", placementId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["location-placements", id] });
+      toast({ title: "Placering slettet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const [isAddingPlacement, setIsAddingPlacement] = useState(false);
+  const [newPlacement, setNewPlacement] = useState({ name: "", daily_rate: 1000 });
 
   const statusColors: Record<string, string> = {
     Ny: "bg-blue-500",
@@ -262,13 +314,97 @@ export default function LocationDetail() {
                 </div>
               </div>
               <div>
-                <Label>Dagspris (kr ex moms)</Label>
+                <Label>
+                  {placements.length > 0
+                    ? "Standardpris (bruges når ingen placering vælges)"
+                    : "Dagspris (kr ex moms)"}
+                </Label>
                 <Input
                   type="number"
                   value={formData.daily_rate || 1000}
                   onChange={(e) => setFormData({ ...formData, daily_rate: parseInt(e.target.value) || 1000 })}
                   disabled={!canEditLocation}
                 />
+                {placements.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Denne pris bruges kun hvis ingen specifik placering vælges.
+                  </p>
+                )}
+              </div>
+
+              {/* Placeringer */}
+              <div className="border-t pt-4 mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Placeringer (valgfrit)</Label>
+                </div>
+
+                <div className="space-y-2 mb-3">
+                  {placements.map((placement: any) => (
+                    <div key={placement.id} className="flex items-center justify-between bg-muted/40 p-2 rounded text-sm">
+                      <div className="flex items-center gap-4">
+                        <span className="font-medium">{placement.name}</span>
+                        <span className="text-muted-foreground">{placement.daily_rate} kr</span>
+                      </div>
+                      {canEditLocation && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive/90"
+                          onClick={() => deletePlacementMutation.mutate(placement.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {placements.length === 0 && !isAddingPlacement && (
+                    <p className="text-sm text-muted-foreground italic">Ingen placeringer tilføjet</p>
+                  )}
+                </div>
+
+                {canEditLocation && (
+                  <>
+                    {isAddingPlacement ? (
+                      <div className="space-y-3 bg-muted/30 p-3 rounded border">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Navn</Label>
+                          <Input
+                            value={newPlacement.name}
+                            onChange={(e) => setNewPlacement({ ...newPlacement, name: e.target.value })}
+                            placeholder="F.eks. Hovedindgang"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Pris (kr)</Label>
+                          <Input
+                            type="number"
+                            value={newPlacement.daily_rate}
+                            onChange={(e) => setNewPlacement({ ...newPlacement, daily_rate: parseInt(e.target.value) || 0 })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button variant="ghost" size="sm" onClick={() => setIsAddingPlacement(false)} className="h-7">
+                            Annuller
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => { if (newPlacement.name) createPlacementMutation.mutate(newPlacement); }}
+                            disabled={!newPlacement.name || createPlacementMutation.isPending}
+                            className="h-7"
+                          >
+                            Tilføj
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => setIsAddingPlacement(true)} className="w-full">
+                        <Plus className="h-3 w-3 mr-1" /> Tilføj placering
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
               <div>
                 <Label>Region</Label>
