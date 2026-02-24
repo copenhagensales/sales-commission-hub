@@ -433,6 +433,7 @@ export type Database = {
           expected_staff_count: number | null
           id: string
           location_id: string
+          placement_id: string | null
           start_date: string
           total_price: number | null
           updated_at: string | null
@@ -451,6 +452,7 @@ export type Database = {
           expected_staff_count?: number | null
           id?: string
           location_id: string
+          placement_id?: string | null
           start_date: string
           total_price?: number | null
           updated_at?: string | null
@@ -469,6 +471,7 @@ export type Database = {
           expected_staff_count?: number | null
           id?: string
           location_id?: string
+          placement_id?: string | null
           start_date?: string
           total_price?: number | null
           updated_at?: string | null
@@ -502,6 +505,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "location_placements"
             referencedColumns: ["id"]
           },
         ]
@@ -6499,6 +6509,38 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      location_placements: {
+        Row: {
+          created_at: string | null
+          daily_rate: number
+          id: string
+          location_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          daily_rate?: number
+          id?: string
+          location_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          daily_rate?: number
+          id?: string
+          location_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_placements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       login_events: {
         Row: {

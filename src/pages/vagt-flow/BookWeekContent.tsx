@@ -71,6 +71,7 @@ export default function BookWeekContent() {
   const [activeTab, setActiveTab] = useState<LocationTab>("mulige");
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const [selectedPlacementId, setSelectedPlacementId] = useState<string>("");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4]);
   const [expectedStaffCount, setExpectedStaffCount] = useState(2);
   const [marketEndWeek, setMarketEndWeek] = useState(selectedWeek);
@@ -127,6 +128,20 @@ export default function BookWeekContent() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch placements for selected location
+  const { data: locationPlacements = [] } = useQuery({
+    queryKey: ["location-placements", selectedLocation?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("location_placements")
+        .select("*")
+        .eq("location_id", selectedLocation.id)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!selectedLocation?.id,
   });
 
   const createBookingMutation = useMutation({
@@ -186,6 +201,11 @@ export default function BookWeekContent() {
       // Parse total price for markets
       const parsedTotalPrice = isMarket && marketTotalPrice ? parseFloat(marketTotalPrice) : null;
 
+      // Determine placement-based rate
+      const selectedPlacement = selectedPlacementId 
+        ? locationPlacements.find((p: any) => p.id === selectedPlacementId)
+        : null;
+
       const { error } = await supabase.from("booking").insert({
         location_id: locationId,
         client_id: clientId,
@@ -197,6 +217,8 @@ export default function BookWeekContent() {
         expected_staff_count: expectedStaffCount,
         booked_days: bookedDays,
         total_price: parsedTotalPrice,
+        placement_id: selectedPlacement?.id || null,
+        daily_rate_override: selectedPlacement?.daily_rate || null,
       } as any);
 
       if (error) throw error;
@@ -205,6 +227,7 @@ export default function BookWeekContent() {
       toast({ title: "Booking oprettet!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
+      setSelectedPlacementId("");
       setExpectedStaffCount(2);
       setMarketEndWeek(selectedWeek);
       setMarketStartDate(undefined);
@@ -552,6 +575,24 @@ export default function BookWeekContent() {
               />
             </div>
 
+            {/* Placement select - only shown when location has placements */}
+            {locationPlacements.length > 0 && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium uppercase text-muted-foreground">Placering *</label>
+                <Select value={selectedPlacementId} onValueChange={setSelectedPlacementId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg placering" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationPlacements.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} — {p.daily_rate} kr
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {/* Date range picker for markets */}
             {isMarketLocation ? (
               <div className="p-3 rounded-lg bg-muted/50 space-y-3">

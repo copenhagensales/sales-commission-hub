@@ -91,6 +91,7 @@ export function EditBookingDialog({
   const [useLocationRate, setUseLocationRate] = useState<boolean>(true);
   const [isEditingLocationRate, setIsEditingLocationRate] = useState<boolean>(false);
   const [locationRateInput, setLocationRateInput] = useState<string>("");
+  const [selectedPlacementId, setSelectedPlacementId] = useState<string>("");
 
   // Employee tab state
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
@@ -108,6 +109,7 @@ export function EditBookingDialog({
     if (booking) {
       setClientId(booking.client_id || "");
       setCampaignId(booking.campaign_id || "");
+      setSelectedPlacementId(booking.placement_id || "");
       
       // Daily rate override
       const hasOverride = booking.daily_rate_override !== null && booking.daily_rate_override !== undefined;
@@ -166,6 +168,20 @@ export function EditBookingDialog({
       return data || [];
     },
     enabled: open && !!clientId,
+  });
+
+  // Fetch placements for the booking's location
+  const { data: bookingPlacements = [] } = useQuery({
+    queryKey: ["location-placements-edit", booking?.location?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("location_placements")
+        .select("*")
+        .eq("location_id", booking.location.id)
+        .order("name");
+      return data || [];
+    },
+    enabled: open && !!booking?.location?.id,
   });
 
   // Employee tab queries
@@ -619,6 +635,7 @@ export function EditBookingDialog({
       client_id: string | null;
       campaign_id: string | null;
       daily_rate_override: number | null;
+      placement_id: string | null;
     }) => {
       const { error } = await supabase
         .from("booking")
@@ -763,11 +780,20 @@ export function EditBookingDialog({
     // Parse daily rate override
     const parsedRate = parseFloat(dailyRateOverride);
     const rateOverride = useLocationRate ? null : (isNaN(parsedRate) ? null : parsedRate);
+
+    // If placement is selected and using location rate, use placement rate as override
+    const selectedPlacement = selectedPlacementId
+      ? bookingPlacements.find((p: any) => p.id === selectedPlacementId)
+      : null;
+    const finalRateOverride = selectedPlacement && useLocationRate
+      ? selectedPlacement.daily_rate
+      : rateOverride;
     
     updateBookingMutation.mutate({
       client_id: clientId,
       campaign_id: campaignId,
-      daily_rate_override: rateOverride,
+      daily_rate_override: finalRateOverride,
+      placement_id: selectedPlacementId || null,
     });
   };
 
@@ -975,6 +1001,34 @@ export function EditBookingDialog({
               </Select>
             </div>
 
+            {/* Placement Selection - only shown when location has placements */}
+            {bookingPlacements.length > 0 && (
+              <div className="space-y-2">
+                <Label>Placering</Label>
+                <Select value={selectedPlacementId || "none"} onValueChange={(v) => {
+                  const pid = v === "none" ? "" : v;
+                  setSelectedPlacementId(pid);
+                  if (pid) {
+                    const placement = bookingPlacements.find((p: any) => p.id === pid);
+                    if (placement && useLocationRate) {
+                      setDailyRateOverride(placement.daily_rate.toString());
+                    }
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg placering" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Ingen placering (standardpris)</SelectItem>
+                    {bookingPlacements.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} — {p.daily_rate} kr
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Daily Rate Section */}
             <div className="space-y-3 pt-3 border-t">
