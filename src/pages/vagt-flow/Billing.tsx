@@ -22,8 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SupplierReportTab } from "@/components/billing/SupplierReportTab";
+import { DiscountRulesTab } from "@/components/billing/DiscountRulesTab";
 
-export default function VagtBilling() {
+function BillingOverviewTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [clientFilter, setClientFilter] = useState<string>("all");
@@ -50,7 +53,6 @@ export default function VagtBilling() {
     },
   });
 
-  // Fetch Fieldmarketing team clients
   const { data: fieldmarketingClients } = useQuery({
     queryKey: ["fieldmarketing-team-clients-billing"],
     queryFn: async () => {
@@ -59,53 +61,41 @@ export default function VagtBilling() {
         .select("id")
         .ilike("name", "%fieldmarketing%")
         .maybeSingle();
-      
       if (!team) return [];
-      
       const { data: teamClients } = await supabase
         .from("team_clients")
         .select("client_id, clients(id, name)")
         .eq("team_id", team.id);
-      
       return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
     },
   });
 
-  // Get unique location types for the filter
   const locationTypes = [...new Set(
     bookings?.map((b: any) => b.location?.type).filter(Boolean) || []
   )];
 
-  // Filter by client and location type
   const filteredBookings = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
     const matchesLocationType = locationTypeFilter === "all" || b.location?.type === locationTypeFilter;
     return matchesClient && matchesLocationType;
   });
 
-  // Group bookings by location
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    
-    // Calculate total for this booking:
-    // If total_price is set (for markets), use it directly
-    // Otherwise calculate from daily rate × days
     let bookingTotal: number;
     let dailyRate: number;
     let days: number;
-    
+
     if (booking.total_price != null) {
-      // Use total_price for markets/fairs
       bookingTotal = booking.total_price;
       days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
-      dailyRate = days > 0 ? bookingTotal / days : bookingTotal; // Derive daily rate for display
+      dailyRate = days > 0 ? bookingTotal / days : bookingTotal;
     } else {
-      // Calculate from daily rate for stores
       dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
       days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       bookingTotal = dailyRate * days;
     }
-    
+
     if (!acc[locationId]) {
       acc[locationId] = {
         location: booking.location,
@@ -113,29 +103,23 @@ export default function VagtBilling() {
         bookings: [],
         totalDays: 0,
         totalAmount: 0,
-        dailyRate: dailyRate,
+        dailyRate,
         usesTotalPrice: booking.total_price != null,
         minDate: booking.start_date,
         maxDate: booking.end_date,
       };
     }
-    
+
     acc[locationId].bookings.push(booking);
     acc[locationId].totalDays += days;
     acc[locationId].totalAmount += bookingTotal;
-    
-    // Track date range
-    if (booking.start_date < acc[locationId].minDate) {
-      acc[locationId].minDate = booking.start_date;
-    }
-    if (booking.end_date > acc[locationId].maxDate) {
-      acc[locationId].maxDate = booking.end_date;
-    }
-    
+
+    if (booking.start_date < acc[locationId].minDate) acc[locationId].minDate = booking.start_date;
+    if (booking.end_date > acc[locationId].maxDate) acc[locationId].maxDate = booking.end_date;
+
     return acc;
   }, {});
 
-  // Calculate totals
   const totalBookings = filteredBookings?.length || 0;
   const totalDays: number = (Object.values(bookingsByLocation || {}) as any[]).reduce(
     (sum: number, loc: any) => sum + (loc.totalDays || 0), 0
@@ -145,7 +129,6 @@ export default function VagtBilling() {
   );
   const uniqueLocations = Object.keys(bookingsByLocation || {}).length;
 
-  // Generate month options
   const monthOptions = [];
   for (let i = -6; i <= 6; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -156,216 +139,221 @@ export default function VagtBilling() {
   }
 
   const formatDateRange = (minDate: string, maxDate: string) => {
-    const start = new Date(minDate);
-    const end = new Date(maxDate);
-    return `${format(start, "dd/MM")} - ${format(end, "dd/MM")}`;
+    return `${format(new Date(minDate), "dd/MM")} - ${format(new Date(maxDate), "dd/MM")}`;
   };
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Faktureringsrapport</h1>
-            <p className="text-muted-foreground">Oversigt over bookinger til fakturering</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Alle kunder" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle kunder</SelectItem>
-                {fieldmarketingClients?.map((client: any) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={locationTypeFilter} onValueChange={setLocationTypeFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Alle typer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle typer</SelectItem>
-                {locationTypes.map((type: string) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Select value={clientFilter} onValueChange={setClientFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Alle kunder" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle kunder</SelectItem>
+            {fieldmarketingClients?.map((client: any) => (
+              <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={locationTypeFilter} onValueChange={setLocationTypeFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Alle typer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle typer</SelectItem>
+            {locationTypes.map((type: string) => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Bookinger</p>
-                  <p className="text-3xl font-bold mt-1">{totalBookings}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Unikke bookinger</p>
-                </div>
-                <div className="p-2 bg-muted rounded-lg">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Bookede Dage</p>
-                  <p className="text-3xl font-bold mt-1">{totalDays}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Lokations-dage</p>
-                </div>
-                <div className="p-2 bg-muted rounded-lg">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Lokationer</p>
-                  <p className="text-3xl font-bold mt-1">{uniqueLocations}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Unikke lokationer</p>
-                </div>
-                <div className="p-2 bg-muted rounded-lg">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Beløb</p>
-                  <p className="text-3xl font-bold mt-1">{totalAmount.toLocaleString("da-DK")}</p>
-                  <p className="text-xs text-muted-foreground mt-1">kr ex moms</p>
-                </div>
-                <div className="p-2 bg-muted rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Detailed Table */}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Detaljeret Oversigt per Lokation</h2>
-                <p className="text-sm text-muted-foreground">
-                  Brug denne oversigt til at kontrollere faktureringen mod aftaler
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Bookinger</p>
+                <p className="text-3xl font-bold mt-1">{totalBookings}</p>
+                <p className="text-xs text-muted-foreground mt-1">Unikke bookinger</p>
+              </div>
+              <div className="p-2 bg-muted rounded-lg">
+                <FileText className="h-5 w-5 text-muted-foreground" />
               </div>
             </div>
-
-            {isLoading ? (
-              <p className="text-muted-foreground py-8 text-center">Indlæser...</p>
-            ) : uniqueLocations === 0 ? (
-              <p className="text-muted-foreground py-8 text-center">
-                Ingen bookinger fundet for den valgte periode
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lokation</TableHead>
-                    <TableHead>Kunde</TableHead>
-                    <TableHead>Dato Periode</TableHead>
-                    <TableHead className="text-right">Bookinger</TableHead>
-                    <TableHead className="text-right">Dage</TableHead>
-                    <TableHead className="text-right">Dagspris</TableHead>
-                    <TableHead className="text-right">Beløb</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.values(bookingsByLocation || {}).map((loc: any) => (
-                    <TableRow key={loc.location?.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{loc.location?.name}</p>
-                          {loc.location?.address_city && (
-                            <p className="text-sm text-muted-foreground">
-                              {loc.location.address_city}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {loc.client?.name || "Ukendt kunde"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
-                      <TableCell className="text-right">{loc.bookings.length}</TableCell>
-                      <TableCell className="text-right">{loc.totalDays}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {loc.usesTotalPrice ? (
-                          <span className="italic">samlet</span>
-                        ) : (
-                          `${loc.dailyRate.toLocaleString("da-DK")} kr`
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">{loc.totalAmount.toLocaleString("da-DK")} kr</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
           </CardContent>
         </Card>
-
-        {/* Tips Card */}
-        <Card className="bg-muted/30">
+        <Card>
           <CardContent className="pt-6">
-            <div className="flex items-start gap-2">
-              <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold mb-2">Faktureringstips:</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>
-                    <span className="font-medium text-foreground">Dato Periode:</span> Viser hvornår lokationen var booket (format: dd/mm - dd/mm)
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Dage:</span> Antal dage lokationen var booket (bruges til dagspriser)
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Bookinger:</span> Antal separate bookinger på samme lokation
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Tip:</span> Sammenlign med jeres aftaler om dagspriser og bemanding
-                  </li>
-                </ul>
+                <p className="text-sm font-medium text-muted-foreground">Bookede Dage</p>
+                <p className="text-3xl font-bold mt-1">{totalDays}</p>
+                <p className="text-xs text-muted-foreground mt-1">Lokations-dage</p>
+              </div>
+              <div className="p-2 bg-muted rounded-lg">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
               </div>
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Lokationer</p>
+                <p className="text-3xl font-bold mt-1">{uniqueLocations}</p>
+                <p className="text-xs text-muted-foreground mt-1">Unikke lokationer</p>
+              </div>
+              <div className="p-2 bg-muted rounded-lg">
+                <MapPin className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Beløb</p>
+                <p className="text-3xl font-bold mt-1">{totalAmount.toLocaleString("da-DK")}</p>
+                <p className="text-xs text-muted-foreground mt-1">kr ex moms</p>
+              </div>
+              <div className="p-2 bg-muted rounded-lg">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <h2 className="text-lg font-semibold">Detaljeret Oversigt per Lokation</h2>
+              <p className="text-sm text-muted-foreground">
+                Brug denne oversigt til at kontrollere faktureringen mod aftaler
+              </p>
+            </div>
+          </div>
+          {isLoading ? (
+            <p className="text-muted-foreground py-8 text-center">Indlæser...</p>
+          ) : uniqueLocations === 0 ? (
+            <p className="text-muted-foreground py-8 text-center">
+              Ingen bookinger fundet for den valgte periode
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lokation</TableHead>
+                  <TableHead>Kunde</TableHead>
+                  <TableHead>Dato Periode</TableHead>
+                  <TableHead className="text-right">Bookinger</TableHead>
+                  <TableHead className="text-right">Dage</TableHead>
+                  <TableHead className="text-right">Dagspris</TableHead>
+                  <TableHead className="text-right">Beløb</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.values(bookingsByLocation || {}).map((loc: any) => (
+                  <TableRow key={loc.location?.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{loc.location?.name}</p>
+                        {loc.location?.address_city && (
+                          <p className="text-sm text-muted-foreground">{loc.location.address_city}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{loc.client?.name || "Ukendt kunde"}</Badge>
+                    </TableCell>
+                    <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
+                    <TableCell className="text-right">{loc.bookings.length}</TableCell>
+                    <TableCell className="text-right">{loc.totalDays}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {loc.usesTotalPrice ? (
+                        <span className="italic">samlet</span>
+                      ) : (
+                        `${loc.dailyRate.toLocaleString("da-DK")} kr`
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {loc.totalAmount.toLocaleString("da-DK")} kr
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tips */}
+      <Card className="bg-muted/30">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-2">
+            <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div>
+              <h3 className="font-semibold mb-2">Faktureringstips:</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li><span className="font-medium text-foreground">Dato Periode:</span> Viser hvornår lokationen var booket (format: dd/mm - dd/mm)</li>
+                <li><span className="font-medium text-foreground">Dage:</span> Antal dage lokationen var booket (bruges til dagspriser)</li>
+                <li><span className="font-medium text-foreground">Bookinger:</span> Antal separate bookinger på samme lokation</li>
+                <li><span className="font-medium text-foreground">Tip:</span> Sammenlign med jeres aftaler om dagspriser og bemanding</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function VagtBilling() {
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Faktureringsrapport</h1>
+          <p className="text-muted-foreground">Oversigt over bookinger til fakturering</p>
+        </div>
+
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">Oversigt</TabsTrigger>
+            <TabsTrigger value="supplier">Leverandørrapport</TabsTrigger>
+            <TabsTrigger value="discounts">Rabataftaler</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <BillingOverviewTab />
+          </TabsContent>
+
+          <TabsContent value="supplier">
+            <SupplierReportTab />
+          </TabsContent>
+
+          <TabsContent value="discounts">
+            <DiscountRulesTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
