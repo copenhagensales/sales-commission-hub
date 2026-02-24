@@ -1,61 +1,46 @@
 
 
-# Plan: Fix provision, vis inaktive medarbejdere, og ret diet-visning
+# Plan: Tilfoej konsulent-markering i Saelgerloensninger
 
-## Problemer
+## Overblik
 
-1. **Manglende provision**: Hook'en bruger `kpi_cached_values` som kun indeholder data for den aktuelle loenperiode. Historiske perioder viser 0.
-2. **Inaktive medarbejdere skjules**: `.eq("is_active", true)` filtrerer dem vaek.
-3. **Diet viser 0 kr.**: Data findes i `booking_diet` tabellen (bekraeftet - fx Oscar og Josefine har 300 kr/dag). Query'en ser korrekt ud, men der kan vaere et timing/caching-problem. Vi sikrer at det virker korrekt.
+Tilfoej en visuel markering for freelance-konsulenter i saelgerloenningstabellen, saa de nemt kan skelnes fra almindelige medarbejdere.
 
 ## Aendringer
 
-### Fil: `src/hooks/useSellerSalariesCached.ts`
+### 1. `src/hooks/useSellerSalariesCached.ts`
 
-**1. Fjern `is_active` filter**
-- Fjern `.eq("is_active", true)` saa baade aktive og inaktive medarbejdere vises.
-- Tilfoej `is_active` til select-felterne.
+- Tilfoej `is_freelance_consultant` til employee-query'ens select-felter
+- Udvid `SellerData` interfacet med `isFreelanceConsultant: boolean`
+- Map vaerdien i seller-data: `isFreelanceConsultant: emp.is_freelance_consultant ?? false`
 
-**2. Erstat KPI-cache med reel salgsdata for provision**
-- Fjern query til `kpi_cached_values` (som kun har aktuel periode).
-- Tilfoej queries der henter:
-  1. `employee_agent_mapping` med `agents(email)` for at linke medarbejdere til salg.
-  2. `sales` + `sale_items(mapped_commission)` filtreret paa den valgte periode og agent-emails.
-- Beregn provision per medarbejder ved at summere `mapped_commission`.
-- Dette foelger samme moenster som `PayrollDayByDay.tsx`.
+### 2. `src/components/salary/SellerSalariesTab.tsx`
 
-**3. Tilfoej `isActive` til SellerData interface**
+- Vis en "Konsulent" badge ved siden af navnet (ligesom "Inaktiv" badge) for medarbejdere hvor `isFreelanceConsultant` er `true`
+- Gaelder baade desktop-tabel og mobil-visning
 
-### Fil: `src/components/salary/SellerSalariesTab.tsx`
+### Eksempel paa badge
 
-**Vis aktiv/inaktiv-status**
-- Inaktive medarbejdere vises med nedtonet tekst og en "(Inaktiv)" badge.
+Medarbejdernavnet vil se saadan ud:
+
+```
+Oscar Hansen [Konsulent]
+```
+
+eller for en inaktiv konsulent:
+
+```
+Oscar Hansen [Konsulent] [Inaktiv]
+```
 
 ---
 
-## Teknisk data-flow for provision
-
-```text
-employee_master_data
-  -> employee_agent_mapping -> agents(email)
-  -> sales (confirmation_date i perioden, ikke annulleret)
-  -> sale_items(mapped_commission)
-  -> sum per employee_id
-```
-
-## Diet data-flow (allerede implementeret, verificeret)
-
-```text
-booking_diet tabellen
-  -> filtreret paa employee_id + date i perioden
-  -> sum af amount per medarbejder
-  (Bekraeftet data: Oscar og Josefine har 4x 300 kr i feb 2026)
-```
-
-## Filaendringer
+## Tekniske detaljer
 
 | Fil | Aendring |
 |-----|---------|
-| `src/hooks/useSellerSalariesCached.ts` | Fjern is_active filter, erstat KPI-cache med salgsdata, tilfoej isActive |
-| `src/components/salary/SellerSalariesTab.tsx` | Vis aktiv/inaktiv markering |
+| `src/hooks/useSellerSalariesCached.ts` | Tilfoej `is_freelance_consultant` til select, udvid interface |
+| `src/components/salary/SellerSalariesTab.tsx` | Vis "Konsulent" badge i tabel og mobil-view |
+
+Ingen database-aendringer - `is_freelance_consultant` feltet eksisterer allerede i `employee_master_data`.
 
