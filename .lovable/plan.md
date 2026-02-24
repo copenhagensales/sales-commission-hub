@@ -1,74 +1,123 @@
 
-# Fix: Enrichment-healer bygger ikke leadResultFields korrekt fra API-svar
 
-## Problem
+# Leverandor-faktureringsrapport med rabataftaler og godkendelsesflow
 
-Healeren henter lead data fra Adversus API, men:
+## Oversigt
 
-1. **API'et returnerer `resultData`** (et array af objekter med `{id, name, value}`), men returnerer IKKE `resultFields` (et key-value objekt)
-2. Healeren tjekker `leadData.resultFields` som ikke eksisterer i API-svaret, og faar derfor `{}`
-3. Healeren gemmer det tomme objekt og overskriver `leadResultFields` med `{}`
-4. Resultatet er at salget markeres som "healed" men stadig viser "Lead data ikke modtaget"
+Udvider Fakturerings-siden med en ny "Leverandorrapport"-fane, der goer det muligt at generere rapporter pr. leverandor (lokationstype) for en given maaned, med automatisk rabatberegning for Danske Shoppingcentre, godkendelsesflow, og konfigurerbare rabataftaler.
 
-Integration-engine adapteren (adversus.ts linje 586-606) haandterer dette korrekt ved at **bygge** `resultFields` manuelt fra `resultData`-arrayet.
+## Nye database-tabeller
 
-## Loesning
+### 1. `supplier_discount_rules`
+Gemmer rabataftaler (fx Danske Shoppingcentre-volumrabat):
 
-Opdater `healAdversus()` i `supabase/functions/enrichment-healer/index.ts` til at:
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| location_type | text | Fx "Danske Shoppingcentre" |
+| min_placements | integer | Minimum antal unikke lokationer |
+| discount_percent | numeric | Rabat i procent (fx 10, 15) |
+| description | text | Beskrivelse af aftalen |
+| is_active | boolean | Om reglen er aktiv |
+| created_at / updated_at | timestamptz | |
 
-1. Bygge `resultFields` fra `resultData`-arrayet (som adapteren goer)
-2. Kun markere som "healed" hvis der faktisk er data
+Seed-data:
+- Danske Shoppingcentre, 11 placeringer -> 10%
+- Danske Shoppingcentre, 20 placeringer -> 15%
 
-### Aendring i `supabase/functions/enrichment-healer/index.ts` (linje 114-123)
+### 2. `supplier_invoice_reports`
+Gemmer genererede rapporter med godkendelsesstatus:
 
-Foer:
-```typescript
-const leadData = await response.json();
-const leadResultFields = leadData.resultFields || leadData.leadResultFields || {};
-const leadResultData = leadData.resultData || leadData.leadResultData || [];
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| location_type | text | Leverandor/type |
+| period_start | date | Periodens start (1. i md) |
+| period_end | date | Periodens slut (sidste i md) |
+| total_amount | numeric | Samlet beloeb foer rabat |
+| discount_percent | numeric | Anvendt rabatprocent |
+| discount_amount | numeric | Rabatbeloeb |
+| final_amount | numeric | Beloeb efter rabat |
+| unique_locations | integer | Antal unikke placeringer |
+| status | text | 'draft' / 'approved' |
+| approved_by | uuid | Bruger der godkendte |
+| approved_at | timestamptz | Tidspunkt for godkendelse |
+| report_data | jsonb | Snapshot af alle linjer |
+| created_at | timestamptz | |
 
-const updatedPayload = {
-  ...rawPayload,
-  leadResultFields,
-  leadResultData,
-};
-```
+## Sidestruktur
 
-Efter:
-```typescript
-const leadData = await response.json();
-const leadResultData = leadData.resultData || leadData.leadResultData || [];
+Billing.tsx faar to faner via Tabs-komponent:
 
-// Build leadResultFields from resultData array (same logic as integration-engine adapter)
-const leadResultFields: Record<string, any> = {};
-if (Array.isArray(leadResultData)) {
-  for (const field of leadResultData) {
-    const fieldName = field?.name || field?.label;
-    if (field && fieldName !== undefined) {
-      leadResultFields[fieldName] = field.value;
-    }
-  }
-}
+### Fane 1: "Oversigt" (eksisterende indhold)
+Den nuvaerende faktureringsrapport forbliver uaendret.
 
-// Only mark as healed if we actually got data
-if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-  throw new Error("API returned empty lead data");
-}
+### Fane 2: "Leverandorrapport"
+Ny fane med foelgende indhold:
 
-const updatedPayload = {
-  ...rawPayload,
-  leadResultFields,
-  leadResultData,
-};
-```
+**Filtre:**
+- Maanedsvaelger (som nu)
+- Lokationstype-filter (vaelg leverandor, fx "Danske Shoppingcentre")
 
-### Hvad dette loeser
+**Rapport-visning:**
+- Tabel med alle lokationer af den valgte type i perioden
+- Kolonner: Lokation, By, Kunde, Periode, Dage, Dagspris, Beloeb
+- Subtotal-raekke
+- Rabatsektion: Viser antal unikke placeringer, hvilken rabattrin der er opnaaet, rabatbeloeb
+- Total efter rabat
 
-- `leadResultFields` bygges korrekt fra API-svarets `resultData`-array (fx "Tilskud", "Sales ID", "Bindingsperiode")
-- Salg markeres kun som "healed" hvis data faktisk blev hentet
-- Eksisterende salg med tom `leadResultFields` kan re-heales ved at nulstille deres `enrichment_status`
-- Logikken matcher nu praecis hvad integration-engine adapteren goer
+**Godkendelsesflow:**
+- "Godkend rapport" knap der gemmer et snapshot i `supplier_invoice_reports`
+- Status-badge: Kladde / Godkendt
+- Godkendte rapporter kan ikke aendres
+- Mulighed for at eksportere/printe godkendt rapport
 
-### Efterfoelgende handling
+### Fane 3: "Rabataftaler"
+Ny fane til administration af rabatregler:
 
-Det allerede "healede" salg (1206846) skal have sin `enrichment_status` sat tilbage til "pending" saa healeren koerer igen med den rettede kode. Dette kan goeres via "Sync single sale"-knappen.
+- Tabel med alle aktive rabataftaler
+- Kolonner: Lokationstype, Min. placeringer, Rabat %, Beskrivelse, Status
+- Mulighed for at tilfoeje, redigere og deaktivere regler
+- Dialog til oprettelse/redigering af regler
+
+## Rabatlogik for Danske Shoppingcentre
+
+Beregningen taeller antal **unikke lokationer** (ikke bookinger) af typen "Danske Shoppingcentre" i den valgte maaned:
+- Under 11 unikke lokationer: Ingen rabat
+- 11-19 unikke lokationer: 10% rabat paa samlet leje
+- 20+ unikke lokationer: 15% rabat paa samlet leje
+
+Rabatten vises tydeligt i rapporten med:
+- Antal unikke placeringer
+- Opnaaet rabattrin
+- Beloeb foer rabat
+- Rabatbeloeb
+- Beloeb efter rabat
+
+## Teknisk plan
+
+### Trin 1: Database-migration
+- Opret `supplier_discount_rules` tabel med seed-data for Danske Shoppingcentre
+- Opret `supplier_invoice_reports` tabel
+- RLS policies baseret paa auth (rolle-check via position_permissions)
+
+### Trin 2: Refaktor Billing.tsx
+- Tilfoej Tabs-komponent med "Oversigt", "Leverandorrapport", "Rabataftaler"
+- Flyt eksisterende indhold til "Oversigt"-fanen
+
+### Trin 3: SupplierReportTab komponent
+- Ny fil: `src/components/billing/SupplierReportTab.tsx`
+- Henter bookinger filtreret paa lokationstype og maaned
+- Beregner rabat baseret paa `supplier_discount_rules`
+- Viser rapport med godkendelsesknap
+- Gemmer godkendt rapport i `supplier_invoice_reports`
+
+### Trin 4: DiscountRulesTab komponent
+- Ny fil: `src/components/billing/DiscountRulesTab.tsx`
+- CRUD paa `supplier_discount_rules`
+- Dialog til oprettelse/redigering
+
+### Trin 5: Rapport-historik
+- Liste over tidligere godkendte rapporter
+- Mulighed for at se detaljer for godkendte rapporter
+
