@@ -1,52 +1,51 @@
 
 
-# Plan: Fix timezone-bug i sælgerløsninger (historiske perioder viser 0 kr)
+# Plan: Inline-redigering af Navn, Type og By på lokationssiden
 
-## Problem
+## Hvad aendres
 
-Alle historiske lønperioder viser 0 kr. fordi `toISOString()` konverterer datoer til UTC, hvilket forskyder datoen med 1 dag i dansk tidszone (CET/CEST = UTC+1/+2).
+Paa `/vagt-flow/locations` skal kolonnerne **Navn**, **Type** og **By** vaere redigerbare direkte i tabellen -- ligesom Dagspris og Cooldown allerede er i dag.
 
-Eksempel: `new Date(2026, 0, 15)` (15. januar midnat lokal tid) bliver `"2026-01-14T23:00:00Z"` i UTC. `toISOString().split("T")[0]` giver `"2026-01-14"` i stedet for `"2026-01-15"`.
+## Implementering
 
-Det betyder:
-- `buildPeriodKey()` bygger `"payroll_2026-01-14"` men snapshot-tabellen har `"payroll_2026-01-15"` - ingen match
-- `periodStartISO`/`periodEndISO` er ogsaa forskudt, saa diet, sygedage og dagbonus queries henter forkerte perioder
-- `isCurrentPayrollPeriod()` sammenligner ogsaa med forkerte ISO-strenge
+### Fil: `src/pages/vagt-flow/Locations.tsx`
 
-## Loesning
+**1. Ny mutation til generel opdatering**
 
-### Fil: `src/hooks/useSellerSalariesCached.ts`
-
-**1. Tilfoej lokal dato-formattering**
-
-Erstat `toISOString().split("T")[0]` med en hjælpefunktion der bruger lokal tid:
+Tilfoej en `updateLocation` mutation (ligesom `updateCooldown`/`updateDailyRate`) der tager vilkaarlige felter:
 
 ```typescript
-function toLocalDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+const updateLocation = useMutation({
+  mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+    const { error } = await supabase.from("location").update(data).eq("id", id);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
+    toast({ title: "Lokation opdateret" });
+  },
+});
 ```
 
-**2. Opdater alle steder der bruger `toISOString()`**
+**2. Erstat statisk tekst med inline-redigerbare felter**
 
-- Linje 50-51: `isCurrentPayrollPeriod` sammenligning
-- Linje 61: `buildPeriodKey` 
-- Linje 69-70: `periodStartISO` og `periodEndISO`
+| Kolonne | Nuvaerende | Ny komponent |
+|---------|-----------|-------------|
+| Navn | `{loc.name}` | `<Input>` med `defaultValue`, opdatering paa `onBlur` |
+| Type | `{loc.type}` | `<Select>` med samme valgmuligheder som "Ny lokation"-dialogen (Butik, Storcenter, Markeder, Messer, Danske Shoppingcentre, Ocean Outdoor) |
+| By | `{loc.address_city}` | `<Input>` med `defaultValue`, opdatering paa `onBlur` |
 
-Alle erstattes med `toLocalDateString()`.
+Alle felter faar `onClick={(e) => e.stopPropagation()}` saa raekke-navigation ikke udloeses ved klik.
 
-## Teknisk detalje
+Felterne er kun redigerbare naar `canEditLocation` er `true` (eksisterende tilladelseslogik).
 
-| Foer (UTC) | Efter (lokal) |
-|------------|---------------|
-| `new Date(2026,0,15).toISOString().split("T")[0]` = `"2026-01-14"` | `toLocalDateString(new Date(2026,0,15))` = `"2026-01-15"` |
+**3. Type-select udvides**
+
+Fra screenshottet ses ogsaa "Danske Shoppingcentre" og "Ocean Outdoor" som typer. Disse tilfoejes til baade "Ny lokation"-dialogen og inline-select.
 
 ## Omfang
 
-- 1 fil aendres, 5 linjer paavirkes
-- Ingen database-aendringer
-- Loeser at alle historiske perioder viser 0 kr
+- 1 fil aendres (`Locations.tsx`)
+- Ingen database-aendringer (kolonnerne eksisterer allerede)
+- Folger eksisterende moenster fra Dagspris/Cooldown inline-redigering
 
