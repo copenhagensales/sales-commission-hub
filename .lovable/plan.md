@@ -1,118 +1,76 @@
 
+Mest sandsynlige årsag er fundet, og den er konkret:
 
-## Flere dagspriser per lokation (placeringer)
+1) Der kører dobbelt sync-arkitektur samtidig
+- Både per-integration jobs er aktive:
+  - `dialer-d79b9632-sync` (Eesy)
+  - `dialer-a5068f85-sync` (tryg)
+  - `dialer-a76cf63a-sync` (ase)
+  - `dialer-657c2050-sync` (Relatel)
+  - `dialer-26fac751-sync-sales` + `dialer-26fac751-sync-meta` (Lovablecph)
+- Og provider-jobs er også aktive:
+  - `provider-enreach-sync` (*/3)
+  - `provider-adversus-sync` (*/5)
 
-### Problem
-Nogle lokationer har flere steder man kan stå (f.eks. hovedindgang, elevator), og prisen afhænger af placeringen. I dag er der kun en enkelt dagspris per lokation.
+Det betyder i praksis at samme integrationer bliver trigget flere gange inden for samme få sekunder/minutter.
 
-### Loesning
+2) Data bekræfter dobbelt-kørsler
+- Enreach-runs har gennemgående dobbeltkørsler:
+  - Fx Eesy har 2 runs samme minut igen og igen.
+- Hver Enreach-run ligger på:
+  - `api_calls_made=12`
+  - `rate_limit_hits=12`
+  - `retries=9`
+  - Altså ren 429-loop.
+- PostgreSQL logs viser også lock-konflikt på `provider_sync_locks`:
+  - `duplicate key value violates unique constraint "provider_sync_locks_pkey"`
+  - Det er et tegn på overlap i provider-sync triggere.
 
-Opret en ny tabel `location_placements` til at holde flere placeringer med individuelle priser. Den eksisterende `daily_rate` kolonne bevares som standardpris for lokationer uden placeringer.
+3) “Var det ændringer i dag?”
+- Der er ingen schedule-audit entries i dag; seneste schedule-ændringer ligger i går (2026-02-23 omkring 17:47 UTC).
+- Så problemet ligner ikke en ny kodeændring i dag, men en eksisterende konfiguration der nu giver burst/overlap under belastning.
+- At det virkede i morges passer med dette: lavere load tidligere + senere overlap/burst => 429-storm.
 
-### 1. Database: Ny tabel `location_placements`
+4) Sekundær design-fejl der forværrer problemet
+- Budgetstyring er primært per time (fx Enreach 10.000/time), men fejlmønstret er per-minut burst.
+- Derfor “ser budget fint ud” samtidig med at alle kald bliver afvist.
 
-```sql
-CREATE TABLE location_placements (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  location_id uuid NOT NULL REFERENCES location(id) ON DELETE CASCADE,
-  name text NOT NULL,           -- f.eks. "Hovedindgang", "Elevator", "Gangarea"
-  daily_rate integer NOT NULL DEFAULT 1000,
-  created_at timestamptz DEFAULT now()
-);
+Implementeringsplan (jeg udfører den efter godkendelse)
+Fase A — Stop blødningen (hurtig stabilisering)
+1. Deaktivér én af de to sync-strategier, så kun én orkestrering er aktiv.
+   - Anbefaling nu: behold per-integration jobs, deaktivér `provider-enreach-sync` og `provider-adversus-sync`.
+   - Begrundelse: nuværende dialer-jobs har allerede fine offsets + Lovablecph split sales/meta.
+2. Verificér at kun ét job per integration er aktivt i `cron.job`.
+3. Overvåg 15-30 min:
+   - 429-rate skal falde markant.
+   - `last_sync_at` må ikke stagnere.
+   - `integration_sync_runs` må ikke have dublet-runs samme minut for samme integration.
 
-ALTER TABLE location_placements ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can manage location_placements"
-  ON location_placements FOR ALL TO authenticated USING (true) WITH CHECK (true);
-```
+Fase B — Gør løsningen robust (så det ikke kommer igen)
+4. Indfør “mutual exclusivity guard” i scheduler-logik:
+   - Når provider-mode er ON: ingen dialer-* sync jobs må eksistere.
+   - Når dialer-mode er ON: ingen provider-* jobs må eksistere.
+5. Opdatér System Stability visning:
+   - Vis kritisk advarsel hvis både provider-jobs og dialer-jobs er aktive samtidig.
+6. Tilføj per-minute budget gate (ikke kun per-hour):
+   - Enreach/Adversus stop eller skip tidligt hvis minute-window er over threshold.
+7. Stram retry/backoff for Enreach:
+   - Mere jitter + adaptiv cooldown efter gentagne 429.
+   - Undgå at alle integrations løber i samme retry-rytme.
 
-Tilfoej ogsaa en `placement_id` kolonne paa `booking` tabellen:
+Fase C — Verifikation og acceptkriterier
+8. Acceptance checks:
+   - Enreach 429-rate < 10% over 30 min.
+   - Adversus 429-rate signifikant ned ift. nu.
+   - Ingen “duplicate minute runs” for samme integration.
+   - Lovablecph sync recovers (ingen “ingen sync i 37 min”).
+9. Hvis stadig høje 429:
+   - Midlertidigt sænk actions pr. run (fx split metadata/sales mere aggressivt)
+   - Øg interval for de mest tunge integrationer.
 
-```sql
-ALTER TABLE booking ADD COLUMN placement_id uuid REFERENCES location_placements(id) ON DELETE SET NULL;
-```
+Teknisk note
+- Rodårsag er ikke “pricing rule rematch” eller løn-siderne.
+- Rodårsag er scheduler-konflikt + minute-burst mod eksterne API’er.
+- Det er derfor helt konsistent med “virkede i morges, men brød senere”.
 
-### 2. LocationDetail.tsx -- Placeringer-sektion
-
-Under dagspris-feltet tilfoej en ny sektion "Placeringer" i Stamdata-kortet:
-
-- Vis eksisterende placeringer som en liste med navn, pris og slet-knap
-- "Tilfoej placering" knap der viser inline inputs (navn + pris)
-- Placeringerne hentes og gemmes direkte (ikke via formData/handleSave, men via separate mutations)
-- Naar en lokation har placeringer, vises dagspris-feltet som "Standardpris (bruges naar ingen placeringer)" med en note
-
-Layouteksempel:
-```text
-Dagspris (kr ex moms): [1200]
-
-Placeringer (valgfrit):
-  Hovedindgang    1500 kr    [Slet]
-  Elevator        1200 kr    [Slet]
-  [+ Tilfoej placering]
-```
-
-### 3. BookWeekContent.tsx -- Valg af placering ved booking
-
-Naar en lokation vælges og den har placeringer:
-- Vis en Select-dropdown "Vælg placering" under lokationsvalget
-- Dropdown indeholder alle placeringer for lokationen
-- Valgt placering bestemmer `daily_rate_override` paa booking
-- `placement_id` gemmes paa booking-rækken
-- Hvis lokationen IKKE har placeringer, vises dropdown ikke (som i dag)
-
-### 4. EditBookingDialog.tsx -- Vis/ændr placering
-
-I "Pris"-fanen:
-- Hvis bookingen har en `placement_id`, vis placeringsnavnet
-- Mulighed for at ændre placering via dropdown (kun hvis lokationen har placeringer)
-- Ændring af placering opdaterer ogsaa dagsprisen
-
-### 5. Berørte filer
-
-| Fil | Aendring |
-|-----|----------|
-| **Migration** | Ny tabel `location_placements` + `booking.placement_id` kolonne |
-| `LocationDetail.tsx` | Ny sektion til at administrere placeringer (CRUD) |
-| `BookWeekContent.tsx` | Hent placeringer for valgt lokation, vis Select hvis der er placeringer, gem `placement_id` |
-| `EditBookingDialog.tsx` | Vis/ændr placering i pris-fanen |
-| `LocationsContent.tsx` | Ingen ændring (dagspris-feltet i opret-dialog forbliver som standard) |
-| `BookingsContent.tsx` | Evt. vis placeringsnavn i oversigten |
-
-### Tekniske detaljer
-
-**Ny query i LocationDetail:**
-```typescript
-const { data: placements = [] } = useQuery({
-  queryKey: ["location-placements", id],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("location_placements")
-      .select("*")
-      .eq("location_id", id)
-      .order("name");
-    return data || [];
-  },
-});
-```
-
-**Ny query i BookWeekContent (naar lokation vælges):**
-```typescript
-const { data: locationPlacements = [] } = useQuery({
-  queryKey: ["location-placements", selectedLocation?.id],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("location_placements")
-      .select("*")
-      .eq("location_id", selectedLocation.id)
-      .order("name");
-    return data || [];
-  },
-  enabled: !!selectedLocation?.id,
-});
-```
-
-**Booking insert udvides med:**
-```typescript
-placement_id: selectedPlacementId || null,
-daily_rate_override: selectedPlacement?.daily_rate || null,
-```
-
+Når du godkender, tager jeg Fase A først (hurtig stabilisering), og derefter Fase B hardening.
