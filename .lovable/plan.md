@@ -1,56 +1,74 @@
 
-# Fix: Enrichment-healer kan ikke finde Adversus credentials
+# Fix: Enrichment-healer bygger ikke leadResultFields korrekt fra API-svar
 
 ## Problem
 
-Healeren fejler med "No Adversus API key found, skipping all" fordi:
+Healeren henter lead data fra Adversus API, men:
 
-1. **Forkert credential-key**: Healeren soeger efter `credentials.api_key` eller `credentials.apiKey` (linje 82), men Adversus credentials er gemt som `{ username, password }` eller `{ ADVERSUS_API_USERNAME, ADVERSUS_API_PASSWORD }`.
-2. **Forkert auth-metode**: Healeren bruger `Bearer ${apiKey}` (linje 105), men Adversus API kraever Basic Auth (`Basic ${btoa(username:password)}`).
+1. **API'et returnerer `resultData`** (et array af objekter med `{id, name, value}`), men returnerer IKKE `resultFields` (et key-value objekt)
+2. Healeren tjekker `leadData.resultFields` som ikke eksisterer i API-svaret, og faar derfor `{}`
+3. Healeren gemmer det tomme objekt og overskriver `leadResultFields` med `{}`
+4. Resultatet er at salget markeres som "healed" men stadig viser "Lead data ikke modtaget"
 
-Integration-engine adapteren haandterer dette korrekt (linje 40-50 i adversus.ts), men healeren har sin egen separate implementation der ikke matcher.
+Integration-engine adapteren (adversus.ts linje 586-606) haandterer dette korrekt ved at **bygge** `resultFields` manuelt fra `resultData`-arrayet.
 
 ## Loesning
 
-Opdater `healAdversus()` i `supabase/functions/enrichment-healer/index.ts`:
+Opdater `healAdversus()` i `supabase/functions/enrichment-healer/index.ts` til at:
 
-### Aendring 1: Credential-udtrækning (linje 82-86)
+1. Bygge `resultFields` fra `resultData`-arrayet (som adapteren goer)
+2. Kun markere som "healed" hvis der faktisk er data
+
+### Aendring i `supabase/functions/enrichment-healer/index.ts` (linje 114-123)
 
 Foer:
 ```typescript
-const apiKey = credentials?.api_key || credentials?.apiKey;
-if (!apiKey) {
-  log("No Adversus API key found, skipping all");
-  return { healed: 0, failed: 0, skipped: sales.length };
-}
+const leadData = await response.json();
+const leadResultFields = leadData.resultFields || leadData.leadResultFields || {};
+const leadResultData = leadData.resultData || leadData.leadResultData || [];
+
+const updatedPayload = {
+  ...rawPayload,
+  leadResultFields,
+  leadResultData,
+};
 ```
 
 Efter:
 ```typescript
-const user = credentials?.username || credentials?.ADVERSUS_API_USERNAME;
-const pass = credentials?.password || credentials?.ADVERSUS_API_PASSWORD;
-if (!user || !pass) {
-  log("No Adversus credentials found (need username+password), skipping all");
-  return { healed: 0, failed: 0, skipped: sales.length };
+const leadData = await response.json();
+const leadResultData = leadData.resultData || leadData.leadResultData || [];
+
+// Build leadResultFields from resultData array (same logic as integration-engine adapter)
+const leadResultFields: Record<string, any> = {};
+if (Array.isArray(leadResultData)) {
+  for (const field of leadResultData) {
+    const fieldName = field?.name || field?.label;
+    if (field && fieldName !== undefined) {
+      leadResultFields[fieldName] = field.value;
+    }
+  }
 }
-const authHeader = "Basic " + btoa(`${user}:${pass}`);
-```
 
-### Aendring 2: Auth-header i API-kald (linje 105)
+// Only mark as healed if we actually got data
+if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
+  throw new Error("API returned empty lead data");
+}
 
-Foer:
-```typescript
-headers: { Authorization: `Bearer ${apiKey}` },
-```
-
-Efter:
-```typescript
-headers: { Authorization: authHeader },
+const updatedPayload = {
+  ...rawPayload,
+  leadResultFields,
+  leadResultData,
+};
 ```
 
 ### Hvad dette loeser
 
-- Healeren kan nu korrekt laese Adversus credentials (username/password)
-- API-kald bruger Basic Auth i stedet for Bearer token
-- Lead data (Tilskud, Sales ID, Bindingsperiode osv.) bliver hentet og gemt i `raw_payload`
-- "Sync enkelt salg" knappen vil nu faktisk heale salget i stedet for at skippe det
+- `leadResultFields` bygges korrekt fra API-svarets `resultData`-array (fx "Tilskud", "Sales ID", "Bindingsperiode")
+- Salg markeres kun som "healed" hvis data faktisk blev hentet
+- Eksisterende salg med tom `leadResultFields` kan re-heales ved at nulstille deres `enrichment_status`
+- Logikken matcher nu praecis hvad integration-engine adapteren goer
+
+### Efterfoelgende handling
+
+Det allerede "healede" salg (1206846) skal have sin `enrichment_status` sat tilbage til "pending" saa healeren koerer igen med den rettede kode. Dette kan goeres via "Sync single sale"-knappen.
