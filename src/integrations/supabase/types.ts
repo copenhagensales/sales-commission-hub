@@ -10274,6 +10274,10 @@ export type Database = {
         }
         Returns: number
       }
+      search_sales: {
+        Args: { max_results?: number; search_query: string }
+        Returns: string[]
+      }
       shares_team_with_user: {
         Args: { _target_employee_id: string; _user_id: string }
         Returns: boolean
