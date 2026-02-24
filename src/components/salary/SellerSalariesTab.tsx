@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/calculations";
@@ -7,21 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, Database, RefreshCw } from "lucide-react";
+import { Search, Users, RefreshCw } from "lucide-react";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
+import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
 export function SellerSalariesTab() {
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  
+  const [periodStart, setPeriodStart] = useState<Date>(() => getPayrollPeriod().start);
+  const [periodEnd, setPeriodEnd] = useState<Date>(() => getPayrollPeriod().end);
 
-  // Use the cached KPI data
-  const { sellerData, isLoading, lastUpdated } = useSellerSalariesCached(selectedTeam);
+  const handlePeriodChange = useCallback((start: Date, end: Date) => {
+    setPeriodStart(start);
+    setPeriodEnd(end);
+  }, []);
 
-  // Fetch teams for filter dropdown
+  const { sellerData, isLoading, lastUpdated } = useSellerSalariesCached(selectedTeam, periodStart, periodEnd);
+
   const { data: teams } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["teams-filter"],
     queryFn: async () => {
@@ -41,8 +49,10 @@ export function SellerSalariesTab() {
   const totalCommission = filteredData.reduce((sum, s) => sum + s.commission, 0);
   const totalCancellations = filteredData.reduce((sum, s) => sum + s.cancellations, 0);
   const totalVacationPay = filteredData.reduce((sum, s) => sum + s.vacationPay, 0);
-
-  // formatCurrency imported from @/lib/calculations
+  const totalDiet = filteredData.reduce((sum, s) => sum + s.diet, 0);
+  const totalSickDays = filteredData.reduce((sum, s) => sum + s.sickDays, 0);
+  const totalDailyBonus = filteredData.reduce((sum, s) => sum + s.dailyBonus, 0);
+  const totalReferralBonus = filteredData.reduce((sum, s) => sum + s.referralBonus, 0);
 
   return (
     <Card>
@@ -54,16 +64,18 @@ export function SellerSalariesTab() {
             {filteredData.length}
           </Badge>
         </div>
-        {lastUpdated && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <RefreshCw className="h-3 w-3" />
-            Opdateret {format(lastUpdated, "HH:mm", { locale: da })}
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          <PayrollPeriodSelector onChange={handlePeriodChange} />
+          {lastUpdated && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RefreshCw className="h-3 w-3" />
+              Opdateret {format(lastUpdated, "HH:mm", { locale: da })}
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Filters */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-4">
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Vælg team" />
@@ -87,8 +99,7 @@ export function SellerSalariesTab() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Indlæser...</div>
           ) : filteredData.length === 0 ? (
@@ -113,21 +124,32 @@ export function SellerSalariesTab() {
                     <span className="text-muted-foreground">Feriepenge</span>
                     <span>{formatCurrency(seller.vacationPay)}</span>
                   </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Diet</span>
+                    <span>{formatCurrency(seller.diet)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Sygdom</span>
+                    <span>{seller.sickDays} dage</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Dagsbonus</span>
+                    <span>{formatCurrency(seller.dailyBonus)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Henvisning</span>
+                    <span>{formatCurrency(seller.referralBonus)}</span>
+                  </div>
                 </div>
               ))}
-              <div className="p-3 bg-muted/50 font-medium">
-                <div className="flex justify-between text-xs">
-                  <span>Total provision</span>
-                  <span>{formatCurrency(totalCommission)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Total annulleringer</span>
-                  <span>{formatCurrency(totalCancellations)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Total feriepenge</span>
-                  <span>{formatCurrency(totalVacationPay)}</span>
-                </div>
+              <div className="p-3 bg-muted/50 font-medium space-y-0.5">
+                <div className="flex justify-between text-xs"><span>Total provision</span><span>{formatCurrency(totalCommission)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total annulleringer</span><span>{formatCurrency(totalCancellations)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total feriepenge</span><span>{formatCurrency(totalVacationPay)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total diet</span><span>{formatCurrency(totalDiet)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total sygdom</span><span>{totalSickDays} dage</span></div>
+                <div className="flex justify-between text-xs"><span>Total dagsbonus</span><span>{formatCurrency(totalDailyBonus)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total henvisning</span><span>{formatCurrency(totalReferralBonus)}</span></div>
               </div>
             </div>
           ) : (
@@ -139,6 +161,10 @@ export function SellerSalariesTab() {
                   <TableHead className="text-right">Provision</TableHead>
                   <TableHead className="text-right">Annulleringer</TableHead>
                   <TableHead className="text-right">Feriepenge</TableHead>
+                  <TableHead className="text-right">Diet</TableHead>
+                  <TableHead className="text-right">Sygdom</TableHead>
+                  <TableHead className="text-right">Dagsbonus</TableHead>
+                  <TableHead className="text-right">Henvisning</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -149,6 +175,10 @@ export function SellerSalariesTab() {
                     <TableCell className="text-right">{formatCurrency(seller.commission)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(seller.cancellations)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(seller.vacationPay)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(seller.diet)}</TableCell>
+                    <TableCell className="text-right">{seller.sickDays}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(seller.dailyBonus)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(seller.referralBonus)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-medium">
@@ -157,6 +187,10 @@ export function SellerSalariesTab() {
                   <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalCancellations)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalVacationPay)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalDiet)}</TableCell>
+                  <TableCell className="text-right">{totalSickDays}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalDailyBonus)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalReferralBonus)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
