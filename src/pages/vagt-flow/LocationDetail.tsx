@@ -238,6 +238,7 @@ export default function LocationDetail() {
                       <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
                       <SelectItem value="Markeder">Markeder</SelectItem>
                       <SelectItem value="Messer">Messer</SelectItem>
+                      <SelectItem value="Anden lokation">Anden lokation</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
