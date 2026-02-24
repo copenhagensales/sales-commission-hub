@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SupplierReportTab } from "@/components/billing/SupplierReportTab";
 import { DiscountRulesTab } from "@/components/billing/DiscountRulesTab";
+import { SupplierContactsTab } from "@/components/billing/SupplierContactsTab";
 
 function BillingOverviewTab() {
   const now = new Date();
@@ -340,6 +341,7 @@ export default function VagtBilling() {
             <TabsTrigger value="overview">Oversigt</TabsTrigger>
             <TabsTrigger value="supplier">Leverandørrapport</TabsTrigger>
             <TabsTrigger value="discounts">Rabataftaler</TabsTrigger>
+            <TabsTrigger value="contacts">Kontaktpersoner</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -352,6 +354,10 @@ export default function VagtBilling() {
 
           <TabsContent value="discounts">
             <DiscountRulesTab />
+          </TabsContent>
+
+          <TabsContent value="contacts">
+            <SupplierContactsTab />
           </TabsContent>
         </Tabs>
       </div>
