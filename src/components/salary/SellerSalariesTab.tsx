@@ -111,6 +111,7 @@ export function SellerSalariesTab() {
                   <div className="flex items-center justify-between">
                     <span className={`font-medium text-sm ${!seller.isActive ? "text-muted-foreground" : ""}`}>
                       {seller.name}
+                      {seller.isFreelanceConsultant && <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">Konsulent</Badge>}
                       {!seller.isActive && <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Inaktiv</Badge>}
                     </span>
                     <span className="text-xs text-muted-foreground">{seller.team}</span>
@@ -175,6 +176,7 @@ export function SellerSalariesTab() {
                   <TableRow key={seller.id}>
                     <TableCell className={`font-medium ${!seller.isActive ? "text-muted-foreground" : ""}`}>
                       {seller.name}
+                      {seller.isFreelanceConsultant && <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0">Konsulent</Badge>}
                       {!seller.isActive && <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">Inaktiv</Badge>}
                     </TableCell>
                     <TableCell>{seller.team}</TableCell>

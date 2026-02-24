@@ -17,6 +17,7 @@ interface SellerData {
   dailyBonus: number;
   referralBonus: number;
   isActive: boolean;
+  isFreelanceConsultant: boolean;
 }
 
 interface UseSellerSalariesCachedResult {
@@ -44,6 +45,7 @@ export function useSellerSalariesCached(
           first_name, 
           last_name,
           is_active,
+          is_freelance_consultant,
           vacation_type,
           referral_bonus,
           team_members!left(
@@ -263,6 +265,7 @@ export function useSellerSalariesCached(
         dailyBonus: dailyBonusMap[emp.id] || 0,
         referralBonus: emp.referral_bonus || 0,
         isActive: emp.is_active ?? true,
+        isFreelanceConsultant: emp.is_freelance_consultant ?? false,
       };
     });
 
