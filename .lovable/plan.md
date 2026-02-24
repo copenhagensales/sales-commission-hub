@@ -1,127 +1,82 @@
 
 
-# Plan: Leverandør-kontaktpersoner og "Send til leverandør"-funktion
+# Plan: Konsolidering af Lønsikring + Salg-prisregler inkl. straksbetaling
 
 ## Overblik
 
-Tilføj en ny fane **"Kontaktpersoner"** i Faktureringsrapport-siden, hvor I kan administrere kontaktpersoner for hver leverandørtype (f.eks. Ocean Outdoor, Danske Shoppingcentre). Når en rapport er godkendt i Leverandørrapport-fanen, vises automatisk en **"Send til [Leverandørnavn]"**-knap, som sender rapporten som en pæn HTML-email til kontaktpersonen.
+Denne plan samler alle ændringer for **Lønsikring** og **Salg**-produkterne, inklusiv straksbetaling.
 
 ---
 
-## Funktioner
+## Del 1: Lønsikring-konsolidering
 
-### 1. Ny database-tabel: `supplier_contacts`
+### Nuværende situation
+12 Lønsikring-produkter, kun 2 med data:
 
-Opretter en tabel til at gemme kontaktpersoner per leverandørtype:
+| Produkt | Items | Handling |
+|---------|-------|----------|
+| **Lønsikring** (`f9a8362f`) | 408 | Beholdes som eneste aktive |
+| Lønsikring Udvidet - 6000 (`fb4763a0`) | 16 | Items flyttes, deaktiveres |
+| 9 andre varianter (Super, Udvidet-16000, osv.) | 0 | Deaktiveres |
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| `id` | uuid | Primær nøgle |
-| `location_type` | text | Leverandørtype (f.eks. "Ocean Outdoor") |
-| `contact_name` | text | Kontaktpersonens navn |
-| `contact_email` | text | Email-adresse |
-| `contact_phone` | text (valgfri) | Telefonnummer |
-| `is_primary` | boolean | Om dette er den primære kontakt |
-| `is_active` | boolean | Aktiv/inaktiv |
-| `created_at` / `updated_at` | timestamp | Tidsstempler |
+### Trin
 
-Hver leverandørtype kan have flere kontaktpersoner, men kun den primære bruges til "Send rapport".
+**1. Flyt 16 sale_items** fra `fb4763a0` til hovedproduktet `f9a8362f`
 
-### 2. Ny fane: "Kontaktpersoner"
+**2. Nulstil alle ~424 items** (`mapped_commission = 0`, `mapped_revenue = 0`, `matched_pricing_rule_id = NULL`)
 
-En ny fane i Faktureringsrapport-siden med:
-- **Oversigt** over alle kontaktpersoner grupperet efter leverandørtype
-- **Tilføj kontaktperson** med navn, email, telefon, og leverandørtype
-- **Rediger/slet** eksisterende kontaktpersoner
-- **Marker som primær** kontakt per leverandørtype
-- Visuelt ikon der viser hvilke leverandørtyper der mangler en kontaktperson
+**3. Opret 2 prisregler** (uden straksbetaling):
 
-### 3. "Send til leverandør"-knap i Leverandørrapport-fanen
+| Regel | Betingelse | Provision | Omsætning | Straks |
+|-------|-----------|-----------|-----------|--------|
+| **Lønsikring Basis** (Lille) | Dækningssum 1–5999 | 200 kr | 400 kr | Nej |
+| **Lønsikring Udvidet** (Stor) | Dækningssum >= 6000 | 400 kr | 800 kr | Nej |
 
-Når en rapport er **godkendt**:
-- Knappen vises automatisk ved siden af "Godkendt"-badge og "Download PDF"
-- Tekst: **"Send til Ocean Outdoor"** (med leverandørnavnet)
-- Under knappen vises kontaktpersonens navn og email i lille tekst
-- Hvis der ikke er opsat en kontaktperson, vises en advarsel med link til Kontaktpersoner-fanen
+Begge med `use_rule_name_as_display = true`, `allows_immediate_payment = false`, prioritet 5.
 
-### 4. Ny Edge Function: `send-supplier-report`
+Dækningssum = 0 matcher ingen regel = 0 kr (korrekt).
 
-Sender rapporten som en professionel HTML-email via M365 Graph API (samme mønster som eksisterende email-funktioner i projektet):
-- Modtager: kontaktpersonens email
-- Emne: "Faktureringsrapport - [Leverandørtype] - [Måned År]"
-- Indhold: HTML-tabel med alle lokationer, dage, beløb, rabatter, og totaler
-- Logger afsendelsen i `supplier_invoice_reports` tabellen (ny kolonne `sent_at` og `sent_to_email`)
+**4. Deaktiver 9 ubrugte produkter** (alle undtagen hovedproduktet og de 3 separate Fagforening-produkter)
 
-### 5. Statussporing
-
-Tilføj kolonner til `supplier_invoice_reports`:
-- `sent_at` (timestamp) - hvornår rapporten blev sendt
-- `sent_to_email` (text) - hvem den blev sendt til
-- `sent_by` (uuid) - hvem der sendte den
-
-Efter afsendelse vises: "Sendt til [navn] ([email]) d. [dato]" i stedet for knappen.
+**5. Kør rematch** for produkt `f9a8362f`
 
 ---
 
-## Ekstra ideer
+## Del 2: Salg-prisregler med straksbetaling
 
-- **Bekræftelsesdialog** inden afsendelse: "Er du sikker på at du vil sende rapporten til [navn] ([email])?" - forhindrer fejl
-- **Genvejen "Send igen"**: Mulighed for at sende rapporten igen, hvis kontaktpersonen f.eks. ikke har modtaget den
-- **CC-felt**: Mulighed for at tilføje ekstra modtagere ved afsendelse
-- **Historik**: En log over alle sendte rapporter med dato, modtager og status
+### Nuværende regler på "Salg" (`1ad52862`)
+
+4 aktive regler allerede konfigureret:
+
+| # | Navn | Prio | Betingelser | Provision | Omsætning | Straks? | Straks-prov. | Straks-oms. |
+|---|------|------|-------------|-----------|-----------|---------|-------------|-------------|
+| 1 | Ung Under Udannelse med FF | 10 | Forening=Ase Lønmodtager + A-kasse type=Ung under uddannelse | 600 kr | 1500 kr | Nej | - | - |
+| 2 | Ung under udannelse uden FF | 5 | A-kasse type=Ung under uddannelse | 300 kr | 1000 kr | Nej | - | - |
+| 3 | A-kasse uden straksbetaling | 2 | A-kasse salg=Ja + A-kasse type=Lønmodtager | 400 kr | 1500 kr | **Ja** | **1000 kr** | **2100 kr** |
+| 4 | Akasse salg uden straks - selvstændig | 1 | A-kasse salg=Ja + A-kasse type=Selvstændig | 400 kr | 1500 kr | **Ja** | **1000 kr** | **2100 kr** |
+
+Regel 3 og 4 har `allows_immediate_payment = true` med straksprovision 1000 kr / 2100 kr omsætning.
+
+### Handling
+
+Reglerne ser korrekte ud. Hvis beløbene stemmer, kører vi blot **rematch for Salg** (`1ad52862`) for at sikre alle 1.255+ sale_items har korrekt provision.
+
+Fortæl mig hvis nogen beløb skal justeres.
 
 ---
 
-## Tekniske detaljer
-
-### Database-migrering
-
-```sql
--- 1. Ny tabel: supplier_contacts
-CREATE TABLE supplier_contacts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  location_type TEXT NOT NULL,
-  contact_name TEXT NOT NULL,
-  contact_email TEXT NOT NULL,
-  contact_phone TEXT,
-  is_primary BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 2. Nye kolonner på supplier_invoice_reports
-ALTER TABLE supplier_invoice_reports 
-  ADD COLUMN sent_at TIMESTAMPTZ,
-  ADD COLUMN sent_to_email TEXT,
-  ADD COLUMN sent_by UUID;
-
--- 3. RLS policies
-```
-
-### Nye filer
-
-| Fil | Beskrivelse |
-|-----|-------------|
-| `src/components/billing/SupplierContactsTab.tsx` | Ny fane-komponent med CRUD for kontaktpersoner |
-| `supabase/functions/send-supplier-report/index.ts` | Edge function der sender rapporten via M365 |
-
-### Ændrede filer
-
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/vagt-flow/Billing.tsx` | Tilføj ny "Kontaktpersoner"-fane |
-| `src/components/billing/SupplierReportTab.tsx` | Tilføj "Send til leverandør"-knap efter godkendelse |
-
-### Flow
+## Samlet rækkefølge
 
 ```text
-1. Bruger opretter kontaktperson for "Ocean Outdoor" i Kontaktpersoner-fanen
-2. Bruger genererer rapport i Leverandørrapport-fanen for "Ocean Outdoor"
-3. Bruger godkender rapporten → "Send til Ocean Outdoor"-knap vises
-4. Bruger klikker "Send til Ocean Outdoor"
-5. Bekræftelsesdialog: "Send rapport til Anders Jensen (anders@ocean.dk)?"
-6. Edge function sender HTML-email via M365
-7. Status opdateres: "Sendt til Anders Jensen d. 24/02/2026 kl. 13:45"
+1. Flyt 16 Lønsikring-items til hovedproduktet
+2. Nulstil alle ~424 Lønsikring-items
+3. Opret 2 Lønsikring-prisregler (Basis + Udvidet, uden straks)
+4. Deaktiver 9 ubrugte Lønsikring-produkter
+5. Kør rematch for Lønsikring (f9a8362f)
+6. Kør rematch for Salg (1ad52862) - verificerer straksreglerne
 ```
+
+## Ingen kodeændringer
+
+Alt er ren datakonfiguration via database-operationer og rematch-kald.
 
