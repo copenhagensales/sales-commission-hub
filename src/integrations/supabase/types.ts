@@ -6089,6 +6089,45 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_period_snapshots: {
+        Row: {
+          formatted_value: string | null
+          id: string
+          kpi_slug: string
+          period_end: string
+          period_key: string
+          period_start: string
+          scope_id: string | null
+          scope_type: string
+          snapshotted_at: string
+          value: number
+        }
+        Insert: {
+          formatted_value?: string | null
+          id?: string
+          kpi_slug: string
+          period_end: string
+          period_key: string
+          period_start: string
+          scope_id?: string | null
+          scope_type: string
+          snapshotted_at?: string
+          value?: number
+        }
+        Update: {
+          formatted_value?: string | null
+          id?: string
+          kpi_slug?: string
+          period_end?: string
+          period_key?: string
+          period_start?: string
+          scope_id?: string | null
+          scope_type?: string
+          snapshotted_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       kpi_reconcile_schedule: {
         Row: {
           cadence: string
