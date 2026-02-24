@@ -62,7 +62,12 @@ export function LiveCronStatus({ integrations }: LiveCronStatusProps) {
       job.jobname?.includes("adversus-sync")
   );
 
-  const hasIssues = unexpectedJobs.length > 0 || legacyJobs.length > 0;
+  // CRITICAL: Detect duplicate sync architecture (both provider-* AND dialer-* active)
+  const activeProviderJobs = integrationJobs.filter((job) => job.jobname?.startsWith("provider-"));
+  const activeDialerJobs = integrationJobs.filter((job) => job.jobname?.startsWith("dialer-"));
+  const hasDuplicateSyncArchitecture = activeProviderJobs.length > 0 && activeDialerJobs.length > 0;
+
+  const hasIssues = unexpectedJobs.length > 0 || legacyJobs.length > 0 || hasDuplicateSyncArchitecture;
 
   return (
     <Card>
@@ -93,6 +98,20 @@ export function LiveCronStatus({ integrations }: LiveCronStatusProps) {
           </p>
         ) : (
           <div className="space-y-4">
+            {hasDuplicateSyncArchitecture && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <p className="text-sm font-medium text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  KRITISK: Dobbelt sync-arkitektur aktiv
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Både provider-jobs ({activeProviderJobs.map(j => j.jobname).join(", ")}) og 
+                  dialer-jobs ({activeDialerJobs.length} stk) kører samtidigt. 
+                  Dette forårsager dobbelte API-kald og 429-fejl. Deaktivér én strategi.
+                </p>
+              </div>
+            )}
+
             {legacyJobs.length > 0 && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
                 <p className="text-sm font-medium text-destructive flex items-center gap-1">

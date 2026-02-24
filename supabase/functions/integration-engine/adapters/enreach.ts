@@ -174,9 +174,15 @@ export class EnreachAdapter implements DialerAdapter {
     return String(val);
   }
 
+  private addJitter(delayMs: number): number {
+    const jitterFactor = 0.3; // ±30%
+    const randomOffset = (Math.random() * 2 - 1) * jitterFactor;
+    return Math.max(500, Math.round(delayMs * (1 + randomOffset)));
+  }
+
   private async get(endpoint: string): Promise<unknown> {
     const url = `${this.baseUrl}${endpoint}`;
-    const maxRetries = 3;
+    const maxRetries = 5;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       this._metrics.apiCalls++;
@@ -187,8 +193,14 @@ export class EnreachAdapter implements DialerAdapter {
         this._metrics.rateLimitHits++;
         if (attempt < maxRetries) {
           this._metrics.retries++;
-          const retryAfter = parseInt(response.headers.get("Retry-After") || "5", 10);
-          const delay = Math.min(retryAfter * 1000, 30000);
+          const retryAfterHeader = response.headers.get("Retry-After");
+          const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
+          // Exponential backoff: 5s, 10s, 20s, 40s, 80s with jitter
+          const exponentialDelay = 5000 * Math.pow(2, attempt);
+          const baseDelay = !isNaN(retryAfterSec) && retryAfterSec > 0 
+            ? retryAfterSec * 1000 
+            : exponentialDelay;
+          const delay = this.addJitter(Math.min(baseDelay, 60000));
           console.warn(`[EnreachAdapter] 429 Rate limited on ${endpoint}. Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
           await new Promise(r => setTimeout(r, delay));
           continue;
