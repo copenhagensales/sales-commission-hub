@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { FileText, Check, Percent, MapPin } from "lucide-react";
+import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp } from "lucide-react";
 import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import {
@@ -25,6 +25,26 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
+interface DiscountRule {
+  id: string;
+  location_type: string;
+  min_placements: number;
+  discount_percent: number;
+  description: string | null;
+  is_active: boolean;
+  discount_type: string;
+  min_revenue: number | null;
+}
+
+interface LocationException {
+  id: string;
+  location_type: string;
+  location_name: string;
+  exception_type: string;
+  max_discount_percent: number | null;
+  is_active: boolean;
+}
+
 export function SupplierReportTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
@@ -33,6 +53,7 @@ export function SupplierReportTab() {
 
   const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
   const monthEnd = endOfMonth(monthStart);
+  const yearStart = new Date(monthStart.getFullYear(), 0, 1);
 
   // Generate month options
   const monthOptions = [];
@@ -74,7 +95,26 @@ export function SupplierReportTab() {
         .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
-      // Filter by location type client-side
+      return data.filter((b: any) => b.location?.type === selectedLocationType);
+    },
+    enabled: !!selectedLocationType,
+  });
+
+  // Fetch YTD bookings for annual_revenue calculation
+  const { data: ytdBookings } = useQuery({
+    queryKey: ["supplier-ytd-bookings", selectedMonth, selectedLocationType],
+    queryFn: async () => {
+      if (!selectedLocationType) return [];
+      const { data, error } = await supabase
+        .from("booking")
+        .select(`
+          *,
+          location(id, name, address_city, daily_rate, type)
+        `)
+        .gte("start_date", format(yearStart, "yyyy-MM-dd"))
+        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
+        .order("start_date");
+      if (error) throw error;
       return data.filter((b: any) => b.location?.type === selectedLocationType);
     },
     enabled: !!selectedLocationType,
@@ -92,7 +132,23 @@ export function SupplierReportTab() {
         .eq("is_active", true)
         .order("min_placements", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as DiscountRule[];
+    },
+    enabled: !!selectedLocationType,
+  });
+
+  // Fetch location exceptions
+  const { data: locationExceptions } = useQuery({
+    queryKey: ["supplier-location-exceptions", selectedLocationType],
+    queryFn: async () => {
+      if (!selectedLocationType) return [];
+      const { data, error } = await supabase
+        .from("supplier_location_exceptions")
+        .select("*")
+        .eq("location_type", selectedLocationType)
+        .eq("is_active", true);
+      if (error) throw error;
+      return data as LocationException[];
     },
     enabled: !!selectedLocationType,
   });
@@ -115,22 +171,30 @@ export function SupplierReportTab() {
     enabled: !!selectedLocationType,
   });
 
-  // Group bookings by location
+  // Determine discount type
+  const discountType = discountRules?.[0]?.discount_type || "placements";
+
+  // Helper to calculate booking total
+  const calcBookingTotal = (booking: any) => {
+    if (booking.total_price != null) {
+      const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      return { total: booking.total_price, days, dailyRate: days > 0 ? booking.total_price / days : booking.total_price, usesTotalPrice: true };
+    }
+    const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
+    const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+    return { total: dailyRate * days, days, dailyRate, usesTotalPrice: false };
+  };
+
+  // Build exception lookup
+  const exceptionMap = new Map<string, LocationException>();
+  locationExceptions?.forEach((exc) => {
+    exceptionMap.set(exc.location_name.toLowerCase(), exc);
+  });
+
+  // Group bookings by location (current month)
   const bookingsByLocation = bookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    let bookingTotal: number;
-    let dailyRate: number;
-    let days: number;
-
-    if (booking.total_price != null) {
-      bookingTotal = booking.total_price;
-      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
-      dailyRate = days > 0 ? bookingTotal / days : bookingTotal;
-    } else {
-      dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
-      bookingTotal = dailyRate * days;
-    }
+    const { total, days, dailyRate, usesTotalPrice } = calcBookingTotal(booking);
 
     if (!acc[locationId]) {
       acc[locationId] = {
@@ -140,7 +204,7 @@ export function SupplierReportTab() {
         totalDays: 0,
         totalAmount: 0,
         dailyRate,
-        usesTotalPrice: booking.total_price != null,
+        usesTotalPrice,
         minDate: booking.start_date,
         maxDate: booking.end_date,
       };
@@ -148,7 +212,7 @@ export function SupplierReportTab() {
 
     acc[locationId].bookings.push(booking);
     acc[locationId].totalDays += days;
-    acc[locationId].totalAmount += bookingTotal;
+    acc[locationId].totalAmount += total;
 
     if (booking.start_date < acc[locationId].minDate) acc[locationId].minDate = booking.start_date;
     if (booking.end_date > acc[locationId].maxDate) acc[locationId].maxDate = booking.end_date;
@@ -158,73 +222,129 @@ export function SupplierReportTab() {
 
   const locationEntries = Object.values(bookingsByLocation) as any[];
   const uniqueLocations = locationEntries.length;
-  const totalAmount = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
 
-  // Calculate discount
+  // Calculate YTD revenue (for annual_revenue type)
+  const ytdRevenue = ytdBookings?.reduce((sum, booking: any) => {
+    const { total } = calcBookingTotal(booking);
+    // Exclude excluded locations from YTD
+    const locName = booking.location?.name?.toLowerCase() || "";
+    const exc = exceptionMap.get(locName);
+    if (exc?.exception_type === "excluded") return sum;
+    return sum + total;
+  }, 0) || 0;
+
+  // Calculate total for current month (non-excluded)
+  const totalAmountNonExcluded = locationEntries.reduce((sum, loc) => {
+    const locName = loc.location?.name?.toLowerCase() || "";
+    const exc = exceptionMap.get(locName);
+    if (exc?.exception_type === "excluded") return sum;
+    return sum + loc.totalAmount;
+  }, 0);
+
+  const totalAmountAll = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
+
+  // Calculate discount based on type
   let appliedDiscount = 0;
-  let appliedRule: any = null;
+  let appliedRule: DiscountRule | null = null;
+
   if (discountRules && discountRules.length > 0) {
-    // Rules are sorted desc by min_placements, find highest applicable
-    for (const rule of discountRules) {
-      if (uniqueLocations >= rule.min_placements) {
-        appliedDiscount = Number(rule.discount_percent);
-        appliedRule = rule;
-        break;
+    if (discountType === "annual_revenue") {
+      // Sort by min_revenue desc for staircase lookup
+      const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+      for (const rule of sortedRules) {
+        if (ytdRevenue >= (rule.min_revenue ?? 0)) {
+          appliedDiscount = Number(rule.discount_percent);
+          appliedRule = rule;
+          break;
+        }
+      }
+    } else {
+      // Placement-based (existing logic)
+      for (const rule of discountRules) {
+        if (uniqueLocations >= rule.min_placements) {
+          appliedDiscount = Number(rule.discount_percent);
+          appliedRule = rule;
+          break;
+        }
       }
     }
   }
-  const discountAmount = totalAmount * (appliedDiscount / 100);
-  const finalAmount = totalAmount - discountAmount;
+
+  // Calculate per-location discounts respecting exceptions
+  let totalDiscountAmount = 0;
+  const locationDiscounts = locationEntries.map((loc: any) => {
+    const locName = loc.location?.name?.toLowerCase() || "";
+    const exc = exceptionMap.get(locName);
+
+    if (exc?.exception_type === "excluded") {
+      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount, isExcluded: true, maxDiscount: null };
+    }
+
+    let effectiveDiscount = appliedDiscount;
+    if (exc?.exception_type === "max_discount" && exc.max_discount_percent != null) {
+      effectiveDiscount = Math.min(appliedDiscount, Number(exc.max_discount_percent));
+    }
+
+    const discountAmount = loc.totalAmount * (effectiveDiscount / 100);
+    totalDiscountAmount += discountAmount;
+
+    return {
+      ...loc,
+      discount: effectiveDiscount,
+      discountAmount,
+      finalAmount: loc.totalAmount - discountAmount,
+      isExcluded: false,
+      maxDiscount: exc?.max_discount_percent ?? null,
+    };
+  });
+
+  const finalAmount = totalAmountAll - totalDiscountAmount;
 
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async () => {
-      const reportData = locationEntries.map((loc) => ({
+      const reportData = locationDiscounts.map((loc) => ({
         locationName: loc.location?.name,
         city: loc.location?.address_city,
         client: loc.client?.name,
         days: loc.totalDays,
         dailyRate: loc.dailyRate,
         amount: loc.totalAmount,
+        discount: loc.discount,
+        discountAmount: loc.discountAmount,
+        finalAmount: loc.finalAmount,
+        isExcluded: loc.isExcluded,
         minDate: loc.minDate,
         maxDate: loc.maxDate,
       }));
 
       const { data: userData } = await supabase.auth.getUser();
 
+      const payload = {
+        location_type: selectedLocationType,
+        period_start: format(monthStart, "yyyy-MM-dd"),
+        period_end: format(monthEnd, "yyyy-MM-dd"),
+        total_amount: totalAmountAll,
+        discount_percent: appliedDiscount,
+        discount_amount: totalDiscountAmount,
+        final_amount: finalAmount,
+        unique_locations: uniqueLocations,
+        status: "approved",
+        approved_by: userData.user?.id,
+        approved_at: new Date().toISOString(),
+        report_data: reportData,
+      };
+
       if (existingReport) {
         const { error } = await supabase
           .from("supplier_invoice_reports")
-          .update({
-            total_amount: totalAmount,
-            discount_percent: appliedDiscount,
-            discount_amount: discountAmount,
-            final_amount: finalAmount,
-            unique_locations: uniqueLocations,
-            status: "approved",
-            approved_by: userData.user?.id,
-            approved_at: new Date().toISOString(),
-            report_data: reportData,
-          })
+          .update(payload)
           .eq("id", existingReport.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("supplier_invoice_reports")
-          .insert({
-            location_type: selectedLocationType,
-            period_start: format(monthStart, "yyyy-MM-dd"),
-            period_end: format(monthEnd, "yyyy-MM-dd"),
-            total_amount: totalAmount,
-            discount_percent: appliedDiscount,
-            discount_amount: discountAmount,
-            final_amount: finalAmount,
-            unique_locations: uniqueLocations,
-            status: "approved",
-            approved_by: userData.user?.id,
-            approved_at: new Date().toISOString(),
-            report_data: reportData,
-          });
+          .insert(payload);
         if (error) throw error;
       }
     },
@@ -242,6 +362,11 @@ export function SupplierReportTab() {
   const formatDateRange = (minDate: string, maxDate: string) => {
     return `${format(new Date(minDate), "dd/MM")} - ${format(new Date(maxDate), "dd/MM")}`;
   };
+
+  // Build staircase visualization for annual_revenue
+  const staircaseSteps = discountType === "annual_revenue" && discountRules
+    ? [...discountRules].sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -314,12 +439,28 @@ export function SupplierReportTab() {
                     <TableHead className="text-right">Dage</TableHead>
                     <TableHead className="text-right">Dagspris</TableHead>
                     <TableHead className="text-right">Beløb</TableHead>
+                    {discountType === "annual_revenue" && (
+                      <>
+                        <TableHead className="text-right">Rabat</TableHead>
+                        <TableHead className="text-right">Efter rabat</TableHead>
+                      </>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {locationEntries.map((loc: any) => (
-                    <TableRow key={loc.location?.id}>
-                      <TableCell className="font-medium">{loc.location?.name}</TableCell>
+                  {locationDiscounts.map((loc: any) => (
+                    <TableRow key={loc.location?.id} className={loc.isExcluded ? "opacity-60" : ""}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {loc.location?.name}
+                          {loc.isExcluded && (
+                            <Badge variant="destructive" className="text-xs">Udelukket</Badge>
+                          )}
+                          {loc.maxDiscount != null && !loc.isExcluded && (
+                            <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{loc.location?.address_city || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{loc.client?.name || "Ukendt"}</Badge>
@@ -336,6 +477,20 @@ export function SupplierReportTab() {
                       <TableCell className="text-right font-semibold">
                         {loc.totalAmount.toLocaleString("da-DK")} kr
                       </TableCell>
+                      {discountType === "annual_revenue" && (
+                        <>
+                          <TableCell className="text-right">
+                            {loc.isExcluded ? (
+                              <span className="text-xs text-muted-foreground italic">Separat</span>
+                            ) : (
+                              <span className="text-green-600">-{loc.discount}%</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {loc.isExcluded ? "-" : `${loc.finalAmount.toLocaleString("da-DK")} kr`}
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -345,8 +500,18 @@ export function SupplierReportTab() {
                       Subtotal
                     </TableCell>
                     <TableCell className="text-right font-bold">
-                      {totalAmount.toLocaleString("da-DK")} kr
+                      {totalAmountAll.toLocaleString("da-DK")} kr
                     </TableCell>
+                    {discountType === "annual_revenue" && (
+                      <>
+                        <TableCell className="text-right font-bold text-green-600">
+                          -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {finalAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -360,31 +525,118 @@ export function SupplierReportTab() {
                 <Percent className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Rabatberegning</h2>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Unikke placeringer</p>
-                  <p className="text-2xl font-bold">{uniqueLocations}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Rabattrin</p>
-                  <p className="text-2xl font-bold">
-                    {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
-                  </p>
-                  {appliedRule && (
-                    <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+
+              {discountType === "annual_revenue" ? (
+                <div className="space-y-4">
+                  {/* Annual revenue overview */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Kumulativ årsomsætning</p>
+                      <p className="text-2xl font-bold">{ytdRevenue.toLocaleString("da-DK")} kr</p>
+                      <p className="text-xs text-muted-foreground">Jan - {format(monthEnd, "MMM yyyy", { locale: da })}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nuværende rabattrin</p>
+                      <p className="text-2xl font-bold">
+                        {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
+                      </p>
+                      {appliedRule && (
+                        <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Samlet rabat (denne md)</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total efter rabat</p>
+                      <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
+                    </div>
+                  </div>
+
+                  {/* Staircase visualization */}
+                  {staircaseSteps.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">Rabattrappe {monthStart.getFullYear()}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {staircaseSteps.map((step, i) => {
+                          const isActive = ytdRevenue >= (step.min_revenue ?? 0);
+                          const isCurrent = step.id === appliedRule?.id;
+                          return (
+                            <div
+                              key={step.id}
+                              className={`flex-1 rounded-md p-2 text-center text-xs border transition-colors ${
+                                isCurrent
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : isActive
+                                  ? "bg-primary/20 border-primary/30"
+                                  : "bg-muted border-border"
+                              }`}
+                            >
+                              <div className="font-bold">{step.discount_percent}%</div>
+                              <div className="truncate">
+                                {(step.min_revenue ?? 0).toLocaleString("da-DK")} kr
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Exceptions info */}
+                  {locationExceptions && locationExceptions.length > 0 && (
+                    <div className="mt-4 p-3 bg-muted rounded-md">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">Undtagelser</p>
+                      </div>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {locationExceptions.map((exc) => (
+                          <li key={exc.id}>
+                            <span className="font-medium">{exc.location_name}</span>:{" "}
+                            {exc.exception_type === "excluded"
+                              ? "Pris aftales separat"
+                              : `Max ${exc.max_discount_percent}% rabat`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Rabatbeløb</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    -{discountAmount.toLocaleString("da-DK")} kr
-                  </p>
+              ) : (
+                /* Placement-based discount (original) */
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Unikke placeringer</p>
+                    <p className="text-2xl font-bold">{uniqueLocations}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rabattrin</p>
+                    <p className="text-2xl font-bold">
+                      {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
+                    </p>
+                    {appliedRule && (
+                      <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rabatbeløb</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total efter rabat</p>
+                    <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total efter rabat</p>
-                  <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

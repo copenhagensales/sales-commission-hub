@@ -8489,30 +8489,36 @@ export type Database = {
           created_at: string
           description: string | null
           discount_percent: number
+          discount_type: string
           id: string
           is_active: boolean
           location_type: string
           min_placements: number
+          min_revenue: number | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           description?: string | null
           discount_percent: number
+          discount_type?: string
           id?: string
           is_active?: boolean
           location_type: string
           min_placements: number
+          min_revenue?: number | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           description?: string | null
           discount_percent?: number
+          discount_type?: string
           id?: string
           is_active?: boolean
           location_type?: string
           min_placements?: number
+          min_revenue?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -8565,6 +8571,39 @@ export type Database = {
           status?: string
           total_amount?: number
           unique_locations?: number
+        }
+        Relationships: []
+      }
+      supplier_location_exceptions: {
+        Row: {
+          created_at: string
+          exception_type: string
+          id: string
+          is_active: boolean
+          location_name: string
+          location_type: string
+          max_discount_percent: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exception_type?: string
+          id?: string
+          is_active?: boolean
+          location_name: string
+          location_type: string
+          max_discount_percent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exception_type?: string
+          id?: string
+          is_active?: boolean
+          location_name?: string
+          location_type?: string
+          max_discount_percent?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
