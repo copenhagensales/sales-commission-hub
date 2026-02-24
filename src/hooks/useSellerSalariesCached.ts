@@ -11,6 +11,10 @@ interface SellerData {
   cancellations: number;
   vacationType: "vacation_pay" | "vacation_bonus" | null;
   vacationPay: number;
+  diet: number;
+  sickDays: number;
+  dailyBonus: number;
+  referralBonus: number;
 }
 
 interface UseSellerSalariesCachedResult {
@@ -19,14 +23,15 @@ interface UseSellerSalariesCachedResult {
   lastUpdated: Date | null;
 }
 
-/**
- * Hook to fetch seller salaries using the pre-computed KPI cache.
- * This replaces the heavy on-the-fly database queries with simple cache lookups.
- * 
- * Uses kpi_cached_values with scope_type='employee' and period_type='payroll_period'
- */
-export function useSellerSalariesCached(selectedTeam?: string | null): UseSellerSalariesCachedResult {
-  // Query 1: Get all active non-staff employees with team info and vacation_type
+export function useSellerSalariesCached(
+  selectedTeam?: string | null,
+  periodStart?: Date | null,
+  periodEnd?: Date | null
+): UseSellerSalariesCachedResult {
+  const periodStartISO = periodStart ? periodStart.toISOString().split("T")[0] : null;
+  const periodEndISO = periodEnd ? periodEnd.toISOString().split("T")[0] : null;
+
+  // Query 1: Get all active non-staff employees with team info, vacation_type, and referral_bonus
   const { data: employees, isLoading: employeesLoading } = useQuery({
     queryKey: ["seller-employees-cached"],
     queryFn: async () => {
@@ -37,6 +42,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
           first_name, 
           last_name,
           vacation_type,
+          referral_bonus,
           team_members!left(
             team_id,
             teams!left(id, name)
@@ -48,7 +54,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       if (error) throw error;
       return data || [];
     },
-    staleTime: 60000, // 1 minute - matches KPI cache refresh
+    staleTime: 60000,
   });
 
   // Query 2: Get cached KPI values for all employees (payroll_period)
@@ -65,8 +71,8 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       if (error) throw error;
       return data || [];
     },
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // Refetch every minute
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   // Query 3: Get Feriepenge salary type rates
@@ -82,7 +88,63 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       if (error) throw error;
       return data || [];
     },
-    staleTime: 300000, // 5 minutes - rates change rarely
+    staleTime: 300000,
+  });
+
+  // Query 4: Diet (booking_diet) for the period
+  const { data: dietData, isLoading: dietLoading } = useQuery({
+    queryKey: ["seller-diet", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("employee_id, amount")
+        .gte("date", periodStartISO)
+        .lte("date", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
+  // Query 5: Sick days (absence_request_v2) for the period
+  const { data: sickData, isLoading: sickLoading } = useQuery({
+    queryKey: ["seller-sick-days", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .select("employee_id, start_date, end_date")
+        .eq("status", "approved")
+        .eq("type", "sick")
+        .gte("start_date", periodStartISO)
+        .lte("start_date", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
+  // Query 6: Daily bonus payouts for the period
+  const { data: dailyBonusData, isLoading: dailyBonusLoading } = useQuery({
+    queryKey: ["seller-daily-bonus", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await supabase
+        .from("daily_bonus_payouts")
+        .select("employee_id, amount")
+        .gte("date", periodStartISO)
+        .lte("date", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
   });
 
   // Helper to find the correct vacation pay rate based on vacation type
@@ -108,28 +170,42 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build a map of employee_id -> { commission }
+    // Build KPI map
     const kpiMap: Record<string, { commission: number }> = {};
     let latestCalculatedAt: Date | null = null;
 
     for (const kpi of cachedKpis || []) {
       if (!kpi.scope_id) continue;
-      
       if (!kpiMap[kpi.scope_id]) {
         kpiMap[kpi.scope_id] = { commission: 0 };
       }
-
       if (kpi.kpi_slug === "total_commission") {
         kpiMap[kpi.scope_id].commission = kpi.value || 0;
       }
-
-      // Track the latest calculated_at timestamp
       if (kpi.calculated_at) {
         const calcDate = new Date(kpi.calculated_at);
         if (!latestCalculatedAt || calcDate > latestCalculatedAt) {
           latestCalculatedAt = calcDate;
         }
       }
+    }
+
+    // Build diet map: employee_id -> total amount
+    const dietMap: Record<string, number> = {};
+    for (const d of dietData || []) {
+      dietMap[d.employee_id] = (dietMap[d.employee_id] || 0) + (d.amount || 0);
+    }
+
+    // Build sick days map: employee_id -> count of sick entries
+    const sickMap: Record<string, number> = {};
+    for (const s of sickData || []) {
+      sickMap[s.employee_id] = (sickMap[s.employee_id] || 0) + 1;
+    }
+
+    // Build daily bonus map: employee_id -> total amount
+    const dailyBonusMap: Record<string, number> = {};
+    for (const db of dailyBonusData || []) {
+      dailyBonusMap[db.employee_id] = (dailyBonusMap[db.employee_id] || 0) + (db.amount || 0);
     }
 
     // Filter by team if needed
@@ -140,7 +216,7 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
       );
     }
 
-    // Map employees to seller data with cached KPIs
+    // Map employees to seller data
     const sellers: SellerData[] = filteredEmployees.map((emp: any) => {
       const teamMember = emp.team_members?.[0];
       const teamData = teamMember?.teams;
@@ -155,21 +231,24 @@ export function useSellerSalariesCached(selectedTeam?: string | null): UseSeller
         team: teamData?.name || "Ikke tildelt",
         teamId: teamMember?.team_id || null,
         commission: kpis.commission,
-        cancellations: 0, // TODO: Implement when cancellation data is available
+        cancellations: 0,
         vacationType,
         vacationPay,
+        diet: dietMap[emp.id] || 0,
+        sickDays: sickMap[emp.id] || 0,
+        dailyBonus: dailyBonusMap[emp.id] || 0,
+        referralBonus: emp.referral_bonus || 0,
       };
     });
 
-    // Sort by commission descending
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: latestCalculatedAt };
-  }, [employees, cachedKpis, selectedTeam, salaryTypes]);
+  }, [employees, cachedKpis, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || kpisLoading || salaryTypesLoading,
+    isLoading: employeesLoading || kpisLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading,
     lastUpdated,
   };
 }
