@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/calculations";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, RefreshCw } from "lucide-react";
+import { Search, Users, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -15,10 +15,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/utils/payrollPeriod";
 
+type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "referralBonus";
+type SortDir = "asc" | "desc";
+
 export function SellerSalariesTab() {
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("commission");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   
   const [periodStart, setPeriodStart] = useState<Date>(() => getPayrollPeriod().start);
   const [periodEnd, setPeriodEnd] = useState<Date>(() => getPayrollPeriod().end);
@@ -26,6 +31,17 @@ export function SellerSalariesTab() {
   const handlePeriodChange = useCallback((start: Date, end: Date) => {
     setPeriodStart(start);
     setPeriodEnd(end);
+  }, []);
+
+  const handleSort = useCallback((key: SortKey) => {
+    setSortKey(prev => {
+      if (prev === key) {
+        setSortDir(d => d === "asc" ? "desc" : "asc");
+        return key;
+      }
+      setSortDir(key === "name" || key === "team" ? "asc" : "desc");
+      return key;
+    });
   }, []);
 
   const { sellerData, isLoading, lastUpdated } = useSellerSalariesCached(selectedTeam, periodStart, periodEnd);
@@ -42,9 +58,21 @@ export function SellerSalariesTab() {
     },
   });
 
-  const filteredData = sellerData?.filter(seller =>
-    seller.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredData = useMemo(() => {
+    const filtered = sellerData?.filter(seller =>
+      seller.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
+
+    return [...filtered].sort((a, b) => {
+      const valA = a[sortKey];
+      const valB = b[sortKey];
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (typeof valA === "string" && typeof valB === "string") {
+        return valA.localeCompare(valB, "da") * dir;
+      }
+      return ((valA as number) - (valB as number)) * dir;
+    });
+  }, [sellerData, searchQuery, sortKey, sortDir]);
 
   const totalCommission = filteredData.reduce((sum, s) => sum + s.commission, 0);
   const totalCancellations = filteredData.reduce((sum, s) => sum + s.cancellations, 0);
@@ -53,6 +81,23 @@ export function SellerSalariesTab() {
   const totalSickDays = filteredData.reduce((sum, s) => sum + s.sickDays, 0);
   const totalDailyBonus = filteredData.reduce((sum, s) => sum + s.dailyBonus, 0);
   const totalReferralBonus = filteredData.reduce((sum, s) => sum + s.referralBonus, 0);
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const SortableHead = ({ col, children, className }: { col: SortKey; children: React.ReactNode; className?: string }) => (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-foreground transition-colors ${className || ""}`}
+      onClick={() => handleSort(col)}
+    >
+      <span className="inline-flex items-center">
+        {children}
+        <SortIcon col={col} />
+      </span>
+    </TableHead>
+  );
 
   return (
     <Card>
@@ -160,15 +205,15 @@ export function SellerSalariesTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Navn</TableHead>
-                  <TableHead>Team</TableHead>
-                  <TableHead className="text-right">Provision</TableHead>
-                  <TableHead className="text-right">Annulleringer</TableHead>
-                  <TableHead className="text-right">Feriepenge</TableHead>
-                  <TableHead className="text-right">Diet</TableHead>
-                  <TableHead className="text-right">Sygdom</TableHead>
-                  <TableHead className="text-right">Dagsbonus</TableHead>
-                  <TableHead className="text-right">Henvisning</TableHead>
+                  <SortableHead col="name">Navn</SortableHead>
+                  <SortableHead col="team">Team</SortableHead>
+                  <SortableHead col="commission" className="text-right">Provision</SortableHead>
+                  <SortableHead col="cancellations" className="text-right">Annulleringer</SortableHead>
+                  <SortableHead col="vacationPay" className="text-right">Feriepenge</SortableHead>
+                  <SortableHead col="diet" className="text-right">Diet</SortableHead>
+                  <SortableHead col="sickDays" className="text-right">Sygdom</SortableHead>
+                  <SortableHead col="dailyBonus" className="text-right">Dagsbonus</SortableHead>
+                  <SortableHead col="referralBonus" className="text-right">Henvisning</SortableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
