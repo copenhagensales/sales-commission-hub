@@ -1,4 +1,12 @@
 import { useState, useMemo } from "react";
+
+// Allow bookings up to 2 months in the past
+const TWO_MONTHS_BACK = (() => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 2);
+  d.setHours(0, 0, 0, 0);
+  return d;
+})();
 import { getWeekStartDate, getWeekYear, getWeekNumber } from "@/lib/vagt-flow-date-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -574,7 +582,7 @@ export default function BookWeekContent() {
                             setMarketEndDate(date);
                           }
                         }}
-                        disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                        disabled={(date) => isBefore(date, TWO_MONTHS_BACK)}
                         initialFocus
                         className="pointer-events-auto"
                         locale={da}
@@ -604,7 +612,7 @@ export default function BookWeekContent() {
                         selected={marketEndDate}
                         onSelect={setMarketEndDate}
                         disabled={(date) => 
-                          isBefore(date, startOfDay(new Date())) || 
+                          isBefore(date, TWO_MONTHS_BACK) || 
                           (marketStartDate ? isBefore(date, marketStartDate) : false)
                         }
                         initialFocus
