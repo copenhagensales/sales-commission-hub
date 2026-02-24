@@ -112,8 +112,23 @@ async function healAdversus(
       }
 
       const leadData = await response.json();
-      const leadResultFields = leadData.resultFields || leadData.leadResultFields || {};
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
+
+      // Build leadResultFields from resultData array (same logic as integration-engine adapter)
+      const leadResultFields: Record<string, any> = {};
+      if (Array.isArray(leadResultData)) {
+        for (const field of leadResultData) {
+          const fieldName = field?.name || field?.label;
+          if (field && fieldName !== undefined) {
+            leadResultFields[fieldName] = field.value;
+          }
+        }
+      }
+
+      // Only mark as healed if we actually got data
+      if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
+        throw new Error("API returned empty lead data");
+      }
 
       // Update sale with enriched data
       const updatedPayload = {
