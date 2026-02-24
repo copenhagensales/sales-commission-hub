@@ -155,6 +155,16 @@ function determineAseProductId(rawPayloadData: Record<string, unknown> | undefin
     console.log(`[rematch-pricing-rules] Product title "${adversusProductTitle}" indicates Lønsikring, correcting product_id`);
     return ASE_LOENSIKRING_PRODUCT_ID;
   }
+
+  // Check raw_payload for Lønsikring patterns (catches items where product_id is "Salg"
+  // but raw_payload contains Lønsikring data like "Lønsikring Udvidet")
+  if (rawPayloadData) {
+    const loensikringValue = rawPayloadData['Lønsikring'] as string | undefined;
+    if (loensikringValue && /lønsikring/i.test(loensikringValue)) {
+      console.log(`[rematch-pricing-rules] raw_payload Lønsikring="${loensikringValue}" → correcting to Lønsikring product`);
+      return ASE_LOENSIKRING_PRODUCT_ID;
+    }
+  }
   
   if (!rawPayloadData) return ASE_SALG_PRODUCT_ID;
   
