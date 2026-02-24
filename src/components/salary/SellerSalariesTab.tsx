@@ -109,7 +109,10 @@ export function SellerSalariesTab() {
               {filteredData.map((seller) => (
                 <div key={seller.id} className="p-3 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{seller.name}</span>
+                    <span className={`font-medium text-sm ${!seller.isActive ? "text-muted-foreground" : ""}`}>
+                      {seller.name}
+                      {!seller.isActive && <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Inaktiv</Badge>}
+                    </span>
                     <span className="text-xs text-muted-foreground">{seller.team}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -170,7 +173,10 @@ export function SellerSalariesTab() {
               <TableBody>
                 {filteredData.map((seller) => (
                   <TableRow key={seller.id}>
-                    <TableCell className="font-medium">{seller.name}</TableCell>
+                    <TableCell className={`font-medium ${!seller.isActive ? "text-muted-foreground" : ""}`}>
+                      {seller.name}
+                      {!seller.isActive && <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">Inaktiv</Badge>}
+                    </TableCell>
                     <TableCell>{seller.team}</TableCell>
                     <TableCell className="text-right">{formatCurrency(seller.commission)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(seller.cancellations)}</TableCell>
