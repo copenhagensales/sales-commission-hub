@@ -140,7 +140,12 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
  * - If 'Ja - Afdeling' is 'Lead', it's a Lead product
  * - Otherwise it's a Salg product (A-kasse sales)
  */
-function determineAseProductId(rawPayloadData: Record<string, unknown> | undefined, originalProductId?: string, adversusProductTitle?: string | null): string {
+function determineAseProductId(
+  rawPayloadData: Record<string, unknown> | undefined,
+  originalProductId?: string,
+  adversusProductTitle?: string | null,
+  hasOtherExplicitLoensikringInSale: boolean = false
+): string {
   // Check if this is a Lønsikring variant - normalize to standard Lønsikring ID
   if (originalProductId && LOENSIKRING_VARIANT_IDS.has(originalProductId)) {
     return ASE_LOENSIKRING_PRODUCT_ID;
@@ -152,27 +157,33 @@ function determineAseProductId(rawPayloadData: Record<string, unknown> | undefin
 
   // Check adversus_product_title for Lønsikring patterns (catches mismatched product_id)
   if (adversusProductTitle && /lønsikring/i.test(adversusProductTitle)) {
-    console.log(`[rematch-pricing-rules] Product title "${adversusProductTitle}" indicates Lønsikring, correcting product_id`);
+    console.log(
+      `[rematch-pricing-rules] Product title "${adversusProductTitle}" indicates Lønsikring, correcting product_id`
+    );
     return ASE_LOENSIKRING_PRODUCT_ID;
   }
 
   // Check raw_payload for Lønsikring patterns (catches items where product_id is "Salg"
   // but raw_payload contains Lønsikring data like "Lønsikring Udvidet")
-  if (rawPayloadData) {
-    const loensikringValue = rawPayloadData['Lønsikring'] as string | undefined;
+  // IMPORTANT: Only do this if the sale does NOT already contain an explicit Lønsikring item,
+  // otherwise we risk creating duplicate Lønsikring commission on the same sale.
+  if (rawPayloadData && !hasOtherExplicitLoensikringInSale) {
+    const loensikringValue = rawPayloadData["Lønsikring"] as string | undefined;
     if (loensikringValue && /lønsikring/i.test(loensikringValue)) {
-      console.log(`[rematch-pricing-rules] raw_payload Lønsikring="${loensikringValue}" → correcting to Lønsikring product`);
+      console.log(
+        `[rematch-pricing-rules] raw_payload Lønsikring="${loensikringValue}" → correcting to Lønsikring product`
+      );
       return ASE_LOENSIKRING_PRODUCT_ID;
     }
   }
-  
+
   if (!rawPayloadData) return ASE_SALG_PRODUCT_ID;
-  
+
   const jaAfdeling = rawPayloadData["Ja - Afdeling"];
   if (jaAfdeling && String(jaAfdeling).toLowerCase() === "lead") {
     return ASE_LEAD_PRODUCT_ID;
   }
-  
+
   return ASE_SALG_PRODUCT_ID;
 }
 
@@ -372,6 +383,42 @@ serve(async (req) => {
       );
     }
 
+    // Prefetch sibling sale_items metadata (needed to detect and prevent duplicate ASE Lønsikring)
+    const saleIdsForContext = [...new Set(saleItems.map((si: any) => si.sale_id).filter(Boolean))] as string[];
+
+    type SaleItemMeta = {
+      id: string;
+      sale_id: string;
+      product_id: string | null;
+      adversus_product_title: string | null;
+      adversus_external_id: string | null;
+    };
+
+    const saleItemMetaById = new Map<string, SaleItemMeta>();
+    const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
+
+    if (saleIdsForContext.length > 0) {
+      const saleIdChunkSize = 500;
+      for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
+        const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
+        const { data: siblings, error: siblingsError } = await supabase
+          .from("sale_items")
+          .select("id, sale_id, product_id, adversus_product_title, adversus_external_id")
+          .in("sale_id", chunk);
+
+        if (siblingsError) {
+          console.error("[rematch-pricing-rules] Error fetching sibling sale_items:", siblingsError);
+        }
+
+        for (const si of (siblings || []) as SaleItemMeta[]) {
+          saleItemMetaById.set(si.id, si);
+          const existing = saleItemsBySaleId.get(si.sale_id) || [];
+          existing.push(si);
+          saleItemsBySaleId.set(si.sale_id, existing);
+        }
+      }
+    }
+
     // Fetch all active pricing rules (include effective dates and immediate payment rates)
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
@@ -440,6 +487,7 @@ serve(async (req) => {
     let productCorrectedCount = 0;
     let baseProductFallbackCount = 0;
     const matchDetails: { saleItemId: string; productId: string; originalProductId: string; ruleName: string; commission: number; revenue: number }[] = [];
+    const deleteIds: string[] = [];
 
     for (const item of saleItems) {
       // Extract raw_payload.data
@@ -492,15 +540,40 @@ serve(async (req) => {
 
       // Determine correct product ID for ASE sales based on lead data
       const isAse = source === "ase" || (item.sales as any)?.source === "ase";
-      
+
       // Normalize raw_payload keys for ASE sales (historical records may have lowercase keys)
       if (isAse && rawPayloadData) {
         rawPayloadData = normalizeRawPayloadKeys(rawPayloadData);
       }
-      
+
       const originalProductId = item.product_id;
-      const correctProductId = isAse ? determineAseProductId(rawPayloadData, originalProductId, (item as any).adversus_product_title) : originalProductId;
-      
+
+      const meta = saleItemMetaById.get(item.id);
+      const siblings = saleItemsBySaleId.get(item.sale_id) || [];
+      const hasOtherExplicitLoensikringInSale = siblings.some(
+        (sib) => sib.id !== item.id && !!sib.adversus_product_title && /lønsikring/i.test(sib.adversus_product_title)
+      );
+
+      const isGhostItem = isAse && !meta?.adversus_product_title && !meta?.adversus_external_id;
+
+      // If the sale already contains an explicit Lønsikring item, a ghost row must be treated as a duplicate
+      // (otherwise it can create double Lønsikring commission).
+      if (isGhostItem && hasOtherExplicitLoensikringInSale) {
+        deleteIds.push(item.id);
+        console.log(
+          `[rematch-pricing-rules] Marking ghost ASE item ${item.id} for deletion (duplicate Lønsikring) on sale ${item.sale_id}`
+        );
+        continue;
+      }
+
+      const correctProductId = isAse
+        ? determineAseProductId(
+            rawPayloadData,
+            originalProductId,
+            (item as any).adversus_product_title,
+            hasOtherExplicitLoensikringInSale
+          )
+        : originalProductId;
       const productWasCorrected = correctProductId !== originalProductId;
       if (productWasCorrected) {
         productCorrectedCount++;
@@ -607,6 +680,24 @@ serve(async (req) => {
       console.log(`[rematch-pricing-rules] Sample matches (first 5):`);
       for (const detail of matchDetails.slice(0, 5)) {
         console.log(`  - ${detail.saleItemId}: ${detail.ruleName} -> ${detail.commission} DKK commission, ${detail.revenue} DKK revenue`);
+      }
+    }
+
+    // Delete ghost ASE items if any (prevents double Lønsikring commission on the same sale)
+    if (deleteIds.length > 0) {
+      if (dryRun) {
+        console.log(`[rematch-pricing-rules] DRY RUN - Would delete ${deleteIds.length} ghost ASE sale_items`);
+      } else {
+        console.log(`[rematch-pricing-rules] Deleting ${deleteIds.length} ghost ASE sale_items...`);
+
+        const deleteChunkSize = 200;
+        for (let i = 0; i < deleteIds.length; i += deleteChunkSize) {
+          const chunk = deleteIds.slice(i, i + deleteChunkSize);
+          const { error: deleteError } = await supabase.from("sale_items").delete().in("id", chunk);
+          if (deleteError) {
+            console.error("[rematch-pricing-rules] Error deleting ghost sale_items:", deleteError);
+          }
+        }
       }
     }
 
