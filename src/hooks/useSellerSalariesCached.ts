@@ -2,6 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 interface SellerData {
   id: string;
   name: string;
@@ -47,8 +54,8 @@ function isCurrentPayrollPeriod(periodStart: Date | null, periodEnd: Date | null
     currentEnd = new Date(year, month, 14, 23, 59, 59);
   }
 
-  const startMatch = periodStart.toISOString().split("T")[0] === currentStart.toISOString().split("T")[0];
-  const endMatch = periodEnd.toISOString().split("T")[0] === currentEnd.toISOString().split("T")[0];
+  const startMatch = toLocalDateString(periodStart) === toLocalDateString(currentStart);
+  const endMatch = toLocalDateString(periodEnd) === toLocalDateString(currentEnd);
 
   return startMatch && endMatch;
 }
@@ -58,7 +65,7 @@ function isCurrentPayrollPeriod(periodStart: Date | null, periodEnd: Date | null
  * Format: "payroll_YYYY-MM-DD"
  */
 function buildPeriodKey(periodStart: Date): string {
-  return `payroll_${periodStart.toISOString().split("T")[0]}`;
+  return `payroll_${toLocalDateString(periodStart)}`;
 }
 
 export function useSellerSalariesCached(
@@ -66,8 +73,8 @@ export function useSellerSalariesCached(
   periodStart?: Date | null,
   periodEnd?: Date | null
 ): UseSellerSalariesCachedResult {
-  const periodStartISO = periodStart ? periodStart.toISOString().split("T")[0] : null;
-  const periodEndISO = periodEnd ? periodEnd.toISOString().split("T")[0] : null;
+  const periodStartISO = periodStart ? toLocalDateString(periodStart) : null;
+  const periodEndISO = periodEnd ? toLocalDateString(periodEnd) : null;
 
   const isCurrent = isCurrentPayrollPeriod(periodStart ?? null, periodEnd ?? null);
   const periodKey = periodStart ? buildPeriodKey(periodStart) : null;
