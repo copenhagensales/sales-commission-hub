@@ -7932,18 +7932,21 @@ export type Database = {
       salary_type_employees: {
         Row: {
           created_at: string
+          effective_from: string | null
           employee_id: string
           id: string
           salary_type_id: string
         }
         Insert: {
           created_at?: string
+          effective_from?: string | null
           employee_id: string
           id?: string
           salary_type_id: string
         }
         Update: {
           created_at?: string
+          effective_from?: string | null
           employee_id?: string
           id?: string
           salary_type_id?: string
