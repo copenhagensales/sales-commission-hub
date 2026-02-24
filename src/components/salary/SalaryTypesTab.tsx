@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Plus, Pencil, Search } from "lucide-react";
+import { Plus, Pencil, Search, ChevronsUpDown, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -67,6 +70,8 @@ export function SalaryTypesTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<SalaryType | null>(null);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [employeePopoverOpen, setEmployeePopoverOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -78,6 +83,34 @@ export function SalaryTypesTab() {
     group_restriction_type: "all" as GroupRestrictionType,
     payout_frequency: "monthly" as PayoutFrequency,
   });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees-for-salary-types"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Load assigned employees when editing
+  useEffect(() => {
+    if (editingType) {
+      supabase
+        .from("salary_type_employees")
+        .select("employee_id")
+        .eq("salary_type_id", editingType.id)
+        .then(({ data }) => {
+          setSelectedEmployeeIds(data?.map((d) => d.employee_id) || []);
+        });
+    } else {
+      setSelectedEmployeeIds([]);
+    }
+  }, [editingType]);
 
   const { data: salaryTypes = [], isLoading } = useQuery({
     queryKey: ["salary-types"],
@@ -91,9 +124,19 @@ export function SalaryTypesTab() {
     },
   });
 
+  const saveEmployeeAssignments = async (salaryTypeId: string, employeeIds: string[]) => {
+    // Delete existing
+    await supabase.from("salary_type_employees").delete().eq("salary_type_id", salaryTypeId);
+    // Insert new
+    if (employeeIds.length > 0) {
+      const rows = employeeIds.map((eid) => ({ salary_type_id: salaryTypeId, employee_id: eid }));
+      await supabase.from("salary_type_employees").insert(rows);
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("salary_types").insert({
+      const { data: inserted, error } = await supabase.from("salary_types").insert({
         name: data.name,
         description: data.description || null,
         amount: data.amount ? parseFloat(data.amount) : null,
@@ -103,8 +146,11 @@ export function SalaryTypesTab() {
         activation_condition: data.activation_condition || null,
         group_restriction_type: data.group_restriction_type,
         payout_frequency: data.payout_frequency,
-      });
+      }).select("id").single();
       if (error) throw error;
+      if (inserted && selectedEmployeeIds.length > 0) {
+        await saveEmployeeAssignments(inserted.id, selectedEmployeeIds);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-types"] });
@@ -133,6 +179,7 @@ export function SalaryTypesTab() {
         })
         .eq("id", id);
       if (error) throw error;
+      await saveEmployeeAssignments(id, selectedEmployeeIds);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-types"] });
@@ -173,6 +220,7 @@ export function SalaryTypesTab() {
       group_restriction_type: "all",
       payout_frequency: "monthly",
     });
+    setSelectedEmployeeIds([]);
     setEditingType(null);
     setIsDialogOpen(false);
   };
@@ -391,6 +439,80 @@ export function SalaryTypesTab() {
                       <SelectItem value="period">Per lønperiode</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Medarbejdere sektion */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Medarbejdere</h3>
+                <div className="space-y-2">
+                  <Label>Tilknyttede medarbejdere</Label>
+                  <Popover open={employeePopoverOpen} onOpenChange={setEmployeePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal"
+                        type="button"
+                      >
+                        {selectedEmployeeIds.length === 0
+                          ? "Vælg medarbejdere..."
+                          : `${selectedEmployeeIds.length} medarbejder${selectedEmployeeIds.length > 1 ? "e" : ""} valgt`}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0 bg-background border z-50" align="start">
+                      <Command>
+                        <CommandInput placeholder="Søg medarbejder..." />
+                        <CommandList>
+                          <CommandEmpty>Ingen medarbejdere fundet</CommandEmpty>
+                          <CommandGroup className="max-h-60 overflow-y-auto">
+                            {employees.map((emp) => (
+                              <CommandItem
+                                key={emp.id}
+                                value={`${emp.first_name} ${emp.last_name}`}
+                                onSelect={() => {
+                                  setSelectedEmployeeIds((prev) =>
+                                    prev.includes(emp.id)
+                                      ? prev.filter((id) => id !== emp.id)
+                                      : [...prev, emp.id]
+                                  );
+                                }}
+                              >
+                                <Checkbox
+                                  checked={selectedEmployeeIds.includes(emp.id)}
+                                  className="mr-2"
+                                />
+                                {emp.first_name} {emp.last_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {selectedEmployeeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedEmployeeIds.map((eid) => {
+                        const emp = employees.find((e) => e.id === eid);
+                        if (!emp) return null;
+                        return (
+                          <Badge key={eid} variant="secondary" className="gap-1">
+                            {emp.first_name} {emp.last_name}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEmployeeIds((prev) => prev.filter((id) => id !== eid))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
