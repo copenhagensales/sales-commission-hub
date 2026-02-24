@@ -8484,6 +8484,42 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_contacts: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          location_type: string
+          name: string
+          phone: string | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          location_type: string
+          name: string
+          phone?: string | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          location_type?: string
+          name?: string
+          phone?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
       supplier_discount_rules: {
         Row: {
           created_at: string
@@ -8536,6 +8572,8 @@ export type Database = {
           period_end: string
           period_start: string
           report_data: Json | null
+          sent_at: string | null
+          sent_to: string[] | null
           status: string
           total_amount: number
           unique_locations: number
@@ -8552,6 +8590,8 @@ export type Database = {
           period_end: string
           period_start: string
           report_data?: Json | null
+          sent_at?: string | null
+          sent_to?: string[] | null
           status?: string
           total_amount?: number
           unique_locations?: number
@@ -8568,6 +8608,8 @@ export type Database = {
           period_end?: string
           period_start?: string
           report_data?: Json | null
+          sent_at?: string | null
+          sent_to?: string[] | null
           status?: string
           total_amount?: number
           unique_locations?: number

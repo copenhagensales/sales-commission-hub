@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp, Download } from "lucide-react";
+import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp, Download, Send } from "lucide-react";
+import { SendToSupplierDialog } from "./SendToSupplierDialog";
 import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import {
@@ -51,6 +52,7 @@ export function SupplierReportTab() {
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const queryClient = useQueryClient();
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
   const monthEnd = endOfMonth(monthStart);
@@ -688,6 +690,15 @@ export function SupplierReportTab() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            {isApproved && (
+              <Button
+                variant="outline"
+                onClick={() => setSendDialogOpen(true)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send til leverandør
+              </Button>
+            )}
             {isApproved ? (
               <div className="text-sm text-muted-foreground flex items-center">
                 Godkendt {existingReport?.approved_at
@@ -701,6 +712,26 @@ export function SupplierReportTab() {
               </Button>
             )}
           </div>
+
+          {isApproved && existingReport && (
+            <SendToSupplierDialog
+              open={sendDialogOpen}
+              onOpenChange={setSendDialogOpen}
+              locationType={selectedLocationType}
+              month={format(monthStart, "MMMM yyyy", { locale: da })}
+              reportId={existingReport.id}
+              reportData={locationDiscounts.map((loc: any) => ({
+                locationName: loc.location?.name,
+                city: loc.location?.address_city,
+                days: loc.totalDays,
+                amount: loc.totalAmount,
+                discount: loc.discount,
+                discountAmount: loc.discountAmount,
+                finalAmount: loc.finalAmount,
+                isExcluded: loc.isExcluded,
+              }))}
+            />
+          )}
         </>
       )}
     </div>

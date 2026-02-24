@@ -216,3 +216,6 @@ verify_jwt = false
 
 [functions.enrichment-healer]
 verify_jwt = false
+
+[functions.send-supplier-report]
+verify_jwt = true
