@@ -89,19 +89,22 @@ export function SyncSingleSaleDialog({
     setSearchResults([]);
 
     try {
-      const orFilter = [
-        `adversus_external_id.ilike.%${q}%`,
-        `customer_phone.ilike.%${q}%`,
-        `customer_company.ilike.%${q}%`,
-        `agent_name.ilike.%${q}%`,
-        `agent_email.ilike.%${q}%`,
-        `internal_reference.ilike.%${q}%`,
-      ].join(",");
+      // Step 1: Search via RPC (includes raw_payload search)
+      const { data: matchedIds, error: rpcError } = await supabase
+        .rpc("search_sales", { search_query: q, max_results: 50 });
+      if (rpcError) throw rpcError;
+      if (!matchedIds?.length) {
+        setSearchResults([]);
+        toast.info("Ingen salg fundet for søgningen");
+        setIsFetching(false);
+        return;
+      }
 
+      // Step 2: Fetch full records filtered by provider
       const { data, error } = await supabase
         .from("sales")
         .select("id, adversus_external_id, agent_name, agent_email, customer_company, customer_phone, sale_datetime, enrichment_status, internal_reference, integration_type")
-        .or(orFilter)
+        .in("id", matchedIds)
         .eq("integration_type", provider)
         .order("sale_datetime", { ascending: false })
         .limit(10);
