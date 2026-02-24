@@ -140,13 +140,19 @@ function evaluateNumericCondition(condition: NumericCondition, leadValue: string
  * - If 'Ja - Afdeling' is 'Lead', it's a Lead product
  * - Otherwise it's a Salg product (A-kasse sales)
  */
-function determineAseProductId(rawPayloadData: Record<string, unknown> | undefined, originalProductId?: string): string {
+function determineAseProductId(rawPayloadData: Record<string, unknown> | undefined, originalProductId?: string, adversusProductTitle?: string | null): string {
   // Check if this is a Lønsikring variant - normalize to standard Lønsikring ID
   if (originalProductId && LOENSIKRING_VARIANT_IDS.has(originalProductId)) {
     return ASE_LOENSIKRING_PRODUCT_ID;
   }
   // If it's already the standard Lønsikring product, keep it
   if (originalProductId === ASE_LOENSIKRING_PRODUCT_ID) {
+    return ASE_LOENSIKRING_PRODUCT_ID;
+  }
+
+  // Check adversus_product_title for Lønsikring patterns (catches mismatched product_id)
+  if (adversusProductTitle && /lønsikring/i.test(adversusProductTitle)) {
+    console.log(`[rematch-pricing-rules] Product title "${adversusProductTitle}" indicates Lønsikring, correcting product_id`);
     return ASE_LOENSIKRING_PRODUCT_ID;
   }
   
@@ -300,6 +306,7 @@ serve(async (req) => {
         mapped_revenue,
         needs_mapping,
         is_immediate_payment,
+        adversus_product_title,
         sales!inner (
           id,
           source,
@@ -474,7 +481,7 @@ serve(async (req) => {
       }
       
       const originalProductId = item.product_id;
-      const correctProductId = isAse ? determineAseProductId(rawPayloadData, originalProductId) : originalProductId;
+      const correctProductId = isAse ? determineAseProductId(rawPayloadData, originalProductId, (item as any).adversus_product_title) : originalProductId;
       
       const productWasCorrected = correctProductId !== originalProductId;
       if (productWasCorrected) {
