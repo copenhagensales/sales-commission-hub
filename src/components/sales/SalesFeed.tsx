@@ -55,6 +55,7 @@ interface RawPayload {
   id?: number; // Opportunity/Sales ID
   campaignId?: number;
   leadResultData?: LeadResultField[];
+  leadResultFields?: Record<string, unknown>; // Adversus object format
   data?: Record<string, unknown>; // Enreach/HeroBase format
   [key: string]: unknown;
 }
@@ -129,9 +130,16 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
 
 // Helper: Get specific field from leadResultData
 function getLeadField(payload: RawPayload | null, label: string): string | null {
-  if (!payload?.leadResultData) return null;
-  const field = payload.leadResultData.find(f => f.label === label);
-  return field?.value || null;
+  if (payload?.leadResultData && payload.leadResultData.length > 0) {
+    const field = payload.leadResultData.find(f => f.label === label);
+    if (field?.value) return field.value;
+  }
+  // Fallback: check leadResultFields object format
+  if (payload?.leadResultFields && typeof payload.leadResultFields === 'object') {
+    const val = payload.leadResultFields[label];
+    if (val != null) return String(val);
+  }
+  return null;
 }
 
 // Helper: Get phone with fallback to lead data
@@ -536,8 +544,14 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
     let leadFields: LeadResultField[] = [];
     
     if (payload.leadResultData && payload.leadResultData.length > 0) {
-      // Adversus format
+      // Adversus array format
       leadFields = payload.leadResultData;
+    } else if (payload.leadResultFields && typeof payload.leadResultFields === 'object') {
+      // Adversus object format - convert keys/values to display fields
+      leadFields = Object.entries(payload.leadResultFields).map(([key, value]) => ({
+        label: key,
+        value: String(value ?? ""),
+      }));
     } else if (payload.data && typeof payload.data === 'object') {
       // Enreach/HeroBase format - convert to array
       leadFields = convertEnreachDataToFields(payload.data);
