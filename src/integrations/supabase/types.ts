@@ -8484,6 +8484,90 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_discount_rules: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount_percent: number
+          id: string
+          is_active: boolean
+          location_type: string
+          min_placements: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount_percent: number
+          id?: string
+          is_active?: boolean
+          location_type: string
+          min_placements: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          location_type?: string
+          min_placements?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_invoice_reports: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          discount_amount: number
+          discount_percent: number
+          final_amount: number
+          id: string
+          location_type: string
+          period_end: string
+          period_start: string
+          report_data: Json | null
+          status: string
+          total_amount: number
+          unique_locations: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          final_amount?: number
+          id?: string
+          location_type: string
+          period_end: string
+          period_start: string
+          report_data?: Json | null
+          status?: string
+          total_amount?: number
+          unique_locations?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          final_amount?: number
+          id?: string
+          location_type?: string
+          period_end?: string
+          period_start?: string
+          report_data?: Json | null
+          status?: string
+          total_amount?: number
+          unique_locations?: number
+        }
+        Relationships: []
+      }
       sync_state: {
         Row: {
           id: number
