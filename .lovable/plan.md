@@ -1,58 +1,52 @@
 
 
-# Plan: Tillad bagudrettet booking (maks 2 maaneder)
+# Plan: Fix timezone-bug i sælgerløsninger (historiske perioder viser 0 kr)
 
-## Overblik
+## Problem
 
-Kalenderne i booking-dialogen blokerer i dag alle datoer foer i dag. Aendringen tillader at vaelge datoer op til 2 maaneder tilbage, saa man kan registrere bookinger retroaktivt.
+Alle historiske lønperioder viser 0 kr. fordi `toISOString()` konverterer datoer til UTC, hvilket forskyder datoen med 1 dag i dansk tidszone (CET/CEST = UTC+1/+2).
 
-## Aendringer
+Eksempel: `new Date(2026, 0, 15)` (15. januar midnat lokal tid) bliver `"2026-01-14T23:00:00Z"` i UTC. `toISOString().split("T")[0]` giver `"2026-01-14"` i stedet for `"2026-01-15"`.
 
-### Fil: `src/pages/vagt-flow/BookWeekContent.tsx`
+Det betyder:
+- `buildPeriodKey()` bygger `"payroll_2026-01-14"` men snapshot-tabellen har `"payroll_2026-01-15"` - ingen match
+- `periodStartISO`/`periodEndISO` er ogsaa forskudt, saa diet, sygedage og dagbonus queries henter forkerte perioder
+- `isCurrentPayrollPeriod()` sammenligner ogsaa med forkerte ISO-strenge
 
-**1. Tilfoej en beregnet graense for 2 maaneder tilbage**
+## Loesning
 
-Tilfoej en konstant tidligt i komponenten:
+### Fil: `src/hooks/useSellerSalariesCached.ts`
+
+**1. Tilfoej lokal dato-formattering**
+
+Erstat `toISOString().split("T")[0]` med en hjælpefunktion der bruger lokal tid:
 
 ```typescript
-const twoMonthsAgo = useMemo(() => {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 2);
-  return startOfDay(d);
-}, []);
-```
-
-**2. Opdater "Fra dato" kalender (linje 577)**
-
-Erstat:
-```typescript
-disabled={(date) => isBefore(date, startOfDay(new Date()))}
-```
-Med:
-```typescript
-disabled={(date) => isBefore(date, twoMonthsAgo)}
-```
-
-**3. Opdater "Til dato" kalender (linje 606-608)**
-
-Erstat:
-```typescript
-disabled={(date) => 
-  isBefore(date, startOfDay(new Date())) || 
-  (marketStartDate ? isBefore(date, marketStartDate) : false)
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 ```
-Med:
-```typescript
-disabled={(date) => 
-  isBefore(date, twoMonthsAgo) || 
-  (marketStartDate ? isBefore(date, marketStartDate) : false)
-}
-```
+
+**2. Opdater alle steder der bruger `toISOString()`**
+
+- Linje 50-51: `isCurrentPayrollPeriod` sammenligning
+- Linje 61: `buildPeriodKey` 
+- Linje 69-70: `periodStartISO` og `periodEndISO`
+
+Alle erstattes med `toLocalDateString()`.
+
+## Teknisk detalje
+
+| Foer (UTC) | Efter (lokal) |
+|------------|---------------|
+| `new Date(2026,0,15).toISOString().split("T")[0]` = `"2026-01-14"` | `toLocalDateString(new Date(2026,0,15))` = `"2026-01-15"` |
 
 ## Omfang
 
-- 1 fil aendres, 3 linjer pavirkes
+- 1 fil aendres, 5 linjer paavirkes
 - Ingen database-aendringer
-- Ugenavigationen (`handlePrevWeek`) har allerede ingen begransning, saa butik-bookinger kan ogsaa laves bagudrettet
+- Loeser at alle historiske perioder viser 0 kr
 
