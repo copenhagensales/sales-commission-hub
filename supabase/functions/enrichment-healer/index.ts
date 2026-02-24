@@ -256,7 +256,7 @@ serve(async (req) => {
     // Fetch sales needing healing
     let salesQuery = supabase
       .from("sales")
-      .select("id, integration_id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
+      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
       .order("sale_datetime", { ascending: false })
       .limit(maxBatch);
 
@@ -272,8 +272,9 @@ serve(async (req) => {
       salesQuery = salesQuery.eq("integration_type", providerFilter);
     }
 
+    // integration_id column doesn't exist on sales table; filter by integration_type instead
     if (integrationIdFilter) {
-      salesQuery = salesQuery.eq("integration_id", integrationIdFilter);
+      // Skip - integrationId filter not supported (no column)
     }
 
     const { data: pendingSales, error } = await salesQuery;
@@ -354,7 +355,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
+    const errMsg = error instanceof Error ? error.message : (typeof error === "object" ? JSON.stringify(error) : String(error));
     console.error("[enrichment-healer] Error:", errMsg);
     return new Response(JSON.stringify({ error: errMsg }), {
       status: 500,
