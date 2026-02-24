@@ -492,7 +492,6 @@ export function AddEmployeeDialog({
     const assignments = validEmployees.map(employeeId => ({
       employeeId,
       dates: Array.from(selectedDays)
-        .filter(dayIndex => hasShiftOnDay(employeeId, dayIndex))
         .filter(dayIndex => !isBookedOnDay(employeeId, dayIndex))
         .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
     })).filter(a => a.dates.length > 0);
