@@ -67,6 +67,12 @@ export default function ShiftOverview() {
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [showWeekend, setShowWeekend] = useState(false);
+  const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
+  const [bonusDialogEmployeeId, setBonusDialogEmployeeId] = useState<string>("");
+  const [bonusDialogEmployeeName, setBonusDialogEmployeeName] = useState<string>("");
+  const [bonusDialogDate, setBonusDialogDate] = useState<string>("");
+  const [bonusDialogTimeStampId, setBonusDialogTimeStampId] = useState<string | undefined>(undefined);
+  const [bonusAmount, setBonusAmount] = useState<number>(0);
 
   const queryClient = useQueryClient();
   const { canEditShiftOverview } = usePermissions();
@@ -1609,50 +1615,57 @@ export default function ShiftOverview() {
                                 Se info
                               </Button>
                               
-                              {/* Daily Bonus Section */}
-                              {(hasBonusEligibility || bonusPaid || (bonusEligibility && bonusEligibility.reason)) && remainingBonusDays && (
-                                <>
-                                  <div className="border-t my-1" />
-                                  <p className="text-[10px] text-muted-foreground px-2">
-                                    Dagsbonus ({remainingBonusDays.used}/{remainingBonusDays.total} dage brugt)
-                                  </p>
-                                  {bonusPaid ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="justify-start gap-2 h-8 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                      onClick={() => {
-                                        deleteDailyBonus.mutate({ employeeId: employee.id, date: dateKey });
-                                        setOpenPopoverKey(null);
-                                      }}
-                                    >
-                                      <Coins className="h-4 w-4" />
-                                      Fjern bonus ({bonusPaid.amount} kr)
-                                    </Button>
-                                  ) : hasBonusEligibility ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="justify-start gap-2 h-8 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
-                                      onClick={() => {
-                                        createDailyBonus.mutate({ 
-                                          employeeId: employee.id, 
-                                          date: dateKey, 
-                                          amount: bonusEligibility.amount,
-                                          timeStampId: timeStamp?.id 
-                                        });
-                                        setOpenPopoverKey(null);
-                                      }}
-                                    >
-                                      <Coins className="h-4 w-4" />
-                                      Udbetal bonus ({bonusEligibility.amount} kr)
-                                    </Button>
-                                  ) : bonusEligibility?.reason ? (
-                                    <p className="text-[10px] text-muted-foreground px-2 py-1 italic">
-                                      Ikke berettiget: {bonusEligibility.reason}
-                                    </p>
-                                  ) : null}
-                                </>
+                              {/* Daily Bonus Section - always visible */}
+                              <div className="border-t my-1" />
+                              {bonusPaid ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="justify-start gap-2 h-8 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                  onClick={() => {
+                                    deleteDailyBonus.mutate({ employeeId: employee.id, date: dateKey });
+                                    setOpenPopoverKey(null);
+                                  }}
+                                >
+                                  <Coins className="h-4 w-4" />
+                                  Fjern bonus ({bonusPaid.amount} kr)
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="justify-start gap-2 h-8 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+                                  onClick={() => {
+                                    if (hasBonusEligibility && bonusEligibility.amount > 0) {
+                                      // Auto amount available, use directly
+                                      createDailyBonus.mutate({ 
+                                        employeeId: employee.id, 
+                                        date: dateKey, 
+                                        amount: bonusEligibility.amount,
+                                        timeStampId: timeStamp?.id 
+                                      });
+                                      setOpenPopoverKey(null);
+                                    } else {
+                                      // Open dialog for manual amount
+                                      setBonusDialogEmployeeId(employee.id);
+                                      setBonusDialogEmployeeName(`${employee.first_name} ${employee.last_name}`);
+                                      setBonusDialogDate(dateKey);
+                                      setBonusDialogTimeStampId(timeStamp?.id);
+                                      setBonusAmount(bonusEligibility?.amount || 0);
+                                      setBonusDialogOpen(true);
+                                      setOpenPopoverKey(null);
+                                    }
+                                  }}
+                                >
+                                  <Coins className="h-4 w-4" />
+                                  Tilføj dagsbonus
+                                </Button>
+                              )}
+                              {/* Automatic bonus info - only when rules exist */}
+                              {remainingBonusDays && (
+                                <p className="text-[10px] text-muted-foreground px-2">
+                                  {remainingBonusDays.used}/{remainingBonusDays.total} bonusdage brugt
+                                </p>
                               )}
                               
                               {hasStatus && (
@@ -1841,6 +1854,65 @@ export default function ShiftOverview() {
             shift={selectedShift}
           />
         )}
+
+        {/* Manual Bonus Amount Dialog */}
+        <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
+          <DialogContent className="sm:max-w-[320px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-emerald-500" />
+                Tilføj dagsbonus
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {bonusDialogEmployeeName} — {bonusDialogDate}
+              </p>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="bonus-amount" className="text-sm text-muted-foreground mb-2 block">
+                Beløb (kr)
+              </Label>
+              <Input
+                id="bonus-amount"
+                type="number"
+                min={0}
+                value={bonusAmount || ""}
+                onChange={(e) => setBonusAmount(Number(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && bonusAmount > 0) {
+                    createDailyBonus.mutate({
+                      employeeId: bonusDialogEmployeeId,
+                      date: bonusDialogDate,
+                      amount: bonusAmount,
+                      timeStampId: bonusDialogTimeStampId,
+                    });
+                    setBonusDialogOpen(false);
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBonusDialogOpen(false)}>
+                Annuller
+              </Button>
+              <Button
+                disabled={bonusAmount <= 0}
+                onClick={() => {
+                  createDailyBonus.mutate({
+                    employeeId: bonusDialogEmployeeId,
+                    date: bonusDialogDate,
+                    amount: bonusAmount,
+                    timeStampId: bonusDialogTimeStampId,
+                  });
+                  setBonusDialogOpen(false);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Tilføj
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
