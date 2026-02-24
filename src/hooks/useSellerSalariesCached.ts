@@ -93,6 +93,8 @@ export function useSellerSalariesCached(
           is_freelance_consultant,
           vacation_type,
           referral_bonus,
+          last_team_id,
+          last_team:last_team_id(id, name),
           team_members!left(
             team_id,
             teams!left(id, name)
@@ -264,7 +266,8 @@ export function useSellerSalariesCached(
     let filteredEmployees = employees;
     if (selectedTeam && selectedTeam !== "all") {
       filteredEmployees = employees.filter((e: any) =>
-        e.team_members?.some((tm: any) => tm.team_id === selectedTeam)
+        e.team_members?.some((tm: any) => tm.team_id === selectedTeam) ||
+        e.last_team_id === selectedTeam
       );
     }
 
@@ -272,6 +275,9 @@ export function useSellerSalariesCached(
     const sellers: SellerData[] = filteredEmployees.map((emp: any) => {
       const teamMember = emp.team_members?.[0];
       const teamData = teamMember?.teams;
+      // Fallback to last_team for inactive employees without team_members
+      const teamName = teamData?.name || emp.last_team?.name || "Ikke tildelt";
+      const teamId = teamMember?.team_id || emp.last_team_id || null;
       const commission = commissionMap[emp.id] || 0;
       const vacationType = emp.vacation_type as "vacation_pay" | "vacation_bonus" | null;
       const vacationRate = getVacationPayRate(vacationType);
@@ -280,8 +286,8 @@ export function useSellerSalariesCached(
       return {
         id: emp.id,
         name: `${emp.first_name} ${emp.last_name}`,
-        team: teamData?.name || "Ikke tildelt",
-        teamId: teamMember?.team_id || null,
+        team: teamName,
+        teamId: teamId,
         commission,
         cancellations: 0,
         vacationType,
