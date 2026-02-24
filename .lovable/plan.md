@@ -1,57 +1,63 @@
 
 
-## Filtrér medarbejdere i vagtplanen baseret på start- og stopdato
+## Dagsbonus altid tilgængelig i kontekstmenuen
 
 ### Problem
-Vagtplanen viser alle aktive medarbejdere, uanset om de er startet endnu. Derudover forsvinder inaktive medarbejdere med det samme, selvom de burde være synlige indtil deres stopdato (`employment_end_date`).
+Dagsbonus-sektionen i vagtplanens kontekstmenu er kun synlig når den automatiske berettigelseslogik (team + klient-konfiguration + antal dage) tillader det. Brugeren skal altid kunne tilføje og fjerne dagsbonus manuelt.
 
 ### Hvad ændres
 
-**Fil: `src/hooks/useShiftPlanning.ts` - `useEmployeesForShifts` hook**
+**Fil: `src/pages/shift-planning/ShiftOverview.tsx`**
 
-Ændringen sker i den centrale hook der henter medarbejdere til vagtplanen. I stedet for kun at filtrere på `is_active = true`, ændres logikken til:
+Linje ~1611-1656: Den eksisterende bonus-sektion opdeles i to dele:
 
-1. **Hent bredere**: Fjern den hårde `is_active = true` filter fra alle Supabase-queries i hooket (3 steder: `fetchEmployeesByIds`, manager fallback, og owner mode)
-2. **Tilføj `employment_start_date` og `employment_end_date`** til select-felterne
-3. **Filtrer i koden** efter hentning med denne logik:
-   - **Skjul** medarbejdere hvor `employment_start_date` er i fremtiden (ikke startet endnu)
-   - **Vis** inaktive medarbejdere (`is_active = false`) så længe `employment_end_date` er i dag eller i fremtiden
-   - **Skjul** inaktive medarbejdere hvor `employment_end_date` er i fortiden (eller ikke sat)
-   - **Vis** aktive medarbejdere der allerede er startet (normal case)
+1. **Manuel bonus-sektion (altid synlig)**
+   - Vises altid efter "Se info"-knappen, adskilt med en separator
+   - Hvis bonus allerede er udbetalt for datoen: Vis "Fjern bonus (X kr)" med grøn baggrund
+   - Hvis ingen bonus: Vis "Tilføj dagsbonus" som åbner en input-dialog til beløb
+
+2. **Automatisk bonus-info (kun synlig når berettigelsesregler matcher)**
+   - Den eksisterende visning af "X/Y dage brugt" og berettigelses-info beholdes som en informationslinje under den manuelle sektion
+   - Vises kun når der er konfigureret regler for medarbejderen
+
+### Ny dialog til manuelt bonus-beløb
+
+Når "Tilføj dagsbonus" trykkes og der ikke er en automatisk berettigelse med et beløb, åbnes en `Dialog` med:
+- Overskrift: "Tilføj dagsbonus"
+- Undertekst: Medarbejdernavn og dato
+- Input-felt: Beløb i kr (number input, default evt. fra bonusEligibility.amount hvis tilgængeligt)
+- Knapper: "Annuller" og "Tilføj"
+
+Hvis der ER en automatisk berettigelse med beløb, bruges beløbet direkte (som i dag) uden dialog.
 
 ### Tekniske detaljer
 
-Pseudo-logik for filtreringen:
+Nye state-variabler tilføjes:
 
 ```text
-const today = new Date() // dagens dato
-
-employees.filter(emp => {
-  // 1. Hvis medarbejder ikke er startet endnu -> skjul
-  if (emp.employment_start_date && parseISO(emp.employment_start_date) > today) {
-    return false
-  }
-
-  // 2. Hvis aktiv -> vis
-  if (emp.is_active) return true
-
-  // 3. Hvis inaktiv men har employment_end_date >= i dag -> vis
-  if (!emp.is_active && emp.employment_end_date) {
-    return parseISO(emp.employment_end_date) >= today
-  }
-
-  // 4. Inaktiv uden stopdato -> skjul
-  return false
-})
+bonusDialogOpen: boolean
+bonusDialogEmployeeId: string
+bonusDialogDate: string
+bonusAmount: number (input-felt)
 ```
 
-Ændringen gælder alle 3 query-paths i hooket:
-- `fetchEmployeesByIds` (bruges ved team-filter og led-teams)
-- Manager fallback query
-- Owner mode query
+Kontekstmenu-strukturen ændres fra:
 
-Select-felterne udvides fra:
-`"id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id"`
-til:
-`"id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date"`
+```text
+[Se info]
+--- (kun hvis berettiget) ---
+Dagsbonus (X/Y dage brugt)
+  [Fjern bonus] eller [Udbetal bonus] eller [Ikke berettiget tekst]
+```
 
+Til:
+
+```text
+[Se info]
+--- separator (altid) ---
+  [Fjern bonus (X kr)]          <-- hvis bonus allerede udbetalt
+  [Tilføj dagsbonus]            <-- hvis ingen bonus (åbner dialog eller bruger auto-beløb)
+  (X/Y dage brugt)              <-- kun hvis automatisk konfiguration findes
+```
+
+Genbruger eksisterende `createDailyBonus` og `deleteDailyBonus` mutationer -- ingen nye API-kald eller tabeller nødvendige.
