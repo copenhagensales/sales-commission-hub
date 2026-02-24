@@ -297,11 +297,13 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const source = body.source as string | undefined; // e.g., 'ase'
-    const productId = body.product_id as string | undefined; // NEW: filter by specific product
+    const productId = body.product_id as string | undefined; // filter by specific product
+    const saleIds = body.sale_ids as string[] | undefined; // filter by specific sale IDs
+    const saleItemIds = body.sale_item_ids as string[] | undefined; // filter by specific sale_item IDs
     const limit = body.limit as number | undefined; // optional limit
     const dryRun = body.dry_run === true;
 
-    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, limit=${limit || "none"}, dry_run=${dryRun}`);
+    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}`);
 
     // Fetch sale_items - either all for specific product, or unmatched items
     let query = supabase
@@ -326,11 +328,17 @@ serve(async (req) => {
         )
       `);
 
-    // If product_id is specified, rematch ALL items for that product (for price updates)
-    if (productId) {
+    // Filter by specific sale_item IDs (highest priority)
+    if (saleItemIds && saleItemIds.length > 0) {
+      query = query.in("id", saleItemIds);
+    } else if (saleIds && saleIds.length > 0) {
+      // Filter by specific sale IDs
+      query = query.in("sale_id", saleIds);
+    } else if (productId) {
+      // If product_id is specified, rematch ALL items for that product (for price updates)
       query = query.eq("product_id", productId);
     } else {
-      // Otherwise, only process items without matched rule and zero commission
+      // Otherwise, only process items without matched rule
       query = query
         .is("matched_pricing_rule_id", null)
         .not("product_id", "is", null);
@@ -496,6 +504,7 @@ serve(async (req) => {
       const productWasCorrected = correctProductId !== originalProductId;
       if (productWasCorrected) {
         productCorrectedCount++;
+        console.log(`[rematch-pricing-rules] Product corrected for item ${item.id}: ${originalProductId} → ${correctProductId}`);
       }
 
       // Get campaign mapping ID
