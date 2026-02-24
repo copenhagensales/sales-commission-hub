@@ -2,6 +2,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { parseISO, startOfDay } from "date-fns";
+
+/** Filter employees based on employment_start_date and employment_end_date */
+function filterVisibleEmployees<T extends { is_active?: boolean | null; employment_start_date?: string | null; employment_end_date?: string | null }>(employees: T[]): T[] {
+  const today = startOfDay(new Date());
+  return employees.filter(emp => {
+    // Hide employees not started yet
+    if (emp.employment_start_date && parseISO(emp.employment_start_date) > today) {
+      return false;
+    }
+    // Active employees are visible
+    if (emp.is_active) return true;
+    // Inactive but still within employment_end_date
+    if (!emp.is_active && emp.employment_end_date) {
+      return parseISO(emp.employment_end_date) >= today;
+    }
+    // Inactive without end date -> hide
+    return false;
+  });
+}
 
 export interface Shift {
   id: string;
@@ -655,13 +675,12 @@ export function useEmployeesForShifts(teamId?: string) {
         if (employeeIds.length === 0) return [];
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
           .in("id", employeeIds)
-          .eq("is_active", true)
           .order("first_name");
         if (error) throw error;
-        // Enrich with team names from team_members
-        return (data || []).map(emp => ({
+        // Filter by visibility rules, then enrich with team names
+        return filterVisibleEmployees(data || []).map(emp => ({
           ...emp,
           department: employeeTeamMap.get(emp.id) || null,
         }));
@@ -716,15 +735,14 @@ export function useEmployeesForShifts(teamId?: string) {
         console.log("[useEmployeesForShifts] No led teams, trying manager_id fallback");
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
-          .eq("is_active", true)
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
           .eq("manager_id", currentEmployeeId)
           .neq("id", currentEmployeeId)
           .order("first_name");
         
         if (error) throw error;
-        // Enrich with team names
-        return (data || []).map(emp => ({
+        // Filter by visibility rules, then enrich with team names
+        return filterVisibleEmployees(data || []).map(emp => ({
           ...emp,
           department: employeeTeamMap.get(emp.id) || null,
         }));
@@ -734,13 +752,12 @@ export function useEmployeesForShifts(teamId?: string) {
       console.log("[useEmployeesForShifts] Owner mode - fetching all employees");
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
-        .eq("is_active", true)
+        .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
         .order("first_name");
 
       if (error) throw error;
-      // Enrich with team names
-      return (data || []).map(emp => ({
+      // Filter by visibility rules, then enrich with team names
+      return filterVisibleEmployees(data || []).map(emp => ({
         ...emp,
         department: employeeTeamMap.get(emp.id) || null,
       }));
