@@ -3975,6 +3975,7 @@ export type Database = {
           is_staff_employee: boolean
           job_title: string | null
           last_name: string
+          last_team_id: string | null
           locked_at: string | null
           manager_id: string | null
           mfa_enabled: boolean | null
@@ -4034,6 +4035,7 @@ export type Database = {
           is_staff_employee?: boolean
           job_title?: string | null
           last_name: string
+          last_team_id?: string | null
           locked_at?: string | null
           manager_id?: string | null
           mfa_enabled?: boolean | null
@@ -4093,6 +4095,7 @@ export type Database = {
           is_staff_employee?: boolean
           job_title?: string | null
           last_name?: string
+          last_team_id?: string | null
           locked_at?: string | null
           manager_id?: string | null
           mfa_enabled?: boolean | null
@@ -4126,6 +4129,13 @@ export type Database = {
             columns: ["daily_bonus_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_last_team_id_fkey"
+            columns: ["last_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
           {
