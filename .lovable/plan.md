@@ -1,56 +1,74 @@
 
 
-## Fix: Adskil API-budget per integration (ikke per provider)
+## Fix: Forskyd Lovablecph sync-meta job så det ikke kolliderer med sync-sales
 
 ### Problem
-Backend-funktionen `provider-sync.ts` summerer API-forbrug for **alle** Adversus-integrationer i en fælles pulje (1000 req/hr). Da Lovablecph og Relatel_CPHSALES har separate Adversus-konti med egne API-credentials, bør de have uafhængige budgetter. Den nuværende logik kan fejlagtigt stoppe den ene integration fordi den anden har brugt "for mange" kald.
+Lovablecph har to cron-jobs der begge korer pa nojagtig de samme minutter:
+- `dialer-26fac751-sync-sales`: `3,8,13,18,23,28,33,38,43,48,53,58`
+- `dialer-26fac751-sync-meta`: `3,8,13,18,23,28,33,38,43,48,53,58`
 
-### Løsning
-Ændre `getBudgetUsage()` i `provider-sync.ts` til at beregne budget **per integration** i stedet for per provider. Dermed kan Lovablecph bruge op til 1000 req/hr uden at Relatel's forbrug påvirker det, og omvendt.
+Begge rammer den samme Adversus API-konto pa samme tid, hvilket giver 429 rate-limit fejl (19 fejl i dag). Det har intet med andre integrationer at gore -- Lovablecph rate-limiter sig selv.
 
-### Tekniske ændringer
+### Losning
+Forskyd `sync-meta` jobbet til hvert 30. minut med 2 minutters offset, sa det aldrig overlapper med `sync-sales`:
 
-**Fil: `supabase/functions/integration-engine/actions/provider-sync.ts`**
+| Job | Nuvarende schedule | Nyt schedule |
+|---|---|---|
+| `sync-sales` | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` | Uandret |
+| `sync-meta` | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` | `5,35 * * * *` |
 
-1. Ændre `getBudgetUsage()` til at modtage et enkelt `integrationId` i stedet for `provider`:
+Meta-data (campaigns, users, calls) andrer sig sjaldent og behover ikke synkroniseres hvert 5. minut.
 
-```text
-// Fra: summerer alle integrationer for provideren
-async function getBudgetUsage(supabase, provider, log): number
-  -> henter ALLE integration IDs for provider
-  -> summerer api_calls_made for dem alle
+### Teknisk andring
 
-// Til: kun den specifikke integration
-async function getIntegrationBudgetUsage(supabase, integrationId, log): number
-  -> summerer api_calls_made kun for denne integration
+**1. Opdater `update-cron-schedule` edge function** (`supabase/functions/update-cron-schedule/index.ts`)
+
+Andringen sikrer at `sync-meta` automatisk far et forskudt schedule nar det oprettes. I `LOVABLE_META_FIVE_MINUTE_SCHEDULE` konstanten (linje 37) andres til et 30-minutters interval med offset:
+
+```
+// Fra:
+const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "3,8,13,18,23,28,33,38,43,48,53,58 * * * *";
+
+// Til:
+const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "5,35 * * * *";
 ```
 
-2. Opdatere provider-sync-loopet til at tjekke budget per integration:
+Ogsa opdater `getMetaSyncSchedule()` funktionen sa den returnerer 30-minutters schedule for alle Lovable/TDC integrationer (ikke kun lovablecph):
 
-```text
-for (const integration of integrations) {
-  // Budget-check pr. integration (ikke samlet for provider)
-  const integrationUsage = await getIntegrationBudgetUsage(supabase, integration.id, log);
-  if (integrationUsage >= budgetThreshold) {
-    skipped.push(integration.name);
-    continue;
-  }
-  // ... sync integration ...
+```
+// Fra (linje 131-132):
+if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
+  return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
 }
+
+// Til:
+return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
 ```
 
-**Fil: `supabase/functions/integration-engine/actions/safe-backfill.ts`**
+**2. Database: Opdater det aktive cron-job**
 
-3. Tilsvarende ændring i `getProviderApiUsage()` -- begrænse budget-tjek til den specifikke integration der backfilles, ikke alle integrationer for provideren.
+Kor en SQL-opdatering for at andre det eksisterende cron-job med det samme (sa vi ikke skal vente pa at nogen trigger `update-cron-schedule`):
 
-### Filer der ændres
+```sql
+SELECT cron.schedule(
+  'dialer-26fac751-sync-meta',
+  '5,35 * * * *',
+  -- (eksisterende command forbliver uandret)
+);
+```
 
-| Fil | Ændring |
+Alternativt: kald `update-cron-schedule` edge function for Lovablecph, som vil gen-oprette begge jobs med de korrekte schedules.
+
+### Filer der andres
+
+| Fil | Andring |
 |---|---|
-| `supabase/functions/integration-engine/actions/provider-sync.ts` | `getBudgetUsage` beregner per integration i stedet for per provider |
-| `supabase/functions/integration-engine/actions/safe-backfill.ts` | `getProviderApiUsage` beregner per integration i stedet for per provider |
+| `supabase/functions/update-cron-schedule/index.ts` | Opdater `LOVABLE_META_FIVE_MINUTE_SCHEDULE` og `getMetaSyncSchedule()` |
+| Database (cron.job) | Opdater schedule for `dialer-26fac751-sync-meta` |
 
 ### Resultat
-- Lovablecph og Relatel_CPHSALES kører med uafhængige budgetter (1000 req/hr hver)
-- Ingen integration stoppes af en andens API-forbrug
-- System Stability-dashboardet viser allerede korrekte per-integration tal (ingen frontend-ændring nødvendig)
+- Sales-sync korer uforstyrret hvert 5. minut (minut 3,8,13,...)
+- Meta-sync korer hvert 30. minut (minut 5,35), aldrig samtidig med sales
+- Forventet reduktion fra ~19 fejl/dag til 0
+- Campaigns/users/calls opdateres stadig regelmaessigt
+
