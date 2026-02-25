@@ -194,11 +194,11 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
 .muted{color:#475569;font-style:italic;font-size:11px}
 
 /* KPI Grid */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.kpi-card{background:#1e293b;padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.kpi-card{background:#1e293b;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
 .kpi-card.highlight{border-color:rgba(99,102,241,0.3);background:#1e2747}
-.kpi-label{display:block;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px}
-.kpi-value{display:block;font-size:20px;font-weight:700;color:#f1f5f9}
+.kpi-label{display:block;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;white-space:nowrap}
+.kpi-value{display:block;font-size:16px;font-weight:700;color:#f1f5f9;white-space:nowrap}
 .kpi-value.accent{color:#34d399}
 
 /* Staircase */
