@@ -51,6 +51,7 @@ export function useSellerSalariesCached(
           id, 
           first_name, 
           last_name,
+          work_email,
           is_active,
           is_freelance_consultant,
           vacation_type,
@@ -173,11 +174,21 @@ export function useSellerSalariesCached(
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build commission map from live sales aggregates: employee_id (UUID) -> commission
+    // Build work_email -> employee_id lookup for FM fallback
+    const emailToEmployeeId: Record<string, string> = {};
+    for (const emp of employees) {
+      if (emp.work_email) {
+        emailToEmployeeId[emp.work_email.toLowerCase()] = emp.id;
+      }
+    }
+
+    // Build commission map from live sales aggregates
+    // Keys can be UUID (mapped employees) or email (unmapped FM employees)
     const commissionMap: Record<string, number> = {};
     if (salesAggregates?.byEmployee) {
-      for (const [employeeKey, empData] of Object.entries(salesAggregates.byEmployee)) {
-        commissionMap[employeeKey] = empData.commission;
+      for (const [key, empData] of Object.entries(salesAggregates.byEmployee)) {
+        const employeeId = emailToEmployeeId[key.toLowerCase()] || key;
+        commissionMap[employeeId] = (commissionMap[employeeId] || 0) + empData.commission;
       }
     }
 
