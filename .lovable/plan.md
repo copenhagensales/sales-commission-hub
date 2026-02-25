@@ -1,46 +1,56 @@
 
 
-## Fix: Vis korrekte medarbejdernavne i ledelsesrapporten
+## Fix: Adskil API-budget per integration (ikke per provider)
 
 ### Problem
-RPC-funktionen `get_sales_aggregates_v2` bruger denne prioritetsrækkefølge for navne:
-```
-COALESCE(a.name, emd_fb.first_name || ' ' || emd_fb.last_name, s.agent_email)
-```
-
-`a.name` er agent-navnet fra dialeren (f.eks. "joel", "trine", "leigk"), som ofte er brugernavne i stedet for rigtige navne. Funktionen bruger **aldrig** `emd.first_name || ' ' || emd.last_name` fra den primære employee_master_data join (via employee_agent_mapping).
+Backend-funktionen `provider-sync.ts` summerer API-forbrug for **alle** Adversus-integrationer i en fælles pulje (1000 req/hr). Da Lovablecph og Relatel_CPHSALES har separate Adversus-konti med egne API-credentials, bør de have uafhængige budgetter. Den nuværende logik kan fejlagtigt stoppe den ene integration fordi den anden har brugt "for mange" kald.
 
 ### Løsning
-Ændr navneopslags-prioriteten i RPC'en til:
+Ændre `getBudgetUsage()` i `provider-sync.ts` til at beregne budget **per integration** i stedet for per provider. Dermed kan Lovablecph bruge op til 1000 req/hr uden at Relatel's forbrug påvirker det, og omvendt.
 
+### Tekniske ændringer
+
+**Fil: `supabase/functions/integration-engine/actions/provider-sync.ts`**
+
+1. Ændre `getBudgetUsage()` til at modtage et enkelt `integrationId` i stedet for `provider`:
+
+```text
+// Fra: summerer alle integrationer for provideren
+async function getBudgetUsage(supabase, provider, log): number
+  -> henter ALLE integration IDs for provider
+  -> summerer api_calls_made for dem alle
+
+// Til: kun den specifikke integration
+async function getIntegrationBudgetUsage(supabase, integrationId, log): number
+  -> summerer api_calls_made kun for denne integration
 ```
-COALESCE(
-  emd.first_name || ' ' || emd.last_name,    -- Primær: via agent mapping
-  emd_fb.first_name || ' ' || emd_fb.last_name, -- Fallback: via work_email
-  a.name,                                       -- Fallback: agent navn
-  s.agent_email                                  -- Sidste udvej: email
-)
+
+2. Opdatere provider-sync-loopet til at tjekke budget per integration:
+
+```text
+for (const integration of integrations) {
+  // Budget-check pr. integration (ikke samlet for provider)
+  const integrationUsage = await getIntegrationBudgetUsage(supabase, integration.id, log);
+  if (integrationUsage >= budgetThreshold) {
+    skipped.push(integration.name);
+    continue;
+  }
+  // ... sync integration ...
+}
 ```
 
-Dette sikrer at det rigtige medarbejdernavn vises, uanset om medarbejderen er aktiv eller inaktiv.
+**Fil: `supabase/functions/integration-engine/actions/safe-backfill.ts`**
 
-### Teknisk ændring
-
-**Database-migration:** Opdater `get_sales_aggregates_v2` funktionen.
-
-Ændringen er i `group_name` CASE-udtrykket for alle tre group_by-varianter (`employee`, `date`, `both`). Prioriteten ændres fra `a.name` først til `emd.first_name || ' ' || emd.last_name` først.
-
-Også i GROUP BY klausulen, så den matcher SELECT-udtrykket.
+3. Tilsvarende ændring i `getProviderApiUsage()` -- begrænse budget-tjek til den specifikke integration der backfilles, ikke alle integrationer for provideren.
 
 ### Filer der ændres
 
 | Fil | Ændring |
 |---|---|
-| Database (ny migration) | Opdater `get_sales_aggregates_v2` med korrekt navneprioritering |
+| `supabase/functions/integration-engine/actions/provider-sync.ts` | `getBudgetUsage` beregner per integration i stedet for per provider |
+| `supabase/functions/integration-engine/actions/safe-backfill.ts` | `getProviderApiUsage` beregner per integration i stedet for per provider |
 
 ### Resultat
-- "joel" → "Joel [Efternavn]"
-- "trine" → "Trine [Efternavn]"  
-- Inaktive medarbejdere vises stadig (ingen `is_active` filter)
-- Ingen ændring i salgstal eller provision
-
+- Lovablecph og Relatel_CPHSALES kører med uafhængige budgetter (1000 req/hr hver)
+- Ingen integration stoppes af en andens API-forbrug
+- System Stability-dashboardet viser allerede korrekte per-integration tal (ingen frontend-ændring nødvendig)
