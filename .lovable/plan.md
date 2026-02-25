@@ -1,44 +1,41 @@
 
 
-## Fix: Dobbelt FM-salg i Dagsrapporter
+## Tilfoej bagudrettet funktionalitet for vagter og lokationer
 
-### Problem
+### Identificerede problemer
 
-Fieldmarketing-salg har et `agent_email`-felt sat (f.eks. `frfo@copenhagensales.dk`). Dagsrapporter henter salg via **to separate forespørgsler**:
+1. **Uge-navigation i "Book uge" kan ikke skifte aar**: `handlePrevWeek` og `handleNextWeek` i `BookWeekContent.tsx` haandterer ikke aar-graenser. Uge 1 minus 1 giver uge 0, som er ugyldig. Det goer det umuligt at navigere til foregaaende aar.
 
-1. **Almindelige salg** (linje ~569): Henter ALLE salg matchende `agent_email` -- inklusiv FM-salg. Disse vises som "Ukendt kampagne" fordi FM-salg ikke har et `dialer_campaign_id`.
-2. **FM-salg** (linje ~668): Henter separat alle salg med `source = 'fieldmarketing'` og matcher via `fm_seller_id`. Disse vises som "Fieldmarketing".
+2. **Ingen "Book alligevel"-knap for utilgaengelige lokationer i fortiden**: Lokationer der allerede har en booking i den valgte uge, eller har status "Sortlistet"/"Pause", vises under "Utilgaengelige" uden mulighed for at booke. For bagudrettede bookinger boer der vaere en "Book alligevel"-knap (som der allerede er for cooldown-lokationer).
 
-Resultatet er at hvert FM-salg taelles og vises dobbelt -- en gang under "Ukendt kampagne" og en gang under "Fieldmarketing" -- med identiske tal.
+3. **Opret lokation med startdato/status**: Naar man opretter en ny lokation kan man ikke angive en startdato eller saette status til "Aktiv" direkte, saa den er klar til at booke bagudrettet.
 
-### Loesning
+### Teknisk plan
 
-Tilfoej et filter der udelukker FM-salg fra den foerste (almindelige) salgs-foresporgsel, saa de kun haandteres af den dedikerede FM-logik.
+#### 1. Fix aar-graense i uge-navigation (`BookWeekContent.tsx`)
 
-### Teknisk aendring
+Ret `handlePrevWeek` og `handleNextWeek` (linje 316-328) til at haandtere aarsskift:
 
-**Fil:** `src/pages/reports/DailyReports.tsx`
-
-**Aendring 1** -- I den almindelige salgs-foresporgsel (ca. linje 569-581), tilfoej `.neq("source", "fieldmarketing")` til filteret:
-
-```typescript
-salesData = await fetchAllRows(
-  "sales", selectClause,
-  (q) => {
-    let query = q
-      .or(emailOrFilter)
-      .neq("source", "fieldmarketing")  // <-- NY LINJE
-      .gte("sale_datetime", `${startStr}T00:00:00`)
-      .lte("sale_datetime", `${endStr}T23:59:59`);
-    if (selectedClient !== "all") {
-      query = query.eq("client_campaigns.client_id", selectedClient);
-    }
-    return query;
-  }
-);
+```text
+handlePrevWeek:
+  Uge 1 -> Uge 52, aar - 1
+  
+handleNextWeek:
+  Uge 52 -> Uge 1, aar + 1
 ```
 
-Dette sikrer at FM-salg kun tælles af den dedikerede FM-logik (linje 826-830), som korrekt viser dem under "Fieldmarketing" med korrekte provisions- og omsætningstal.
+#### 2. Tilfoej "Book alligevel"-knap for utilgaengelige lokationer (`BookWeekContent.tsx`)
 
-Ingen andre filer eller logik behøver ændres.
+I tabellen under "Utilgaengelige" (ca. linje 507-533), tilfoej en "Book alligevel"-knap med variant="outline" saa brugere kan oprette bagudrettede bookinger paa lokationer der allerede er booket i den uge.
+
+#### 3. Tilfoej status-vaelger i "Opret ny lokation" (`LocationsContent.tsx`)
+
+I dialogen for ny lokation (linje ~235), tilfoej en Select for status med valgmulighederne "Ny", "Aktiv", "Pause", "Sortlistet". Default forbliver "Ny", men brugeren kan saette "Aktiv" med det samme saa lokationen er klar til booking.
+
+### Filer der aendres
+
+| Fil | Aendring |
+|---|---|
+| `src/pages/vagt-flow/BookWeekContent.tsx` | Fix aar-rollover i handlePrevWeek/handleNextWeek + tilfoej Book-knap paa utilgaengelige |
+| `src/pages/vagt-flow/LocationsContent.tsx` | Tilfoej status-vaelger i opret-dialog |
 
