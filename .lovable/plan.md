@@ -1,39 +1,26 @@
 
 
-## Tilføj lønperiode-valg til Faktureringsrapport
+## Tilføj lønperiode-valg til Oversigt-fanen
 
 ### Hvad ændres
 
-Periode-vælgeren i leverandørrapporten udvides med et nyt valg: **Lønperiode (15.–14.)**. I dag kan man kun vælge hele måneder. Med denne ændring kan brugeren skifte mellem "Måned" og "Lønperiode", og datoerne beregnes automatisk.
+Oversigt-fanen (`BillingOverviewTab` i `src/pages/vagt-flow/Billing.tsx`) får samme periodetype-toggle som Leverandørrapport-fanen, så brugeren kan vælge mellem "Måned" og "Lønperiode (15.–14.)".
 
-Eksempel: "Lønperiode februar 2026" = 15. januar 2026 – 14. februar 2026.
+### Teknisk plan (1 fil: `src/pages/vagt-flow/Billing.tsx`)
 
-### Teknisk plan (1 fil)
+1. **Ny state** (linje ~32): Tilføj `periodType` state med `"month" | "payroll"`.
 
-**`src/components/billing/SupplierReportTab.tsx`**
+2. **Beregning af datoer** (linje ~36-37): Erstat den faste `monthStart`/`monthEnd` med betinget logik:
+   - `"payroll"`: `periodStart = 15. i forrige måned`, `periodEnd = 14. i valgte måned`
+   - `"month"`: Uændret (1.–ultimo)
 
-1. **Ny state**: Tilføj `periodType` state med værdier `"month"` og `"payroll"`.
-2. **Ny UI-toggle**: Tilføj en Select-komponent før måned-vælgeren, der lader brugeren vælge mellem "Måned" og "Lønperiode".
-3. **Beregning af datoer**: Erstat den faste `monthStart`/`monthEnd`-logik med en betinget beregning:
-   - `"month"`: Uændret (1.–ultimo).
-   - `"payroll"`: `periodStart = 15. i forrige måned`, `periodEnd = 14. i valgte måned`.
-4. **Opdatér labels**: Når "Lønperiode" er valgt, vis f.eks. "Lønperiode februar 2026" i stedet for "februar 2026" i overskrifter og PDF.
-5. **Opdatér query keys**: Inkludér `periodType` i alle relevante query keys, så data genindlæses korrekt ved skift.
-6. **YTD-beregning**: Tilpas `yearStart` til at starte fra 15. januar ved lønperiode-mode, så YTD-summen følger samme logik.
-7. **PDF-label**: Send den korrekte periode-label til `downloadSupplierReportPdf` så PDF'en afspejler den valgte periodetype.
+3. **Opdatér queries** (linje ~40, 49-50): 
+   - Brug `periodStart`/`periodEnd` i stedet for `monthStart`/`monthEnd` i booking-queryen
+   - Tilføj `periodType` til query key
 
-### Eksempel på datoberegning
+4. **Ny UI-toggle** (linje ~148, efter filter-rækken): Tilføj en Select-komponent med "Måned" og "Lønperiode" før måned-vælgeren -- samme mønster som i SupplierReportTab.
 
-```text
-periodType = "payroll", selectedMonth = "2026-02"
-→ periodStart = 2026-01-15
-→ periodEnd   = 2026-02-14
+### Ingen andre filer ændres
 
-periodType = "month", selectedMonth = "2026-02"
-→ periodStart = 2026-02-01
-→ periodEnd   = 2026-02-28
-```
+Samme logik som allerede er implementeret i `SupplierReportTab.tsx`, bare kopieret ind i `BillingOverviewTab`.
 
-### Ingen database-ændringer
-
-Alt beregnes client-side ud fra den valgte måned + periodetype. Eksisterende bookinger filtreres med de nye datoer.
