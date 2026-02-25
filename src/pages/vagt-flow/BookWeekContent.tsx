@@ -314,17 +314,29 @@ export default function BookWeekContent() {
   }, [processedLocations, activeTab, searchQuery, locationType]);
 
   const handlePrevWeek = () => {
-    const newWeek = selectedWeek - 1;
+    let newWeek = selectedWeek - 1;
+    let newYear = selectedYear;
+    if (newWeek < 1) {
+      newWeek = 52;
+      newYear = selectedYear - 1;
+    }
     setSelectedWeek(newWeek);
+    setSelectedYear(newYear);
     const currentTab = searchParams.get("tab") || "book-week";
-    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: selectedYear.toString() });
+    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: newYear.toString() });
   };
 
   const handleNextWeek = () => {
-    const newWeek = selectedWeek + 1;
+    let newWeek = selectedWeek + 1;
+    let newYear = selectedYear;
+    if (newWeek > 52) {
+      newWeek = 1;
+      newYear = selectedYear + 1;
+    }
     setSelectedWeek(newWeek);
+    setSelectedYear(newYear);
     const currentTab = searchParams.get("tab") || "book-week";
-    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: selectedYear.toString() });
+    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: newYear.toString() });
   };
 
   const toggleDay = (dayValue: number) => {
@@ -517,7 +529,7 @@ export default function BookWeekContent() {
                             Book
                           </Button>
                         )}
-                        {activeTab === "cooldown" && (
+                        {(activeTab === "cooldown" || activeTab === "utilgaengelige") && (
                           <Button
                             size="sm"
                             variant="outline"

@@ -64,6 +64,7 @@ export default function LocationsContent() {
     contact_email: "",
     bookable_client_ids: [] as string[],
     daily_rate: 1000,
+    status: "Ny",
   });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -122,7 +123,7 @@ export default function LocationsContent() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newLocation) => {
-      const { error } = await supabase.from("location").insert({
+      const { error } = await supabase.from("location").insert([{
         name: data.name,
         type: data.type || null,
         address_street: data.address_street || null,
@@ -134,8 +135,8 @@ export default function LocationsContent() {
         contact_email: data.contact_email || null,
         bookable_client_ids: data.bookable_client_ids,
         daily_rate: data.daily_rate || 1000,
-        status: "Ny",
-      });
+        status: (data.status || "Ny") as "Ny" | "Aktiv" | "Pause" | "Sortlistet",
+      }]);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -154,6 +155,7 @@ export default function LocationsContent() {
         contact_email: "",
         bookable_client_ids: [],
         daily_rate: 1000,
+        status: "Ny",
       });
     },
     onError: (error: any) => {
@@ -395,15 +397,34 @@ export default function LocationsContent() {
                 ))}
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="daily_rate">Dagspris (kr)</Label>
-              <Input
-                id="daily_rate"
-                type="number"
-                value={newLocation.daily_rate}
-                onChange={(e) => setNewLocation({ ...newLocation, daily_rate: parseInt(e.target.value) || 1000 })}
-                placeholder="1000"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="daily_rate">Dagspris (kr)</Label>
+                <Input
+                  id="daily_rate"
+                  type="number"
+                  value={newLocation.daily_rate}
+                  onChange={(e) => setNewLocation({ ...newLocation, daily_rate: parseInt(e.target.value) || 1000 })}
+                  placeholder="1000"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={newLocation.status}
+                  onValueChange={(value) => setNewLocation({ ...newLocation, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ny">Ny</SelectItem>
+                    <SelectItem value="Aktiv">Aktiv</SelectItem>
+                    <SelectItem value="Pause">Pause</SelectItem>
+                    <SelectItem value="Sortlistet">Sortlistet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
