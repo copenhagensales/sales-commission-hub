@@ -1,29 +1,51 @@
 
 
-## Tillad tidligere datoer for flytning + korrekt datahåndtering
+## Status: Hvad er gjort, og hvad mangler?
 
-### Problem
-Kalenderen i "Flyt medarbejder"-dialogen blokerer alle datoer før i dag (`date < startOfDay(new Date())`). Brugeren skal kunne vælge tidligere datoer for at registrere flytninger med tilbagevirkende kraft.
+### Allerede implementeret
 
-### Løsning
+| Trin | Beskrivelse | Status |
+|------|-------------|--------|
+| **Trin 1** | Frontend: Erstat `@/utils/payrollPeriod` imports → `@/lib/calculations` | **DONE** — filen `src/utils/payrollPeriod.ts` er slettet, ingen imports refererer til den |
+| **Trin 2** | Frontend: Erstat `@/lib/vagt-flow-date-utils` imports → `@/lib/calculations` | **DONE** — filen er slettet, ingen imports refererer til den |
+| **Trin 3** | Slet legacy-filer | **DONE** — begge filer er væk |
+| **Trin 4A** | `tv-dashboard-data` → importerer `_shared/date-helpers.ts` | **DONE** — importerer `getStartOfWeek`, `getPayrollPeriod` |
+| **Trin 4A** | `parse-expense-formula` → importerer `_shared/date-helpers.ts` | **DONE** — importerer `getPayrollPeriod`, `countWorkDaysInPeriod` |
+| **Trin 4B** | `calculate-kpi-incremental` → importerer `_shared/date-helpers.ts` | **DONE** |
+| **Trin 4B** | `calculate-leaderboard-incremental` → importerer `_shared/date-helpers.ts` | **DONE** |
+| **Trin 4B** | `snapshot-payroll-period` → importerer `_shared/date-helpers.ts` (inkl. `getPreviousPayrollPeriod`) | **DONE** |
+| **Trin 4C** | CI-script `scripts/check-inline-dates.sh` | **DONE** — scriptet eksisterer og fanger `day|currentDay|d >= 15` |
 
-**Fil:** `src/components/employees/TeamsTab.tsx`
+---
 
-1. **Fjern datobegrænsningen** på kalenderen (linje 1028):
-   - Fjern `disabled={(date) => date < startOfDay(new Date())}` så alle datoer kan vælges
+### Det der mangler (2 ting)
 
-2. **Behandl tidligere datoer som øjeblikkelige flytninger:**
-   - I mutationen (`moveEmployeeToTeamMutation`): udvid `isTodayMove`-checket til også at inkludere datoer i fortiden
-   - Ændre logik: `const isImmediateMove = isToday(effectiveDate) || effectiveDate < new Date()`
-   - Tidligere datoer udfører flytningen med det samme (ligesom "i dag"), da de allerede skulle have været gennemført
+#### 1. Én sidste inline-rest i `calculate-kpi-values/index.ts` (linje 1741-1745)
 
-3. **Opdater UI-feedback:**
-   - Tilføj en besked for tidligere datoer: "Medarbejderen flyttes øjeblikkeligt (tilbagevirkende kraft)"
-   - Behold eksisterende beskeder for i dag og fremtidige datoer
+Filen importerer allerede `getPayrollPeriod` fra `_shared/date-helpers.ts` (linje 2), men **bruger den ikke** i funktionen `countActiveAndRecentSellers` (linje ~1740). Der ligger stadig en inline-kopi:
+
+```ts
+const day = now.getDate();
+const payrollStart = day >= 15
+  ? new Date(year, month, 15)
+  : new Date(year, month - 1, 15);
+```
+
+**Fix:** Erstat med `const { start: payrollStart } = getPayrollPeriod(now);` og slet de 4 overflødige linjer.
+
+Dette er den **eneste** rest af inline payroll-logik i hele repoen (bekræftet via grep). CI-scriptet ville fange den.
+
+#### 2. `lint:dates` mangler i `package.json`
+
+CI-scriptet `scripts/check-inline-dates.sh` eksisterer, men der er ingen `lint:dates`-kommando i `package.json`, så det kan ikke køres via `npm run lint:dates`.
+
+**Fix:** Tilføj `"lint:dates": "bash scripts/check-inline-dates.sh"` i `scripts`-sektionen af `package.json`.
+
+---
 
 ### Teknisk opsummering
-- 1 fil ændres: `src/components/employees/TeamsTab.tsx`
-- Kalenderen tillader alle datoer
-- Tidligere datoer → øjeblikkelig flytning (som i dag)
-- Fremtidige datoer → planlagt flytning via `scheduled_team_changes` (uændret)
+
+- **1 linje inline-logik** fjernes i `calculate-kpi-values/index.ts`
+- **1 script-reference** tilføjes i `package.json`
+- Herefter er hele den 4-trins plan **100% gennemført**
 
