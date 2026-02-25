@@ -171,8 +171,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 .section h3{font-size:14px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px}
 
 /* Table */
-table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden}
-th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
+table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden;table-layout:fixed}
+col.col-loc{width:22%}col.col-by{width:13%}col.col-kunde{width:10%}col.col-periode{width:12%}col.col-book{width:7%}col.col-dage{width:6%}col.col-dagspris{width:12%}col.col-belob{width:12%}col.col-rabat{width:8%}col.col-efter{width:12%}
+th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}
 td{padding:7px 6px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
 tbody tr{background:#151d27}
 tbody tr:nth-child(even){background:#1a2332}
@@ -197,8 +198,8 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
 .kpi-card{background:#1e293b;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
 .kpi-card.highlight{border-color:rgba(99,102,241,0.3);background:#1e2747}
-.kpi-label{display:block;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;white-space:nowrap}
-.kpi-value{display:block;font-size:16px;font-weight:700;color:#f1f5f9;white-space:nowrap}
+.kpi-label{display:block;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-value{display:block;font-size:15px;font-weight:700;color:#f1f5f9;white-space:nowrap}
 .kpi-value.accent{color:#34d399}
 
 /* Staircase */
@@ -228,10 +229,15 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
   <div class="section">
     <h3>Bookinger</h3>
     <table>
+      <colgroup>
+        <col class="col-loc"><col class="col-by"><col class="col-kunde"><col class="col-periode">
+        <col class="col-book"><col class="col-dage"><col class="col-dagspris"><col class="col-belob">
+        ${isAnnualRevenue ? '<col class="col-rabat"><col class="col-efter">' : ""}
+      </colgroup>
       <thead>
         <tr>
           <th>Lokation</th><th>By</th><th>Kunde</th><th>Periode</th>
-          <th class="num">Bookinger</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
+          <th class="num">Book.</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
           ${isAnnualRevenue ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
         </tr>
       </thead>
