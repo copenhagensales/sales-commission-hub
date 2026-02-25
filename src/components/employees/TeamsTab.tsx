@@ -339,9 +339,9 @@ export function TeamsTab() {
         throw new Error("Medarbejderen er allerede på dette team");
       }
       
-      const isTodayMove = isToday(effectiveDate);
+      const isImmediateMove = isToday(effectiveDate) || effectiveDate < new Date();
       
-      if (isTodayMove) {
+      if (isImmediateMove) {
         // Insert into new team immediately - database trigger handles cleanup for non-staff
         const { error } = await supabase
           .from("team_members")
@@ -1025,7 +1025,7 @@ export function TeamsTab() {
                       mode="single"
                       selected={effectiveDate}
                       onSelect={setEffectiveDate}
-                      disabled={(date) => date < startOfDay(new Date())}
+                      
                       locale={da}
                     />
                   </PopoverContent>
@@ -1036,8 +1036,14 @@ export function TeamsTab() {
                     Medarbejderen flyttes øjeblikkeligt
                   </p>
                 )}
+
+                {effectiveDate && !isToday(effectiveDate) && effectiveDate < new Date() && (
+                  <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                    ⏪ Medarbejderen flyttes øjeblikkeligt (tilbagevirkende kraft)
+                  </p>
+                )}
                 
-                {effectiveDate && !isToday(effectiveDate) && (
+                {effectiveDate && !isToday(effectiveDate) && effectiveDate > new Date() && (
                   <p className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/30 p-2 rounded">
                     ℹ️ Medarbejderen forbliver på nuværende team indtil {format(effectiveDate, "d. MMMM yyyy", { locale: da })}
                   </p>
