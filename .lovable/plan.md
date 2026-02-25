@@ -1,69 +1,65 @@
 
-
-## Excel-udtræk: Eesy TM salg per medarbejder
+## Rabatstruktur: Minimum dage pr. lokation for at taelle som placering
 
 ### Problem
-Brugeren har brug for et Excel-udtræk over Eesy TM-salg i lønperioden 15/1 - 14/2, med antal salg og provision pr. medarbejder. Rapporter Ledelse-siden er tom i dag.
+I dag taeller rabatsystemet for "Danske Shoppingcentre" alle bookinger som placeringer. Brugeren vil have, at en lokation kun taeller som 1 placering, hvis der er booket mindst 5 dage paa den lokation i perioden. Fx: Amager Centeret med 5 dage = 1 placering, Kolding Storcenter med 4 dage = 0 placeringer.
 
 ### Loesning
-Tilfoej en Excel-eksport funktion paa ReportsManagement-siden med forudindstillet Eesy TM klient og lønperiode, der henter salgsdata grupperet pr. medarbejder og genererer en .xlsx fil.
+Tilfoej et `min_days_per_location` felt paa rabatreglerne og aendr beregningslogikken, saa "placeringer" taelles som unikke lokationer der opfylder minimumskravet.
 
 ### Teknisk plan
 
-**Fil:** `src/pages/reports/ReportsManagement.tsx`
+**Database-migration:**
 
-**Aendring 1** -- Tilfoej imports:
-- `useState`, `useMemo` fra React
-- `useQuery` fra tanstack
-- `supabase` fra integrations
-- `* as XLSX` fra xlsx
-- `Button`, `Select`, `Card`, `Table` UI-komponenter
-- `Download`, `FileSpreadsheet` ikoner fra lucide-react
-- `format` fra date-fns
-- `CLIENT_IDS` fra clientIds
-- `fetchAllRows` fra supabasePagination
+Tilfoej kolonne `min_days_per_location` (default 1 for bagudkompatibilitet):
 
-**Aendring 2** -- Tilfoej state og data-hentning:
-- State for valgt klient (default: Eesy TM id) og periodestart/slut (default: 2026-01-15 / 2026-02-14)
-- `useQuery` der henter salg med `sale_items` og `employee_agent_mapping` for den valgte klient og periode
-- Aggreger data pr. medarbejder (navn, antal salg, provision)
+```sql
+ALTER TABLE supplier_discount_rules
+ADD COLUMN min_days_per_location integer NOT NULL DEFAULT 1;
 
-**Aendring 3** -- Tilfoej Excel-eksport funktion:
-```typescript
-const handleExport = () => {
-  const rows = aggregatedData.map(emp => ({
-    "Medarbejder": emp.name,
-    "Antal salg": emp.salesCount,
-    "Provision (DKK)": Math.round(emp.commission),
-  }));
-  // Tilfoej totalraekke
-  rows.push({
-    "Medarbejder": "TOTAL",
-    "Antal salg": totalSales,
-    "Provision (DKK)": Math.round(totalCommission),
-  });
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Eesy TM Salg");
-  XLSX.writeFile(wb, `eesy-tm-salg-${periodLabel}.xlsx`);
-};
+-- Opdater Danske Shoppingcentre regler til 5 dage
+UPDATE supplier_discount_rules
+SET min_days_per_location = 5
+WHERE location_type = 'Danske Shoppingcentre';
 ```
 
-**Aendring 4** -- UI med tabel-preview og download-knap:
-- Kort med titel "Salgsudtræk per medarbejder"
-- Dropdown til klient-valg og dato-inputs til periode
-- Tabel der viser medarbejder, antal salg, provision
-- Download-knap der genererer Excel-filen
+**Fil 1: `src/components/billing/SupplierReportTab.tsx`**
 
-### Data-flow
-1. Hent salg fra `sales` + `sale_items` filtreret paa `client_campaigns.client_id` og `sale_datetime`
-2. Map `agent_email` til medarbejdernavn via `employee_agent_mapping` + `employee_master_data`
-3. Aggreger pr. medarbejder: sum af quantity (counts_as_sale) og sum af mapped_commission
-4. Generer XLSX med xlsx-biblioteket (allerede installeret)
+Aendring i placeringsberegningen (linje 244):
+
+Erstat den nuvaerende `totalPlacements` (som taeller antal bookinger) med en beregning der:
+1. For hver lokation, summer det faktiske antal bookede dage (via `booked_days` array eller fallback til `differenceInDays`)
+2. Kun taeller lokationen som 1 placering hvis `totalDays >= min_days_per_location` (hentet fra discount rules)
+
+```typescript
+const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
+const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
+  return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);
+}, 0);
+```
+
+Ogsaa sikre at `totalDays` beregnes fra `booked_days` array naar det er tilgaengeligt (som i Billing.tsx), saa vi faar det praecise antal dage.
+
+**Fil 2: `src/components/billing/DiscountRulesTab.tsx`**
+
+Tilfoej UI-felt til `min_days_per_location` i opret/rediger dialogen:
+- Nyt input-felt "Min. dage pr. lokation" (kun synligt naar discount_type er "placements")
+- Default vaerdi: 1
+- Gem vaerdien ved opret/opdater
+
+**Fil 3: `src/integrations/supabase/types.ts`**
+
+Opdateres automatisk efter migrationen.
 
 ### Filer der aendres
 
 | Fil | Aendring |
 |---|---|
-| `src/pages/reports/ReportsManagement.tsx` | Fuldt nyt indhold med klientfilter, datatabel og Excel-eksport |
+| Database | Tilfoej `min_days_per_location` kolonne, saet til 5 for Danske Shoppingcentre |
+| `src/components/billing/SupplierReportTab.tsx` | Aendr placeringsoptaelling til unikke lokationer med nok dage |
+| `src/components/billing/DiscountRulesTab.tsx` | Tilfoej min-dage felt i opret/rediger dialog |
 
+### Resultat
+- Danske Shoppingcentre: En lokation taeller kun som 1 placering hvis den har 5+ bookede dage
+- Andre lokationstyper: Default 1 dag (ingen aendring i adfaerd)
+- Konfigurerbart per rabattype via admin-UI
