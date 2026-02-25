@@ -8,6 +8,7 @@ interface LocationRow {
   city: string;
   client: string;
   period: string;
+  bookings: number;
   days: number;
   dailyRate: number | string;
   amount: number;
@@ -55,7 +56,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
     .map(
       (loc) => `
       <tr class="${loc.isExcluded ? "excluded" : ""}">
-        <td>
+        <td class="cell-name">
           ${loc.locationName}
           ${loc.isExcluded ? ' <span class="badge badge-excluded">Udelukket</span>' : ""}
           ${loc.maxDiscount != null && !loc.isExcluded ? ` <span class="badge badge-max">Max ${loc.maxDiscount}%</span>` : ""}
@@ -63,12 +64,13 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
         <td>${loc.city || "-"}</td>
         <td>${loc.client || "-"}</td>
         <td>${loc.period}</td>
+        <td class="num">${loc.bookings}</td>
         <td class="num">${loc.days}</td>
         <td class="num">${typeof loc.dailyRate === "number" ? fmtKr(loc.dailyRate) : loc.dailyRate}</td>
         <td class="num">${fmtKr(loc.amount)}</td>
         ${
           isAnnualRevenue
-            ? `<td class="num discount">${loc.isExcluded ? '<span class="muted">Separat</span>' : `-${loc.discount}%`}</td>
+            ? `<td class="num accent">${loc.isExcluded ? '<span class="muted">Separat</span>' : `-${loc.discount}%`}</td>
                <td class="num">${loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</td>`
             : ""
         }
@@ -97,34 +99,56 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       ? `
       <div class="staircase">
         <h4>Rabattrappe</h4>
-        <table class="staircase-table">
-          <tr>
-            ${config.discountInfo.staircaseSteps
-              .map(
-                (s) =>
-                  `<td class="${config.discountInfo.ytdRevenue != null && config.discountInfo.ytdRevenue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><small>${fmtKr(s.minRevenue)}+</small></td>`
-              )
-              .join("")}
-          </tr>
-        </table>
+        <div class="staircase-row">
+          ${config.discountInfo.staircaseSteps
+            .map(
+              (s) =>
+                `<div class="staircase-step ${config.discountInfo.ytdRevenue != null && config.discountInfo.ytdRevenue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><span class="step-label">${fmtKr(s.minRevenue)}+</span></div>`
+            )
+            .join("")}
+        </div>
       </div>`
       : "";
 
   const discountSectionHtml = isAnnualRevenue
     ? `
-      <div class="summary-grid">
-        <div><span class="label">Kumulativ årsomsætning</span><span class="value">${fmtKr(config.discountInfo.ytdRevenue ?? 0)}</span></div>
-        <div><span class="label">Nuværende rabattrin</span><span class="value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span></div>
-        <div><span class="label">Samlet rabat (denne md)</span><span class="value discount">-${fmtKr(config.totals.discountAmount)}</span></div>
-        <div><span class="label">Total efter rabat</span><span class="value bold">${fmtKr(config.totals.finalAmount)}</span></div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Kumulativ årsomsætning</span>
+          <span class="kpi-value">${fmtKr(config.discountInfo.ytdRevenue ?? 0)}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Nuværende rabattrin</span>
+          <span class="kpi-value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Samlet rabat (denne md)</span>
+          <span class="kpi-value accent">-${fmtKr(config.totals.discountAmount)}</span>
+        </div>
+        <div class="kpi-card highlight">
+          <span class="kpi-label">Total efter rabat</span>
+          <span class="kpi-value">${fmtKr(config.totals.finalAmount)}</span>
+        </div>
       </div>
       ${staircaseHtml}`
     : `
-      <div class="summary-grid">
-        <div><span class="label">Bookinger</span><span class="value">${config.discountInfo.uniquePlacements}</span></div>
-        <div><span class="label">Rabattrin</span><span class="value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span></div>
-        <div><span class="label">Rabatbeløb</span><span class="value discount">-${fmtKr(config.totals.discountAmount)}</span></div>
-        <div><span class="label">Total efter rabat</span><span class="value bold">${fmtKr(config.totals.finalAmount)}</span></div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Bookinger</span>
+          <span class="kpi-value">${config.discountInfo.uniquePlacements}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Rabattrin</span>
+          <span class="kpi-value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Rabatbeløb</span>
+          <span class="kpi-value accent">-${fmtKr(config.totals.discountAmount)}</span>
+        </div>
+        <div class="kpi-card highlight">
+          <span class="kpi-label">Total efter rabat</span>
+          <span class="kpi-value">${fmtKr(config.totals.finalAmount)}</span>
+        </div>
       </div>`;
 
   const html = `<!DOCTYPE html>
@@ -134,36 +158,92 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 <title>Leverandørrapport – ${config.locationType} – ${config.month}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5;color:#1a1a1a;padding:32px;max-width:900px;margin:0 auto;font-size:13px}
-.header{border-bottom:2px solid #222;padding-bottom:16px;margin-bottom:24px}
-.header h1{font-size:20px;margin-bottom:4px}
-.header .meta{color:#666;font-size:13px}
-table{width:100%;border-collapse:collapse;margin-bottom:20px}
-th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;font-size:12px}
-th{background:#f5f5f5;font-weight:600}
-.num{text-align:right}
-tfoot td{font-weight:700;background:#fafafa}
-.excluded{opacity:.55}
-.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500;margin-left:4px}
-.badge-excluded{background:#fee2e2;color:#991b1b}
-.badge-max{background:#e0e7ff;color:#3730a3}
-.discount{color:#16a34a}
-.muted{color:#999;font-style:italic;font-size:11px}
-.section{margin-bottom:20px}
-.section h3{font-size:15px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}
-.exceptions{margin-left:20px;font-size:12px}
-.exceptions li{margin-bottom:2px}
-.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
-.summary-grid div{background:#f9f9f9;padding:10px;border-radius:6px}
-.summary-grid .label{display:block;font-size:11px;color:#666}
-.summary-grid .value{display:block;font-size:18px;font-weight:700;margin-top:2px}
-.summary-grid .bold{font-weight:800}
-.staircase{margin-top:12px}
-.staircase h4{font-size:13px;margin-bottom:6px}
-.staircase-table td{text-align:center;background:#f3f4f6;border:1px solid #ddd;padding:8px;font-size:12px;font-weight:600}
-.staircase-table td.active{background:#dbeafe;border-color:#93c5fd}
-.footer{margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;color:#aaa;font-size:11px}
-@media print{body{padding:16px}}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#e2e8f0;background:#0f1419;padding:40px;max-width:960px;margin:0 auto;font-size:13px}
+
+/* Header */
+.header{padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.header h1{font-size:22px;font-weight:700;color:#f1f5f9;letter-spacing:-0.02em}
+.header .meta{color:#64748b;font-size:13px;margin-top:4px}
+
+/* Section */
+.section{margin-bottom:28px}
+.section h3{font-size:14px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px}
+
+/* Table */
+table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden}
+th{background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:10px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
+td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
+tbody tr{background:#151d27}
+tbody tr:nth-child(even){background:#1a2332}
+tbody tr:hover{background:#1e2d3d}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.cell-name{font-weight:500;color:#f1f5f9}
+tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid rgba(255,255,255,0.08);border-bottom:none}
+
+/* Excluded rows */
+.excluded td{opacity:.45}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle}
+.badge-excluded{background:rgba(239,68,68,0.15);color:#f87171}
+.badge-max{background:rgba(99,102,241,0.15);color:#818cf8}
+
+/* Accent color for discount */
+.accent{color:#34d399}
+.muted{color:#475569;font-style:italic;font-size:11px}
+
+/* KPI Grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi-card{background:#1e293b;padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
+.kpi-card.highlight{border-color:rgba(99,102,241,0.3);background:#1e2747}
+.kpi-label{display:block;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px}
+.kpi-value{display:block;font-size:20px;font-weight:700;color:#f1f5f9}
+.kpi-value.accent{color:#34d399}
+
+/* Staircase */
+.staircase{margin-top:16px}
+.staircase h4{font-size:13px;color:#94a3b8;margin-bottom:8px;font-weight:600}
+.staircase-row{display:flex;gap:8px}
+.staircase-step{flex:1;text-align:center;background:#1e293b;border:1px solid rgba(255,255,255,0.06);padding:12px 8px;border-radius:6px;font-size:14px;font-weight:700;color:#94a3b8}
+.staircase-step.active{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#818cf8}
+.step-label{font-size:10px;font-weight:500;color:#64748b}
+
+/* Exceptions */
+.exceptions{margin-left:20px;font-size:12px;color:#94a3b8}
+.exceptions li{margin-bottom:4px}
+.exceptions strong{color:#cbd5e1}
+
+/* Footer */
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;color:#475569;font-size:11px}
+
+/* Print */
+@media print{
+  body{background:#fff;color:#1a1a1a;padding:20px}
+  .header{border-bottom-color:#e2e8f0}
+  .header h1{color:#0f172a}
+  .header .meta{color:#64748b}
+  .section h3{color:#475569}
+  th{background:#f1f5f9;color:#475569;border-bottom-color:#e2e8f0}
+  td{color:#334155;border-bottom-color:#f1f5f9}
+  tbody tr,tbody tr:nth-child(even){background:#fff}
+  tbody tr:hover{background:#fff}
+  .cell-name{color:#0f172a}
+  tfoot td{background:#f1f5f9;color:#0f172a;border-top-color:#e2e8f0}
+  .excluded td{opacity:.5}
+  .badge-excluded{background:#fee2e2;color:#dc2626}
+  .badge-max{background:#e0e7ff;color:#4338ca}
+  .accent{color:#059669}
+  .kpi-card{background:#f8fafc;border-color:#e2e8f0}
+  .kpi-card.highlight{background:#eef2ff;border-color:#c7d2fe}
+  .kpi-label{color:#64748b}
+  .kpi-value{color:#0f172a}
+  .kpi-value.accent{color:#059669}
+  .staircase-step{background:#f8fafc;border-color:#e2e8f0;color:#475569}
+  .staircase-step.active{background:#eef2ff;border-color:#a5b4fc;color:#4338ca}
+  .exceptions{color:#475569}
+  .exceptions strong{color:#1e293b}
+  .footer{border-top-color:#e2e8f0;color:#94a3b8}
+}
 </style>
 </head>
 <body>
@@ -178,16 +258,16 @@ tfoot td{font-weight:700;background:#fafafa}
       <thead>
         <tr>
           <th>Lokation</th><th>By</th><th>Kunde</th><th>Periode</th>
-          <th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
+          <th class="num">Bookinger</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
           ${isAnnualRevenue ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
         </tr>
       </thead>
       <tbody>${locationRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="6">Subtotal</td>
+          <td colspan="7">Subtotal</td>
           <td class="num">${fmtKr(config.totals.subtotal)}</td>
-          ${isAnnualRevenue ? `<td class="num discount">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
+          ${isAnnualRevenue ? `<td class="num accent">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
         </tr>
       </tfoot>
     </table>

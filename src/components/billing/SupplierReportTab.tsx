@@ -663,6 +663,7 @@ export function SupplierReportTab() {
                     city: loc.location?.address_city || "",
                     client: loc.client?.name || "",
                     period: formatDateRange(loc.minDate, loc.maxDate),
+                    bookings: loc.bookings.length,
                     days: loc.totalDays,
                     dailyRate: loc.usesTotalPrice ? "samlet" : loc.dailyRate,
                     amount: loc.totalAmount,
