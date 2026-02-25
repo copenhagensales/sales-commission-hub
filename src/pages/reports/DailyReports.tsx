@@ -570,8 +570,9 @@ export default function DailyReports() {
               "sales", selectClause,
               (q) => {
                 let query = q
-                  .or(emailOrFilter)
-                  .gte("sale_datetime", `${startStr}T00:00:00`)
+                   .or(emailOrFilter)
+                   .neq("source", "fieldmarketing")
+                   .gte("sale_datetime", `${startStr}T00:00:00`)
                   .lte("sale_datetime", `${endStr}T23:59:59`);
                 if (selectedClient !== "all") {
                   query = query.eq("client_campaigns.client_id", selectedClient);
