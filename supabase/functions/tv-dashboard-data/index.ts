@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getStartOfWeek, getPayrollPeriod } from "../_shared/date-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -614,8 +615,8 @@ async function resolveAgentNames(
 async function fetchTeamPerformanceData(supabase: any, todayStr: string) {
   const today = new Date(todayStr);
   
-  // Calculate period starts
-  const weekStart = getWeekStart(today);
+   // Calculate period starts
+  const weekStart = getWeekStartStr(today);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   
   console.log(`Fetching team performance: today=${todayStr}, weekStart=${weekStart}, monthStart=${monthStart}`);
@@ -877,13 +878,9 @@ async function fetchTeamPerformanceData(supabase: any, todayStr: string) {
   }));
 }
 
-// Helper to get week start (Monday)
-function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d.toISOString().split('T')[0];
+// getWeekStart is now imported from _shared/date-helpers.ts
+function getWeekStartStr(date: Date): string {
+  return getStartOfWeek(date).toISOString().split('T')[0];
 }
 
 // Fetch absence data grouped by client for TV mode "Salg per opgave" display
@@ -1224,7 +1221,7 @@ async function handleCelebrationData(
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-  const weekStart = getWeekStart(today);
+  const weekStart = getWeekStartStr(today);
 
   // Map dashboard slugs to client IDs
   const clientIdMap: Record<string, string> = {
@@ -1402,21 +1399,9 @@ async function handleEesyTmData(
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
-  // Calculate week start (Monday)
-  const dayOfWeek = today.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - daysToMonday);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  
-  // Calculate payroll period (15th to 14th)
-  const currentDay = today.getDate();
-  let payrollStart: Date;
-  if (currentDay >= 15) {
-    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
-  } else {
-    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-  }
+  // Calculate period starts using shared helpers
+  const weekStartStr = getStartOfWeek(today).toISOString().split("T")[0];
+  const { start: payrollStart } = getPayrollPeriod(today);
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // Eesy client ID
@@ -1617,21 +1602,9 @@ async function handleTdcErhvervData(
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
-  // Calculate week start (Monday)
-  const dayOfWeek = today.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - daysToMonday);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  
-  // Calculate payroll period (15th to 14th)
-  const currentDay = today.getDate();
-  let payrollStart: Date;
-  if (currentDay >= 15) {
-    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
-  } else {
-    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-  }
+  // Calculate period starts using shared helpers
+  const weekStartStr = getStartOfWeek(today).toISOString().split("T")[0];
+  const { start: payrollStart } = getPayrollPeriod(today);
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // TDC Erhverv client ID
@@ -1927,25 +1900,9 @@ async function handleRelatelData(
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
-  // Calculate week start (Monday)
-  const dayOfWeek = today.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - daysToMonday);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  
-  // Calculate payroll period (15th to 14th)
-  const currentDay = today.getDate();
-  let payrollStart: Date;
-  let payrollEnd: Date;
-  
-  if (currentDay >= 15) {
-    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
-    payrollEnd = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-  } else {
-    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-    payrollEnd = new Date(today.getFullYear(), today.getMonth(), 14);
-  }
+  // Calculate period starts using shared helpers
+  const weekStartStr = getStartOfWeek(today).toISOString().split("T")[0];
+  const { start: payrollStart, end: payrollEnd } = getPayrollPeriod(today);
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // Relatel client ID (look it up or use the known ID)
@@ -2173,21 +2130,9 @@ async function handleCsTop20Data(
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
-  // Calculate week start (Monday)
-  const dayOfWeek = today.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - daysToMonday);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  
-  // Calculate payroll period (15th to 14th)
-  const currentDay = today.getDate();
-  let payrollStart: Date;
-  if (currentDay >= 15) {
-    payrollStart = new Date(today.getFullYear(), today.getMonth(), 15);
-  } else {
-    payrollStart = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-  }
+  // Calculate period starts using shared helpers
+  const weekStartStr = getStartOfWeek(today).toISOString().split("T")[0];
+  const { start: payrollStart } = getPayrollPeriod(today);
   const payrollStartStr = payrollStart.toISOString().split("T")[0];
 
   // All sales (TM + FM) now have sale_items with mapped_commission via triggers
