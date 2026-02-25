@@ -398,7 +398,7 @@ export default function DailyReports() {
         if (employeeIds.length > 0) {
           let empQuery = supabase
             .from("employee_master_data")
-            .select(`id, first_name, last_name, team_members(team:teams(id, name))`)
+            .select(`id, first_name, last_name, last_team_id, team_members(team:teams(id, name))`)
             .in("id", employeeIds);
           
           if (employeeStatusFilter === "active") {
@@ -415,6 +415,7 @@ export default function DailyReports() {
           if (selectedTeam !== "all") {
             filteredEmployees = filteredEmployees.filter(emp => 
               emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
+              || (emp as any).last_team_id === selectedTeam
             );
           }
           
@@ -431,6 +432,7 @@ export default function DailyReports() {
             id,
             first_name,
             last_name,
+            last_team_id,
             team_members(team:teams(id, name))
           `)
         
@@ -455,6 +457,7 @@ export default function DailyReports() {
           // Team scope: only employees from user's led teams
           filteredEmployees = filteredEmployees.filter(emp =>
             emp.team_members?.some((tm: any) => ledTeamIds.includes(tm.team?.id))
+            || ledTeamIds.includes((emp as any).last_team_id)
           );
         } else if (scopeReportsDaily === "egen" && currentEmployee?.id) {
           // Own scope: only current user's data
@@ -465,6 +468,7 @@ export default function DailyReports() {
         if (selectedTeam !== "all") {
           filteredEmployees = filteredEmployees.filter(emp => 
             emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
+            || (emp as any).last_team_id === selectedTeam
           );
         }
 
