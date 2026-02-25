@@ -157,8 +157,9 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 <meta charset="UTF-8">
 <title>Leverandørrapport – ${config.locationType} – ${config.month}</title>
 <style>
+@page{size:A4;margin:15mm}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#e2e8f0;background:#0f1419;padding:40px;max-width:960px;margin:0 auto;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;color:#e2e8f0;background:#0f1419;padding:15mm;max-width:210mm;margin:0 auto;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 
 /* Header */
 .header{padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08)}
