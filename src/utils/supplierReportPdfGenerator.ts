@@ -121,7 +121,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       ${staircaseHtml}`
     : `
       <div class="summary-grid">
-        <div><span class="label">Unikke placeringer</span><span class="value">${config.discountInfo.uniquePlacements}</span></div>
+        <div><span class="label">Bookinger</span><span class="value">${config.discountInfo.uniquePlacements}</span></div>
         <div><span class="label">Rabattrin</span><span class="value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span></div>
         <div><span class="label">Rabatbeløb</span><span class="value discount">-${fmtKr(config.totals.discountAmount)}</span></div>
         <div><span class="label">Total efter rabat</span><span class="value bold">${fmtKr(config.totals.finalAmount)}</span></div>

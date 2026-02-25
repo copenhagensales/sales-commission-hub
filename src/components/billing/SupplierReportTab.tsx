@@ -224,7 +224,7 @@ export function SupplierReportTab() {
   }, {} as Record<string, any>) || {};
 
   const locationEntries = Object.values(bookingsByLocation) as any[];
-  const uniqueLocations = locationEntries.length;
+  const totalPlacements = locationEntries.reduce((sum: number, loc: any) => sum + loc.bookings.length, 0);
 
   // Calculate YTD revenue (for annual_revenue type)
   const ytdRevenue = ytdBookings?.reduce((sum, booking: any) => {
@@ -264,7 +264,7 @@ export function SupplierReportTab() {
     } else {
       // Placement-based (existing logic)
       for (const rule of discountRules) {
-        if (uniqueLocations >= rule.min_placements) {
+        if (totalPlacements >= rule.min_placements) {
           appliedDiscount = Number(rule.discount_percent);
           appliedRule = rule;
           break;
@@ -331,7 +331,7 @@ export function SupplierReportTab() {
         discount_percent: appliedDiscount,
         discount_amount: totalDiscountAmount,
         final_amount: finalAmount,
-        unique_locations: uniqueLocations,
+        unique_locations: totalPlacements,
         status: "approved",
         approved_by: userData.user?.id,
         approved_at: new Date().toISOString(),
@@ -415,7 +415,7 @@ export function SupplierReportTab() {
         </Card>
       ) : isLoading ? (
         <p className="text-muted-foreground text-center py-8">Indlæser...</p>
-      ) : uniqueLocations === 0 ? (
+      ) : totalPlacements === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             Ingen bookinger fundet for {selectedLocationType} i den valgte periode
@@ -616,8 +616,8 @@ export function SupplierReportTab() {
                 /* Placement-based discount (original) */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Unikke placeringer</p>
-                    <p className="text-2xl font-bold">{uniqueLocations}</p>
+                    <p className="text-sm text-muted-foreground">Bookinger</p>
+                    <p className="text-2xl font-bold">{totalPlacements}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Rabattrin</p>
@@ -673,7 +673,7 @@ export function SupplierReportTab() {
                   discountType,
                   totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
                   discountInfo: {
-                    uniquePlacements: uniqueLocations,
+                    uniquePlacements: totalPlacements,
                     discountPercent: appliedDiscount,
                     discountDescription: appliedRule?.description ?? null,
                     ytdRevenue,
