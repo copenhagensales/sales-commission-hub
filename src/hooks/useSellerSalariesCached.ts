@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
-import { getPayrollPeriod } from "@/lib/calculations";
+import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 
 function toLocalDateString(date: Date): string {
   const y = date.getFullYear();
@@ -33,28 +33,6 @@ interface UseSellerSalariesCachedResult {
   lastUpdated: Date | null;
 }
 
-/**
- * Determines whether a given period matches the current payroll period.
- */
-function isCurrentPayrollPeriod(periodStart: Date | null, periodEnd: Date | null): boolean {
-  if (!periodStart || !periodEnd) return false;
-
-  const { start: currentStart, end: currentEnd } = getPayrollPeriod(new Date());
-
-  const startMatch = toLocalDateString(periodStart) === toLocalDateString(currentStart);
-  const endMatch = toLocalDateString(periodEnd) === toLocalDateString(currentEnd);
-
-  return startMatch && endMatch;
-}
-
-/**
- * Builds a period_key for kpi_period_snapshots from a period start date.
- * Format: "payroll_YYYY-MM-DD"
- */
-function buildPeriodKey(periodStart: Date): string {
-  return `payroll_${toLocalDateString(periodStart)}`;
-}
-
 export function useSellerSalariesCached(
   selectedTeam?: string | null,
   periodStart?: Date | null,
@@ -62,9 +40,6 @@ export function useSellerSalariesCached(
 ): UseSellerSalariesCachedResult {
   const periodStartISO = periodStart ? toLocalDateString(periodStart) : null;
   const periodEndISO = periodEnd ? toLocalDateString(periodEnd) : null;
-
-  const isCurrent = isCurrentPayrollPeriod(periodStart ?? null, periodEnd ?? null);
-  const periodKey = periodStart ? buildPeriodKey(periodStart) : null;
 
   // Query 1: Get all non-staff employees with team info
   const { data: employees, isLoading: employeesLoading } = useQuery({
@@ -95,37 +70,12 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 2: Commission from KPI cache (current period) OR snapshots (historical)
-  const { data: commissionData, isLoading: commissionLoading } = useQuery({
-    queryKey: ["seller-commission-kpi", isCurrent ? "current" : periodKey],
-    queryFn: async () => {
-      if (isCurrent) {
-        // Current period: read from kpi_cached_values
-        const { data, error } = await supabase
-          .from("kpi_cached_values")
-          .select("scope_id, value")
-          .eq("kpi_slug", "total_commission")
-          .eq("period_type", "payroll_period")
-          .eq("scope_type", "employee");
-
-        if (error) throw error;
-        return data || [];
-      } else {
-        // Historical period: read from kpi_period_snapshots
-        if (!periodKey) return [];
-        const { data, error } = await (supabase
-          .from("kpi_period_snapshots") as any)
-          .select("scope_id, value")
-          .eq("kpi_slug", "total_commission")
-          .eq("period_key", periodKey)
-          .eq("scope_type", "employee");
-
-        if (error) throw error;
-        return data || [];
-      }
-    },
-    enabled: !!periodStartISO && !!periodEndISO,
-    staleTime: isCurrent ? 30000 : 300000, // Current: 30s, historical: 5min
+  // Query 2: Live commission via useSalesAggregatesExtended (replaces KPI cache)
+  const { data: salesAggregates, isLoading: commissionLoading } = useSalesAggregatesExtended({
+    periodStart: periodStart ?? new Date(),
+    periodEnd: periodEnd ?? new Date(),
+    groupBy: ['employee'],
+    enabled: !!periodStart && !!periodEnd,
   });
 
   // Query 3: Feriepenge salary type rates
@@ -217,17 +167,17 @@ export function useSellerSalariesCached(
     return matchingType?.amount ? matchingType.amount / 100 : 0;
   };
 
-  // Combine employees with their KPI commission data
+  // Combine employees with their live commission data
   const { sellerData, lastUpdated } = useMemo(() => {
     if (!employees) {
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build commission map from KPI data: scope_id (employee_id) -> value
+    // Build commission map from live sales aggregates: employee_id (UUID) -> commission
     const commissionMap: Record<string, number> = {};
-    for (const entry of commissionData || []) {
-      if (entry.scope_id) {
-        commissionMap[entry.scope_id] = Number(entry.value) || 0;
+    if (salesAggregates?.byEmployee) {
+      for (const [employeeKey, empData] of Object.entries(salesAggregates.byEmployee)) {
+        commissionMap[employeeKey] = empData.commission;
       }
     }
 
@@ -262,7 +212,6 @@ export function useSellerSalariesCached(
     const sellers: SellerData[] = filteredEmployees.map((emp: any) => {
       const teamMember = emp.team_members?.[0];
       const teamData = teamMember?.teams;
-      // Fallback to last_team for inactive employees without team_members
       const teamName = teamData?.name || emp.last_team?.name || "Ikke tildelt";
       const teamId = teamMember?.team_id || emp.last_team_id || null;
       const commission = commissionMap[emp.id] || 0;
@@ -291,7 +240,7 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, commissionData, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
 
   return {
     sellerData,
