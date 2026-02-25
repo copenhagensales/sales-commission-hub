@@ -41,6 +41,7 @@ interface DiscountRule {
   is_active: boolean;
   discount_type: string;
   min_revenue: number | null;
+  min_days_per_location: number;
 }
 
 interface LocationException {
@@ -63,6 +64,7 @@ export function DiscountRulesTab() {
     description: "",
     discount_type: "placements" as string,
     min_revenue: "",
+    min_days_per_location: "1",
   });
 
   // Exception state
@@ -108,6 +110,7 @@ export function DiscountRulesTab() {
         discount_percent: parseFloat(formData.discount_percent),
         description: formData.description || null,
         discount_type: formData.discount_type,
+        min_days_per_location: parseInt(formData.min_days_per_location) || 1,
       };
 
       if (formData.discount_type === "placements") {
@@ -204,7 +207,7 @@ export function DiscountRulesTab() {
 
   const openCreate = () => {
     setEditingRule(null);
-    setFormData({ location_type: "", min_placements: "", discount_percent: "", description: "", discount_type: "placements", min_revenue: "" });
+    setFormData({ location_type: "", min_placements: "", discount_percent: "", description: "", discount_type: "placements", min_revenue: "", min_days_per_location: "1" });
     setDialogOpen(true);
   };
 
@@ -217,6 +220,7 @@ export function DiscountRulesTab() {
       description: rule.description || "",
       discount_type: rule.discount_type || "placements",
       min_revenue: rule.min_revenue != null ? String(rule.min_revenue) : "",
+      min_days_per_location: String(rule.min_days_per_location ?? 1),
     });
     setDialogOpen(true);
   };
@@ -442,6 +446,17 @@ export function DiscountRulesTab() {
                 />
               </div>
             </div>
+            {formData.discount_type === "placements" && (
+              <div>
+                <Label>Min. dage pr. lokation</Label>
+                <Input
+                  type="number"
+                  value={formData.min_days_per_location}
+                  onChange={(e) => setFormData((p) => ({ ...p, min_days_per_location: e.target.value }))}
+                  placeholder="1"
+                />
+              </div>
+            )}
             <div>
               <Label>Beskrivelse</Label>
               <Input

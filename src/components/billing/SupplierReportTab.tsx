@@ -36,6 +36,7 @@ interface DiscountRule {
   is_active: boolean;
   discount_type: string;
   min_revenue: number | null;
+  min_days_per_location: number;
 }
 
 interface LocationException {
@@ -241,7 +242,10 @@ export function SupplierReportTab() {
   }, {} as Record<string, any>) || {};
 
   const locationEntries = Object.values(bookingsByLocation) as any[];
-  const totalPlacements = locationEntries.reduce((sum: number, loc: any) => sum + loc.bookings.length, 0);
+  const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
+  const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
+    return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);
+  }, 0);
 
   // Calculate YTD revenue (for annual_revenue type)
   const ytdRevenue = ytdBookings?.reduce((sum, booking: any) => {
