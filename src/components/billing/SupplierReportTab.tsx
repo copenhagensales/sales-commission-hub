@@ -439,8 +439,9 @@ export function SupplierReportTab() {
                     <TableHead>By</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Periode</TableHead>
-                    <TableHead className="text-right">Dage</TableHead>
-                    <TableHead className="text-right">Dagspris</TableHead>
+                     <TableHead className="text-right">Bookinger</TableHead>
+                     <TableHead className="text-right">Dage</TableHead>
+                     <TableHead className="text-right">Dagspris</TableHead>
                     <TableHead className="text-right">Beløb</TableHead>
                     {discountType === "annual_revenue" && (
                       <>
@@ -469,7 +470,8 @@ export function SupplierReportTab() {
                         <Badge variant="outline">{loc.client?.name || "Ukendt"}</Badge>
                       </TableCell>
                       <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
-                      <TableCell className="text-right">{loc.totalDays}</TableCell>
+                       <TableCell className="text-right">{loc.bookings.length}</TableCell>
+                       <TableCell className="text-right">{loc.totalDays}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {loc.usesTotalPrice ? (
                           <span className="italic">samlet</span>
@@ -499,7 +501,7 @@ export function SupplierReportTab() {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={6} className="font-semibold">
+                    <TableCell colSpan={7} className="font-semibold">
                       Subtotal
                     </TableCell>
                     <TableCell className="text-right font-bold">
