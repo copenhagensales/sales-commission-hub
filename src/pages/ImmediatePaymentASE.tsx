@@ -23,31 +23,9 @@ import { da } from "date-fns/locale";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "@/hooks/use-toast";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
-
-// Calculate payroll period (15th to 14th)
-function getPayrollPeriod(): { start: Date; end: Date } {
-  const today = new Date();
-  const currentDay = today.getDate();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  
-  let start: Date;
-  let end: Date;
-  
-  if (currentDay >= 15) {
-    // Period: 15th of current month to 14th of next month
-    start = new Date(year, month, 15, 0, 0, 0);
-    end = new Date(year, month + 1, 14, 23, 59, 59);
-  } else {
-    // Period: 15th of previous month to 14th of current month
-    start = new Date(year, month - 1, 15, 0, 0, 0);
-    end = new Date(year, month, 14, 23, 59, 59);
-  }
-  
-  return { start, end };
-}
 
 interface ImmediatePaymentSale {
   id: string;

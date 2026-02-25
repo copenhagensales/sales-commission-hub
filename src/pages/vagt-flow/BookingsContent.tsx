@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
-import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
+import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";

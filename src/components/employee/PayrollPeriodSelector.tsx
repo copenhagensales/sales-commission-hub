@@ -8,7 +8,7 @@ interface PayrollPeriodSelectorProps {
   onChange: (periodStart: Date, periodEnd: Date) => void;
 }
 
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 export function PayrollPeriodSelector({ onChange }: PayrollPeriodSelectorProps) {
   const [currentBaseDate, setCurrentBaseDate] = useState(() => new Date());

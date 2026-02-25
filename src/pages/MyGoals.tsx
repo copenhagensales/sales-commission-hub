@@ -12,7 +12,7 @@ import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { Button } from "@/components/ui/button";
 import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 import { PayrollErrorReportDialog } from "@/components/my-profile/PayrollErrorReportDialog";
 
 type EmployeeData = {
@@ -75,22 +75,7 @@ export default function MyGoals() {
   const isViewingOther = !!urlEmployeeId;
 
   // Calculate payroll period (15th to 14th)
-  const payrollPeriod = useMemo(() => {
-    const today = new Date();
-    const currentDay = today.getDate();
-    
-    let start: Date, end: Date;
-    
-    if (currentDay >= 15) {
-      start = new Date(today.getFullYear(), today.getMonth(), 15);
-      end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-    } else {
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-      end = new Date(today.getFullYear(), today.getMonth(), 14);
-    }
-    
-    return { start, end };
-  }, []);
+  const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
 
   // Fetch KPIs from cache for payroll period
   const { data: payrollKpis } = usePrecomputedKpis(

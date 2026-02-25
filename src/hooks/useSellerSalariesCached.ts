@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 function toLocalDateString(date: Date): string {
   const y = date.getFullYear();
@@ -38,21 +39,7 @@ interface UseSellerSalariesCachedResult {
 function isCurrentPayrollPeriod(periodStart: Date | null, periodEnd: Date | null): boolean {
   if (!periodStart || !periodEnd) return false;
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
-
-  let currentStart: Date;
-  let currentEnd: Date;
-
-  if (day >= 15) {
-    currentStart = new Date(year, month, 15);
-    currentEnd = new Date(year, month + 1, 14, 23, 59, 59);
-  } else {
-    currentStart = new Date(year, month - 1, 15);
-    currentEnd = new Date(year, month, 14, 23, 59, 59);
-  }
+  const { start: currentStart, end: currentEnd } = getPayrollPeriod(new Date());
 
   const startMatch = toLocalDateString(periodStart) === toLocalDateString(currentStart);
   const endMatch = toLocalDateString(periodEnd) === toLocalDateString(currentEnd);

@@ -31,7 +31,7 @@ interface DashboardPeriodSelectorProps {
   disabled?: boolean;
 }
 
-import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { calculatePayrollPeriod } from "@/lib/calculations";
 
 export function getDefaultPeriod(type: PeriodType = "payroll_period"): PeriodSelection {
   const now = new Date();

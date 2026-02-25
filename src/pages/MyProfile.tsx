@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
-import { VACATION_PAY_RATES, countWorkDaysInPeriod } from "@/lib/calculations";
+import { VACATION_PAY_RATES, countWorkDaysInPeriod, getPayrollPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 
@@ -601,19 +601,7 @@ export default function MyProfile() {
   // Holidays count as paid days (not deducted from workdays)
   const payrollPeriod = useMemo(() => {
     const now = new Date();
-    const currentDay = now.getDate();
-    let periodStart: Date;
-    let periodEnd: Date;
-    
-    if (currentDay >= 15) {
-      // We're in the period from 15th of current month to 14th of next month
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 15);
-      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14);
-    } else {
-      // We're in the period from 15th of previous month to 14th of current month
-      periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
-      periodEnd = new Date(now.getFullYear(), now.getMonth(), 14);
-    }
+    const { start: periodStart, end: periodEnd } = getPayrollPeriod(now);
     
     // Helper to format date as YYYY-MM-DD for holiday lookup
     const formatDateKey = (date: Date) => {

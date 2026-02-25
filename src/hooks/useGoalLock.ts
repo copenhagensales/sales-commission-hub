@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
-import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { calculatePayrollPeriod } from "@/lib/calculations";
 
 interface PayrollPeriod {
   start: Date;
