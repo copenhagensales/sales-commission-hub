@@ -1,80 +1,71 @@
 
 
-## Vis biler som tags paa booking-oversigten
+## Vis bil-tags per dag i booking-gitteret
 
 ### Problem
-Booking-oversigten (`/vagt-flow/booking`) viser ikke hvilke biler der er tildelt til de enkelte lokationer. Data findes i `booking_vehicle`-tabellen, men den hentes ikke paa denne side.
+Bil-tags vises kun samlet under lokationsnavnet. Brugeren vil se hvilken bil der er tildelt på hver enkelt dag i ugeoversigten.
 
 ### Loesning
-Hent `booking_vehicle`-data for den valgte uge og vis et kompakt bil-tag under hver lokations navn med bilens navn og nummerplade. Pænt, diskret design der ikke fylder for meget.
+Aendre vehicle-lookup fra booking-niveau til booking+dato-niveau, og vise bil-badges inde i hver dags celle i gitteret.
 
 ### Teknisk plan
 
 **Fil:** `src/pages/vagt-flow/BookingsContent.tsx`
 
-**Aendring 1** -- Tilfoej Car-ikon til import (linje 7):
-Tilfoej `Car` fra lucide-react.
+**Aendring 1** -- Udvid `vehiclesByBooking` til at vaere dato-baseret (linje 229-241):
 
-**Aendring 2** -- Hent booking_vehicle data (efter vehicles-query, ca. linje 210):
-Tilfoej en ny `useQuery` der henter `booking_vehicle` med vehicle-join for alle bookinger i den valgte uge:
+Erstat det nuvaerende lookup med et der bruger `booking_id + date` som noegle:
 
 ```typescript
-const { data: bookingVehicles = [] } = useQuery({
-  queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear],
-  queryFn: async () => {
-    const bookingIds = bookings?.map(b => b.id) || [];
-    if (bookingIds.length === 0) return [];
-    const { data, error } = await supabase
-      .from("booking_vehicle")
-      .select("id, booking_id, vehicle_id, date, vehicle:vehicle_id(name, license_plate)")
-      .in("booking_id", bookingIds);
-    if (error) throw error;
-    return data || [];
-  },
-  enabled: !!bookings && bookings.length > 0,
-});
-```
-
-**Aendring 3** -- Byg et helper-lookup (efter queryen):
-```typescript
-const vehiclesByBooking = useMemo(() => {
+const vehiclesByBookingDate = useMemo(() => {
   const map = new Map<string, { name: string; plate: string }[]>();
-  for (const bv of bookingVehicles) {
-    if (!bv.vehicle) continue;
-    const existing = map.get(bv.booking_id) || [];
+  for (const bv of bookingVehicles as any[]) {
+    if (!bv.vehicle || !bv.date) continue;
+    const key = `${bv.booking_id}_${bv.date}`;
+    const existing = map.get(key) || [];
     const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
     if (!alreadyAdded) {
       existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
     }
-    map.set(bv.booking_id, existing);
+    map.set(key, existing);
   }
   return map;
 }, [bookingVehicles]);
 ```
 
-**Aendring 4** -- Vis bil-tags i booking-kortet (ca. linje 528-529, under lokationsnavn/by):
-Under `{booking.location?.address_city} . {booking.location?.type}` linjen, tilfoej:
+**Aendring 2** -- Vis bil-badge i hver dags celle (efter medarbejder-assignments, ca. linje 678):
+
+Inde i hver dag-celle, efter assignments-listen, tilfoej:
 
 ```tsx
-{vehiclesByBooking.get(booking.id)?.length > 0 && (
-  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-    {vehiclesByBooking.get(booking.id)!.map((v, i) => (
-      <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 gap-1 text-muted-foreground">
-        <Car className="h-2.5 w-2.5" />
-        {v.name}
-      </Badge>
-    ))}
-  </div>
-)}
+{(() => {
+  const dateStr = format(dayDate, "yyyy-MM-dd");
+  const dayVehicles = vehiclesByBookingDate.get(`${booking.id}_${dateStr}`);
+  if (!dayVehicles?.length) return null;
+  return (
+    <div className="mt-1 flex flex-col items-center gap-0.5">
+      {dayVehicles.map((v, i) => (
+        <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-primary/10 text-primary">
+          <Car className="h-2 w-2" />
+          {v.name}
+        </Badge>
+      ))}
+    </div>
+  );
+})()}
 ```
 
-### Resultat
-- Hvert booking-kort viser sm diskrete tags med bil-ikon og bilnavn under lokationsinfo
-- Tags er kompakte og passer ind i det eksisterende design
-- Kun synlige naar der faktisk er tildelt en bil
+**Aendring 3** -- Fjern bil-tags fra lokationsnavnet (linje 561-570):
+
+Fjern den eksisterende `vehiclesByBooking.get(booking.id)` sektion under lokationsnavnet, da bilerne nu vises per dag i stedet.
 
 ### Filer der aendres
 
 | Fil | Aendring |
 |---|---|
-| `src/pages/vagt-flow/BookingsContent.tsx` | Hent booking_vehicle data, byg lookup, vis bil-tags |
+| `src/pages/vagt-flow/BookingsContent.tsx` | Aendr vehicle-lookup til dato-baseret, vis bil-badges per dag, fjern samlet bil-sektion |
+
+### Resultat
+- Hver dag i ugegitteret viser hvilke biler der er tildelt den specifikke dag
+- Kompakte badges med bil-ikon og navn
+- Kun synlige paa dage hvor der faktisk er tildelt en bil
