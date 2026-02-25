@@ -1,45 +1,78 @@
 
 
-## Migrér Sælgerlønninger fra KPI-cache til live beregning
+## FM-medarbejdere viser 0 kr — manglende agent-mapping
 
-### Problem
+### Grundårsag
 
-`useSellerSalariesCached.ts` henter provision fra `kpi_cached_values` (aktuel periode) og `kpi_period_snapshots` (historisk). Disse caches opdateres asynkront og kan afvige fra de faktiske `sale_items.mapped_commission`-værdier, som Dagsrapporter bruger direkte.
+RPC'en `get_sales_aggregates_v2` resolver medarbejder-ID via kæden:
+
+```text
+sales.agent_email → agents.email → employee_agent_mapping → employee_master_data
+```
+
+De fleste FM-medarbejdere (16 ud af 20) har **ingen entry i `agents`-tabellen**. Deres `work_email` matcher `sales.agent_email`, men RPC'en joiner kun via `agents`-tabellen — ikke direkte mod `employee_master_data.work_email`.
+
+Resultatet: RPC'en returnerer FM-salg med **email som group_key** (f.eks. `macu@copenhagensales.dk`) i stedet for **employee UUID**. Hooken `useSellerSalariesCached` slår op med `commissionMap[emp.id]` (UUID), finder intet match, og viser 0 kr.
+
+**Bevis:** Martina Cubranovic har 376 salg og 154.560 kr provision i RPC'en, men group_key er `macu@copenhagensales.dk` — ikke hendes UUID `c72e428f-066d-46ce-83f5-4d43c9911fec`.
 
 ### Løsning
 
-Erstat Query 2 (linje 98-129) med et kald til `useSalesAggregatesExtended`, som kalder `get_sales_aggregates_v2` RPC'en. Denne beregner live fra `sale_items.mapped_commission` — samme kilde som Dagsrapporter.
+Tilføj en work_email-fallback i RPC'en, så FM-medarbejdere uden agent-mapping også resolves til deres employee UUID.
 
-### Teknisk plan (1 fil)
+### Teknisk plan
 
-**`src/hooks/useSellerSalariesCached.ts`:**
+**1. Database: Opdatér `get_sales_aggregates_v2` RPC**
 
-1. Importér `useSalesAggregatesExtended` fra `@/hooks/useSalesAggregatesExtended`.
-2. Erstat Query 2 (`kpi_cached_values`/`kpi_period_snapshots`) med:
-   ```ts
-   const { data: salesAggregates, isLoading: commissionLoading } = useSalesAggregatesExtended({
-     periodStart: periodStart ?? new Date(),
-     periodEnd: periodEnd ?? new Date(),
-     groupBy: ['employee'],
-     enabled: !!periodStart && !!periodEnd,
-   });
-   ```
-3. Byg `commissionMap` fra `salesAggregates.byEmployee` i stedet for fra cache-data. RPC'ens `group_key` er allerede `employee_id` (UUID), så det mapper direkte til `emp.id`.
-4. Slet dead code: `isCurrentPayrollPeriod()`, `buildPeriodKey()`, `isCurrent`, `periodKey`.
-5. Behold `toLocalDateString()` — bruges stadig af diet/sick/bonus queries.
+Tilføj et ekstra LEFT JOIN direkte fra `sales.agent_email` til `employee_master_data.work_email` som fallback, når `employee_agent_mapping` ikke matcher:
 
-### Mapping-detalje
+```sql
+-- Eksisterende joins:
+LEFT JOIN agents a ON lower(a.email) = lower(s.agent_email)
+LEFT JOIN employee_agent_mapping eam ON eam.agent_id = a.id
+LEFT JOIN employee_master_data emd ON emd.id = eam.employee_id
 
-RPC'en (`get_sales_aggregates_v2`) joiner allerede `employee_agent_mapping` → `agents` for at resolve `employee_id`. Når `group_by = 'employee'`, er `group_key = eam.employee_id::text` — præcis det UUID der matches mod `emp.id` i `commissionMap`. Ingen ekstra agent-email-query nødvendig.
+-- Ny fallback join:
+LEFT JOIN employee_master_data emd_fb 
+  ON emd.id IS NULL 
+  AND lower(emd_fb.work_email) = lower(s.agent_email)
+```
 
-### Ingen ændringer i andre filer
+Opdatér group_key til: `COALESCE(eam.employee_id::text, emd_fb.id::text, lower(s.agent_email))`
+Opdatér group_name til: `COALESCE(a.name, emd_fb.first_name || ' ' || emd_fb.last_name, s.agent_email)`
 
-- `SellerSalariesTab.tsx` forbruger stadig `SellerData[]` — interfacet er uændret.
-- Queries 3-6 (feriepenge, diet, sygdom, dagsbonus) forbliver uændrede.
+**2. Frontend: Tilføj email→UUID fallback i `useSellerSalariesCached.ts`**
 
-### Performance
+Som sikkerhedsnet (i tilfælde af at RPC-migrationen ikke er kørt endnu), tilføj en sekundær lookup i `commissionMap`-opbygningen:
 
-- RPC'en kører en enkelt aggregeret SQL-forespørgsel med JOINs — hurtigere end at hente tusindvis af rækker client-side.
-- Historiske perioder håndteres identisk (RPC accepterer vilkårlige datoer).
-- `staleTime: 60000` fra `useSalesAggregatesExtended` giver rimelig caching uden drift.
+```typescript
+// Build work_email -> employee_id lookup for FM fallback
+const emailToEmployeeId: Record<string, string> = {};
+for (const emp of employees) {
+  if (emp.work_email) {
+    emailToEmployeeId[emp.work_email.toLowerCase()] = emp.id;
+  }
+}
+
+// Build commission map with fallback
+for (const [key, empData] of Object.entries(salesAggregates.byEmployee)) {
+  // Key is either UUID or email (for unmapped FM employees)
+  const employeeId = emailToEmployeeId[key.toLowerCase()] || key;
+  commissionMap[employeeId] = (commissionMap[employeeId] || 0) + empData.commission;
+}
+```
+
+Dette kræver at `work_email` hentes i employees-query'en (linje 65 — allerede inkluderet i select).
+
+### Påvirkning
+
+- FM-medarbejdere med salg vil vise korrekt provision i Sælgerlønninger.
+- Ingen ændring i interface — `SellerData[]` er uændret.
+- RPC-rettelsen gavner også alle andre views der bruger `useSalesAggregatesExtended` med `groupBy: ['employee']`.
+- Eksisterende TM-medarbejdere med agent-mapping påvirkes ikke (de matcher stadig via UUID).
+
+### Filer
+
+1. **Database migration**: Opdatér `get_sales_aggregates_v2` RPC med work_email fallback join.
+2. **`src/hooks/useSellerSalariesCached.ts`**: Tilføj email→UUID fallback i commissionMap (linje 176-181). Tilføj `work_email` til employees select hvis det ikke allerede er der.
 
