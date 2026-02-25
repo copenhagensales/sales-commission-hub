@@ -1,71 +1,69 @@
 
 
-## Vis bil-tags per dag i booking-gitteret
+## Excel-udtræk: Eesy TM salg per medarbejder
 
 ### Problem
-Bil-tags vises kun samlet under lokationsnavnet. Brugeren vil se hvilken bil der er tildelt på hver enkelt dag i ugeoversigten.
+Brugeren har brug for et Excel-udtræk over Eesy TM-salg i lønperioden 15/1 - 14/2, med antal salg og provision pr. medarbejder. Rapporter Ledelse-siden er tom i dag.
 
 ### Loesning
-Aendre vehicle-lookup fra booking-niveau til booking+dato-niveau, og vise bil-badges inde i hver dags celle i gitteret.
+Tilfoej en Excel-eksport funktion paa ReportsManagement-siden med forudindstillet Eesy TM klient og lønperiode, der henter salgsdata grupperet pr. medarbejder og genererer en .xlsx fil.
 
 ### Teknisk plan
 
-**Fil:** `src/pages/vagt-flow/BookingsContent.tsx`
+**Fil:** `src/pages/reports/ReportsManagement.tsx`
 
-**Aendring 1** -- Udvid `vehiclesByBooking` til at vaere dato-baseret (linje 229-241):
+**Aendring 1** -- Tilfoej imports:
+- `useState`, `useMemo` fra React
+- `useQuery` fra tanstack
+- `supabase` fra integrations
+- `* as XLSX` fra xlsx
+- `Button`, `Select`, `Card`, `Table` UI-komponenter
+- `Download`, `FileSpreadsheet` ikoner fra lucide-react
+- `format` fra date-fns
+- `CLIENT_IDS` fra clientIds
+- `fetchAllRows` fra supabasePagination
 
-Erstat det nuvaerende lookup med et der bruger `booking_id + date` som noegle:
+**Aendring 2** -- Tilfoej state og data-hentning:
+- State for valgt klient (default: Eesy TM id) og periodestart/slut (default: 2026-01-15 / 2026-02-14)
+- `useQuery` der henter salg med `sale_items` og `employee_agent_mapping` for den valgte klient og periode
+- Aggreger data pr. medarbejder (navn, antal salg, provision)
 
+**Aendring 3** -- Tilfoej Excel-eksport funktion:
 ```typescript
-const vehiclesByBookingDate = useMemo(() => {
-  const map = new Map<string, { name: string; plate: string }[]>();
-  for (const bv of bookingVehicles as any[]) {
-    if (!bv.vehicle || !bv.date) continue;
-    const key = `${bv.booking_id}_${bv.date}`;
-    const existing = map.get(key) || [];
-    const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
-    if (!alreadyAdded) {
-      existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
-    }
-    map.set(key, existing);
-  }
-  return map;
-}, [bookingVehicles]);
+const handleExport = () => {
+  const rows = aggregatedData.map(emp => ({
+    "Medarbejder": emp.name,
+    "Antal salg": emp.salesCount,
+    "Provision (DKK)": Math.round(emp.commission),
+  }));
+  // Tilfoej totalraekke
+  rows.push({
+    "Medarbejder": "TOTAL",
+    "Antal salg": totalSales,
+    "Provision (DKK)": Math.round(totalCommission),
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Eesy TM Salg");
+  XLSX.writeFile(wb, `eesy-tm-salg-${periodLabel}.xlsx`);
+};
 ```
 
-**Aendring 2** -- Vis bil-badge i hver dags celle (efter medarbejder-assignments, ca. linje 678):
+**Aendring 4** -- UI med tabel-preview og download-knap:
+- Kort med titel "Salgsudtræk per medarbejder"
+- Dropdown til klient-valg og dato-inputs til periode
+- Tabel der viser medarbejder, antal salg, provision
+- Download-knap der genererer Excel-filen
 
-Inde i hver dag-celle, efter assignments-listen, tilfoej:
-
-```tsx
-{(() => {
-  const dateStr = format(dayDate, "yyyy-MM-dd");
-  const dayVehicles = vehiclesByBookingDate.get(`${booking.id}_${dateStr}`);
-  if (!dayVehicles?.length) return null;
-  return (
-    <div className="mt-1 flex flex-col items-center gap-0.5">
-      {dayVehicles.map((v, i) => (
-        <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-primary/10 text-primary">
-          <Car className="h-2 w-2" />
-          {v.name}
-        </Badge>
-      ))}
-    </div>
-  );
-})()}
-```
-
-**Aendring 3** -- Fjern bil-tags fra lokationsnavnet (linje 561-570):
-
-Fjern den eksisterende `vehiclesByBooking.get(booking.id)` sektion under lokationsnavnet, da bilerne nu vises per dag i stedet.
+### Data-flow
+1. Hent salg fra `sales` + `sale_items` filtreret paa `client_campaigns.client_id` og `sale_datetime`
+2. Map `agent_email` til medarbejdernavn via `employee_agent_mapping` + `employee_master_data`
+3. Aggreger pr. medarbejder: sum af quantity (counts_as_sale) og sum af mapped_commission
+4. Generer XLSX med xlsx-biblioteket (allerede installeret)
 
 ### Filer der aendres
 
 | Fil | Aendring |
 |---|---|
-| `src/pages/vagt-flow/BookingsContent.tsx` | Aendr vehicle-lookup til dato-baseret, vis bil-badges per dag, fjern samlet bil-sektion |
+| `src/pages/reports/ReportsManagement.tsx` | Fuldt nyt indhold med klientfilter, datatabel og Excel-eksport |
 
-### Resultat
-- Hver dag i ugegitteret viser hvilke biler der er tildelt den specifikke dag
-- Kompakte badges med bil-ikon og navn
-- Kun synlige paa dage hvor der faktisk er tildelt en bil
