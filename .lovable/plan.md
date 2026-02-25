@@ -1,26 +1,29 @@
 
 
-## Fix: Header synlighed + valuta-linjeskift i PDF
+## Tillad tidligere datoer for flytning + korrekt datahåndtering
 
-### Problemer
-1. **Header-teksten** er svær at læse mod den mørke baggrund — farven er for tæt på baggrunden.
-2. **Beløb-kolonnen** er for smal, så "kr" bryder til ny linje (f.eks. "12.000\nkr").
+### Problem
+Kalenderen i "Flyt medarbejder"-dialogen blokerer alle datoer før i dag (`date < startOfDay(new Date())`). Brugeren skal kunne vælge tidligere datoer for at registrere flytninger med tilbagevirkende kraft.
 
 ### Løsning
 
-**Fil:** `src/utils/supplierReportPdfGenerator.ts`
+**Fil:** `src/components/employees/TeamsTab.tsx`
 
-1. **Header mere synlig:**
-   - Gør h1 farven lysere/hvid (#ffffff) og øg kontrasten
-   - Tilføj evt. lidt mere spacing
+1. **Fjern datobegrænsningen** på kalenderen (linje 1028):
+   - Fjern `disabled={(date) => date < startOfDay(new Date())}` så alle datoer kan vælges
 
-2. **Prevent linjeskift i beløb:**
-   - Tilføj `white-space: nowrap` til `.num` celler så "12.000 kr" aldrig brydes
-   - Reducer font-size på tabellen en smule (11px → 10px) for at give mere plads
-   - Sæt en `table-layout: fixed` med passende kolonnebredder, eller alternativt reducer padding i cellerne fra 12px til 8px for at give mere plads til indholdet
-   - Gør "Lokation"-kolonnen bredere og de numeriske kolonner smallere men med nowrap
+2. **Behandl tidligere datoer som øjeblikkelige flytninger:**
+   - I mutationen (`moveEmployeeToTeamMutation`): udvid `isTodayMove`-checket til også at inkludere datoer i fortiden
+   - Ændre logik: `const isImmediateMove = isToday(effectiveDate) || effectiveDate < new Date()`
+   - Tidligere datoer udfører flytningen med det samme (ligesom "i dag"), da de allerede skulle have været gennemført
+
+3. **Opdater UI-feedback:**
+   - Tilføj en besked for tidligere datoer: "Medarbejderen flyttes øjeblikkeligt (tilbagevirkende kraft)"
+   - Behold eksisterende beskeder for i dag og fremtidige datoer
 
 ### Teknisk opsummering
-- 1 fil ændres: `src/utils/supplierReportPdfGenerator.ts`
-- Kun CSS-justeringer, ingen logikændringer
+- 1 fil ændres: `src/components/employees/TeamsTab.tsx`
+- Kalenderen tillader alle datoer
+- Tidligere datoer → øjeblikkelig flytning (som i dag)
+- Fremtidige datoer → planlagt flytning via `scheduled_team_changes` (uændret)
 
