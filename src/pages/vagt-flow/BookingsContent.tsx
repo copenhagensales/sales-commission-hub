@@ -561,7 +561,7 @@ export default function BookingsContent() {
                           {vehiclesByBooking.get(booking.id)?.length ? (
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {vehiclesByBooking.get(booking.id)!.map((v, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 gap-1 text-muted-foreground">
+                                <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 bg-primary/10 text-primary border-primary/20">
                                   <Car className="h-2.5 w-2.5" />
                                   {v.name}
                                 </Badge>
