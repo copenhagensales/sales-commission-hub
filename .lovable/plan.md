@@ -1,33 +1,25 @@
 
 
-## PDF Opdatering: Bookinger-kolonne + Visuelt redesign
+## Fix: Behold moerkt tema i PDF-udskrift
 
-### 1. Tilfoej "Bookinger" kolonne til PDF tabellen
+### Problem
+PDF-rapporten ser hvid ud fordi `@media print` CSS-reglerne (linje 220-246) overskriver det moerke tema med hvid baggrund og moerk tekst. Naar browseren "gemmer som PDF" bruger den print-stilarterne.
+
+### Loesning
+Fjern `@media print`-blokken helt, saa det moerke tema bevares i PDF'en. Tilfoej i stedet `color-adjust: exact` og `-webkit-print-color-adjust: exact` paa `body` for at sikre at browseren gengiver baggrundsfarver korrekt ved print/PDF.
+
+### Teknisk aendring
 
 **Fil:** `src/utils/supplierReportPdfGenerator.ts`
 
-- Tilfoej `bookings: number` til `LocationRow` interfacet
-- Tilfoej en "Bookinger" kolonne i tabel-headeren (mellem "Periode" og "Dage")
-- Vis `loc.bookings` i hver raekke
-- Opdater subtotal-raekkens `colspan` fra 6 til 7
+1. Tilfoej print-color properties til `body`-stilen:
+   - `color-adjust: exact`
+   - `-webkit-print-color-adjust: exact`
+   - `print-color-adjust: exact`
 
-**Fil:** `src/components/billing/SupplierReportTab.tsx`
+2. Fjern hele `@media print { ... }` blokken (linje 220-246) saa det moerke tema bruges direkte i PDF'en.
 
-- I `downloadSupplierReportPdf`-kaldet (linje ~661): tilfoej `bookings: loc.bookings.length` til location-mapping
+### Resultat
+- PDF'en vil have moerk baggrund og lyst tekst -- praecis som det ser ud i preview-vinduet
+- Kun 1 fil aendres, ingen andre sideeffekter
 
-### 2. Visuelt redesign af PDF til at matche app-designet
-
-Opdater CSS i `supplierReportPdfGenerator.ts` til et moderne, moerkt tema der matcher appen:
-
-- **Baggrund:** Moerk baggrund (#0f1419) med lys tekst
-- **Header:** Stor titel med subtil separator, matching app-font (Inter/system)
-- **Tabel:** Moerk tabel med alternerende raekke-farver, afrundede hjoerner, ingen haarfine borders men subtile separatorer
-- **Rabatberegning:** KPI-kort med moerk baggrund og accent-farver (groen for rabat, hvid for tal)
-- **Badges:** Stilede badges for "Udelukket" (roed) og "Max %" (blaa) som i appen
-- **Footer:** Subtil footer med genererings-tidspunkt
-- **Print-optimering:** `@media print` regler der sikrer korrekt udskrift (hvid baggrund ved print for laesbarhed)
-
-### Teknisk opsummering
-- 2 filer aendres
-- Ingen databaseaendringer
-- PDF faar ny "Bookinger" kolonne + professionelt dark-theme design
