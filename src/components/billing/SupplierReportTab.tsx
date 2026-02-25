@@ -51,12 +51,29 @@ export function SupplierReportTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
+  const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
   const queryClient = useQueryClient();
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
-  const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
+  const monthDate = new Date(selectedMonth + "-01");
+  const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthStart);
-  const yearStart = new Date(monthStart.getFullYear(), 0, 1);
+
+  // Calculate period dates based on periodType
+  const periodStart = periodType === "payroll"
+    ? new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 15)
+    : monthStart;
+  const periodEnd = periodType === "payroll"
+    ? new Date(monthDate.getFullYear(), monthDate.getMonth(), 14, 23, 59, 59, 999)
+    : monthEnd;
+  const yearStart = periodType === "payroll"
+    ? new Date(monthDate.getFullYear(), 0, 15)
+    : new Date(monthDate.getFullYear(), 0, 1);
+
+  // Period label for display and PDF
+  const periodLabel = periodType === "payroll"
+    ? `Lønperiode ${format(monthDate, "MMMM yyyy", { locale: da })}`
+    : format(monthDate, "MMMM yyyy", { locale: da });
 
   // Generate month options
   const monthOptions = [];
@@ -84,7 +101,7 @@ export function SupplierReportTab() {
 
   // Fetch bookings for selected type and month
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ["supplier-report-bookings", selectedMonth, selectedLocationType],
+    queryKey: ["supplier-report-bookings", selectedMonth, selectedLocationType, periodType],
     queryFn: async () => {
       if (!selectedLocationType) return [];
       const { data, error } = await supabase
@@ -94,8 +111,8 @@ export function SupplierReportTab() {
           location(id, name, address_city, daily_rate, type, external_id),
           clients(id, name)
         `)
-        .gte("start_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("start_date", format(periodStart, "yyyy-MM-dd"))
+        .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
       return data.filter((b: any) => b.location?.type === selectedLocationType);
@@ -105,7 +122,7 @@ export function SupplierReportTab() {
 
   // Fetch YTD bookings for annual_revenue calculation
   const { data: ytdBookings } = useQuery({
-    queryKey: ["supplier-ytd-bookings", selectedMonth, selectedLocationType],
+    queryKey: ["supplier-ytd-bookings", selectedMonth, selectedLocationType, periodType],
     queryFn: async () => {
       if (!selectedLocationType) return [];
       const { data, error } = await supabase
@@ -115,7 +132,7 @@ export function SupplierReportTab() {
           location(id, name, address_city, daily_rate, type, external_id)
         `)
         .gte("start_date", format(yearStart, "yyyy-MM-dd"))
-        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
+        .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
       return data.filter((b: any) => b.location?.type === selectedLocationType);
@@ -158,15 +175,15 @@ export function SupplierReportTab() {
 
   // Fetch existing report for this period + type
   const { data: existingReport } = useQuery({
-    queryKey: ["supplier-report", selectedMonth, selectedLocationType],
+    queryKey: ["supplier-report", selectedMonth, selectedLocationType, periodType],
     queryFn: async () => {
       if (!selectedLocationType) return null;
       const { data, error } = await supabase
         .from("supplier_invoice_reports")
         .select("*")
         .eq("location_type", selectedLocationType)
-        .eq("period_start", format(monthStart, "yyyy-MM-dd"))
-        .eq("period_end", format(monthEnd, "yyyy-MM-dd"))
+        .eq("period_start", format(periodStart, "yyyy-MM-dd"))
+        .eq("period_end", format(periodEnd, "yyyy-MM-dd"))
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -325,8 +342,8 @@ export function SupplierReportTab() {
 
       const payload = {
         location_type: selectedLocationType,
-        period_start: format(monthStart, "yyyy-MM-dd"),
-        period_end: format(monthEnd, "yyyy-MM-dd"),
+        period_start: format(periodStart, "yyyy-MM-dd"),
+        period_end: format(periodEnd, "yyyy-MM-dd"),
         total_amount: totalAmountAll,
         discount_percent: appliedDiscount,
         discount_amount: totalDiscountAmount,
@@ -385,6 +402,15 @@ export function SupplierReportTab() {
                 {type}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Måned</SelectItem>
+            <SelectItem value="payroll">Lønperiode (15.–14.)</SelectItem>
           </SelectContent>
         </Select>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -540,7 +566,7 @@ export function SupplierReportTab() {
                     <div>
                       <p className="text-sm text-muted-foreground">Kumulativ årsomsætning</p>
                       <p className="text-2xl font-bold">{ytdRevenue.toLocaleString("da-DK")} kr</p>
-                      <p className="text-xs text-muted-foreground">Jan - {format(monthEnd, "MMM yyyy", { locale: da })}</p>
+                      <p className="text-xs text-muted-foreground">{periodType === "payroll" ? "15. jan" : "Jan"} - {format(periodEnd, "dd. MMM yyyy", { locale: da })}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Nuværende rabattrin</p>
@@ -652,7 +678,7 @@ export function SupplierReportTab() {
             <Button
               variant="outline"
               onClick={() => {
-                const monthLabel = format(monthStart, "MMMM yyyy", { locale: da });
+                const monthLabel = periodLabel;
                 const staircaseSteps = discountType === "annual_revenue" && discountRules
                   ? [...discountRules].sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0)).map(r => ({ minRevenue: r.min_revenue ?? 0, discountPercent: r.discount_percent }))
                   : [];
@@ -724,7 +750,7 @@ export function SupplierReportTab() {
               open={sendDialogOpen}
               onOpenChange={setSendDialogOpen}
               locationType={selectedLocationType}
-              month={format(monthStart, "MMMM yyyy", { locale: da })}
+              month={periodLabel}
               reportId={existingReport.id}
               reportData={locationDiscounts.map((loc: any) => ({
                 locationName: loc.location?.name,
