@@ -1117,7 +1117,7 @@ export default function DailyReports() {
                   <SheetTitle className="text-white text-lg">Filtre</SheetTitle>
                 </SheetHeader>
                 
-                <div className="flex-1 space-y-4">
+                <div className="flex-1 space-y-4 overflow-y-auto">
                   {/* Periode */}
                   <div className="space-y-1.5">
                     <label className="text-xs text-white/70 font-medium">Periode</label>
