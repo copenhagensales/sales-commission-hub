@@ -1737,12 +1737,7 @@ async function calculateActiveEmployees(
 
   // Also count inactive employees who have sales data in the current payroll period
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
-  const payrollStart = day >= 15
-    ? new Date(year, month, 15)
-    : new Date(year, month - 1, 15);
+  const { start: payrollStart } = getPayrollPeriod(now);
 
   const { data: inactiveWithSales } = await supabase
     .from("employee_master_data")
