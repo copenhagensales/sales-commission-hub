@@ -1,35 +1,46 @@
 
 
-## Fix: SØG-knap ikke synlig på bærbare computere
+## Fix: Vis korrekte medarbejdernavne i ledelsesrapporten
 
 ### Problem
-Filter-panelet (Sheet) i Dagsrapporter har 7 dropdown-filtre stacked vertikalt. På bærbare med lavere skærmhøjde (typisk 768px-900px) overflower indholdet, og "SØG"-knappen i bunden bliver skubbet ud af viewporten. Brugerne kan ikke scrolle ned til den.
+RPC-funktionen `get_sales_aggregates_v2` bruger denne prioritetsrækkefølge for navne:
+```
+COALESCE(a.name, emd_fb.first_name || ' ' || emd_fb.last_name, s.agent_email)
+```
 
-### Årsag
-Filter-containeren (`flex-1 space-y-4` på linje 1120) har ingen `overflow-y-auto`, så den vokser ud over skærmhøjden i stedet for at blive scrollbar. SØG-knappen sidder i en separat `div` i bunden, men den bliver usynlig fordi flex-containeren aldrig begrænser sin højde.
+`a.name` er agent-navnet fra dialeren (f.eks. "joel", "trine", "leigk"), som ofte er brugernavne i stedet for rigtige navne. Funktionen bruger **aldrig** `emd.first_name || ' ' || emd.last_name` fra den primære employee_master_data join (via employee_agent_mapping).
 
 ### Løsning
-Tilføj `overflow-y-auto` på filter-containeren, så filtrene kan scrolles mens SØG-knappen forbliver fast i bunden af panelet.
+Ændr navneopslags-prioriteten i RPC'en til:
+
+```
+COALESCE(
+  emd.first_name || ' ' || emd.last_name,    -- Primær: via agent mapping
+  emd_fb.first_name || ' ' || emd_fb.last_name, -- Fallback: via work_email
+  a.name,                                       -- Fallback: agent navn
+  s.agent_email                                  -- Sidste udvej: email
+)
+```
+
+Dette sikrer at det rigtige medarbejdernavn vises, uanset om medarbejderen er aktiv eller inaktiv.
 
 ### Teknisk ændring
 
-**Fil:** `src/pages/reports/DailyReports.tsx`
+**Database-migration:** Opdater `get_sales_aggregates_v2` funktionen.
 
-**Linje 1120** -- Tilføj scroll til filter-containeren:
+Ændringen er i `group_name` CASE-udtrykket for alle tre group_by-varianter (`employee`, `date`, `both`). Prioriteten ændres fra `a.name` først til `emd.first_name || ' ' || emd.last_name` først.
 
-```
-// Fra:
-<div className="flex-1 space-y-4">
-
-// Til:
-<div className="flex-1 space-y-4 overflow-y-auto">
-```
-
-Det er en ét-linje ændring. `flex-1` giver allerede containeren en bounded height inden for `h-full` flex-parent, og `overflow-y-auto` aktiverer scroll når indholdet overskrider den tilgængelige plads. SØG-knappen i `pt-6 border-t` div'en forbliver fast i bunden.
+Også i GROUP BY klausulen, så den matcher SELECT-udtrykket.
 
 ### Filer der ændres
 
 | Fil | Ændring |
 |---|---|
-| `src/pages/reports/DailyReports.tsx` | Tilføj `overflow-y-auto` på filter-container (linje 1120) |
+| Database (ny migration) | Opdater `get_sales_aggregates_v2` med korrekt navneprioritering |
+
+### Resultat
+- "joel" → "Joel [Efternavn]"
+- "trine" → "Trine [Efternavn]"  
+- Inaktive medarbejdere vises stadig (ingen `is_active` filter)
+- Ingen ændring i salgstal eller provision
 
