@@ -98,11 +98,17 @@ function BillingOverviewTab() {
 
     if (booking.total_price != null) {
       bookingTotal = booking.total_price;
-      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      const bookedDaysArr1 = booking.booked_days as number[] | null;
+      days = bookedDaysArr1 && bookedDaysArr1.length > 0
+        ? bookedDaysArr1.length
+        : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       dailyRate = days > 0 ? bookingTotal / days : bookingTotal;
     } else {
       dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-      days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      const bookedDaysArr2 = booking.booked_days as number[] | null;
+      days = bookedDaysArr2 && bookedDaysArr2.length > 0
+        ? bookedDaysArr2.length
+        : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       bookingTotal = dailyRate * days;
     }
 
