@@ -1,25 +1,26 @@
 
 
-## Fix: Behold moerkt tema i PDF-udskrift
+## Fix: Header synlighed + valuta-linjeskift i PDF
 
-### Problem
-PDF-rapporten ser hvid ud fordi `@media print` CSS-reglerne (linje 220-246) overskriver det moerke tema med hvid baggrund og moerk tekst. Naar browseren "gemmer som PDF" bruger den print-stilarterne.
+### Problemer
+1. **Header-teksten** er svær at læse mod den mørke baggrund — farven er for tæt på baggrunden.
+2. **Beløb-kolonnen** er for smal, så "kr" bryder til ny linje (f.eks. "12.000\nkr").
 
-### Loesning
-Fjern `@media print`-blokken helt, saa det moerke tema bevares i PDF'en. Tilfoej i stedet `color-adjust: exact` og `-webkit-print-color-adjust: exact` paa `body` for at sikre at browseren gengiver baggrundsfarver korrekt ved print/PDF.
-
-### Teknisk aendring
+### Løsning
 
 **Fil:** `src/utils/supplierReportPdfGenerator.ts`
 
-1. Tilfoej print-color properties til `body`-stilen:
-   - `color-adjust: exact`
-   - `-webkit-print-color-adjust: exact`
-   - `print-color-adjust: exact`
+1. **Header mere synlig:**
+   - Gør h1 farven lysere/hvid (#ffffff) og øg kontrasten
+   - Tilføj evt. lidt mere spacing
 
-2. Fjern hele `@media print { ... }` blokken (linje 220-246) saa det moerke tema bruges direkte i PDF'en.
+2. **Prevent linjeskift i beløb:**
+   - Tilføj `white-space: nowrap` til `.num` celler så "12.000 kr" aldrig brydes
+   - Reducer font-size på tabellen en smule (11px → 10px) for at give mere plads
+   - Sæt en `table-layout: fixed` med passende kolonnebredder, eller alternativt reducer padding i cellerne fra 12px til 8px for at give mere plads til indholdet
+   - Gør "Lokation"-kolonnen bredere og de numeriske kolonner smallere men med nowrap
 
-### Resultat
-- PDF'en vil have moerk baggrund og lyst tekst -- praecis som det ser ud i preview-vinduet
-- Kun 1 fil aendres, ingen andre sideeffekter
+### Teknisk opsummering
+- 1 fil ændres: `src/utils/supplierReportPdfGenerator.ts`
+- Kun CSS-justeringer, ingen logikændringer
 
