@@ -32,12 +32,21 @@ function BillingOverviewTab() {
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [locationTypeFilter, setLocationTypeFilter] = useState<string>("all");
+  const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
 
-  const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
+  const monthDate = new Date(selectedMonth + "-01");
+  const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthStart);
 
+  const periodStart = periodType === "payroll"
+    ? new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 15)
+    : monthStart;
+  const periodEnd = periodType === "payroll"
+    ? new Date(monthDate.getFullYear(), monthDate.getMonth(), 14)
+    : monthEnd;
+
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ["vagt-billing-bookings", selectedMonth],
+    queryKey: ["vagt-billing-bookings", selectedMonth, periodType],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
@@ -46,8 +55,8 @@ function BillingOverviewTab() {
           location(id, name, address_city, daily_rate, type),
           clients(id, name)
         `)
-        .gte("start_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("start_date", format(periodStart, "yyyy-MM-dd"))
+        .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
       return data;
@@ -146,6 +155,15 @@ function BillingOverviewTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Måned</SelectItem>
+            <SelectItem value="payroll">Lønperiode (15.–14.)</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={clientFilter} onValueChange={setClientFilter}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Alle kunder" />
