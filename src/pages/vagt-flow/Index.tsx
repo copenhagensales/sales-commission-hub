@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, endOfWeek, getWeek } from "date-fns";
 import { da } from "date-fns/locale";
-import { getWeekYear } from "@/lib/vagt-flow-date-utils";
+import { getWeekYear } from "@/lib/calculations";
 import { BookingsLast30DaysChart } from "@/components/vagt-flow/BookingsLast30DaysChart";
 
 export default function VagtFlowIndex() {

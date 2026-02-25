@@ -10,7 +10,7 @@ import { DashboardPeriodSelector, getDefaultPeriod, canUseCachedKpis, type Perio
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
-import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { calculatePayrollPeriod } from "@/lib/calculations";
 import { getDisplayName } from "@/utils/formatting";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { useQuery } from "@tanstack/react-query";

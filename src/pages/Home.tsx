@@ -50,7 +50,7 @@ import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
-import { getVacationPayRate } from "@/lib/calculations";
+import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
 const Home = () => {
   const { user } = useAuth();
@@ -123,20 +123,7 @@ const Home = () => {
   const isEnrolledInLeague = !!enrollment;
 
   // Calculate payroll period (15th-14th)
-  const payrollPeriod = useMemo(() => {
-    const today = new Date();
-    const currentDay = today.getDate();
-    
-    if (currentDay >= 15) {
-      const start = new Date(today.getFullYear(), today.getMonth(), 15);
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
-      return { start, end };
-    } else {
-      const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
-      const end = new Date(today.getFullYear(), today.getMonth(), 14);
-      return { start, end };
-    }
-  }, []);
+  const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
 
   // Cached personal stats
   const { data: cachedPersonalPayroll } = usePrecomputedKpis(

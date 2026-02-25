@@ -1,39 +1,16 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPayrollPeriod, toDateString } from "../_shared/date-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ============= DATE HELPERS (same as calculate-kpi-incremental) =============
-function getPayrollPeriod(date: Date): { start: Date; end: Date } {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-
-  if (day >= 15) {
-    return {
-      start: new Date(year, month, 15),
-      end: new Date(year, month + 1, 14, 23, 59, 59),
-    };
-  } else {
-    return {
-      start: new Date(year, month - 1, 15),
-      end: new Date(year, month, 14, 23, 59, 59),
-    };
-  }
-}
-
 function getPreviousPayrollPeriod(date: Date): { start: Date; end: Date } {
   const current = getPayrollPeriod(date);
-  // Go back one day from the current period start to land in the previous period
   const prevDate = new Date(current.start);
   prevDate.setDate(prevDate.getDate() - 1);
   return getPayrollPeriod(prevDate);
-}
-
-function toDateString(date: Date): string {
-  return date.toISOString().split("T")[0];
 }
 
 function formatValue(value: number, category: string): string {

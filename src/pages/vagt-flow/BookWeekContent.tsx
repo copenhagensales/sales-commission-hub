@@ -7,7 +7,7 @@ const TWO_MONTHS_BACK = (() => {
   d.setHours(0, 0, 0, 0);
   return d;
 })();
-import { getWeekStartDate, getWeekYear, getWeekNumber } from "@/lib/vagt-flow-date-utils";
+import { getWeekStartDate, getWeekYear, getWeekNumber } from "@/lib/calculations";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

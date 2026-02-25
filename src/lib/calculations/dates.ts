@@ -5,6 +5,9 @@
  * Mirrors the backend logic in supabase/functions/_shared/date-helpers.ts
  */
 
+import { addDays, endOfWeek, format, getISOWeekYear, getWeek, startOfWeek } from "date-fns";
+import { da } from "date-fns/locale";
+
 /**
  * Gets the start of a day (midnight) for a given date.
  */
@@ -87,6 +90,54 @@ export function getPayrollPeriod(date: Date = new Date()): { start: Date; end: D
       end: new Date(year, month, 14, 23, 59, 59, 999),
     };
   }
+}
+
+/**
+ * Gets the payroll period immediately before the period containing the provided date.
+ */
+export function getPreviousPayrollPeriod(date: Date = new Date()): { start: Date; end: Date } {
+  const current = getPayrollPeriod(date);
+  const previousDate = new Date(current.start);
+  previousDate.setDate(previousDate.getDate() - 1);
+  return getPayrollPeriod(previousDate);
+}
+
+/**
+ * Gets ISO week number for a date (Monday-based).
+ */
+export function getWeekNumber(date: Date): number {
+  return getWeek(date, { weekStartsOn: 1, locale: da });
+}
+
+/**
+ * Gets ISO week year for a date.
+ */
+export function getWeekYear(date: Date): number {
+  return getISOWeekYear(date);
+}
+
+/**
+ * Formats a week range for display.
+ */
+export function formatWeekRange(startDate: Date, endDate: Date): string {
+  return `${format(startDate, "d/M", { locale: da })} - ${format(endDate, "d/M", { locale: da })}`;
+}
+
+/**
+ * Gets week start date (Monday) from ISO week/year values.
+ */
+export function getWeekStartDate(year: number, weekNumber: number): Date {
+  const jan4 = new Date(year, 0, 4);
+  const firstWeekStart = startOfWeek(jan4, { weekStartsOn: 1 });
+  return addDays(firstWeekStart, (weekNumber - 1) * 7);
+}
+
+/**
+ * Gets week end date (Sunday) from ISO week/year values.
+ */
+export function getWeekEndDate(year: number, weekNumber: number): Date {
+  const weekStart = getWeekStartDate(year, weekNumber);
+  return endOfWeek(weekStart, { weekStartsOn: 1 });
 }
 
 /**
@@ -176,3 +227,11 @@ export function formatDateRange(
 
 /** Standard number of days in a month for proration calculations */
 export const STANDARD_MONTH_DAYS = 30;
+
+/**
+ * Backwards-compatible alias for legacy callers.
+ * @deprecated Use getPayrollPeriod() instead.
+ */
+export function calculatePayrollPeriod(): { start: Date; end: Date } {
+  return getPayrollPeriod(new Date());
+}

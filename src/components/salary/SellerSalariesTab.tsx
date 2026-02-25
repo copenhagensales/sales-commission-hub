@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "referralBonus";
 type SortDir = "asc" | "desc";

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPayrollPeriod, getStartOfDay, getStartOfMonth, getStartOfWeek } from "../_shared/date-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -216,44 +217,6 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
 }
 
 // fetchFmCommissionMap removed — FM sales now use sale_items via trigger
-
-// Date helpers
-function getStartOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function getStartOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function getStartOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function getPayrollPeriod(date: Date): { start: Date; end: Date } {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-
-  if (day >= 15) {
-    return {
-      start: new Date(year, month, 15),
-      end: new Date(year, month + 1, 14, 23, 59, 59),
-    };
-  } else {
-    return {
-      start: new Date(year, month - 1, 15),
-      end: new Date(year, month, 14, 23, 59, 59),
-    };
-  }
-}
 
 function formatValue(value: number, category: string): string {
   if (category === "revenue" || category === "commission" || category === "økonomi") {

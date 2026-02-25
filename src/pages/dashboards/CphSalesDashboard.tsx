@@ -19,7 +19,7 @@ import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRa
 import { DateRange } from "react-day-picker";
 import { countWorkDaysInPeriod } from "@/lib/calculations";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 interface TopSeller {
   name: string;

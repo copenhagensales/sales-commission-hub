@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isTvMode } from "@/utils/tvMode";
-import { calculatePayrollPeriod } from "@/utils/payrollPeriod";
+import { calculatePayrollPeriod } from "@/lib/calculations";
 import ClientDashboard from "@/components/dashboard/ClientDashboard";
 
 // Get distinct color for each client

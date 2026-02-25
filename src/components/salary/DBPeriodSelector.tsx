@@ -27,7 +27,7 @@ interface DBPeriodSelectorProps {
   onPresetLabelChange?: (label: string | undefined) => void;
 }
 
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 export function DBPeriodSelector({
   periodStart,

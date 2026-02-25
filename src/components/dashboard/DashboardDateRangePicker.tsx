@@ -13,7 +13,7 @@ interface DashboardDateRangePickerProps {
   onDateRangeChange: (range: DateRange | undefined) => void;
 }
 
-import { getPayrollPeriod } from "@/utils/payrollPeriod";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 const presets = [
   { label: "Lønperiode", getValue: () => {

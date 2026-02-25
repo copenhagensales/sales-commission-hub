@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
 import { format, addDays, getWeek } from "date-fns";
-import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
+import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
