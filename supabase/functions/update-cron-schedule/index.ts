@@ -27,7 +27,7 @@ const staggeredFiveMinuteSchedules: Record<string, string> = {
 };
 
 const LOVABLE_ALLOWED_ACTIONS = ["campaigns", "users", "sales", "calls"] as const;
-const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "3,8,13,18,23,28,33,38,43,48,53,58 * * * *";
+const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "5,35 * * * *";
 
 const isLovableTdcIntegration = (
   integrationName?: string | null,
@@ -133,9 +133,7 @@ const getMetaSyncSchedule = (
   }
 
   if (isLovableTdcIntegration(integrationName, config)) {
-    if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
-      return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
-    }
+    return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
   }
 
   return null;
