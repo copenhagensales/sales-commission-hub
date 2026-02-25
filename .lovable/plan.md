@@ -1,74 +1,62 @@
 
 
-## Fix: Forskyd Lovablecph sync-meta job så det ikke kolliderer med sync-sales
+## Preventiv retry-reduktion for Adversus-adapteren
 
-### Problem
-Lovablecph har to cron-jobs der begge korer pa nojagtig de samme minutter:
-- `dialer-26fac751-sync-sales`: `3,8,13,18,23,28,33,38,43,48,53,58`
-- `dialer-26fac751-sync-meta`: `3,8,13,18,23,28,33,38,43,48,53,58`
+### Baggrund
+Adversus-adapteren har p.t. 6 retries med 10s exponential backoff i `get()`, hvilket giver en worst-case ventetid pa ~310 sekunder. Dette overstiger edge function timeout (~50s) markant. Selvom staggering-fix og provider-sync locking holder 429-fejl nede, vil en enkelt rate-limit udlose samme cascade-problem som vi netop har fixet for Enreach.
 
-Begge rammer den samme Adversus API-konto pa samme tid, hvilket giver 429 rate-limit fejl (19 fejl i dag). Det har intet med andre integrationer at gore -- Lovablecph rate-limiter sig selv.
+### Aendringer
 
-### Losning
-Forskyd `sync-meta` jobbet til hvert 30. minut med 2 minutters offset, sa det aldrig overlapper med `sync-sales`:
+**Fil: `supabase/functions/integration-engine/adapters/adversus.ts`**
 
-| Job | Nuvarende schedule | Nyt schedule |
-|---|---|---|
-| `sync-sales` | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` | Uandret |
-| `sync-meta` | `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` | `5,35 * * * *` |
+3 steder skal justeres:
 
-Meta-data (campaigns, users, calls) andrer sig sjaldent og behover ikke synkroniseres hvert 5. minut.
+**1. `get()` metoden (linje 84)**
+- `retries`: 6 -> 3
+- `baseDelay`: 10000 -> 5000
+- Max delay cap: tilfoej `Math.min(..., 20000)` sa worst case = 5+10+20 = ~35s (under timeout)
 
-### Teknisk andring
+**2. `fetchSales` pagineringens retry-loop (linje 697-720)**
+- `maxRetries`: 6 -> 3
+- Base delay: 10000 -> 5000
+- Max delay: tilfoej cap pa 20000ms
 
-**1. Opdater `update-cron-schedule` edge function** (`supabase/functions/update-cron-schedule/index.ts`)
+**3. `fetchCalls` pagineringens retry-loop (linje 880-900)**
+- `maxRetries`: 5 -> 3
+- Max delay cap: 60000 -> 20000
 
-Andringen sikrer at `sync-meta` automatisk far et forskudt schedule nar det oprettes. I `LOVABLE_META_FIVE_MINUTE_SCHEDULE` konstanten (linje 37) andres til et 30-minutters interval med offset:
+**Fil: `supabase/functions/integration-engine/actions/sync-integration.ts`**
 
-```
-// Fra:
-const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "3,8,13,18,23,28,33,38,43,48,53,58 * * * *";
+Udvid den eksisterende Enreach-scopede fail-fast guard til ogsa at daekke Adversus:
 
-// Til:
-const LOVABLE_META_FIVE_MINUTE_SCHEDULE = "5,35 * * * *";
-```
-
-Ogsa opdater `getMetaSyncSchedule()` funktionen sa den returnerer 30-minutters schedule for alle Lovable/TDC integrationer (ikke kun lovablecph):
-
-```
-// Fra (linje 131-132):
-if ((integrationName || "").trim().toLowerCase() === "lovablecph") {
-  return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
+```text
+const provider = (source || integration.provider || "").toLowerCase();
+if (provider === "enreach" || provider === "adversus") {
+  const earlyMetrics = adapter.getMetrics();
+  if (earlyMetrics.rateLimitHits > 0) {
+    log("WARN", `${provider} rate limit detected...`);
+    throw new Error(`${provider} rate limited during meta sync, aborting`);
+  }
 }
-
-// Til:
-return LOVABLE_META_FIVE_MINUTE_SCHEDULE;
 ```
 
-**2. Database: Opdater det aktive cron-job**
+### Oversigt
 
-Kor en SQL-opdatering for at andre det eksisterende cron-job med det samme (sa vi ikke skal vente pa at nogen trigger `update-cron-schedule`):
+| Adapter | Retries for | Retries efter | Worst-case for | Worst-case efter |
+|---------|------------|--------------|----------------|-----------------|
+| Enreach get() | 5 | 2 | ~155s | ~12s |
+| Adversus get() | 6 | 3 | ~310s | ~35s |
+| Adversus fetchSales | 6 | 3 | ~310s | ~35s |
+| Adversus fetchCalls | 5 | 3 | ~155s | ~35s |
 
-```sql
-SELECT cron.schedule(
-  'dialer-26fac751-sync-meta',
-  '5,35 * * * *',
-  -- (eksisterende command forbliver uandret)
-);
-```
+### Hvorfor 3 retries for Adversus (vs 2 for Enreach)
+- Adversus korer pa 5-min cron interval (vs 3-min for Enreach), sa der er mere plads
+- 35s worst case er stadig under edge function timeout (~50s)
+- Giver lidt mere resilience for transiente fejl
 
-Alternativt: kald `update-cron-schedule` edge function for Lovablecph, som vil gen-oprette begge jobs med de korrekte schedules.
-
-### Filer der andres
-
-| Fil | Andring |
-|---|---|
-| `supabase/functions/update-cron-schedule/index.ts` | Opdater `LOVABLE_META_FIVE_MINUTE_SCHEDULE` og `getMetaSyncSchedule()` |
-| Database (cron.job) | Opdater schedule for `dialer-26fac751-sync-meta` |
-
-### Resultat
-- Sales-sync korer uforstyrret hvert 5. minut (minut 3,8,13,...)
-- Meta-sync korer hvert 30. minut (minut 5,35), aldrig samtidig med sales
-- Forventet reduktion fra ~19 fejl/dag til 0
-- Campaigns/users/calls opdateres stadig regelmaessigt
+### Forventet resultat
+- Ingen Adversus-sync vil nogensinde time ud pa retries
+- Fail-fast guard forhindrer cascade hvis 429 rammer under meta-sync
+- Eksisterende staggering og provider-sync locking forbliver uaendret
+- Systemet er konsistent beskyttes mod retry-cascade pa tvaers af begge providers
 
