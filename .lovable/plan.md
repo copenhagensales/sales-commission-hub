@@ -1,65 +1,35 @@
 
-## Rabatstruktur: Minimum dage pr. lokation for at taelle som placering
+
+## Fix: SØG-knap ikke synlig på bærbare computere
 
 ### Problem
-I dag taeller rabatsystemet for "Danske Shoppingcentre" alle bookinger som placeringer. Brugeren vil have, at en lokation kun taeller som 1 placering, hvis der er booket mindst 5 dage paa den lokation i perioden. Fx: Amager Centeret med 5 dage = 1 placering, Kolding Storcenter med 4 dage = 0 placeringer.
+Filter-panelet (Sheet) i Dagsrapporter har 7 dropdown-filtre stacked vertikalt. På bærbare med lavere skærmhøjde (typisk 768px-900px) overflower indholdet, og "SØG"-knappen i bunden bliver skubbet ud af viewporten. Brugerne kan ikke scrolle ned til den.
 
-### Loesning
-Tilfoej et `min_days_per_location` felt paa rabatreglerne og aendr beregningslogikken, saa "placeringer" taelles som unikke lokationer der opfylder minimumskravet.
+### Årsag
+Filter-containeren (`flex-1 space-y-4` på linje 1120) har ingen `overflow-y-auto`, så den vokser ud over skærmhøjden i stedet for at blive scrollbar. SØG-knappen sidder i en separat `div` i bunden, men den bliver usynlig fordi flex-containeren aldrig begrænser sin højde.
 
-### Teknisk plan
+### Løsning
+Tilføj `overflow-y-auto` på filter-containeren, så filtrene kan scrolles mens SØG-knappen forbliver fast i bunden af panelet.
 
-**Database-migration:**
+### Teknisk ændring
 
-Tilfoej kolonne `min_days_per_location` (default 1 for bagudkompatibilitet):
+**Fil:** `src/pages/reports/DailyReports.tsx`
 
-```sql
-ALTER TABLE supplier_discount_rules
-ADD COLUMN min_days_per_location integer NOT NULL DEFAULT 1;
+**Linje 1120** -- Tilføj scroll til filter-containeren:
 
--- Opdater Danske Shoppingcentre regler til 5 dage
-UPDATE supplier_discount_rules
-SET min_days_per_location = 5
-WHERE location_type = 'Danske Shoppingcentre';
+```
+// Fra:
+<div className="flex-1 space-y-4">
+
+// Til:
+<div className="flex-1 space-y-4 overflow-y-auto">
 ```
 
-**Fil 1: `src/components/billing/SupplierReportTab.tsx`**
+Det er en ét-linje ændring. `flex-1` giver allerede containeren en bounded height inden for `h-full` flex-parent, og `overflow-y-auto` aktiverer scroll når indholdet overskrider den tilgængelige plads. SØG-knappen i `pt-6 border-t` div'en forbliver fast i bunden.
 
-Aendring i placeringsberegningen (linje 244):
+### Filer der ændres
 
-Erstat den nuvaerende `totalPlacements` (som taeller antal bookinger) med en beregning der:
-1. For hver lokation, summer det faktiske antal bookede dage (via `booked_days` array eller fallback til `differenceInDays`)
-2. Kun taeller lokationen som 1 placering hvis `totalDays >= min_days_per_location` (hentet fra discount rules)
-
-```typescript
-const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
-const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
-  return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);
-}, 0);
-```
-
-Ogsaa sikre at `totalDays` beregnes fra `booked_days` array naar det er tilgaengeligt (som i Billing.tsx), saa vi faar det praecise antal dage.
-
-**Fil 2: `src/components/billing/DiscountRulesTab.tsx`**
-
-Tilfoej UI-felt til `min_days_per_location` i opret/rediger dialogen:
-- Nyt input-felt "Min. dage pr. lokation" (kun synligt naar discount_type er "placements")
-- Default vaerdi: 1
-- Gem vaerdien ved opret/opdater
-
-**Fil 3: `src/integrations/supabase/types.ts`**
-
-Opdateres automatisk efter migrationen.
-
-### Filer der aendres
-
-| Fil | Aendring |
+| Fil | Ændring |
 |---|---|
-| Database | Tilfoej `min_days_per_location` kolonne, saet til 5 for Danske Shoppingcentre |
-| `src/components/billing/SupplierReportTab.tsx` | Aendr placeringsoptaelling til unikke lokationer med nok dage |
-| `src/components/billing/DiscountRulesTab.tsx` | Tilfoej min-dage felt i opret/rediger dialog |
+| `src/pages/reports/DailyReports.tsx` | Tilføj `overflow-y-auto` på filter-container (linje 1120) |
 
-### Resultat
-- Danske Shoppingcentre: En lokation taeller kun som 1 placering hvis den har 5+ bookede dage
-- Andre lokationstyper: Default 1 dag (ingen aendring i adfaerd)
-- Konfigurerbart per rabattype via admin-UI
