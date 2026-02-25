@@ -45,31 +45,20 @@ interface SafeBackfillResult {
 }
 
 /**
- * Get total API calls made by ALL integrations sharing the same provider
- * within the given time window.
+ * Get total API calls made by a single integration within the given time window.
+ * Each integration has its own independent budget since they use separate API credentials.
  */
-async function getProviderApiUsage(
+async function getIntegrationApiUsage(
   supabase: SupabaseClient,
-  provider: string,
+  integrationId: string,
   windowMinutes: number,
 ): Promise<number> {
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
 
-  // Get all integration IDs for this provider
-  const { data: integrations } = await supabase
-    .from("dialer_integrations")
-    .select("id")
-    .eq("provider", provider)
-    .eq("is_active", true);
-
-  if (!integrations || integrations.length === 0) return 0;
-
-  const integrationIds = integrations.map((i: any) => i.id);
-
   const { data, error } = await supabase
     .from("integration_sync_runs")
     .select("api_calls_made")
-    .in("integration_id", integrationIds)
+    .eq("integration_id", integrationId)
     .gte("started_at", since);
 
   if (error || !data) return 0;
@@ -160,15 +149,15 @@ export async function safeBackfill(
   log("INFO", `Safe backfill: ${integration.name} (${provider}), range ${from} -> ${to}, uncapped=${uncapped}, campaignIds=${campaignIds?.join(",") || "all"}`);
 
   // 2. Check provider-level budget
-  const providerUsage = await getProviderApiUsage(supabase, provider, BUDGET_WINDOW_MINUTES);
-  const availableBudget = calculateSafeMaxRecords(providerUsage, provider, log);
+  const integrationUsage = await getIntegrationApiUsage(supabase, integrationId, BUDGET_WINDOW_MINUTES);
+  const availableBudget = calculateSafeMaxRecords(integrationUsage, provider, log);
 
   if (availableBudget <= 0) {
     log("WARN", `No API budget available for provider ${provider} — skipping`);
     return {
       success: true, daysProcessed: 0, totalSales: 0, totalCalls: 0,
-      budgetUsed: providerUsage, budgetAvailable: 0, details: {},
-      message: `No API budget available for ${provider}. Current usage: ${providerUsage}. Will retry later.`,
+      budgetUsed: integrationUsage, budgetAvailable: 0, details: {},
+      message: `No API budget available for integration ${integration.name}. Current usage: ${integrationUsage}. Will retry later.`,
     };
   }
 
@@ -203,7 +192,7 @@ export async function safeBackfill(
 
   for (const dayStart of days) {
     // Re-check budget before each day (account for calls made in this run)
-    const currentTotalUsage = providerUsage + apiCallsThisRun;
+    const currentTotalUsage = integrationUsage + apiCallsThisRun;
     const limits = PROVIDER_LIMITS[provider] || { perHour: 1000 };
     const usableCapacity = Math.floor(limits.perHour * (1 - RESERVE_PCT));
     const remaining = usableCapacity - currentTotalUsage;
@@ -304,7 +293,7 @@ export async function safeBackfill(
       days_total: days.length,
       total_sales: totalSales,
       total_calls: totalCalls,
-      budget_used: providerUsage + adapterMetrics.apiCalls,
+      budget_used: integrationUsage + adapterMetrics.apiCalls,
       budget_available: availableBudget,
       stopped_early: stoppedEarly,
       results: details,
@@ -320,7 +309,7 @@ export async function safeBackfill(
     daysProcessed,
     totalSales,
     totalCalls,
-    budgetUsed: providerUsage + adapterMetrics.apiCalls,
+    budgetUsed: integrationUsage + adapterMetrics.apiCalls,
     budgetAvailable: availableBudget,
     details,
     message,
