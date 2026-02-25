@@ -81,7 +81,7 @@ export class AdversusAdapter implements DialerAdapter {
     return Math.max(250, Math.round(delayMs * (1 + randomOffset)));
   }
 
-  private async get(endpoint: string, retries = 6, baseDelay = 10000): Promise<any> {
+  private async get(endpoint: string, retries = 3, baseDelay = 5000): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       this._metrics.apiCalls++;
       const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
@@ -95,7 +95,7 @@ export class AdversusAdapter implements DialerAdapter {
         }
         this._metrics.retries++;
         const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
-        const exponentialDelay = baseDelay * Math.pow(2, attempt - 1); // 10s, 20s, 40s, 80s...
+        const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), 20000); // 5s, 10s, 20s (capped)
         const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
 
         console.log(
@@ -697,7 +697,7 @@ export class AdversusAdapter implements DialerAdapter {
     while (hasMore && page <= 100) { // Max 100,000 ventas
       const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
       let retryAttempt = 0;
-      const maxRetries = 6;
+      const maxRetries = 3;
 
       while (retryAttempt < maxRetries) {
         try {
@@ -714,7 +714,7 @@ export class AdversusAdapter implements DialerAdapter {
             }
             this._metrics.retries++;
             const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
-            const exponentialDelay = 10000 * Math.pow(2, retryAttempt - 1); // Start at 10s, then 20s, 40s...
+            const exponentialDelay = Math.min(5000 * Math.pow(2, retryAttempt - 1), 20000); // 5s, 10s, 20s (capped)
             const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
             console.log(`[Adversus] Rate limited on page ${page}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
             await new Promise(r => setTimeout(r, delay));
@@ -880,7 +880,7 @@ export class AdversusAdapter implements DialerAdapter {
 
       while (hasMore) {
         let retries = 0;
-        const maxRetries = 5;
+        const maxRetries = 3;
         let success = false;
 
         while (!success && retries < maxRetries) {
@@ -894,7 +894,7 @@ export class AdversusAdapter implements DialerAdapter {
             });
 
             if (res.status === 429) {
-              const waitTime = Math.min(5000 * Math.pow(2, retries), 60000);
+              const waitTime = Math.min(5000 * Math.pow(2, retries), 20000);
               console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s...`);
               await new Promise(r => setTimeout(r, waitTime));
               retries++;

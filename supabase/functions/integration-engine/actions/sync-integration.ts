@@ -124,6 +124,16 @@ export async function syncIntegration(
       runResults["users"] = await engine.processUsers(users, dialerSource);
     }
 
+    // Early abort for Enreach/Adversus if rate-limited during meta sync
+    const provider = (source || integration.provider || "").toLowerCase();
+    if (provider === "enreach" || provider === "adversus") {
+      const earlyMetrics = adapter.getMetrics();
+      if (earlyMetrics.rateLimitHits > 0) {
+        log("WARN", `${provider} rate limit detected during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits), aborting remaining actions to prevent cascade`);
+        throw new Error(`${provider} rate limited during meta sync (${earlyMetrics.rateLimitHits} hits), aborting to prevent cascade`);
+      }
+    }
+
     // Process sales
     if (actionList.includes("sales") || action === "sync") {
       const useRange = from && to;
