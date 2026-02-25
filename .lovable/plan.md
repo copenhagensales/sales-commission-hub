@@ -1,29 +1,44 @@
 
 
-## Ret faktureringsberegning til at bruge faktiske bookede dage
+## Fix: Dobbelt FM-salg i Dagsrapporter
 
 ### Problem
 
-Faktureringstabellen bruger `differenceInDays` (kalenderdage mellem start- og slutdato) til at beregne antal dage. Men hver booking har et `booked_days`-felt der angiver praecist hvilke ugedage der er booket. Det giver forkerte tal -- fx Frederiksberg Centeret viser 27 dage / 54.000 kr i stedet for de faktiske 22 bookede dage / 44.000 kr.
+Fieldmarketing-salg har et `agent_email`-felt sat (f.eks. `frfo@copenhagensales.dk`). Dagsrapporter henter salg via **to separate forespørgsler**:
 
-### Teknisk plan (1 fil)
+1. **Almindelige salg** (linje ~569): Henter ALLE salg matchende `agent_email` -- inklusiv FM-salg. Disse vises som "Ukendt kampagne" fordi FM-salg ikke har et `dialer_campaign_id`.
+2. **FM-salg** (linje ~668): Henter separat alle salg med `source = 'fieldmarketing'` og matcher via `fm_seller_id`. Disse vises som "Fieldmarketing".
 
-**`src/pages/vagt-flow/Billing.tsx`** -- 2 steder i `bookingsByLocation`-reduceren (ca. linje 95 og 102):
+Resultatet er at hvert FM-salg taelles og vises dobbelt -- en gang under "Ukendt kampagne" og en gang under "Fieldmarketing" -- med identiske tal.
 
-Erstat:
+### Loesning
+
+Tilfoej et filter der udelukker FM-salg fra den foerste (almindelige) salgs-foresporgsel, saa de kun haandteres af den dedikerede FM-logik.
+
+### Teknisk aendring
+
+**Fil:** `src/pages/reports/DailyReports.tsx`
+
+**Aendring 1** -- I den almindelige salgs-foresporgsel (ca. linje 569-581), tilfoej `.neq("source", "fieldmarketing")` til filteret:
+
 ```typescript
-days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+salesData = await fetchAllRows(
+  "sales", selectClause,
+  (q) => {
+    let query = q
+      .or(emailOrFilter)
+      .neq("source", "fieldmarketing")  // <-- NY LINJE
+      .gte("sale_datetime", `${startStr}T00:00:00`)
+      .lte("sale_datetime", `${endStr}T23:59:59`);
+    if (selectedClient !== "all") {
+      query = query.eq("client_campaigns.client_id", selectedClient);
+    }
+    return query;
+  }
+);
 ```
 
-Med:
-```typescript
-const bookedDays = booking.booked_days as number[] | null;
-days = bookedDays && bookedDays.length > 0
-  ? bookedDays.length
-  : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
-```
+Dette sikrer at FM-salg kun tælles af den dedikerede FM-logik (linje 826-830), som korrekt viser dem under "Fieldmarketing" med korrekte provisions- og omsætningstal.
 
-Begge steder -- baade for bookinger med `total_price` og uden. Fallback til `differenceInDays` bevares for gamle bookinger uden `booked_days`.
-
-Ingen andre filer aendres.
+Ingen andre filer eller logik behøver ændres.
 
