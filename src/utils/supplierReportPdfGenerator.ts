@@ -162,7 +162,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;color:#e2e8f0;background:#0f1419;padding:15mm;max-width:210mm;margin:0 auto;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 
 /* Header */
-.header{padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.header{padding:16px 20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08);background:#0f1419}
 .header h1{font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em}
 .header .meta{color:#64748b;font-size:13px;margin-top:4px}
 
