@@ -1,0 +1,1 @@
+ALTER TABLE public.location ADD COLUMN external_id text;

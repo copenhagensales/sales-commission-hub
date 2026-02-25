@@ -268,6 +268,15 @@ export default function LocationDetail() {
                   disabled={!canEditLocation}
                 />
               </div>
+              <div>
+                <Label>ID (valgfrit)</Label>
+                <Input
+                  value={formData.external_id || ""}
+                  onChange={(e) => setFormData({ ...formData, external_id: e.target.value })}
+                  placeholder="F.eks. butiksnummer"
+                  disabled={!canEditLocation}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Type</Label>
