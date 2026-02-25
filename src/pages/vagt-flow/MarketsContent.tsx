@@ -56,12 +56,14 @@ export default function MarketsContent() {
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
+  const [pastSectionOpen, setPastSectionOpen] = useState(false);
 
   // Fetch market bookings (next 12 months)
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["vagt-market-bookings"],
     queryFn: async () => {
       const today = new Date();
+      const sixMonthsAgo = addMonths(today, -6);
       const twelveMonthsFromNow = addMonths(today, 12);
 
       const { data: bookingData, error } = await supabase
@@ -74,7 +76,7 @@ export default function MarketsContent() {
           booking_assignment(id, date, employee_id)
         `)
         .in("location.type", MARKET_TYPES)
-        .gte("start_date", format(today, "yyyy-MM-dd"))
+        .gte("start_date", format(sixMonthsAgo, "yyyy-MM-dd"))
         .lte("start_date", format(twelveMonthsFromNow, "yyyy-MM-dd"))
         .order("start_date");
 
@@ -219,23 +221,45 @@ export default function MarketsContent() {
     }) || [];
   }, [bookings, clientFilter]);
 
-  // Group by month
+  // Split into upcoming and past
+  const { upcomingBookings, pastBookings } = useMemo(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    return {
+      upcomingBookings: filtered.filter((b: any) => b.start_date >= todayStr),
+      pastBookings: filtered.filter((b: any) => b.start_date < todayStr),
+    };
+  }, [filtered]);
+
+  // Group by month (upcoming)
   const groupedByMonth = useMemo(() => {
     const groups: Record<string, { label: string; bookings: any[] }> = {};
-    
-    for (const booking of filtered) {
+    for (const booking of upcomingBookings) {
       const startDate = parseISO(booking.start_date);
       const monthKey = format(startDate, "yyyy-MM");
       const monthLabel = format(startDate, "MMMM yyyy", { locale: da });
-      
       if (!groups[monthKey]) {
         groups[monthKey] = { label: monthLabel, bookings: [] };
       }
       groups[monthKey].bookings.push(booking);
     }
-    
     return groups;
-  }, [filtered]);
+  }, [upcomingBookings]);
+
+  // Group by month (past)
+  const pastGroupedByMonth = useMemo(() => {
+    const groups: Record<string, { label: string; bookings: any[] }> = {};
+    for (const booking of pastBookings) {
+      const startDate = parseISO(booking.start_date);
+      const monthKey = format(startDate, "yyyy-MM");
+      const monthLabel = format(startDate, "MMMM yyyy", { locale: da });
+      if (!groups[monthKey]) {
+        groups[monthKey] = { label: monthLabel, bookings: [] };
+      }
+      groups[monthKey].bookings.push(booking);
+    }
+    return groups;
+  }, [pastBookings]);
+
 
   const toggleMonthExpand = (key: string) => {
     setExpandedMonths(prev => {
@@ -277,7 +301,7 @@ export default function MarketsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <Badge variant="outline" className="text-lg px-4 py-2">
-          {filtered.length} events
+          {upcomingBookings.length} kommende{pastBookings.length > 0 && ` · ${pastBookings.length} tidligere`}
         </Badge>
       </div>
 
@@ -442,6 +466,98 @@ export default function MarketsContent() {
             </Card>
           </Collapsible>
         ))
+      )}
+
+      {/* Past markets section */}
+      {Object.keys(pastGroupedByMonth).length > 0 && (
+        <Collapsible open={pastSectionOpen} onOpenChange={setPastSectionOpen}>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-muted-foreground">Tidligere markeder</h3>
+                  <p className="text-sm text-muted-foreground">{pastBookings.length} afviklede events</p>
+                </div>
+              </div>
+              {pastSectionOpen ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-4 mt-4 opacity-70">
+              {Object.entries(pastGroupedByMonth)
+                .sort(([a], [b]) => b.localeCompare(a))
+                .map(([monthKey, { label, bookings: monthBookings }]) => (
+                <Card key={monthKey} className="bg-muted/20">
+                  <CardHeader className="py-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="font-medium capitalize text-muted-foreground">{label}</h4>
+                      <span className="text-sm text-muted-foreground">({monthBookings.length})</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-2">
+                      {monthBookings.map((booking: any) => {
+                        const staffingStatus = getStaffingStatus(booking);
+                        return (
+                          <div
+                            key={booking.id}
+                            className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => setEditBookingDialogBooking(booking)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-sm">{booking.location?.name}</h4>
+                                  <Badge variant="outline" className="text-xs">{booking.location?.type}</Badge>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <CalendarIcon className="h-3 w-3" />
+                                    {getDateDisplay(booking)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {booking.location?.region || "Ukendt"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant="secondary" className="text-xs">{booking.clients?.name || "Ukendt"}</Badge>
+                                  <Badge className={`text-xs ${staffingStatus.color}`}>
+                                    <Users className="h-3 w-3 mr-1" />
+                                    {staffingStatus.label}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteBookingId(booking.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       {/* Delete confirmation dialog */}
