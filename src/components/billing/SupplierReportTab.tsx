@@ -91,7 +91,7 @@ export function SupplierReportTab() {
         .from("booking")
         .select(`
           *,
-          location(id, name, address_city, daily_rate, type),
+          location(id, name, address_city, daily_rate, type, external_id),
           clients(id, name)
         `)
         .gte("start_date", format(monthStart, "yyyy-MM-dd"))
@@ -112,7 +112,7 @@ export function SupplierReportTab() {
         .from("booking")
         .select(`
           *,
-          location(id, name, address_city, daily_rate, type)
+          location(id, name, address_city, daily_rate, type, external_id)
         `)
         .gte("start_date", format(yearStart, "yyyy-MM-dd"))
         .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
@@ -436,6 +436,7 @@ export function SupplierReportTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lokation</TableHead>
+                    <TableHead>ID</TableHead>
                     <TableHead>By</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Periode</TableHead>
@@ -465,6 +466,7 @@ export function SupplierReportTab() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="text-muted-foreground">{loc.location?.external_id || "-"}</TableCell>
                       <TableCell>{loc.location?.address_city || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{loc.client?.name || "Ukendt"}</Badge>
@@ -501,7 +503,7 @@ export function SupplierReportTab() {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={7} className="font-semibold">
+                    <TableCell colSpan={8} className="font-semibold">
                       Subtotal
                     </TableCell>
                     <TableCell className="text-right font-bold">
@@ -660,6 +662,7 @@ export function SupplierReportTab() {
                   month: monthLabel,
                   locations: locationDiscounts.map((loc: any) => ({
                     locationName: loc.location?.name || "",
+                    externalId: loc.location?.external_id || "",
                     city: loc.location?.address_city || "",
                     client: loc.client?.name || "",
                     period: formatDateRange(loc.minDate, loc.maxDate),
