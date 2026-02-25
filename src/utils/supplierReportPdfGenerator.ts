@@ -5,6 +5,7 @@
 
 interface LocationRow {
   locationName: string;
+  externalId?: string;
   city: string;
   client: string;
   period: string;
@@ -61,6 +62,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${loc.isExcluded ? ' <span class="badge badge-excluded">Udelukket</span>' : ""}
           ${loc.maxDiscount != null && !loc.isExcluded ? ` <span class="badge badge-max">Max ${loc.maxDiscount}%</span>` : ""}
         </td>
+        <td>${loc.externalId || "-"}</td>
         <td>${loc.city || "-"}</td>
         <td>${loc.client || "-"}</td>
         <td>${loc.period}</td>
@@ -172,7 +174,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 
 /* Table */
 table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden;table-layout:fixed}
-col.col-loc{width:22%}col.col-by{width:13%}col.col-kunde{width:10%}col.col-periode{width:12%}col.col-book{width:7%}col.col-dage{width:6%}col.col-dagspris{width:12%}col.col-belob{width:12%}col.col-rabat{width:8%}col.col-efter{width:12%}
+col.col-loc{width:20%}col.col-id{width:8%}col.col-by{width:11%}col.col-kunde{width:10%}col.col-periode{width:11%}col.col-book{width:6%}col.col-dage{width:5%}col.col-dagspris{width:11%}col.col-belob{width:11%}col.col-rabat{width:7%}col.col-efter{width:11%}
 th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}
 td{padding:7px 6px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
 tbody tr{background:#151d27}
@@ -230,13 +232,13 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
     <h3>Bookinger</h3>
     <table>
       <colgroup>
-        <col class="col-loc"><col class="col-by"><col class="col-kunde"><col class="col-periode">
+        <col class="col-loc"><col class="col-id"><col class="col-by"><col class="col-kunde"><col class="col-periode">
         <col class="col-book"><col class="col-dage"><col class="col-dagspris"><col class="col-belob">
         ${isAnnualRevenue ? '<col class="col-rabat"><col class="col-efter">' : ""}
       </colgroup>
       <thead>
         <tr>
-          <th>Lokation</th><th>By</th><th>Kunde</th><th>Periode</th>
+          <th>Lokation</th><th>ID</th><th>By</th><th>Kunde</th><th>Periode</th>
           <th class="num">Book.</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
           ${isAnnualRevenue ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
         </tr>
@@ -244,7 +246,7 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
       <tbody>${locationRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="7">Subtotal</td>
+          <td colspan="8">Subtotal</td>
           <td class="num">${fmtKr(config.totals.subtotal)}</td>
           ${isAnnualRevenue ? `<td class="num accent">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
         </tr>
