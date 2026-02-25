@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
@@ -208,6 +208,37 @@ export default function BookingsContent() {
       return data || [];
     },
   });
+
+  // Fetch booking_vehicle data for vehicle tags
+  const { data: bookingVehicles = [] } = useQuery({
+    queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear],
+    queryFn: async () => {
+      const bookingIds = bookings?.map((b: any) => b.id) || [];
+      if (bookingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("booking_vehicle")
+        .select("id, booking_id, vehicle_id, date, vehicle:vehicle_id(name, license_plate)")
+        .in("booking_id", bookingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!bookings && bookings.length > 0,
+  });
+
+  // Build lookup: booking_id -> unique vehicles
+  const vehiclesByBooking = useMemo(() => {
+    const map = new Map<string, { name: string; plate: string }[]>();
+    for (const bv of bookingVehicles as any[]) {
+      if (!bv.vehicle) continue;
+      const existing = map.get(bv.booking_id) || [];
+      const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
+      if (!alreadyAdded) {
+        existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
+      }
+      map.set(bv.booking_id, existing);
+    }
+    return map;
+  }, [bookingVehicles]);
 
   // Fetch approved absences for employees in this week's bookings
   const { data: employeeAbsences = [] } = useQuery({
@@ -527,6 +558,16 @@ export default function BookingsContent() {
                           <p className="text-sm text-muted-foreground">
                             {booking.location?.address_city} • {booking.location?.type}
                           </p>
+                          {vehiclesByBooking.get(booking.id)?.length ? (
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {vehiclesByBooking.get(booking.id)!.map((v, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 gap-1 text-muted-foreground">
+                                  <Car className="h-2.5 w-2.5" />
+                                  {v.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex items-center gap-2">
                           {canEditFmBookings && (
