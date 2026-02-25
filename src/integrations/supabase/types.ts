@@ -8676,6 +8676,7 @@ export type Database = {
           id: string
           is_active: boolean
           location_type: string
+          min_days_per_location: number
           min_placements: number
           min_revenue: number | null
           updated_at: string
@@ -8688,6 +8689,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_type: string
+          min_days_per_location?: number
           min_placements: number
           min_revenue?: number | null
           updated_at?: string
@@ -8700,6 +8702,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_type?: string
+          min_days_per_location?: number
           min_placements?: number
           min_revenue?: number | null
           updated_at?: string
