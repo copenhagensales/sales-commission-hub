@@ -225,17 +225,18 @@ export default function BookingsContent() {
     enabled: !!bookings && bookings.length > 0,
   });
 
-  // Build lookup: booking_id -> unique vehicles
-  const vehiclesByBooking = useMemo(() => {
+  // Build lookup: booking_id + date -> unique vehicles
+  const vehiclesByBookingDate = useMemo(() => {
     const map = new Map<string, { name: string; plate: string }[]>();
     for (const bv of bookingVehicles as any[]) {
-      if (!bv.vehicle) continue;
-      const existing = map.get(bv.booking_id) || [];
+      if (!bv.vehicle || !bv.date) continue;
+      const key = `${bv.booking_id}_${bv.date}`;
+      const existing = map.get(key) || [];
       const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
       if (!alreadyAdded) {
         existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
       }
-      map.set(bv.booking_id, existing);
+      map.set(key, existing);
     }
     return map;
   }, [bookingVehicles]);
@@ -558,16 +559,6 @@ export default function BookingsContent() {
                           <p className="text-sm text-muted-foreground">
                             {booking.location?.address_city} • {booking.location?.type}
                           </p>
-                          {vehiclesByBooking.get(booking.id)?.length ? (
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {vehiclesByBooking.get(booking.id)!.map((v, i) => (
-                                <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 bg-primary/10 text-primary border-primary/20">
-                                  <Car className="h-2.5 w-2.5" />
-                                  {v.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : null}
                         </div>
                         <div className="flex items-center gap-2">
                           {canEditFmBookings && (
@@ -677,6 +668,21 @@ export default function BookingsContent() {
                                   })}
                                 </div>
                               )}
+                              {(() => {
+                                const dateStr = format(dayDate, "yyyy-MM-dd");
+                                const dayVehicles = vehiclesByBookingDate.get(`${booking.id}_${dateStr}`);
+                                if (!dayVehicles?.length) return null;
+                                return (
+                                  <div className="mt-1 flex flex-col items-center gap-0.5">
+                                    {dayVehicles.map((v, i) => (
+                                      <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-primary/10 text-primary">
+                                        <Car className="h-2 w-2" />
+                                        {v.name}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
