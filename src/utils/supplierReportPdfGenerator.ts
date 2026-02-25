@@ -158,7 +158,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 <title>Leverandørrapport – ${config.locationType} – ${config.month}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#e2e8f0;background:#0f1419;padding:40px;max-width:960px;margin:0 auto;font-size:13px}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#e2e8f0;background:#0f1419;padding:40px;max-width:960px;margin:0 auto;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 
 /* Header */
 .header{padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08)}
@@ -216,34 +216,6 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
 /* Footer */
 .footer{margin-top:36px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;color:#475569;font-size:11px}
 
-/* Print */
-@media print{
-  body{background:#fff;color:#1a1a1a;padding:20px}
-  .header{border-bottom-color:#e2e8f0}
-  .header h1{color:#0f172a}
-  .header .meta{color:#64748b}
-  .section h3{color:#475569}
-  th{background:#f1f5f9;color:#475569;border-bottom-color:#e2e8f0}
-  td{color:#334155;border-bottom-color:#f1f5f9}
-  tbody tr,tbody tr:nth-child(even){background:#fff}
-  tbody tr:hover{background:#fff}
-  .cell-name{color:#0f172a}
-  tfoot td{background:#f1f5f9;color:#0f172a;border-top-color:#e2e8f0}
-  .excluded td{opacity:.5}
-  .badge-excluded{background:#fee2e2;color:#dc2626}
-  .badge-max{background:#e0e7ff;color:#4338ca}
-  .accent{color:#059669}
-  .kpi-card{background:#f8fafc;border-color:#e2e8f0}
-  .kpi-card.highlight{background:#eef2ff;border-color:#c7d2fe}
-  .kpi-label{color:#64748b}
-  .kpi-value{color:#0f172a}
-  .kpi-value.accent{color:#059669}
-  .staircase-step{background:#f8fafc;border-color:#e2e8f0;color:#475569}
-  .staircase-step.active{background:#eef2ff;border-color:#a5b4fc;color:#4338ca}
-  .exceptions{color:#475569}
-  .exceptions strong{color:#1e293b}
-  .footer{border-top-color:#e2e8f0;color:#94a3b8}
-}
 </style>
 </head>
 <body>
