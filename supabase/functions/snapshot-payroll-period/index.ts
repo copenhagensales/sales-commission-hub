@@ -1,17 +1,10 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPayrollPeriod, toDateString } from "../_shared/date-helpers.ts";
+import { getPayrollPeriod, getPreviousPayrollPeriod, toDateString } from "../_shared/date-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-function getPreviousPayrollPeriod(date: Date): { start: Date; end: Date } {
-  const current = getPayrollPeriod(date);
-  const prevDate = new Date(current.start);
-  prevDate.setDate(prevDate.getDate() - 1);
-  return getPayrollPeriod(prevDate);
-}
 
 function formatValue(value: number, category: string): string {
   if (category === "revenue" || category === "commission") {

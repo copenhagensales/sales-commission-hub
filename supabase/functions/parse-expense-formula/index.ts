@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPayrollPeriod, countWorkDaysInPeriod } from "../_shared/date-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -261,37 +262,19 @@ serve(async (req) => {
     const employeeIds = teamEmployees?.map(e => e.id) || [];
     const teamMemberCount = employeeIds.length;
 
-    // Get current payroll period (15th of previous month to 14th of current month, or 15th of current to 14th of next)
+    // Get current payroll period using shared helper
     const now = new Date();
-    const day = now.getDate();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    
-    let periodStart: Date;
-    // Always use today as the end date (not the end of the payroll period)
-    const periodEnd: Date = new Date(year, month, day);
-    
-    if (day >= 15) {
-      // Current period starts: 15th of this month
-      periodStart = new Date(year, month, 15);
-    } else {
-      // Current period starts: 15th of last month
-      periodStart = new Date(year, month - 1, 15);
-    }
+    const { start: periodStart } = getPayrollPeriod(now);
+    // Use today at midnight as end date (not end of payroll period)
+    const periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     const startDateStr = periodStart.toISOString().split("T")[0];
     const endDateStr = periodEnd.toISOString().split("T")[0];
     
     console.log(`Payroll period: ${startDateStr} to ${endDateStr}`);
     
-    // Calculate working days in payroll period (weekdays)
-    let workingDaysInMonth = 0;
-    const tempDate = new Date(periodStart);
-    while (tempDate <= periodEnd) {
-      const dayOfWeek = tempDate.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) workingDaysInMonth++;
-      tempDate.setDate(tempDate.getDate() + 1);
-    }
+    // Calculate working days using shared helper
+    const workingDaysInMonth = countWorkDaysInPeriod(periodStart, periodEnd);
 
     // Get team sales for current month with employee breakdown
     const { data: salesData } = await supabase

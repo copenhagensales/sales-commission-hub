@@ -168,3 +168,13 @@ export function getIncrementalPeriods(now: Date): Array<{ type: string; start: D
     { type: "payroll_period", start: payroll.start, end: payroll.end },
   ];
 }
+
+/**
+ * Gets the payroll period immediately before the period containing the provided date.
+ */
+export function getPreviousPayrollPeriod(date: Date): { start: Date; end: Date } {
+  const current = getPayrollPeriod(date);
+  const previousDate = new Date(current.start);
+  previousDate.setDate(previousDate.getDate() - 1);
+  return getPayrollPeriod(previousDate);
+}
