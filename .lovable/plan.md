@@ -1,26 +1,29 @@
 
 
-## Tilføj lønperiode-valg til Oversigt-fanen
+## Ret faktureringsberegning til at bruge faktiske bookede dage
 
-### Hvad ændres
+### Problem
 
-Oversigt-fanen (`BillingOverviewTab` i `src/pages/vagt-flow/Billing.tsx`) får samme periodetype-toggle som Leverandørrapport-fanen, så brugeren kan vælge mellem "Måned" og "Lønperiode (15.–14.)".
+Faktureringstabellen bruger `differenceInDays` (kalenderdage mellem start- og slutdato) til at beregne antal dage. Men hver booking har et `booked_days`-felt der angiver praecist hvilke ugedage der er booket. Det giver forkerte tal -- fx Frederiksberg Centeret viser 27 dage / 54.000 kr i stedet for de faktiske 22 bookede dage / 44.000 kr.
 
-### Teknisk plan (1 fil: `src/pages/vagt-flow/Billing.tsx`)
+### Teknisk plan (1 fil)
 
-1. **Ny state** (linje ~32): Tilføj `periodType` state med `"month" | "payroll"`.
+**`src/pages/vagt-flow/Billing.tsx`** -- 2 steder i `bookingsByLocation`-reduceren (ca. linje 95 og 102):
 
-2. **Beregning af datoer** (linje ~36-37): Erstat den faste `monthStart`/`monthEnd` med betinget logik:
-   - `"payroll"`: `periodStart = 15. i forrige måned`, `periodEnd = 14. i valgte måned`
-   - `"month"`: Uændret (1.–ultimo)
+Erstat:
+```typescript
+days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+```
 
-3. **Opdatér queries** (linje ~40, 49-50): 
-   - Brug `periodStart`/`periodEnd` i stedet for `monthStart`/`monthEnd` i booking-queryen
-   - Tilføj `periodType` til query key
+Med:
+```typescript
+const bookedDays = booking.booked_days as number[] | null;
+days = bookedDays && bookedDays.length > 0
+  ? bookedDays.length
+  : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+```
 
-4. **Ny UI-toggle** (linje ~148, efter filter-rækken): Tilføj en Select-komponent med "Måned" og "Lønperiode" før måned-vælgeren -- samme mønster som i SupplierReportTab.
+Begge steder -- baade for bookinger med `total_price` og uden. Fallback til `differenceInDays` bevares for gamle bookinger uden `booked_days`.
 
-### Ingen andre filer ændres
-
-Samme logik som allerede er implementeret i `SupplierReportTab.tsx`, bare kopieret ind i `BillingOverviewTab`.
+Ingen andre filer aendres.
 
