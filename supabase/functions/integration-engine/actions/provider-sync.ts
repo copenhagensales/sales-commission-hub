@@ -71,30 +71,20 @@ async function releaseLock(supabase: SupabaseClient, provider: string, log: LogF
 }
 
 /**
- * Calculate current API budget usage for a provider (last 60 minutes)
+ * Calculate current API budget usage for a single integration (last 60 minutes)
+ * Each integration has its own independent budget since they use separate API credentials.
  */
-async function getBudgetUsage(supabase: SupabaseClient, provider: string, log: LogFn): Promise<number> {
+async function getIntegrationBudgetUsage(supabase: SupabaseClient, integrationId: string, integrationName: string, log: LogFn): Promise<number> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-
-  // Get all integration IDs for this provider
-  const { data: integrations } = await supabase
-    .from("dialer_integrations")
-    .select("id")
-    .eq("provider", provider)
-    .eq("is_active", true);
-
-  if (!integrations || integrations.length === 0) return 0;
-
-  const ids = integrations.map(i => i.id);
 
   const { data: runs } = await supabase
     .from("integration_sync_runs")
     .select("api_calls_made")
-    .in("integration_id", ids)
+    .eq("integration_id", integrationId)
     .gte("started_at", oneHourAgo);
 
-  const totalCalls = (runs || []).reduce((sum, r) => sum + (r.api_calls_made || 0), 0);
-  log("INFO", `Provider ${provider} budget usage: ${totalCalls} calls in last 60 min`);
+  const totalCalls = (runs || []).reduce((sum: number, r: any) => sum + (r.api_calls_made || 0), 0);
+  log("INFO", `Integration ${integrationName} budget usage: ${totalCalls} calls in last 60 min`);
   return totalCalls;
 }
 
@@ -140,18 +130,19 @@ export async function providerSync(
     // 4. Process integrations sequentially with budget checks
     const results: any[] = [];
     const skipped: string[] = [];
-    let totalBudgetUsed = await getBudgetUsage(supabase, provider, log);
+    let totalBudgetUsed = 0;
 
     for (const integration of integrations) {
-      // Budget gate: check before each integration
+      // Budget gate: check per integration (each has independent API credentials)
+      const integrationUsage = await getIntegrationBudgetUsage(supabase, integration.id, integration.name, log);
       const budgetThreshold = budget.limit * budget.threshold;
-      if (totalBudgetUsed >= budgetThreshold) {
-        log("WARN", `Budget threshold reached (${totalBudgetUsed}/${budget.limit} @ ${budget.threshold * 100}%), skipping ${integration.name}`);
+      if (integrationUsage >= budgetThreshold) {
+        log("WARN", `Integration ${integration.name} budget threshold reached (${integrationUsage}/${budget.limit} @ ${budget.threshold * 100}%), skipping`);
         skipped.push(integration.name);
         continue;
       }
 
-      log("INFO", `Syncing ${integration.name} (budget: ${totalBudgetUsed}/${budget.limit})`);
+      log("INFO", `Syncing ${integration.name} (budget: ${integrationUsage}/${budget.limit})`);
 
       const result = await syncIntegration(supabase, integration, engine, campaignMappings, {
         source: provider,
@@ -162,8 +153,9 @@ export async function providerSync(
 
       results.push(result);
 
-      // Re-check budget after each integration
-      totalBudgetUsed = await getBudgetUsage(supabase, provider, log);
+      // Track total for return value
+      const postUsage = await getIntegrationBudgetUsage(supabase, integration.id, integration.name, log);
+      totalBudgetUsed += postUsage;
     }
 
     return { success: true, results, budgetUsed: totalBudgetUsed, skipped };
