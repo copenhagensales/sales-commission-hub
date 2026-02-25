@@ -1,39 +1,42 @@
-## Status: Dato-konsolidering — 100% gennemført ✅
 
-### Alle trin implementeret
 
-| Trin | Beskrivelse | Status |
-|------|-------------|--------|
-| **Trin 1** | Frontend: Erstat `@/utils/payrollPeriod` imports → `@/lib/calculations` | ✅ DONE |
-| **Trin 2** | Frontend: Erstat `@/lib/vagt-flow-date-utils` imports → `@/lib/calculations` | ✅ DONE |
-| **Trin 3** | Slet legacy-filer (`payrollPeriod.ts`, `vagt-flow-date-utils.ts`) | ✅ DONE |
-| **Trin 4A** | `tv-dashboard-data` → importerer `_shared/date-helpers.ts` | ✅ DONE |
-| **Trin 4A** | `parse-expense-formula` → importerer `_shared/date-helpers.ts` | ✅ DONE |
-| **Trin 4B** | `calculate-kpi-incremental` → importerer `_shared/date-helpers.ts` | ✅ DONE |
-| **Trin 4B** | `calculate-kpi-values` → bruger `getPayrollPeriod()` fra `_shared/date-helpers.ts` | ✅ DONE |
-| **Trin 4B** | `calculate-leaderboard-incremental` → importerer `_shared/date-helpers.ts` | ✅ DONE |
-| **Trin 4B** | `snapshot-payroll-period` → importerer `_shared/date-helpers.ts` (inkl. `getPreviousPayrollPeriod`) | ✅ DONE |
-| **Trin 4C** | CI-script `scripts/check-inline-dates.sh` | ✅ DONE |
+## Tilføj valgfrit "ID" felt til lokations-stamdata
 
----
+### Hvad
 
-### Bemærkning: `lint:dates` i `package.json`
+Et nyt valgfrit tekstfelt "ID" i Stamdata-sektionen på lokationsdetaljesiden, placeret mellem "Navn" og "Type/Status"-rækken. Feltet kan bruges til at angive et eksternt ID (f.eks. butiksnummer, Coop-ID osv.) men er ikke påkrævet.
 
-`package.json` er read-only i Lovable. Scriptet `scripts/check-inline-dates.sh` kan køres direkte med:
+### Database
 
-```bash
-bash scripts/check-inline-dates.sh
+Tilføj kolonne til `location`-tabellen:
+
+```sql
+ALTER TABLE public.location ADD COLUMN external_id text;
 ```
 
-Hvis `lint:dates` ønskes i `package.json`, skal det tilføjes manuelt via git.
+Nullable, ingen default — helt valgfrit.
 
----
+### Frontend (1 fil)
 
-### Kanoniske kilder
+**`src/pages/vagt-flow/LocationDetail.tsx`:**
 
-| Kontekst | Fil | Eksporterede funktioner |
-|----------|-----|------------------------|
-| Frontend | `src/lib/calculations/dates.ts` | `getPayrollPeriod`, `getStartOfWeek`, `countWorkDaysInPeriod`, `getPreviousPayrollPeriod` |
-| Backend | `supabase/functions/_shared/date-helpers.ts` | Samme funktioner |
+1. Tilføj `external_id` til `formData`-initialisering (fra location-query).
+2. Indsæt et nyt input-felt lige under "Navn"-feltet:
+   ```
+   <div>
+     <Label>ID (valgfrit)</Label>
+     <Input
+       value={formData.external_id || ""}
+       onChange={...}
+       placeholder="F.eks. butiksnummer"
+       disabled={!canEditLocation}
+     />
+   </div>
+   ```
+3. Inkludér `external_id` i save-mutation'en, så værdien gemmes.
 
-**Nul inline payroll-logik tilbage i repoen.** CI-scriptet fanger fremtidige regressioner.
+### Ingen andre ændringer
+
+- Feltet er rent valgfrit — ingen validering påkrævet.
+- Lokationslisten (LocationsContent) behøver ikke vise feltet medmindre du ønsker det senere.
+
