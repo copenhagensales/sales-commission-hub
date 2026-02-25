@@ -1,33 +1,33 @@
 
 
-## Ændring: Tæl bookinger i stedet for unikke lokationer
+## PDF Opdatering: Bookinger-kolonne + Visuelt redesign
 
-### Hvad ændres
-Rabatberegningen for Danske Shoppingcentre ændres fra at tælle **unikke lokationer** til at tælle **totale bookinger** (antal gange en lokation er booket).
+### 1. Tilfoej "Bookinger" kolonne til PDF tabellen
 
-**Eksempel:** Lyngby Storcenter booket mandag + fredag i februar = **2 placeringer** (i dag tæller det kun som 1).
+**Fil:** `src/utils/supplierReportPdfGenerator.ts`
 
----
+- Tilfoej `bookings: number` til `LocationRow` interfacet
+- Tilfoej en "Bookinger" kolonne i tabel-headeren (mellem "Periode" og "Dage")
+- Vis `loc.bookings` i hver raekke
+- Opdater subtotal-raekkens `colspan` fra 6 til 7
 
-### 1. Database: Opdater regelbeskrivelser
-Opdater de to eksisterende regler i `supplier_discount_rules` så beskrivelserne afspejler den nye tællemetode:
-- "Rabat ved 11+ unikke placeringer pr. maaned" bliver til "Rabat ved 11+ bookinger pr. maaned"
-- "Rabat ved 20+ unikke placeringer pr. maaned" bliver til "Rabat ved 20+ bookinger pr. maaned"
+**Fil:** `src/components/billing/SupplierReportTab.tsx`
 
-Tærskelværdierne (11 og 20) og rabatprocenterne (10% og 15%) forbliver uændrede -- det er kun **hvad der tælles** der ændrer sig.
+- I `downloadSupplierReportPdf`-kaldet (linje ~661): tilfoej `bookings: loc.bookings.length` til location-mapping
 
-### 2. Kodeændring: `src/components/billing/SupplierReportTab.tsx`
-- Beregn `totalPlacements` som summen af alle bookinger på tværs af lokationer (sum af `loc.bookings.length`) i stedet for antal unikke lokationer (`locationEntries.length`)
-- Brug `totalPlacements` i rabatberegningen hvor `uniqueLocations` bruges i dag
-- Opdater UI-label fra "Unikke placeringer" til "Bookinger" i rapportvisningen
+### 2. Visuelt redesign af PDF til at matche app-designet
 
-### 3. Kodeændring: `src/utils/supplierReportPdfGenerator.ts`
-- Opdater PDF-label fra "Unikke placeringer" til "Bookinger" i rabatberegningssektionen
+Opdater CSS i `supplierReportPdfGenerator.ts` til et moderne, moerkt tema der matcher appen:
 
----
+- **Baggrund:** Moerk baggrund (#0f1419) med lys tekst
+- **Header:** Stor titel med subtil separator, matching app-font (Inter/system)
+- **Tabel:** Moerk tabel med alternerende raekke-farver, afrundede hjoerner, ingen haarfine borders men subtile separatorer
+- **Rabatberegning:** KPI-kort med moerk baggrund og accent-farver (groen for rabat, hvid for tal)
+- **Badges:** Stilede badges for "Udelukket" (roed) og "Max %" (blaa) som i appen
+- **Footer:** Subtil footer med genererings-tidspunkt
+- **Print-optimering:** `@media print` regler der sikrer korrekt udskrift (hvid baggrund ved print for laesbarhed)
 
-### Opsummering
-- **Database:** 2 beskrivelser opdateres (ingen nye tabeller/kolonner)
-- **Kode:** 2 filer ændres (tællelogik + labels)
-- **Resultat:** Rabat beregnes ud fra totale bookinger, ikke unikke lokationer
-
+### Teknisk opsummering
+- 2 filer aendres
+- Ingen databaseaendringer
+- PDF faar ny "Bookinger" kolonne + professionelt dark-theme design
