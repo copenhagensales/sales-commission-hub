@@ -163,7 +163,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 
 /* Header */
 .header{padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08)}
-.header h1{font-size:22px;font-weight:700;color:#f1f5f9;letter-spacing:-0.02em}
+.header h1{font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em}
 .header .meta{color:#64748b;font-size:13px;margin-top:4px}
 
 /* Section */
@@ -172,12 +172,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 
 /* Table */
 table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden}
-th{background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:10px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
-td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
+th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
+td{padding:7px 6px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
 tbody tr{background:#151d27}
 tbody tr:nth-child(even){background:#1a2332}
 tbody tr:hover{background:#1e2d3d}
-.num{text-align:right;font-variant-numeric:tabular-nums}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cell-name{font-weight:500;color:#f1f5f9}
 tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid rgba(255,255,255,0.08);border-bottom:none}
 
