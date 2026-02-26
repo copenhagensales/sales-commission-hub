@@ -1278,7 +1278,7 @@ export function EditBookingDialog({
                       value={emp || ""}
                       onValueChange={(value) => updateEmployee(index, value)}
                     >
-                      <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-red-500 bg-green-100 dark:bg-green-900/30 text-foreground" : hasBooking ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20" : ""}`}>
+                      <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-green-700 bg-green-800 text-white dark:bg-green-900 dark:border-green-600" : hasBooking ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20" : ""}`}>
                         <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                       </SelectTrigger>
                       <SelectContent className="bg-popover">
