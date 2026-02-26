@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
@@ -127,6 +127,52 @@ export default function BookingsContent() {
       }
       
       return filteredData?.map(booking => ({
+        ...booking,
+        booking_assignment: booking.booking_assignment?.map((a: any) => ({
+          ...a,
+          employee_name: employeeMap.get(a.employee_id) || "Ukendt"
+        }))
+      }));
+    },
+  });
+
+  // Fetch market bookings for the selected week (shown separately)
+  const { data: marketBookings } = useQuery({
+    queryKey: ["vagt-market-bookings-week", selectedWeek, selectedYear],
+    queryFn: async () => {
+      const { data: bookingData, error } = await supabase
+        .from("booking")
+        .select(`
+          *,
+          location(name, address_city, type, daily_rate),
+          clients(id, name),
+          client_campaigns:campaign_id(id, name),
+          booking_assignment(id, date, employee_id)
+        `)
+        .eq("week_number", selectedWeek)
+        .eq("year", selectedYear)
+        .order("start_date");
+      if (error) throw error;
+
+      // Only keep markets/fairs
+      const marketData = bookingData?.filter((b: any) =>
+        MARKET_TYPES.includes(b.location?.type)
+      ) || [];
+
+      const employeeIds = [...new Set(
+        marketData.flatMap(b => (b as any).booking_assignment?.map((a: any) => a.employee_id) || [])
+      )];
+
+      let employeeMap = new Map<string, string>();
+      if (employeeIds.length > 0) {
+        const { data: empData } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name")
+          .in("id", employeeIds);
+        employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
+      }
+
+      return marketData.map((booking: any) => ({
         ...booking,
         booking_assignment: booking.booking_assignment?.map((a: any) => ({
           ...a,
@@ -698,7 +744,90 @@ export default function BookingsContent() {
         ))
       )}
 
-      {/* Delete booking confirmation */}
+      {/* Market bookings section */}
+      {marketBookings && marketBookings.length > 0 && (
+        <Card className="border-indigo-200 bg-indigo-50/30 dark:border-indigo-800 dark:bg-indigo-950/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                <Tent className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Markeder denne uge</h3>
+                <p className="text-sm text-muted-foreground">{marketBookings.length} marked{marketBookings.length !== 1 ? 'er' : ''}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {marketBookings.map((booking: any) => (
+                <div key={booking.id} className="p-4 border rounded-lg bg-card hover:bg-muted/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
+                    >
+                      <p className="font-medium hover:underline">{booking.location?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.location?.address_city} • {booking.location?.type}
+                        {booking.clients?.name ? ` • ${booking.clients.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {canEditFmBookings && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditBookingDialogBooking(booking)}
+                          title="Rediger booking"
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Days grid - same as regular bookings */}
+                  <div className="grid grid-cols-7 gap-2">
+                    {DAYS.map((day, idx) => {
+                      const isBooked = booking.booked_days?.includes(idx);
+                      const dayDate = addDays(weekStart, idx);
+                      const dayAssignments = booking.booking_assignment?.filter(
+                        (a: any) => format(new Date(a.date), "yyyy-MM-dd") === format(dayDate, "yyyy-MM-dd")
+                      );
+
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "p-2 rounded-lg text-center text-xs",
+                            isBooked ? "bg-indigo-100/60 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700" : "bg-muted/50"
+                          )}
+                        >
+                          <p className="font-medium">{day}</p>
+                          <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
+                          {isBooked && dayAssignments?.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {dayAssignments.map((assignment: any) => (
+                                <div
+                                  key={assignment.id}
+                                  className="text-[10px] font-medium truncate text-indigo-700 dark:text-indigo-300"
+                                >
+                                  {assignment.employee_name?.split(' ')[0]}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
       <AlertDialog open={!!deleteBookingId} onOpenChange={() => setDeleteBookingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
