@@ -1,49 +1,42 @@
 
-
-## Gør kapacitetspanelet lettere at aflæse
+## Kapacitetspanel: Totalt pædagogisk layout
 
 ### Problem
-Den nuværende visning har tre separate rækker (Kapacitet, Booket, Ledige) med løsrevne tal, som er svære at aflæse hurtigt. Man skal selv sammenligne tallene på tværs af rækker for at forstå situationen.
+Det nuværende "4/9" format er stadig forvirrende -- man ved ikke hvad man skal gøre med informationen. Brugeren vil vide: "Hvor mange lokationer mangler jeg at booke?"
 
-### Ny visning: "Booket / Kapacitet" med progress bar
+### Ny visning: Tre klare linjer per dag
 
-Erstat de tre rækker med en enkelt, kompakt visning per dag der viser:
+For hver kunde vises tre simple rækker med tydelige labels og tal per ugedag:
 
 ```text
-Eesy FM (25 medarbejdere)
-        M     T     O     T     F     L     S
-       4/9   3/9   5/8   4/9   2/9   0/9   0/9
-       [====-    ] [===-     ] [======-  ] ...
+Eesy FM
+                    M    T    O    T    F    L    S
+👷 På vagt          18   20   17   18   20   18   18
+📍 Booket lok.       4    3    5    4    2    0    0
+🎯 Mangler at booke  5    7    4    5    8    9    9
 ```
 
-Hvert dagsfelt viser:
-- **"4/9"** format (booket/kapacitet) -- klart og entydigt
-- En lille progress bar under tallet der visuelt viser fyldningsgraden
-- Farve baseret på fyldningsgrad:
-  - **Gron**: under 50% booket (masser af plads)
-  - **Gul**: 50-80% booket (ved at fylde op)
-  - **Rod**: over 80% eller fuldt booket
-  - **Mork rod**: overbooket (booket > kapacitet)
+**Forklaring af de tre linjer:**
+1. **"På vagt"** = totale medarbejdere minus fraværende (= dem der rent faktisk er til rådighed)
+2. **"Booket lok."** = antal lokationer der allerede er booket den dag
+3. **"Mangler at booke"** = kapacitet minus booket (= hvor mange flere lokationer du KAN og BØR booke)
 
-### Tooltip
-Hover viser stadig detaljer: "Mandag 24. feb -- 9 kapacitet, 4 booket, 5 ledige (7 fravaerende)"
+Farver på "Mangler at booke":
+- **Grøn** med fed: der er stadig lokationer at booke
+- **Grå**: 0 -- alt er booket, ingen action nødvendig
+- **Rød**: negativt tal -- der er overbooket!
 
-### Tekniske andringer
+### Tekniske ændringer
 
 **Fil: `src/components/vagt-flow/CapacityPanel.tsx`**
 
-1. Fjern de tre separate raekker (Kapacitet, Booket, Ledige) og erstat med en enkelt raekke per kunde
-2. Hvert dagsfelt renderes som en kompakt celle med:
-   - Tekst: `{booked}/{capacity}` i fed skrift
-   - En 4px progress bar nedenunder (`width: (booked/capacity)*100%`)
-   - Baggrundsfarve baseret pa fyldningsgrad
-3. Behold tooltip med fuld breakdown
-4. Behold info-teksten i bunden men opdater til at bruge "X/Y" format
-5. Tilf0j `absent` til dayData-objektet sa tooltip kan vise det
-
-### Resultat
-- Et hurtigt blik viser "4/9" = 4 ud af 9 mulige lokationer er booket
-- Progress baren giver visuelt overblik uden at laese tal
-- Farverne signalerer straks om der er plads eller ej
-- Meget mere kompakt -- en raekke i stedet for tre
-
+1. Fjern det kompakte "Booket / Kap." layout og progress bars
+2. Erstat med tre rækker per kunde:
+   - Række 1: `Users`-ikon + "På vagt" + tal per dag (`available = total - absent`)
+   - Række 2: `MapPin`-ikon + "Booket" + tal per dag (`booked`)
+   - Række 3: `Target`-ikon + "Mangler" + tal per dag (`capacity - booked`), farvekodet
+3. Behold dag-headers (M, T, O, T, F, L, S) øverst
+4. Fjern info-teksten i bunden (de tre linjer er selvforklarende)
+5. Behold tooltip med detaljer ved hover på tallene
+6. Gør tallene bredere (w-10) så de er nemme at læse
+7. Tilføj en lille forklaringstekst under kundenavnet: "1 lokation = 2 medarbejdere"
