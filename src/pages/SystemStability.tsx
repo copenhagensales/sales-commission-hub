@@ -406,13 +406,21 @@ export default function SystemStability() {
                           </TableCell>
                           <TableCell className="text-xs font-medium">{run.integration_name}</TableCell>
                           <TableCell>
-                            {run.status === "success" ? (
+                          {run.status === "success" && ((run.rate_limit_hits || 0) > 0 || (run.retries || 0) > 0) ? (
+                              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-600 border-amber-200">
+                                <AlertTriangle className="h-3 w-3 mr-1" /> Degraderet
+                              </Badge>
+                            ) : run.status === "success" ? (
                               <Badge variant="default" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">
                                 <CheckCircle2 className="h-3 w-3 mr-1" /> OK
                               </Badge>
                             ) : run.status === "error" ? (
                               <Badge variant="destructive" className="text-xs">
                                 <XCircle className="h-3 w-3 mr-1" /> Fejl
+                              </Badge>
+                            ) : run.status === "partial_success" ? (
+                              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-600 border-amber-200">
+                                <AlertTriangle className="h-3 w-3 mr-1" /> Delvis
                               </Badge>
                             ) : (
                               <Badge variant="secondary" className="text-xs">
