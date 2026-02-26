@@ -1,103 +1,60 @@
 
 
-# Fix Enreach Rate-Limiting: 4 problemer
+# Stop Enreach-syncs udenfor arbejdstid (21:00-08:00 DK)
 
-## Baggrund
+## Problemet
 
-Enreach/HeroBase taller API-kald **4-8x dyrere** uden `X-Rate-Limit-Fair-Use-Policy: Minute rated` headeren. Hovedadapteren (`integration-engine/adapters/enreach.ts`) sender headeren korrekt, men to andre funktioner gor det ikke:
+Enreach-integrationer (Eesy, Tryg, ASE) syncer 24/7, men der kommer aldrig ny data mellem 21:00 og 08:00 dansk tid. Resultat: **~48% af den daglige API-kvote (2.980 kald) spildes om natten** pa tomme forespoorgsler. Dette er hovedarsagen til at kvoten nar 0 om eftermiddagen.
 
-1. **`client-sales-overview`** -- ingen fair-use header
-2. **`enrichment-healer`** -- ingen fair-use header
-3. **Rate-limit data logges ikke** i `integration_sync_runs` (adapteren samler det, men det gemmes ikke)
-4. **Scheduling** kan strammes for at reducere unodvendige kald
+## Besparelse
 
----
+| Periode | API-kald/dag (gns.) |
+|---------|---------------------|
+| Nat (21-07) | ~5.000 |
+| Dag (08-20) | ~5.400 |
+| **Total** | **~10.400** |
 
-## Fix 1: Fair-use header i `client-sales-overview`
+Ved at stoppe nat-syncs reduceres forbruget til ~5.400/dag -- komfortabelt under kvoten pa 2.980 per provider... men vent, det er stadig over. Alligevel: med fair-use headeren (deployet i dag) taeller hvert kald kun 1x i stedet for 4-8x, sa det reelle forbrug falder drastisk. Nat-pause sikrer at kvoten ikke opbruges for arbejdsdagen starter.
 
-**Fil:** `supabase/functions/client-sales-overview/index.ts`
+## Implementering
 
-Linje 128 -- tilfoj headeren:
+### Trin 1: Tilfoj tidstjek i `sync-integration.ts`
 
-```typescript
-const headers: Record<string, string> = { 
-  Accept: "application/json",
-  "X-Rate-Limit-Fair-Use-Policy": "Minute rated",  // <-- NY
-};
-```
-
-Effekt: Hvert kald taller 1 i stedet for 4-8.
-
----
-
-## Fix 2: Fair-use header i `enrichment-healer`
-
-**Fil:** `supabase/functions/enrichment-healer/index.ts`
-
-I `healEnreach`-funktionen (linje 205-206) -- tilfoj headeren:
+Tilfoj en hjalpefunktion der checker om det er arbejdstid i dansk tidszone:
 
 ```typescript
-const response = await fetch(url, {
-  headers: { 
-    Authorization: `Bearer ${apiKey}`,
-    "X-Rate-Limit-Fair-Use-Policy": "Minute rated",  // <-- NY
-  },
-});
+function isDanishWorkingHours(): boolean {
+  const now = new Date();
+  const dkHour = parseInt(
+    now.toLocaleString('en-US', { 
+      hour: 'numeric', hour12: false, timeZone: 'Europe/Copenhagen' 
+    })
+  );
+  return dkHour >= 8 && dkHour < 21;
+}
 ```
 
-Effekt: Healing-kald koster 1/4-1/8 af hvad de gor nu.
+Indsaet check i `syncIntegration()` for Enreach-integationer: hvis udenfor arbejdstid, returner `skipped` med besked "Outside working hours (21-08 DK)" -- ingen API-kald, ingen fejl-logning, ingen circuit breaker-paavirkning.
 
----
+### Trin 2: Tilfoj tilsvarende check i `provider-sync.ts`
 
-## Fix 3: Log rate-limit data i sync_runs
+I `providerSync()` for `enreach`-provideren: skip hele provider-sync hvis udenfor arbejdstid. Log besked og returner tidligt.
 
-Adapteren samler allerede `rateLimitDailyLimit`, `rateLimitRemaining` og `rateLimitReset` i `_metrics`, men `sync-integration.ts` gemmer dem ikke i databasen.
+### Trin 3: Opdater SystemStability dashboard
 
-**Trin 1 -- Migration:** Tilfoj 3 kolonner til `integration_sync_runs`:
+Tilfoj en info-badge eller note pa Enreach-integrationer der viser "Pauset (udenfor arbejdstid)" nar klokken er mellem 21-08 DK tid, sa dashboardet ikke viser falske advarsler om manglende syncs.
 
-```sql
-ALTER TABLE integration_sync_runs 
-  ADD COLUMN IF NOT EXISTS rate_limit_daily_limit integer,
-  ADD COLUMN IF NOT EXISTS rate_limit_remaining integer,
-  ADD COLUMN IF NOT EXISTS rate_limit_reset integer;
-```
+## Filer der aendres
 
-**Trin 2 -- Fil:** `supabase/functions/integration-engine/actions/sync-integration.ts`
+1. `supabase/functions/integration-engine/actions/sync-integration.ts` -- tidstjek for enreach
+2. `supabase/functions/integration-engine/actions/provider-sync.ts` -- tidstjek for enreach provider
+3. `src/pages/SystemStability.tsx` -- undertryk "ingen sync"-advarsler udenfor arbejdstid
+4. Deploy: `integration-engine`
 
-Hvor sync-run insertes (ca. linje 450-470), tilfoj de 3 felter fra `adapter.getMetrics()`:
+## Risici og haandtering
 
-```typescript
-rate_limit_daily_limit: metrics?.rateLimitDailyLimit ?? null,
-rate_limit_remaining: metrics?.rateLimitRemaining ?? null,
-rate_limit_reset: metrics?.rateLimitReset ?? null,
-```
-
-Effekt: System Stability-dashboardet kan vise faktisk daglig quota og remaining i realtid.
-
----
-
-## Fix 4: Optimer scheduling -- reducer 429s
-
-Enreach-integrationerne (Eesy, Tryg, ASE) korer sales-sync hvert 15. minut med stagger. Men meta-sync (campaigns/users/sessions) korer hvert 60. minut. Problemet er at meta-sync rammer API'et lige efter sales-sync, sa de kolliderer.
-
-**Handling:** Opdater meta-sync schedules sa de ikke overlapper med sales-sync. Konkret: forskyd meta-jobs med +7 minutter fra narmeste sales-job:
-
-| Job | Nuvarende | Ny |
-|-----|----------|-----|
-| Eesy Meta | :00 (kolliderer med sales) | :07 |
-| Tryg Meta | :02 (kolliderer med sales) | :22 |
-| ASE Meta | :04 (kolliderer med sales) | :37 |
-
-Dette gores via `update-cron-schedule` edge function eller direkte database-update af `config.meta_sync_schedule` + re-scheduling af cron jobs.
-
----
-
-## Raekkefolge
-
-1. Migration (3 nye kolonner)
-2. Opdater `client-sales-overview` (1 linje)
-3. Opdater `enrichment-healer` (1 linje)
-4. Opdater `sync-integration.ts` (3 linjer)
-5. Deploy edge functions
-6. Opdater meta-sync schedules i databasen
+- **Adversus pavirkes IKKE** -- kun Enreach-integationer far nat-pause
+- **Ingen data-tab** -- der er ingen data at hente om natten
+- Morgen-sync kl. 08:00 henter automatisk alt nyt via inkrementel watermark (last_success_at)
+- Configurable: arbejdstiden kan later goores konfigurerbar via `dialer_integrations.config` hvis behovet aendrer sig
 
