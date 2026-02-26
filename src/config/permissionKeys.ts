@@ -246,6 +246,7 @@ export const PERMISSION_KEYS = {
   tab_fm_markets: { label: 'Fane: Kommende markeder', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_locations: { label: 'Fane: Lokationer', section: 'fieldmarketing', parent: 'menu_fm_booking' },
   tab_fm_vagtplan: { label: 'Fane: Vagtplan FM', section: 'fieldmarketing', parent: 'menu_fm_booking' },
+  tab_fm_hotels: { label: 'Fane: Hoteller', section: 'fieldmarketing', parent: 'menu_fm_booking' },
 
   // ==================== SALG & SYSTEM (under menu_section_sales_system) ====================
   menu_sales: { label: 'Salg', section: 'sales_system', parent: 'menu_section_sales_system' },
