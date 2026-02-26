@@ -71,20 +71,37 @@ async function releaseLock(supabase: SupabaseClient, provider: string, log: LogF
 }
 
 /**
- * Calculate current API budget usage for a single integration (last 60 minutes)
- * Each integration has its own independent budget since they use separate API credentials.
+ * Calculate current API budget usage across ALL integrations for a provider (last 60 minutes).
+ * Enreach integrations share a single account-level daily quota, so we must
+ * aggregate api_calls_made across Eesy, Tryg, ASE etc. to correctly gate syncs.
  */
-async function getIntegrationBudgetUsage(supabase: SupabaseClient, integrationId: string, integrationName: string, log: LogFn): Promise<number> {
+async function getProviderBudgetUsage(supabase: SupabaseClient, provider: string, log: LogFn): Promise<number> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
+  // Get all active integration IDs for this provider
+  const { data: integrations } = await supabase
+    .from("dialer_integrations")
+    .select("id, name")
+    .eq("provider", provider)
+    .eq("is_active", true);
+
+  if (!integrations || integrations.length === 0) return 0;
+
+  const integrationIds = integrations.map((i: any) => i.id);
+
+  // Sum api_calls_made across ALL integrations for this provider
   const { data: runs } = await supabase
     .from("integration_sync_runs")
-    .select("api_calls_made")
-    .eq("integration_id", integrationId)
+    .select("api_calls_made, integration_id")
+    .in("integration_id", integrationIds)
     .gte("started_at", oneHourAgo);
 
   const totalCalls = (runs || []).reduce((sum: number, r: any) => sum + (r.api_calls_made || 0), 0);
-  log("INFO", `Integration ${integrationName} budget usage: ${totalCalls} calls in last 60 min`);
+  const breakdown = integrations.map((i: any) => {
+    const calls = (runs || []).filter((r: any) => r.integration_id === i.id).reduce((s: number, r: any) => s + (r.api_calls_made || 0), 0);
+    return `${i.name}:${calls}`;
+  }).join(", ");
+  log("INFO", `Provider ${provider} shared budget usage: ${totalCalls} calls in last 60 min (${breakdown})`);
   return totalCalls;
 }
 
@@ -133,16 +150,16 @@ export async function providerSync(
     let totalBudgetUsed = 0;
 
     for (const integration of integrations) {
-      // Budget gate: check per integration (each has independent API credentials)
-      const integrationUsage = await getIntegrationBudgetUsage(supabase, integration.id, integration.name, log);
+      // Budget gate: check shared provider-level usage (Enreach shares a single account quota)
+      const providerUsage = await getProviderBudgetUsage(supabase, provider, log);
       const budgetThreshold = budget.limit * budget.threshold;
-      if (integrationUsage >= budgetThreshold) {
-        log("WARN", `Integration ${integration.name} budget threshold reached (${integrationUsage}/${budget.limit} @ ${budget.threshold * 100}%), skipping`);
+      if (providerUsage >= budgetThreshold) {
+        log("WARN", `Provider ${provider} shared budget threshold reached (${providerUsage}/${budget.limit} @ ${budget.threshold * 100}%), skipping ${integration.name}`);
         skipped.push(integration.name);
         continue;
       }
 
-      log("INFO", `Syncing ${integration.name} (budget: ${integrationUsage}/${budget.limit})`);
+      log("INFO", `Syncing ${integration.name} (shared provider budget: ${providerUsage}/${budget.limit})`);
 
       const result = await syncIntegration(supabase, integration, engine, campaignMappings, {
         source: provider,
@@ -152,11 +169,10 @@ export async function providerSync(
       }, log);
 
       results.push(result);
-
-      // Track total for return value
-      const postUsage = await getIntegrationBudgetUsage(supabase, integration.id, integration.name, log);
-      totalBudgetUsed += postUsage;
     }
+
+    // Get final total for return value
+    totalBudgetUsed = await getProviderBudgetUsage(supabase, provider, log);
 
     return { success: true, results, budgetUsed: totalBudgetUsed, skipped };
   } finally {

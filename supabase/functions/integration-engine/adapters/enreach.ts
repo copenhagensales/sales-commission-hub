@@ -98,6 +98,18 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   /**
+   * Fetch Enreach account rate limit info directly from the API.
+   * Calls /api/myaccount/request/limits and /api/myaccount/request/counts
+   */
+  async fetchRateLimits(): Promise<{ limits: unknown; counts: unknown }> {
+    const [limits, counts] = await Promise.all([
+      this.get("/myaccount/request/limits").catch(e => ({ error: String(e) })),
+      this.get("/myaccount/request/counts").catch(e => ({ error: String(e) })),
+    ]);
+    return { limits, counts };
+  }
+
+  /**
    * Returns true if this integration uses the /leads endpoint (ASE)
    * instead of /simpleleads (Eesy, Tryg, etc.)
    */
@@ -188,6 +200,19 @@ export class EnreachAdapter implements DialerAdapter {
       this._metrics.apiCalls++;
 
       const response = await fetch(url, { method: "GET", headers: this.headers });
+
+      // Capture rate-limit headers from every response
+      const rlLimit = response.headers.get("X-Rate-Limit-Limit");
+      const rlRemaining = response.headers.get("X-Rate-Limit-Remaining");
+      const rlReset = response.headers.get("X-Rate-Limit-Reset");
+      if (rlLimit || rlRemaining || response.status === 429) {
+        const info = { limit: rlLimit, remaining: rlRemaining, reset: rlReset, status: response.status, endpoint };
+        console.log(`[EnreachAdapter] Rate-limit headers: ${JSON.stringify(info)}`);
+        // Store latest values in metrics for sync-run logging
+        if (rlLimit) this._metrics.rateLimitDailyLimit = parseInt(rlLimit, 10);
+        if (rlRemaining) this._metrics.rateLimitRemaining = parseInt(rlRemaining, 10);
+        if (rlReset) this._metrics.rateLimitReset = parseInt(rlReset, 10);
+      }
 
       if (response.status === 429) {
         this._metrics.rateLimitHits++;
