@@ -112,25 +112,40 @@ export async function syncIntegration(
     // Support both 'action' (legacy) and 'actions' (new array), with Lovablecph self-healing merge
 
     // Process campaigns
+    let metaSyncRateLimited = false;
     if (actionList.includes("campaigns")) {
-      const campaigns = await adapter.fetchCampaigns();
-      runResults["campaigns"] = await engine.processCampaigns(campaigns);
+      try {
+        const campaigns = await adapter.fetchCampaigns();
+        runResults["campaigns"] = await engine.processCampaigns(campaigns);
+      } catch (e) {
+        log("WARN", `Campaign sync failed for ${integration.name}: ${(e as Error).message}`);
+      }
     }
 
     // Process users
     if (actionList.includes("users")) {
-      const users = await adapter.fetchUsers();
-      const dialerSource = (source || integration.provider) === "enreach" ? "enreach" : "adversus";
-      runResults["users"] = await engine.processUsers(users, dialerSource);
+      try {
+        const users = await adapter.fetchUsers();
+        const dialerSource = (source || integration.provider) === "enreach" ? "enreach" : "adversus";
+        runResults["users"] = await engine.processUsers(users, dialerSource);
+      } catch (e) {
+        log("WARN", `User sync failed for ${integration.name}: ${(e as Error).message}`);
+      }
     }
 
-    // Early abort for Enreach/Adversus if rate-limited during meta sync
+    // Check rate-limit status after meta sync — log warning but continue to sales
+    // Previously this threw an error and aborted entirely, causing a permanent lock-out loop
+    // when the provider temporarily tightened rate limits.
     const provider = (source || integration.provider || "").toLowerCase();
     if (provider === "enreach" || provider === "adversus") {
       const earlyMetrics = adapter.getMetrics();
-      if (earlyMetrics.rateLimitHits > 0) {
-        log("WARN", `${provider} rate limit detected during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits), aborting remaining actions to prevent cascade`);
-        throw new Error(`${provider} rate limited during meta sync (${earlyMetrics.rateLimitHits} hits), aborting to prevent cascade`);
+      if (earlyMetrics.rateLimitHits > 0 && earlyMetrics.rateLimitHits >= earlyMetrics.apiCalls * 0.5) {
+        metaSyncRateLimited = true;
+        log("WARN", `${provider} rate limited during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits}/${earlyMetrics.apiCalls} calls). Skipping meta but continuing to sales sync.`);
+        // Reset metrics so sales sync gets a clean budget assessment
+        adapter.resetMetrics();
+      } else if (earlyMetrics.rateLimitHits > 0) {
+        log("INFO", `${provider} transient rate limits during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — retries recovered, continuing`);
       }
     }
 
