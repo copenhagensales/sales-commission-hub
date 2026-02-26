@@ -316,26 +316,23 @@ export default function MyBookingSchedule() {
                           return (
                             <div key={idx} className="space-y-1.5">
                               {/* Location */}
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <span className="font-medium text-foreground">
                                   {location?.name || "Ukendt lokation"}
                                   {location?.address_city && `, ${location.address_city}`}
                                 </span>
-                              </div>
-                              {(location?.address_street || location?.address_city) && (
-                                <div className="flex items-center gap-2 ml-6">
-                                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                {(location?.address_street || location?.address_city) && (
                                   <a
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([location.address_street, location.address_city].filter(Boolean).join(", "))}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-sm text-primary underline hover:text-primary/80"
                                   >
-                                    {[location.address_street, location.address_city].filter(Boolean).join(", ")}
+                                    ({[location.address_street, location.address_city].filter(Boolean).join(", ")})
                                   </a>
-                                </div>
-                              )}
+                                )}
+                              </div>
 
                               {/* Client / Campaign */}
                               {(client?.name || campaign?.name) && (
