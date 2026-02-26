@@ -255,23 +255,7 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch booking_vehicle data for vehicle tags
-  const { data: bookingVehicles = [] } = useQuery({
-    queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear],
-    queryFn: async () => {
-      const bookingIds = bookings?.map((b: any) => b.id) || [];
-      if (bookingIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("booking_vehicle")
-        .select("id, booking_id, vehicle_id, date, vehicle:vehicle_id(name, license_plate)")
-        .in("booking_id", bookingIds);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!bookings && bookings.length > 0,
-  });
-
-  // Fetch booking_diet data for diet tags
+  // Combine all booking IDs (normal + market) for shared queries
   const allBookingIds = useMemo(() => {
     const ids = [
       ...(bookings?.map((b: any) => b.id) || []),
@@ -279,6 +263,23 @@ export default function BookingsContent() {
     ];
     return [...new Set(ids)];
   }, [bookings, marketBookings]);
+
+  // Fetch booking_vehicle data for vehicle tags
+  const { data: bookingVehicles = [] } = useQuery({
+    queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear, allBookingIds],
+    queryFn: async () => {
+      if (allBookingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("booking_vehicle")
+        .select("id, booking_id, vehicle_id, date, vehicle:vehicle_id(name, license_plate)")
+        .in("booking_id", allBookingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allBookingIds.length > 0,
+  });
+
+  // Fetch booking_diet data for diet tags
 
   const { data: bookingDiets = [] } = useQuery({
     queryKey: ["vagt-booking-diets", selectedWeek, selectedYear],
