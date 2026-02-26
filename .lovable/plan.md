@@ -1,56 +1,66 @@
 
 
-# Reducer Enreach sync-frekvens for at komme under delt API-kvote
+# Shared Enreach Budget Tracker + Rate-Limit Diagnostik
 
 ## Problem
+De 3 Enreach-integrationer (Eesy, Tryg, ASE) deler en faelles daglig API-kvote pa kontoniveau, men systemet behandler dem som uafhaengige. En integration kan opbruge hele kvoten uden at de andre ved det.
 
-Alle 3 Enreach-integrationer (ASE, Tryg, Eesy) deler en global API-kvote hos Enreach/HeroBase. Den nuvaerende konfiguration sender ~180 API-kald/time, hvilket er langt over kvoten. Resultatet er 100% rate-limiting i 6+ timer.
+## Loesning: 3 dele
 
-## Nuvaerende vs. ny frekvens
+### 1. Rate-limit header logging i Enreach-adapteren
+I `get()` metoden (linje ~190 i `enreach.ts`), log de 3 response headers efter hvert svar:
+- `X-Rate-Limit-Limit` (daglig graense)
+- `X-Rate-Limit-Remaining` (resterende)
+- `X-Rate-Limit-Reset` (sekunder til reset)
+
+Dette giver os konkret synlighed i kvoteforbrug pr. API-kald. Headerdata gemmes ogsa i `_metrics` objektet sa det kan returneres til sync-run loggen.
+
+### 2. Shared provider-level budget tracker
+Erstat `getIntegrationBudgetUsage()` i `provider-sync.ts` med en ny `getProviderBudgetUsage()` der summerer `api_calls_made` pa tvaers af ALLE integrationer for samme provider (ikke kun den enkelte integration).
 
 ```text
-                    NU                          NY
-Sales-sync:     hvert 5 min (12x/time/int)  -> hvert 15 min (4x/time/int)
-Meta-sync:      hvert 30 min (2x/time/int)  -> hvert 60 min (1x/time/int)
+Foer (fejlagtigt):
+  Eesy: 15 calls/hr  -> OK (under 1000)
+  Tryg: 15 calls/hr  -> OK (under 1000)
+  ASE:  15 calls/hr   -> OK (under 1000)
+  Total: 45 calls/hr  -> Men delt kvote er maaske kun 500!
 
-Runs/time:      42 runs (180 API-kald)       -> 15 runs (~45 API-kald)
-Reduktion:      ~75% faerre API-kald
+Efter (korrekt):
+  Enreach total: 45 calls/hr -> Tjek mod faelles graense
+  Gating: Hvis total > threshold, skip resterende integrationer
 ```
 
-## Nye cron-schedules (staggered)
+Aendringer i `provider-sync.ts`:
+- Ny funktion `getProviderBudgetUsage()` der henter alle aktive integration IDs for provideren og summerer deres `api_calls_made`
+- Budget-gate i hovedloopet bruger den samlede sum i stedet for individuelle tal
+- Kommentaren "Each integration has its own independent budget" opdateres
 
-| Job                   | Ny schedule              | Minut-offsets       |
-|-----------------------|--------------------------|---------------------|
-| enreach-eesy-sales    | 0,15,30,45 * * * *       | :00, :15, :30, :45  |
-| enreach-tryg-sales    | 2,17,32,47 * * * *       | :02, :17, :32, :47  |
-| enreach-ase-sales     | 4,19,34,49 * * * *       | :04, :19, :34, :49  |
-| enreach-eesy-meta     | 10 * * * *               | :10                 |
-| enreach-tryg-meta     | 25 * * * *               | :25                 |
-| enreach-ase-meta      | 40 * * * *               | :40                 |
+### 3. Diagnostik-endpoint: `check-rate-limits`
+Nyt action i `index.ts` der kalder Enreach API'ets egne endpoints:
+- `/api/myaccount/request/limits` — viser daglige graenser pr. service
+- `/api/myaccount/request/counts` — viser nuvaerende forbrug
 
-Stagger: Sales-jobs er forskudt 2 minutter. Meta-jobs er forskudt 15 minutter. Ingen overlap.
+Returnerer resultatet direkte sa vi kan se praecis hvad kontoen har tilbage.
 
-## Implementering
+## Tekniske detaljer
 
-### Trin 1: Opdater cron-jobs i databasen
+### Fil: `supabase/functions/integration-engine/adapters/enreach.ts`
+- I `get()` metoden (linje ~190-216): efter response modtages, laes og log `X-Rate-Limit-Limit`, `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset`
+- Tilfoej `rateLimitInfo` til `_metrics` interfacet sa det kan udlaeses af sync-integration.ts og gemmes i run-loggen
+- Ny metode `async fetchRateLimits(): Promise<{limits: unknown; counts: unknown}>` der kalder `/api/myaccount/request/limits` og `/api/myaccount/request/counts`
 
-Kald `cron.unschedule()` for alle 6 eksisterende Enreach-jobs og `cron.schedule()` / `schedule_integration_sync()` med de nye schedules.
+### Fil: `supabase/functions/integration-engine/adapters/interface.ts`
+- Udvid `ApiMetrics` med optional `rateLimitRemaining?: number` og `rateLimitDailyLimit?: number` felter
 
-### Trin 2: Opdater integration-config
+### Fil: `supabase/functions/integration-engine/actions/provider-sync.ts`
+- Erstat `getIntegrationBudgetUsage()` med `getProviderBudgetUsage()` der henter alle integration IDs for provideren og summerer API-forbrug
+- Budget-gate bruger den samlede sum mod en faelles provider-graense
 
-Opdater `sync_frequency_minutes` fra 3 til 15 og `sync_schedule` i `dialer_integrations.config` for alle 3 Enreach-integrationer, saa dashboard og ScheduleEditor viser korrekt frekvens.
+### Fil: `supabase/functions/integration-engine/index.ts`
+- Ny action handler `check-rate-limits` der henter credentials for en given integration, opretter EnreachAdapter, kalder `fetchRateLimits()`, og returnerer resultatet
 
-### Trin 3: Nulstil circuit breaker
-
-Reset `integration_circuit_breaker` for alle 3 integrationer, saa de kan begynde at synce med det samme efter opdateringen.
-
-### Trin 4: Verificer
-
-Vent 15-20 minutter og kør en forespørgsel for at se om 429-raten falder. Hvis Enreach stadig blokerer, kan det vaere nødvendigt at reducere yderligere (fx hvert 30. minut for sales).
-
-## Risiko
-
-- Lav risiko: Data opdateres hvert 15. minut i stedet for hvert 5. minut. For de fleste use cases er dette acceptabelt.
-- Hvis kvoten stadig overskrides, kan vi reducere til hvert 30. minut som naeste trin.
-- Ideel løsning paa sigt: Kontakt Enreach og bed om separate kvoter per integration eller højere samlet kvote.
+## Forventet resultat
+- Fuld synlighed i Enreach-kontoens kvoter og faktisk forbrug
+- Korrekt budget-gating der tager hoejde for den delte kvote
+- Mulighed for at koere `check-rate-limits` manuelt for at se praecis forbrug og graenser
 
