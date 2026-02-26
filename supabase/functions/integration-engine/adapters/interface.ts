@@ -4,6 +4,9 @@ export interface ApiMetrics {
   apiCalls: number;
   rateLimitHits: number;
   retries: number;
+  rateLimitRemaining?: number;
+  rateLimitDailyLimit?: number;
+  rateLimitReset?: number;
 }
 
 export interface DialerAdapter {

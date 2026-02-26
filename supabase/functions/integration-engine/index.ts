@@ -38,6 +38,66 @@ serve(async (req) => {
 
     const supabase = getSupabase();
 
+    // Handle check-rate-limits action (Enreach diagnostics)
+    if (action === "check-rate-limits") {
+      const effectiveIntegrationId = integrationId || integration_id;
+      if (!effectiveIntegrationId) {
+        return new Response(JSON.stringify({ success: false, error: "integration_id is required for check-rate-limits" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get integration credentials
+      const { data: integration, error: intError } = await supabase
+        .from("dialer_integrations")
+        .select("*")
+        .eq("id", effectiveIntegrationId)
+        .single();
+
+      if (intError || !integration) {
+        return new Response(JSON.stringify({ success: false, error: `Integration not found: ${effectiveIntegrationId}` }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (integration.provider !== "enreach") {
+        return new Response(JSON.stringify({ success: false, error: "check-rate-limits is only supported for Enreach integrations" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Decrypt credentials
+      const encryptionKey = Deno.env.get("INTEGRATION_ENCRYPTION_KEY");
+      if (!encryptionKey) {
+        return new Response(JSON.stringify({ success: false, error: "INTEGRATION_ENCRYPTION_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: credData } = await supabase.rpc("get_dialer_credentials", {
+        p_integration_id: effectiveIntegrationId,
+        p_encryption_key: encryptionKey,
+      });
+
+      if (!credData) {
+        return new Response(JSON.stringify({ success: false, error: "Could not decrypt credentials" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { EnreachAdapter } = await import("./adapters/enreach.ts");
+      const adapter = new EnreachAdapter(credData as any, integration.name);
+      const rateLimits = await adapter.fetchRateLimits();
+
+      return new Response(JSON.stringify({
+        success: true,
+        action: "check-rate-limits",
+        integration: { id: integration.id, name: integration.name },
+        rateLimits,
+        metrics: adapter.getMetrics(),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Handle fetch-sample-fields action
     if (action === "fetch-sample-fields") {
       // Support both integrationId (from frontend) and integration_id
