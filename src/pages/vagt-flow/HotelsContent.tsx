@@ -3,10 +3,10 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Hotel, CircleAlert, CircleCheck, Clock, Loader2 } from "lucide-react";
-import { useJyllandFynBookings, useBookingHotels } from "@/hooks/useBookingHotels";
+import { Hotel, CircleAlert, CircleCheck, Clock, Loader2, Check } from "lucide-react";
+import { useJyllandFynBookings, useBookingHotels, useUpdateBookingHotel } from "@/hooks/useBookingHotels";
 import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { HotelRegistry } from "@/components/vagt-flow/HotelRegistry";
 
@@ -16,17 +16,16 @@ export default function HotelsContent() {
   const { data: bookingHotels = [], isLoading: hotelsLoading } = useBookingHotels(
     bookingIds.length > 0 ? bookingIds : undefined
   );
+  const updateBookingHotel = useUpdateBookingHotel();
 
   const [assignBooking, setAssignBooking] = useState<any>(null);
+  const [editingBookingHotel, setEditingBookingHotel] = useState<any>(null);
 
   const isLoading = bookingsLoading || hotelsLoading;
 
-  // Map booking_id -> booking_hotel
   const hotelMap = useMemo(() => {
     const map: Record<string, any> = {};
-    bookingHotels.forEach((bh) => {
-      map[bh.booking_id] = bh;
-    });
+    bookingHotels.forEach((bh) => { map[bh.booking_id] = bh; });
     return map;
   }, [bookingHotels]);
 
@@ -42,25 +41,34 @@ export default function HotelsContent() {
       case "confirmed":
         return (
           <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-            <CircleCheck className="h-3 w-3 mr-1" />
-            Bekræftet
+            <CircleCheck className="h-3 w-3 mr-1" />Bekræftet
           </Badge>
         );
       case "pending":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-            <Clock className="h-3 w-3 mr-1" />
-            Ubekræftet
+            <Clock className="h-3 w-3 mr-1" />Ubekræftet
           </Badge>
         );
       default:
         return (
           <Badge variant="destructive">
-            <CircleAlert className="h-3 w-3 mr-1" />
-            Mangler hotel
+            <CircleAlert className="h-3 w-3 mr-1" />Mangler hotel
           </Badge>
         );
     }
+  };
+
+  const handleQuickConfirm = (bookingId: string) => {
+    const bh = hotelMap[bookingId];
+    if (!bh) return;
+    updateBookingHotel.mutate({ id: bh.id, status: "confirmed" });
+  };
+
+  const handleEdit = (booking: any) => {
+    const bh = hotelMap[booking.id];
+    setEditingBookingHotel(bh || null);
+    setAssignBooking(booking);
   };
 
   const missingCount = bookings.filter((b: any) => getStatus(b.id) === "missing").length;
@@ -70,8 +78,7 @@ export default function HotelsContent() {
       <Tabs defaultValue="bookings">
         <TabsList>
           <TabsTrigger value="bookings" className="flex items-center gap-2">
-            <Hotel className="h-4 w-4" />
-            Bookinger
+            <Hotel className="h-4 w-4" />Bookinger
             {missingCount > 0 && (
               <Badge variant="destructive" className="ml-1 text-xs">{missingCount}</Badge>
             )}
@@ -85,9 +92,7 @@ export default function HotelsContent() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : bookings.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              Ingen kommende bookinger i Jylland/Fyn.
-            </p>
+            <p className="text-muted-foreground text-center py-8">Ingen kommende bookinger i Jylland/Fyn.</p>
           ) : (
             <div className="space-y-2">
               {bookings.map((booking: any) => {
@@ -98,8 +103,7 @@ export default function HotelsContent() {
                 return (
                   <Card key={booking.id} className={
                     status === "missing" ? "border-destructive/50" :
-                    status === "pending" ? "border-yellow-400/50" :
-                    "border-green-400/50"
+                    status === "pending" ? "border-yellow-400/50" : "border-green-400/50"
                   }>
                     <CardContent className="py-3 px-4 flex items-center justify-between">
                       <div className="space-y-0.5">
@@ -128,13 +132,21 @@ export default function HotelsContent() {
                       <div className="flex items-center gap-2">
                         {statusBadge(status)}
                         {status === "missing" ? (
-                          <Button size="sm" onClick={() => setAssignBooking(booking)}>
+                          <Button size="sm" onClick={() => { setEditingBookingHotel(null); setAssignBooking(booking); }}>
                             Tildel hotel
                           </Button>
                         ) : (
-                          <Button variant="outline" size="sm" onClick={() => setAssignBooking(booking)}>
-                            Ændr
-                          </Button>
+                          <>
+                            {status === "pending" && (
+                              <Button size="sm" variant="outline" onClick={() => handleQuickConfirm(booking.id)}
+                                disabled={updateBookingHotel.isPending}>
+                                <Check className="h-4 w-4 mr-1" />Bekræft
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(booking)}>
+                              Ændr
+                            </Button>
+                          </>
                         )}
                       </div>
                     </CardContent>
@@ -153,8 +165,9 @@ export default function HotelsContent() {
       {assignBooking && (
         <AssignHotelDialog
           open={!!assignBooking}
-          onOpenChange={(open) => !open && setAssignBooking(null)}
+          onOpenChange={(open) => { if (!open) { setAssignBooking(null); setEditingBookingHotel(null); } }}
           booking={assignBooking}
+          existingBookingHotel={editingBookingHotel}
         />
       )}
     </div>
