@@ -380,9 +380,9 @@ export async function syncIntegration(
     // Reset circuit breaker on success — BUT if heavily rate-limited, record as failure
     const heavilyRateLimited = adapterMetrics.rateLimitHits > 0 && adapterMetrics.rateLimitHits >= adapterMetrics.apiCalls * 0.5;
     if (heavilyRateLimited && totalRecords === 0) {
-      const cb = await recordCircuitBreakerFailure(supabase, integration.id, `Sync succeeded but 100% rate-limited (${adapterMetrics.rateLimitHits}/${adapterMetrics.apiCalls})`);
-      if (cb.pausedMinutes) {
-        log("WARN", `Circuit breaker: ${integration.name} paused for ${cb.pausedMinutes} min — sync "succeeded" but yielded 0 records due to rate limits`);
+      const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, `Sync succeeded but 100% rate-limited (${adapterMetrics.rateLimitHits}/${adapterMetrics.apiCalls})`);
+      if (cbResult.pausedMinutes) {
+        log("WARN", `Circuit breaker: ${integration.name} paused for ${cbResult.pausedMinutes} min — sync "succeeded" but yielded 0 records due to rate limits`);
       }
     } else {
       await resetCircuitBreaker(supabase, integration.id);
@@ -435,9 +435,9 @@ export async function syncIntegration(
     // Record circuit breaker failure (especially for rate-limit errors)
     const isRateLimitError = errMsg.includes("429") || errMsg.includes("rate limit") || (errorMetrics.rateLimitHits > 0 && errorMetrics.rateLimitHits >= errorMetrics.apiCalls * 0.5);
     if (isRateLimitError) {
-      const cb = await recordCircuitBreakerFailure(supabase, integration.id, errMsg);
-      if (cb.pausedMinutes) {
-        log("WARN", `Circuit breaker: ${integration.name} paused for ${cb.pausedMinutes} min after ${cb.newCount} consecutive rate-limit failures`);
+      const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, errMsg);
+      if (cbResult.pausedMinutes) {
+        log("WARN", `Circuit breaker: ${integration.name} paused for ${cbResult.pausedMinutes} min after ${cbResult.newCount} consecutive rate-limit failures`);
       }
     }
 
