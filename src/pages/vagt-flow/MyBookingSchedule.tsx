@@ -371,36 +371,32 @@ export default function MyBookingSchedule() {
 
                               {/* Hotel detail callout on check-in day */}
                               {a.hotel?.isCheckInDay && (
-                                <div className="ml-6 mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-                                  <div className="flex items-center gap-1.5 mb-1.5">
-                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
+                                <div className="ml-6 mt-1.5 px-3 py-2 rounded-md bg-blue-600/10 border border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-400/20">
+                                  <div className="flex items-center gap-1.5">
+                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300 shrink-0" />
                                     <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">{a.hotel.name || "Hotel"}</span>
+                                    {(a.hotel.address || a.hotel.city) && (
+                                      <span className="text-xs text-blue-600/80 dark:text-blue-300/70">
+                                        – {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
+                                      </span>
+                                    )}
                                   </div>
-                                  {(a.hotel.address || a.hotel.city) && (
-                                    <p className="text-sm text-foreground ml-5 mb-1">
-                                      {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
-                                    </p>
-                                  )}
-                                  <div className="text-sm text-foreground ml-5 space-y-0.5">
-                                    <p>Indtjekning: {format(parseISO(a.hotel.checkIn), "EEEE d. MMM", { locale: da })}</p>
-                                    <p>Udtjekning: {format(parseISO(a.hotel.checkOut), "EEEE d. MMM", { locale: da })}</p>
+                                  <div className="text-xs text-foreground ml-5 mt-1 flex flex-wrap gap-x-3">
+                                    <span>Ind: {format(parseISO(a.hotel.checkIn), "EEE d/M", { locale: da })}</span>
+                                    <span>Ud: {format(parseISO(a.hotel.checkOut), "EEE d/M", { locale: da })}</span>
+                                    {a.hotel.phone && <span>Tlf: {a.hotel.phone}</span>}
                                   </div>
-                                  {a.hotel.phone && (
-                                    <p className="text-xs text-muted-foreground ml-5 mt-1">Tlf: {a.hotel.phone}</p>
-                                  )}
                                   {a.hotel.notes && (
-                                    <p className="text-xs text-muted-foreground ml-5 mt-1 italic">{a.hotel.notes}</p>
+                                    <p className="text-xs text-foreground/70 ml-5 mt-0.5 italic">{a.hotel.notes}</p>
                                   )}
                                 </div>
                               )}
 
                               {/* Hotel checkout reminder */}
                               {a.hotel?.isCheckOutDay && !a.hotel?.isCheckInDay && (
-                                <div className="ml-6 mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-                                  <div className="flex items-center gap-1.5">
-                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
-                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Udtjekning i dag – {a.hotel.name}</span>
-                                  </div>
+                                <div className="ml-6 mt-1.5 px-3 py-1.5 rounded-md bg-blue-600/10 border border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-400/20 inline-flex items-center gap-1.5">
+                                  <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
+                                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Udtjekning i dag – {a.hotel.name}</span>
                                 </div>
                               )}
 
