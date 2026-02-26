@@ -187,9 +187,9 @@ export default function BookingsContent() {
   const marketBookingIds = useMemo(() => (marketBookings || []).map((b: any) => b.id), [marketBookings]);
   const { data: bookingHotels } = useBookingHotels(marketBookingIds.length > 0 ? marketBookingIds : undefined);
   const hotelMap = useMemo(() => {
-    const map: Record<string, { hotelName: string; status: string }> = {};
+    const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
     (bookingHotels || []).forEach((bh: any) => {
-      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status };
+      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status, checkIn: bh.check_in || null, checkOut: bh.check_out || null };
     });
     return map;
   }, [bookingHotels]);
@@ -842,12 +842,6 @@ export default function BookingsContent() {
                         {booking.location?.address_city} • {booking.location?.type}
                         {booking.clients?.name ? ` • ${booking.clients.name}` : ''}
                       </p>
-                      {hotelMap[booking.id] && (
-                        <Badge variant="outline" className="mt-1 gap-1 text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
-                          <Hotel className="h-3 w-3" />
-                          {hotelMap[booking.id].hotelName}
-                        </Badge>
-                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {canEditFmBookings && (
@@ -917,6 +911,22 @@ export default function BookingsContent() {
                                 <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
                                   <Utensils className="h-2 w-2" />
                                   Diæt
+                                </Badge>
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const hotelInfo = hotelMap[booking.id];
+                            if (!hotelInfo) return null;
+                            const dateStr = format(dayDate, "yyyy-MM-dd");
+                            if (hotelInfo.checkIn && hotelInfo.checkOut) {
+                              if (dateStr < hotelInfo.checkIn || dateStr > hotelInfo.checkOut) return null;
+                            }
+                            return (
+                              <div className="mt-1 flex flex-col items-center">
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-blue-100 text-blue-800 border border-blue-300">
+                                  <Hotel className="h-2 w-2" />
+                                  {hotelInfo.hotelName}
                                 </Badge>
                               </div>
                             );
