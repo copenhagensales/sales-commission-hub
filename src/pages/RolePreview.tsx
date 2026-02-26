@@ -83,6 +83,7 @@ const generateAllPermissions = (): RolePreviewPermissions => ({
   menu_extra_work: { view: true, edit: true },
   menu_extra_work_admin: { view: true, edit: true },
   // Fieldmarketing menu
+  menu_fm_my_schedule: true,
   menu_fm_overview: { view: true, edit: true },
   menu_fm_my_week: true,
   menu_fm_book_week: { view: true, edit: true },

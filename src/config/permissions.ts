@@ -314,6 +314,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Fieldmarketing menu",
     icon: "🚗",
     permissions: [
+      { key: "menu_fm_my_schedule", label: "Min vagtplan", description: "Adgang til personlig vagtplan", hasEditOption: false },
       {
         key: "menu_fm_overview",
         label: "Dashboard",
