@@ -1,29 +1,49 @@
 
 
-## Fix: Melissa (og andre uden agent-mapping) viser 0 provision
+## Gør kapacitetspanelet lettere at aflæse
 
-### Årsag
-`usePersonalSalesStats` henter agent-emails via `employee_agent_mapping`. Melissa har ingen mapping, så `agentEmails` returnerer et tomt array. Linje 58 har betingelsen `agentEmails.length > 0`, som blokerer hele queryen - provision bliver aldrig hentet.
+### Problem
+Den nuværende visning har tre separate rækker (Kapacitet, Booket, Ledige) med løsrevne tal, som er svære at aflæse hurtigt. Man skal selv sammenligne tallene på tværs af rækker for at forstå situationen.
 
-Melissa har salg under `mech@copenhagensales.dk` (hendes work_email), men hooket kender ikke til den.
+### Ny visning: "Booket / Kapacitet" med progress bar
 
-### Løsning
-Tilføj work_email som fallback i `usePersonalSalesStats` (og tilsvarende i `usePreviousPeriodComparison`), så medarbejdere uden agent-mapping stadig får vist deres provision.
+Erstat de tre rækker med en enkelt, kompakt visning per dag der viser:
 
-### Ændringer
+```text
+Eesy FM (25 medarbejdere)
+        M     T     O     T     F     L     S
+       4/9   3/9   5/8   4/9   2/9   0/9   0/9
+       [====-    ] [===-     ] [======-  ] ...
+```
 
-**1. `src/hooks/usePersonalSalesStats.ts` (linje 33-58)**
-- I agent-email queryen: Hvis `employee_agent_mapping` returnerer tomt, hent `work_email` fra `employee_master_data` som fallback.
-- Fjern kravet om `agentEmails.length > 0` i `enabled`-betingelsen - lad den køre hvis der er enten agent-emails eller work_email.
+Hvert dagsfelt viser:
+- **"4/9"** format (booket/kapacitet) -- klart og entydigt
+- En lille progress bar under tallet der visuelt viser fyldningsgraden
+- Farve baseret på fyldningsgrad:
+  - **Gron**: under 50% booket (masser af plads)
+  - **Gul**: 50-80% booket (ved at fylde op)
+  - **Rod**: over 80% eller fuldt booket
+  - **Mork rod**: overbooket (booket > kapacitet)
 
-**2. `src/hooks/usePreviousPeriodComparison.ts` (linje 33-50)**
-- Samme fallback-logik: Hent work_email hvis ingen agent-mapping findes.
+### Tooltip
+Hover viser stadig detaljer: "Mandag 24. feb -- 9 kapacitet, 4 booket, 5 ledige (7 fravaerende)"
 
-### Teknisk detalje
-Ændringen er ca. 10-15 linjer per fil. Query-funktionen udvides til:
-1. Hent emails fra `employee_agent_mapping` (eksisterende logik)
-2. Hvis tomt: Hent `work_email` fra `employee_master_data` for medarbejderen
-3. Returner det fundne som `agentEmails`
+### Tekniske andringer
 
-Dette matcher den fallback-kæde som allerede bruges i `get_sales_aggregates_v2` RPC'en og `useSellerSalariesCached`.
+**Fil: `src/components/vagt-flow/CapacityPanel.tsx`**
+
+1. Fjern de tre separate raekker (Kapacitet, Booket, Ledige) og erstat med en enkelt raekke per kunde
+2. Hvert dagsfelt renderes som en kompakt celle med:
+   - Tekst: `{booked}/{capacity}` i fed skrift
+   - En 4px progress bar nedenunder (`width: (booked/capacity)*100%`)
+   - Baggrundsfarve baseret pa fyldningsgrad
+3. Behold tooltip med fuld breakdown
+4. Behold info-teksten i bunden men opdater til at bruge "X/Y" format
+5. Tilf0j `absent` til dayData-objektet sa tooltip kan vise det
+
+### Resultat
+- Et hurtigt blik viser "4/9" = 4 ud af 9 mulige lokationer er booket
+- Progress baren giver visuelt overblik uden at laese tal
+- Farverne signalerer straks om der er plads eller ej
+- Meget mere kompakt -- en raekke i stedet for tre
 
