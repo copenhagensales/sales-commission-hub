@@ -1,44 +1,50 @@
 
-## Fix: Enreach-adapterens retry-logik er ikke opdateret
+
+## Fix: Stagger Relatel cron-schedule for at undga Adversus API-kollision
 
 ### Problem
-Kun Adversus-adapteren og fail-fast guarden blev ændret i den forrige implementering. Enreach-adapterens `get()` metode kører stadig med de gamle værdier:
-- `maxRetries = 5` (skal være 2)
-- Max delay cap: `60000ms` (skal være 15000ms)
-- Backoff base: `5000 * Math.pow(2, attempt)` = 5s, 10s, 20s, 40s, 80s
+Lovablecph og Relatel har begge cron-jobs pa **identiske minutter**: `3,8,13,18,23,28,33,38,43,48,53,58`. De starter samtidigt og rammer Adversus API'et parallelt, hvilket udloser sporadiske 429-fejl pa Relatel (ca. hver 25. minut).
 
-Dette betyder at hver Enreach-sync bruger ~120s på retries før fail-fast guarden overhovedet kan fange fejlen, fordi `fetchUsers` kalder `get()` internt og bruger alle 5 retries inden den kaster fejlen op.
+Fail-fast guarden virker korrekt (aborterer pa ~5s), men de sporadiske fejl giver "Kritisk" status i dashboardet.
 
-### Ændring
+### Losning
+Flyt Relatel's cron-schedule 2 minutter frem, sa den altid korer EFTER Lovablecph er startet og har passeret sine foerste API-kald.
 
-**Fil: `supabase/functions/integration-engine/adapters/enreach.ts`** (linje 183-219)
+### Aendring
 
-3 ændringer i `get()` metoden:
+**Database migration** - opdater Relatel's cron job:
 
-```text
-// Fra (linje 185):
-const maxRetries = 5;
+```sql
+SELECT cron.unschedule('dialer-657c2050-sync');
 
-// Til:
-const maxRetries = 2;
-
-// Fra (linje 203):
-const delay = this.addJitter(Math.min(baseDelay, 60000));
-
-// Til:
-const delay = this.addJitter(Math.min(baseDelay, 15000));
-
-// Fra (linje 199, kommentar opdatering):
-// Exponential backoff: 5s, 10s, 20s, 40s, 80s with jitter
-const exponentialDelay = 5000 * Math.pow(2, attempt);
-
-// Til:
-// Exponential backoff: 3s, 6s with jitter (capped at 15s)
-const exponentialDelay = 3000 * Math.pow(2, attempt);
+SELECT cron.schedule(
+  'dialer-657c2050-sync',
+  '0,5,10,15,20,25,30,35,40,45,50,55 * * * *',
+  $$SELECT net.http_post(
+    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ..."}'::jsonb,
+    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users", "sales", "sessions"], "integration_id": "657c2050-1faa-4233-a964-900fb9e7b8c6"}'::jsonb
+  ) AS request_id$$
+);
 ```
 
+### Tidsplan efter fix
+
+| Minut | Lovablecph (sales) | Lovablecph (meta) | Relatel |
+|-------|-------------------|-------------------|---------|
+| :00 | | | Relatel sync |
+| :03 | Sales sync | | |
+| :05 | | Meta sync (halv-times) | Relatel sync |
+| :08 | Sales sync | | |
+| :10 | | | Relatel sync |
+
+Der er nu altid mindst 2 minutters mellemrum, sa Adversus API'et nar at nulstille burst-limiten.
+
+### Ingen kodeaendringer
+Kun en database cron-justering. Ingen aendringer i edge functions eller frontend.
+
 ### Forventet resultat
-- Worst-case retry-tid falder fra ~155s til ~12s
-- Fail-fast guarden i sync-integration.ts fanger 429 hurtigere
-- Enreach-integrationerne (Eesy, Tryg, ASE) stopper med at vise "Kritisk" når API'et er tilgængeligt igen
-- Adversus-ændringerne fra forrige fix er allerede aktive og fungerer korrekt
+- Relatel stopper med at fa sporadiske 429-fejl
+- "Kritisk" status forsvinder fra dashboardet
+- Begge Adversus-integrationer korer stabilt med 5-minutters interval, bare forskudt
+
