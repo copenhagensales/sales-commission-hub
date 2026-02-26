@@ -1,21 +1,30 @@
 
-
-## Fix: "På vagt" viser stadig folk i weekenden
+## Fix: Skjul "Mangler" i weekenden
 
 ### Problem
-Weekend-tjekket blev kun tilføjet i `dayData`-beregningen (linje 196), men i renderingen (linje 284) beregnes "På vagt" separat som `totalEmployees - day.absent` -- uden weekend-tjek. Derfor vises stadig 21-23 medarbejdere på vagt lørdag/søndag.
+Weekenden viser kapacitet 0 men stadig bookede lokationer (markeder), hvilket giver et negativt "Mangler"-tal i rod. Det er misvisende -- markedsvagter i weekenden er normale, ikke overbookinger.
 
-### Løsning
-Linje 284 i `CapacityPanel.tsx`: Tilføj samme weekend-tjek, så "På vagt" viser 0 i weekenden.
+### Losning
+I weekenden: vis bookede lokationer (de er reelle), men vis "Mangler" som **"-"** (bindestreg) i stedet for et negativt tal. Weekenden har ingen standard-kapacitet, sa der er intet at "mangle".
 
-**Ændring:**
-```typescript
-// FØR (linje 284):
-const available = totalEmployees - day.absent;
+### Tekniske aendringer
 
-// EFTER:
-const isWeekendDay = day.date.getDay() === 0 || day.date.getDay() === 6;
-const available = isWeekendDay ? 0 : totalEmployees - day.absent;
+**Fil: `src/components/vagt-flow/CapacityPanel.tsx`**
+
+1. I `capacityByClient` beregningen (linje 193-201): Tilfoej `isWeekend` flag til dayData-objektet sa renderingen ved om det er weekend.
+
+2. I "Pa vagt" renderingen (linje ~284): Vis "-" i stedet for 0 i weekenden (der er ingen standard-vagter at taelle).
+
+3. I "Mangler" renderingen (linje ~308): Vis "-" i stedet for det negative tal i weekenden.
+
+4. "Booket lok." forbliver uaendret -- den viser stadig de reelle markedsbookinger i weekenden.
+
+**Resultat:**
+```
+              M    T    O    T    F    L    S
+Pa vagt      18   20   17   18   20    -    -
+Booket lok.   4    3    5    4    2    1    1
+Mangler       5    7    4    5    8    -    -
 ```
 
-En enkelt linje-ændring -- resten af panelet bruger allerede de korrekte `dayData`-værdier med weekend-tjek.
+Weekenden viser bindestreg for "Pa vagt" og "Mangler" (ikke relevant), men viser stadig de faktiske bookinger under "Booket lok." sa man kan se markedsvagterne.
