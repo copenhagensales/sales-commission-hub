@@ -1,18 +1,26 @@
 
+## Tilføj hotel-tag på markedsbookinger i booking-oversigten
 
-## Ændr markedsbookinger fra blå/indigo til samme grønne stil som normale bookinger
+### Hvad ændres
+Booking-oversigten for markeder viser i dag medarbejdere, køretøjer og diæt pr. dag -- men ikke hvilket hotel der er booket. Vi tilføjer et hotel-tag (ikon + hotelnavn) under hver markedbooking-header, så man hurtigt kan se om der er tildelt et hotel og hvilket.
 
-### Problem
-Markedsbookinger ("Markeder denne uge") bruger en blå/indigo farveskala, som er svær at se i dark mode. Normale bookinger bruger `primary`-farver (grøn), som ser bedre ud.
+### Teknisk plan
 
-### Ændring
-En enkelt fil: `src/pages/vagt-flow/BookingsContent.tsx`
+**Fil: `src/pages/vagt-flow/BookingsContent.tsx`**
 
-Erstat alle indigo-farver i markedsektionen (linje 800-872) med de samme `primary`-baserede farver som normale bookinger:
+1. **Import `useBookingHotels`** fra `@/hooks/useBookingHotels` samt `Hotel`-ikonet fra lucide-react.
 
-- **Kort-ramme (linje 800):** `border-indigo-200 bg-indigo-50/30 dark:border-indigo-800 dark:bg-indigo-950/20` bliver til ingen specielle farver (standard `Card`)
-- **Ikon-cirkel (linje 804):** `bg-indigo-100 dark:bg-indigo-900/40` bliver til `bg-primary/10`
-- **Ikon (linje 805):** `text-indigo-600 dark:text-indigo-400` bliver til `text-primary`
-- **Dag-celler (linje 862):** `bg-indigo-100/60 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700` bliver til `bg-primary/10 border border-primary/20`
-- **Medarbejder-navne (linje 872):** `text-indigo-700 dark:text-indigo-300` bliver til `text-primary`
+2. **Hent hotel-data**: Brug `useBookingHotels` med alle synlige booking-IDs (fra `allBookings` eller tilsvarende) til at hente tilknyttede hoteller. Byg et `hotelMap` (booking_id -> booking_hotel record) med `useMemo`.
 
+3. **Vis hotel-tag i markedsektionen**: Under booking-titlen (by/type/klient-linjen, ca. linje 832) tilføjes en `Badge` med hotelikonet og hotelnavnet, hvis der er et hotel tildelt til den pågældende booking. Stilen matcher de eksisterende tags (f.eks. køretøjs-badges) med en blå/lilla farve for at skille det visuelt fra medarbejdere og køretøjer.
+
+```text
+  Bolig & Livsstilsmessen Odense
+  Odense C - Markeder - Eesy FM
+  [Hotel-ikon] Hotel Odense          <-- nyt tag
+```
+
+Badgen vises kun når `hotelMap[booking.id]` eksisterer og har et hotel-navn. Farven bliver f.eks. `bg-blue-100 text-blue-800 border-blue-300` (eller tilsvarende i dark mode) for at adskille det fra de grønne/gule/orange tags.
+
+### Omfang
+En enkelt fil ændres (`BookingsContent.tsx`), ingen database-ændringer.
