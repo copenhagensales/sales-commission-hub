@@ -5,6 +5,19 @@ import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recor
 import { CampaignMappingConfig } from "../types.ts";
 import { acquireRunLock, releaseRunLock, generateRunId } from "../utils/run-lock.ts";
 
+/**
+ * Check if current time is within Danish working hours (08:00-21:00 Europe/Copenhagen)
+ */
+function isDanishWorkingHours(): boolean {
+  const now = new Date();
+  const dkHour = parseInt(
+    now.toLocaleString('en-US', { 
+      hour: 'numeric', hour12: false, timeZone: 'Europe/Copenhagen' 
+    })
+  );
+  return dkHour >= 8 && dkHour < 21;
+}
+
 interface SyncOptions {
   source?: string;
   action?: string;
@@ -90,6 +103,27 @@ export async function syncIntegration(
   const syncRunStartedAt = new Date();
   const runId = generateRunId();
   let adapter: any = null;
+
+  // === Enreach: Skip outside Danish working hours (21:00-08:00) ===
+  const provider = (source || integration.provider || "").toLowerCase();
+  if (provider === "enreach" && !isDanishWorkingHours()) {
+    log("INFO", `Skipping ${integration.name}: outside Danish working hours (21:00-08:00 DK)`);
+    await supabase.from("integration_sync_runs").insert({
+      integration_id: integration.id,
+      started_at: syncRunStartedAt.toISOString(),
+      completed_at: new Date().toISOString(),
+      duration_ms: 0,
+      status: "skipped",
+      actions: actionList,
+      records_processed: 0,
+      api_calls_made: 0,
+      retries: 0,
+      rate_limit_hits: 0,
+      run_id: runId,
+      error_message: "Skipped: outside working hours (21:00-08:00 DK)",
+    });
+    return { name: integration.name, status: "skipped_locked" as any, error: "Outside working hours (21:00-08:00 DK)" };
+  }
 
   // === Per-Integration Run Lock ===
   const lockAcquired = await acquireRunLock(supabase, integration.id, runId, log);

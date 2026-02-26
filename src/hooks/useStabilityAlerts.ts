@@ -14,10 +14,25 @@ export interface StabilityAlert {
 interface IntegrationMetric {
   id: string;
   name: string;
+  provider?: string;
   successRate1h: number;
   rateLimitRate15m: number;
   last_sync_at: string | null;
   lastRuns: { status: string }[];
+}
+
+/**
+ * Check if current time is outside Danish working hours (21:00-08:00 Europe/Copenhagen).
+ * Used to suppress alerts for Enreach integrations during off-hours.
+ */
+function isOutsideDanishWorkingHours(): boolean {
+  const now = new Date();
+  const dkHour = parseInt(
+    now.toLocaleString('en-US', { 
+      hour: 'numeric', hour12: false, timeZone: 'Europe/Copenhagen' 
+    })
+  );
+  return dkHour < 8 || dkHour >= 21;
 }
 
 export interface ProviderBudget {
@@ -87,8 +102,22 @@ export function useStabilityAlerts({
         });
       }
 
-      // Last sync checks
-      if (int.last_sync_at) {
+      // Last sync checks — suppress for Enreach outside working hours
+      const isEnreach = (int.provider || "").toLowerCase() === "enreach";
+      const enreachOffHours = isEnreach && isOutsideDanishWorkingHours();
+
+      if (enreachOffHours) {
+        // Show info-level "paused" instead of missing-sync alerts
+        result.push({
+          id: `enreach-paused-${int.id}`,
+          level: "info",
+          integration: int.name,
+          message: `Pauset (udenfor arbejdstid 21:00-08:00 DK)`,
+          metric: "lastSync",
+          value: 0,
+          threshold: 0,
+        });
+      } else if (int.last_sync_at) {
         const minsSinceSync = (Date.now() - new Date(int.last_sync_at).getTime()) / 60000;
         if (minsSinceSync > 60) {
           result.push({
