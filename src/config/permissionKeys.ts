@@ -225,6 +225,7 @@ export const PERMISSION_KEYS = {
   menu_kpi_definitions: { label: 'KPI definitioner', section: 'admin', parent: 'menu_section_admin' },
 
   // ==================== FIELDMARKETING (under menu_section_fieldmarketing) ====================
+  menu_fm_my_schedule: { label: 'Min FM vagtplan', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_overview: { label: 'Oversigt', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_booking: { label: 'Booking', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_vehicles: { label: 'Køretøjer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
