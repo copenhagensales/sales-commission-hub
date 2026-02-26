@@ -198,7 +198,7 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
       const booked = getBookingsForClientDay(client.id, date);
       const remaining = capacity - booked;
       
-      return { date, capacity, booked, remaining, absent };
+      return { date, capacity, booked, remaining, absent, isWeekend: isWeekendDay };
     });
 
     return {
@@ -281,12 +281,11 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
                     <Users className="h-3 w-3 shrink-0" /> På vagt
                   </div>
                   {dayData.map((day, idx) => {
-                    const isWeekendDay = day.date.getDay() === 0 || day.date.getDay() === 6;
-                    const available = isWeekendDay ? 0 : totalEmployees - day.absent;
+                    const available = day.isWeekend ? null : totalEmployees - day.absent;
                     return (
                       <Tooltip key={idx}>
                         <TooltipTrigger asChild>
-                          <div className="text-center text-xs font-medium">{available}</div>
+                          <div className="text-center text-xs font-medium text-muted-foreground">{available === null ? "-" : available}</div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
@@ -319,8 +318,8 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
                   {dayData.map((day, idx) => (
                     <Tooltip key={idx}>
                       <TooltipTrigger asChild>
-                        <div className={`text-center text-xs ${getManglerColor(day.remaining)}`}>
-                          {day.remaining}
+                      <div className={`text-center text-xs ${day.isWeekend ? "text-muted-foreground" : getManglerColor(day.remaining)}`}>
+                          {day.isWeekend ? "-" : day.remaining}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
