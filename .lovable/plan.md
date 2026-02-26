@@ -1,32 +1,39 @@
 
 
-## Flyt hotel-tag ned på de enkelte dage
+## Tilføj hotel-info på medarbejderens vagtplan
 
 ### Hvad ændres
-Hotel-badgen flyttes fra booking-headeren ned i dag-gitteret, så den vises pr. dag ligesom bil- og diæt-badges. Badgen vises kun på de dage der falder inden for hotellets check-in og check-out datoer.
+Medarbejdere skal kunne se deres hotel-booking direkte i vagtplanen -- med hotelnavn, adresse, check-in/check-out tidspunkter og eventuelle noter. Hotelkortet vises som et pænt callout-kort (ligesom booking-noten) på de relevante dage.
 
 ### Teknisk plan
 
-**Fil: `src/pages/vagt-flow/BookingsContent.tsx`**
+**Fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`**
 
-1. **Fjern hotel-badge fra headeren** (linje 845-850) -- den nuværende badge under booking-titlen slettes.
+1. **Ny data-query: Hent booking_hotel data**
+   - Tilføj en `useQuery` der henter `booking_hotel` + `hotel`-stamdata for ugens `bookingIds`
+   - Felter: `booking_id`, `check_in`, `check_out`, `notes`, `status`, samt hotel: `name`, `address`, `city`, `phone`
 
-2. **Udvid `hotelMap`** til at inkludere `checkIn` og `checkOut` datoer (fra `booking_hotel.check_in` og `booking_hotel.check_out`), så vi kan afgore hvilke dage hotellet daekker.
+2. **Udvid dayData med hotel-info**
+   - I `useMemo` der grupperer data pr. dag: match hotel til assignment hvis dagens dato falder inden for `check_in`/`check_out` intervallet
+   - Tilføj `isCheckInDay` og `isCheckOutDay` flag så vi kan vise specielle labels
 
-3. **Tilføj hotel-badge i dag-gitteret** (efter diæt-badgen, ca. linje 923): For hver dag tjekkes om datoen falder inden for hotellets check-in/check-out interval. Hvis ja, vises en blå badge med hotel-ikon og hotelnavn -- samme stil og størrelse som bil- og diæt-badges:
+3. **UI: Hotel-badge i badges-rækken**
+   - Tilføj blå `Badge` med `Hotel`-ikon og hotelnavn i samme række som bil og diæt
+   - Stil: `bg-blue-100 text-blue-800 border-blue-300` (matcher det eksisterende mønster fra BookingsContent)
 
-```text
-  Man
-  23/2
-  Anders
-  [Bil] Toyota
-  [Diæt] Diæt
-  [Hotel] AIR BNB    <-- nyt, kun på relevante dage
-```
+4. **UI: Hotel-detalje callout på check-in og check-out dage**
+   - På check-in dag: Vis et callout-kort (samme stil som booking-noten) med:
+     - Hotel-ikon + hotelnavn som header
+     - Adresse og by
+     - "Indtjekning: [dato]" 
+     - "Udtjekning: [dato]"
+     - Eventuelle noter fra hotelreservationen
+   - På check-out dag: Vis et kort reminder-callout med "Udtjekning i dag"
+   - På mellemliggende dage: Kun badge (ingen detaljer)
 
-Badge-stilen bliver `text-[9px]` med `bg-blue-100 text-blue-800 border-blue-300` for at matche bil (gul) og diæt (orange) mønsteret.
-
-4. **Fallback**: Hvis check-in/check-out ikke er sat, vises hotel-badgen på alle bookede dage for den pågældende booking.
+5. **Import**
+   - Tilføj `Hotel` fra `lucide-react`
 
 ### Omfang
-En enkelt fil ændres (`BookingsContent.tsx`), ingen database-ændringer.
+En enkelt fil ændres (`MyBookingSchedule.tsx`), ingen database-ændringer.
+
