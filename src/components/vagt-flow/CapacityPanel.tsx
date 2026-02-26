@@ -152,9 +152,8 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
   });
 
   // Get employee count per client (excluding "no shift" employees)
-  const getEmployeeCountForClient = (clientName: string) => {
+  const getEmployeeCountForClient = () => {
     return allEmployees?.filter(e => 
-      e.team?.toLowerCase().includes(clientName.toLowerCase()) &&
       !employeesWithNoShifts.includes(e.id)
     ).length || 0;
   };
@@ -170,19 +169,18 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
   };
 
   // Get absent employees per day per client
-  const getAbsencesForClientDay = (clientName: string, date: Date) => {
+  const getAbsencesForDay = (date: Date) => {
     let absent = 0;
     absencesData?.forEach((absence: any) => {
       const employee = absence.employee;
       if (!employee || !employee.is_active) return;
+      if (employeesWithNoShifts.includes(absence.employee_id)) return;
 
       const absenceStart = parseISO(absence.start_date);
       const absenceEnd = parseISO(absence.end_date);
 
       if (isWithinInterval(date, { start: absenceStart, end: absenceEnd })) {
-        if (employee.team?.toLowerCase().includes(clientName.toLowerCase())) {
-          absent++;
-        }
+        absent++;
       }
     });
     return absent;
@@ -190,10 +188,10 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
 
   // Calculate capacity data per client per day
   const capacityByClient = fieldmarketingClients.map((client: any) => {
-    const totalEmployees = getEmployeeCountForClient(client.name);
+    const totalEmployees = getEmployeeCountForClient();
     
     const dayData = weekDates.map((date) => {
-      const absent = getAbsencesForClientDay(client.name, date);
+      const absent = getAbsencesForDay(date);
       const available = totalEmployees - absent;
       const capacity = Math.floor(available / 2); // 2 employees per location
       const booked = getBookingsForClientDay(client.id, date);
