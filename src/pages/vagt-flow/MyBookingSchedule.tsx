@@ -384,12 +384,20 @@ export default function MyBookingSchedule() {
                                   <div className="flex items-center gap-1.5">
                                     <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300 shrink-0" />
                                     <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">{a.hotel.name || "Hotel"}</span>
-                                    {(a.hotel.address || a.hotel.city) && (
-                                      <span className="text-xs text-blue-600/80 dark:text-blue-300/70">
-                                        – {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
-                                      </span>
-                                    )}
                                   </div>
+                                  {(a.hotel.address || a.hotel.city) && (
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                      <a
+                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([a.hotel.address, a.hotel.city].filter(Boolean).join(", "))}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-200"
+                                      >
+                                        {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
+                                      </a>
+                                    </div>
+                                  )}
                                   <div className="text-xs text-foreground ml-5 mt-1 flex flex-wrap gap-x-3">
                                     <span>Ind: {format(parseISO(a.hotel.checkIn), "EEE d/M", { locale: da })}{a.hotel.checkInTime ? ` kl. ${a.hotel.checkInTime.slice(0, 5)}` : ""}</span>
                                     <span>Ud: {format(parseISO(a.hotel.checkOut), "EEE d/M", { locale: da })}{a.hotel.checkOutTime ? ` kl. ${a.hotel.checkOutTime.slice(0, 5)}` : ""}</span>
