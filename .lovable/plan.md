@@ -1,28 +1,31 @@
 
 
-## Gør hoteladresse tydeligere + tilføj Google Maps-link
+## Fix: Bemærkninger og kampagne forsvinder ved genåbning
 
-### Hvad ændres
-Adressen vises i dag inline med hotelnavnet, men er svær at se. Vi giver den sin egen linje og gør den klikbar med et Google Maps-link.
+### Problem
+1. **Bemærkninger forsvinder**: Når bookingen gemmes fra "Rediger booking"-dialogen, invalideres kun `vagt-bookings-list` og `vagt-billing-bookings` query-cache -- men IKKE `vagt-market-bookings`. Sa nar dialogen abnes igen fra Markeder-visningen, bruges gamle (stale) data uden den opdaterede bemærkning.
+2. **Kampagne skal vælges igen**: Samme problem -- `campaign_id` er gemt korrekt i databasen, men den lokale booking-data er stale, sa `campaign_id` er `null` i den gamle cache.
 
-### Ændring i `src/pages/vagt-flow/MyBookingSchedule.tsx`
+### Losning
 
-**Linje 384-392 (hotel callout)** opdateres:
+**Fil: `src/components/vagt-flow/EditBookingDialog.tsx`**
 
-1. Hotelnavn forbliver på første linje med Hotel-ikonet
-2. Adresse flyttes til en **ny linje** under navnet med et `MapPin`-ikon
-3. Adressen wraps i et `<a>`-tag der linker til Google Maps:
-   - URL: `https://www.google.com/maps/search/?api=1&query={encodedAddress}`
-   - `target="_blank"` og `rel="noopener noreferrer"`
-   - Understreget tekst i blå så det tydeligt er klikbart
+Tilføj `vagt-market-bookings` til invalidation i `updateBookingMutation.onSuccess` (linje 653-657):
 
-### Resultat
-
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+  queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] }); // TILFOJET
+  queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
+  toast.success("Booking opdateret");
+  onOpenChange(false);
+},
 ```
-[Hotel-ikon] Hotel Scandic Aarhus
-[MapPin-ikon] Banegårdspladsen 14, Aarhus  (klikbart link)
-Ind: tor 27/2 kl. 15:00    Ud: fre 28/2 kl. 10:00
-```
+
+Dette sikrer at booking-data genindlæses fra databasen med de opdaterede felter (comment, campaign_id osv.), uanset om dialogen åbnes fra Bookings- eller Markeder-visningen.
 
 ### Omfang
-Kun UI-ændring i en enkelt fil, ingen database-ændringer.
+- 1 linje tilfojet i 1 fil
+- Ingen database-aendringer
+- Loser begge problemer (bemærkning + kampagne) da begge skyldes stale cache
+
