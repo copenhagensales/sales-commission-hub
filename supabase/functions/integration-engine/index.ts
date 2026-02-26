@@ -67,9 +67,9 @@ serve(async (req) => {
       }
 
       // Decrypt credentials
-      const encryptionKey = Deno.env.get("INTEGRATION_ENCRYPTION_KEY");
+      const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
       if (!encryptionKey) {
-        return new Response(JSON.stringify({ success: false, error: "INTEGRATION_ENCRYPTION_KEY not configured" }), {
+        return new Response(JSON.stringify({ success: false, error: "DB_ENCRYPTION_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

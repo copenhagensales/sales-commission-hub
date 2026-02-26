@@ -196,6 +196,13 @@ export class EnreachAdapter implements DialerAdapter {
     const url = `${this.baseUrl}${endpoint}`;
     const maxRetries = 2;
 
+    // Proactive gating: stop early if we know quota is nearly exhausted
+    if (this._metrics.rateLimitRemaining !== undefined && this._metrics.rateLimitRemaining < 50) {
+      const msg = `RATE_LIMIT_EXHAUSTED: Only ${this._metrics.rateLimitRemaining} calls remaining (threshold: 50). Stopping proactively to preserve quota.`;
+      console.warn(`[EnreachAdapter] ${msg}`);
+      throw new Error(msg);
+    }
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       this._metrics.apiCalls++;
 
