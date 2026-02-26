@@ -1,40 +1,36 @@
 
+# Fix check-rate-limits og tilføj proaktiv gating i Enreach-adapteren
 
-# Fix: Vis realistisk status-badge baseret på 429-hits og retries
+## 1. Fix forkert secret-navn i check-rate-limits
 
-## Problem
-Status-badget i "Seneste Sync Runs"-tabellen viser grøn "OK" selvom en kørsel havde 3 rate-limit hits (429) og 2 retries. Årsagen er at backend markerer en kørsel som `success` så længe den til sidst gennemfører uden at kaste en fejl — uanset hvor meget friktion der var undervejs. UI'et viser derefter blindt grøn for alt med `status === "success"`.
+I `supabase/functions/integration-engine/index.ts` (linje 70-74) bruges `INTEGRATION_ENCRYPTION_KEY`, men den faktiske secret hedder `DB_ENCRYPTION_KEY`. Alle andre steder i kodebasen bruger det korrekte navn. Rettes til `DB_ENCRYPTION_KEY`.
 
-## Løsning
-Tilføj en visuel "degraderet" status i UI'et der tager højde for `rate_limit_hits` og `retries` — uden at ændre backend-logikken.
+## 2. Proaktiv gating i Enreach-adapteren
 
-### Ændring i `src/pages/SystemStability.tsx` (kun UI-rendering)
+I `supabase/functions/integration-engine/adapters/enreach.ts` i `get()` metoden (linje 195+):
 
-I status-badge renderingen (linje ~408-421), tilføj en check **før** den grønne badge:
+- Tjek `_metrics.rateLimitRemaining` **inden** hvert API-kald
+- Hvis remaining er under en threshold (50), kast en specifik `RateLimitExhaustionError` i stedet for at lave kaldet og vente på en 429
+- Sync-integration kan fange denne fejl og returnere `partial_success` i stedet for at køre videre
+
+Dette forhindrer at vi "brænder" kald af når vi allerede ved at kvoten er ved at løbe tør — og sparer de sidste kald til vigtigere ting.
+
+### Teknisk detalje
 
 ```text
-Nuværende logik:
-  success → grøn "OK"
-  error → rød "Fejl"
-  andet → gul badge
-
-Ny logik:
-  success + (rate_limit_hits > 0 ELLER retries > 0) → amber/gul "Degraderet" badge
-  success + ingen 429/retries → grøn "OK"
-  error → rød "Fejl"
-  partial_success → gul "Delvis"
-  andet → gul badge
+get() metoden:
+  BEFORE fetch():
+    if (this._metrics.rateLimitRemaining !== undefined
+        && this._metrics.rateLimitRemaining < 50) {
+      throw new Error("RATE_LIMIT_EXHAUSTED: Only X calls remaining");
+    }
 ```
 
-Badget vil vise:
-- **Grøn "OK"**: Ren kørsel uden problemer
-- **Amber "Degraderet"** (med AlertTriangle ikon): Synkronisering gennemført, men med rate-limit hits eller retries — indikerer pres på API-kvoten
-- **Rød "Fejl"**: Kørsel fejlede
-- **Gul tekst**: partial_success, skipped_locked, osv.
+Threshold på 50 er konservativ nok til at stoppe tidligt, men tillader at kritiske kald (som sales-fetch) kan komme igennem hvis de kører først.
 
-### Ændring i status-cards (integrations-overblik)
-Ingen ændring nødvendig — de bruger allerede aggregerede metrikker (`successRate1h`, `rateLimitRate15m`) som korrekt reflekterer problemer.
+## Filer der ændres
 
-### Ingen backend-ændringer
-Backend-status `success` er korrekt — synkroniseringen *gennemførte* faktisk. Det er kun den visuelle repræsentation i tabellen der skal nuanceres.
-
+| Fil | Ændring |
+|-----|---------|
+| `supabase/functions/integration-engine/index.ts` | `INTEGRATION_ENCRYPTION_KEY` -> `DB_ENCRYPTION_KEY` (2 steder, linje 70+72) |
+| `supabase/functions/integration-engine/adapters/enreach.ts` | Tilføj proaktiv gating-check i `get()` metoden |
