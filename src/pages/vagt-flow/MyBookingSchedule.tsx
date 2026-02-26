@@ -157,14 +157,44 @@ export default function MyBookingSchedule() {
           (p: any) => p.booking_id === a.booking_id && p.date === a.date
         ) ?? [];
 
-        // Match hotel: check if this day falls within check_in/check_out
+        // Match hotel: find any hotel for this booking where date falls within check_in/check_out
+        // Also check across all bookings in case check-in day is on a different booking
         const hotelForBooking = bookingHotels?.find((bh: any) => {
           if (bh.booking_id !== a.booking_id) return false;
           if (bh.check_in && bh.check_out) {
             return a.date >= bh.check_in && a.date <= bh.check_out;
           }
-          return true; // fallback: show on all days
+          return true;
+        }) ?? bookingHotels?.find((bh: any) => {
+          // Fallback: match any hotel whose date range covers this day
+          if (bh.check_in && bh.check_out) {
+            return a.date >= bh.check_in && a.date <= bh.check_out;
+          }
+          return false;
         });
+
+        // Determine if this is the first day the employee actually has a shift with this hotel
+        const isFirstShiftDay = hotelForBooking ? (() => {
+          const allDatesWithHotel = assignments
+            ?.filter((ass: any) => {
+              if (!hotelForBooking.check_in || !hotelForBooking.check_out) return true;
+              return ass.date >= hotelForBooking.check_in && ass.date <= hotelForBooking.check_out;
+            })
+            .map((ass: any) => ass.date)
+            .sort() ?? [];
+          return allDatesWithHotel[0] === a.date;
+        })() : false;
+
+        const isLastShiftDay = hotelForBooking ? (() => {
+          const allDatesWithHotel = assignments
+            ?.filter((ass: any) => {
+              if (!hotelForBooking.check_in || !hotelForBooking.check_out) return false;
+              return ass.date >= hotelForBooking.check_in && ass.date <= hotelForBooking.check_out;
+            })
+            .map((ass: any) => ass.date)
+            .sort() ?? [];
+          return allDatesWithHotel[allDatesWithHotel.length - 1] === a.date;
+        })() : false;
 
         days[a.date].assignments.push({
           ...a,
@@ -179,8 +209,8 @@ export default function MyBookingSchedule() {
             checkIn: hotelForBooking.check_in,
             checkOut: hotelForBooking.check_out,
             notes: hotelForBooking.notes,
-            isCheckInDay: a.date === hotelForBooking.check_in,
-            isCheckOutDay: a.date === hotelForBooking.check_out,
+            isCheckInDay: isFirstShiftDay,
+            isCheckOutDay: isLastShiftDay && !isFirstShiftDay,
           } : null,
         });
       }
