@@ -193,11 +193,11 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     const dayData = weekDates.map((date) => {
       const absent = getAbsencesForDay(date);
       const available = totalEmployees - absent;
-      const capacity = Math.floor(available / 2); // 2 employees per location
+      const capacity = Math.floor(available / 2);
       const booked = getBookingsForClientDay(client.id, date);
       const remaining = capacity - booked;
       
-      return { date, capacity, booked, remaining };
+      return { date, capacity, booked, remaining, absent };
     });
 
     return {
@@ -208,21 +208,39 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
   });
 
   // Get info text for client
-  const getInfoText = (dayData: { remaining: number }[]) => {
-    const weekdayCapacities = dayData.slice(0, 5).map(d => d.remaining);
-    const minCap = Math.min(...weekdayCapacities);
-    const maxCap = Math.max(...weekdayCapacities);
+  const getInfoText = (dayData: { booked: number; capacity: number }[]) => {
+    const weekdayData = dayData.slice(0, 5);
+    const minRemaining = Math.min(...weekdayData.map(d => d.capacity - d.booked));
+    const maxRemaining = Math.max(...weekdayData.map(d => d.capacity - d.booked));
     
-    if (minCap === maxCap) {
-      return `Kan booke op til ${maxCap} lokationer alle hverdage`;
+    if (minRemaining === maxRemaining) {
+      return `${maxRemaining} ledige lok. alle hverdage`;
     }
     
-    const minDays = weekdayCapacities
-      .map((c, i) => ({ cap: c, day: ["mandag", "tirsdag", "onsdag", "torsdag", "fredag"][i] }))
-      .filter(d => d.cap === minCap)
+    const minDays = weekdayData
+      .map((d, i) => ({ rem: d.capacity - d.booked, day: ["mandag", "tirsdag", "onsdag", "torsdag", "fredag"][i] }))
+      .filter(d => d.rem === minRemaining)
       .map(d => d.day);
     
-    return `Max ${minCap} lok. ${minDays.join(" & ")}, ${maxCap} lok. øvrige dage`;
+    return `${minRemaining} ledige lok. ${minDays.join(" & ")}, ${maxRemaining} øvrige dage`;
+  };
+
+  const getFillColor = (booked: number, capacity: number) => {
+    if (capacity === 0) return "bg-muted";
+    const ratio = booked / capacity;
+    if (ratio > 1) return "bg-destructive";
+    if (ratio > 0.8) return "bg-destructive/80";
+    if (ratio >= 0.5) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
+  const getTextColor = (booked: number, capacity: number) => {
+    if (capacity === 0) return "text-muted-foreground";
+    const ratio = booked / capacity;
+    if (ratio > 1) return "text-destructive font-bold";
+    if (ratio > 0.8) return "text-destructive";
+    if (ratio >= 0.5) return "text-yellow-600 dark:text-yellow-400";
+    return "text-green-600 dark:text-green-400";
   };
 
   if (absencesLoading) return null;
@@ -268,52 +286,31 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
                   {client.name} ({totalEmployees} medarbejdere)
                 </div>
                 
-                {/* Kapacitet row */}
+                {/* Compact booket/kapacitet row */}
                 <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <MapPin className="h-3 w-3" /> Kapacitet
+                    <MapPin className="h-3 w-3" /> Booket / Kap.
                   </span>
-                  <div className="flex gap-1">
-                    {dayData.map((day, idx) => (
-                      <div key={idx} className="w-7 h-7 flex items-center justify-center text-xs font-medium text-muted-foreground">
-                        {day.capacity}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Booket row */}
-                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Calendar className="h-3 w-3" /> Booket
-                  </span>
-                  <div className="flex gap-1">
-                    {dayData.map((day, idx) => (
-                      <div key={idx} className="w-7 h-7 flex items-center justify-center text-xs font-medium text-muted-foreground">
-                        {day.booked}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ledige row */}
-                <div className="flex items-center justify-between bg-green-50 dark:bg-green-950/30 rounded-lg px-3 py-2">
-                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">Ledige</span>
                   <div className="flex gap-1">
                     {dayData.map((day, idx) => (
                       <Tooltip key={idx}>
                         <TooltipTrigger asChild>
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                            day.remaining <= 0 ? "bg-destructive/20 text-destructive" :
-                            day.remaining <= 2 ? "bg-yellow-500/20 text-yellow-600" :
-                            "bg-green-500 text-white"
-                          }`}>
-                            {day.remaining}
+                          <div className="w-10 flex flex-col items-center gap-0.5">
+                            <span className={`text-xs font-bold ${getTextColor(day.booked, day.capacity)}`}>
+                              {day.booked}/{day.capacity}
+                            </span>
+                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${getFillColor(day.booked, day.capacity)}`}
+                                style={{ width: `${day.capacity > 0 ? Math.min((day.booked / day.capacity) * 100, 100) : 0}%` }}
+                              />
+                            </div>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{format(day.date, "EEEE d. MMM", { locale: da })}</p>
-                          <p className="text-xs">{day.capacity} kap. - {day.booked} booket = {day.remaining} ledige</p>
+                          <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                          <p className="text-xs">{day.capacity} kap. – {day.booked} booket = {day.capacity - day.booked} ledige</p>
+                          <p className="text-xs text-muted-foreground">{day.absent} fraværende</p>
                         </TooltipContent>
                       </Tooltip>
                     ))}
@@ -322,7 +319,7 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
 
                 {/* Info text */}
                 <div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground">
-                  <span className="text-yellow-500">💡</span>
+                  <span>💡</span>
                   {getInfoText(dayData)}
                 </div>
               </div>
