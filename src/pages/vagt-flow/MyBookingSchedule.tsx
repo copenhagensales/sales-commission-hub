@@ -235,205 +235,211 @@ export default function MyBookingSchedule() {
 
   return (
     <VagtFlowLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Min vagtplan</h1>
-            <p className="text-muted-foreground">
-              Uge {weekNumber} • {format(weekStart, "d. MMM", { locale: da })} – {format(weekEnd, "d. MMM yyyy", { locale: da })}
+      <div className="space-y-4">
+        {/* Header – compact on mobile */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-foreground leading-tight">Min vagtplan</h1>
+            <p className="text-xs text-muted-foreground">
+              Uge {weekNumber} · {format(weekStart, "d. MMM", { locale: da })} – {format(weekEnd, "d. MMM yyyy", { locale: da })}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setReferenceDate(new Date())}>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button variant="outline" size="sm" className="h-8 text-xs px-2.5" onClick={() => setReferenceDate(new Date())}>
               I dag
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setReferenceDate(d => addWeeks(d, -1))}>
-              <ChevronLeft className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setReferenceDate(d => addWeeks(d, -1))}>
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setReferenceDate(d => addWeeks(d, 1))}>
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setReferenceDate(d => addWeeks(d, 1))}>
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
 
-        {/* Next shift highlight */}
+        {/* Next shift highlight – compact */}
         {nextShift && nextShift.assignments.length > 0 && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
-                <CalendarDays className="h-4 w-4" />
-                Næste vagt: {nextShift.dayName} {format(nextShift.date, "d/M")}
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-primary font-semibold text-xs mb-0.5">
+              <CalendarDays className="h-3.5 w-3.5" />
+              Næste vagt: {nextShift.dayName} {format(nextShift.date, "d/M")}
+            </div>
+            {nextShift.assignments.map((a: any, i: number) => (
+              <div key={i} className="text-xs text-foreground">
+                {(a.booking as any)?.location?.name} · {a.start_time?.slice(0, 5)} – {a.end_time?.slice(0, 5)}
               </div>
-              {nextShift.assignments.map((a: any, i: number) => (
-                <div key={i} className="text-sm text-foreground">
-                  {(a.booking as any)?.location?.name} • {a.start_time?.slice(0, 5)} – {a.end_time?.slice(0, 5)}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+            ))}
+          </div>
         )}
 
         {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">Indlæser vagtplan...</div>
+          <div className="text-center py-12 text-muted-foreground text-sm">Indlæser vagtplan...</div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {dayData.map((day: any) => {
               const isDayToday = isToday(day.date);
               const isPast = isBefore(day.date, new Date()) && !isDayToday;
 
+              // Hide empty past days completely
+              if (isPast && day.assignments.length === 0) return null;
+
+              // Empty future/today days – minimal row
+              if (day.assignments.length === 0) {
+                return (
+                  <div
+                    key={day.dateStr}
+                    className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground border-b border-border/50"
+                  >
+                    <span className="font-medium">{day.dayName.slice(0, 3).toUpperCase()} {format(day.date, "d/M")}</span>
+                    {isDayToday && <Badge variant="default" className="text-[10px] h-4 px-1.5">I dag</Badge>}
+                    <span className="italic">— Ingen vagt</span>
+                  </div>
+                );
+              }
+
+              // Day with assignments – card
               return (
                 <Card
                   key={day.dateStr}
                   className={cn(
                     "transition-colors",
-                    isDayToday && "border-primary/50 bg-primary/5",
-                    isPast && day.assignments.length === 0 && "opacity-50"
+                    isDayToday && "border-primary/50 bg-primary/5"
                   )}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">
-                          {day.dayName.slice(0, 3).toUpperCase()} {format(day.date, "d/M")}
-                        </span>
-                        {isDayToday && (
-                          <Badge variant="default" className="text-xs">I dag</Badge>
-                        )}
-                      </div>
+                  <CardContent className="p-3">
+                    {/* Day header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-semibold text-sm text-foreground">
+                        {day.dayName.slice(0, 3).toUpperCase()} {format(day.date, "d/M")}
+                      </span>
+                      {isDayToday && (
+                        <Badge variant="default" className="text-[10px] h-4 px-1.5">I dag</Badge>
+                      )}
                     </div>
 
-                    {day.assignments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic">Ingen vagt</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {day.assignments.map((a: any, idx: number) => {
-                          const booking = a.booking as any;
-                          const location = booking?.location;
-                          const client = booking?.client;
-                          const campaign = booking?.campaign;
+                    <div className="space-y-3">
+                      {day.assignments.map((a: any, idx: number) => {
+                        const booking = a.booking as any;
+                        const location = booking?.location;
+                        const client = booking?.client;
+                        const campaign = booking?.campaign;
 
-                          return (
-                            <div key={idx} className="space-y-1.5">
-                              {/* Location */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span className="font-medium text-foreground">
-                                  {location?.name || "Ukendt lokation"}
-                                  {location?.address_city && `, ${location.address_city}`}
+                        return (
+                          <div key={idx} className="border-l-2 border-primary/40 pl-3 space-y-1">
+                            {/* Location name */}
+                            <div className="font-semibold text-sm text-foreground leading-tight">
+                              {location?.name || "Ukendt lokation"}
+                            </div>
+
+                            {/* Address link */}
+                            {(location?.address_street || location?.address_city) && (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([location.address_street, location.address_city].filter(Boolean).join(", "))}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                              >
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="underline">{[location.address_street, location.address_city].filter(Boolean).join(", ")}</span>
+                              </a>
+                            )}
+
+                            {/* Client / Campaign */}
+                            {(client?.name || campaign?.name) && (
+                              <p className="text-xs text-muted-foreground">
+                                {client?.name}{campaign?.name ? ` – ${campaign.name}` : ""}
+                              </p>
+                            )}
+
+                            {/* Time */}
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-foreground">
+                                {a.start_time?.slice(0, 5)} – {a.end_time?.slice(0, 5)}
+                              </span>
+                            </div>
+
+                            {/* Partners */}
+                            {a.partners.length > 0 && (
+                              <div className="flex items-center gap-1.5">
+                                <Users className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-foreground">
+                                  Makker: {a.partners.join(", ")}
                                 </span>
-                                {(location?.address_street || location?.address_city) && (
-                                  <a
-                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([location.address_street, location.address_city].filter(Boolean).join(", "))}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-primary underline hover:text-primary/80"
-                                  >
-                                    ({[location.address_street, location.address_city].filter(Boolean).join(", ")})
-                                  </a>
-                                )}
                               </div>
+                            )}
 
-                              {/* Client / Campaign */}
-                              {(client?.name || campaign?.name) && (
-                                <p className="text-sm text-muted-foreground ml-6">
-                                  {client?.name}{campaign?.name ? ` – ${campaign.name}` : ""}
-                                </p>
+                            {/* Badges row – compact */}
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              {a.vehicle && (
+                                <Badge variant="outline" className="text-[11px] py-0 px-1.5 h-5 bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-100 dark:border-yellow-700 gap-1">
+                                  <Car className="h-2.5 w-2.5" />
+                                  {(a.vehicle as any)?.name}
+                                </Badge>
                               )}
-
-                              {/* Time */}
-                              <div className="flex items-center gap-2 ml-6">
-                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="text-sm text-foreground">
-                                  {a.start_time?.slice(0, 5)} – {a.end_time?.slice(0, 5)}
-                                </span>
-                              </div>
-
-                              {/* Partners */}
-                              {a.partners.length > 0 && (
-                                <div className="flex items-center gap-2 ml-6">
-                                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                  <span className="text-sm text-foreground">
-                                    Makker: {a.partners.join(", ")}
-                                  </span>
-                                </div>
+                              {a.diet && (
+                                <Badge variant="outline" className="text-[11px] py-0 px-1.5 h-5 bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-700 gap-1">
+                                  <Utensils className="h-2.5 w-2.5" />
+                                  Diæt
+                                </Badge>
                               )}
-
-                              {/* Badges row */}
-                              <div className="flex items-center gap-2 ml-6 flex-wrap">
-                                {a.vehicle && (
-                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-100 dark:border-yellow-700 gap-1">
-                                    <Car className="h-3 w-3" />
-                                    {(a.vehicle as any)?.name}
-                                  </Badge>
-                                )}
-                                {a.diet && (
-                                  <Badge variant="outline" className="bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-700 gap-1">
-                                    <Utensils className="h-3 w-3" />
-                                    Diæt
-                                  </Badge>
-                                )}
-                                {a.hotel && (
-                                  <Badge variant="outline" className="bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-100 dark:border-blue-700 gap-1">
-                                    <Hotel className="h-3 w-3" />
-                                    {a.hotel.name || "Hotel"}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* Hotel detail callout – shown on ALL days in hotel period */}
                               {a.hotel && (
-                                <div className="ml-6 mt-1.5 px-3 py-2 rounded-md bg-blue-600/10 border border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-400/20">
-                                  {/* Check-in / check-out day label */}
-                                  {a.hotel.isCheckInDay && (
-                                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-1">Indtjekning i dag</div>
-                                  )}
-                                  {a.hotel.isCheckOutDay && !a.hotel.isCheckInDay && (
-                                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-1">Udtjekning i dag</div>
-                                  )}
-                                  <div className="flex items-center gap-1.5">
-                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300 shrink-0" />
-                                    <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">{a.hotel.name || "Hotel"}</span>
-                                  </div>
-                                  {(a.hotel.address || a.hotel.city) && (
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                                      <a
-                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([a.hotel.address, a.hotel.city].filter(Boolean).join(", "))}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-200"
-                                      >
-                                        {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
-                                      </a>
-                                    </div>
-                                  )}
-                                  <div className="text-xs text-foreground ml-5 mt-1 flex flex-wrap gap-x-3">
-                                    <span>Ind: {format(parseISO(a.hotel.checkIn), "EEE d/M", { locale: da })}{a.hotel.checkInTime ? ` kl. ${a.hotel.checkInTime.slice(0, 5)}` : ""}</span>
-                                    <span>Ud: {format(parseISO(a.hotel.checkOut), "EEE d/M", { locale: da })}{a.hotel.checkOutTime ? ` kl. ${a.hotel.checkOutTime.slice(0, 5)}` : ""}</span>
-                                    {a.hotel.phone && <span>Tlf: {a.hotel.phone}</span>}
-                                  </div>
-                                  {a.hotel.notes && (
-                                    <p className="text-xs text-foreground/70 ml-5 mt-0.5 italic">{a.hotel.notes}</p>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Booking comment callout */}
-                              {booking?.comment && (
-                                <div className="ml-6 mt-2 p-3 rounded-lg bg-accent/50 border border-border">
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                                    <span className="text-xs font-semibold text-primary">Note</span>
-                                  </div>
-                                  <p className="text-sm text-foreground">{booking.comment}</p>
-                                </div>
+                                <Badge variant="outline" className="text-[11px] py-0 px-1.5 h-5 bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-100 dark:border-blue-700 gap-1">
+                                  <Hotel className="h-2.5 w-2.5" />
+                                  {a.hotel.name || "Hotel"}
+                                </Badge>
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+
+                            {/* Hotel detail callout – compact */}
+                            {a.hotel && (
+                              <div className="mt-1 px-2.5 py-1.5 rounded-md bg-blue-600/10 border border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-400/20">
+                                {a.hotel.isCheckInDay && (
+                                  <div className="text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-0.5">Indtjekning i dag</div>
+                                )}
+                                {a.hotel.isCheckOutDay && !a.hotel.isCheckInDay && (
+                                  <div className="text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-0.5">Udtjekning i dag</div>
+                                )}
+                                <div className="flex items-center gap-1">
+                                  <Hotel className="w-3 h-3 text-blue-700 dark:text-blue-300 shrink-0" />
+                                  <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">{a.hotel.name || "Hotel"}</span>
+                                </div>
+                                {(a.hotel.address || a.hotel.city) && (
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([a.hotel.address, a.hotel.city].filter(Boolean).join(", "))}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 mt-0.5"
+                                  >
+                                    <MapPin className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
+                                    <span className="text-[11px] text-blue-600 dark:text-blue-400 underline">{[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}</span>
+                                  </a>
+                                )}
+                                <div className="text-[11px] text-foreground ml-4 mt-0.5 flex flex-wrap gap-x-2">
+                                  <span>Ind: {format(parseISO(a.hotel.checkIn), "EEE d/M", { locale: da })}{a.hotel.checkInTime ? ` kl. ${a.hotel.checkInTime.slice(0, 5)}` : ""}</span>
+                                  <span>Ud: {format(parseISO(a.hotel.checkOut), "EEE d/M", { locale: da })}{a.hotel.checkOutTime ? ` kl. ${a.hotel.checkOutTime.slice(0, 5)}` : ""}</span>
+                                  {a.hotel.phone && <span>Tlf: {a.hotel.phone}</span>}
+                                </div>
+                                {a.hotel.notes && (
+                                  <p className="text-[11px] text-foreground/70 ml-4 mt-0.5 italic">{a.hotel.notes}</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Booking comment callout – compact */}
+                            {booking?.comment && (
+                              <div className="mt-1 px-2.5 py-1.5 rounded-md bg-accent/50 border border-border">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <MessageSquare className="w-3 h-3 text-primary" />
+                                  <span className="text-[11px] font-semibold text-primary">Note</span>
+                                </div>
+                                <p className="text-xs text-foreground">{booking.comment}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </CardContent>
                 </Card>
               );
