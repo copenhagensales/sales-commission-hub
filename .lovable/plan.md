@@ -1,50 +1,56 @@
 
 
-## Fix: Stagger Relatel cron-schedule for at undga Adversus API-kollision
+## Vis markeder i Bookinger-fanen
 
 ### Problem
-Lovablecph og Relatel har begge cron-jobs pa **identiske minutter**: `3,8,13,18,23,28,33,38,43,48,53,58`. De starter samtidigt og rammer Adversus API'et parallelt, hvilket udloser sporadiske 429-fejl pa Relatel (ca. hver 25. minut).
-
-Fail-fast guarden virker korrekt (aborterer pa ~5s), men de sporadiske fejl giver "Kritisk" status i dashboardet.
+Bookinger-fanen filtrerer aktivt markeder og messer fra (linje 91+111 i BookingsContent.tsx). Brugeren vil gerne se markeder begge steder for bedre overblik.
 
 ### Losning
-Flyt Relatel's cron-schedule 2 minutter frem, sa den altid korer EFTER Lovablecph er startet og har passeret sine foerste API-kald.
+Tilfoej en separat sektion i bunden af Bookinger-fanen der viser market-bookinger for den valgte uge. Markederne vises i et visuelt adskilt kort med et Tent-ikon, sa de er nemme at skelne fra almindelige bookinger.
 
-### Aendring
+### Aendringer i `BookingsContent.tsx`
 
-**Database migration** - opdater Relatel's cron job:
+1. **Ny query for market-bookinger** - Tilfoej en `useQuery` der henter bookinger med `location.type IN ('Markeder', 'Messer')` for den valgte uge (samme week/year filter som eksisterende).
 
-```sql
-SELECT cron.unschedule('dialer-657c2050-sync');
+2. **Ny sektion i UI** - Efter de eksisterende client-grupperede bookinger, tilfoej en "Markeder denne uge" sektion:
+   - Vises kun hvis der er market-bookinger i den valgte uge
+   - Bruger Tent-ikon og lilla/indigo farvetema for at adskille visuelt fra normale bookinger
+   - Viser lokation, dato-range, kunde, bemandingsstatus og tildelte medarbejdere
+   - Samme dagsgrid (Man-Son) som normale bookinger, sa det er konsistent
+   - Klikbar for at aabne EditBookingDialog
 
-SELECT cron.schedule(
-  'dialer-657c2050-sync',
-  '0,5,10,15,20,25,30,35,40,45,50,55 * * * *',
-  $$SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/integration-engine',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ..."}'::jsonb,
-    body := '{"days": 1, "source": "adversus", "actions": ["campaigns", "users", "sales", "sessions"], "integration_id": "657c2050-1faa-4233-a964-900fb9e7b8c6"}'::jsonb
-  ) AS request_id$$
-);
+3. **Ingen aendring i Markeder-fanen** - Markeder vises stadig i deres egen fane med den fulde maanedsvisning og kalender-widget.
+
+### Teknisk detalje
+
+```text
+// Ny query (ca. linje 137, efter eksisterende bookings query)
+const { data: marketBookings } = useQuery({
+  queryKey: ["vagt-market-bookings-week", selectedWeek, selectedYear],
+  queryFn: async () => {
+    // Hent bookinger med location.type IN MARKET_TYPES for valgt uge
+    // Samme employee-name enrichment som eksisterende query
+  },
+});
+
+// Ny UI-sektion (efter linje 698, efter normale bookinger)
+{marketBookings?.length > 0 && (
+  <Card className="border-indigo-200 bg-indigo-50/30">
+    <CardContent>
+      <div className="flex items-center gap-2 mb-4">
+        <Tent className="h-5 w-5 text-indigo-600" />
+        <h3 className="font-semibold">Markeder denne uge</h3>
+        <Badge>{marketBookings.length}</Badge>
+      </div>
+      {/* Samme dagsgrid-rendering som normale bookinger */}
+    </CardContent>
+  </Card>
+)}
 ```
 
-### Tidsplan efter fix
-
-| Minut | Lovablecph (sales) | Lovablecph (meta) | Relatel |
-|-------|-------------------|-------------------|---------|
-| :00 | | | Relatel sync |
-| :03 | Sales sync | | |
-| :05 | | Meta sync (halv-times) | Relatel sync |
-| :08 | Sales sync | | |
-| :10 | | | Relatel sync |
-
-Der er nu altid mindst 2 minutters mellemrum, sa Adversus API'et nar at nulstille burst-limiten.
-
-### Ingen kodeaendringer
-Kun en database cron-justering. Ingen aendringer i edge functions eller frontend.
-
-### Forventet resultat
-- Relatel stopper med at fa sporadiske 429-fejl
-- "Kritisk" status forsvinder fra dashboardet
-- Begge Adversus-integrationer korer stabilt med 5-minutters interval, bare forskudt
+### Resultat
+- Markeder vises i **begge** faner: Bookinger (ugeoverblik) og Markeder (maanedsoverblik)
+- Visuelt adskilt med ikon og farve sa man hurtigt kan se forskel
+- Klikbar for redigering via EditBookingDialog
+- Ingen pavirkning af eksisterende funktionalitet
 
