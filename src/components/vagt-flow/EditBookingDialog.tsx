@@ -652,6 +652,7 @@ export function EditBookingDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
       toast.success("Booking opdateret");
       onOpenChange(false);
