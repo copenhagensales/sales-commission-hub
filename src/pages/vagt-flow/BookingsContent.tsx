@@ -797,12 +797,12 @@ export default function BookingsContent() {
           onOpenChange={() => toggleWeekExpand(`${selectedYear}-${selectedWeek}-markets`)}
           defaultOpen
         >
-          <Card className="border-indigo-200 bg-indigo-50/30 dark:border-indigo-800 dark:bg-indigo-950/20">
+          <Card>
             <CollapsibleTrigger className="w-full">
               <CardContent className="py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                    <Tent className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Tent className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left">
                     <h3 className="font-semibold">Markeder denne uge</h3>
@@ -859,7 +859,7 @@ export default function BookingsContent() {
                           key={idx}
                           className={cn(
                             "p-2 rounded-lg text-center text-xs",
-                            isBooked ? "bg-indigo-100/60 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700" : "bg-muted/50"
+                            isBooked ? "bg-primary/10 border border-primary/20" : "bg-muted/50"
                           )}
                         >
                           <p className="font-medium">{day}</p>
@@ -869,7 +869,7 @@ export default function BookingsContent() {
                               {dayAssignments.map((assignment: any) => (
                                 <div
                                   key={assignment.id}
-                                  className="text-[10px] font-medium truncate text-indigo-700 dark:text-indigo-300"
+                                  className="text-[10px] font-medium truncate text-primary"
                                 >
                                   {assignment.employee_name?.split(' ')[0]}
                                 </div>
