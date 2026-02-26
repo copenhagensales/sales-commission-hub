@@ -273,16 +273,6 @@ export default function MyBookingSchedule() {
                                 </span>
                               </div>
 
-                              {/* Booking comment */}
-                              {booking?.comment && (
-                                <div className="flex items-start gap-2 ml-6">
-                                  <MessageSquare className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                                  <span className="text-sm italic text-muted-foreground">
-                                    {booking.comment}
-                                  </span>
-                                </div>
-                              )}
-
                               {/* Partners */}
                               {a.partners.length > 0 && (
                                 <div className="flex items-center gap-2 ml-6">
@@ -308,6 +298,17 @@ export default function MyBookingSchedule() {
                                   </Badge>
                                 )}
                               </div>
+
+                              {/* Booking comment callout */}
+                              {booking?.comment && (
+                                <div className="ml-6 mt-2 p-3 rounded-lg bg-accent/50 border border-border">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-xs font-semibold text-primary">Note</span>
+                                  </div>
+                                  <p className="text-sm text-foreground">{booking.comment}</p>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
