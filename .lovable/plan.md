@@ -1,21 +1,15 @@
 
 
-## Fix: Tilføj "Min vagtplan" til den rigtige sidebar
+## Fix: Ret kolonnenavn i MyBookingSchedule query
 
 ### Problem
-"Min vagtplan" (`menu_fm_my_schedule`) er korrekt oprettet i rettighedseditoren og databasen, men **mangler i den faktiske sidebar** (`AppSidebar.tsx`) og i permission-hooket (`usePositionPermissions.ts`). Derfor vises menupunktet aldrig, uanset om rettigheden er slået til.
+Queryen i `MyBookingSchedule.tsx` forsoeger at hente `city` fra `location`-tabellen, men kolonnen hedder `address_city`. Dette giver en 400-fejl fra databasen, og derfor vises ingen vagter.
 
-### Ændringer
+### Aendring
 
-**1. `src/hooks/usePositionPermissions.ts`** (linje ~576)
-- Tilføj `canViewFmMySchedule: canView("menu_fm_my_schedule")` under Fieldmarketing-sektionen
+**`src/pages/vagt-flow/MyBookingSchedule.tsx`**
+- Linje 53: Aendr `city` til `address_city` i select-strengen for location
+- Linje 148: Aendr `location?.city` til `location?.address_city` i rendering
 
-**2. `src/components/layout/AppSidebar.tsx`**
-- Tilføj `canViewFmMySchedule` til `showFieldmarketingMenu`-checken (linje ~440), så FM-sektionen vises hvis brugeren har denne rettighed
-- Tilføj en NavLink til `/vagt-flow/my-schedule` med "Min vagtplan" label og `UserCheck`-ikon, placeret øverst i Fieldmarketing-menuen (før "Oversigt")
+Det er en enkel to-linjers fix der loeser hele problemet.
 
-**3. Database fix**
-- Opdater `fm_medarbejder_` rollen så `can_view = true` for `menu_fm_my_schedule` (den står pt. som `false` i databasen)
-
-### Resultat
-FM-medarbejdere vil kunne se "Min vagtplan" i sidebaren under Fieldmarketing og navigere til deres personlige vagtplan.
