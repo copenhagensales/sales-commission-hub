@@ -656,6 +656,63 @@ export type Database = {
           },
         ]
       }
+      booking_hotel: {
+        Row: {
+          booking_id: string
+          check_in: string
+          check_out: string
+          confirmation_number: string | null
+          created_at: string
+          hotel_id: string
+          id: string
+          notes: string | null
+          price_per_night: number | null
+          rooms: number
+          status: string
+        }
+        Insert: {
+          booking_id: string
+          check_in: string
+          check_out: string
+          confirmation_number?: string | null
+          created_at?: string
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          price_per_night?: number | null
+          rooms?: number
+          status?: string
+        }
+        Update: {
+          booking_id?: string
+          check_in?: string
+          check_out?: string
+          confirmation_number?: string | null
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          price_per_night?: number | null
+          rooms?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_hotel_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_hotel_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_vehicle: {
         Row: {
           booking_id: string
@@ -5584,6 +5641,42 @@ export type Database = {
           start_date?: string
           team_name?: string
           tenure_days?: number | null
+        }
+        Relationships: []
+      }
+      hotel: {
+        Row: {
+          address: string | null
+          city: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          times_used: number
+        }
+        Insert: {
+          address?: string | null
+          city: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          times_used?: number
+        }
+        Update: {
+          address?: string | null
+          city?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          times_used?: number
         }
         Relationships: []
       }

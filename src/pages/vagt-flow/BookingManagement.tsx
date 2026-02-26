@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -12,6 +12,7 @@ const LocationsContent = lazy(() => import("./LocationsContent"));
 const BookingsContent = lazy(() => import("./BookingsContent"));
 const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
+const HotelsContent = lazy(() => import("./HotelsContent"));
 
 // Tab configuration with permission keys
 const allTabs = [
@@ -20,6 +21,7 @@ const allTabs = [
   { value: "markets", label: "Markeder", icon: Tent, permissionKey: "tab_fm_markets" },
   { value: "locations", label: "Lokationer", labelKey: "sidebar.locations", icon: MapPin, permissionKey: "tab_fm_locations" },
   { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
+  { value: "hotels", label: "Hoteller", icon: Hotel, permissionKey: "tab_fm_hotels" },
 ];
 
 export default function BookingManagement() {
@@ -140,6 +142,14 @@ export default function BookingManagement() {
             <TabsContent value="vagtplan-fm" className="mt-6">
               <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
                 <VagtplanFMContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
+          {visibleTabs.some(t => t.value === "hotels") && (
+            <TabsContent value="hotels" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <HotelsContent />
               </Suspense>
             </TabsContent>
           )}
