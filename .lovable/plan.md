@@ -1,39 +1,90 @@
 
-## Mobiloptimering af "Min vagtplan"
 
-Forbedringer fokuseret pa at gore mobilvisningen renere, mere luftig og lettere at laese.
+# Fix-plan: Fuldfor stabilitets-implementering
 
-### Visuelle aendringer
+## Problemoversigt
 
-**1. Header -- kompakt og centreret pa mobil**
-- Titel og ugenummer stables vertikalt med navigation-knapper centreret nedenunder
-- Mindre titel pa mobil (text-xl i stedet for text-2xl)
+Der er 3 problemer der skal fixes for at stabilitetsplanen er fuldt implementeret:
 
-**2. Dage uden vagt -- skjules/minimeres**
-- Dage uden vagt vises som en enkel linje (ikke et helt kort) for at spare plads
-- Kun "MAN 23/2 -- Ingen vagt" pa en tynd, dempet raekke
+### Problem 1: Circuit breaker bug
+`sync-integration.ts` har en reference-fejl (`pausedMinutes is not defined`) i error-håndteringen. Variablen fra `recordCircuitBreakerFailure` destruktureres korrekt som `{ newCount, pausedMinutes }` men tilgås senere som `cb.pausedMinutes` i stedet for den lokale variabel.
 
-**3. Dagskort med vagt -- renere layout**
-- Fjern `ml-6` indrykning pa alle underlinjer -- brug i stedet en venstre border-accent til at gruppere visuelt
-- Lokationsnavn som primaer overskrift (storre, bold)
-- Adresse-link direkte under navn, mindre og diskret
-- Tid, makker, klient/kampagne som kompakte linjer med ikoner
-- Badges (bil, diaet, hotel) samles i en raekke med mindre padding
+### Problem 2: Enreach-kollisioner (manglende staggering)
+Tryg (`d79b9632`) og Eesy (`a5068f85`) korer sales-sync pa same minut-offsets, hvilket skaber samtidige API-kald mod Enreach/HeroBase. Tryg's sales korer `:0,:5,:10...` og Eesy's sales korer `:2,:7,:12...` -- men Tryg burde IKKE kore pa `:0` da Relatel allerede gor det.
 
-**4. "Naeste vagt"-kort**
-- Gores mere kompakt med tighter padding pa mobil
+### Problem 3: Alle Enreach-integrationer er 100% rate-limited
+Tryg, Eesy og ASE viser `rate_limit_hits = api_calls_made` pa ALLE runs den seneste time. Ingen data processeres (0 records). Dette indikerer at HeroBase har en strammere rate-limit end forventet, og at integrationerne skal bruge provider-level serialisering.
 
-**5. Tomme dage kollapses**
-- Dage i fortiden uden vagter skjules helt i stedet for at vise dem faded
+---
 
-### Teknisk implementering
+## Implementeringsplan
 
-Alt aendres i en enkelt fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`
+### Trin 1: Fix circuit breaker bug
+**Fil:** `supabase/functions/integration-engine/actions/sync-integration.ts`
 
-- Erstatte individuelle `Card` for tomme dage med en simpel `div`-raekke
-- Tilfoeje `p-3` i stedet for `p-4` pa mobil via responsive classes
-- Bruge `border-l-2 border-primary pl-3` pa vagtdetaljer i stedet for `ml-6`
-- Skjule tomme fortidsdage helt (`isPast && assignments.length === 0` = return null)
-- Reducere spacing mellem elementer (`space-y-1` i stedet for `space-y-1.5`)
-- Goere badges mindre med `text-[11px]` og `py-0 px-1.5`
-- Hotel/comment callouts: reducere padding og font-sizes lidt
+Find alle steder hvor `cb.pausedMinutes` refereres og ret til den korrekte lokale variabel fra `recordCircuitBreakerFailure`-kaldet. Der er mindst 2 steder:
+- I success-flowet (linje ~370): `if (cb.pausedMinutes)` skal bruge den returnerede variabel
+- I error-flowet (linje ~420): Samme fix
+
+### Trin 2: Ret cron-kollisioner for Enreach
+Opdater cron-schedules sa ingen Enreach-integrationer korer samtidigt:
+
+| Integration | Sales (nu) | Sales (nyt) | Meta (uaendret) |
+|---|---|---|---|
+| Tryg (d79b9632) | `:0,:5,:10...` | `:0,:5,:10...` | `:1,:31` |
+| Eesy (a5068f85) | `:2,:7,:12...` | `:2,:7,:12...` | `:3,:33` |
+| ASE (a76cf63a) | `:4,:9,:14...` | `:4,:9,:14...` | `:5,:35` |
+
+Staggeringen ser faktisk OK ud (2 min mellem hver). Det reelle problem er at de IKKE bruger provider-locking.
+
+### Trin 3: Skift Enreach-jobs til provider-sync
+I stedet for at hver integration kalder `integration-engine` direkte, skal Enreach-integrationernes cron-jobs bruge `action: "provider-sync"` med `source: "enreach"`. Dette aktiverer:
+- Database-las via `provider_sync_locks`
+- Sekventiel eksekvering (kun en ad gangen)
+- Budget-gating (stop ved 80% kapacitet)
+
+Konkret: Fjern de 6 individuelle Enreach cron-jobs (Tryg/Eesy/ASE sales+meta) og erstat med 2 provider-level jobs:
+- `provider-enreach-sync-sales`: Hvert 5. minut, `{"source":"enreach","action":"provider-sync","actions":["sales"]}`
+- `provider-enreach-sync-meta`: Hvert 30. minut, `{"source":"enreach","action":"provider-sync","actions":["campaigns","users","sessions"]}`
+
+### Trin 4: Deploy og verificer
+- Deploy `integration-engine` edge function
+- Vent 10-15 minutter
+- Verificer at `integration_sync_runs` viser lavere `rate_limit_hits`
+
+---
+
+## Tekniske detaljer
+
+### Circuit breaker fix (sync-integration.ts)
+```text
+// FOER (buggy):
+const cb = await recordCircuitBreakerFailure(supabase, integration.id, ...);
+if (cb.pausedMinutes) {  // <-- "pausedMinutes is not defined"
+
+// EFTER (fix):
+const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, ...);
+if (cbResult.pausedMinutes) {
+```
+
+### Provider-sync cron SQL
+```text
+-- Fjern 6 individuelle Enreach-jobs
+SELECT cron.unschedule(111);  -- Tryg sales
+SELECT cron.unschedule(112);  -- Tryg meta
+SELECT cron.unschedule(113);  -- Eesy sales
+SELECT cron.unschedule(114);  -- Eesy meta
+SELECT cron.unschedule(115);  -- ASE sales
+SELECT cron.unschedule(116);  -- ASE meta
+
+-- Opret 2 provider-level jobs
+SELECT cron.schedule('provider-enreach-sync-sales', '*/5 * * * *', ...);
+SELECT cron.schedule('provider-enreach-sync-meta', '5,35 * * * *', ...);
+```
+
+### Forventet resultat
+- Circuit breaker logger korrekt uden fejl
+- Enreach-integrationer korer sekventielt (aldrig samtidigt)
+- Rate-limit hits falder dramatisk
+- Data begynder at blive processeret igen for Tryg/Eesy/ASE
+
