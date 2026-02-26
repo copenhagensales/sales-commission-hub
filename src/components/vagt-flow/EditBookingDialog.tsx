@@ -867,6 +867,7 @@ export function EditBookingDialog({
     onAddEmployeeAssignments(assignments);
     setSelectedEmployees([null]);
     setSelectedEmployeeDays(new Set());
+    onOpenChange(false);
   };
 
   // Vehicle tab handlers
