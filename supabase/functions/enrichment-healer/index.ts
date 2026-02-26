@@ -203,7 +203,7 @@ async function healEnreach(
     try {
       const url = `${apiUrl}/simpleleads?UniqueId=${externalId}`;
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${apiKey}`, "X-Rate-Limit-Fair-Use-Policy": "Minute rated" },
       });
 
       if (!response.ok) {

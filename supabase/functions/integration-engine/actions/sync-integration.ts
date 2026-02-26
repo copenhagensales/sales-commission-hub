@@ -392,6 +392,9 @@ export async function syncIntegration(
       rate_limit_hits: adapterMetrics.rateLimitHits,
       run_id: runId,
       error_message: metaSyncRateLimited ? "rate_limited_meta_abort: heavy actions skipped" : null,
+      rate_limit_daily_limit: adapterMetrics.rateLimitDailyLimit ?? null,
+      rate_limit_remaining: adapterMetrics.rateLimitRemaining ?? null,
+      rate_limit_reset: adapterMetrics.rateLimitReset ?? null,
     });
 
     await supabase.from("integration_logs").insert({
@@ -450,6 +453,9 @@ export async function syncIntegration(
       rate_limit_hits: errorMetrics.rateLimitHits,
       error_message: errMsg,
       run_id: runId,
+      rate_limit_daily_limit: errorMetrics.rateLimitDailyLimit ?? null,
+      rate_limit_remaining: errorMetrics.rateLimitRemaining ?? null,
+      rate_limit_reset: errorMetrics.rateLimitReset ?? null,
     });
 
     await supabase.from("integration_logs").insert({

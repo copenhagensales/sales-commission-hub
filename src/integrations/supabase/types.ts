@@ -5945,7 +5945,10 @@ export type Database = {
           error_message: string | null
           id: string
           integration_id: string | null
+          rate_limit_daily_limit: number | null
           rate_limit_hits: number | null
+          rate_limit_remaining: number | null
+          rate_limit_reset: number | null
           records_processed: number | null
           retries: number | null
           run_id: string | null
@@ -5961,7 +5964,10 @@ export type Database = {
           error_message?: string | null
           id?: string
           integration_id?: string | null
+          rate_limit_daily_limit?: number | null
           rate_limit_hits?: number | null
+          rate_limit_remaining?: number | null
+          rate_limit_reset?: number | null
           records_processed?: number | null
           retries?: number | null
           run_id?: string | null
@@ -5977,7 +5983,10 @@ export type Database = {
           error_message?: string | null
           id?: string
           integration_id?: string | null
+          rate_limit_daily_limit?: number | null
           rate_limit_hits?: number | null
+          rate_limit_remaining?: number | null
+          rate_limit_reset?: number | null
           records_processed?: number | null
           retries?: number | null
           run_id?: string | null
