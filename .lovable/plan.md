@@ -1,36 +1,28 @@
 
 
-## Vis hotel-detaljer på alle dage + tilføj ind/ud-tidspunkter
+## Gør hoteladresse tydeligere + tilføj Google Maps-link
 
-### Problem
-1. Hotel-adressen og check-in/out datoer vises kun pa den forste vagtdag -- pa de ovrige dage ser medarbejderen kun et badge uden info.
-2. Databasen gemmer kun datoer (ikke klokkeslaet) for check-in og check-out.
+### Hvad ændres
+Adressen vises i dag inline med hotelnavnet, men er svær at se. Vi giver den sin egen linje og gør den klikbar med et Google Maps-link.
 
-### Losning
+### Ændring i `src/pages/vagt-flow/MyBookingSchedule.tsx`
 
-**1. Database: Tilføj tidsfelter (migration)**
+**Linje 384-392 (hotel callout)** opdateres:
 
-Tilføj to nye kolonner til `booking_hotel`:
-- `check_in_time` (time, nullable) -- f.eks. "15:00"
-- `check_out_time` (time, nullable) -- f.eks. "10:00"
+1. Hotelnavn forbliver på første linje med Hotel-ikonet
+2. Adresse flyttes til en **ny linje** under navnet med et `MapPin`-ikon
+3. Adressen wraps i et `<a>`-tag der linker til Google Maps:
+   - URL: `https://www.google.com/maps/search/?api=1&query={encodedAddress}`
+   - `target="_blank"` og `rel="noopener noreferrer"`
+   - Understreget tekst i blå så det tydeligt er klikbart
 
-```sql
-ALTER TABLE booking_hotel
-  ADD COLUMN check_in_time time,
-  ADD COLUMN check_out_time time;
+### Resultat
+
+```
+[Hotel-ikon] Hotel Scandic Aarhus
+[MapPin-ikon] Banegårdspladsen 14, Aarhus  (klikbart link)
+Ind: tor 27/2 kl. 15:00    Ud: fre 28/2 kl. 10:00
 ```
 
-**2. Fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`**
-
-- Udvid query til ogsa at hente `check_in_time` og `check_out_time`
-- Vis hotel-callout pa **alle dage** i hotelperioden (ikke kun check-in dag)
-- Callout'et viser altid: hotelnavn, adresse/by, check-in dato+tid, check-out dato+tid, telefon og noter
-- Pa check-in og check-out dage tilfojes en ekstra label ("Indtjekning i dag" / "Udtjekning i dag")
-
-**3. Fil: Admin-side (BookingsContent.tsx) -- valgfrit**
-
-- Tilfoej felter for `check_in_time` og `check_out_time` i hotel-tildelingsformularen sa planlaeggere kan indtaste tiderne
-
 ### Omfang
-- 1 database-migration (2 kolonner)
-- 1-2 filer aendres (MyBookingSchedule.tsx + evt. BookingsContent.tsx)
+Kun UI-ændring i en enkelt fil, ingen database-ændringer.
