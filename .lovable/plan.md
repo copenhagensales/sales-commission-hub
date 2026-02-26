@@ -1,44 +1,24 @@
 
 
-## Bemærkning og mødetid på bookinger
+## Fix: Kampagne nulstilles ved åbning af Rediger-dialog
 
-### Oversigt
-To nye features til booking-systemet:
-1. **Bemærkning til booking** - En fritekst-besked (fx "I skal stå ved elevatoren") som sælgerne kan se på deres vagtplan
-2. **Manuel mødetid** - Mulighed for at rette start- og sluttid per dag direkte i booking-dialogen
+### Problem
+Når du åbner Rediger-dialogen, sættes både kunde og kampagne med det samme (fra bookingdata). Men kampagne-listen hentes asynkront baseret på den valgte kunde. I det korte øjeblik hvor listen endnu ikke er hentet, har Select-komponenten en værdi (`campaignId`) men ingen matchende valgmuligheder - så den viser "Vælg kampagne" i stedet for den korrekte kampagne.
 
-### Eksisterende infrastruktur (ingen skemaændringer nødvendige)
-- `booking`-tabellen har allerede en `comment`-kolonne (text, nullable)
-- `booking_assignment`-tabellen har allerede `start_time`, `end_time` og `note`-kolonner
-- Tiderne er pt. hardkodet til 09:00-17:00 ved oprettelse
+Det betyder at du skal vælge kampagnen igen, selvom den allerede var sat.
 
-### Ændringer
+### Løsning
+Tilføj kampagnens aktuelle ID og navn som et fallback-element i Select-listen, så den altid kan vise den korrekte værdi - også mens kampagne-listen loader.
 
-**1. EditBookingDialog.tsx - Booking-fanen: Tilføj bemærkningsfelt**
-- Tilføj state `comment` initialiseret fra `booking.comment`
-- Tilføj et `<Textarea>` felt med label "Bemærkning til sælger" under dagspris-sektionen
-- Placeholder: "Fx 'Stå ved elevatoren' eller 'Parkering bag bygningen'"
-- Inkluder `comment` i `handleSaveBooking` / `updateBookingMutation`
+### Ændring
 
-**2. EditBookingDialog.tsx - Medarbejder-fanen: Tilføj mødetid**
-- Tilføj state for `meetingStartTime` og `meetingEndTime` (default 09:00 / 17:00)
-- Vis to `TimeSelect` felter ("Mødetid" og "Sluttid") i "Tilføj medarbejdere"-sektionen
-- Tiderne bruges ved oprettelse af assignments i stedet for de hardkodede 09:00-17:00
-- Vis nuværende tider på eksisterende assignments
+**`src/components/vagt-flow/EditBookingDialog.tsx`**
 
-**3. EditBookingDialog.tsx - Eksisterende assignments: Vis/ret tider**
-- I sektionen "Tilknyttede medarbejdere" tilføj mulighed for at se og redigere start/sluttid per medarbejder
-- Tilføj en inline redigeringsmulighed eller en lille edit-knap
+I kampagne-Select (linje ~1004-1010): Tilføj et fallback `<SelectItem>` når `campaignId` er sat men ikke findes i den loadede `campaigns`-liste. Bookingen indeholder allerede kampagnenavnet (via join), så vi kan vise det korrekt.
 
-**4. MarketsContent.tsx og BookingsContent.tsx - Brug dynamiske tider**
-- Opdater `bulkAssignMutation` i begge filer til at acceptere og videresende `start_time`/`end_time` fra EditBookingDialog i stedet for hardkodede værdier
+Konkret:
+- Tjek om `campaignId` allerede findes i `campaigns`-listen
+- Hvis ikke (fx fordi listen stadig loader), vis et midlertidigt SelectItem med booking-kampagnens navn
+- Når listen loader færdig, overtager de rigtige items automatisk
 
-**5. MyBookingSchedule.tsx - Vis bemærkning**
-- Tilføj `comment` til booking-queryen (allerede henter `booking:booking_id`)
-- Vis bemærkningen med et info-ikon under lokation/tid, kun hvis den ikke er tom
-- Vis bemærkningen med let styling så den skiller sig ud (fx italic eller en lille info-boks)
-
-### Resultat
-- Bookingansvarlige kan skrive en bemærkning der automatisk vises for alle sælgere tildelt den booking
-- Mødetiden kan tilpasses per booking i stedet for altid at være 09:00-17:00
-- Sælgere ser både bemærkning og korrekt mødetid på deres vagtplan
+Det er en ~5-linjers ændring der fjerner behovet for at genvælge kampagnen.
