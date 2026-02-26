@@ -5686,6 +5686,41 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_circuit_breaker: {
+        Row: {
+          consecutive_failures: number
+          integration_id: string
+          last_error: string | null
+          last_failure_at: string | null
+          paused_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          integration_id: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          paused_until?: string | null
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          integration_id?: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          paused_until?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_circuit_breaker_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_debug_log: {
         Row: {
           created_at: string
