@@ -1267,10 +1267,13 @@ export function EditBookingDialog({
               </div>
               
               {selectedEmployees.map((emp, index) => {
-                const hasAbsence = emp && absencesByEmployeeAndDay.has(emp);
-                const hasBooking = emp && bookingsByEmployeeAndDay.has(emp);
-                const absenceTypes = emp && hasAbsence 
-                  ? [...new Set(Array.from(absencesByEmployeeAndDay.get(emp)!.values()))]
+                const bookedDays = (booking?.booked_days || []) as number[];
+                const empAbsenceMap = emp ? absencesByEmployeeAndDay.get(emp) : undefined;
+                const hasAbsence = emp && empAbsenceMap && bookedDays.some(d => empAbsenceMap.has(d));
+                const empBookingMap = emp ? bookingsByEmployeeAndDay.get(emp) : undefined;
+                const hasBooking = emp && empBookingMap && bookedDays.some(d => empBookingMap.has(d));
+                const absenceTypes = hasAbsence
+                  ? [...new Set(bookedDays.filter(d => empAbsenceMap!.has(d)).map(d => empAbsenceMap!.get(d)!))]
                   : [];
                 return (
                   <div key={index} className="flex items-center gap-2">
