@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, MapPin, Calendar } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin, Users, Target } from "lucide-react";
 import { startOfWeek, addDays, format, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -225,22 +225,10 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     return `${minRemaining} ledige lok. ${minDays.join(" & ")}, ${maxRemaining} øvrige dage`;
   };
 
-  const getFillColor = (booked: number, capacity: number) => {
-    if (capacity === 0) return "bg-muted";
-    const ratio = booked / capacity;
-    if (ratio > 1) return "bg-destructive";
-    if (ratio > 0.8) return "bg-destructive/80";
-    if (ratio >= 0.5) return "bg-yellow-500";
-    return "bg-green-500";
-  };
-
-  const getTextColor = (booked: number, capacity: number) => {
-    if (capacity === 0) return "text-muted-foreground";
-    const ratio = booked / capacity;
-    if (ratio > 1) return "text-destructive font-bold";
-    if (ratio > 0.8) return "text-destructive";
-    if (ratio >= 0.5) return "text-yellow-600 dark:text-yellow-400";
-    return "text-green-600 dark:text-green-400";
+  const getManglerColor = (remaining: number) => {
+    if (remaining < 0) return "text-destructive font-bold";
+    if (remaining === 0) return "text-muted-foreground";
+    return "text-green-600 dark:text-green-400 font-bold";
   };
 
   if (absencesLoading) return null;
@@ -271,56 +259,74 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
 
         {isExpanded && (
           <div className="mt-4 space-y-6">
-            {/* Day headers */}
-            <div className="flex justify-end gap-1 mb-2 pr-3">
-              {DAY_LABELS.map((label, idx) => (
-                <div key={idx} className="w-7 text-center text-xs font-medium text-muted-foreground">
-                  {label}
-                </div>
-              ))}
-            </div>
-
             {capacityByClient.map(({ client, totalEmployees, dayData }) => (
               <div key={client.id} className="space-y-1">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  {client.name} ({totalEmployees} medarbejdere)
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {client.name}
                 </div>
-                
-                {/* Compact booket/kapacitet row */}
-                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
-                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <MapPin className="h-3 w-3" /> Booket / Kap.
-                  </span>
-                  <div className="flex gap-1">
-                    {dayData.map((day, idx) => (
+                <div className="text-[10px] text-muted-foreground mb-2">1 lokation = 2 medarbejdere</div>
+
+                {/* Day headers */}
+                <div className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1 items-center">
+                  <div className="w-32" />
+                  {DAY_LABELS.map((label, idx) => (
+                    <div key={idx} className="text-center text-xs font-medium text-muted-foreground">
+                      {label}
+                    </div>
+                  ))}
+
+                  {/* Row 1: På vagt */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                    <Users className="h-3 w-3 shrink-0" /> På vagt
+                  </div>
+                  {dayData.map((day, idx) => {
+                    const available = totalEmployees - day.absent;
+                    return (
                       <Tooltip key={idx}>
                         <TooltipTrigger asChild>
-                          <div className="w-10 flex flex-col items-center gap-0.5">
-                            <span className={`text-xs font-bold ${getTextColor(day.booked, day.capacity)}`}>
-                              {day.booked}/{day.capacity}
-                            </span>
-                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${getFillColor(day.booked, day.capacity)}`}
-                                style={{ width: `${day.capacity > 0 ? Math.min((day.booked / day.capacity) * 100, 100) : 0}%` }}
-                              />
-                            </div>
-                          </div>
+                          <div className="text-center text-xs font-medium">{available}</div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
-                          <p className="text-xs">{day.capacity} kap. – {day.booked} booket = {day.capacity - day.booked} ledige</p>
-                          <p className="text-xs text-muted-foreground">{day.absent} fraværende</p>
+                          <p className="text-xs">{totalEmployees} total − {day.absent} fraværende = {available} på vagt</p>
                         </TooltipContent>
                       </Tooltip>
-                    ))}
-                  </div>
-                </div>
+                    );
+                  })}
 
-                {/* Info text */}
-                <div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground">
-                  <span>💡</span>
-                  {getInfoText(dayData)}
+                  {/* Row 2: Booket lok. */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                    <MapPin className="h-3 w-3 shrink-0" /> Booket lok.
+                  </div>
+                  {dayData.map((day, idx) => (
+                    <Tooltip key={idx}>
+                      <TooltipTrigger asChild>
+                        <div className="text-center text-xs font-medium">{day.booked}</div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                        <p className="text-xs">{day.booked} lokationer booket</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+
+                  {/* Row 3: Mangler at booke */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                    <Target className="h-3 w-3 shrink-0" /> Mangler
+                  </div>
+                  {dayData.map((day, idx) => (
+                    <Tooltip key={idx}>
+                      <TooltipTrigger asChild>
+                        <div className={`text-center text-xs ${getManglerColor(day.remaining)}`}>
+                          {day.remaining}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                        <p className="text-xs">{day.capacity} kapacitet − {day.booked} booket = {day.remaining} mangler</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
                 </div>
               </div>
             ))}
