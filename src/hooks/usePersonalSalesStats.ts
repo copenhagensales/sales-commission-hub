@@ -39,9 +39,21 @@ export function usePersonalSalesStats(
         .select("agent_id, agents(email)")
         .eq("employee_id", employeeId);
 
-      return mappings
+      const emails = mappings
         ?.map(m => (m.agents as any)?.email)
         .filter(Boolean) as string[] || [];
+
+      if (emails.length > 0) return emails;
+
+      // Fallback: use work_email from employee_master_data
+      const { data: emp } = await supabase
+        .from("employee_master_data" as any)
+        .select("work_email")
+        .eq("id", employeeId)
+        .maybeSingle();
+
+      const workEmail = (emp as any)?.work_email;
+      return workEmail ? [workEmail] : [];
     },
     enabled: !!employeeId,
   });
