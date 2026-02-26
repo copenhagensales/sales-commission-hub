@@ -69,16 +69,16 @@ export async function recordCircuitBreakerFailure(
   const newCount = (current?.consecutive_failures || 0) + 1;
 
   // Determine pause duration
-  let pauseMinutes: number | null = null;
+  let pausedMinutes: number | null = null;
   for (const level of PAUSE_SCHEDULE) {
     if (newCount >= level.threshold) {
-      pauseMinutes = level.pauseMinutes;
+      pausedMinutes = level.pauseMinutes;
       break;
     }
   }
 
-  const pausedUntil = pauseMinutes
-    ? new Date(Date.now() + pauseMinutes * 60 * 1000).toISOString()
+  const pausedUntil = pausedMinutes
+    ? new Date(Date.now() + pausedMinutes * 60 * 1000).toISOString()
     : null;
 
   await supabase
