@@ -1,31 +1,31 @@
 
 
-## Fix: Bemærkninger og kampagne forsvinder ved genåbning
+## Vis lokationsadresse med Google Maps-link i vagtplanen
 
-### Problem
-1. **Bemærkninger forsvinder**: Når bookingen gemmes fra "Rediger booking"-dialogen, invalideres kun `vagt-bookings-list` og `vagt-billing-bookings` query-cache -- men IKKE `vagt-market-bookings`. Sa nar dialogen abnes igen fra Markeder-visningen, bruges gamle (stale) data uden den opdaterede bemærkning.
-2. **Kampagne skal vælges igen**: Samme problem -- `campaign_id` er gemt korrekt i databasen, men den lokale booking-data er stale, sa `campaign_id` er `null` i den gamle cache.
+### Hvad ændres
+Når du ser din vagtplan, vises lokationen kun med navn og by (f.eks. "Kvickly Næstved, Næstved"). Vi tilføjer gadenavn under lokationsnavnet som et klikbart Google Maps-link.
 
-### Losning
+### Ændring i `src/pages/vagt-flow/MyBookingSchedule.tsx`
 
-**Fil: `src/components/vagt-flow/EditBookingDialog.tsx`**
-
-Tilføj `vagt-market-bookings` til invalidation i `updateBookingMutation.onSuccess` (linje 653-657):
-
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
-  queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] }); // TILFOJET
-  queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
-  toast.success("Booking opdateret");
-  onOpenChange(false);
-},
+**1. Udvid data-query (linje 54)**
+Tilføj `address_street` til location-select:
+```
+location:location_id ( id, name, address_city, address_street )
 ```
 
-Dette sikrer at booking-data genindlæses fra databasen med de opdaterede felter (comment, campaign_id osv.), uanset om dialogen åbnes fra Bookings- eller Markeder-visningen.
+**2. Tilføj adresselinje under lokationsnavnet (linje 319-325)**
+Under den eksisterende lokationslinje tilføjes en ny linje med `MapPin`-ikon og klikbar adresse:
+
+```
+Kvickly Næstved, Næstved
+  [MapPin] Ringstedgade 43, Næstved  ← klikbart Google Maps-link
+```
+
+- Adressen sammensættes af `address_street` og `address_city`
+- Vises kun hvis mindst ét adressefelt er udfyldt
+- Linket åbner Google Maps i ny fane
 
 ### Omfang
-- 1 linje tilfojet i 1 fil
-- Ingen database-aendringer
-- Loser begge problemer (bemærkning + kampagne) da begge skyldes stale cache
+- 1 fil ændres, kun UI -- ingen database-ændringer
+- Adressedata findes allerede i `location`-tabellen, vi henter bare feltet med
 
