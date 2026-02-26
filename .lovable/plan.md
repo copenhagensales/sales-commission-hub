@@ -1,41 +1,52 @@
 
 
-## Tilfoej diaet-tag i booking-oversigten
+## Fix: Biler og diaeter vises ikke pa markeder
 
 ### Problem
-Naar der er tildelt diaeter pa en booking, kan man kun se det inde i EditBookingDialog. Der mangler et visuelt tag i selve booking-griddet (ligesom bil-tagget med gult tema).
+Vehicle-queryen i `BookingsContent.tsx` (linje 262) henter kun `booking_vehicle` data for normale bookinger (`bookings`), men inkluderer IKKE market-bookinger (`marketBookings`). Derfor vises bil-tags aldrig i "Markeder denne uge" sektionen.
 
-### Losning
-Tilfoej et orange-farvet tag med et Utensils-ikon (bestik) i dag-cellerne, der viser "Diaet" naar der findes diaet-poster for den paagaeldende booking og dato. Moenstreret foelger praecis det eksisterende vehicle-tag moenster.
+Diaet-queryen er korrekt implementeret (linje 275-281) - den bruger `allBookingIds` som kombinerer begge. Vehicle-queryen skal opdateres til at goere det samme.
 
-### Aendringer i `src/pages/vagt-flow/BookingsContent.tsx`
+### Aendring i `src/pages/vagt-flow/BookingsContent.tsx`
 
-1. **Ny query for booking_diet data** (efter vehicle-queryen, ca. linje 272):
-   - Hent `booking_diet` raekkerne for alle synlige booking-id'er
-   - Select: `id, booking_id, date` (vi behoever ikke amount/employee for tagget)
+**1. Opdater vehicle-queryen til at bruge `allBookingIds` i stedet for kun `bookings`:**
 
-2. **Ny lookup-map** (efter vehiclesByBookingDate):
-   - `dietByBookingDate`: `Map<string, boolean>` med key `bookingId_date`
-   - Returnerer `true` hvis der findes mindst en diaet-post for den kombination
+Linje 258-272 aendres:
+- Flyt `allBookingIds` memo OVER vehicle-queryen (flyttes fra linje 275 til foer linje 258)
+- Aendr vehicle-queryen til at bruge `allBookingIds` i stedet for `bookings?.map(b => b.id)`
+- Opdater `enabled`-betingelsen til `allBookingIds.length > 0`
+- Opdater queryKey til at inkludere `allBookingIds` for korrekt cache-invalidering
 
-3. **Render tag i dag-cellen** (efter vehicle-tagget, ca. linje 731):
-   - Samme moenster som bil-tagget
-   - Orange tema: `bg-orange-100 text-orange-800 border-orange-300`
-   - Utensils-ikon (bestik) fra lucide-react + teksten "Diaet"
+### Specifik kode-aendring
 
-4. **Render tag i market-sektionen** (i markedernes dagsgrid, ca. linje 817):
-   - Samme orange diaet-tag i market-bookingernes dag-celler
-   - Bruger den samme `dietByBookingDate` map (market-bookinger er inkluderet i queryen via `marketBookings`)
-
-### Imports
-- Tilfoej `Utensils` til den eksisterende lucide-react import
-
-### Eksempel paa tagget
 ```text
-[Utensils-ikon] Diaet
-```
-Farve: orange (bg-orange-100, text-orange-800, border-orange-300) - matcher den eksisterende diaet-farve brugt i EditBookingDialog.
+// FOER (linje 258-272):
+const { data: bookingVehicles = [] } = useQuery({
+  queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear],
+  queryFn: async () => {
+    const bookingIds = bookings?.map((b: any) => b.id) || [];
+    if (bookingIds.length === 0) return [];
+    // ...
+    .in("booking_id", bookingIds);
+  },
+  enabled: !!bookings && bookings.length > 0,
+});
 
-### Ingen database-aendringer
-`booking_diet`-tabellen eksisterer allerede og indeholder de noedvendige data.
+// EFTER:
+// allBookingIds memo flyttes op FOER denne query
+const { data: bookingVehicles = [] } = useQuery({
+  queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear, allBookingIds],
+  queryFn: async () => {
+    if (allBookingIds.length === 0) return [];
+    // ...
+    .in("booking_id", allBookingIds);
+  },
+  enabled: allBookingIds.length > 0,
+});
+```
+
+### Resultat
+- Bil-tags vises nu korrekt i BAADE normale bookinger OG markeder-sektionen
+- Diaet-tags virker allerede korrekt (ingen aendring noedvendig)
+- Ingen database-aendringer - kun en kode-fix i een fil
 
