@@ -1,37 +1,21 @@
 
 
-## Fix: Vis 0 kapacitet i weekenden som standard
+## Fix: "På vagt" viser stadig folk i weekenden
 
 ### Problem
-Kapacitetspanelet viser alle FM-medarbejdere som "på vagt" alle 7 dage, inkl. lordag og sondag. FM-medarbejdere arbejder normalt kun mandag-fredag, sa weekenden bor vise 0 pa vagt (og dermed 0 kapacitet og 0 "mangler").
+Weekend-tjekket blev kun tilføjet i `dayData`-beregningen (linje 196), men i renderingen (linje 284) beregnes "På vagt" separat som `totalEmployees - day.absent` -- uden weekend-tjek. Derfor vises stadig 21-23 medarbejdere på vagt lørdag/søndag.
 
-### Losning
-Tilfoej et simpelt weekend-tjek i kapacitetsberegningen: hvis dagen er lordag (6) eller sondag (0), saet antal tilgaengelige medarbejdere til 0.
+### Løsning
+Linje 284 i `CapacityPanel.tsx`: Tilføj samme weekend-tjek, så "På vagt" viser 0 i weekenden.
 
-### Tekniske aendringer
-
-**Fil: `src/components/vagt-flow/CapacityPanel.tsx`**
-
-I `capacityByClient`-beregningen (linje 193-200), tilfoej et tjek for weekend:
-
+**Ændring:**
 ```typescript
-const dayData = weekDates.map((date) => {
-  const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-  const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
-  
-  const absent = getAbsencesForDay(date);
-  const available = isWeekendDay ? 0 : totalEmployees - absent;
-  const capacity = Math.floor(available / 2);
-  const booked = getBookingsForClientDay(client.id, date);
-  const remaining = capacity - booked;
-  
-  return { date, capacity, booked, remaining, absent };
-});
+// FØR (linje 284):
+const available = totalEmployees - day.absent;
+
+// EFTER:
+const isWeekendDay = day.date.getDay() === 0 || day.date.getDay() === 6;
+const available = isWeekendDay ? 0 : totalEmployees - day.absent;
 ```
 
-Dette betyder:
-- **Mandag-fredag**: Beregning som nu (total minus fravaerende, divideret med 2)
-- **Lordag-sondag**: 0 pa vagt, 0 kapacitet. Hvis der ER bookinger i weekenden, vises de stadig under "Booket lok." og "Mangler" bliver negativt (rod) for at signalere overbooking ift. standard kapacitet
-
-### Fremtidig udvidelse
-Hvis der pa et tidspunkt er medarbejdere med faste weekendvagter, kan logikken udvides til at tjekke individuelle vagtplaner per dag. Men for nu er "ingen weekend som standard" den korrekte antagelse.
+En enkelt linje-ændring -- resten af panelet bruger allerede de korrekte `dayData`-værdier med weekend-tjek.
