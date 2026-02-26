@@ -51,7 +51,7 @@ export default function MyBookingSchedule() {
           id, date, start_time, end_time, booking_id,
           booking:booking_id (
             id, week_number, year,
-            location:location_id ( id, name, city ),
+            location:location_id ( id, name, address_city ),
             client:client_id ( name ),
             campaign:campaign_id ( name )
           )
@@ -253,7 +253,7 @@ export default function MyBookingSchedule() {
                                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <span className="font-medium text-foreground">
                                   {location?.name || "Ukendt lokation"}
-                                  {location?.city && `, ${location.city}`}
+                                  {location?.address_city && `, ${location.address_city}`}
                                 </span>
                               </div>
 
