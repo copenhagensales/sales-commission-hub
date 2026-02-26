@@ -186,45 +186,25 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     return absent;
   };
 
-  // Calculate capacity data per client per day
-  const capacityByClient = fieldmarketingClients.map((client: any) => {
-    const totalEmployees = getEmployeeCountForClient();
-    
-    const dayData = weekDates.map((date) => {
-      const isWeekendDay = date.getDay() === 0 || date.getDay() === 6;
-      const absent = getAbsencesForDay(date);
-      const available = isWeekendDay ? 0 : totalEmployees - absent;
-      const capacity = Math.floor(available / 2);
-      const booked = getBookingsForClientDay(client.id, date);
-      const remaining = capacity - booked;
-      
-      return { date, capacity, booked, remaining, absent, isWeekend: isWeekendDay };
-    });
+  // Calculate shared capacity (single pool across all clients)
+  const totalEmployees = getEmployeeCountForClient();
 
-    return {
-      client,
-      totalEmployees,
-      dayData,
-    };
+  const sharedDayData = weekDates.map((date) => {
+    const isWeekendDay = date.getDay() === 0 || date.getDay() === 6;
+    const absent = getAbsencesForDay(date);
+    const available = isWeekendDay ? 0 : totalEmployees - absent;
+    const capacity = Math.floor(available / 2);
+
+    const clientBookings = fieldmarketingClients.map((client: any) => ({
+      clientId: client.id,
+      clientName: client.name,
+      booked: getBookingsForClientDay(client.id, date),
+    }));
+    const totalBooked = clientBookings.reduce((sum, cb) => sum + cb.booked, 0);
+    const remaining = capacity - totalBooked;
+
+    return { date, available, capacity, totalBooked, remaining, absent, isWeekend: isWeekendDay, clientBookings };
   });
-
-  // Get info text for client
-  const getInfoText = (dayData: { booked: number; capacity: number }[]) => {
-    const weekdayData = dayData.slice(0, 5);
-    const minRemaining = Math.min(...weekdayData.map(d => d.capacity - d.booked));
-    const maxRemaining = Math.max(...weekdayData.map(d => d.capacity - d.booked));
-    
-    if (minRemaining === maxRemaining) {
-      return `${maxRemaining} ledige lok. alle hverdage`;
-    }
-    
-    const minDays = weekdayData
-      .map((d, i) => ({ rem: d.capacity - d.booked, day: ["mandag", "tirsdag", "onsdag", "torsdag", "fredag"][i] }))
-      .filter(d => d.rem === minRemaining)
-      .map(d => d.day);
-    
-    return `${minRemaining} ledige lok. ${minDays.join(" & ")}, ${maxRemaining} øvrige dage`;
-  };
 
   const getManglerColor = (remaining: number) => {
     if (remaining < 0) return "text-destructive font-bold";
@@ -259,78 +239,101 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
         </button>
 
         {isExpanded && (
-          <div className="mt-4 space-y-6">
-            {capacityByClient.map(({ client, totalEmployees, dayData }) => (
-              <div key={client.id} className="space-y-1">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {client.name}
+          <div className="mt-4 space-y-1">
+            <div className="text-[10px] text-muted-foreground mb-2">1 lokation = 2 medarbejdere</div>
+
+            <div className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1 items-center">
+              {/* Day headers */}
+              <div className="w-32" />
+              {DAY_LABELS.map((label, idx) => (
+                <div key={idx} className="text-center text-xs font-medium text-muted-foreground">
+                  {label}
                 </div>
-                <div className="text-[10px] text-muted-foreground mb-2">1 lokation = 2 medarbejdere</div>
+              ))}
 
-                {/* Day headers */}
-                <div className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1 items-center">
-                  <div className="w-32" />
-                  {DAY_LABELS.map((label, idx) => (
-                    <div key={idx} className="text-center text-xs font-medium text-muted-foreground">
-                      {label}
+              {/* Row: På vagt */}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                <Users className="h-3 w-3 shrink-0" /> På vagt
+              </div>
+              {sharedDayData.map((day, idx) => (
+                <Tooltip key={idx}>
+                  <TooltipTrigger asChild>
+                    <div className="text-center text-xs font-medium text-muted-foreground">
+                      {day.isWeekend ? "-" : day.available}
                     </div>
-                  ))}
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                    <p className="text-xs">{totalEmployees} total − {day.absent} fraværende = {day.available} på vagt</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
 
-                  {/* Row 1: På vagt */}
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
-                    <Users className="h-3 w-3 shrink-0" /> På vagt
+              {/* Row: Kapacitet (lokationer) */}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                <MapPin className="h-3 w-3 shrink-0" /> Kapacitet
+              </div>
+              {sharedDayData.map((day, idx) => (
+                <Tooltip key={idx}>
+                  <TooltipTrigger asChild>
+                    <div className="text-center text-xs font-medium text-muted-foreground">
+                      {day.isWeekend ? "-" : day.capacity}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                    <p className="text-xs">{day.available} på vagt ÷ 2 = {day.capacity} lokationer</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+
+              {/* Spacer row */}
+              <div className="col-span-8 h-1" />
+
+              {/* Per-client booking rows */}
+              {fieldmarketingClients.map((client: any) => (
+                <>
+                  <div key={client.id} className="flex items-center gap-1.5 text-xs text-muted-foreground w-32 pl-4">
+                    {client.name}
                   </div>
-                  {dayData.map((day, idx) => {
-                    const available = day.isWeekend ? null : totalEmployees - day.absent;
+                  {sharedDayData.map((day, idx) => {
+                    const cb = day.clientBookings.find(b => b.clientId === client.id);
                     return (
-                      <Tooltip key={idx}>
-                        <TooltipTrigger asChild>
-                          <div className="text-center text-xs font-medium text-muted-foreground">{available === null ? "-" : available}</div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
-                          <p className="text-xs">{totalEmployees} total − {day.absent} fraværende = {available} på vagt</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      <div key={idx} className="text-center text-xs font-medium">{cb?.booked || 0}</div>
                     );
                   })}
+                </>
+              ))}
 
-                  {/* Row 2: Booket lok. */}
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
-                    <MapPin className="h-3 w-3 shrink-0" /> Booket lok.
-                  </div>
-                  {dayData.map((day, idx) => (
-                    <Tooltip key={idx}>
-                      <TooltipTrigger asChild>
-                        <div className="text-center text-xs font-medium">{day.booked}</div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
-                        <p className="text-xs">{day.booked} lokationer booket</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-
-                  {/* Row 3: Mangler at booke */}
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
-                    <Target className="h-3 w-3 shrink-0" /> Mangler
-                  </div>
-                  {dayData.map((day, idx) => (
-                    <Tooltip key={idx}>
-                      <TooltipTrigger asChild>
-                      <div className={`text-center text-xs ${day.isWeekend ? "text-muted-foreground" : getManglerColor(day.remaining)}`}>
-                          {day.isWeekend ? "-" : day.remaining}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
-                        <p className="text-xs">{day.capacity} kapacitet − {day.booked} booket = {day.remaining} mangler</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
+              {/* Total booked row */}
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground w-32">
+                <MapPin className="h-3 w-3 shrink-0" /> Total booket
               </div>
-            ))}
+              {sharedDayData.map((day, idx) => (
+                <div key={idx} className="text-center text-xs font-semibold">{day.totalBooked}</div>
+              ))}
+
+              {/* Spacer row */}
+              <div className="col-span-8 h-1" />
+
+              {/* Row: Mangler */}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-32">
+                <Target className="h-3 w-3 shrink-0" /> Mangler
+              </div>
+              {sharedDayData.map((day, idx) => (
+                <Tooltip key={idx}>
+                  <TooltipTrigger asChild>
+                    <div className={`text-center text-xs ${day.isWeekend ? "text-muted-foreground" : getManglerColor(day.remaining)}`}>
+                      {day.isWeekend ? "-" : day.remaining}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{format(day.date, "EEEE d. MMM", { locale: da })}</p>
+                    <p className="text-xs">{day.capacity} kapacitet − {day.totalBooked} booket = {day.remaining} mangler</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>
