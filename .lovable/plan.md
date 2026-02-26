@@ -1,40 +1,56 @@
 
 
-# Fix: Circuit Breaker variabelfejl
+# Reducer Enreach sync-frekvens for at komme under delt API-kvote
 
 ## Problem
-I filen `supabase/functions/integration-engine/utils/circuit-breaker.ts`, funktion `recordCircuitBreakerFailure`:
 
-- **Linje 76**: Variablen defineres som `let pauseMinutes: number | null = null;`
-- **Linje 98**: Return-objektet refererer til `pausedMinutes` (med 'd')
+Alle 3 Enreach-integrationer (ASE, Tryg, Eesy) deler en global API-kvote hos Enreach/HeroBase. Den nuvaerende konfiguration sender ~180 API-kald/time, hvilket er langt over kvoten. Resultatet er 100% rate-limiting i 6+ timer.
 
-JavaScript/TypeScript shorthand `{ newCount, pausedMinutes }` leder efter en variabel kaldet `pausedMinutes`, men den hedder `pauseMinutes`. Det giver `ReferenceError: pausedMinutes is not defined` hver gang en integration er rate-limited.
-
-## Konsekvens
-Alle Enreach-integrationer (Tryg, Eesy, ASE) crasher i circuit breaker-logikken efter 429-fejl. Det resulterer i dobbelte sync runs (en success + en error) og forhindrer korrekt circuit breaker-pause.
-
-## Fix
-En enkelt linje-rettelse i `circuit-breaker.ts`:
-
-Ret variabelnavnet fra `pauseMinutes` til `pausedMinutes` (linje 76), ELLER ret return-objektet til at bruge det korrekte variabelnavn. Den nemmeste fix er at omdobe variablen:
+## Nuvaerende vs. ny frekvens
 
 ```text
-Fil: supabase/functions/integration-engine/utils/circuit-breaker.ts
+                    NU                          NY
+Sales-sync:     hvert 5 min (12x/time/int)  -> hvert 15 min (4x/time/int)
+Meta-sync:      hvert 30 min (2x/time/int)  -> hvert 60 min (1x/time/int)
 
-Linje 76: let pauseMinutes  -->  let pausedMinutes
-Linje 78-82: pauseMinutes references  -->  pausedMinutes
-Linje 84-85: pauseMinutes references  -->  pausedMinutes
+Runs/time:      42 runs (180 API-kald)       -> 15 runs (~45 API-kald)
+Reduktion:      ~75% faerre API-kald
 ```
 
-Specifikt:
-- `let pauseMinutes` bliver til `let pausedMinutes`
-- `pauseMinutes = level.pauseMinutes` bliver til `pausedMinutes = level.pauseMinutes`
-- `const pausedUntil = pauseMinutes` bliver til `const pausedUntil = pausedMinutes`
+## Nye cron-schedules (staggered)
 
-Herefter redeploy `integration-engine` edge function.
+| Job                   | Ny schedule              | Minut-offsets       |
+|-----------------------|--------------------------|---------------------|
+| enreach-eesy-sales    | 0,15,30,45 * * * *       | :00, :15, :30, :45  |
+| enreach-tryg-sales    | 2,17,32,47 * * * *       | :02, :17, :32, :47  |
+| enreach-ase-sales     | 4,19,34,49 * * * *       | :04, :19, :34, :49  |
+| enreach-eesy-meta     | 10 * * * *               | :10                 |
+| enreach-tryg-meta     | 25 * * * *               | :25                 |
+| enreach-ase-meta      | 40 * * * *               | :40                 |
 
-## Forventet resultat
-- Ingen flere `ReferenceError: pausedMinutes is not defined`
-- Circuit breaker fungerer korrekt: pauser integrationer ved gentagne 429-fejl
-- Enreach rate-limiting håndteres korrekt med automatisk backoff
+Stagger: Sales-jobs er forskudt 2 minutter. Meta-jobs er forskudt 15 minutter. Ingen overlap.
+
+## Implementering
+
+### Trin 1: Opdater cron-jobs i databasen
+
+Kald `cron.unschedule()` for alle 6 eksisterende Enreach-jobs og `cron.schedule()` / `schedule_integration_sync()` med de nye schedules.
+
+### Trin 2: Opdater integration-config
+
+Opdater `sync_frequency_minutes` fra 3 til 15 og `sync_schedule` i `dialer_integrations.config` for alle 3 Enreach-integrationer, saa dashboard og ScheduleEditor viser korrekt frekvens.
+
+### Trin 3: Nulstil circuit breaker
+
+Reset `integration_circuit_breaker` for alle 3 integrationer, saa de kan begynde at synce med det samme efter opdateringen.
+
+### Trin 4: Verificer
+
+Vent 15-20 minutter og kør en forespørgsel for at se om 429-raten falder. Hvis Enreach stadig blokerer, kan det vaere nødvendigt at reducere yderligere (fx hvert 30. minut for sales).
+
+## Risiko
+
+- Lav risiko: Data opdateres hvert 15. minut i stedet for hvert 5. minut. For de fleste use cases er dette acceptabelt.
+- Hvis kvoten stadig overskrides, kan vi reducere til hvert 30. minut som naeste trin.
+- Ideel løsning paa sigt: Kontakt Enreach og bed om separate kvoter per integration eller højere samlet kvote.
 
