@@ -1455,14 +1455,14 @@ export function EditBookingDialog({
                       return `${DAY_NAMES[dayIndex]?.slice(0, 3) || '?'} ${format(parseISO(d), "d/M")}`;
                     });
                     return (
-                      <div key={vehId} className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 rounded-md px-3 py-2">
+                      <div key={vehId} className="flex items-center justify-between bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-300 dark:border-yellow-700 rounded-md px-3 py-2">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-2">
-                            <Car className="h-4 w-4 text-blue-600 shrink-0" />
-                            <span className="font-medium">{(vehicle as any)?.name || "Ukendt"}</span>
-                            <span className="text-sm text-foreground/70">({(vehicle as any)?.license_plate})</span>
+                            <Car className="h-4 w-4 text-yellow-800 dark:text-yellow-300 shrink-0" />
+                            <span className="font-semibold text-yellow-900 dark:text-yellow-100">{(vehicle as any)?.name || "Ukendt"}</span>
+                            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">({(vehicle as any)?.license_plate})</span>
                           </div>
-                          <span className="text-sm text-foreground/80 ml-6">{dateLabels.join(", ")}</span>
+                          <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200 ml-6">{dateLabels.join(", ")}</span>
                         </div>
                         <Button 
                           variant="ghost" 
