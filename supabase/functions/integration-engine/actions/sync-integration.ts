@@ -1,7 +1,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
-import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError } from "../utils/index.ts";
+import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError, checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker } from "../utils/index.ts";
 import { CampaignMappingConfig } from "../types.ts";
 
 interface SyncOptions {
@@ -89,6 +89,17 @@ export async function syncIntegration(
   const syncRunStartedAt = new Date();
   let adapter: any = null;
   try {
+    // === Circuit Breaker Check ===
+    const cbState = await checkCircuitBreaker(supabase, integration.id);
+    if (cbState.paused) {
+      log("WARN", `Circuit breaker: ${integration.name} paused until ${cbState.pausedUntil} (${cbState.consecutiveFailures} consecutive failures). Skipping.`);
+      return {
+        name: integration.name,
+        status: "error",
+        error: `Circuit breaker active: paused until ${cbState.pausedUntil}`,
+      };
+    }
+
     log("INFO", `Processing integration: ${integration.name}`);
 
     // Get decrypted credentials
@@ -151,13 +162,30 @@ export async function syncIntegration(
 
     // Process sales
     if (actionList.includes("sales") || action === "sync") {
-      const useRange = from && to;
+      const useExplicitRange = from && to;
       let sales: any[] = [];
+      let salesWindowEnd: Date | null = null;
       
-      if (useRange && (adapter as any).fetchSalesRange) {
-        log("INFO", `Fetching sales by range ${from} -> ${to}`);
+      if (useExplicitRange && (adapter as any).fetchSalesRange) {
+        // Explicit range provided (manual trigger or backfill)
+        log("INFO", `Fetching sales by explicit range ${from} -> ${to}`);
         sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings, maxRecords);
+      } else if ((adapter as any).fetchSalesRange) {
+        // === Incremental sales sync using watermark ===
+        const salesSyncState = await getSyncState(supabase, integration.id, "sales");
+        const windowStart = salesSyncState?.last_success_at
+          ? new Date(new Date(salesSyncState.last_success_at).getTime() - 5 * 60 * 1000) // 5-min overlap
+          : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        salesWindowEnd = new Date(Date.now() - 2 * 60 * 1000); // 2-min buffer
+
+        log("INFO", `Incremental sales sync: ${windowStart.toISOString()} -> ${salesWindowEnd.toISOString()}`);
+        sales = await (adapter as any).fetchSalesRange(
+          { from: windowStart.toISOString(), to: salesWindowEnd.toISOString() },
+          campaignMappings,
+          maxRecords
+        );
       } else {
+        // Fallback: day-based fetch
         sales = await adapter.fetchSales(days, campaignMappings, maxRecords);
       }
       
@@ -197,6 +225,11 @@ export async function syncIntegration(
           debugData.skipReasonMap
         );
         await saveDebugLog(supabase, debugEntry);
+      }
+
+      // Update sales sync state watermark on success
+      if (salesWindowEnd) {
+        await upsertSyncState(supabase, integration.id, "sales", salesWindowEnd);
       }
     }
 
@@ -344,6 +377,17 @@ export async function syncIntegration(
       },
     });
 
+    // Reset circuit breaker on success — BUT if heavily rate-limited, record as failure
+    const heavilyRateLimited = adapterMetrics.rateLimitHits > 0 && adapterMetrics.rateLimitHits >= adapterMetrics.apiCalls * 0.5;
+    if (heavilyRateLimited && totalRecords === 0) {
+      const cb = await recordCircuitBreakerFailure(supabase, integration.id, `Sync succeeded but 100% rate-limited (${adapterMetrics.rateLimitHits}/${adapterMetrics.apiCalls})`);
+      if (cb.pausedMinutes) {
+        log("WARN", `Circuit breaker: ${integration.name} paused for ${cb.pausedMinutes} min — sync "succeeded" but yielded 0 records due to rate limits`);
+      }
+    } else {
+      await resetCircuitBreaker(supabase, integration.id);
+    }
+
     return { name: integration.name, status: "success", data: runResults };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
@@ -387,6 +431,15 @@ export async function syncIntegration(
         error: errMsg,
       },
     });
+
+    // Record circuit breaker failure (especially for rate-limit errors)
+    const isRateLimitError = errMsg.includes("429") || errMsg.includes("rate limit") || (errorMetrics.rateLimitHits > 0 && errorMetrics.rateLimitHits >= errorMetrics.apiCalls * 0.5);
+    if (isRateLimitError) {
+      const cb = await recordCircuitBreakerFailure(supabase, integration.id, errMsg);
+      if (cb.pausedMinutes) {
+        log("WARN", `Circuit breaker: ${integration.name} paused for ${cb.pausedMinutes} min after ${cb.newCount} consecutive rate-limit failures`);
+      }
+    }
 
     return { name: integration.name, status: "error", error: errMsg };
   }

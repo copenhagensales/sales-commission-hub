@@ -11,3 +11,4 @@ export type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknow
 export { saveDebugLog, createDebugLogEntry } from "./debug-log.ts";
 export { RateLimiter } from "./rate-limiter.ts";
 export { getSyncState, upsertSyncState, recordSyncError } from "./sync-state.ts";
+export { checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker } from "./circuit-breaker.ts";
