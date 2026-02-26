@@ -106,6 +106,19 @@ async function getProviderBudgetUsage(supabase: SupabaseClient, provider: string
 }
 
 /**
+ * Check if current time is within Danish working hours (08:00-21:00 Europe/Copenhagen)
+ */
+function isDanishWorkingHours(): boolean {
+  const now = new Date();
+  const dkHour = parseInt(
+    now.toLocaleString('en-US', { 
+      hour: 'numeric', hour12: false, timeZone: 'Europe/Copenhagen' 
+    })
+  );
+  return dkHour >= 8 && dkHour < 21;
+}
+
+/**
  * Provider-sync orchestrator
  * Runs all active integrations for a provider sequentially with budget gates
  */
@@ -116,6 +129,12 @@ export async function providerSync(
 ): Promise<{ success: boolean; results: any[]; budgetUsed: number; skipped: string[] }> {
   const budget = PROVIDER_BUDGETS[provider] || { limit: 1000, threshold: 0.70 };
   const defaults = PROVIDER_DEFAULTS[provider] || { actions: ["campaigns", "users", "sales"], maxRecords: 200, days: 2 };
+
+  // Enreach: Skip entire provider sync outside Danish working hours (21:00-08:00)
+  if (provider === "enreach" && !isDanishWorkingHours()) {
+    log("INFO", `Provider-sync skipped for enreach: outside Danish working hours (21:00-08:00 DK)`);
+    return { success: true, results: [], budgetUsed: 0, skipped: ["outside_working_hours"] };
+  }
 
   // 1. Acquire lock
   const locked = await acquireLock(supabase, provider, log);
