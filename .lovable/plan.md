@@ -1,56 +1,41 @@
 
 
-## Vis markeder i Bookinger-fanen
+## Tilfoej diaet-tag i booking-oversigten
 
 ### Problem
-Bookinger-fanen filtrerer aktivt markeder og messer fra (linje 91+111 i BookingsContent.tsx). Brugeren vil gerne se markeder begge steder for bedre overblik.
+Naar der er tildelt diaeter pa en booking, kan man kun se det inde i EditBookingDialog. Der mangler et visuelt tag i selve booking-griddet (ligesom bil-tagget med gult tema).
 
 ### Losning
-Tilfoej en separat sektion i bunden af Bookinger-fanen der viser market-bookinger for den valgte uge. Markederne vises i et visuelt adskilt kort med et Tent-ikon, sa de er nemme at skelne fra almindelige bookinger.
+Tilfoej et orange-farvet tag med et Utensils-ikon (bestik) i dag-cellerne, der viser "Diaet" naar der findes diaet-poster for den paagaeldende booking og dato. Moenstreret foelger praecis det eksisterende vehicle-tag moenster.
 
-### Aendringer i `BookingsContent.tsx`
+### Aendringer i `src/pages/vagt-flow/BookingsContent.tsx`
 
-1. **Ny query for market-bookinger** - Tilfoej en `useQuery` der henter bookinger med `location.type IN ('Markeder', 'Messer')` for den valgte uge (samme week/year filter som eksisterende).
+1. **Ny query for booking_diet data** (efter vehicle-queryen, ca. linje 272):
+   - Hent `booking_diet` raekkerne for alle synlige booking-id'er
+   - Select: `id, booking_id, date` (vi behoever ikke amount/employee for tagget)
 
-2. **Ny sektion i UI** - Efter de eksisterende client-grupperede bookinger, tilfoej en "Markeder denne uge" sektion:
-   - Vises kun hvis der er market-bookinger i den valgte uge
-   - Bruger Tent-ikon og lilla/indigo farvetema for at adskille visuelt fra normale bookinger
-   - Viser lokation, dato-range, kunde, bemandingsstatus og tildelte medarbejdere
-   - Samme dagsgrid (Man-Son) som normale bookinger, sa det er konsistent
-   - Klikbar for at aabne EditBookingDialog
+2. **Ny lookup-map** (efter vehiclesByBookingDate):
+   - `dietByBookingDate`: `Map<string, boolean>` med key `bookingId_date`
+   - Returnerer `true` hvis der findes mindst en diaet-post for den kombination
 
-3. **Ingen aendring i Markeder-fanen** - Markeder vises stadig i deres egen fane med den fulde maanedsvisning og kalender-widget.
+3. **Render tag i dag-cellen** (efter vehicle-tagget, ca. linje 731):
+   - Samme moenster som bil-tagget
+   - Orange tema: `bg-orange-100 text-orange-800 border-orange-300`
+   - Utensils-ikon (bestik) fra lucide-react + teksten "Diaet"
 
-### Teknisk detalje
+4. **Render tag i market-sektionen** (i markedernes dagsgrid, ca. linje 817):
+   - Samme orange diaet-tag i market-bookingernes dag-celler
+   - Bruger den samme `dietByBookingDate` map (market-bookinger er inkluderet i queryen via `marketBookings`)
 
+### Imports
+- Tilfoej `Utensils` til den eksisterende lucide-react import
+
+### Eksempel paa tagget
 ```text
-// Ny query (ca. linje 137, efter eksisterende bookings query)
-const { data: marketBookings } = useQuery({
-  queryKey: ["vagt-market-bookings-week", selectedWeek, selectedYear],
-  queryFn: async () => {
-    // Hent bookinger med location.type IN MARKET_TYPES for valgt uge
-    // Samme employee-name enrichment som eksisterende query
-  },
-});
-
-// Ny UI-sektion (efter linje 698, efter normale bookinger)
-{marketBookings?.length > 0 && (
-  <Card className="border-indigo-200 bg-indigo-50/30">
-    <CardContent>
-      <div className="flex items-center gap-2 mb-4">
-        <Tent className="h-5 w-5 text-indigo-600" />
-        <h3 className="font-semibold">Markeder denne uge</h3>
-        <Badge>{marketBookings.length}</Badge>
-      </div>
-      {/* Samme dagsgrid-rendering som normale bookinger */}
-    </CardContent>
-  </Card>
-)}
+[Utensils-ikon] Diaet
 ```
+Farve: orange (bg-orange-100, text-orange-800, border-orange-300) - matcher den eksisterende diaet-farve brugt i EditBookingDialog.
 
-### Resultat
-- Markeder vises i **begge** faner: Bookinger (ugeoverblik) og Markeder (maanedsoverblik)
-- Visuelt adskilt med ikon og farve sa man hurtigt kan se forskel
-- Klikbar for redigering via EditBookingDialog
-- Ingen pavirkning af eksisterende funktionalitet
+### Ingen database-aendringer
+`booking_diet`-tabellen eksisterer allerede og indeholder de noedvendige data.
 
