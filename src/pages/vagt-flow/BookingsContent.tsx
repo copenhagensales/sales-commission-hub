@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel } from "lucide-react";
+import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
@@ -181,6 +182,17 @@ export default function BookingsContent() {
       }));
     },
   });
+
+  // Fetch hotel assignments for market bookings
+  const marketBookingIds = useMemo(() => (marketBookings || []).map((b: any) => b.id), [marketBookings]);
+  const { data: bookingHotels } = useBookingHotels(marketBookingIds.length > 0 ? marketBookingIds : undefined);
+  const hotelMap = useMemo(() => {
+    const map: Record<string, { hotelName: string; status: string }> = {};
+    (bookingHotels || []).forEach((bh: any) => {
+      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status };
+    });
+    return map;
+  }, [bookingHotels]);
 
   const { data: fieldmarketingClients } = useQuery({
     queryKey: ["fieldmarketing-team-clients-bookings"],
@@ -830,6 +842,12 @@ export default function BookingsContent() {
                         {booking.location?.address_city} • {booking.location?.type}
                         {booking.clients?.name ? ` • ${booking.clients.name}` : ''}
                       </p>
+                      {hotelMap[booking.id] && (
+                        <Badge variant="outline" className="mt-1 gap-1 text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+                          <Hotel className="h-3 w-3" />
+                          {hotelMap[booking.id].hotelName}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {canEditFmBookings && (
