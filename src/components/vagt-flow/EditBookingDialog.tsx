@@ -23,6 +23,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { TimeSelect } from "@/components/ui/time-select";
 
 interface Employee {
   id: string;
@@ -64,7 +66,7 @@ interface EditBookingDialogProps {
   weekStart: Date;
   employees: Employee[];
   vehicles: Vehicle[];
-  onAddEmployeeAssignments: (assignments: { employeeId: string; dates: string[] }[]) => void;
+  onAddEmployeeAssignments: (assignments: { employeeId: string; dates: string[]; startTime: string; endTime: string }[]) => void;
   onAddVehicleAssignment: (assignment: { vehicleId: string; dates: string[] }) => void;
 }
 
@@ -92,10 +94,13 @@ export function EditBookingDialog({
   const [isEditingLocationRate, setIsEditingLocationRate] = useState<boolean>(false);
   const [locationRateInput, setLocationRateInput] = useState<string>("");
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>("");
+  const [comment, setComment] = useState<string>("");
 
   // Employee tab state
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedEmployeeDays, setSelectedEmployeeDays] = useState<Set<number>>(new Set());
+  const [meetingStartTime, setMeetingStartTime] = useState<string>("09:00");
+  const [meetingEndTime, setMeetingEndTime] = useState<string>("17:00");
 
   // Vehicle tab state
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
@@ -110,6 +115,7 @@ export function EditBookingDialog({
       setClientId(booking.client_id || "");
       setCampaignId(booking.campaign_id || "");
       setSelectedPlacementId(booking.placement_id || "");
+      setComment(booking.comment || "");
       
       // Daily rate override
       const hasOverride = booking.daily_rate_override !== null && booking.daily_rate_override !== undefined;
@@ -636,6 +642,7 @@ export function EditBookingDialog({
       campaign_id: string | null;
       daily_rate_override: number | null;
       placement_id: string | null;
+      comment: string | null;
     }) => {
       const { error } = await supabase
         .from("booking")
@@ -794,6 +801,7 @@ export function EditBookingDialog({
       campaign_id: campaignId,
       daily_rate_override: finalRateOverride,
       placement_id: selectedPlacementId || null,
+      comment: comment.trim() || null,
     });
   };
 
@@ -844,6 +852,8 @@ export function EditBookingDialog({
     // Filter only days where employee has shift AND is not already booked elsewhere
     const assignments = validEmployees.map(employeeId => ({
       employeeId,
+      startTime: meetingStartTime || "09:00",
+      endTime: meetingEndTime || "17:00",
       dates: Array.from(selectedEmployeeDays)
         .filter(dayIndex => !isBookedOnDay(employeeId, dayIndex))
         .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd")),
@@ -1138,6 +1148,21 @@ export function EditBookingDialog({
               </div>
             </div>
 
+            {/* Comment field */}
+            <div className="space-y-2 pt-3 border-t">
+              <Label htmlFor="booking-comment">Bemærkning til sælger</Label>
+              <Textarea
+                id="booking-comment"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Fx 'Stå ved elevatoren' eller 'Parkering bag bygningen'"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Bemærkningen vises for alle sælgere tildelt denne booking
+              </p>
+            </div>
+
             {/* Warning for missing staff */}
             {daysWithoutStaff.length > 0 && (
               <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/20 p-3">
@@ -1223,6 +1248,18 @@ export function EditBookingDialog({
                   </span>
                 )}
               </p>
+
+              {/* Meeting time controls */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Mødetid</Label>
+                  <TimeSelect value={meetingStartTime} onChange={setMeetingStartTime} placeholder="09:00" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Sluttid</Label>
+                  <TimeSelect value={meetingEndTime} onChange={setMeetingEndTime} placeholder="17:00" />
+                </div>
+              </div>
               
               {selectedEmployees.map((emp, index) => {
                 const hasAbsence = emp && absencesByEmployeeAndDay.has(emp);

@@ -384,14 +384,14 @@ export default function BookingsContent() {
   };
 
   const bulkAssignMutation = useMutation({
-    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[]; startTime: string; endTime: string }[]) => {
       const inserts = assignments.flatMap(a => 
         a.dates.map(date => ({
           booking_id: a.bookingId,
           employee_id: a.employeeId,
           date,
-          start_time: "09:00",
-          end_time: "17:00",
+          start_time: a.startTime || "09:00",
+          end_time: a.endTime || "17:00",
         }))
       );
       const { data, error } = await supabase.from("booking_assignment").insert(inserts).select();
@@ -1018,6 +1018,8 @@ export default function BookingsContent() {
               bookingId: editBookingDialogBooking.id,
               employeeId: a.employeeId,
               dates: a.dates,
+              startTime: a.startTime,
+              endTime: a.endTime,
             }))
           );
         }}
