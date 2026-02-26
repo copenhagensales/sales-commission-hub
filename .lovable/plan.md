@@ -1,28 +1,45 @@
 
 
-## Fix: Kapacitetspanel viser 0 medarbejdere for alle kunder
+## Redesign af booking-kommentar i vagtplanen
 
 ### Problem
-`getEmployeeCountForClient` (linje 155-159) matcher medarbejdere til kunder ved at tjekke:
+Kommentaren ("Dette er en test-note :-)") drukner visuelt i de andre tekstlinjer. Den bruger samme layout som tid og makker, og er let at overse.
+
+### Design-ide: Callout-kort under badges
+
+Inspireret af Apples "inline callout" pattern (som man kender fra Notes og Reminders) placeres kommentaren som et lille fremhævet kort **under** makker og badges - helt nederst i vagtkortet. Det giver den visuel vægt uden at forstyrre det primære informationshierarki (lokation, tid, makker, bil/diaet).
+
+Layoutet bliver:
+
+```text
+MAN 23/2
+  @ Kvickly Holbaek, Holbaek
+    Eesy FM - Eesy gaden
+    09:00 - 17:00
+    Makker: Martina
+    [Ford Transit]  [Diaet]
+  +-------------------------------------+
+  | Note fra planlægger                  |
+  | "Dette er en test-note :-)"          |
+  +-------------------------------------+
 ```
-e.team?.toLowerCase().includes(clientName.toLowerCase())
-```
 
-Men alle FM-medarbejdere er i teamet **"Fieldmarketing"** - ikke i "Eesy FM" eller "Yousee". Derfor returnerer funktionen altid 0, og kapaciteten bliver 0.
+### Visuelt design
+- Fuld bredde inden for kortet (ml-6 for alignment med resten)
+- Afrundet container med `rounded-lg`
+- Blå/indigo tonalitet: `bg-blue-50 border border-blue-200` (dark: `bg-blue-950/30 border-blue-800`)
+- Lille label "Note" i semibold over selve teksten
+- `MessageSquare`-ikon ved labelen i matchende blaa
+- Kommentarteksten i normal vaegt (ikke kursiv - det er svaerere at laese)
 
-### Løsning
-Da alle fieldmarketing-medarbejdere er i en fælles pulje og kan arbejde for alle FM-kunder, skal kapaciteten beregnes baseret på **alle aktive FM-medarbejdere** (minus dem uden vagter), ikke opdelt per kunde.
+### Teknisk aendring
 
-### Ændring i `src/components/vagt-flow/CapacityPanel.tsx`
+**Fil:** `src/pages/vagt-flow/MyBookingSchedule.tsx`
 
-**`getEmployeeCountForClient` (linje 155-159)**: Fjern den fejlagtige team-navn-matching. I stedet returneres det samlede antal aktive FM-medarbejdere (ekskl. dem uden vagter) for alle kunder, da de deler den samme medarbejderpulje.
+1. Flyt kommentar-blokken (linje 276-284) til **efter** badges-rækken (efter linje 310)
+2. Erstat den simple tekstlinje med en callout-container:
+   - Ydre `div` med `ml-6 mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800`
+   - Indre header: ikon + "Note" label i `text-xs font-semibold text-blue-700 dark:text-blue-300`
+   - Kommentartekst i `text-sm text-blue-900 dark:text-blue-100`
 
-Tilsvarende rettelse i:
-- **`getAbsencesForClientDay` (linje 170-182)**: Fjern team-navn-filtreringen, da fravær gælder for hele FM-puljen uanset kunde.
-
-Begge funktioner bruger samme fejlagtige `e.team?.toLowerCase().includes(clientName.toLowerCase())` pattern.
-
-### Resultat
-- Kapacitet beregnes korrekt: (antal aktive medarbejdere - fraværende) / 2 = antal lokationer
-- Bookinger vises stadig per kunde (det virker allerede korrekt via `client_id`)
-- "Ledige" tallet afspejler den reelle kapacitet
+En enkelt aendring i en fil, ca. 15 linjer kode.
