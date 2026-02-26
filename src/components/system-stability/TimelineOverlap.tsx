@@ -29,25 +29,15 @@ interface TimelineJob {
   type: "sales" | "meta";
 }
 
-/**
- * Match a cron job row to an integration by extracting the UUID from the jobname.
- * Pattern: dialer-<uuid>-sync-<sales|meta>
- */
 function buildJobsFromCron(integrations: Integration[], cronJobs: CronJobRow[]): TimelineJob[] {
   const jobs: TimelineJob[] = [];
-
   for (const cj of cronJobs) {
-    // Extract UUID and type from jobname like "dialer-657c2050-sync-sales"
     const match = cj.jobname.match(/^dialer-([0-9a-f-]+)-sync-(sales|meta)$/i);
     if (!match) continue;
-
     const idPrefix = match[1];
     const type = match[2] as "sales" | "meta";
-
-    // Find matching integration (id starts with the prefix)
     const int = integrations.find(i => i.id.startsWith(idPrefix));
     if (!int) continue;
-
     jobs.push({
       id: `${int.id}-${type}`,
       name: `${int.name} ${type === "sales" ? "Sales" : "Meta"}`,
@@ -56,7 +46,6 @@ function buildJobsFromCron(integrations: Integration[], cronJobs: CronJobRow[]):
       type,
     });
   }
-
   return jobs;
 }
 
@@ -70,15 +59,8 @@ function buildJobsFromConfig(integrations: Integration[]): TimelineJob[] {
   }));
 }
 
-export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps) {
-  const jobs = useMemo(() => {
-    if (cronJobs && cronJobs.length > 0) {
-      return buildJobsFromCron(integrations, cronJobs);
-    }
-    return buildJobsFromConfig(integrations);
-  }, [integrations, cronJobs]);
-
-  const overlapWarnings = useMemo(() => detectOverlaps(jobs, 2, true), [jobs]);
+function ProviderTimeline({ provider, jobs }: { provider: string; jobs: TimelineJob[] }) {
+  const overlapWarnings = useMemo(() => detectOverlaps(jobs, 2, false), [jobs]);
   const conflictMinutesSet = useMemo(() => {
     const set = new Set<number>();
     overlapWarnings.forEach(w => w.conflictMinutes.forEach(m => set.add(m)));
@@ -86,13 +68,14 @@ export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps
   }, [overlapWarnings]);
 
   const minuteLabels = Array.from({ length: 12 }, (_, i) => i * 5);
+  const label = provider.charAt(0).toUpperCase() + provider.slice(1);
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Clock className="h-4 w-4" />
-          Tidslinje (60 min) — Sales + Meta
+          Tidslinje (60 min) — {label}
           {overlapWarnings.length > 0 && (
             <span className="text-xs font-normal text-destructive ml-2">
               {overlapWarnings.length} overlap{overlapWarnings.length > 1 ? "s" : ""}
@@ -101,7 +84,6 @@ export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Minute axis */}
         <div className="mb-1">
           <div className="flex ml-[140px]">
             {minuteLabels.map(m => (
@@ -112,7 +94,6 @@ export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps
           </div>
         </div>
 
-        {/* Rows per job (sales + meta) */}
         <div className="space-y-1">
           {jobs.map(job => {
             const fireMinutes = parseCronMinutes(job.schedule);
@@ -145,7 +126,6 @@ export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps
           })}
         </div>
 
-        {/* Legend */}
         <div className="flex gap-4 mt-3 text-[10px] text-muted-foreground">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-sm bg-primary" /> Sales
@@ -159,5 +139,32 @@ export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export function TimelineOverlap({ integrations, cronJobs }: TimelineOverlapProps) {
+  const jobs = useMemo(() => {
+    if (cronJobs && cronJobs.length > 0) {
+      return buildJobsFromCron(integrations, cronJobs);
+    }
+    return buildJobsFromConfig(integrations);
+  }, [integrations, cronJobs]);
+
+  const providerGroups = useMemo(() => {
+    const map = new Map<string, TimelineJob[]>();
+    for (const job of jobs) {
+      const key = job.provider.toLowerCase();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(job);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [jobs]);
+
+  return (
+    <div className="space-y-4">
+      {providerGroups.map(([provider, providerJobs]) => (
+        <ProviderTimeline key={provider} provider={provider} jobs={providerJobs} />
+      ))}
+    </div>
   );
 }
