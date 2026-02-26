@@ -1,52 +1,78 @@
 
 
-## Fix: Kapacitet skal vises som samlet pulje, ikke per kunde
+## Hotel-administration for Jylland/Fyn bookinger
 
-### Problem
-Kapacitetspanelet viser det **samme** antal medarbejdere (f.eks. 25) for **hver** kunde (Eesy FM og Yousee). Det er den samme pulje FM-medarbejdere der deles mellem kunderne, sa det giver et misvisende billede -- det ser ud som om der er dobbelt sa mange folk som der reelt er.
+### Idé
+Når lokationer i Jylland eller Fyn bookes, skal der automatisk vises en oversigt hvor man kan tildele hoteller. Systemet husker tidligere brugte hoteller per by, så man hurtigt kan genbruge dem.
 
-### Losning
-Aendr panelet til at vise en **samlet kapacitetsoversigt** i stedet for at duplikere tallene per kunde:
+### Database (nye tabeller)
 
-- **En enkelt "Pa vagt" raekke** der viser det samlede antal tilgaengelige FM-medarbejdere per dag
-- **En enkelt "Kapacitet" raekke** der viser det samlede antal lokationer teamet kan daekke (tilgaengelige / 2)
-- **"Booket lok." per kunde** -- her giver det mening at vise per kunde, da bookinger ER per kunde
-- **"Mangler" raekke** der viser samlet kapacitet minus alle bookinger pa tvaers af kunder
+**1. `hotel` -- hotelregister**
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid | PK |
+| name | text | Hotelnavn (f.eks. "Zleep Hotel Kolding") |
+| city | text | By (f.eks. "Kolding") |
+| address | text | Adresse |
+| phone | text | Telefonnummer |
+| email | text | Email til booking |
+| notes | text | Bemærkninger (parkering, check-in tid osv.) |
+| times_used | integer | Antal gange brugt (for sortering) |
+| created_at | timestamptz | |
 
-### Forventet resultat
-```text
-Kapacitet uge 9
-1 lokation = 2 medarbejdere
+**2. `booking_hotel` -- kobling mellem booking og hotel**
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid | PK |
+| booking_id | uuid | FK til booking |
+| hotel_id | uuid | FK til hotel |
+| check_in | date | Check-in dato |
+| check_out | date | Check-out dato |
+| rooms | integer | Antal værelser |
+| confirmation_number | text | Bekræftelsesnummer |
+| status | text | "pending" / "confirmed" / "cancelled" |
+| price_per_night | numeric | Pris pr. nat |
+| notes | text | |
+| created_at | timestamptz | |
 
-              M    T    O    T    F    L    S
-Pa vagt      22   22   21   22   20    -    -
-Kapacitet    11   11   10   11   10    -    -
+### Ny fane: "Hoteller" (Hotel-ikon)
 
-Booket lok.
-  Eesy FM     5    5    5    5    4    1    1
-  Yousee      4    4    4    4    4    1    0
-  Total       9    9    9    9    8    2    1
+Fanen vises i BookingManagement med permission key `tab_fm_hotels`.
 
-Mangler       2    2    1    2    2    -    -
-```
+**Indhold i tre sektioner:**
 
-### Tekniske aendringer
+**Sektion 1: Kommende bookinger der kræver hotel**
+- Automatisk filtreret liste over bookinger hvor lokationen er i Jylland eller Fyn
+- Viser: Lokation, by, datoer, antal medarbejdere, hotelstatus (mangler/booket)
+- Farvekodning: Rod = intet hotel, gul = hotel tildelt men ubekræftet, gron = bekræftet
+- Knap "Tildel hotel" per booking
 
-**Fil: `src/components/vagt-flow/CapacityPanel.tsx`**
+**Sektion 2: Tildel hotel (dialog)**
+- Når man klikker "Tildel hotel" åbnes en dialog
+- Viser foreslåede hoteller baseret på by (sorteret efter `times_used`)
+- Mulighed for at tilføje nyt hotel hvis det ikke findes i listen
+- Felter: check-in, check-out (auto-udfyldt fra booking-datoer), antal værelser, bekræftelsesnummer, pris
 
-1. Fjern `capacityByClient` loop-strukturen og erstat med en samlet beregning:
-   - Beregn `totalAvailable` per dag en gang (samlet for alle FM-medarbejdere)
-   - Beregn `totalCapacity = Math.floor(totalAvailable / 2)` per dag
-   - Beregn bookinger per kunde per dag (behold eksisterende logik)
-   - Beregn `totalBooked` som sum af bookinger pa tvaers af alle kunder
-   - Beregn `remaining = totalCapacity - totalBooked`
+**Sektion 3: Hotelregister**
+- Samlet liste over alle kendte hoteller, grupperet per by
+- Viser antal gange brugt, kontaktinfo
+- Mulighed for at redigere/tilføje hoteller
 
-2. Opdater renderingen:
-   - Vis en samlet "Pa vagt" raekke med det reelle antal tilgaengelige medarbejdere
-   - Vis en samlet "Kapacitet" raekke (lokationer)
-   - Vis "Booket lok." med en underraekke per kunde + en total-raekke
-   - Vis en samlet "Mangler" raekke baseret pa total kapacitet minus total booket
+### Tekniske ændringer
 
-3. Tooltips opdateres til at reflektere den samlede beregning
+**Nye filer:**
+- `src/pages/vagt-flow/HotelsContent.tsx` -- Hovedkomponent for hotel-fanen
+- `src/components/vagt-flow/AssignHotelDialog.tsx` -- Dialog til at tildele hotel
+- `src/components/vagt-flow/HotelRegistry.tsx` -- Hotelregister-oversigt
+- `src/hooks/useBookingHotels.ts` -- React Query hooks til hotel-data
 
-Denne aendring sikrer at kapaciteten afspejler virkeligheden: der er en fast pulje FM-medarbejdere, og den samlede kapacitet skal daekke bookinger pa tvaers af alle kunder.
+**Ændrede filer:**
+- `src/pages/vagt-flow/BookingManagement.tsx` -- Tilføj "Hoteller" fane
+- Database migration -- Opret `hotel` og `booking_hotel` tabeller med RLS
+
+### Smart funktionalitet
+- Hoteller foreslås automatisk baseret på by-match (f.eks. booking i Kolding viser "Kolding hoteller" først)
+- `times_used` tæller op automatisk, så mest brugte hoteller vises øverst
+- Overblik over alle kommende bookinger der mangler hotel (rød indikator)
+- Historik-visning: "Sidst brugt til [markedsnavn] den [dato]"
+
