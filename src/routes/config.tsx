@@ -28,6 +28,7 @@ import {
   VagtSalesRegistration,
   VagtTravelExpenses,
   VagtEditSalesRegistrations,
+  MyBookingSchedule,
   ShiftOverview,
   MySchedule,
   AbsenceManagement,
@@ -167,6 +168,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
+  { path: "/vagt-flow/my-schedule", component: MyBookingSchedule, access: "role", positionPermission: "menu_fm_my_schedule" },
   { path: "/vagt-flow", component: VagtFlowIndex, access: "role", positionPermission: "menu_fm_overview" },
   {
     path: "/vagt-flow/booking",
