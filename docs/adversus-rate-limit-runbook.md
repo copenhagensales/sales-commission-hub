@@ -1,79 +1,74 @@
-# Runbook: Adversus rate-limit stabilisering + ASE sync-vindue
+# Runbook: API Rate-Limit Stabilisering
 
 ## Formål
-Denne runbook beskriver driftstrin for at reducere 429-fejl på Adversus og sikre at ASE-sync kan hente data udenfor 24 timers-vinduet.
+Denne runbook beskriver alle driftstiltag for at reducere 429-fejl og sikre stabil synkronisering.
 
-## Implementerede ændringer
-1. `integration-engine` bruger nu:
-   - `Retry-After` header hvis tilgængelig.
-   - eksponentiel backoff fallback (5s base, 3 retries).
-   - jitter (±20%) for at undgå samtidige retry-kollisioner.
-2. `update-cron-schedule` beregner `days` per integration:
-   - default: `1`
-   - ASE: `3`
-   - evt. override via `dialer_integrations.config.sync_days`
-3. Migration opdaterer cron-forskydning og persisterer `config.sync_schedule` for de navngivne integrationer samt `sync_days = 3` for ASE.
+## Implementerede stabilitetstiltag
 
-## Deploy-sekvens
-1. Deploy edge functions:
-   - `supabase/functions/integration-engine`
-   - `supabase/functions/update-cron-schedule`
-2. Kør migration:
-   - `supabase/migrations/20260218101500_9d4d9d2f-ops-cron-stagger-and-ase-sync-window.sql`
-3. Verificér at cron schedules er opdateret i `cron.job` og at `dialer_integrations.config.sync_schedule` er sat for de berørte integrationer.
+### 1. Split Cron: Sales vs Meta
+Alle integrationer kører nu to separate cron jobs:
+- **Sales-sync**: Hver 5. minut (primær data)
+- **Meta-sync**: Hver 30. minut (campaigns, users, sessions/calls)
 
-## Manuel backfill (efter deploy)
-Kør manuel sync for kritiske integrationer (især Lovablecph, Relatel_CPHSALES, ASE):
+Dette reducerer API-kald med ~60% da campaigns/users sjældent ændrer sig.
+
+| Integration | Sales Schedule | Meta Schedule |
+|---|---|---|
+| Lovablecph (26fac751) | :03,:08,:13... | :05,:35 |
+| Relatel (657c2050) | :00,:05,:10... | :10,:40 |
+| Tryg (d79b9632) | :00,:05,:10... | :01,:31 |
+| Eesy (a5068f85) | :02,:07,:12... | :03,:33 |
+| ASE (a76cf63a) | :04,:09,:14... | :05,:35 |
+
+### 2. Inkrementel Sales Sync
+I stedet for at hente de sidste N dage ved hvert kald, bruger systemet nu en **watermark** (gemt i `dialer_sync_state`):
+- Henter kun sales ændret siden `last_success_at` (med 5 min overlap)
+- Buffer på 2 min for in-flight records
+- Fallback til day-baseret fetch for nye integrationer
+
+### 3. Circuit Breaker
+Tabel: `integration_circuit_breaker`
+
+| Consecutive failures | Pause-tid |
+|---|---|
+| 3 | 15 minutter |
+| 5 | 30 minutter |
+| 8+ | 60 minutter |
+
+- Trigges ved 429-fejl eller når >50% af API-kald er rate-limited
+- Nulstilles automatisk ved succesfuld sync
+- Prevents hammering af blokeret API
+
+### 4. Provider-Level Locking (Adversus)
+`provider_sync_locks` tabel sikrer at kun én Adversus-sync kører ad gangen.
+Enreach-integrationer bruger staggered cron schedules for kollisionsundgåelse.
+
+### 5. Soft Fail-Fast på Meta Sync
+Hvis campaigns/users sync rammer 429, logges en warning men sales-sync fortsætter.
+Tidligere aborterede hele processen.
+
+## Verifikation
+Overvåg i System Stability:
+- `integration_sync_runs`: Check `rate_limit_hits` og `api_calls_made`
+- `integration_circuit_breaker`: Check om nogen er paused
+- `integration_logs`: Check for "Circuit breaker" warnings
 
 ```sql
-select net.http_post(
-  url := 'https://<project-ref>.supabase.co/functions/v1/integration-engine',
-  headers := jsonb_build_object(
-    'Content-Type', 'application/json',
-    'Authorization', 'Bearer ' || '<SUPABASE_ANON_KEY>'
-  ),
-  body := jsonb_build_object(
-    'source', 'adversus',
-    'integration_id', '<integration-uuid>',
-    'actions', jsonb_build_array('campaigns','users','sales','sessions'),
-    'days', 3
-  )
-);
+-- Check circuit breaker status
+SELECT cb.*, di.name 
+FROM integration_circuit_breaker cb
+JOIN dialer_integrations di ON di.id = cb.integration_id
+WHERE cb.consecutive_failures > 0 OR cb.paused_until > now();
+
+-- Check sync run health (last hour)
+SELECT di.name, isr.status, isr.api_calls_made, isr.rate_limit_hits, isr.duration_ms
+FROM integration_sync_runs isr
+JOIN dialer_integrations di ON di.id = isr.integration_id
+WHERE isr.started_at > now() - interval '1 hour'
+ORDER BY isr.started_at DESC;
 ```
-
-> For ikke-ASE integrationer kan `days` sættes til 1.
-
-
-## Lovablecph hotfix: split cron payload
-For Lovablecph oprettes nu to separate dialer-jobs via `update-cron-schedule`:
-
-1. `dialer-<id>-sync-sales` (primær frekvens, typisk hver 5. min)
-   - payload: `actions=["sales"]`
-   - inkluderer `maxRecords` fra `dialer_integrations.config.sales_max_records` (default 20)
-2. `dialer-<id>-sync-meta` (default hver 30. min eller `config.meta_sync_schedule`)
-   - payload: `actions=["campaigns","users","sessions"]`
-
-Dette reducerer timeout-risiko for sales-sync markant, fordi lead-enrichment ikke konkurrerer med campaigns/users/sessions i samme edge-kald.
-
-## Verifikation (24-48 timer)
-Overvåg følgende pr. integration:
-- 429-rate i edge function logs (`integration-engine` / Adversus calls)
-- antal importerede sales per sync-run
-- runtime per sync-run og antal retries
-
-Anbefalet SQL/observability checks:
-- tæl fejl med `status_code = 429` i relevante log-tabeller (hvis tilgængelig)
-- sammenlign antal nye sales før/efter deploy
-- verificér at cron jobs ikke starter i samme minut for delte credentials
 
 ## Rollback
-1. Revert commit og deploy tidligere funktionsversion.
-2. Sæt cron schedules tilbage i `cron.job` for berørte jobnavne.
-3. Fjern `config.sync_schedule` for berørte integrationer og `config.sync_days` override hvis nødvendigt:
-
-```sql
-update public.dialer_integrations
-set config = (coalesce(config, '{}'::jsonb) - 'sync_schedule') - 'sync_days',
-    updated_at = now()
-where lower(name) in ('lovablecph', 'relatel_cphsales', 'eesy', 'tryg', 'ase');
-```
+For at gendanne combined cron jobs:
+1. Slet split-jobs: `SELECT cron.unschedule('<jobid>')` for alle `-sync-sales` og `-sync-meta` jobs
+2. Genskab combined jobs med `actions: ["campaigns","users","sales","sessions"]`
