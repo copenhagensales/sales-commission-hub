@@ -6,7 +6,7 @@ import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -87,6 +87,20 @@ export default function MyBookingSchedule() {
     enabled: bookingIds.length > 0,
   });
 
+  // Fetch hotel bookings for my bookings this week
+  const { data: bookingHotels } = useQuery({
+    queryKey: ["my-booking-hotels", bookingIds],
+    queryFn: async () => {
+      if (bookingIds.length === 0) return [];
+      const { data } = await (supabase as any)
+        .from("booking_hotel")
+        .select("booking_id, check_in, check_out, notes, status, hotel:hotel_id ( name, address, city, phone )")
+        .in("booking_id", bookingIds);
+      return data ?? [];
+    },
+    enabled: bookingIds.length > 0,
+  });
+
   // Fetch diets for me this week
   const { data: diets } = useQuery({
     queryKey: ["my-booking-diets", employeeId, bookingIds],
@@ -143,17 +157,37 @@ export default function MyBookingSchedule() {
           (p: any) => p.booking_id === a.booking_id && p.date === a.date
         ) ?? [];
 
+        // Match hotel: check if this day falls within check_in/check_out
+        const hotelForBooking = bookingHotels?.find((bh: any) => {
+          if (bh.booking_id !== a.booking_id) return false;
+          if (bh.check_in && bh.check_out) {
+            return a.date >= bh.check_in && a.date <= bh.check_out;
+          }
+          return true; // fallback: show on all days
+        });
+
         days[a.date].assignments.push({
           ...a,
           vehicle: vehicleForDay?.vehicle,
           diet: dietForDay,
           partners: partnersForDay.map((p: any) => p.employee?.first_name).filter(Boolean),
+          hotel: hotelForBooking ? {
+            name: hotelForBooking.hotel?.name,
+            address: hotelForBooking.hotel?.address,
+            city: hotelForBooking.hotel?.city,
+            phone: hotelForBooking.hotel?.phone,
+            checkIn: hotelForBooking.check_in,
+            checkOut: hotelForBooking.check_out,
+            notes: hotelForBooking.notes,
+            isCheckInDay: a.date === hotelForBooking.check_in,
+            isCheckOutDay: a.date === hotelForBooking.check_out,
+          } : null,
         });
       }
     });
 
     return Object.values(days);
-  }, [assignments, vehicles, diets, partners, weekStart]);
+  }, [assignments, vehicles, diets, partners, bookingHotels, weekStart]);
 
   // Find next upcoming shift
   const nextShift = useMemo(() => {
@@ -297,7 +331,48 @@ export default function MyBookingSchedule() {
                                     Diæt
                                   </Badge>
                                 )}
+                                {a.hotel && (
+                                  <Badge variant="outline" className="bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-100 dark:border-blue-700 gap-1">
+                                    <Hotel className="h-3 w-3" />
+                                    {a.hotel.name || "Hotel"}
+                                  </Badge>
+                                )}
                               </div>
+
+                              {/* Hotel detail callout on check-in day */}
+                              {a.hotel?.isCheckInDay && (
+                                <div className="ml-6 mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
+                                    <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">{a.hotel.name || "Hotel"}</span>
+                                  </div>
+                                  {(a.hotel.address || a.hotel.city) && (
+                                    <p className="text-sm text-foreground ml-5 mb-1">
+                                      {[a.hotel.address, a.hotel.city].filter(Boolean).join(", ")}
+                                    </p>
+                                  )}
+                                  <div className="text-sm text-foreground ml-5 space-y-0.5">
+                                    <p>Indtjekning: {format(parseISO(a.hotel.checkIn), "EEEE d. MMM", { locale: da })}</p>
+                                    <p>Udtjekning: {format(parseISO(a.hotel.checkOut), "EEEE d. MMM", { locale: da })}</p>
+                                  </div>
+                                  {a.hotel.phone && (
+                                    <p className="text-xs text-muted-foreground ml-5 mt-1">Tlf: {a.hotel.phone}</p>
+                                  )}
+                                  {a.hotel.notes && (
+                                    <p className="text-xs text-muted-foreground ml-5 mt-1 italic">{a.hotel.notes}</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Hotel checkout reminder */}
+                              {a.hotel?.isCheckOutDay && !a.hotel?.isCheckInDay && (
+                                <div className="ml-6 mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                                  <div className="flex items-center gap-1.5">
+                                    <Hotel className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
+                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Udtjekning i dag – {a.hotel.name}</span>
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Booking comment callout */}
                               {booking?.comment && (
