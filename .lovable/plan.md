@@ -1,39 +1,36 @@
 
 
-## Tilføj hotel-info på medarbejderens vagtplan
+## Vis hotel-detaljer på alle dage + tilføj ind/ud-tidspunkter
 
-### Hvad ændres
-Medarbejdere skal kunne se deres hotel-booking direkte i vagtplanen -- med hotelnavn, adresse, check-in/check-out tidspunkter og eventuelle noter. Hotelkortet vises som et pænt callout-kort (ligesom booking-noten) på de relevante dage.
+### Problem
+1. Hotel-adressen og check-in/out datoer vises kun pa den forste vagtdag -- pa de ovrige dage ser medarbejderen kun et badge uden info.
+2. Databasen gemmer kun datoer (ikke klokkeslaet) for check-in og check-out.
 
-### Teknisk plan
+### Losning
 
-**Fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`**
+**1. Database: Tilføj tidsfelter (migration)**
 
-1. **Ny data-query: Hent booking_hotel data**
-   - Tilføj en `useQuery` der henter `booking_hotel` + `hotel`-stamdata for ugens `bookingIds`
-   - Felter: `booking_id`, `check_in`, `check_out`, `notes`, `status`, samt hotel: `name`, `address`, `city`, `phone`
+Tilføj to nye kolonner til `booking_hotel`:
+- `check_in_time` (time, nullable) -- f.eks. "15:00"
+- `check_out_time` (time, nullable) -- f.eks. "10:00"
 
-2. **Udvid dayData med hotel-info**
-   - I `useMemo` der grupperer data pr. dag: match hotel til assignment hvis dagens dato falder inden for `check_in`/`check_out` intervallet
-   - Tilføj `isCheckInDay` og `isCheckOutDay` flag så vi kan vise specielle labels
+```sql
+ALTER TABLE booking_hotel
+  ADD COLUMN check_in_time time,
+  ADD COLUMN check_out_time time;
+```
 
-3. **UI: Hotel-badge i badges-rækken**
-   - Tilføj blå `Badge` med `Hotel`-ikon og hotelnavn i samme række som bil og diæt
-   - Stil: `bg-blue-100 text-blue-800 border-blue-300` (matcher det eksisterende mønster fra BookingsContent)
+**2. Fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`**
 
-4. **UI: Hotel-detalje callout på check-in og check-out dage**
-   - På check-in dag: Vis et callout-kort (samme stil som booking-noten) med:
-     - Hotel-ikon + hotelnavn som header
-     - Adresse og by
-     - "Indtjekning: [dato]" 
-     - "Udtjekning: [dato]"
-     - Eventuelle noter fra hotelreservationen
-   - På check-out dag: Vis et kort reminder-callout med "Udtjekning i dag"
-   - På mellemliggende dage: Kun badge (ingen detaljer)
+- Udvid query til ogsa at hente `check_in_time` og `check_out_time`
+- Vis hotel-callout pa **alle dage** i hotelperioden (ikke kun check-in dag)
+- Callout'et viser altid: hotelnavn, adresse/by, check-in dato+tid, check-out dato+tid, telefon og noter
+- Pa check-in og check-out dage tilfojes en ekstra label ("Indtjekning i dag" / "Udtjekning i dag")
 
-5. **Import**
-   - Tilføj `Hotel` fra `lucide-react`
+**3. Fil: Admin-side (BookingsContent.tsx) -- valgfrit**
+
+- Tilfoej felter for `check_in_time` og `check_out_time` i hotel-tildelingsformularen sa planlaeggere kan indtaste tiderne
 
 ### Omfang
-En enkelt fil ændres (`MyBookingSchedule.tsx`), ingen database-ændringer.
-
+- 1 database-migration (2 kolonner)
+- 1-2 filer aendres (MyBookingSchedule.tsx + evt. BookingsContent.tsx)
