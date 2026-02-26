@@ -281,7 +281,8 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
                     <Users className="h-3 w-3 shrink-0" /> På vagt
                   </div>
                   {dayData.map((day, idx) => {
-                    const available = totalEmployees - day.absent;
+                    const isWeekendDay = day.date.getDay() === 0 || day.date.getDay() === 6;
+                    const available = isWeekendDay ? 0 : totalEmployees - day.absent;
                     return (
                       <Tooltip key={idx}>
                         <TooltipTrigger asChild>
