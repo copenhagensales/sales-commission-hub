@@ -98,7 +98,10 @@ export default function HotelsContent() {
               {bookings.map((booking: any) => {
                 const status = getStatus(booking.id);
                 const bh = hotelMap[booking.id];
-                const staffCount = booking.booking_assignment?.length || booking.expected_staff_count || 0;
+                const uniqueStaff = new Set(
+                  (booking.booking_assignment || []).map((a: any) => a.employee_id)
+                );
+                const staffCount = uniqueStaff.size || booking.expected_staff_count || 0;
 
                 return (
                   <Card key={booking.id} className={
