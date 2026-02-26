@@ -1007,6 +1007,11 @@ export function EditBookingDialog({
                       {campaign.name}
                     </SelectItem>
                   ))}
+                  {campaignId && !campaigns?.some((c: any) => c.id === campaignId) && (
+                    <SelectItem value={campaignId}>
+                      {booking?.client_campaigns?.name || "Indlæser..."}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
