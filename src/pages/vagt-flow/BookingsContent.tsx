@@ -791,18 +791,32 @@ export default function BookingsContent() {
 
       {/* Market bookings section */}
       {marketBookings && marketBookings.length > 0 && (
-        <Card className="border-indigo-200 bg-indigo-50/30 dark:border-indigo-800 dark:bg-indigo-950/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                <Tent className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Markeder denne uge</h3>
-                <p className="text-sm text-muted-foreground">{marketBookings.length} marked{marketBookings.length !== 1 ? 'er' : ''}</p>
-              </div>
-            </div>
-            <div className="space-y-4">
+        <Collapsible
+          open={expandedWeeks.has(`${selectedYear}-${selectedWeek}-markets`)}
+          onOpenChange={() => toggleWeekExpand(`${selectedYear}-${selectedWeek}-markets`)}
+          defaultOpen
+        >
+          <Card className="border-indigo-200 bg-indigo-50/30 dark:border-indigo-800 dark:bg-indigo-950/20">
+            <CollapsibleTrigger className="w-full">
+              <CardContent className="py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                    <Tent className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold">Markeder denne uge</h3>
+                    <p className="text-sm text-muted-foreground">{marketBookings.length} marked{marketBookings.length !== 1 ? 'er' : ''}</p>
+                  </div>
+                </div>
+                {expandedWeeks.has(`${selectedYear}-${selectedWeek}-markets`) ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </CardContent>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t px-6 pb-6 pt-4 space-y-4">
               {marketBookings.map((booking: any) => (
                 <div key={booking.id} className="p-4 border rounded-lg bg-card hover:bg-muted/50">
                   <div className="flex items-center justify-between mb-3">
@@ -894,9 +908,10 @@ export default function BookingsContent() {
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
 
