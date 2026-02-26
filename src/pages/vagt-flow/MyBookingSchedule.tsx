@@ -51,7 +51,7 @@ export default function MyBookingSchedule() {
           id, date, start_time, end_time, booking_id,
           booking:booking_id (
             id, week_number, year,
-            location:location_id ( id, name, address_city ),
+            location:location_id ( id, name, address_city, address_street ),
             client:client_id ( name ),
             campaign:campaign_id ( name ),
             comment
@@ -323,6 +323,19 @@ export default function MyBookingSchedule() {
                                   {location?.address_city && `, ${location.address_city}`}
                                 </span>
                               </div>
+                              {(location?.address_street || location?.address_city) && (
+                                <div className="flex items-center gap-2 ml-6">
+                                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([location.address_street, location.address_city].filter(Boolean).join(", "))}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-primary underline hover:text-primary/80"
+                                  >
+                                    {[location.address_street, location.address_city].filter(Boolean).join(", ")}
+                                  </a>
+                                </div>
+                              )}
 
                               {/* Client / Campaign */}
                               {(client?.name || campaign?.name) && (
