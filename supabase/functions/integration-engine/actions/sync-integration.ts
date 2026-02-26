@@ -3,6 +3,7 @@ import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
 import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError, checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker } from "../utils/index.ts";
 import { CampaignMappingConfig } from "../types.ts";
+import { acquireRunLock, releaseRunLock, generateRunId } from "../utils/run-lock.ts";
 
 interface SyncOptions {
   source?: string;
@@ -68,13 +69,13 @@ const getEffectiveActionList = (
 
 interface SyncResult {
   name: string;
-  status: "success" | "error";
+  status: "success" | "error" | "partial_success" | "skipped_locked";
   data?: Record<string, unknown>;
   error?: string;
 }
 
 /**
- * Process a single integration sync
+ * Process a single integration sync with per-integration run lock
  */
 export async function syncIntegration(
   supabase: SupabaseClient,
@@ -87,7 +88,31 @@ export async function syncIntegration(
   const { source, action, actions, days = 3, campaignId, from, to, maxRecords = 50 } = options;
   const actionList = getEffectiveActionList(integration, actions, action);
   const syncRunStartedAt = new Date();
+  const runId = generateRunId();
   let adapter: any = null;
+
+  // === Per-Integration Run Lock ===
+  const lockAcquired = await acquireRunLock(supabase, integration.id, runId, log);
+  if (!lockAcquired) {
+    // Record as skipped_locked — NOT an error
+    const now = new Date();
+    await supabase.from("integration_sync_runs").insert({
+      integration_id: integration.id,
+      started_at: syncRunStartedAt.toISOString(),
+      completed_at: now.toISOString(),
+      duration_ms: now.getTime() - syncRunStartedAt.getTime(),
+      status: "skipped_locked",
+      actions: actionList,
+      records_processed: 0,
+      api_calls_made: 0,
+      retries: 0,
+      rate_limit_hits: 0,
+      run_id: runId,
+      error_message: "Skipped: another sync run is already in progress",
+    });
+    return { name: integration.name, status: "skipped_locked", error: "Another sync run already in progress" };
+  }
+
   try {
     // === Circuit Breaker Check ===
     const cbState = await checkCircuitBreaker(supabase, integration.id);
@@ -100,7 +125,7 @@ export async function syncIntegration(
       };
     }
 
-    log("INFO", `Processing integration: ${integration.name}`);
+    log("INFO", `Processing integration: ${integration.name} (run_id=${runId}, actions=[${actionList.join(",")}])`);
 
     // Get decrypted credentials
     const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
@@ -119,15 +144,16 @@ export async function syncIntegration(
     );
 
     const runResults: Record<string, unknown> = {};
-
-    // Support both 'action' (legacy) and 'actions' (new array), with Lovablecph self-healing merge
+    const actionsExecuted: string[] = [];
+    const actionsSkipped: string[] = [];
+    let metaSyncRateLimited = false;
 
     // Process campaigns
-    let metaSyncRateLimited = false;
     if (actionList.includes("campaigns")) {
       try {
         const campaigns = await adapter.fetchCampaigns();
         runResults["campaigns"] = await engine.processCampaigns(campaigns);
+        actionsExecuted.push("campaigns");
       } catch (e) {
         log("WARN", `Campaign sync failed for ${integration.name}: ${(e as Error).message}`);
       }
@@ -139,44 +165,53 @@ export async function syncIntegration(
         const users = await adapter.fetchUsers();
         const dialerSource = (source || integration.provider) === "enreach" ? "enreach" : "adversus";
         runResults["users"] = await engine.processUsers(users, dialerSource);
+        actionsExecuted.push("users");
       } catch (e) {
         log("WARN", `User sync failed for ${integration.name}: ${(e as Error).message}`);
       }
     }
 
-    // Check rate-limit status after meta sync — log warning but continue to sales
-    // Previously this threw an error and aborted entirely, causing a permanent lock-out loop
-    // when the provider temporarily tightened rate limits.
+    // Check rate-limit status after meta sync — Enreach-specific targeted abort
     const provider = (source || integration.provider || "").toLowerCase();
-    if (provider === "enreach" || provider === "adversus") {
+    if (provider === "enreach") {
       const earlyMetrics = adapter.getMetrics();
       if (earlyMetrics.rateLimitHits > 0 && earlyMetrics.rateLimitHits >= earlyMetrics.apiCalls * 0.5) {
         metaSyncRateLimited = true;
-        log("WARN", `${provider} rate limited during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits}/${earlyMetrics.apiCalls} calls). Skipping meta but continuing to sales sync.`);
-        // Reset metrics so sales sync gets a clean budget assessment
+        log("WARN", `Enreach rate limited during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits}/${earlyMetrics.apiCalls} calls). Skipping heavy actions, marking as partial_success.`, {
+          provider,
+          integration: integration.name,
+          reason: "rate_limited_meta_abort",
+          actionsSkipped: actionList.filter(a => !actionsExecuted.includes(a)),
+        });
+        // Reset metrics so any remaining actions get clean budget
         adapter.resetMetrics();
       } else if (earlyMetrics.rateLimitHits > 0) {
-        log("INFO", `${provider} transient rate limits during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — retries recovered, continuing`);
+        log("INFO", `Enreach transient rate limits during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — retries recovered, continuing`);
+      }
+    }
+    // Adversus: log but do NOT abort — Adversus has higher rate limits
+    if (provider === "adversus") {
+      const earlyMetrics = adapter.getMetrics();
+      if (earlyMetrics.rateLimitHits > 0) {
+        log("INFO", `Adversus transient rate limits for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — continuing without abort`);
       }
     }
 
-    // Process sales
-    if (actionList.includes("sales") || action === "sync") {
+    // Process sales (skip if Enreach rate-limited during meta)
+    if ((actionList.includes("sales") || action === "sync") && !metaSyncRateLimited) {
       const useExplicitRange = from && to;
       let sales: any[] = [];
       let salesWindowEnd: Date | null = null;
       
       if (useExplicitRange && (adapter as any).fetchSalesRange) {
-        // Explicit range provided (manual trigger or backfill)
         log("INFO", `Fetching sales by explicit range ${from} -> ${to}`);
         sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings, maxRecords);
       } else if ((adapter as any).fetchSalesRange) {
-        // === Incremental sales sync using watermark ===
         const salesSyncState = await getSyncState(supabase, integration.id, "sales");
         const windowStart = salesSyncState?.last_success_at
-          ? new Date(new Date(salesSyncState.last_success_at).getTime() - 5 * 60 * 1000) // 5-min overlap
+          ? new Date(new Date(salesSyncState.last_success_at).getTime() - 5 * 60 * 1000)
           : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        salesWindowEnd = new Date(Date.now() - 2 * 60 * 1000); // 2-min buffer
+        salesWindowEnd = new Date(Date.now() - 2 * 60 * 1000);
 
         log("INFO", `Incremental sales sync: ${windowStart.toISOString()} -> ${salesWindowEnd.toISOString()}`);
         sales = await (adapter as any).fetchSalesRange(
@@ -185,7 +220,6 @@ export async function syncIntegration(
           maxRecords
         );
       } else {
-        // Fallback: day-based fetch
         sales = await adapter.fetchSales(days, campaignMappings, maxRecords);
       }
       
@@ -196,24 +230,20 @@ export async function syncIntegration(
         log("INFO", `Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
       }
 
-      // Sort sales by date DESCENDING (newest first) before applying limit
-      // This ensures today's sales are always processed first, regardless of backlog size
       sales.sort((a, b) => {
         const dateA = new Date(a.saleDate || a.date || 0).getTime();
         const dateB = new Date(b.saleDate || b.date || 0).getTime();
-        return dateB - dateA; // Newest first
+        return dateB - dateA;
       });
 
-      // Apply max records limit to prevent CPU timeout
       if (maxRecords && sales.length > maxRecords) {
         log("INFO", `Limiting sales from ${sales.length} to ${maxRecords} (keeping newest)`);
         sales = sales.slice(0, maxRecords);
       }
 
-      // Use smaller batch size (200) to reduce CPU pressure
       runResults["sales"] = await engine.processSales(sales, 200);
+      actionsExecuted.push("sales");
 
-      // Save debug log if adapter supports it
       const debugData = (adapter as any).getLastDebugData?.();
       if (debugData) {
         log("INFO", `Saving debug log for ${integration.name}...`);
@@ -227,14 +257,16 @@ export async function syncIntegration(
         await saveDebugLog(supabase, debugEntry);
       }
 
-      // Update sales sync state watermark on success
       if (salesWindowEnd) {
         await upsertSyncState(supabase, integration.id, "sales", salesWindowEnd);
       }
+    } else if (metaSyncRateLimited && actionList.includes("sales")) {
+      actionsSkipped.push("sales");
+      runResults["sales"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
-    // Process calls (CDR - GDPR Compliant)
-    if (actionList.includes("calls")) {
+    // Process calls
+    if (actionList.includes("calls") && !metaSyncRateLimited) {
       let calls: any[] = [];
       
       if ((adapter as any).fetchCallsRange && from && to) {
@@ -242,17 +274,18 @@ export async function syncIntegration(
         calls = await (adapter as any).fetchCallsRange({ from, to });
         log("INFO", `Fetched ${calls.length} calls`);
         runResults["calls"] = await engine.processCalls(calls, integration.id);
+        actionsExecuted.push("calls");
       } else if (adapter.fetchCalls) {
         log("INFO", `Fetching calls for ${integration.name}...`);
         calls = await adapter.fetchCalls(days);
         log("INFO", `Fetched ${calls.length} calls`);
         runResults["calls"] = await engine.processCalls(calls, integration.id);
+        actionsExecuted.push("calls");
       } else {
         log("INFO", `Adapter for ${integration.name} does not support fetchCalls`);
         runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
       }
 
-      // Save debug log for calls
       const callsDebugData = (adapter as any).getLastDebugData?.();
       if (callsDebugData?.rawCalls) {
         log("INFO", `Saving calls debug log for ${integration.name}...`);
@@ -265,18 +298,15 @@ export async function syncIntegration(
         );
         await saveDebugLog(supabase, callsDebugEntry);
       }
+    } else if (metaSyncRateLimited && actionList.includes("calls")) {
+      actionsSkipped.push("calls");
+      runResults["calls"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
-    // Process sessions (ALL outcomes for hitrate analytics)
-    if (actionList.includes("sessions")) {
+    // Process sessions (skip if Enreach rate-limited)
+    if (actionList.includes("sessions") && !metaSyncRateLimited) {
       try {
-        // 1. Read sync state for incremental window
         const syncState = await getSyncState(supabase, integration.id, "sessions");
-        
-        // 2. Calculate window
-        //    start = last_success_at - 5min overlap (catch late-registered records)
-        //    stop = now - 2min (avoid in-flight records)
-        //    Fallback for new integration: days parameter
         const windowStart = syncState?.last_success_at
           ? new Date(new Date(syncState.last_success_at).getTime() - 5 * 60 * 1000)
           : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -284,7 +314,6 @@ export async function syncIntegration(
 
         log("INFO", `Sessions window: ${windowStart.toISOString()} -> ${windowEnd.toISOString()}`);
 
-        // 3. Fetch via adapter
         let sessions: any[] = [];
         if ((adapter as any).fetchSessionsRange) {
           sessions = await (adapter as any).fetchSessionsRange({
@@ -298,15 +327,14 @@ export async function syncIntegration(
           runResults["sessions"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support sessions" };
         }
 
-        // 4. Process and upsert
         if (sessions.length > 0) {
           log("INFO", `Fetched ${sessions.length} sessions, processing...`);
           runResults["sessions"] = await engine.processSessions(sessions, integration.id);
+          actionsExecuted.push("sessions");
         } else if (!runResults["sessions"]) {
           runResults["sessions"] = { processed: 0, errors: 0, matched: 0, message: "No sessions found" };
         }
 
-        // 5. Update sync state on success
         await upsertSyncState(supabase, integration.id, "sessions", windowEnd);
       } catch (sessErr) {
         const sessErrMsg = sessErr instanceof Error ? sessErr.message : String(sessErr);
@@ -314,70 +342,78 @@ export async function syncIntegration(
         await recordSyncError(supabase, integration.id, "sessions", sessErrMsg);
         runResults["sessions"] = { processed: 0, errors: 1, message: sessErrMsg };
       }
+    } else if (metaSyncRateLimited && actionList.includes("sessions")) {
+      actionsSkipped.push("sessions");
+      runResults["sessions"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
     await supabase
       .from("dialer_integrations")
-      .update({ last_sync_at: new Date().toISOString(), last_status: "success" })
+      .update({ last_sync_at: new Date().toISOString(), last_status: metaSyncRateLimited ? "partial" : "success" })
       .eq("id", integration.id);
 
-    // Log success to integration_logs
+    // Determine final status
+    const finalStatus: "success" | "partial_success" = metaSyncRateLimited ? "partial_success" : "success";
+
+    // Log summary
     const actionSummary = Object.entries(runResults)
       .map(([name, result]) => {
-        const typedResult = result as { processed?: number; matched?: number } | undefined;
+        const typedResult = result as { processed?: number; matched?: number; message?: string } | undefined;
         if (typedResult?.processed === undefined) return null;
-        if (name === "calls") {
-          return `${typedResult.processed} calls (${typedResult.matched || 0} matched)`;
-        }
+        if (typedResult.message?.includes("Skipped")) return `${name}:skipped`;
+        if (name === "calls") return `${typedResult.processed} calls (${typedResult.matched || 0} matched)`;
         return `${typedResult.processed} ${name}`;
       })
       .filter((part): part is string => Boolean(part));
 
-    // Calculate total records processed
     const totalRecords = Object.values(runResults).reduce((sum: number, r: any) => sum + (r?.processed || 0), 0);
 
     const syncMessage = actionSummary.length > 0
-      ? `Sync completed: ${actionSummary.join(", ")} (total ${totalRecords})`
-      : "Sync completed: No data processed";
+      ? `Sync ${finalStatus}: ${actionSummary.join(", ")} (total ${totalRecords})`
+      : `Sync ${finalStatus}: No data processed`;
 
-    // Calculate sync run duration
     const syncRunCompletedAt = new Date();
     const syncRunDurationMs = syncRunCompletedAt.getTime() - syncRunStartedAt.getTime();
 
-    // Get API metrics from adapter
     const adapterMetrics = adapter.getMetrics();
 
-    // Insert into integration_sync_runs
+    log("INFO", `Sync completed: integration=${integration.name} status=${finalStatus} run_id=${runId} duration=${syncRunDurationMs}ms executed=[${actionsExecuted.join(",")}] skipped=[${actionsSkipped.join(",")}] records=${totalRecords}`);
+
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,
       started_at: syncRunStartedAt.toISOString(),
       completed_at: syncRunCompletedAt.toISOString(),
       duration_ms: syncRunDurationMs,
-      status: "success",
+      status: finalStatus,
       actions: actionList.filter(Boolean) as string[],
       records_processed: totalRecords,
       api_calls_made: adapterMetrics.apiCalls,
       retries: adapterMetrics.retries,
       rate_limit_hits: adapterMetrics.rateLimitHits,
+      run_id: runId,
+      error_message: metaSyncRateLimited ? "rate_limited_meta_abort: heavy actions skipped" : null,
     });
 
     await supabase.from("integration_logs").insert({
       integration_type: "dialer",
       integration_id: integration.id,
       integration_name: integration.name,
-      status: "success",
+      status: finalStatus === "partial_success" ? "warning" : "success",
       message: syncMessage,
       duration_ms: syncRunDurationMs,
       details: {
         source,
         actions: actionList.filter(Boolean) as string[],
+        actionsExecuted,
+        actionsSkipped,
         days,
         campaignId: campaignId || null,
         results: runResults,
+        runId,
       },
     });
 
-    // Reset circuit breaker on success — BUT if heavily rate-limited, record as failure
+    // Circuit breaker logic
     const heavilyRateLimited = adapterMetrics.rateLimitHits > 0 && adapterMetrics.rateLimitHits >= adapterMetrics.apiCalls * 0.5;
     if (heavilyRateLimited && totalRecords === 0) {
       const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, `Sync succeeded but 100% rate-limited (${adapterMetrics.rateLimitHits}/${adapterMetrics.apiCalls})`);
@@ -388,19 +424,19 @@ export async function syncIntegration(
       await resetCircuitBreaker(supabase, integration.id);
     }
 
-    return { name: integration.name, status: "success", data: runResults };
+    return { name: integration.name, status: finalStatus, data: runResults };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
-    log("ERROR", `Error in integration ${integration.name}: ${errMsg}`);
+    log("ERROR", `Error in integration ${integration.name}: ${errMsg}`, {
+      provider: source || integration.provider,
+      integration: integration.name,
+      runId,
+    });
 
-    // Calculate error run duration
     const errorCompletedAt = new Date();
     const errorDurationMs = errorCompletedAt.getTime() - syncRunStartedAt.getTime();
-
-    // Get partial metrics from adapter (may have partial data before error)
     const errorMetrics = adapter?.getMetrics?.() ?? { apiCalls: 0, retries: 0, rateLimitHits: 0 };
 
-    // Insert error sync run
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,
       started_at: syncRunStartedAt.toISOString(),
@@ -413,9 +449,9 @@ export async function syncIntegration(
       retries: errorMetrics.retries,
       rate_limit_hits: errorMetrics.rateLimitHits,
       error_message: errMsg,
+      run_id: runId,
     });
 
-    // Log error to integration_logs
     await supabase.from("integration_logs").insert({
       integration_type: "dialer",
       integration_id: integration.id,
@@ -429,10 +465,11 @@ export async function syncIntegration(
         days: options.days,
         campaignId: options.campaignId || null,
         error: errMsg,
+        runId,
       },
     });
 
-    // Record circuit breaker failure (especially for rate-limit errors)
+    // Circuit breaker for rate-limit errors
     const isRateLimitError = errMsg.includes("429") || errMsg.includes("rate limit") || (errorMetrics.rateLimitHits > 0 && errorMetrics.rateLimitHits >= errorMetrics.apiCalls * 0.5);
     if (isRateLimitError) {
       const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, errMsg);
@@ -442,5 +479,8 @@ export async function syncIntegration(
     }
 
     return { name: integration.name, status: "error", error: errMsg };
+  } finally {
+    // === Always release lock ===
+    await releaseRunLock(supabase, integration.id, runId, log);
   }
 }

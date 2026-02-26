@@ -145,8 +145,10 @@ export default function SystemStability() {
     const runs1h = intRuns.length > 0
       ? intRuns.filter(r => new Date(r.started_at).getTime() > oneHourAgo)
       : intLogs.filter((l: any) => new Date(l.created_at).getTime() > oneHourAgo);
-    const successCount = runs1h.filter((r: any) => r.status === "success").length;
-    const successRate1h = runs1h.length > 0 ? (successCount / runs1h.length) * 100 : 100;
+    // Count success + partial_success as non-errors; skipped_locked is neutral (excluded from denominator)
+    const meaningfulRuns = runs1h.filter((r: any) => r.status !== "skipped_locked");
+    const successCount = meaningfulRuns.filter((r: any) => r.status === "success" || r.status === "partial_success").length;
+    const successRate1h = meaningfulRuns.length > 0 ? (successCount / meaningfulRuns.length) * 100 : 100;
 
     const runs15m = intRuns.length > 0
       ? intRuns.filter(r => new Date(r.started_at).getTime() > fifteenMinAgo)

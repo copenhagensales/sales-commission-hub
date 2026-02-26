@@ -5859,6 +5859,38 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_run_locks: {
+        Row: {
+          created_at: string
+          expires_at: string
+          integration_id: string
+          locked_at: string
+          locked_by: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          integration_id: string
+          locked_at?: string
+          locked_by: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          integration_id?: string
+          locked_at?: string
+          locked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_run_locks_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_schedule_audit: {
         Row: {
           change_type: string
@@ -5916,6 +5948,7 @@ export type Database = {
           rate_limit_hits: number | null
           records_processed: number | null
           retries: number | null
+          run_id: string | null
           started_at: string
           status: string
         }
@@ -5931,6 +5964,7 @@ export type Database = {
           rate_limit_hits?: number | null
           records_processed?: number | null
           retries?: number | null
+          run_id?: string | null
           started_at?: string
           status?: string
         }
@@ -5946,6 +5980,7 @@ export type Database = {
           rate_limit_hits?: number | null
           records_processed?: number | null
           retries?: number | null
+          run_id?: string | null
           started_at?: string
           status?: string
         }
