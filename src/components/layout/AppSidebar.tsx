@@ -438,7 +438,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if any Fieldmarketing items are visible (requires section permission)
   const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
-    (p.canViewFmOverview || p.canViewFmBookWeek || 
+    (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
      p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
      p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
      false);
@@ -1145,6 +1145,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewFmMySchedule && (
+                  <NavLink to="/vagt-flow/my-schedule" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/vagt-flow/my-schedule" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <UserCheck className="h-4 w-4" />
+                    Min vagtplan
+                  </NavLink>
+                )}
                 {p.canViewFmOverview && (
                   <NavLink to="/vagt-flow" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",

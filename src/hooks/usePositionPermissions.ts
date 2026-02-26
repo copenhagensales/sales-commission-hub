@@ -574,6 +574,7 @@ export function usePermissions() {
     canViewExtraWork: canView("menu_extra_work"),
     canViewExtraWorkAdmin: canView("menu_extra_work_admin"),
     // Fieldmarketing menu
+    canViewFmMySchedule: canView("menu_fm_my_schedule"),
     canViewFmOverview: canView("menu_fm_overview"),
     canEditFmOverview: canEdit("menu_fm_overview"),
     canViewFmBookWeek: canView("menu_fm_book_week"),
