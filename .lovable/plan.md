@@ -1,24 +1,21 @@
 
 
-## Fix: Kampagne nulstilles ved åbning af Rediger-dialog
+## Fix: Fraværsadvarsel vises for hele ugen i stedet for kun valgte dage
 
 ### Problem
-Når du åbner Rediger-dialogen, sættes både kunde og kampagne med det samme (fra bookingdata). Men kampagne-listen hentes asynkront baseret på den valgte kunde. I det korte øjeblik hvor listen endnu ikke er hentet, har Select-komponenten en værdi (`campaignId`) men ingen matchende valgmuligheder - så den viser "Vælg kampagne" i stedet for den korrekte kampagne.
+Når Julie har fravær mandag og tirsdag, men bookingen kun er på fredag, vises fraværsadvarslen (grøn boks + "vacation, day_off") alligevel. Det er fordi koden tjekker om medarbejderen har **nogen som helst** fravær i ugen - ikke om fraværet overlapper med de **valgte dage**.
 
-Det betyder at du skal vælge kampagnen igen, selvom den allerede var sat.
+Interessant nok gør dropdown-listen det korrekt allerede (linje 1296-1298) - den tjekker kun de valgte booking-dage. Men den ydre visning (linje 1270-1274) bruger en bredere check.
 
 ### Løsning
-Tilføj kampagnens aktuelle ID og navn som et fallback-element i Select-listen, så den altid kan vise den korrekte værdi - også mens kampagne-listen loader.
+Ændre linje 1270-1274 i `EditBookingDialog.tsx` til kun at markere medarbejderen hvis fraværet overlapper med de faktisk valgte dage (`booked_days`).
 
-### Ændring
+### Ændring i `src/components/vagt-flow/EditBookingDialog.tsx`
 
-**`src/components/vagt-flow/EditBookingDialog.tsx`**
+**Linje 1270-1274**: Erstat den brede `absencesByEmployeeAndDay.has(emp)` check med en dag-specifik check der bruger `booking?.booked_days`:
 
-I kampagne-Select (linje ~1004-1010): Tilføj et fallback `<SelectItem>` når `campaignId` er sat men ikke findes i den loadede `campaigns`-liste. Bookingen indeholder allerede kampagnenavnet (via join), så vi kan vise det korrekt.
+- `hasAbsence` skal tjekke om medarbejderens fravær overlapper med `booked_days`
+- `absenceTypes` skal kun vise fraværstyper for de overlappende dage, ikke alle ugens fravær
 
-Konkret:
-- Tjek om `campaignId` allerede findes i `campaigns`-listen
-- Hvis ikke (fx fordi listen stadig loader), vis et midlertidigt SelectItem med booking-kampagnens navn
-- Når listen loader færdig, overtager de rigtige items automatisk
+Det er en ~6-linjers ændring der sikrer at advarslen kun vises når fraværet faktisk konflikter med de valgte booking-dage.
 
-Det er en ~5-linjers ændring der fjerner behovet for at genvælge kampagnen.
