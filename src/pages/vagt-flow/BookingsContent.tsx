@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
@@ -270,6 +270,39 @@ export default function BookingsContent() {
     },
     enabled: !!bookings && bookings.length > 0,
   });
+
+  // Fetch booking_diet data for diet tags
+  const allBookingIds = useMemo(() => {
+    const ids = [
+      ...(bookings?.map((b: any) => b.id) || []),
+      ...(marketBookings?.map((b: any) => b.id) || []),
+    ];
+    return [...new Set(ids)];
+  }, [bookings, marketBookings]);
+
+  const { data: bookingDiets = [] } = useQuery({
+    queryKey: ["vagt-booking-diets", selectedWeek, selectedYear],
+    queryFn: async () => {
+      if (allBookingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("id, booking_id, date")
+        .in("booking_id", allBookingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allBookingIds.length > 0,
+  });
+
+  // Build lookup: booking_id + date -> has diet
+  const dietByBookingDate = useMemo(() => {
+    const map = new Set<string>();
+    for (const d of bookingDiets as any[]) {
+      if (!d.date) continue;
+      map.add(`${d.booking_id}_${d.date}`);
+    }
+    return map;
+  }, [bookingDiets]);
 
   // Build lookup: booking_id + date -> unique vehicles
   const vehiclesByBookingDate = useMemo(() => {
@@ -729,6 +762,18 @@ export default function BookingsContent() {
                                   </div>
                                 );
                               })()}
+                              {(() => {
+                                const dateStr = format(dayDate, "yyyy-MM-dd");
+                                if (!dietByBookingDate.has(`${booking.id}_${dateStr}`)) return null;
+                                return (
+                                  <div className="mt-1 flex flex-col items-center">
+                                    <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
+                                      <Utensils className="h-2 w-2" />
+                                      Diæt
+                                    </Badge>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -816,6 +861,33 @@ export default function BookingsContent() {
                               ))}
                             </div>
                           )}
+                          {(() => {
+                            const dateStr = format(dayDate, "yyyy-MM-dd");
+                            const dayVehicles = vehiclesByBookingDate.get(`${booking.id}_${dateStr}`);
+                            if (!dayVehicles?.length) return null;
+                            return (
+                              <div className="mt-1 flex flex-col items-center gap-0.5">
+                                {dayVehicles.map((v, i) => (
+                                  <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">
+                                    <Car className="h-2 w-2" />
+                                    {v.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const dateStr = format(dayDate, "yyyy-MM-dd");
+                            if (!dietByBookingDate.has(`${booking.id}_${dateStr}`)) return null;
+                            return (
+                              <div className="mt-1 flex flex-col items-center">
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
+                                  <Utensils className="h-2 w-2" />
+                                  Diæt
+                                </Badge>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
