@@ -39,6 +39,8 @@ export interface ProviderBudget {
   provider: string;
   used1m: number;
   used60m: number;
+  quotaRemaining?: number | null;
+  quotaResetAt?: string | null;
 }
 
 interface UseStabilityAlertsParams {
@@ -175,6 +177,19 @@ export function useStabilityAlerts({
     // Per-provider budget checks
     for (const pb of providerBudgets) {
       const label = pb.provider.charAt(0).toUpperCase() + pb.provider.slice(1);
+
+      // Quota exhaustion alert
+      if (pb.quotaRemaining !== undefined && pb.quotaRemaining !== null && pb.quotaRemaining <= 0) {
+        result.push({
+          id: `quota-exhausted-${pb.provider}`,
+          level: "critical",
+          integration: label,
+          message: `API-kvote opbrugt (remaining=0${pb.quotaResetAt ? `, reset: ${new Date(pb.quotaResetAt).toLocaleTimeString("da-DK")}` : ""})`,
+          metric: "quotaRemaining",
+          value: 0,
+          threshold: 1,
+        });
+      }
 
       if (pb.used1m > 90) {
         result.push({

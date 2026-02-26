@@ -2,6 +2,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { syncIntegration } from "./sync-integration.ts";
 import { CampaignMappingConfig } from "../types.ts";
+import { checkProviderQuota } from "../utils/quota-gate.ts";
 import type { LogFn } from "../utils/index.ts";
 
 /**
@@ -136,7 +137,14 @@ export async function providerSync(
     return { success: true, results: [], budgetUsed: 0, skipped: ["outside_working_hours"] };
   }
 
-  // 1. Acquire lock
+  // 1. Global quota gate — skip entire provider if quota exhausted
+  const quotaStatus = await checkProviderQuota(supabase, provider);
+  if (quotaStatus.exhausted) {
+    log("WARN", `Provider-sync quota gate: ${provider} quota exhausted (remaining=${quotaStatus.remaining}, reset=${quotaStatus.resetAt}). Skipping entire provider.`);
+    return { success: true, results: [], budgetUsed: 0, skipped: ["quota_exhausted"] };
+  }
+
+  // 2. Acquire lock
   const locked = await acquireLock(supabase, provider, log);
   if (!locked) {
     return { success: false, results: [], budgetUsed: 0, skipped: [`lock_held`] };
