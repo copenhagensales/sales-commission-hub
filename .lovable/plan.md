@@ -1,45 +1,29 @@
 
 
-## Redesign af booking-kommentar i vagtplanen
+## Fix: Melissa (og andre uden agent-mapping) viser 0 provision
 
-### Problem
-Kommentaren ("Dette er en test-note :-)") drukner visuelt i de andre tekstlinjer. Den bruger samme layout som tid og makker, og er let at overse.
+### Årsag
+`usePersonalSalesStats` henter agent-emails via `employee_agent_mapping`. Melissa har ingen mapping, så `agentEmails` returnerer et tomt array. Linje 58 har betingelsen `agentEmails.length > 0`, som blokerer hele queryen - provision bliver aldrig hentet.
 
-### Design-ide: Callout-kort under badges
+Melissa har salg under `mech@copenhagensales.dk` (hendes work_email), men hooket kender ikke til den.
 
-Inspireret af Apples "inline callout" pattern (som man kender fra Notes og Reminders) placeres kommentaren som et lille fremhævet kort **under** makker og badges - helt nederst i vagtkortet. Det giver den visuel vægt uden at forstyrre det primære informationshierarki (lokation, tid, makker, bil/diaet).
+### Løsning
+Tilføj work_email som fallback i `usePersonalSalesStats` (og tilsvarende i `usePreviousPeriodComparison`), så medarbejdere uden agent-mapping stadig får vist deres provision.
 
-Layoutet bliver:
+### Ændringer
 
-```text
-MAN 23/2
-  @ Kvickly Holbaek, Holbaek
-    Eesy FM - Eesy gaden
-    09:00 - 17:00
-    Makker: Martina
-    [Ford Transit]  [Diaet]
-  +-------------------------------------+
-  | Note fra planlægger                  |
-  | "Dette er en test-note :-)"          |
-  +-------------------------------------+
-```
+**1. `src/hooks/usePersonalSalesStats.ts` (linje 33-58)**
+- I agent-email queryen: Hvis `employee_agent_mapping` returnerer tomt, hent `work_email` fra `employee_master_data` som fallback.
+- Fjern kravet om `agentEmails.length > 0` i `enabled`-betingelsen - lad den køre hvis der er enten agent-emails eller work_email.
 
-### Visuelt design
-- Fuld bredde inden for kortet (ml-6 for alignment med resten)
-- Afrundet container med `rounded-lg`
-- Blå/indigo tonalitet: `bg-blue-50 border border-blue-200` (dark: `bg-blue-950/30 border-blue-800`)
-- Lille label "Note" i semibold over selve teksten
-- `MessageSquare`-ikon ved labelen i matchende blaa
-- Kommentarteksten i normal vaegt (ikke kursiv - det er svaerere at laese)
+**2. `src/hooks/usePreviousPeriodComparison.ts` (linje 33-50)**
+- Samme fallback-logik: Hent work_email hvis ingen agent-mapping findes.
 
-### Teknisk aendring
+### Teknisk detalje
+Ændringen er ca. 10-15 linjer per fil. Query-funktionen udvides til:
+1. Hent emails fra `employee_agent_mapping` (eksisterende logik)
+2. Hvis tomt: Hent `work_email` fra `employee_master_data` for medarbejderen
+3. Returner det fundne som `agentEmails`
 
-**Fil:** `src/pages/vagt-flow/MyBookingSchedule.tsx`
+Dette matcher den fallback-kæde som allerede bruges i `get_sales_aggregates_v2` RPC'en og `useSellerSalariesCached`.
 
-1. Flyt kommentar-blokken (linje 276-284) til **efter** badges-rækken (efter linje 310)
-2. Erstat den simple tekstlinje med en callout-container:
-   - Ydre `div` med `ml-6 mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800`
-   - Indre header: ikon + "Note" label i `text-xs font-semibold text-blue-700 dark:text-blue-300`
-   - Kommentartekst i `text-sm text-blue-900 dark:text-blue-100`
-
-En enkelt aendring i en fil, ca. 15 linjer kode.
