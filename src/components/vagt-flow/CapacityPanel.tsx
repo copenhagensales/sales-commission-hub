@@ -191,8 +191,9 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     const totalEmployees = getEmployeeCountForClient();
     
     const dayData = weekDates.map((date) => {
+      const isWeekendDay = date.getDay() === 0 || date.getDay() === 6;
       const absent = getAbsencesForDay(date);
-      const available = totalEmployees - absent;
+      const available = isWeekendDay ? 0 : totalEmployees - absent;
       const capacity = Math.floor(available / 2);
       const booked = getBookingsForClientDay(client.id, date);
       const remaining = capacity - booked;
