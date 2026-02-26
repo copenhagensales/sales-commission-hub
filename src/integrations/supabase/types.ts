@@ -8977,6 +8977,87 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_daily_summary: {
+        Row: {
+          avg_duration_ms: number
+          created_at: string
+          error_runs: number
+          id: string
+          provider: string
+          skipped_runs: number
+          successful_runs: number
+          summary_date: string
+          total_api_calls: number
+          total_rate_limit_hits: number
+          total_records_processed: number
+          total_runs: number
+        }
+        Insert: {
+          avg_duration_ms?: number
+          created_at?: string
+          error_runs?: number
+          id?: string
+          provider: string
+          skipped_runs?: number
+          successful_runs?: number
+          summary_date: string
+          total_api_calls?: number
+          total_rate_limit_hits?: number
+          total_records_processed?: number
+          total_runs?: number
+        }
+        Update: {
+          avg_duration_ms?: number
+          created_at?: string
+          error_runs?: number
+          id?: string
+          provider?: string
+          skipped_runs?: number
+          successful_runs?: number
+          summary_date?: string
+          total_api_calls?: number
+          total_rate_limit_hits?: number
+          total_records_processed?: number
+          total_runs?: number
+        }
+        Relationships: []
+      }
+      sync_failed_records: {
+        Row: {
+          created_at: string
+          dataset: string
+          error_message: string
+          id: string
+          integration_id: string
+          raw_payload: Json
+          resolved_at: string | null
+          retry_count: number
+          run_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dataset: string
+          error_message: string
+          id?: string
+          integration_id: string
+          raw_payload: Json
+          resolved_at?: string | null
+          retry_count?: number
+          run_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dataset?: string
+          error_message?: string
+          id?: string
+          integration_id?: string
+          raw_payload?: Json
+          resolved_at?: string | null
+          retry_count?: number
+          run_id?: string | null
+        }
+        Relationships: []
+      }
       sync_state: {
         Row: {
           id: number
@@ -10796,6 +10877,14 @@ export type Database = {
       }
       update_fordelingsregel_counts: { Args: never; Returns: undefined }
       update_overdue_coaching_tasks: { Args: never; Returns: number }
+      upsert_sync_state_atomic: {
+        Args: {
+          p_dataset: string
+          p_integration_id: string
+          p_last_success_at: string
+        }
+        Returns: undefined
+      }
       validate_password_reset_token: {
         Args: { _token_hash: string }
         Returns: {

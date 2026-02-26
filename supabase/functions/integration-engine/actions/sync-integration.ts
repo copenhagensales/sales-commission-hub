@@ -1,7 +1,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
-import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError, checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker } from "../utils/index.ts";
+import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError, checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker, checkProviderQuota, TimeoutGuard, enqueueFailed } from "../utils/index.ts";
 import { CampaignMappingConfig } from "../types.ts";
 import { acquireRunLock, releaseRunLock, generateRunId } from "../utils/run-lock.ts";
 
@@ -147,7 +147,32 @@ export async function syncIntegration(
     return { name: integration.name, status: "skipped_locked", error: "Another sync run already in progress" };
   }
 
+  // Initialize timeout guard (150s budget, stop at 80%)
+  const timer = new TimeoutGuard(150_000, 0.80);
+
   try {
+    // === Global Provider Quota Gate ===
+    const quotaStatus = await checkProviderQuota(supabase, provider);
+    if (quotaStatus.exhausted) {
+      log("WARN", `Quota gate: ${provider} quota exhausted (remaining=${quotaStatus.remaining}, reset=${quotaStatus.resetAt}). Skipping ${integration.name}.`);
+      const now = new Date();
+      await supabase.from("integration_sync_runs").insert({
+        integration_id: integration.id,
+        started_at: syncRunStartedAt.toISOString(),
+        completed_at: now.toISOString(),
+        duration_ms: now.getTime() - syncRunStartedAt.getTime(),
+        status: "skipped",
+        actions: actionList,
+        records_processed: 0,
+        api_calls_made: 0,
+        retries: 0,
+        rate_limit_hits: 0,
+        run_id: runId,
+        error_message: `Quota exhausted (remaining=0, reset=${quotaStatus.resetAt || "unknown"})`,
+      });
+      return { name: integration.name, status: "skipped_locked" as any, error: `Quota exhausted until ${quotaStatus.resetAt || "unknown"}` };
+    }
+
     // === Circuit Breaker Check ===
     const cbState = await checkCircuitBreaker(supabase, integration.id);
     if (cbState.paused) {
@@ -231,8 +256,8 @@ export async function syncIntegration(
       }
     }
 
-    // Process sales (skip if Enreach rate-limited during meta)
-    if ((actionList.includes("sales") || action === "sync") && !metaSyncRateLimited) {
+    // Process sales (skip if Enreach rate-limited during meta, or timeout approaching)
+    if ((actionList.includes("sales") || action === "sync") && !metaSyncRateLimited && !timer.isExpired()) {
       const useExplicitRange = from && to;
       let sales: any[] = [];
       let salesWindowEnd: Date | null = null;
@@ -275,8 +300,16 @@ export async function syncIntegration(
         sales = sales.slice(0, maxRecords);
       }
 
-      runResults["sales"] = await engine.processSales(sales, 200);
-      actionsExecuted.push("sales");
+      try {
+        runResults["sales"] = await engine.processSales(sales, 200);
+        actionsExecuted.push("sales");
+      } catch (salesErr) {
+        const salesErrMsg = salesErr instanceof Error ? salesErr.message : String(salesErr);
+        log("ERROR", `Sales upsert failed for ${integration.name}: ${salesErrMsg}`);
+        // DLQ: save failed records for later reprocessing
+        await enqueueFailed(supabase, integration.id, "sales", sales, salesErrMsg, runId);
+        runResults["sales"] = { processed: 0, errors: sales.length, message: `Failed: ${salesErrMsg} (${sales.length} records queued in DLQ)` };
+      }
 
       const debugData = (adapter as any).getLastDebugData?.();
       if (debugData) {
@@ -299,8 +332,8 @@ export async function syncIntegration(
       runResults["sales"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
-    // Process calls
-    if (actionList.includes("calls") && !metaSyncRateLimited) {
+    // Process calls (skip if timeout approaching)
+    if (actionList.includes("calls") && !metaSyncRateLimited && !timer.isExpired()) {
       let calls: any[] = [];
       
       if ((adapter as any).fetchCallsRange && from && to) {
@@ -337,8 +370,8 @@ export async function syncIntegration(
       runResults["calls"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
-    // Process sessions (skip if Enreach rate-limited)
-    if (actionList.includes("sessions") && !metaSyncRateLimited) {
+    // Process sessions (skip if rate-limited or timeout approaching)
+    if (actionList.includes("sessions") && !metaSyncRateLimited && !timer.isExpired()) {
       try {
         const syncState = await getSyncState(supabase, integration.id, "sessions");
         const windowStart = syncState?.last_success_at
@@ -381,13 +414,20 @@ export async function syncIntegration(
       runResults["sessions"] = { processed: 0, errors: 0, message: "Skipped: rate_limited_meta_abort" };
     }
 
+    // Check if timeout guard triggered any skips
+    const timedOut = timer.isExpired();
+    if (timedOut) {
+      log("WARN", `Timeout guard: ${integration.name} hit ${timer.percentUsed().toFixed(0)}% budget (${timer.elapsed()}ms). Some actions may have been skipped.`);
+      actionsSkipped.push("timeout_guard");
+    }
+
     await supabase
       .from("dialer_integrations")
-      .update({ last_sync_at: new Date().toISOString(), last_status: metaSyncRateLimited ? "partial" : "success" })
+      .update({ last_sync_at: new Date().toISOString(), last_status: (metaSyncRateLimited || timedOut) ? "partial" : "success" })
       .eq("id", integration.id);
 
     // Determine final status
-    const finalStatus: "success" | "partial_success" = metaSyncRateLimited ? "partial_success" : "success";
+    const finalStatus: "success" | "partial_success" = (metaSyncRateLimited || timedOut) ? "partial_success" : "success";
 
     // Log summary
     const actionSummary = Object.entries(runResults)
