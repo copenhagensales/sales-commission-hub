@@ -1,24 +1,21 @@
 
 
-## Tilfoej "Min vagtplan" til rettighedssystemet
+## Fix: Tilføj "Min vagtplan" til den rigtige sidebar
 
 ### Problem
-`menu_fm_my_schedule` er registreret i `permissionKeys.ts` (som rettighedseditoren bruger), men mangler i `permissions.ts` (som bruges til ejers automatiske rettigheder og RolePreview). Derudover er rettigheden ikke blevet seedet til eksisterende roller, fordi den blev tilføjet efter roller allerede var oprettet.
+"Min vagtplan" (`menu_fm_my_schedule`) er korrekt oprettet i rettighedseditoren og databasen, men **mangler i den faktiske sidebar** (`AppSidebar.tsx`) og i permission-hooket (`usePositionPermissions.ts`). Derfor vises menupunktet aldrig, uanset om rettigheden er slået til.
 
-### Aendringer
+### Ændringer
 
-**1. `src/config/permissions.ts`** - Tilfoej `menu_fm_my_schedule` under FIELDMARKETING-sektionen
-- Placeres som foerste element i `menu_fieldmarketing` permissions-arrayet
-- Label: "Min vagtplan", description: "Adgang til personlig vagtplan"
-- `hasEditOption: false` (read-only)
+**1. `src/hooks/usePositionPermissions.ts`** (linje ~576)
+- Tilføj `canViewFmMySchedule: canView("menu_fm_my_schedule")` under Fieldmarketing-sektionen
 
-**2. `src/pages/RolePreview.tsx`** - Tilfoej `menu_fm_my_schedule: true` i `generateAllPermissions()`
-- Sikrer at ejere ser menupunktet i preview-tilstand
+**2. `src/components/layout/AppSidebar.tsx`**
+- Tilføj `canViewFmMySchedule` til `showFieldmarketingMenu`-checken (linje ~440), så FM-sektionen vises hvis brugeren har denne rettighed
+- Tilføj en NavLink til `/vagt-flow/my-schedule` med "Min vagtplan" label og `UserCheck`-ikon, placeret øverst i Fieldmarketing-menuen (før "Oversigt")
 
-**3. Database seed** - Indsaet rettigheden for relevante roller
-- Brug insert-tool til at tilfoeje `menu_fm_my_schedule` med `can_view = true` for rollerne: `fm_medarbejder_`, `fm_leder`, `assisterende_teamleder_fm`, `ejer`, `teamleder`, `medarbejder`, `backoffice`
-- Saetter `can_edit = false` (read-only vagtplan)
-- Saetter `parent_key = menu_section_fieldmarketing`
+**3. Database fix**
+- Opdater `fm_medarbejder_` rollen så `can_view = true` for `menu_fm_my_schedule` (den står pt. som `false` i databasen)
 
-Efter disse aendringer vil rettigheden vaere synlig i rettighedseditoren og automatisk tildelt de relevante roller.
-
+### Resultat
+FM-medarbejdere vil kunne se "Min vagtplan" i sidebaren under Fieldmarketing og navigere til deres personlige vagtplan.
