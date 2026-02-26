@@ -660,7 +660,9 @@ export type Database = {
         Row: {
           booking_id: string
           check_in: string
+          check_in_time: string | null
           check_out: string
+          check_out_time: string | null
           confirmation_number: string | null
           created_at: string
           hotel_id: string
@@ -673,7 +675,9 @@ export type Database = {
         Insert: {
           booking_id: string
           check_in: string
+          check_in_time?: string | null
           check_out: string
+          check_out_time?: string | null
           confirmation_number?: string | null
           created_at?: string
           hotel_id: string
@@ -686,7 +690,9 @@ export type Database = {
         Update: {
           booking_id?: string
           check_in?: string
+          check_in_time?: string | null
           check_out?: string
+          check_out_time?: string | null
           confirmation_number?: string | null
           created_at?: string
           hotel_id?: string
