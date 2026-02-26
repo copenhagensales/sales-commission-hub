@@ -125,7 +125,7 @@ serve(async (req) => {
     console.log("[ClientSalesOverview] Using API URL:", baseUrl);
 
     // Build auth headers
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = { Accept: "application/json", "X-Rate-Limit-Fair-Use-Policy": "Minute rated" };
     if (credentials.username && credentials.password) {
       headers["Authorization"] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
     }
