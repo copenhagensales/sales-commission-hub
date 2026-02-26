@@ -6,7 +6,7 @@ import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,8 @@ export default function MyBookingSchedule() {
             id, week_number, year,
             location:location_id ( id, name, address_city ),
             client:client_id ( name ),
-            campaign:campaign_id ( name )
+            campaign:campaign_id ( name ),
+            comment
           )
         `)
         .eq("employee_id", employeeId)
@@ -271,6 +272,16 @@ export default function MyBookingSchedule() {
                                   {a.start_time?.slice(0, 5)} – {a.end_time?.slice(0, 5)}
                                 </span>
                               </div>
+
+                              {/* Booking comment */}
+                              {booking?.comment && (
+                                <div className="flex items-start gap-2 ml-6">
+                                  <MessageSquare className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                                  <span className="text-sm italic text-muted-foreground">
+                                    {booking.comment}
+                                  </span>
+                                </div>
+                              )}
 
                               {/* Partners */}
                               {a.partners.length > 0 && (
