@@ -104,9 +104,9 @@ export async function syncIntegration(
   const runId = generateRunId();
   let adapter: any = null;
 
-  // === Enreach: Skip outside Danish working hours (21:00-08:00) ===
+  // === Skip outside Danish working hours (21:00-08:00) for both Enreach and Adversus ===
   const provider = (source || integration.provider || "").toLowerCase();
-  if (provider === "enreach" && !isDanishWorkingHours()) {
+  if ((provider === "enreach" || provider === "adversus") && !isDanishWorkingHours()) {
     log("INFO", `Skipping ${integration.name}: outside Danish working hours (21:00-08:00 DK)`);
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,

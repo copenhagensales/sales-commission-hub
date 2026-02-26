@@ -103,10 +103,10 @@ export function useStabilityAlerts({
       }
 
       // Last sync checks — suppress for Enreach outside working hours
-      const isEnreach = (int.provider || "").toLowerCase() === "enreach";
-      const enreachOffHours = isEnreach && isOutsideDanishWorkingHours();
+      const providerLower = (int.provider || "").toLowerCase();
+      const isOffHoursProvider = (providerLower === "enreach" || providerLower === "adversus") && isOutsideDanishWorkingHours();
 
-      if (enreachOffHours) {
+      if (isOffHoursProvider) {
         // Show info-level "paused" instead of missing-sync alerts
         result.push({
           id: `enreach-paused-${int.id}`,

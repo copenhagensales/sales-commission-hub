@@ -130,9 +130,9 @@ export async function providerSync(
   const budget = PROVIDER_BUDGETS[provider] || { limit: 1000, threshold: 0.70 };
   const defaults = PROVIDER_DEFAULTS[provider] || { actions: ["campaigns", "users", "sales"], maxRecords: 200, days: 2 };
 
-  // Enreach: Skip entire provider sync outside Danish working hours (21:00-08:00)
-  if (provider === "enreach" && !isDanishWorkingHours()) {
-    log("INFO", `Provider-sync skipped for enreach: outside Danish working hours (21:00-08:00 DK)`);
+  // Skip entire provider sync outside Danish working hours (21:00-08:00)
+  if ((provider === "enreach" || provider === "adversus") && !isDanishWorkingHours()) {
+    log("INFO", `Provider-sync skipped for ${provider}: outside Danish working hours (21:00-08:00 DK)`);
     return { success: true, results: [], budgetUsed: 0, skipped: ["outside_working_hours"] };
   }
 
