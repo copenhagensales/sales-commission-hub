@@ -119,6 +119,20 @@ export default function SystemStability() {
     staleTime: 30000,
   });
 
+  // Fetch actual cron jobs for timeline
+  const { data: cronJobs = [] } = useQuery({
+    queryKey: ["system-stability-cron-jobs"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_active_cron_jobs" as any);
+      if (error) {
+        console.warn("Could not fetch cron jobs:", error.message);
+        return [];
+      }
+      return (data || []) as unknown as { jobname: string; schedule: string }[];
+    },
+    staleTime: 60000,
+  });
+
   // Fetch audit log
   const { data: auditLog = [], refetch: refetchAudit } = useQuery({
     queryKey: ["system-stability-audit"],
@@ -365,7 +379,7 @@ export default function SystemStability() {
             </div>
 
             {/* Timeline Overlap Visualization */}
-            <TimelineOverlap integrations={integrations as any} />
+            <TimelineOverlap integrations={integrations as any} cronJobs={cronJobs} />
 
             {/* Schedule Editor */}
             <ScheduleEditor integrations={integrations as any} onScheduleUpdated={handleRefresh} />
