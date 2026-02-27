@@ -117,6 +117,7 @@ import {
   EconomicExpenses,
   EconomicBudget,
   EconomicMapping,
+  EconomicPosteringer,
   Cancellations,
   SystemStability,
 } from "./pages";
@@ -375,6 +376,7 @@ export const routes: RouteConfig[] = [
 
   // Economic Dashboard (with nested routes)
   { path: "/economic", component: EconomicDashboard, access: "role", positionPermission: "menu_economic_dashboard" },
+  { path: "/economic/posteringer", component: EconomicPosteringer, access: "role", positionPermission: "menu_economic_dashboard" },
   { path: "/economic/expenses", component: EconomicExpenses, access: "role", positionPermission: "menu_economic_expenses" },
   { path: "/economic/budget", component: EconomicBudget, access: "role", positionPermission: "menu_economic_budget" },
   { path: "/economic/mapping", component: EconomicMapping, access: "role", positionPermission: "menu_economic_mapping" },

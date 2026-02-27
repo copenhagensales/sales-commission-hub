@@ -167,6 +167,7 @@ export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUploa
 export const EconomicLayout = lazyPage(() => import("@/pages/economic/EconomicLayout"));
 export const EconomicDashboard = lazyPage(() => import("@/pages/economic/EconomicDashboard"));
 export const EconomicExpenses = lazyPage(() => import("@/pages/economic/EconomicExpenses"));
+export const EconomicPosteringer = lazyPage(() => import("@/pages/economic/EconomicPosteringer"));
 export const EconomicBudget = lazyPage(() => import("@/pages/economic/EconomicBudget"));
 export const EconomicMapping = lazyPage(() => import("@/pages/economic/EconomicMapping"));
 

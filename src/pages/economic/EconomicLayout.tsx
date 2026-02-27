@@ -1,9 +1,10 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Target, Settings2 } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, Settings2, List } from "lucide-react";
 
 const navItems = [
   { path: "/economic", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { path: "/economic/posteringer", label: "Posteringer", icon: List },
   { path: "/economic/expenses", label: "Udgifter", icon: Receipt },
   { path: "/economic/budget", label: "Budget 2026", icon: Target },
   { path: "/economic/mapping", label: "Mapping", icon: Settings2 },
