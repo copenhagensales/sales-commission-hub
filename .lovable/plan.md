@@ -1,18 +1,31 @@
 
-# Fix: Tilfoej DELETE RLS-policy til economic_imports
 
-## Problem
-Tabellen `economic_imports` har RLS aktiveret med policies for SELECT, INSERT og UPDATE, men mangler en DELETE-policy. Naar en bruger forsøger at slette, blokerer RLS operationen stille (ingen fejl, ingen sletning). Toast'en "Import slettet" vises fordi databasen ikke kaster en fejl - den sletter bare 0 raekker.
+# Ny fane: Posteringer (udspecificeret)
 
-## Fix
-Tilfoej en DELETE-policy der matcher de eksisterende policies:
+## Hvad du faar
+En ny fane "Posteringer" i Economic-navigationen, der viser alle importerede posteringer i en soegbar, filtrerbar tabel.
 
-```sql
-CREATE POLICY "Owners can delete imports"
-  ON public.economic_imports
-  FOR DELETE
-  USING (is_owner(auth.uid()));
-```
+### Funktioner
+- Fuld tabel med kolonner: Dato, Konto nr, Kontonavn, Tekst, Beloeb, Kategori, Team, Kilde
+- Soegefelt (soeg i tekst, kontonavn)
+- Filtre: Aar, Kategori, Team
+- Sortering paa alle kolonner (default: dato faldende)
+- Farvemarkering af indtaegter (groent) vs. udgifter (roedt)
+- Badge der viser klassificeringskilde (regel/mapping/fallback)
+- Paginering eller scroll med alle posteringer synlige
 
-## Ingen kodeaendringer
-Koden i `EconomicUpload.tsx` er korrekt. Problemet er udelukkende en manglende database-policy.
+## Teknisk plan
+
+### 1. Ny side: `src/pages/economic/EconomicPosteringer.tsx`
+- Bruger eksisterende `usePosteringerEnriched` hook til at hente data
+- Soegefelt filtrerer lokalt paa tekst og kontonavn
+- Select-filtre for aar, kategori og team (genbruger eksisterende hooks)
+- Tabel med alle felter fra `PosteringEnriched`
+- `formatDKK` til beloeb-formatering
+
+### 2. Opdater `src/pages/economic/EconomicLayout.tsx`
+- Tilfoej nyt nav-item: `{ path: "/economic/posteringer", label: "Posteringer", icon: List }`
+
+### 3. Opdater routing (App.tsx eller routes config)
+- Tilfoej route: `/economic/posteringer` -> `EconomicPosteringer`
+
