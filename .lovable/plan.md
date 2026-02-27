@@ -1,31 +1,34 @@
 
 
-# Ny fane: Posteringer (udspecificeret)
+# Oprydning af Relatel cron jobs
 
-## Hvad du faar
-En ny fane "Posteringer" i Economic-navigationen, der viser alle importerede posteringer i en soegbar, filtrerbar tabel.
+## Problem
+Relatel (657c2050) har 3 aktive cron jobs, hvor 2 af dem overlapper og sales synkroniseres hvert 5. minut i stedet for hvert 15. minut. Dette forårsager:
+- Dobbelte API-kald (combined job + dedikeret sales job)
+- `skipped_locked`-fejl fra samtidige kørsler
+- Unødvendigt forbrug af det delte Adversus API-budget
 
-### Funktioner
-- Fuld tabel med kolonner: Dato, Konto nr, Kontonavn, Tekst, Beloeb, Kategori, Team, Kilde
-- Soegefelt (soeg i tekst, kontonavn)
-- Filtre: Aar, Kategori, Team
-- Sortering paa alle kolonner (default: dato faldende)
-- Farvemarkering af indtaegter (groent) vs. udgifter (roedt)
-- Badge der viser klassificeringskilde (regel/mapping/fallback)
-- Paginering eller scroll med alle posteringer synlige
+## Plan
 
-## Teknisk plan
+### 1. Fjern det kombinerede job (jobid 135)
+Slet `dialer-657c2050-sync` som kører alle actions hvert 15. minut. Det er overflødigt, da sales og meta allerede har dedikerede jobs.
 
-### 1. Ny side: `src/pages/economic/EconomicPosteringer.tsx`
-- Bruger eksisterende `usePosteringerEnriched` hook til at hente data
-- Soegefelt filtrerer lokalt paa tekst og kontonavn
-- Select-filtre for aar, kategori og team (genbruger eksisterende hooks)
-- Tabel med alle felter fra `PosteringEnriched`
-- `formatDKK` til beloeb-formatering
+### 2. Ret sales-job til hvert 15. minut (jobid 117)
+Ændr `dialer-657c2050-sync-sales` fra `0,5,10,...,55` (hvert 5. min) til `0,15,30,45` (hvert 15. min), staggered fra Lovablecph (som kører :03,:18,:33,:48).
 
-### 2. Opdater `src/pages/economic/EconomicLayout.tsx`
-- Tilfoej nyt nav-item: `{ path: "/economic/posteringer", label: "Posteringer", icon: List }`
+### 3. Behold meta-job uændret (jobid 118)
+`dialer-657c2050-sync-meta` kører allerede korrekt på `10,40` (hvert 30. min).
 
-### 3. Opdater routing (App.tsx eller routes config)
-- Tilfoej route: `/economic/posteringer` -> `EconomicPosteringer`
+## Resultat efter oprydning
+
+| Job | Schedule | Actions |
+|---|---|---|
+| `dialer-657c2050-sync-sales` | `0,15,30,45 * * * *` | sales |
+| `dialer-657c2050-sync-meta` | `10,40 * * * *` | campaigns, users, calls |
+
+## Tekniske detaljer
+- Udføres via SQL: `SELECT cron.unschedule(135)` for at fjerne combined job
+- Sales-job opdateres via `cron.alter_job(117, schedule := '0,15,30,45 * * * *')`
+- Stagger-mønster: Relatel :00, Lovablecph :03 -- 3 minutters mellemrum forhindrer kollisioner
+- Opdatering af `dialer_integrations.config` for Relatel med den nye `sync_schedule`
 
