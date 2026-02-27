@@ -178,10 +178,28 @@ async function healEnreach(
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
-  const apiKey = credentials?.api_key || credentials?.apiKey;
-  const apiUrl = integration?.api_url || credentials?.api_url || "https://api.herobase.com";
-  if (!apiKey) {
-    log("No Enreach API key found, skipping all");
+  // Build auth header using same heuristic as EnreachAdapter
+  let apiUrl = integration?.api_url || credentials?.api_url || "https://wshero01.herobase.com/api";
+  apiUrl = apiUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
+  if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+    apiUrl = 'https://' + apiUrl;
+  }
+  if (apiUrl.endsWith('/')) apiUrl = apiUrl.slice(0, -1);
+  if (!apiUrl.endsWith('/api')) apiUrl = apiUrl + '/api';
+
+  let authHeader: string;
+  const user = credentials?.username;
+  const pass = credentials?.password;
+  const apiToken = credentials?.api_token;
+
+  if (user && pass) {
+    authHeader = "Basic " + btoa(`${user}:${pass}`);
+  } else if (apiToken && apiToken.includes(':')) {
+    authHeader = "Basic " + btoa(apiToken);
+  } else if (apiToken) {
+    authHeader = `Bearer ${apiToken}`;
+  } else {
+    log("No Enreach credentials found (need username+password or api_token), skipping all");
     return { healed: 0, failed: 0, skipped: sales.length };
   }
 
@@ -203,7 +221,7 @@ async function healEnreach(
     try {
       const url = `${apiUrl}/simpleleads?UniqueId=${externalId}`;
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${apiKey}`, "X-Rate-Limit-Fair-Use-Policy": "Minute rated" },
+        headers: { Authorization: authHeader, "X-Rate-Limit-Fair-Use-Policy": "Minute rated" },
       });
 
       if (!response.ok) {
