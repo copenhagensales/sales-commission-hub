@@ -565,8 +565,11 @@ export class EnreachAdapter implements DialerAdapter {
   ): Promise<StandardSale[]> {
     try {
       const fromStr = range.from.split("T")[0];
-      const toStr = range.to.split("T")[0];
-      console.log(`[EnreachAdapter] Fetching leads for range ${fromStr} -> ${toStr} (will filter closure=success client-side)`);
+      // Bump toStr by +1 day because HeroBase treats ModifiedTo as exclusive
+      const toDate = new Date(range.to);
+      toDate.setUTCDate(toDate.getUTCDate() + 1);
+      const toStr = toDate.toISOString().split("T")[0];
+      console.log(`[EnreachAdapter] Fetching leads for range ${fromStr} -> ${toStr} (ModifiedTo bumped +1d for exclusive API, will filter closure=success client-side)`);
 
       const endpoint = this.buildLeadsEndpoint(fromStr, toStr);
 
@@ -1647,8 +1650,11 @@ export class EnreachAdapter implements DialerAdapter {
   async fetchSessionsRange(range: { from: string; to: string }): Promise<StandardSession[]> {
     try {
       const fromStr = range.from.split("T")[0];
-      const toStr = range.to.split("T")[0];
-      console.log(`[EnreachAdapter] Fetching ALL sessions (all closures) for range ${fromStr} -> ${toStr}`);
+      // Bump toStr by +1 day because HeroBase treats ModifiedTo as exclusive
+      const toDate = new Date(range.to);
+      toDate.setUTCDate(toDate.getUTCDate() + 1);
+      const toStr = toDate.toISOString().split("T")[0];
+      console.log(`[EnreachAdapter] Fetching ALL sessions (all closures) for range ${fromStr} -> ${toStr} (ModifiedTo bumped +1d for exclusive API)`);
 
       const endpoint = this.buildLeadsEndpoint(fromStr, toStr);
 
