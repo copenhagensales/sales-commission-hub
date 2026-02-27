@@ -1,56 +1,74 @@
 
 
-# Ret DataHealthChecks: praecis LEFT JOIN for "Salg uden sale_items"
+# Ret enrichment-healer Enreach credential-logik
 
 ## Problem
-Den nuvaerende logik i `DataHealthChecks.tsx` bruger to upraecise metoder:
-1. En `.not("id", "in", subquery)` som Supabase JS-klienten ikke understotter korrekt
-2. En fallback der sammenligner `sale_items.created_at` med `sales.sale_datetime` -- de kan vaere forskellige, hvilket giver forkert taelling
-
-Korrekt antal (verificeret med direkte SQL): **384 salg uden sale_items de seneste 24 timer**. UI viser aktuelt 184.
+`healEnreach()` i `enrichment-healer/index.ts` (linje 181-186) soeger efter `credentials.api_key` eller `credentials.apiKey` og bruger `Bearer`-auth. Men de faktiske Enreach-credentials bruger `username`/`password` (Basic Auth) eller `api_token` -- praecis som `EnreachAdapter` i integration-engine haandterer det.
 
 ## Loesning
-Opret en database-funktion med LEFT JOIN og kald den via RPC fra komponenten.
+Erstat credential-udtrak og auth-header-opbygning i `healEnreach()` med samme heuristik som `EnreachAdapter` (linje 73-87):
+
+1. Hvis `username` + `password` findes: brug `Basic btoa(user:pass)`
+2. Ellers hvis `api_token` findes og indeholder `:`: brug `Basic btoa(token)`
+3. Ellers hvis `api_token` findes: brug `Bearer token`
+4. Hvis intet matcher: skip med fejlbesked
 
 ## AEndringer
 
-### 1. Ny database-funktion (migration)
+### Fil: `supabase/functions/enrichment-healer/index.ts`
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_sales_without_items_count(p_since timestamptz)
-RETURNS bigint
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT count(*)
-  FROM sales s
-  LEFT JOIN sale_items si ON si.sale_id = s.id
-  WHERE s.sale_datetime >= p_since
-    AND si.id IS NULL;
-$$;
-```
-
-### 2. Opdater `src/components/system-stability/DataHealthChecks.tsx`
-
-Erstat linje 22-44 (den upraecise dobbelt-query logik) med et enkelt RPC-kald:
+Erstat linje 181-186 i `healEnreach()`:
 
 ```typescript
-// 1. Sales without sale_items (last 24h) -- accurate LEFT JOIN via RPC
-const { data: orphanData } = await supabase.rpc("get_sales_without_items_count", {
-  p_since: since24h,
-});
-const orphanCount = typeof orphanData === "number" ? orphanData : 0;
+// FRA (forkert):
+const apiKey = credentials?.api_key || credentials?.apiKey;
+const apiUrl = integration?.api_url || credentials?.api_url || "https://api.herobase.com";
+if (!apiKey) {
+  log("No Enreach API key found, skipping all");
+  return { healed: 0, failed: 0, skipped: sales.length };
+}
 
-// Also fetch total sales for rejected ratio later
-const { count: totalSales24h } = await supabase
-  .from("sales")
-  .select("id", { count: "exact", head: true })
-  .gte("sale_datetime", since24h);
+// TIL (samme heuristik som EnreachAdapter):
+let apiUrl = integration?.api_url || credentials?.api_url || "https://wshero01.herobase.com/api";
+// Sanitize and normalize URL (same as EnreachAdapter)
+apiUrl = apiUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
+if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+  apiUrl = 'https://' + apiUrl;
+}
+if (apiUrl.endsWith('/')) apiUrl = apiUrl.slice(0, -1);
+if (!apiUrl.endsWith('/api')) apiUrl = apiUrl + '/api';
+
+let authHeader: string;
+const user = credentials?.username;
+const pass = credentials?.password;
+const apiToken = credentials?.api_token;
+
+if (user && pass) {
+  authHeader = "Basic " + btoa(`${user}:${pass}`);
+} else if (apiToken && apiToken.includes(':')) {
+  authHeader = "Basic " + btoa(apiToken);
+} else if (apiToken) {
+  authHeader = `Bearer ${apiToken}`;
+} else {
+  log("No Enreach credentials found (need username+password or api_token), skipping all");
+  return { healed: 0, failed: 0, skipped: sales.length };
+}
 ```
 
+Erstat ogsaa fetch-headeren (linje 205-206) til at bruge den nye `authHeader` og tilfoej fair-use-headeren:
+
+```typescript
+// FRA:
+headers: { Authorization: `Bearer ${apiKey}`, "X-Rate-Limit-Fair-Use-Policy": "Minute rated" },
+
+// TIL:
+headers: { Authorization: authHeader, "X-Rate-Limit-Fair-Use-Policy": "Minute rated" },
+```
+
+Ret ogsaa default API-URL til `simpleleads`-endpointet (linje 204). Da `apiUrl` nu ender paa `/api`, bliver URL'en korrekt: `${apiUrl}/simpleleads?UniqueId=...`.
+
 ### Forventet effekt
-- UI viser nu det korrekte antal (384 i stedet for 184)
-- Eet enkelt database-kald i stedet for tre separate queries
-- LEFT JOIN er den praecise metode til at finde salg uden tilhoerende sale_items
+- Enrichment-healeren kan nu autentificere mod Enreach med de faktiske credentials (username/password)
+- De 383+ pending Enreach-salg vil begynde at blive healet ved naeste koersel
+- Samme URL-sanitering som adapteren sikrer korrekt endpoint
 
