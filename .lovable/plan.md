@@ -1,37 +1,56 @@
 
-# Tilfoej burst-throttling til Adversus-adapteren
+
+# Ret DataHealthChecks: praecis LEFT JOIN for "Salg uden sale_items"
 
 ## Problem
-Adversus-adapteren sender API-kald i hurtig raekkefoelge uden pause. Relatel-kontoen har tilsyneladende en lavere burst-graense, hvilket udloeser 429-fejl selv med faa kald totalt.
+Den nuvaerende logik i `DataHealthChecks.tsx` bruger to upraecise metoder:
+1. En `.not("id", "in", subquery)` som Supabase JS-klienten ikke understotter korrekt
+2. En fallback der sammenligner `sale_items.created_at` med `sales.sale_datetime` -- de kan vaere forskellige, hvilket giver forkert taelling
+
+Korrekt antal (verificeret med direkte SQL): **384 salg uden sale_items de seneste 24 timer**. UI viser aktuelt 184.
 
 ## Loesning
-Tilfoej en 500ms pause **efter hvert succesfuldt API-kald** i `get()`-metoden. Da `get()` er den eneste gateway for alle Adversus API-kald, daekker dette automatisk alle operationer (sales, users, campaigns, calls, sessions, lead enrichment).
+Opret en database-funktion med LEFT JOIN og kald den via RPC fra komponenten.
 
-## AEndring
+## AEndringer
 
-### Fil: `supabase/functions/integration-engine/adapters/adversus.ts`
+### 1. Ny database-funktion (migration)
 
-Tilfoej en `lastRequestTime`-tracker og en `throttle()`-metode, der venter minimum 500ms mellem kald:
+```sql
+CREATE OR REPLACE FUNCTION public.get_sales_without_items_count(p_since timestamptz)
+RETURNS bigint
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT count(*)
+  FROM sales s
+  LEFT JOIN sale_items si ON si.sale_id = s.id
+  WHERE s.sale_datetime >= p_since
+    AND si.id IS NULL;
+$$;
+```
 
-```text
-// Ny property paa klassen (efter linje 18):
-private lastRequestTime = 0;
-private throttleMs = 500;
+### 2. Opdater `src/components/system-stability/DataHealthChecks.tsx`
 
-// Ny metode:
-private async throttle(): Promise<void> {
-  const elapsed = Date.now() - this.lastRequestTime;
-  if (elapsed < this.throttleMs) {
-    await new Promise(r => setTimeout(r, this.throttleMs - elapsed));
-  }
-  this.lastRequestTime = Date.now();
-}
+Erstat linje 22-44 (den upraecise dobbelt-query logik) med et enkelt RPC-kald:
 
-// I get()-metoden (linje 86, foer fetch-kaldet):
-await this.throttle();
+```typescript
+// 1. Sales without sale_items (last 24h) -- accurate LEFT JOIN via RPC
+const { data: orphanData } = await supabase.rpc("get_sales_without_items_count", {
+  p_since: since24h,
+});
+const orphanCount = typeof orphanData === "number" ? orphanData : 0;
+
+// Also fetch total sales for rejected ratio later
+const { count: totalSales24h } = await supabase
+  .from("sales")
+  .select("id", { count: "exact", head: true })
+  .gte("sale_datetime", since24h);
 ```
 
 ### Forventet effekt
-- Maks ~2 API-kald pr. sekund i stedet for ubegreanset burst
-- Reducerer 429-fejl for Relatel uden at pavirke overall throughput vaesentligt
-- Foerste kald har ingen ventetid (lastRequestTime = 0)
+- UI viser nu det korrekte antal (384 i stedet for 184)
+- Eet enkelt database-kald i stedet for tre separate queries
+- LEFT JOIN er den praecise metode til at finde salg uden tilhoerende sale_items
+
