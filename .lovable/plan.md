@@ -1,40 +1,19 @@
 
+# Tilføj "Data" kolonne til Sync Runs tabellen
 
-# Fix: "Cannot access 'provider' before initialization"
+## Hvad
+En ny kolonne "Data" i tabellen "Seneste Sync Runs" på System Stability-siden, der viser hvor mange records hver sync-kørsel har hentet/behandlet.
 
-## Problem
-En JavaScript "temporal dead zone" (TDZ) fejl forhindrer ALLE syncs i at koere. Fejlen opstod under den seneste refactoring, hvor `const provider` blev deklareret to gange i samme `try`-blok i `sync-integration.ts`:
+## Hvordan
+- Tilføj en ny `TableHead` og `TableCell` kolonne med label "Data" i tabellen
+- Vis `records_processed` værdien fra hver sync run
+- Fremhæv visuelt runs der henter mange records (fx fed skrift eller farve over en tærskel)
+- Vis "0" i dæmpet farve når intet data blev hentet, så man hurtigt kan skelne aktive fra tomme syncs
 
-- **Linje 108:** `const provider = ...` (udenfor try-blokken -- OK)
-- **Linje 234:** `const provider = ...` (inde i try-blokken -- overskygger den ydre)
-- **Linje 155:** `checkProviderQuota(supabase, provider)` (inde i try-blokken -- rammer TDZ)
-
-Resultat: Alle 5 integrationer (Lovablecph, Relatel, Eesy, Tryg, ASE) fejler med "Cannot access 'provider' before initialization" siden kl. ~07:30 (foerste forsog efter nat-pause).
-
-## Loesning
-
-Omdoeb den duplikerede variabel pa linje 234 til noget andet, fx `providerForRateCheck`:
-
-```typescript
-// Linje 234 - aendres fra:
-const provider = (source || integration.provider || "").toLowerCase();
-
-// til:
-const providerForRateCheck = (source || integration.provider || "").toLowerCase();
-```
-
-Og opdater alle referencer til denne variabel i den omgivende blok (linje 235-249) til at bruge `providerForRateCheck`.
+## Fil der ændres
+- `src/pages/SystemStability.tsx` — tilføj kolonne i Recent Runs tabellen (TableHeader + TableBody)
 
 ## Teknisk detalje
-
-I JavaScript har `const`/`let` block-scoping. Inde i `try { }`-blokken (linje 153-?) overskygger `const provider` pa linje 234 den ydre `const provider` fra linje 108. Men da den indre deklaration foerst initialiseres pa linje 234, er enhver reference til `provider` foer linje 234 (men inde i try-blokken) i "temporal dead zone", hvilket udloeser en ReferenceError.
-
-## Filer der aendres
-
-1. `supabase/functions/integration-engine/actions/sync-integration.ts` -- omdoeb duplikeret variabel
-2. Deploy: `integration-engine`
-
-## Effekt
-
-Alle 5 integrationer vil genoptage normal sync umiddelbart efter deploy. Ingen data er tabt -- watermarks sikrer at morgen-sync henter alt fra sidste succesfulde klokkeslaet (ca. kl. 23:00 i gar).
-
+- Feltet `records_processed` eksisterer allerede i `integration_sync_runs` tabellen og hentes i queryen
+- For fallback-data fra `integration_logs` sættes værdien til 0 (allerede i koden)
+- Kolonnen placeres efter "Status" og før "Varighed"
