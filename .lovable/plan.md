@@ -1,34 +1,38 @@
 
 
-# Oprydning af Relatel cron jobs
+# Forskyd Relatel sales-sync for at undgå 429-kollisioner
 
 ## Problem
-Relatel (657c2050) har 3 aktive cron jobs, hvor 2 af dem overlapper og sales synkroniseres hvert 5. minut i stedet for hvert 15. minut. Dette forårsager:
-- Dobbelte API-kald (combined job + dedikeret sales job)
-- `skipped_locked`-fejl fra samtidige kørsler
-- Unødvendigt forbrug af det delte Adversus API-budget
+Relatel og Lovablecph deler samme Adversus API rate-limit (60 req/min). Med Relatel på `:00` og Lovablecph på `:03` er der kun 3 minutters mellemrum, hvilket foraarsager 429-fejl naar begge rammer API'et naesten samtidig.
 
-## Plan
+## Lsning
+Flyt Relatel sales-sync fra `0,15,30,45` til `8,23,38,53` saa der er mindst 5 minutters afstand til Lovablecph og 2 minutter fra Relatel's egen meta-job.
 
-### 1. Fjern det kombinerede job (jobid 135)
-Slet `dialer-657c2050-sync` som kører alle actions hvert 15. minut. Det er overflødigt, da sales og meta allerede har dedikerede jobs.
+### Nyt schedule-overblik (kun Adversus)
 
-### 2. Ret sales-job til hvert 15. minut (jobid 117)
-Ændr `dialer-657c2050-sync-sales` fra `0,5,10,...,55` (hvert 5. min) til `0,15,30,45` (hvert 15. min), staggered fra Lovablecph (som kører :03,:18,:33,:48).
-
-### 3. Behold meta-job uændret (jobid 118)
-`dialer-657c2050-sync-meta` kører allerede korrekt på `10,40` (hvert 30. min).
-
-## Resultat efter oprydning
-
-| Job | Schedule | Actions |
+| Job | Nuvaerende | Nyt | 
 |---|---|---|
-| `dialer-657c2050-sync-sales` | `0,15,30,45 * * * *` | sales |
-| `dialer-657c2050-sync-meta` | `10,40 * * * *` | campaigns, users, calls |
+| Lovablecph sales | :03, :18, :33, :48 | (uaendret) |
+| Lovablecph meta | :05, :35 | (uaendret) |
+| Relatel sales | :00, :15, :30, :45 | :08, :23, :38, :53 |
+| Relatel meta | :10, :40 | (uaendret) |
 
-## Tekniske detaljer
-- Udføres via SQL: `SELECT cron.unschedule(135)` for at fjerne combined job
-- Sales-job opdateres via `cron.alter_job(117, schedule := '0,15,30,45 * * * *')`
-- Stagger-mønster: Relatel :00, Lovablecph :03 -- 3 minutters mellemrum forhindrer kollisioner
-- Opdatering af `dialer_integrations.config` for Relatel med den nye `sync_schedule`
+### Tidslinjevisning (minut i timen)
+```text
+:00  :03  :05  :08  :10     :18  :23     :33  :35  :38  :40     :48  :53  :55
+      LC   LM   RS   RM      LC   RS      LC   LM   RS   RM      LC   RS
+```
+LC = Lovablecph sales, LM = Lovablecph meta, RS = Relatel sales, RM = Relatel meta
+
+Minimum afstand mellem Adversus-kald: 2 minutter (meta og sales kolliderer ikke funktionelt da meta kun laver 2 API-kald).
+
+## Tekniske trin
+
+1. **Opdater cron job 117** med nyt schedule:
+   - `SELECT cron.alter_job(117, schedule := '8,23,38,53 * * * *')`
+
+2. **Opdater integration config** saa metadata matcher:
+   - `UPDATE dialer_integrations SET config = jsonb_set(config, '{sync_schedule}', '"8,23,38,53 * * * *"') WHERE id = '657c2050-...'`
+
+3. **Verificer** at jobbet er korrekt opdateret via `cron.job`
 
