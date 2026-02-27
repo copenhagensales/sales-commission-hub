@@ -1,22 +1,18 @@
 
+# Fix: Tilfoej DELETE RLS-policy til economic_imports
 
-# Tilfoej "Freelance" badge til Nye medarbejdere-tabellen
+## Problem
+Tabellen `economic_imports` har RLS aktiveret med policies for SELECT, INSERT og UPDATE, men mangler en DELETE-policy. Naar en bruger forsøger at slette, blokerer RLS operationen stille (ingen fejl, ingen sletning). Toast'en "Import slettet" vises fordi databasen ikke kaster en fejl - den sletter bare 0 raekker.
 
-## Hvad
-Viser et tydeligt farvet badge ved siden af medarbejdernavnet i "Nye medarbejdere"-fanen, hvis medarbejderen er markeret som freelance konsulent (`is_freelance_consultant = true`).
+## Fix
+Tilfoej en DELETE-policy der matcher de eksisterende policies:
 
-## Fil der aendres
-**`src/components/salary/NewEmployeesTab.tsx`**
+```sql
+CREATE POLICY "Owners can delete imports"
+  ON public.economic_imports
+  FOR DELETE
+  USING (is_owner(auth.uid()));
+```
 
-1. Tilfoej `is_freelance_consultant` til `NewEmployee` interfacet og til Supabase-queryen (`.select(...)`)
-2. I `EmployeeTable` renderingen, tilfoej et badge efter navnet:
-   ```
-   {employee.is_freelance_consultant && (
-     <Badge variant="secondary" className="...">Freelance</Badge>
-   )}
-   ```
-   Badget faar en tydelig styling (fx orange/amber farve) saa det skiller sig ud fra "Inaktiv"-badget.
-
-## Ingen database-aendringer
-Feltet `is_freelance_consultant` eksisterer allerede i `employee_master_data`. Aendringen er rent UI.
-
+## Ingen kodeaendringer
+Koden i `EconomicUpload.tsx` er korrekt. Problemet er udelukkende en manglende database-policy.
