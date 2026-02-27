@@ -19,6 +19,7 @@ interface NewEmployee {
   employment_start_date: string | null;
   is_staff_employee: boolean | null;
   is_active: boolean | null;
+  is_freelance_consultant: boolean | null;
   team_members: Array<{
     teams: {
       name: string;
@@ -55,6 +56,7 @@ export function NewEmployeesTab() {
           employment_start_date,
           is_staff_employee,
           is_active,
+          is_freelance_consultant,
           team_members(teams(name))
         `)
         .gte("employment_start_date", startStr)
@@ -128,6 +130,9 @@ export function NewEmployeesTab() {
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-2">
                       {employee.first_name} {employee.last_name}
+                      {employee.is_freelance_consultant && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-amber-500 text-white border-transparent hover:bg-amber-600">Freelance</Badge>
+                      )}
                       {employee.is_active === false && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inaktiv</Badge>
                       )}
