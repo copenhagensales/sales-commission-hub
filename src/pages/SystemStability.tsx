@@ -399,6 +399,7 @@ export default function SystemStability() {
                       <TableHead>Tid</TableHead>
                       <TableHead>Integration</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Data</TableHead>
                       <TableHead className="text-right">Varighed</TableHead>
                       <TableHead className="text-right">API</TableHead>
                       <TableHead className="text-right">429s</TableHead>
@@ -441,6 +442,9 @@ export default function SystemStability() {
                                 <AlertTriangle className="h-3 w-3 mr-1" /> {run.status}
                               </Badge>
                             )}
+                          </TableCell>
+                          <TableCell className={`text-xs text-right ${(run.records_processed || 0) === 0 ? "text-muted-foreground" : (run.records_processed || 0) > 1000 ? "font-semibold text-foreground" : "text-foreground"}`}>
+                            {(run.records_processed || 0).toLocaleString("da-DK")}
                           </TableCell>
                           <TableCell className="text-xs text-right">
                             {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
