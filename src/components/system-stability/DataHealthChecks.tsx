@@ -19,29 +19,17 @@ export function DataHealthChecks() {
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const results: HealthCheck[] = [];
 
-      // 1. Sales without sale_items (last 24h)
-      const { count: salesWithoutItems } = await supabase
-        .from("sales")
-        .select("id", { count: "exact", head: true })
-        .gte("sale_datetime", since24h)
-        .not("id", "in", 
-          `(SELECT DISTINCT sale_id FROM sale_items)`
-        );
+      // 1. Sales without sale_items (last 24h) -- accurate LEFT JOIN via RPC
+      const { data: orphanData } = await supabase.rpc("get_sales_without_items_count", {
+        p_since: since24h,
+      });
+      const orphanCount = typeof orphanData === "number" ? orphanData : 0;
 
-      // Fallback: count sales and sale_items separately
+      // Also fetch total sales for rejected ratio later
       const { count: totalSales24h } = await supabase
         .from("sales")
         .select("id", { count: "exact", head: true })
         .gte("sale_datetime", since24h);
-
-      const { data: saleIdsWithItems } = await supabase
-        .from("sale_items")
-        .select("sale_id")
-        .gte("created_at", since24h);
-
-      const uniqueSaleIdsWithItems = new Set((saleIdsWithItems || []).map(s => s.sale_id));
-      const orphanedSales = (totalSales24h || 0) - uniqueSaleIdsWithItems.size;
-      const orphanCount = Math.max(orphanedSales, 0);
 
       results.push({
         label: "Salg uden sale_items (24t)",
