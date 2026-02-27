@@ -1,19 +1,26 @@
 
-# Tilføj "Data" kolonne til Sync Runs tabellen
+
+# Tilføj "Type" kolonne til Sync Runs tabellen
 
 ## Hvad
-En ny kolonne "Data" i tabellen "Seneste Sync Runs" på System Stability-siden, der viser hvor mange records hver sync-kørsel har hentet/behandlet.
+En ny kolonne "Type" der viser om en sync-kørsel er et "Meta"-kald (campaigns, users) eller et "Sales"-kald, så man hurtigt kan se hvilken type arbejde der blev udført.
 
-## Hvordan
-- Tilføj en ny `TableHead` og `TableCell` kolonne med label "Data" i tabellen
-- Vis `records_processed` værdien fra hver sync run
-- Fremhæv visuelt runs der henter mange records (fx fed skrift eller farve over en tærskel)
-- Vis "0" i dæmpet farve når intet data blev hentet, så man hurtigt kan skelne aktive fra tomme syncs
+## Logik
+Data eksisterer allerede i `actions`-arrayet (fx `["sales"]`, `["campaigns", "users", "sales", "sessions"]`). Kolonnen vil vise:
 
-## Fil der ændres
-- `src/pages/SystemStability.tsx` — tilføj kolonne i Recent Runs tabellen (TableHeader + TableBody)
+- **Meta** -- hvis actions indeholder "campaigns" eller "users" (typisk meta-syncs)
+- **Sales** -- hvis actions kun indeholder "sales"
+- **Calls** -- hvis actions kun indeholder "calls"
+- **Fuld** -- hvis actions indeholder blanding af meta + data (fx `["campaigns", "users", "sales", "sessions"]`)
+
+Visuelt bruges små farvede badges (fx blaa for Meta, groen for Sales, lilla for Fuld) saa man hurtigt kan skelne typerne.
+
+## Fil der aendres
+- `src/pages/SystemStability.tsx`
+  - Tilfoej "Type" `TableHead` efter "Integration" kolonnen
+  - Tilfoej `TableCell` med logik der laaser `run.actions` og viser passende badge
+  - Opdater `colSpan` i tom-tilstand fra 7 til 8
 
 ## Teknisk detalje
-- Feltet `records_processed` eksisterer allerede i `integration_sync_runs` tabellen og hentes i queryen
-- For fallback-data fra `integration_logs` sættes værdien til 0 (allerede i koden)
-- Kolonnen placeres efter "Status" og før "Varighed"
+Ingen database-aendringer -- `actions` arrayet hentes allerede i den eksisterende query. Aendringen er rent UI-baseret.
+
