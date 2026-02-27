@@ -398,6 +398,7 @@ export default function SystemStability() {
                     <TableRow>
                       <TableHead>Tid</TableHead>
                       <TableHead>Integration</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Data</TableHead>
                       <TableHead className="text-right">Varighed</TableHead>
@@ -409,7 +410,7 @@ export default function SystemStability() {
                   <TableBody>
                     {runsTableData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                           Ingen sync runs endnu.
                         </TableCell>
                       </TableRow>
@@ -420,6 +421,21 @@ export default function SystemStability() {
                             {format(new Date(run.started_at), "dd/MM HH:mm:ss")}
                           </TableCell>
                           <TableCell className="text-xs font-medium">{run.integration_name}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const actions: string[] = run.actions || [];
+                              const hasMeta = actions.some((a: string) => a === "campaigns" || a === "users");
+                              const hasSales = actions.includes("sales");
+                              const hasCalls = actions.includes("calls");
+                              const hasData = hasSales || hasCalls || actions.includes("sessions");
+                              if (hasMeta && hasData) return <Badge variant="secondary" className="text-xs bg-indigo-500/10 text-indigo-600 border-indigo-200">Fuld</Badge>;
+                              if (hasMeta) return <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">Meta</Badge>;
+                              if (hasSales) return <Badge variant="secondary" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">Sales</Badge>;
+                              if (hasCalls) return <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">Calls</Badge>;
+                              if (actions.length > 0) return <Badge variant="secondary" className="text-xs">{actions.join(", ")}</Badge>;
+                              return <span className="text-xs text-muted-foreground">—</span>;
+                            })()}
+                          </TableCell>
                           <TableCell>
                           {run.status === "success" && ((run.rate_limit_hits || 0) > 0 || (run.retries || 0) > 0) ? (
                               <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-600 border-amber-200">
