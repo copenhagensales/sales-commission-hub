@@ -17,6 +17,10 @@ export class AdversusAdapter implements DialerAdapter {
   // API metrics tracking
   private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
 
+  // Burst-throttling: minimum 500ms between API calls
+  private lastRequestTime = 0;
+  private throttleMs = 500;
+
   getMetrics(): ApiMetrics {
     return { ...this._metrics };
   }
@@ -81,8 +85,17 @@ export class AdversusAdapter implements DialerAdapter {
     return Math.max(250, Math.round(delayMs * (1 + randomOffset)));
   }
 
+  private async throttle(): Promise<void> {
+    const elapsed = Date.now() - this.lastRequestTime;
+    if (elapsed < this.throttleMs) {
+      await new Promise(r => setTimeout(r, this.throttleMs - elapsed));
+    }
+    this.lastRequestTime = Date.now();
+  }
+
   private async get(endpoint: string, retries = 3, baseDelay = 5000): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
+      await this.throttle();
       this._metrics.apiCalls++;
       const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
