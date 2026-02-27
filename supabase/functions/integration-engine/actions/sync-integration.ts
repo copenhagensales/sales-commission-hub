@@ -231,13 +231,13 @@ export async function syncIntegration(
     }
 
     // Check rate-limit status after meta sync — Enreach-specific targeted abort
-    const provider = (source || integration.provider || "").toLowerCase();
-    if (provider === "enreach") {
+    const providerForRateCheck = (source || integration.provider || "").toLowerCase();
+    if (providerForRateCheck === "enreach") {
       const earlyMetrics = adapter.getMetrics();
       if (earlyMetrics.rateLimitHits > 0 && earlyMetrics.rateLimitHits >= earlyMetrics.apiCalls * 0.5) {
         metaSyncRateLimited = true;
         log("WARN", `Enreach rate limited during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits}/${earlyMetrics.apiCalls} calls). Skipping heavy actions, marking as partial_success.`, {
-          provider,
+          provider: providerForRateCheck,
           integration: integration.name,
           reason: "rate_limited_meta_abort",
           actionsSkipped: actionList.filter(a => !actionsExecuted.includes(a)),
@@ -249,7 +249,7 @@ export async function syncIntegration(
       }
     }
     // Adversus: log but do NOT abort — Adversus has higher rate limits
-    if (provider === "adversus") {
+    if (providerForRateCheck === "adversus") {
       const earlyMetrics = adapter.getMetrics();
       if (earlyMetrics.rateLimitHits > 0) {
         log("INFO", `Adversus transient rate limits for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — continuing without abort`);
