@@ -10747,6 +10747,10 @@ export type Database = {
           source: string
         }[]
       }
+      get_sales_without_items_count: {
+        Args: { p_since: string }
+        Returns: number
+      }
       get_source_counts: {
         Args: never
         Returns: {
