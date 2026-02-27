@@ -334,36 +334,64 @@ export async function syncIntegration(
 
     // Process calls (skip if timeout approaching)
     if (actionList.includes("calls") && !metaSyncRateLimited && !timer.isExpired()) {
-      let calls: any[] = [];
-      
-      if ((adapter as any).fetchCallsRange && from && to) {
-        log("INFO", `Fetching calls by range ${from} -> ${to}`);
-        calls = await (adapter as any).fetchCallsRange({ from, to });
-        log("INFO", `Fetched ${calls.length} calls`);
-        runResults["calls"] = await engine.processCalls(calls, integration.id);
-        actionsExecuted.push("calls");
-      } else if (adapter.fetchCalls) {
-        log("INFO", `Fetching calls for ${integration.name}...`);
-        calls = await adapter.fetchCalls(days);
-        log("INFO", `Fetched ${calls.length} calls`);
-        runResults["calls"] = await engine.processCalls(calls, integration.id);
-        actionsExecuted.push("calls");
-      } else {
-        log("INFO", `Adapter for ${integration.name} does not support fetchCalls`);
-        runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
-      }
+      try {
+        let calls: any[] = [];
 
-      const callsDebugData = (adapter as any).getLastDebugData?.();
-      if (callsDebugData?.rawCalls) {
-        log("INFO", `Saving calls debug log for ${integration.name}...`);
-        const callsDebugEntry = createDebugLogEntry(
-          integration.name,
-          "calls",
-          callsDebugData.rawCalls,
-          callsDebugData.processedCalls,
-          callsDebugData.skipReasonMap || new Map()
-        );
-        await saveDebugLog(supabase, callsDebugEntry);
+        // Watermark-based incremental sync (same pattern as sessions)
+        const callsSyncState = await getSyncState(supabase, integration.id, "calls");
+        let callsWindowStart = callsSyncState?.last_success_at
+          ? new Date(new Date(callsSyncState.last_success_at).getTime() - 5 * 60 * 1000)
+          : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        let callsWindowEnd = new Date(Date.now() - 2 * 60 * 1000);
+
+        // Explicit from/to from request overrides watermark
+        if (from && to) {
+          callsWindowStart = new Date(from);
+          callsWindowEnd = new Date(to);
+        }
+
+        log("INFO", `Calls window: ${callsWindowStart.toISOString()} -> ${callsWindowEnd.toISOString()}`);
+
+        if ((adapter as any).fetchCallsRange) {
+          calls = await (adapter as any).fetchCallsRange({
+            from: callsWindowStart.toISOString(),
+            to: callsWindowEnd.toISOString(),
+          });
+        } else if (adapter.fetchCalls) {
+          calls = await adapter.fetchCalls(days); // fallback for adapters without range support
+        } else {
+          log("INFO", `Adapter for ${integration.name} does not support fetchCalls`);
+          runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
+        }
+
+        if (calls.length > 0) {
+          log("INFO", `Fetched ${calls.length} calls, processing...`);
+          runResults["calls"] = await engine.processCalls(calls, integration.id);
+          actionsExecuted.push("calls");
+        } else if (!runResults["calls"]) {
+          runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "No calls found" };
+        }
+
+        // Save debug log
+        const callsDebugData = (adapter as any).getLastDebugData?.();
+        if (callsDebugData?.rawCalls) {
+          log("INFO", `Saving calls debug log for ${integration.name}...`);
+          const callsDebugEntry = createDebugLogEntry(
+            integration.name,
+            "calls",
+            callsDebugData.rawCalls,
+            callsDebugData.processedCalls,
+            callsDebugData.skipReasonMap || new Map()
+          );
+          await saveDebugLog(supabase, callsDebugEntry);
+        }
+
+        await upsertSyncState(supabase, integration.id, "calls", callsWindowEnd);
+      } catch (callsErr) {
+        const callsErrMsg = callsErr instanceof Error ? callsErr.message : String(callsErr);
+        log("ERROR", `Error in calls sync: ${callsErrMsg}`);
+        await recordSyncError(supabase, integration.id, "calls", callsErrMsg);
+        runResults["calls"] = { processed: 0, errors: 1, message: callsErrMsg };
       }
     } else if (metaSyncRateLimited && actionList.includes("calls")) {
       actionsSkipped.push("calls");
