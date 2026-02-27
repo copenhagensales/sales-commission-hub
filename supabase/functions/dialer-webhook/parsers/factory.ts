@@ -1,11 +1,13 @@
 import { WebhookParser, StandardWebhookPayload } from "./interface.ts";
 import { AdversusWebhookParser } from "./adversus.ts";
-import { EnreachWebhookParser } from "./enreach.ts";
+// EnreachWebhookParser disabled – Enreach webhooks send empty payloads.
+// All Enreach data is ingested via API-sync (integration-engine) every 15 min.
+// import { EnreachWebhookParser } from "./enreach.ts";
 
 // Registry of all available parsers
 const parsers: { provider: string; parser: WebhookParser }[] = [
   { provider: "adversus", parser: new AdversusWebhookParser() },
-  { provider: "enreach", parser: new EnreachWebhookParser() },
+  // { provider: "enreach", parser: new EnreachWebhookParser() },
 ];
 
 /**
