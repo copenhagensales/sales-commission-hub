@@ -1,26 +1,43 @@
 
 
-# Tilføj "Type" kolonne til Sync Runs tabellen
+# Fix: Eesy (Enreach) salg mangler - ModifiedTo dato-bug
 
-## Hvad
-En ny kolonne "Type" der viser om en sync-kørsel er et "Meta"-kald (campaigns, users) eller et "Sales"-kald, så man hurtigt kan se hvilken type arbejde der blev udført.
+## Problem
+HeroBase API'et behandler `ModifiedTo` parameteren som **eksklusiv** (op til, men ikke inklusiv den dato). Den inkrementelle sync truncerer baade `from` og `to` til dato-delen (`YYYY-MM-DD`), saa naar begge falder paa samme dag, bliver API-kaldet:
 
-## Logik
-Data eksisterer allerede i `actions`-arrayet (fx `["sales"]`, `["campaigns", "users", "sales", "sessions"]`). Kolonnen vil vise:
+```
+/simpleleads?ModifiedFrom=2026-02-27&ModifiedTo=2026-02-27
+```
 
-- **Meta** -- hvis actions indeholder "campaigns" eller "users" (typisk meta-syncs)
-- **Sales** -- hvis actions kun indeholder "sales"
-- **Calls** -- hvis actions kun indeholder "calls"
-- **Fuld** -- hvis actions indeholder blanding af meta + data (fx `["campaigns", "users", "sales", "sessions"]`)
+Denne range er tom og returnerer altid 0 resultater. Manuelt test med `ModifiedTo=2026-02-28` returnerede **5 salg** - saa dataen eksisterer.
 
-Visuelt bruges små farvede badges (fx blaa for Meta, groen for Sales, lilla for Fuld) saa man hurtigt kan skelne typerne.
+## Bevis
+- `ModifiedFrom=2026-02-27&ModifiedTo=2026-02-27` -> 0 leads
+- `ModifiedFrom=2026-02-27&ModifiedTo=2026-02-28` -> 5 leads (bekraeftet via curl)
+- Alle Eesy-syncs siden 08:30 har returneret 0 records pga denne bug
 
-## Fil der aendres
-- `src/pages/SystemStability.tsx`
-  - Tilfoej "Type" `TableHead` efter "Integration" kolonnen
-  - Tilfoej `TableCell` med logik der laaser `run.actions` og viser passende badge
-  - Opdater `colSpan` i tom-tilstand fra 7 til 8
+## Fix
+**Fil:** `supabase/functions/integration-engine/adapters/enreach.ts`
 
-## Teknisk detalje
-Ingen database-aendringer -- `actions` arrayet hentes allerede i den eksisterende query. Aendringen er rent UI-baseret.
+I baade `fetchSalesRange()` (linje 567-568) og `fetchSessions()` (tilsvarende logik), bump `toStr` med en dag saa API'et inkluderer hele den oenskede dag:
+
+```text
+// FØR (linje 567-568):
+const fromStr = range.from.split("T")[0];
+const toStr = range.to.split("T")[0];
+
+// EFTER:
+const fromStr = range.from.split("T")[0];
+const toDate = new Date(range.to);
+toDate.setUTCDate(toDate.getUTCDate() + 1);
+const toStr = toDate.toISOString().split("T")[0];
+```
+
+Samme fix skal ogsaa anvendes i `buildLeadsEndpoint` eller alle steder der bruger `ModifiedTo` med dato-only.
+
+## Paavirkede integrationer
+Alle Enreach-integrationer der bruger inkrementel sync (Eesy, ASE, Tryg via integration-engine). Tryg er ikke pavirket i praksis fordi den primaert bruger webhooks, men ASE og Eesy er direkte pavirket.
+
+## Risiko
+Lav. Aendringen goer blot at `ModifiedTo` altid er dagen EFTER den oenskede slutdato, hvilket sikrer at hele den sidste dag inkluderes. Der er ingen risiko for duplikater da systemet allerede haandterer deduplicering via `adversus_external_id`.
 
