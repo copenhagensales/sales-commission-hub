@@ -450,6 +450,7 @@ async function processSalesBatch(
         raw_payload: sale.rawPayload || null,
         normalized_data: sale.normalizedData || null,
         updated_at: new Date().toISOString(),
+        validation_status: 'pending',  // Eksplicit default for at undgå NULL
         enrichment_status: enrichmentStatus,
         enrichment_attempts: 0,
         enrichment_error: null,
