@@ -1,54 +1,55 @@
 
 
-# Fix: NULL validation_status bug i alle filer
+# Fix: 3 resterende NULL-usikre filtre i calculate-kpi-values
 
-## Problem
-`.neq("validation_status", "rejected")` og `.not("sales.validation_status", "eq", "rejected")` ekskluderer salgsposter med `NULL` validation_status, fordi PostgreSQL behandler `NULL != 'rejected'` som `NULL` (falsk). Dette skjuler ca. 107.000 kr provision fra dashboards.
+## Hvad vi fandt
 
-## Trin 1: Backfill eksisterende NULL-raekker
-Opdater alle salg med `validation_status = NULL` til `'pending'`, saa de straks bliver synlige.
+### Allerede rettet (bekraeftet)
+- Backfill koerte korrekt: **0 NULL raekker** i databasen lige nu
+- Kolonnen har `DEFAULT 'pending'` -- nye salg faar altid en vaerdi
+- Alle **frontend-filer** er korrekt rettet (0 usikre filtre)
+- 5 ud af 8 steder i edge functions er rettet
 
-```sql
-UPDATE sales SET validation_status = 'pending' WHERE validation_status IS NULL;
+### Stadig saarbare: 3 steder i `calculate-kpi-values/index.ts`
+Disse 3 funktioner bruger stadig `.not("sales.validation_status", "eq", "rejected")` som ekskluderer NULL-raekker:
+
+| Linje | Funktion | Effekt |
+|-------|----------|--------|
+| 1435 | `calculateSalesCount()` | Antal salg mangler |
+| 1483 | `calculateTotalCommission()` | Provision mangler |
+| 1511 | `calculateTotalRevenue()` | Omsaetning mangler |
+
+Disse bruges af den **timelige full-refresh cron** (`calculate-kpi-values`), som er safety-net for alle KPI-caches. Hvis NULL-raekker vender tilbage, vil disse 3 steder igen skjule salg.
+
+### Kan NULL vende tilbage?
+- **Integration engine** (`core/sales.ts`): Saetter IKKE eksplicit `validation_status` ved upsert. Nye inserts faar DEFAULT, men det er sikrere at saette det eksplicit.
+- **Dialer webhooks**: Saetter eksplicit `'pending'` -- OK
+- **Risiko**: Lav men reel. Enhver fremtidig insert-sti der glemmer feltet, kan genintroducere NULL.
+
+## Plan
+
+### Trin 1: Fix de 3 resterende filtre i `calculate-kpi-values/index.ts`
+Erstat paa linje 1435, 1483 og 1511:
 ```
-
-## Trin 2: Fix filter i 17 steder paa tvaers af 14 filer
-
-Erstat `.neq("validation_status", "rejected")` med:
+.not("sales.validation_status", "eq", "rejected")
 ```
-.or("validation_status.neq.rejected,validation_status.is.null")
-```
-
-Erstat `.not("sales.validation_status", "eq", "rejected")` med:
+med:
 ```
 .or("sales.validation_status.neq.rejected,sales.validation_status.is.null")
 ```
 
-### Frontend-filer (8 filer):
-1. `src/hooks/useSalesAggregatesExtended.ts` - 1 sted
-2. `src/hooks/useSalesAggregates.ts` - 1 sted
-3. `src/hooks/useDashboardKpiData.ts` - 3 steder (`.not()` variant)
-4. `src/components/home/HeadToHeadComparison.tsx` - 1 sted
-5. `src/components/sales/SalesFeed.tsx` - 1 sted
-6. `src/components/dashboard/DailyRevenueChart.tsx` - 1 sted
-7. `src/components/my-profile/SalesGoalTracker.tsx` - 1 sted (`.not()` variant)
-8. `src/pages/shift-planning/ShiftOverview.tsx` - 1 sted
-9. `src/pages/dashboards/CphSalesDashboard.tsx` - 2 steder
-10. `src/pages/ImmediatePaymentASE.tsx` - 1 sted
+### Trin 2: Tilfoej eksplicit `validation_status: 'pending'` i integration engine
+I `supabase/functions/integration-engine/core/sales.ts` (ca. linje 456), tilfoej default-vaerdi i saleData-objektet saa det altid er sat, uanset om det er insert eller update:
+```typescript
+validation_status: 'pending',  // Eksplicit default for at undgaa NULL
+```
 
-### Edge Functions (4 filer):
-11. `supabase/functions/calculate-kpi-incremental/index.ts` - 1 sted
-12. `supabase/functions/calculate-kpi-values/index.ts` - 5 steder (`.neq()`) + 3 steder (`.not()`)
-13. `supabase/functions/calculate-leaderboard-incremental/index.ts` - 1 sted
-14. `supabase/functions/tv-dashboard-data/index.ts` - 2 steder
-15. `supabase/functions/snapshot-payroll-period/index.ts` - 1 sted
-16. `supabase/functions/league-calculate-standings/index.ts` - 1 sted
+### Trin 3: Deploy og genberegn
+- Deploy `calculate-kpi-values` og `integration-engine`
+- Kald `calculate-kpi-incremental` for at opdatere cache
 
-## Trin 3: Genberegn KPI-cache
-Kald `calculate-kpi-incremental` med `force: true` for at opdatere cached vaerdier med det rettede filter.
-
-## Effekt
-- Thorbjorns dashboard-tal vil matche dagsrapporten
-- Alle fremtidige salg med NULL validation_status bliver korrekt inkluderet
-- Ca. 107.000 kr provision genoprettes i dashboards systemdaekkende
+### Effekt
+- Alle kampagner er beskyttet mod NULL validation_status
+- Baade minutlig (incremental) og timelig (full-refresh) KPI-beregning haandterer NULL korrekt
+- Fremtidige salg fra integration engine faar altid eksplicit status
 
