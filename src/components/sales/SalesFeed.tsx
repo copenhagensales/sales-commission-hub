@@ -275,7 +275,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
             products (id, name)
           )
         `, { count: "exact" })
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .order("sale_datetime", { ascending: false });
 
       // Apply filters - use RPC for full-text search across all fields including raw_payload

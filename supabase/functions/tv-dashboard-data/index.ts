@@ -95,7 +95,7 @@ async function fetchAllSales(
     selectFields,
     (query) => {
       let next = query
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", dateStart)
         .lte("sale_datetime", dateEnd);
 
@@ -1072,7 +1072,7 @@ async function handleTeamDashboard(
     `,
     (query) => query
       .in("client_campaign_id", campaignIds.length > 0 ? campaignIds : ["none"])
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", monthStart)
       .order("sale_datetime", { ascending: false })
   );
