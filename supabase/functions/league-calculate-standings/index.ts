@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
       const { data: salesBatch, error: salesError } = await supabase
         .from("sales")
         .select("id, agent_email")
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", sourceStart)
         .lte("sale_datetime", sourceEnd)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);

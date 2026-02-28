@@ -231,7 +231,7 @@ async function fetchAndCalculateClientSide(params: {
 
   const filters = (query: any) => {
     let q = query
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr);
     

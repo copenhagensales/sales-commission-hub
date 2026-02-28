@@ -444,7 +444,7 @@ export const useDashboardKpiData = () => {
               let filtered = q
                 .gte("sales.sale_datetime", startISO)
                 .lte("sales.sale_datetime", endISO)
-                .not("sales.validation_status", "eq", "rejected");
+                .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
               if (campaignIds.length > 0) {
                 filtered = filtered.in("sales.client_campaign_id", campaignIds);
               }
@@ -591,7 +591,7 @@ const fetchMetricValueForFormula = async (
           let filtered = q
             .gte("sales.sale_datetime", startISO)
             .lte("sales.sale_datetime", endISO)
-            .not("sales.validation_status", "eq", "rejected");
+            .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
           if (campaignIds.length > 0) {
             filtered = filtered.in("sales.client_campaign_id", campaignIds);
           }
@@ -1185,7 +1185,7 @@ export const useWidgetKpiData = (widgets: Array<{
                     let filtered = q
                       .gte("sales.sale_datetime", startISO)
                       .lte("sales.sale_datetime", endISO)
-                      .not("sales.validation_status", "eq", "rejected");
+                      .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
                     if (campaignIds.length > 0) {
                       filtered = filtered.in("sales.client_campaign_id", campaignIds);
                     }

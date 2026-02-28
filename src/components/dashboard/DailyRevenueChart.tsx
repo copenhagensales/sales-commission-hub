@@ -38,7 +38,7 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
           `)
            .gte("sale_datetime", `${startDateStr}T00:00:00`)
           .lte("sale_datetime", `${todayStr}T23:59:59`)
-          .neq("validation_status", "rejected")
+          .or("validation_status.neq.rejected,validation_status.is.null")
           .range(page * pageSize, (page + 1) * pageSize - 1);
         
         if (error) throw error;

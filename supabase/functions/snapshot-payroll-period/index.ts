@@ -59,7 +59,7 @@ async function fetchAllSalesWithItems(
     const { data, error } = await supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, sale_datetime, client_campaign_id, source, sale_items(quantity, mapped_commission, mapped_revenue, product_id)")
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })

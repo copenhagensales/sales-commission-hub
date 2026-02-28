@@ -156,7 +156,7 @@ export function SalesGoalTracker({
         .select("mapped_commission, sales!inner(agent_name, sale_datetime, validation_status)")
         .eq("sales.agent_name", agentName)
         .gte("sales.sale_datetime", `${weekStartStr}T00:00:00`)
-        .not("sales.validation_status", "eq", "rejected");
+        .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
       
       if (error) throw error;
       

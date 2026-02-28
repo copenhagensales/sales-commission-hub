@@ -222,7 +222,7 @@ export default function ShiftOverview() {
         .gte("sale_datetime", format(weekStart, "yyyy-MM-dd"))
         .lte("sale_datetime", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`)
         .or("status.in.(pending,approved),status.is.null")
-        .neq("validation_status", "rejected");
+        .or("validation_status.neq.rejected,validation_status.is.null");
       if (error) throw error;
       return data;
     },

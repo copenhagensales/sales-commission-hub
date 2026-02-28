@@ -239,7 +239,7 @@ export default function CphSalesDashboard() {
         `)
         .gte("sale_datetime", startOfDay)
         .lte("sale_datetime", endOfDay)
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .order("created_at", { ascending: false });
       if (error) throw error;
       
@@ -554,7 +554,7 @@ export default function CphSalesDashboard() {
         (q) => q
           .gte("sale_datetime", `${monthStart}T00:00:00`)
           .lte("sale_datetime", `${todayStr}T23:59:59`)
-          .neq("validation_status", "rejected"),
+          .or("validation_status.neq.rejected,validation_status.is.null"),
         { orderBy: "sale_datetime", ascending: false }
       );
 

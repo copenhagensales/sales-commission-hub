@@ -156,7 +156,7 @@ async function fetchAllSaleIds(
       .from("sales")
       .select("id")
       .in("client_campaign_id", campaignIds)
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .range(offset, offset + PAGE - 1);
@@ -192,7 +192,7 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
     const { data: sales, error } = await supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission, quantity, product_id)")
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -869,7 +869,7 @@ async function fetchAllSalesWithItems(
     let query = supabase
       .from("sales")
       .select("id, agent_email, agent_external_id, agent_name, sale_datetime, sale_items(sale_id, quantity, mapped_commission, product_id)")
-      .neq("validation_status", "rejected")
+      .or("validation_status.neq.rejected,validation_status.is.null")
       .gte("sale_datetime", startStr)
       .lte("sale_datetime", endStr)
       .order("sale_datetime", { ascending: true })
@@ -1774,7 +1774,7 @@ async function calculateActiveEmployees(
     .select("agent_email")
     .in("agent_email", emails)
     .gte("sale_datetime", payrollStart.toISOString())
-    .neq("validation_status", "rejected");
+    .or("validation_status.neq.rejected,validation_status.is.null");
 
   const uniqueEmails = new Set(
     (salesData || []).map(s => s.agent_email?.toLowerCase()).filter(Boolean)
