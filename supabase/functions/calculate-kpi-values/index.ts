@@ -1432,7 +1432,7 @@ async function calculateSalesCount(
   const { data, error: siError } = await supabase
     .from("sale_items")
     .select("quantity, product_id, sale_id, sales!inner(validation_status)")
-    .not("sales.validation_status", "eq", "rejected")
+    .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" })
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
@@ -1480,7 +1480,7 @@ async function calculateTotalCommission(
   const { data, error } = await supabase
     .from("sale_items")
     .select("mapped_commission, quantity, sales!inner(validation_status)")
-    .not("sales.validation_status", "eq", "rejected")
+    .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" })
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
@@ -1508,7 +1508,7 @@ async function calculateTotalRevenue(
   const { data, error } = await supabase
     .from("sale_items")
     .select("mapped_revenue, quantity, sales!inner(validation_status)")
-    .not("sales.validation_status", "eq", "rejected")
+    .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" })
     .gte("created_at", startStr)
     .lte("created_at", endStr);
 
