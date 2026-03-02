@@ -10735,6 +10735,21 @@ export type Database = {
           revenue: number
         }[]
       }
+      get_sales_report_raw: {
+        Args: { p_client_id: string; p_end: string; p_start: string }
+        Returns: {
+          commission: number
+          customer_company: string
+          customer_phone: string
+          employee_name: string
+          internal_reference: string
+          product_name: string
+          quantity: number
+          revenue: number
+          sale_datetime: string
+          status: string
+        }[]
+      }
       get_sales_with_unknown_products: {
         Args: never
         Returns: {

@@ -38,6 +38,19 @@ interface DetailedRow {
   revenue: number;
 }
 
+interface RawRow {
+  employee_name: string;
+  sale_datetime: string;
+  product_name: string;
+  quantity: number;
+  commission: number;
+  revenue: number;
+  customer_phone: string;
+  customer_company: string;
+  status: string;
+  internal_reference: string;
+}
+
 interface EmployeeRow {
   name: string;
   salesCount: number;
@@ -68,6 +81,20 @@ export default function ReportsManagement() {
       });
       if (error) throw error;
       return (data ?? []) as DetailedRow[];
+    },
+    enabled: !!clientId && !!periodStart && !!periodEnd,
+  });
+
+  const { data: rawSalesData } = useQuery({
+    queryKey: ["sales-report-raw", clientId, periodStart, periodEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_sales_report_raw", {
+        p_client_id: clientId,
+        p_start: periodStart,
+        p_end: periodEnd,
+      });
+      if (error) throw error;
+      return (data ?? []) as RawRow[];
     },
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
@@ -114,7 +141,9 @@ export default function ReportsManagement() {
 
   const handleExport = () => {
     if (!employees.length) return;
-    const rows = employees.map((emp) => {
+
+    // === Fane 1: Opsummering ===
+    const summaryRows = employees.map((emp) => {
       const row: Record<string, string | number> = {
         Medarbejder: emp.name,
         "Antal salg": emp.salesCount,
@@ -127,7 +156,6 @@ export default function ReportsManagement() {
       return row;
     });
 
-    // Total row
     const totalRow: Record<string, string | number> = {
       Medarbejder: "TOTAL",
       "Antal salg": totals.salesCount,
@@ -137,13 +165,36 @@ export default function ReportsManagement() {
     }
     totalRow["Provision (DKK)"] = Math.round(totals.commission);
     totalRow["Revenue (DKK)"] = Math.round(totals.revenue);
-    rows.push(totalRow);
+    summaryRows.push(totalRow);
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
     const colCount = 2 + productNames.length + 2;
-    ws["!cols"] = Array.from({ length: colCount }, (_, i) => ({ wch: i === 0 ? 30 : 14 }));
+    wsSummary["!cols"] = Array.from({ length: colCount }, (_, i) => ({ wch: i === 0 ? 30 : 14 }));
+
+    // === Fane 2: Rådata ===
+    const rawRows = (rawSalesData ?? []).map((r) => ({
+      Dato: r.sale_datetime ? new Date(r.sale_datetime).toLocaleString("da-DK") : "",
+      Medarbejder: r.employee_name ?? "",
+      Produkt: r.product_name ?? "",
+      Antal: r.quantity ?? 1,
+      "Provision (DKK)": Math.round(Number(r.commission ?? 0)),
+      "Revenue (DKK)": Math.round(Number(r.revenue ?? 0)),
+      Telefon: r.customer_phone ?? "",
+      Virksomhed: r.customer_company ?? "",
+      Status: r.status ?? "",
+      Reference: r.internal_reference ?? "",
+    }));
+
+    const wsRaw = XLSX.utils.json_to_sheet(rawRows);
+    wsRaw["!cols"] = [
+      { wch: 20 }, { wch: 25 }, { wch: 20 }, { wch: 8 },
+      { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 },
+      { wch: 12 }, { wch: 18 },
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${clientLabel} Salg`);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Opsummering");
+    XLSX.utils.book_append_sheet(wb, wsRaw, "Rådata");
     XLSX.writeFile(wb, `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`);
   };
 
