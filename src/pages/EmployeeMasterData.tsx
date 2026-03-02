@@ -150,7 +150,7 @@ export default function EmployeeMasterData() {
   const currentUserPosition = position?.name;
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
-  const { canView } = useUnifiedPermissions();
+  const { canView, canEdit: canEditPermission } = useUnifiedPermissions();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "all-employees";
@@ -470,11 +470,15 @@ export default function EmployeeMasterData() {
           | undefined;
       }
       
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from("employee_master_data")
         .update(updateData)
-        .eq("id", id);
+        .eq("id", id)
+        .select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Du har ikke rettighed til at ændre denne medarbejder");
+      }
 
       // If deactivating, send deactivation reminder
       if (!is_active) {
@@ -969,7 +973,7 @@ export default function EmployeeMasterData() {
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee }); }}} />
+                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee }); }}} />
                             </TableCell>
                             <TableCell className="py-3">
                               <div className="flex items-center gap-0.5">
