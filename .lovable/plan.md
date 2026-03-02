@@ -1,28 +1,22 @@
 
 
-# Excel-eksport med to faner: Opsummering + Rådata
+# Fix: Fjern 1000-rækkers begrænsning på rådata
 
-## Ændringer
+## Problem
+Database-klienten (SDK) har en standard-grænse på 1000 rækker per forespørgsel. SQL-funktionen `get_sales_report_raw` har ingen LIMIT, men SDK'en afskærer resultatet.
 
-### 1. Ny database-funktion: `get_sales_report_raw`
-Opretter en ny RPC der returnerer hvert enkelt salg som sin egen række med felter:
-- `employee_name` — sælgerens navn
-- `sale_datetime` — salgstidspunkt
-- `product_name` — produktnavn
-- `quantity` — antal
-- `commission` — provision
-- `revenue` — omsætning
-- `customer_phone` — kundens telefonnummer
-- `customer_company` — virksomhed
-- `status` — salgsstatus
+## Datakilde
+Rådata hentes fra `sale_items` JOIN `sales` JOIN `products` JOIN `client_campaigns` — filtreret på klient og periode, kun produkter med `counts_as_sale = true`.
 
-Baseret på samme joins og filtre som `get_sales_report_detailed`, men uden GROUP BY — altså en række per `sale_item`.
+## Løsning
+I `ReportsManagement.tsx`: Erstat det nuværende `supabase.rpc(...)` kald med pagineret fetching der henter alle rækker i batches af 1000 (via `.range(offset, offset + pageSize - 1)` eller ved at bruge den eksisterende `fetchAllRows`-helper fra `src/utils/supabasePagination.ts`).
 
-### 2. Frontend: `ReportsManagement.tsx`
-- Tilføj et nyt query der kalder `get_sales_report_raw` med samme filtre
-- Opdater `handleExport` til at oprette en Excel-fil med **to faner**:
-  - **Fane 1: "Opsummering"** — den eksisterende aggregerede tabel (per medarbejder med produktkolonner + total)
-  - **Fane 2: "Rådata"** — alle individuelle salg med en række per salg, inkl. dato, medarbejder, produkt, antal, provision, revenue, kundeinfo
+Da det er et RPC-kald (ikke en table query), kan vi ikke bruge `.range()` direkte. I stedet:
+- Tilføj `LIMIT` og `OFFSET` parametre til `get_sales_report_raw` SQL-funktionen
+- Loop i frontend indtil færre end `pageSize` rækker returneres
+- Eller alternativt: kald RPC'en med en ekstra parameter `p_limit` sat til fx 10000 (realistisk max for en lønperiode)
 
-Ingen ændring i den viste tabel på skærmen — kun Excel-eksporten får den ekstra fane.
+Den simpleste løsning: Kald RPC'en via en POST med `.csv()` header eller tilføj pagination-parametre til funktionen.
+
+**Anbefalet tilgang:** Opdater SQL-funktionen til at accepte `p_limit int DEFAULT 10000` og `p_offset int DEFAULT 0`, og loop i frontend med batches.
 
