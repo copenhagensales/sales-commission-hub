@@ -90,11 +90,12 @@ export default function ReportsManagement() {
   const { data: rawSalesData, isLoading: isLoadingRaw, isFetching: isFetchingRaw } = useQuery({
     queryKey: ["sales-report-raw", clientId, periodStart, periodEnd],
     queryFn: async () => {
-      const PAGE_SIZE = 2000;
+      const PAGE_SIZE = 1000;
       const allRows: RawRow[] = [];
       let offset = 0;
+      const MAX_PAGES = 50;
 
-      while (true) {
+      while (allRows.length / PAGE_SIZE < MAX_PAGES) {
         const { data, error } = await supabase.rpc("get_sales_report_raw", {
           p_client_id: clientId,
           p_start: periodStart,
