@@ -239,6 +239,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 isLoading={isLoading}
                 tvMode={tvMode}
                 showCrossSales={showCrossSales}
+                maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
                 title="Top Uge"
@@ -246,6 +247,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 isLoading={isLoading}
                 tvMode={tvMode}
                 showCrossSales={showCrossSales}
+                maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
                 title="Top Dag"
@@ -253,6 +255,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 isLoading={isLoading}
                 tvMode={tvMode}
                 showCrossSales={showCrossSales}
+                maxRows={tvMode ? 10 : undefined}
               />
             </div>
           </>

@@ -89,9 +89,9 @@ export function TvLeaderboardTable({
   tvMode,
   showCrossSales = false,
   crossSalesLabel = "Switch",
-  maxRows = 10,
+  maxRows,
 }: TvLeaderboardTableProps) {
-  const displaySellers = sellers.slice(0, maxRows);
+  const displaySellers = maxRows ? sellers.slice(0, maxRows) : sellers;
 
   return (
     <Card className={tvMode 
@@ -104,7 +104,7 @@ export function TvLeaderboardTable({
           : 'text-center text-lg font-bold uppercase tracking-wider'
         }>{title}</CardTitle>
       </CardHeader>
-      <CardContent className={tvMode ? 'flex-1 overflow-hidden p-0' : 'p-0'}>
+      <CardContent className={tvMode ? 'flex-1 overflow-hidden p-0' : 'p-0 max-h-[600px] overflow-y-auto'}>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <span className="text-muted-foreground">Indlæser...</span>
@@ -179,7 +179,7 @@ export function TvLeaderboardTable({
                 ))}
               </TableBody>
             </Table>
-            {tvMode && displaySellers.length < maxRows && displaySellers.length > 0 && (
+            {tvMode && maxRows && displaySellers.length < maxRows && displaySellers.length > 0 && (
               <p className="text-center text-muted-foreground/60 text-[14px] py-2">
                 Kun {displaySellers.length} registrering{displaySellers.length !== 1 ? 'er' : ''} i denne periode
               </p>
