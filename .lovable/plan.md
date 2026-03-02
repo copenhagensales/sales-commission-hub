@@ -1,22 +1,20 @@
 
 
-# Fix: Fjern 1000-rækkers begrænsning på rådata
+# Sørg for at Excel-arket indeholder al data
 
 ## Problem
-Database-klienten (SDK) har en standard-grænse på 1000 rækker per forespørgsel. SQL-funktionen `get_sales_report_raw` har ingen LIMIT, men SDK'en afskærer resultatet.
-
-## Datakilde
-Rådata hentes fra `sale_items` JOIN `sales` JOIN `products` JOIN `client_campaigns` — filtreret på klient og periode, kun produkter med `counts_as_sale = true`.
+Eksport-knappen kan klikkes før rådata er færdigindlæst, fordi den kun tjekker om opsummeringsdata er klar (`!employees.length`). Rådata-queryen kører asynkront i baggrunden og kan stadig paginere. Resultatet: Excel-filen kan mangle Rådata-fanen eller have ufuldstændige data.
 
 ## Løsning
-I `ReportsManagement.tsx`: Erstat det nuværende `supabase.rpc(...)` kald med pagineret fetching der henter alle rækker i batches af 1000 (via `.range(offset, offset + pageSize - 1)` eller ved at bruge den eksisterende `fetchAllRows`-helper fra `src/utils/supabasePagination.ts`).
 
-Da det er et RPC-kald (ikke en table query), kan vi ikke bruge `.range()` direkte. I stedet:
-- Tilføj `LIMIT` og `OFFSET` parametre til `get_sales_report_raw` SQL-funktionen
-- Loop i frontend indtil færre end `pageSize` rækker returneres
-- Eller alternativt: kald RPC'en med en ekstra parameter `p_limit` sat til fx 10000 (realistisk max for en lønperiode)
+### 1. Tilføj loading-state for rådata
+- Brug `isLoading`/`isFetching` fra `useQuery` for `rawSalesData`-queryen.
+- Disable eksport-knappen når enten opsummering ELLER rådata stadig indlæses.
+- Vis en loading-indikator på knappen (spinner + "Henter data...") når data stadig hentes.
 
-Den simpleste løsning: Kald RPC'en via en POST med `.csv()` header eller tilføj pagination-parametre til funktionen.
+### 2. Opdater knap-logik
+- Ændr `disabled`-betingelsen til: `!employees.length || isLoadingRaw`
+- Vis antal rækker i knappen når data er klar, fx "Download Excel (1.523 rækker)"
 
-**Anbefalet tilgang:** Opdater SQL-funktionen til at accepte `p_limit int DEFAULT 10000` og `p_offset int DEFAULT 0`, og loop i frontend med batches.
+Ingen database-ændringer nødvendige — paginering er allerede implementeret korrekt.
 
