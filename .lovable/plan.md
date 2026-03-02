@@ -1,20 +1,22 @@
 
 
-# Sørg for at Excel-arket indeholder al data
+# Fix: Pagination-stopbetingelse i ReportsManagement.tsx
 
-## Problem
-Eksport-knappen kan klikkes før rådata er færdigindlæst, fordi den kun tjekker om opsummeringsdata er klar (`!employees.length`). Rådata-queryen kører asynkront i baggrunden og kan stadig paginere. Resultatet: Excel-filen kan mangle Rådata-fanen eller have ufuldstændige data.
+## Hvad er bygget allerede (bekræftet)
+- System Architecture Diagram med 3-lags flow (Eksterne Kilder → Processing & Data → KPI & Output)
+- Unified KPI Gateway (`useKpiGateway.ts`) med contract versioning, freshness og health monitoring
+- KPI cache-lag (`kpi_cached_values`, `kpi_leaderboard_cache`) opdateret af edge functions
+- Metric Contract (`metricContract.ts`) og runtime config (`kpiRuntime.ts`)
+- Dual-read compare infrastruktur via `useKpiHealthMonitor`
+- Pagineret RPC `get_sales_report_raw` med `p_limit`/`p_offset`
 
-## Løsning
+## Det ene resterende problem
+`PAGE_SIZE = 2000` i `ReportsManagement.tsx` linje 93, men Supabase API returnerer maks 1000 rækker. Loopet bryder ved `data.length (1000) < PAGE_SIZE (2000)` = true → kun 1000 rækker.
 
-### 1. Tilføj loading-state for rådata
-- Brug `isLoading`/`isFetching` fra `useQuery` for `rawSalesData`-queryen.
-- Disable eksport-knappen når enten opsummering ELLER rådata stadig indlæses.
-- Vis en loading-indikator på knappen (spinner + "Henter data...") når data stadig hentes.
+## Ændring
+**Fil: `src/pages/reports/ReportsManagement.tsx`**
+- Linje 93: Ændr `PAGE_SIZE` fra `2000` til `1000`
+- Tilføj safety guard (max 50 iterationer) for at undgå uendelig løkke
 
-### 2. Opdater knap-logik
-- Ændr `disabled`-betingelsen til: `!employees.length || isLoadingRaw`
-- Vis antal rækker i knappen når data er klar, fx "Download Excel (1.523 rækker)"
-
-Ingen database-ændringer nødvendige — paginering er allerede implementeret korrekt.
+Det er en én-linje fix der løser hele Excel-problemet. Ingen database-ændringer nødvendige — arkitekturen er korrekt.
 
