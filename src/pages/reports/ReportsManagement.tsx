@@ -90,13 +90,26 @@ export default function ReportsManagement() {
   const { data: rawSalesData } = useQuery({
     queryKey: ["sales-report-raw", clientId, periodStart, periodEnd],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_sales_report_raw", {
-        p_client_id: clientId,
-        p_start: periodStart,
-        p_end: periodEnd,
-      });
-      if (error) throw error;
-      return (data ?? []) as RawRow[];
+      const PAGE_SIZE = 2000;
+      const allRows: RawRow[] = [];
+      let offset = 0;
+
+      while (true) {
+        const { data, error } = await supabase.rpc("get_sales_report_raw", {
+          p_client_id: clientId,
+          p_start: periodStart,
+          p_end: periodEnd,
+          p_limit: PAGE_SIZE,
+          p_offset: offset,
+        });
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allRows.push(...(data as RawRow[]));
+        if (data.length < PAGE_SIZE) break;
+        offset += data.length;
+      }
+
+      return allRows;
     },
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
