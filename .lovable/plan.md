@@ -1,11 +1,13 @@
 
 
-# Flyt "Specialsalg / 5G Fri" op under Opsummeringstype
+# Opdater `.lovable/plan.md`
 
-## Ændring
-Flyt hele "Specialsalg"-blokken (linje 528-546) fra bunden af "Valgfrie sektioner"-kortet op i "Opsummeringstype"-kortet, lige under RadioGroup-toglen (efter linje 306).
+Filen indeholder den gamle plan om at flytte Specialsalg-blokken. Den skal opdateres til at beskrive den faktiske implementering: tre opsummeringstyper som RadioGroup (Standard / Pilot / Kun 5g Fri Salg), samt pilot-formuleringerne.
 
-**Fil: `src/pages/TdcOpsummering.tsx`**
-1. Fjern `<Separator />` + Specialsalg-blokken (linje 528-546) fra sin nuværende position
-2. Indsæt den i Opsummeringstype-kortets `<CardContent>`, efter RadioGroup (linje 306), med en `<Separator />` imellem
+**Fil: `.lovable/plan.md`**
+- Erstat indholdet med en beskrivelse af den nuværende tilstand:
+  - Tre opsummeringstyper via `SummaryVariant`: `"standard" | "pilot" | "5g-fri"`
+  - Pilot-ændringer: Vilkår (7 hverdage), Nummervalg (nye formuleringer), Opstart skjult, Omstilling (welcome call)
+  - 5g Fri: forenklet opsummering
+  - Næste skridt: synkroniser `TdcOpsummeringPublic.tsx` med samme ændringer
 
