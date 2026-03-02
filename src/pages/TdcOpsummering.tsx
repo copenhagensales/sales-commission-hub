@@ -30,7 +30,7 @@ interface SummaryLine {
 type MbbType = "mobilevoice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
-type SummaryVariant = "standard" | "pilot";
+type SummaryVariant = "standard" | "pilot" | "5g-fri";
 
 export default function TdcOpsummering() {
   const { toast } = useToast();
@@ -41,6 +41,7 @@ export default function TdcOpsummering() {
   // Summary variant toggle
   const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>("standard");
   const isPilot = summaryVariant === "pilot";
+  const kun5gFriSalg = summaryVariant === "5g-fri";
 
   // MBB options
   const [mbbType, setMbbType] = useState<MbbType>(null);
@@ -66,8 +67,7 @@ export default function TdcOpsummering() {
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
   const [noOmstilling, setNoOmstilling] = useState(false);
 
-  // Specialsalg
-  const [kun5gFriSalg, setKun5gFriSalg] = useState(false);
+  // Specialsalg - now derived from summaryVariant
 
   // Validation
   const isNummervalgMissing = !numberChoice;
@@ -293,7 +293,7 @@ export default function TdcOpsummering() {
                 <RadioGroup
                   value={summaryVariant}
                   onValueChange={(val) => setSummaryVariant(val as SummaryVariant)}
-                  className="flex gap-4"
+                  className="flex gap-4 flex-wrap"
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="standard" id="variant-standard" />
@@ -303,27 +303,11 @@ export default function TdcOpsummering() {
                     <RadioGroupItem value="pilot" id="variant-pilot" />
                     <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
                   </div>
-                </RadioGroup>
-
-                <Separator />
-
-                {/* Specialsalg */}
-                <div className="space-y-2">
-                  <Label className="font-medium">Specialsalg</Label>
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="kun5gFriSalg" 
-                      checked={kun5gFriSalg}
-                      onCheckedChange={(checked) => setKun5gFriSalg(checked === true)}
-                    />
-                    <Label htmlFor="kun5gFriSalg" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                    <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
+                    <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
                   </div>
-                  {kun5gFriSalg && (
-                    <p className="text-sm text-muted-foreground ml-6">
-                      Ved aktivering bruges en forenklet opsummering kun til 5G Fri produkter.
-                    </p>
-                  )}
-                </div>
+                </RadioGroup>
               </CardContent>
             </Card>
 
