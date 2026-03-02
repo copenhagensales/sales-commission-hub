@@ -1,22 +1,41 @@
 
 
-# Fix: Pagination-stopbetingelse i ReportsManagement.tsx
+# TDC Opsummering: Tilføj "Pilot Opsummering" variant
 
-## Hvad er bygget allerede (bekræftet)
-- System Architecture Diagram med 3-lags flow (Eksterne Kilder → Processing & Data → KPI & Output)
-- Unified KPI Gateway (`useKpiGateway.ts`) med contract versioning, freshness og health monitoring
-- KPI cache-lag (`kpi_cached_values`, `kpi_leaderboard_cache`) opdateret af edge functions
-- Metric Contract (`metricContract.ts`) og runtime config (`kpiRuntime.ts`)
-- Dual-read compare infrastruktur via `useKpiHealthMonitor`
-- Pagineret RPC `get_sales_report_raw` med `p_limit`/`p_offset`
+## Overblik
+Tilføj en toggle øverst på siden så sælgeren kan vælge mellem **Standard opsummering** og **Pilot opsummering**. Pilot-varianten genbruger samme UI-struktur, men med ændrede formuleringer i bestemte sektioner og fjernelse af "Opstart"-punktet.
 
-## Det ene resterende problem
-`PAGE_SIZE = 2000` i `ReportsManagement.tsx` linje 93, men Supabase API returnerer maks 1000 rækker. Loopet bryder ved `data.length (1000) < PAGE_SIZE (2000)` = true → kun 1000 rækker.
+## Ændringer i detaljer
 
-## Ændring
-**Fil: `src/pages/reports/ReportsManagement.tsx`**
-- Linje 93: Ændr `PAGE_SIZE` fra `2000` til `1000`
-- Tilføj safety guard (max 50 iterationer) for at undgå uendelig løkke
+### 1. Ny state + toggle UI (øverst)
+- Tilføj `summaryVariant` state: `"standard" | "pilot"`
+- Indsæt en `RadioGroup` eller segmented toggle øverst i formularen (over "Valgfrie sektioner") med valgene "Standard opsummering" og "Pilot opsummering"
 
-Det er en én-linje fix der løser hele Excel-problemet. Ingen database-ændringer nødvendige — arkitekturen er korrekt.
+### 2. Sektionsændringer i Pilot-varianten
+
+| Sektion | Standard (uændret) | Pilot |
+|---|---|---|
+| Indledning | ✅ Uændret | ✅ Uændret |
+| Grundoplysninger | ✅ Uændret | ✅ Uændret |
+| Indhold | ✅ Uændret | ✅ Uændret |
+| MV/Datadelingskort | ✅ Uændret | ✅ Uændret |
+| Hvis uden Router | ✅ Uændret | ✅ Uændret |
+| **Vilkår** | "I er bundet..." + ordrebekr. + tilføj/opsig tekst | Ny formulering: "I er bundet på kontrakten i 36 måneder." + "Inden for 3 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er" |
+| **Nummervalg** | Samme valgmuligheder | Nye formuleringer: eksisterende → "(antal) eksisterende numre", mixed → "(antal) eksisterende numre og (antal) nye numre", nye → "Udelukkende nye numre der oprettes" + "Hvilke numre i ønsker, er op til jer, men antallet af abonnementer skal overholdes" |
+| **Opstart** | Vises som sektion | **Fjernet fra UI** – erstattet af generisk tekst: "Numrene starter som udgangspunkt op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber..." (altid vist) |
+| Tilskud | ✅ Uændret | ✅ Uændret |
+| **Omstilling** | "Gennemgå kaldsflow..." (rød) + standard-opgradering | Ny formulering: "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen." + Standard: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling" |
+
+### 3. UI-ændringer i Pilot-mode
+- **Opstart-sektionen** skjules i formularen (venstre side)
+- **Opstart-validation** springes over (`isOpstartMissing = false` når pilot)
+- Nummervalg-labels forbliver de samme – kun output-teksten ændres
+
+### 4. Implementering
+Alt sker i **én fil**: `src/pages/TdcOpsummering.tsx`
+- Tilføj `summaryVariant` state
+- Tilføj toggle-UI øverst
+- I `summaryLines` useMemo: branch på `summaryVariant` for Vilkår, Nummervalg, Opstart og Omstilling sektioner
+- Skjul Opstart-UI-sektionen når `summaryVariant === "pilot"`
+- Opdater validation: spring Opstart over i pilot-mode
 
