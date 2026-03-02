@@ -87,7 +87,7 @@ export default function ReportsManagement() {
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
 
-  const { data: rawSalesData } = useQuery({
+  const { data: rawSalesData, isLoading: isLoadingRaw, isFetching: isFetchingRaw } = useQuery({
     queryKey: ["sales-report-raw", clientId, periodStart, periodEnd],
     queryFn: async () => {
       const PAGE_SIZE = 2000;
@@ -229,11 +229,20 @@ export default function ReportsManagement() {
             </CardTitle>
             <Button
               onClick={handleExport}
-              disabled={!employees.length}
+              disabled={!employees.length || isLoading || isLoadingRaw || isFetchingRaw}
               size="sm"
             >
-              <Download className="h-4 w-4 mr-1" />
-              Download Excel
+              {(isLoading || isLoadingRaw || isFetchingRaw) ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Henter data...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-1" />
+                  Download Excel{rawSalesData?.length ? ` (${rawSalesData.length.toLocaleString("da-DK")} rækker)` : ""}
+                </>
+              )}
             </Button>
           </CardHeader>
 
