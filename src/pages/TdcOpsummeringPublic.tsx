@@ -25,10 +25,16 @@ interface SummaryLine {
 type MbbType = "mobilevoice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
+type SummaryVariant = "standard" | "pilot" | "5g-fri";
 
 export default function TdcOpsummeringPublic() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+
+  // Summary variant toggle
+  const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>("standard");
+  const isPilot = summaryVariant === "pilot";
+  const kun5gFriSalg = summaryVariant === "5g-fri";
 
   // MBB options (1 and 2 - only one can be selected)
   const [mbbType, setMbbType] = useState<MbbType>(null);
@@ -56,88 +62,136 @@ export default function TdcOpsummeringPublic() {
 
   // Validation for required fields
   const isNummervalgMissing = !numberChoice;
-  const isOpstartRequired = numberChoice === "existing" || numberChoice === "mixed";
+  const isOpstartRequired = !isPilot && (numberChoice === "existing" || numberChoice === "mixed");
   const isOpstartMissing = isOpstartRequired && !startupChoice;
   
   const isMbbMissing = !noMbb && mbbType === null;
   const isTilskudMissing = !noSubsidy && !hasSubsidy;
   const isOmstillingMissing = !noOmstilling && !hasOmstilling;
 
-  const showWarningBanner = isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing;
+  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing);
 
-  // Generate summary lines with formatting info
+  // Generate summary lines
   const summaryLines = useMemo(() => {
     const lines: SummaryLine[] = [];
 
+    // Kun 5g Fri Salg shortcut
+    if (kun5gFriSalg) {
+      lines.push({ text: "For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages." });
+      lines.push({ text: "" });
+      lines.push({ text: "Aftalen bliver oprettet i (firmanavn) med CVR-nummer (CVR-nummer). Kontaktpersonen er (navn), og det telefonnummer vi benytter, er (telefonnummer)." });
+      lines.push({ text: "" });
+      lines.push({ text: "Du får (antal + fulde produktnavn + hastighedsbegrænsning) til en månedlig pris på (beløb) kr. ekskl. moms." });
+      lines.push({ text: "" });
+      lines.push({ text: "Abonnementet har 12 måneders binding og derefter 3 måneders opsigelse. Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår. Vi kan ikke opsige dit nuværende internet for dig, vi anbefaler derfor at du matcher opsigelsen med vores oprettelsesdato der fremgår i ordrebekræftelsen." });
+      lines.push({ text: "" });
+      lines.push({ text: "Har du nogle spørgsmål til mig?" });
+      return lines;
+    }
+
+    // 1. Introduction (always)
     lines.push({ text: "For at sikre, at der ikke opstår misforståelser, vil jeg lige opsummere aftalen med dig. Jeg skal gøre opmærksom på, at samtalen nu optages." });
     lines.push({ text: "" });
 
+    // 2. Basic info (always)
     lines.push({ text: "Aftalen bliver oprettet i (firmanavn) med CVR-nummer (CVR-nummer). Kontaktpersonen er (navn), og det telefonnummer vi benytter, er (telefonnummer)." });
     lines.push({ text: "" });
 
+    // 3. Product lines
     lines.push({ text: "Du får (antal + fulde produktnavn + datamængde) til en månedlig pris på (beløb) kr. ekskl. moms." });
     lines.push({ text: "" });
 
+    // MBB
     if (mbbType === "mobilevoice") {
       lines.push({ text: "Der oprettes et mobilt bredbånd gennem et mobilabonnement. Det får et fiktivt nummer, som vil fremgå i din ordrebekræftelse." });
       lines.push({ text: "" });
     }
-    
     if (mbbType === "datadelingskort") {
       lines.push({ text: "Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet/puljen, det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement på fremtidige fakturaer." });
       lines.push({ text: "" });
     }
-    
     if (mbbType && includeWithoutRouter) {
       lines.push({ text: "Der medfølger ikke en router til abonnementet, så du skal selv sørge for en router." });
       lines.push({ text: "" });
     }
 
-    if (numberChoice === "existing") {
-      lines.push({ text: "Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: [X, Y, Z]." });
-      lines.push({ text: "" });
-    } else if (numberChoice === "mixed") {
-      lines.push({ text: "Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er [X, Y, Z], og at vi derudover opretter (antal) nye mobilnumre." });
-      lines.push({ text: "" });
-    } else if (numberChoice === "new") {
-      lines.push({ text: "Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre." });
-      lines.push({ text: "" });
-    }
-
-    if (numberChoice === "new") {
-      lines.push({ text: "Dine nye numre starter (hurtigst muligt eller på bestemt dato)." });
-      lines.push({ text: "" });
-    }
-    
-    if (numberChoice === "existing" || numberChoice === "mixed") {
-      lines.push({ text: "Vi opsiger kun de numre, vi har aftalt, bliver overflyttet. Internet og produkter uden et nummer tilkoblet skal du derfor selv opsige." });
-      lines.push({ text: "" });
-    }
-    
-    if (numberChoice === "new") {
-      lines.push({ text: "Da vi opretter nye abonnementer opsiger vi derfor intet du måtte have ved andre udbydere." });
-      lines.push({ text: "" });
-    }
-
+    // Vilkår
     lines.push({ text: "I er bundet på kontrakten i 36 måneder." });
     lines.push({ text: "" });
 
-    if (numberChoice === "existing" || numberChoice === "mixed") {
-      if (startupChoice === "asap") {
-        lines.push({ text: "Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder." });
+    if (isPilot) {
+      // Pilot: Vilkår + welcome call + nummervalg in one flow
+      lines.push({ text: "Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er" });
+      lines.push({ text: "" });
+
+      // Pilot nummervalg
+      if (numberChoice === "existing") {
+        lines.push({ text: "(antal) eksisterende numre" });
         lines.push({ text: "" });
-      } else if (startupChoice === "specific") {
-        lines.push({ text: "Vi har aftalt, at numrene flyttes den (dato). Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse." });
+      } else if (numberChoice === "mixed") {
+        lines.push({ text: "(antal) eksisterende numre og (antal) nye numre" });
+        lines.push({ text: "" });
+      } else if (numberChoice === "new") {
+        lines.push({ text: "Udelukkende nye numre der oprettes" });
         lines.push({ text: "" });
       }
+
+      if (numberChoice) {
+        lines.push({ text: "Hvilke numre i ønsker, er op til jer, men antallet af abonnementer skal overholdes" });
+        lines.push({ text: "" });
+      }
+
+      // Pilot opstart - generisk tekst (altid)
+      lines.push({ text: "Numrene starter som udgangspunkt op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder." });
+      lines.push({ text: "" });
+
+    } else {
+      // Standard: nummervalg
+      if (numberChoice === "existing") {
+        lines.push({ text: "Jeg vil lige bede dig bekræfte, at det er følgende numre, der skal indgå i aftalen: [X, Y, Z]." });
+        lines.push({ text: "" });
+      } else if (numberChoice === "mixed") {
+        lines.push({ text: "Jeg vil lige bede dig bekræfte, at de numre, der skal indgå i aftalen, er [X, Y, Z], og at vi derudover opretter (antal) nye mobilnumre." });
+        lines.push({ text: "" });
+      } else if (numberChoice === "new") {
+        lines.push({ text: "Jeg vil lige bede dig bekræfte, at du ikke ønsker at flytte eksisterende numre med over, og at løsningen derfor udelukkende skal bestå af nye mobilnumre." });
+        lines.push({ text: "" });
+      }
+
+      if (numberChoice === "new") {
+        lines.push({ text: "Dine nye numre starter (hurtigst muligt eller på bestemt dato)." });
+        lines.push({ text: "" });
+      }
+      
+      if (numberChoice === "existing" || numberChoice === "mixed") {
+        lines.push({ text: "Vi opsiger kun de numre, vi har aftalt, bliver overflyttet. Internet og produkter uden et nummer tilkoblet skal du derfor selv opsige." });
+        lines.push({ text: "" });
+      }
+      if (numberChoice === "new") {
+        lines.push({ text: "Da vi opretter nye abonnementer opsiger vi derfor intet du måtte have ved andre udbydere." });
+        lines.push({ text: "" });
+      }
+
+      // Standard opstart
+      if (numberChoice === "existing" || numberChoice === "mixed") {
+        if (startupChoice === "asap") {
+          lines.push({ text: "Numrene starter op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder." });
+          lines.push({ text: "" });
+        } else if (startupChoice === "specific") {
+          lines.push({ text: "Vi har aftalt, at numrene flyttes den (dato). Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse." });
+          lines.push({ text: "" });
+        }
+      }
+
+      lines.push({ text: "Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår." });
+      lines.push({ text: "" });
     }
 
-    lines.push({ text: "Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår." });
-    lines.push({ text: "" });
-
+    // Tilføj/opsig abonnementer (always)
     lines.push({ text: "Det er muligt at tilføje ekstra abonnementer til samme priser som står i kontrakten i hele kontraktperioden. Det er også muligt at opsige abonnementer i perioden med 3 måneders varsel, hvilket muliggør løbende udskiftning af numre og op- og nedgradering af abonnementer, så længe den samlede månedlige pris overholdes." });
     lines.push({ text: "" });
 
+    // Subsidy
     if (hasSubsidy) {
       lines.push({ text: "Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers." });
       lines.push({ text: "" });
@@ -149,20 +203,31 @@ export default function TdcOpsummeringPublic() {
       lines.push({ text: "" });
     }
 
+    // Omstilling
     if (hasOmstilling) {
-      lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
-      lines.push({ text: "" });
-      
-      if (isStandardOmstilling) {
-        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
+      if (isPilot) {
+        lines.push({ text: "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen." });
         lines.push({ text: "" });
+        if (isStandardOmstilling) {
+          lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling" });
+          lines.push({ text: "" });
+        }
+      } else {
+        lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
+        lines.push({ text: "" });
+        if (isStandardOmstilling) {
+          lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
+          lines.push({ text: "" });
+        }
       }
     }
 
+    // Closing
     lines.push({ text: "Har du nogle spørgsmål til mig?" });
 
     return lines;
   }, [
+    kun5gFriSalg, isPilot,
     mbbType, includeWithoutRouter, 
     numberChoice,
     startupChoice,
@@ -207,6 +272,33 @@ export default function TdcOpsummeringPublic() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Input form */}
           <div className="space-y-6">
+            {/* Summary variant toggle */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Opsummeringstype</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup
+                  value={summaryVariant}
+                  onValueChange={(val) => setSummaryVariant(val as SummaryVariant)}
+                  className="flex gap-4 flex-wrap"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="standard" id="variant-standard" />
+                    <Label htmlFor="variant-standard" className="font-normal cursor-pointer">Standard opsummering</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="pilot" id="variant-pilot" />
+                    <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
+                    <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Valgfrie sektioner</CardTitle>
@@ -317,29 +409,30 @@ export default function TdcOpsummeringPublic() {
                 </div>
 
                 <Separator />
-                <Separator />
 
-                {/* Startup */}
-                {(numberChoice === "existing" || numberChoice === "mixed") && (
-                  <div className="space-y-3">
-                    <Label className="font-medium">Opstart *</Label>
-                    <RadioGroup 
-                      value={startupChoice || ""} 
-                      onValueChange={(val) => setStartupChoice(val as StartupChoice)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="asap" id="asap" />
-                        <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode (7)</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="specific" id="specific" />
-                        <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
+                {/* Startup - hidden in pilot mode */}
+                {!isPilot && (numberChoice === "existing" || numberChoice === "mixed") && (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="font-medium">Opstart *</Label>
+                      <RadioGroup 
+                        value={startupChoice || ""} 
+                        onValueChange={(val) => setStartupChoice(val as StartupChoice)}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="asap" id="asap" />
+                          <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode (7)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="specific" id="specific" />
+                          <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    <Separator />
+                  </>
                 )}
 
-                <Separator />
                 <Separator />
 
                 {/* Subsidy */}
