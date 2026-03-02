@@ -304,6 +304,26 @@ export default function TdcOpsummering() {
                     <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
                   </div>
                 </RadioGroup>
+
+                <Separator />
+
+                {/* Specialsalg */}
+                <div className="space-y-2">
+                  <Label className="font-medium">Specialsalg</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="kun5gFriSalg" 
+                      checked={kun5gFriSalg}
+                      onCheckedChange={(checked) => setKun5gFriSalg(checked === true)}
+                    />
+                    <Label htmlFor="kun5gFriSalg" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                  </div>
+                  {kun5gFriSalg && (
+                    <p className="text-sm text-muted-foreground ml-6">
+                      Ved aktivering bruges en forenklet opsummering kun til 5G Fri produkter.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -525,25 +545,6 @@ export default function TdcOpsummering() {
                   </div>
                 </div>
 
-                <Separator />
-
-                {/* Specialsalg */}
-                <div className="space-y-2">
-                  <Label className="font-medium">Specialsalg</Label>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="kun5gFriSalg" 
-                      checked={kun5gFriSalg}
-                      onCheckedChange={(checked) => setKun5gFriSalg(checked === true)}
-                    />
-                    <Label htmlFor="kun5gFriSalg" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
-                  </div>
-                  {kun5gFriSalg && (
-                    <p className="text-sm text-muted-foreground ml-6">
-                      Ved aktivering bruges en forenklet opsummering kun til 5G Fri produkter.
-                    </p>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
