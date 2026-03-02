@@ -130,7 +130,7 @@ export default function TdcOpsummering() {
 
     if (isPilot) {
       // Pilot: Vilkår + welcome call + nummervalg in one flow
-      lines.push({ text: "Inden for 3 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er" });
+      lines.push({ text: "Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er" });
       lines.push({ text: "" });
 
       // Pilot nummervalg
