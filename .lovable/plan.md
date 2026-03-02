@@ -1,23 +1,21 @@
 
-# Fix: Tilføj "cancelled" til contract_status enum
 
-## Problem
-Databasen har en trigger (`remove_deactivated_employee_from_teams`) der automatisk sætter ventende kontrakter til status `cancelled` når en medarbejder deaktiveres. Men `cancelled` er ikke en gyldig værdi i `contract_status` enum'en, hvilket giver fejlen:
+# Vis alle sælgere i leaderboard-tabellerne (ikke kun top 10)
 
-```
-invalid input value for enum contract_status: "cancelled"
-```
+## Ændring
+Fjern begrænsningen på 10 rækker i leaderboard-tabellerne, så alle sælgere med data vises. Brugere kan scrolle ned for at se resten.
 
-Gyldige værdier i dag: `draft`, `pending_employee`, `pending_manager`, `signed`, `rejected`, `expired`
+## Tekniske detaljer
 
-## Løsning
-En enkelt database-migration der tilføjer `cancelled` som gyldig enum-værdi:
+### 1. `TvDashboardComponents.tsx` - TvLeaderboardTable
+- Fjern `maxRows` default på 10 og `.slice(0, maxRows)` logikken
+- Når `maxRows` ikke er sat, vises alle sælgere
+- Behold `maxRows` som optional prop til TV-mode (hvor man ikke kan scrolle)
+- Tilføj `max-height` med `overflow-y: auto` i ikke-TV-mode så tabellen kan scrolles
 
-```sql
-ALTER TYPE contract_status ADD VALUE IF NOT EXISTS 'cancelled';
-```
+### 2. `ClientDashboard.tsx` - Kald til TvLeaderboardTable
+- I standard dashboard-mode (ikke TV): send ingen `maxRows` prop, så alle vises
+- I TV-mode: behold begrænsningen, da TV-skærme ikke kan scrolles
 
-## Konsekvens
-- Deaktivering af medarbejdere (som Alfred Rud) vil fungere igen
-- Ventende kontrakter vil korrekt blive markeret som annulleret ved deaktivering
-- Ingen kodeændringer nødvendige -- kun database-fix
+Ingen database-ændringer nødvendige.
+
