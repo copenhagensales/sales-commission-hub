@@ -27,9 +27,24 @@ import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { CLIENT_IDS } from "@/utils/clientIds";
 
 const CLIENT_OPTIONS = Object.entries(CLIENT_IDS).filter(
-  // Remove duplicate "Eesy" (same id as "Eesy TM")
   ([name]) => name !== "Eesy"
 );
+
+interface DetailedRow {
+  employee_name: string;
+  product_name: string;
+  quantity: number;
+  commission: number;
+  revenue: number;
+}
+
+interface EmployeeRow {
+  name: string;
+  salesCount: number;
+  commission: number;
+  revenue: number;
+  products: Record<string, number>;
+}
 
 export default function ReportsManagement() {
   const { t } = useTranslation();
@@ -43,53 +58,90 @@ export default function ReportsManagement() {
     [clientId]
   );
 
-  const { data: aggregatedData, isLoading } = useQuery({
-    queryKey: ["sales-report", clientId, periodStart, periodEnd],
+  const { data: rawData, isLoading } = useQuery({
+    queryKey: ["sales-report-detailed", clientId, periodStart, periodEnd],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_sales_aggregates_v2", {
+      const { data, error } = await supabase.rpc("get_sales_report_detailed", {
         p_client_id: clientId,
         p_start: periodStart,
         p_end: periodEnd,
-        p_group_by: "employee",
       });
       if (error) throw error;
-      return (data ?? [])
-        .map((r: any) => ({
-          name: r.group_name || r.group_key || "Ukendt",
-          salesCount: Number(r.total_sales ?? 0),
-          commission: Number(r.total_commission ?? 0),
-        }))
-        .sort((a: any, b: any) => b.salesCount - a.salesCount);
+      return (data ?? []) as DetailedRow[];
     },
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
 
-  const totalSales = useMemo(
-    () => (aggregatedData ?? []).reduce((s, e) => s + e.salesCount, 0),
-    [aggregatedData]
-  );
-  const totalCommission = useMemo(
-    () => (aggregatedData ?? []).reduce((s, e) => s + e.commission, 0),
-    [aggregatedData]
-  );
+  // Aggregate: group by employee, collect product quantities
+  const { employees, productNames } = useMemo(() => {
+    if (!rawData?.length) return { employees: [] as EmployeeRow[], productNames: [] as string[] };
+
+    const empMap = new Map<string, EmployeeRow>();
+    const prodSet = new Set<string>();
+
+    for (const row of rawData) {
+      prodSet.add(row.product_name);
+      let emp = empMap.get(row.employee_name);
+      if (!emp) {
+        emp = { name: row.employee_name, salesCount: 0, commission: 0, revenue: 0, products: {} };
+        empMap.set(row.employee_name, emp);
+      }
+      emp.salesCount += Number(row.quantity ?? 0);
+      emp.commission += Number(row.commission ?? 0);
+      emp.revenue += Number(row.revenue ?? 0);
+      emp.products[row.product_name] = (emp.products[row.product_name] || 0) + Number(row.quantity ?? 0);
+    }
+
+    const sorted = Array.from(empMap.values()).sort((a, b) => b.salesCount - a.salesCount);
+    const names = Array.from(prodSet).sort();
+    return { employees: sorted, productNames: names };
+  }, [rawData]);
+
+  const totals = useMemo(() => {
+    const t = { salesCount: 0, commission: 0, revenue: 0, products: {} as Record<string, number> };
+    for (const emp of employees) {
+      t.salesCount += emp.salesCount;
+      t.commission += emp.commission;
+      t.revenue += emp.revenue;
+      for (const pn of productNames) {
+        t.products[pn] = (t.products[pn] || 0) + (emp.products[pn] || 0);
+      }
+    }
+    return t;
+  }, [employees, productNames]);
 
   const periodLabel = `${periodStart}_${periodEnd}`;
 
   const handleExport = () => {
-    if (!aggregatedData?.length) return;
-    const rows = aggregatedData.map((emp) => ({
-      Medarbejder: emp.name,
-      "Antal salg": emp.salesCount,
-      "Provision (DKK)": Math.round(emp.commission),
-    }));
-    rows.push({
-      Medarbejder: "TOTAL",
-      "Antal salg": totalSales,
-      "Provision (DKK)": Math.round(totalCommission),
+    if (!employees.length) return;
+    const rows = employees.map((emp) => {
+      const row: Record<string, string | number> = {
+        Medarbejder: emp.name,
+        "Antal salg": emp.salesCount,
+      };
+      for (const pn of productNames) {
+        row[pn] = emp.products[pn] || 0;
+      }
+      row["Provision (DKK)"] = Math.round(emp.commission);
+      row["Revenue (DKK)"] = Math.round(emp.revenue);
+      return row;
     });
+
+    // Total row
+    const totalRow: Record<string, string | number> = {
+      Medarbejder: "TOTAL",
+      "Antal salg": totals.salesCount,
+    };
+    for (const pn of productNames) {
+      totalRow[pn] = totals.products[pn] || 0;
+    }
+    totalRow["Provision (DKK)"] = Math.round(totals.commission);
+    totalRow["Revenue (DKK)"] = Math.round(totals.revenue);
+    rows.push(totalRow);
+
     const ws = XLSX.utils.json_to_sheet(rows);
-    // Auto-size columns
-    ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 16 }];
+    const colCount = 2 + productNames.length + 2;
+    ws["!cols"] = Array.from({ length: colCount }, (_, i) => ({ wch: i === 0 ? 30 : 14 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `${clientLabel} Salg`);
     XLSX.writeFile(wb, `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`);
@@ -111,7 +163,7 @@ export default function ReportsManagement() {
             </CardTitle>
             <Button
               onClick={handleExport}
-              disabled={!aggregatedData?.length}
+              disabled={!employees.length}
               size="sm"
             >
               <Download className="h-4 w-4 mr-1" />
@@ -162,35 +214,51 @@ export default function ReportsManagement() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : !aggregatedData?.length ? (
+            ) : !employees.length ? (
               <p className="text-sm text-muted-foreground py-4">
                 Ingen salgsdata fundet for den valgte periode.
               </p>
             ) : (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Medarbejder</TableHead>
+                      <TableHead className="sticky left-0 bg-background z-10">Medarbejder</TableHead>
                       <TableHead className="text-right">Antal salg</TableHead>
+                      {productNames.map((pn) => (
+                        <TableHead key={pn} className="text-right whitespace-nowrap">{pn}</TableHead>
+                      ))}
                       <TableHead className="text-right">Provision (DKK)</TableHead>
+                      <TableHead className="text-right">Revenue (DKK)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {aggregatedData.map((emp) => (
+                    {employees.map((emp) => (
                       <TableRow key={emp.name}>
-                        <TableCell className="font-medium">{emp.name}</TableCell>
+                        <TableCell className="font-medium sticky left-0 bg-background z-10">{emp.name}</TableCell>
                         <TableCell className="text-right">{emp.salesCount}</TableCell>
+                        {productNames.map((pn) => (
+                          <TableCell key={pn} className="text-right">{emp.products[pn] || 0}</TableCell>
+                        ))}
                         <TableCell className="text-right">
                           {Math.round(emp.commission).toLocaleString("da-DK")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {Math.round(emp.revenue).toLocaleString("da-DK")}
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold border-t-2">
-                      <TableCell>TOTAL</TableCell>
-                      <TableCell className="text-right">{totalSales}</TableCell>
+                      <TableCell className="sticky left-0 bg-background z-10">TOTAL</TableCell>
+                      <TableCell className="text-right">{totals.salesCount}</TableCell>
+                      {productNames.map((pn) => (
+                        <TableCell key={pn} className="text-right">{totals.products[pn] || 0}</TableCell>
+                      ))}
                       <TableCell className="text-right">
-                        {Math.round(totalCommission).toLocaleString("da-DK")}
+                        {Math.round(totals.commission).toLocaleString("da-DK")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {Math.round(totals.revenue).toLocaleString("da-DK")}
                       </TableCell>
                     </TableRow>
                   </TableBody>
