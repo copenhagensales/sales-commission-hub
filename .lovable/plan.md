@@ -1,32 +1,28 @@
 
 
-# Udvidet salgsudtræk med produktdetaljer
+# Excel-eksport med to faner: Opsummering + Rådata
 
-## Hvad der bygges
-Rapporten "Salgsudtræk per medarbejder" udvides med kolonner for produktopdeling per medarbejder, så man kan se fx antal telefonabonnementer, 5GI, omsætning (revenue) osv. — ud over bare samlet salg og provision.
+## Ændringer
 
-## Teknisk tilgang
-
-### 1. Ny database-funktion: `get_sales_report_detailed`
-Opretter en ny RPC der returnerer data per **medarbejder + produkt**, med felter:
-- `employee_name` — medarbejderens navn
+### 1. Ny database-funktion: `get_sales_report_raw`
+Opretter en ny RPC der returnerer hvert enkelt salg som sin egen række med felter:
+- `employee_name` — sælgerens navn
+- `sale_datetime` — salgstidspunkt
 - `product_name` — produktnavn
-- `quantity` — antal solgte
+- `quantity` — antal
 - `commission` — provision
 - `revenue` — omsætning
+- `customer_phone` — kundens telefonnummer
+- `customer_company` — virksomhed
+- `status` — salgsstatus
 
-Funktionen filtrerer på klient og periode (ligesom `get_sales_aggregates_v2`), men grupperer på medarbejder + produkt i stedet for kun medarbejder. Den inkluderer kun produkter med `counts_as_sale = true`.
+Baseret på samme joins og filtre som `get_sales_report_detailed`, men uden GROUP BY — altså en række per `sale_item`.
 
 ### 2. Frontend: `ReportsManagement.tsx`
-- Kald den nye RPC i stedet for `get_sales_aggregates_v2`
-- Aggreger data i frontend: per medarbejder samles produkter, og unikke produktnavne bliver til dynamiske kolonner
-- Tabellen viser: **Medarbejder | Antal salg | [Produkt1] | [Produkt2] | ... | Provision | Revenue**
-- Produktkolonner genereres dynamisk baseret på hvilke produkter der faktisk findes i data
-- Tilføj en "Revenue (DKK)" kolonne
-- Excel-eksporten opdateres tilsvarende med alle kolonner
+- Tilføj et nyt query der kalder `get_sales_report_raw` med samme filtre
+- Opdater `handleExport` til at oprette en Excel-fil med **to faner**:
+  - **Fane 1: "Opsummering"** — den eksisterende aggregerede tabel (per medarbejder med produktkolonner + total)
+  - **Fane 2: "Rådata"** — alle individuelle salg med en række per salg, inkl. dato, medarbejder, produkt, antal, provision, revenue, kundeinfo
 
-### 3. UI-forbedringer
-- Tabellen får `overflow-x-auto` da der kan være mange produktkolonner
-- Produktkolonner viser antal (quantity) per produkt per medarbejder
-- TOTAL-rækken summerer alle kolonner
+Ingen ændring i den viste tabel på skærmen — kun Excel-eksporten får den ekstra fane.
 
