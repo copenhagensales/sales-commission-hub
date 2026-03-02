@@ -23,8 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { RawSalesTable } from "./RawSalesTable";
 
 const CLIENT_OPTIONS = Object.entries(CLIENT_IDS).filter(
   ([name]) => name !== "Eesy"
@@ -260,62 +262,75 @@ export default function ReportsManagement() {
               </div>
             </div>
 
-            {/* Table */}
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : !employees.length ? (
-              <p className="text-sm text-muted-foreground py-4">
-                Ingen salgsdata fundet for den valgte periode.
-              </p>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 bg-background z-10">Medarbejder</TableHead>
-                      <TableHead className="text-right">Antal salg</TableHead>
-                      {productNames.map((pn) => (
-                        <TableHead key={pn} className="text-right whitespace-nowrap">{pn}</TableHead>
-                      ))}
-                      <TableHead className="text-right">Provision (DKK)</TableHead>
-                      <TableHead className="text-right">Revenue (DKK)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employees.map((emp) => (
-                      <TableRow key={emp.name}>
-                        <TableCell className="font-medium sticky left-0 bg-background z-10">{emp.name}</TableCell>
-                        <TableCell className="text-right">{emp.salesCount}</TableCell>
-                        {productNames.map((pn) => (
-                          <TableCell key={pn} className="text-right">{emp.products[pn] || 0}</TableCell>
+            {/* Tabs: Opsummering + Rådata */}
+            <Tabs defaultValue="opsummering">
+              <TabsList>
+                <TabsTrigger value="opsummering">Opsummering</TabsTrigger>
+                <TabsTrigger value="raadata">Rådata ({rawSalesData?.length ?? 0})</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="opsummering">
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !employees.length ? (
+                  <p className="text-sm text-muted-foreground py-4">
+                    Ingen salgsdata fundet for den valgte periode.
+                  </p>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 bg-background z-10">Medarbejder</TableHead>
+                          <TableHead className="text-right">Antal salg</TableHead>
+                          {productNames.map((pn) => (
+                            <TableHead key={pn} className="text-right whitespace-nowrap">{pn}</TableHead>
+                          ))}
+                          <TableHead className="text-right">Provision (DKK)</TableHead>
+                          <TableHead className="text-right">Revenue (DKK)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {employees.map((emp) => (
+                          <TableRow key={emp.name}>
+                            <TableCell className="font-medium sticky left-0 bg-background z-10">{emp.name}</TableCell>
+                            <TableCell className="text-right">{emp.salesCount}</TableCell>
+                            {productNames.map((pn) => (
+                              <TableCell key={pn} className="text-right">{emp.products[pn] || 0}</TableCell>
+                            ))}
+                            <TableCell className="text-right">
+                              {Math.round(emp.commission).toLocaleString("da-DK")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {Math.round(emp.revenue).toLocaleString("da-DK")}
+                            </TableCell>
+                          </TableRow>
                         ))}
-                        <TableCell className="text-right">
-                          {Math.round(emp.commission).toLocaleString("da-DK")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {Math.round(emp.revenue).toLocaleString("da-DK")}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell className="sticky left-0 bg-background z-10">TOTAL</TableCell>
-                      <TableCell className="text-right">{totals.salesCount}</TableCell>
-                      {productNames.map((pn) => (
-                        <TableCell key={pn} className="text-right">{totals.products[pn] || 0}</TableCell>
-                      ))}
-                      <TableCell className="text-right">
-                        {Math.round(totals.commission).toLocaleString("da-DK")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {Math.round(totals.revenue).toLocaleString("da-DK")}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                        <TableRow className="font-bold border-t-2">
+                          <TableCell className="sticky left-0 bg-background z-10">TOTAL</TableCell>
+                          <TableCell className="text-right">{totals.salesCount}</TableCell>
+                          {productNames.map((pn) => (
+                            <TableCell key={pn} className="text-right">{totals.products[pn] || 0}</TableCell>
+                          ))}
+                          <TableCell className="text-right">
+                            {Math.round(totals.commission).toLocaleString("da-DK")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {Math.round(totals.revenue).toLocaleString("da-DK")}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="raadata">
+                <RawSalesTable data={rawSalesData} isLoading={isLoading} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
