@@ -1,13 +1,18 @@
+# TDC Opsummering – Nuværende tilstand
 
+## Opsummeringstyper
+Tre gensidigt udelukkende typer via `SummaryVariant`:
+- **Standard** (`"standard"`) – fuld opsummering med alle sektioner
+- **Pilot** (`"pilot"`) – tilpassede formuleringer:
+  - Vilkår: 7 hverdages fortrydelsesret + welcome call
+  - Nummervalg: nye formuleringer
+  - Opstart: skjult (ikke påkrævet)
+  - Omstilling: welcome call i stedet for standard
+- **Kun 5g Fri Salg** (`"5g-fri"`) – forenklet opsummering kun til 5G Fri produkter
 
-# Opdater `.lovable/plan.md`
+## Status
+- `TdcOpsummering.tsx`: ✅ Implementeret
+- `TdcOpsummeringPublic.tsx`: ❌ Mangler synkronisering
 
-Filen indeholder den gamle plan om at flytte Specialsalg-blokken. Den skal opdateres til at beskrive den faktiske implementering: tre opsummeringstyper som RadioGroup (Standard / Pilot / Kun 5g Fri Salg), samt pilot-formuleringerne.
-
-**Fil: `.lovable/plan.md`**
-- Erstat indholdet med en beskrivelse af den nuværende tilstand:
-  - Tre opsummeringstyper via `SummaryVariant`: `"standard" | "pilot" | "5g-fri"`
-  - Pilot-ændringer: Vilkår (7 hverdage), Nummervalg (nye formuleringer), Opstart skjult, Omstilling (welcome call)
-  - 5g Fri: forenklet opsummering
-  - Næste skridt: synkroniser `TdcOpsummeringPublic.tsx` med samme ændringer
-
+## Næste skridt
+Synkroniser `TdcOpsummeringPublic.tsx` med samme ændringer som `TdcOpsummering.tsx`.
