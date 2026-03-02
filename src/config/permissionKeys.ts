@@ -95,6 +95,7 @@ export const PERMISSION_KEYS = {
   tab_employees_positions: { label: 'Fane: Stillinger', section: 'personale', parent: 'menu_employees' },
   tab_employees_permissions: { label: 'Fane: Rettigheder', section: 'personale', parent: 'menu_employees' },
   tab_employees_dialer_mapping: { label: 'Fane: Dialer-mapping', section: 'personale', parent: 'menu_employees' },
+  action_employee_deactivate: { label: 'Deaktiver medarbejder', section: 'personale', parent: 'menu_employees' },
 
   // ==================== LEDELSE (under menu_section_ledelse) ====================
   menu_company_overview: { label: 'Firmaoversigt', section: 'ledelse', parent: 'menu_section_ledelse' },
