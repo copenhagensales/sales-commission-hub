@@ -10924,6 +10924,7 @@ export type Database = {
         | "signed"
         | "rejected"
         | "expired"
+        | "cancelled"
       contract_type:
         | "employment"
         | "amendment"
@@ -11105,6 +11106,7 @@ export const Constants = {
         "signed",
         "rejected",
         "expired",
+        "cancelled",
       ],
       contract_type: [
         "employment",
