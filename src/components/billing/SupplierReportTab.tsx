@@ -763,7 +763,8 @@ export function SupplierReportTab() {
                     externalId: loc.location?.external_id || "",
                     city: loc.location?.address_city || "",
                     client: loc.client?.name || "",
-                    period: formatDateRange(loc.minDate, loc.maxDate),
+                    weekdays: [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
+                      .map(([week, daysSet]) => ({ week, days: [...daysSet].sort((a: number, b: number) => a - b) })),
                     bookings: loc.bookings.length,
                     days: loc.totalDays,
                     dailyRate: loc.usesTotalPrice ? "samlet" : loc.dailyRate,
@@ -775,6 +776,7 @@ export function SupplierReportTab() {
                     maxDiscount: loc.maxDiscount,
                   })),
                   discountType,
+                  minDaysPerLocation,
                   totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
                   discountInfo: {
                     uniquePlacements: totalPlacements,
@@ -827,6 +829,8 @@ export function SupplierReportTab() {
               reportData={locationDiscounts.map((loc: any) => ({
                 locationName: loc.location?.name,
                 city: loc.location?.address_city,
+                weekdays: [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
+                  .map(([week, daysSet]) => ({ week, days: [...daysSet].sort((a: number, b: number) => a - b) })),
                 days: loc.totalDays,
                 amount: loc.totalAmount,
                 discount: loc.discount,
