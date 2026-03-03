@@ -743,7 +743,8 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
-          {/* Discount section */}
+          {/* Discount section - only show when discount rules exist */}
+          {discountRules && discountRules.length > 0 && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 mb-4">
@@ -758,10 +759,9 @@ export function SupplierReportTab() {
                     <div>
                       <p className="text-sm text-muted-foreground">Kumulativ årsomsætning</p>
                       <p className="text-2xl font-bold">{ytdRevenue.toLocaleString("da-DK")} kr</p>
-                      <p className="text-xs text-muted-foreground">{periodType === "payroll" ? "15. jan" : "Jan"} - {format(periodEnd, "dd. MMM yyyy", { locale: da })}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Nuværende rabattrin</p>
+                      <p className="text-sm text-muted-foreground">Rabattrin</p>
                       <p className="text-2xl font-bold">
                         {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
                       </p>
@@ -770,7 +770,7 @@ export function SupplierReportTab() {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Samlet rabat (denne md)</p>
+                      <p className="text-sm text-muted-foreground">Rabatbeløb</p>
                       <p className="text-2xl font-bold text-green-600">
                         -{totalDiscountAmount.toLocaleString("da-DK")} kr
                       </p>
@@ -782,60 +782,32 @@ export function SupplierReportTab() {
                   </div>
 
                   {/* Staircase visualization */}
-                  {staircaseSteps.length > 0 && (
-                    <div className="mt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">Rabattrappe {monthStart.getFullYear()}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        {staircaseSteps.map((step, i) => {
-                          const isActive = ytdRevenue >= (step.min_revenue ?? 0);
-                          const isCurrent = step.id === appliedRule?.id;
-                          return (
+                  {discountRules && discountRules.length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h3 className="text-sm font-medium mb-2">Rabattrappe</h3>
+                      <div className="space-y-2">
+                        {[...discountRules]
+                          .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
+                          .map((rule, idx) => (
                             <div
-                              key={step.id}
-                              className={`flex-1 rounded-md p-2 text-center text-xs border transition-colors ${
-                                isCurrent
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : isActive
-                                  ? "bg-primary/20 border-primary/30"
-                                  : "bg-muted border-border"
+                              key={rule.id}
+                              className={`flex items-center justify-between p-2 rounded ${
+                                appliedRule?.id === rule.id
+                                  ? "bg-primary/10 border border-primary"
+                                  : "bg-muted/50"
                               }`}
                             >
-                              <div className="font-bold">{step.discount_percent}%</div>
-                              <div className="truncate">
-                                {(step.min_revenue ?? 0).toLocaleString("da-DK")} kr
-                              </div>
+                              <span className="text-sm">
+                                {rule.description || `Fra ${(rule.min_revenue ?? 0).toLocaleString("da-DK")} kr`}
+                              </span>
+                              <span className="font-semibold">{rule.discount_percent}%</span>
                             </div>
-                          );
-                        })}
+                          ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Exceptions info */}
-                  {locationExceptions && locationExceptions.length > 0 && (
-                    <div className="mt-4 p-3 bg-muted rounded-md">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">Undtagelser</p>
-                      </div>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        {locationExceptions.map((exc) => (
-                          <li key={exc.id}>
-                            <span className="font-medium">{exc.location_name}</span>:{" "}
-                            {exc.exception_type === "excluded"
-                              ? "Pris aftales separat"
-                              : `Max ${exc.max_discount_percent}% rabat`}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   )}
                 </div>
               ) : (
-                /* Placement-based discount (original) */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Bookinger (min. {minDaysPerLocation} dage)</p>
@@ -868,6 +840,7 @@ export function SupplierReportTab() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
