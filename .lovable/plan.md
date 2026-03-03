@@ -1,22 +1,14 @@
 
 
-## Plan: Tilføj uger & ugedags-badges til Leverandørrapport-fanen
+## Plan: Fjern eller forbedre dato-range teksten under uge-badges
 
-### Ændringer i `src/components/billing/SupplierReportTab.tsx`
+**Problem:** Datoteksten "02/02 – 20/02" under uge-badges er forvirrende — den er svær at koble til ugerne ovenover og tilføjer ikke reel værdi, da ugerne allerede viser hvornår der er booket.
 
-1. **Import `getISOWeek` fra `date-fns`** (allerede bruger `date-fns`).
+**Løsning:** Fjern den lille dato-range tekst helt. Uge-badges giver allerede al den nødvendige information. Dato-rangen er redundant og skaber forvirring.
 
-2. **Tilføj `getBookedWeekdays` hjælpefunktion** — kopieret fra Billing.tsx. Returnerer `Map<number, Set<number>>` (ugenummer → ISO-ugedage).
+### Ændring i `src/components/billing/SupplierReportTab.tsx`
 
-3. **Udvid `bookingsByLocation` reduceren** til at akkumulere `weekdaysByWeek` for hver lokation (merge Sets per uge).
+Fjern linje 567-569 — `<p>` tagget med `format(loc.minDate) – format(loc.maxDate)`. Det er den eneste ændring.
 
-4. **Erstat `Periode`-kolonnen** (linje 487 header, linje 519 celle):
-   - Kolonne-header: `"Periode"` → `"Uger & Dage"`
-   - Celle: Erstatter `formatDateRange(loc.minDate, loc.maxDate)` med uge-baseret visning:
-     - Sorterede ugenumre med `Uge X` label
-     - Weekday badges (`Man`, `Tir`, `Ons`, `Tor`, `Fre`, `Lør`, `Søn`)
-     - Fulde hverdagsuger (0-4) vises som én `Man–Fre` badge
-     - Original dato-range som `text-xs text-muted-foreground` nedenunder
-
-Samme visuelle design som allerede implementeret i Oversigten.
+Samme ændring laves i `src/pages/vagt-flow/Billing.tsx` (Oversigten) for konsistens, da den også viser dato-range under badges.
 
