@@ -123,7 +123,7 @@ export default function BookWeekContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("location")
-        .select("*, booking(id, campaign_id, week_number, year, end_date, client_campaigns:campaign_id(id, name), clients:client_id(id, name))")
+        .select("*, booking(id, client_id, campaign_id, week_number, year, end_date, client_campaigns:campaign_id(id, name), clients:client_id(id, name))")
         .order("name");
       if (error) throw error;
       return data;
