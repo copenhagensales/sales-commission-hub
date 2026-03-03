@@ -1,30 +1,44 @@
 
 
-## Plan: Placements skal tælle sammenhængende dage (i træk)
+## Plan: Optimer PDF-rapport til A4 print med læsbart layout
 
-**Problem:** Nuværende logik tæller placements som `Math.floor(totalDays / 5)` — den ignorerer om dagene er sammenhængende. 4 dage i uge 5 + 1 dag i uge 6 tæller fejlagtigt som 1 placement.
+**Problemer identificeret i den genererede PDF:**
+1. `table-layout: fixed` med for snævre procentbredder — tal og tekst flyder ud af celler
+2. "Uger & Dage"-kolonnen med badges wrapper dårligt og overlapper naboceller
+3. Mørkt tema er uegnet til print/PDF (dårlig kontrast, spild af blæk)
+4. Font-størrelser for små, padding for tæt
 
-**Korrekt regel:** Kun sammenhængende sekvenser af bookede dage på 5+ dage tæller. Hver sekvens på ≥5 dage = 1 placement (ikke `floor(sekvenslængde/5)`).
+### Ændringer i `src/utils/supplierReportPdfGenerator.ts`
 
-### Ændring i `src/components/billing/SupplierReportTab.tsx`
+**1. Skift til lyst print-tema:**
+- Hvid baggrund, sort/mørkegrå tekst
+- Lyse borders i stedet for mørke baggrunde
+- Professionelt udseende til at sende til leverandører
 
-**Ny hjælpefunktion** `countConsecutivePlacements(bookings, minDays)`:
-1. Samler alle faktiske bookede kalenderdatoer for en lokation (fra alle bookings).
-2. Sorterer dem kronologisk.
-3. Finder sammenhængende sekvenser (dag-for-dag uden huller).
-4. Tæller antal sekvenser med længde ≥ `minDaysPerLocation`.
+**2. Tabellayout-fix:**
+- Fjern `table-layout: fixed` — brug `auto` så kolonner tilpasser sig indhold
+- Øg padding i celler (8-10px)
+- Sæt `white-space: nowrap` på talkolonner
+- Giv "Uger & Dage" kolonnen `min-width` i stedet for fast procentbredde
 
-**Erstat linje 289-291** — brug den nye funktion i stedet for `Math.floor(loc.totalDays / minDaysPerLocation)`.
+**3. Weekday-badges optimeret til print:**
+- Brug simpel inline tekst med let baggrund i stedet for tætte badges
+- Bedre spacing mellem ugerækker
 
-### Opdater tekst/labels
+**4. Øg font-størrelse:**
+- Body: 11px → 12px
+- Tabelceller: 10px → 11px
+- Headers: 10px → 11px
 
-Opdater "1 placering = min. X dage på samme lokation" til "1 placering = min. X sammenhængende dage på samme lokation" (linje ~722 og i PDF-generatoren + email-funktionen).
+**5. Landscape-orientering:**
+- Skift `@page` til `size: A4 landscape` for at give mere bredde til tabellen med 9+ kolonner
+
+**6. KPI-kort tilpasset lyst tema:**
+- Let grå baggrund, mørk tekst, tydelige borders
 
 ### Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| `SupplierReportTab.tsx` | Ny consecutive-counting funktion + opdater label |
-| `supplierReportPdfGenerator.ts` | Opdater placement-tekst |
-| `send-supplier-report/index.ts` | Opdater placement-tekst |
+| `supplierReportPdfGenerator.ts` | Komplet CSS-overhaul: lyst tema, auto tabel-layout, større fontstørrelser, landscape A4 |
 
