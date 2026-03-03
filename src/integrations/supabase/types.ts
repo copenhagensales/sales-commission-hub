@@ -10185,6 +10185,62 @@ export type Database = {
           },
         ]
       }
+      vehicle_return_confirmation: {
+        Row: {
+          booking_date: string | null
+          booking_vehicle_id: string
+          confirmed_at: string
+          employee_id: string
+          id: string
+          vehicle_name: string | null
+        }
+        Insert: {
+          booking_date?: string | null
+          booking_vehicle_id: string
+          confirmed_at?: string
+          employee_id: string
+          id?: string
+          vehicle_name?: string | null
+        }
+        Update: {
+          booking_date?: string | null
+          booking_vehicle_id?: string
+          confirmed_at?: string
+          employee_id?: string
+          id?: string
+          vehicle_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_return_confirmation_booking_vehicle_id_fkey"
+            columns: ["booking_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "booking_vehicle"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_return_confirmation_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_return_confirmation_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_return_confirmation_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_endpoints: {
         Row: {
           created_at: string | null
