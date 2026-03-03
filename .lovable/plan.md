@@ -1,23 +1,72 @@
 
 
-# Fix: Stande/roll-ups påmindelser kun på første og sidste dag
+# Bil-aflevering påmindelse og bekræftelse
 
-## Problem
-Påmindelsen om stande og roll-ups vises i dag på mellemliggende dage i en booking, i stedet for kun den absolut forste og sidste dag.
+## Oversigt
+Pa den sidste dag en bil er booket til en medarbejder, vises en detaljeret instruktions-callout om aflevering. Medarbejderen kan bekrafte afleveringen med en knap, som sender en email-notifikation til Fieldmarketing-lederne. GreenMobility-biler er undtaget.
 
-## Arsag
-Queryen der henter alle booking-datoer (`allBookingDates`) filtrerer pa `employee_id`, hvilket betyder den kun finder datoer hvor den specifikke medarbejder er tildelt. Hvis medarbejderen ikke er tildelt alle dage i bookingen, kan "forste" og "sidste" dag beregnes forkert. Derudover kan timing-problemer betyde at `allBookingDates` ikke er loadet endnu nar `dayData` beregnes, sa `range` bliver `undefined` og logikken falder igennem.
+## UI/UX Design
 
-## Losning
-Andre queryen til at hente alle datoer for bookingen uafhaengigt af medarbejder -- sa vi far den rigtige forste og sidste dag for hele bookingen (ikke kun for den enkelte medarbejder). Derudover tilfojes en ekstra sikkerhed sa callouts aldrig vises nar data mangler.
+### Callout pa sidste bil-dag (gul/amber tema, matcher bil-badge stilen)
+En kompakt, men synlig callout vises KUN pa den sidste dag bilen er booket. Den indeholder:
+
+```text
++--------------------------------------------------+
+|  CAR  AFLEVERING AF BIL I DAG                    |
+|                                                   |
+|  Parker bilen pa parkeringspladsen i de           |
+|  afmaerkede base med "Copenhagen Sales".          |
+|                                                   |
+|  Hvis porten er last, brug noeglebrik fra         |
+|  noegleboksen til hoejre for porten (kode 2109).  |
+|  Aflever noeglen pa det lille kontor.             |
+|                                                   |
+|  ! Afleveres noeglen ikke, kan kollegaer ikke     |
+|    bruge bilen. Parkerer du udenfor porten, er    |
+|    du selv ansvarlig for parkeringsboeder.        |
+|                                                   |
+|  [check] Bekraeft aflevering                      |
++--------------------------------------------------+
+```
+
+- Farvetema: Amber/gul (matcher eksisterende bil-badge)
+- "Bekraeft aflevering"-knappen skifter til en gron "Afleveret"-tilstand efter klik
+- GreenMobility-biler viser IKKE denne callout
+
+### Bekraeftelses-flow
+1. Medarbejder klikker "Bekraeft aflevering"
+2. En record gemmes i en ny `vehicle_return_confirmation`-tabel
+3. En edge function sender email til FM-lederne (William Krogh Bornak + Thomas Wehage)
+4. Knappen viser "Afleveret kl. HH:MM" i gron
 
 ## Tekniske aendringer
 
-### `src/pages/vagt-flow/MyBookingSchedule.tsx`
-1. **Ret `allBookingDates` queryen** -- fjern `.eq("employee_id", employeeId)` filteret, sa den henter ALLE assignment-datoer for de relevante bookings (uanset medarbejder). Dette giver den korrekte forste/sidste dag for hele bookingen.
+### 1. Database: Ny tabel `vehicle_return_confirmation`
+```sql
+CREATE TABLE vehicle_return_confirmation (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_vehicle_id UUID REFERENCES booking_vehicle(id) ON DELETE CASCADE,
+  employee_id UUID REFERENCES employee_master_data(id),
+  confirmed_at TIMESTAMPTZ DEFAULT now(),
+  vehicle_name TEXT,
+  booking_date DATE
+);
+-- RLS: authenticated kan INSERT egne og SELECT egne
+```
 
-2. **Opdater query key** -- fjern `employeeId` fra query key da det ikke laengere bruges som filter.
+### 2. Edge function: `notify-vehicle-returned`
+- Modtager: employee_id, vehicle_name, booking_date
+- Slar op hvem der er FM-ledere (job_title ILIKE '%fieldmarketing leder%' eller 'Assisterende Teamleder FM')
+- Sender email via M365 Graph API (samme monstre som andre send-funktioner)
+- Emailen indeholder: Hvem afleverede, hvilken bil, hvilken dato
 
-3. **Tilfoej guard i renderingen** -- Vis kun callouts nar `allBookingDates` er loaded (ikke `undefined`), sa der aldrig vises forkerte paemindelser mens data hentes.
+### 3. Frontend: `MyBookingSchedule.tsx`
+- **Logik**: For hvert assignment med en bil, beregn om det er den sidste dag bilen er booket for det booking (ved at se alle booking_vehicle datoer for samme booking_id og vehicle_id). Undtag biler hvor `vehicle.name` matcher "Greenmobility" (case-insensitive).
+- **Query**: Hent eksisterende `vehicle_return_confirmation` records for at vise "allerede bekraeftet" tilstand.
+- **Mutation**: `useMutation` til at indsaette i `vehicle_return_confirmation` og kalde `notify-vehicle-returned` edge function.
+- **UI**: Amber-farvet callout med instruktioner + bekraeft-knap, kun pa sidste bil-dag og kun for ikke-GreenMobility biler.
 
-4. **Behold UI uaendret** -- Gronne og orange callouts forbliver som de er, bare med korrekt logik bag.
+### 4. Raekkefoelge
+1. Opret database-tabel + RLS
+2. Opret edge function `notify-vehicle-returned`
+3. Opdater `MyBookingSchedule.tsx` med logik, UI og mutation
