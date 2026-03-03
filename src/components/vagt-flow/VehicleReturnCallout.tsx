@@ -115,18 +115,18 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, onC
           className="hidden"
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
-        <p className="text-[10px] text-muted-foreground">Valgfrit: tag et billede af hvor nøglen er lagt</p>
+        <p className="text-[10px] text-muted-foreground">Tag et billede af hvor nøglen er lagt (påkrævet)</p>
       </div>
 
       <div className="pt-1">
         <Button
           size="sm"
           className="w-full h-9 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-sm dark:bg-amber-600 dark:hover:bg-amber-700"
-          disabled={isConfirming}
+          disabled={isConfirming || !photo}
           onClick={() => onConfirm(photo ?? undefined)}
         >
           <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-          {isConfirming ? "Bekræfter..." : "Bekræft aflevering af nøgle"}
+          {isConfirming ? "Bekræfter..." : !photo ? "Upload billede først" : "Bekræft aflevering af nøgle"}
         </Button>
       </div>
     </div>
