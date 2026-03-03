@@ -2,23 +2,42 @@
 
 ## Problem
 
-When Thomas registers lateness ("forsinkelse") for employees who have individual shifts in the `shift` table, the lateness indicator is **hidden** in the shift overview UI. 
+The discount calculation logic is wrong. Currently (line 246-248):
 
-The root cause is in `ShiftOverview.tsx` line 1435:
-```tsx
-{!hasShift && isLate && (
+```typescript
+const totalPlacements = locationEntries.reduce((sum, loc) => {
+  return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);  // ← BUG: counts max 1 per location
+}, 0);
 ```
 
-This condition means the lateness tag (orange "Forsinket" badge) is only rendered when there is **no individual shift**. When an employee has both a shift and a lateness record, only the `ShiftCard` is displayed, and `ShiftCard` has no awareness of lateness data.
+Each location counts as **at most 1 placement**, regardless of how many days it has. So a location with 20 days still counts as just 1 booking for discount purposes.
+
+The correct business rule: **every 5 days at a location = 1 booking**. So 16 days = 3 bookings, 20 days = 4 bookings, etc.
+
+The "Bookinger" column in the table already shows `loc.bookings.length` (number of separate booking records), but the **discount calculation** (`totalPlacements`) ignores this and just checks ≥5 days → 1.
+
+## Current numbers from screenshot
+
+Looking at the table, the "Bookinger" column sums to ~30+, but the discount counter only counts 14 unique locations with ≥5 days.
 
 ## Plan
 
-1. **Show lateness indicator alongside shift cards** — In `ShiftOverview.tsx`, add a lateness indicator block that renders when `isLate` is true, regardless of `hasShift`. When both exist, show the shift card AND an orange lateness badge below it.
+**One change in `src/components/billing/SupplierReportTab.tsx`** (lines 246-248):
 
-2. **Update the rendering logic** around lines 1423-1453 to:
-   - Keep shift cards rendering as-is when `hasShift` is true
-   - Add a separate lateness indicator that shows when `isLate` is true (remove the `!hasShift` guard)
-   - The lateness display when `hasShift` is true should be a compact orange badge showing the delay minutes and adjusted time
+Replace the placement calculation from:
+```typescript
+return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);
+```
+to:
+```typescript
+return sum + Math.floor(loc.totalDays / minDaysPerLocation);
+```
 
-This ensures that no matter whether an employee has an individual shift or uses standard team times, the lateness registration will always be visible in the shift overview.
+This way:
+- 16 days / 5 = 3 bookings
+- 20 days / 5 = 4 bookings  
+- 4 days / 5 = 0 bookings
+- 10 days / 5 = 2 bookings
+
+The same `totalPlacements` variable is used for the discount tier lookup, the KPI display ("Bookinger"), the PDF export, and the database snapshot — so this single fix corrects all of them.
 
