@@ -245,6 +245,41 @@ export function SupplierReportTab() {
     return weeks;
   };
 
+  // Count consecutive-day placements: each unbroken sequence of ≥ minDays calendar dates = 1 placement
+  const countConsecutivePlacements = (bookings: any[], minDays: number): number => {
+    // Collect all actual booked calendar dates as YYYY-MM-DD strings
+    const dateSet = new Set<string>();
+    for (const booking of bookings) {
+      const bookedDays = booking.booked_days as number[] | null;
+      const start = new Date(booking.start_date);
+      const end = new Date(booking.end_date);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+        if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(isoDay)) {
+          dateSet.add(d.toISOString().slice(0, 10));
+        }
+      }
+    }
+    // Sort dates and find consecutive sequences
+    const sorted = [...dateSet].sort();
+    if (sorted.length === 0) return 0;
+    let placements = 0;
+    let streak = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = new Date(sorted[i - 1]);
+      const curr = new Date(sorted[i]);
+      const diffMs = curr.getTime() - prev.getTime();
+      if (diffMs === 86400000) { // exactly 1 day apart
+        streak++;
+      } else {
+        if (streak >= minDays) placements++;
+        streak = 1;
+      }
+    }
+    if (streak >= minDays) placements++;
+    return placements;
+  };
+
   // Group bookings by location (current month)
   const bookingsByLocation = bookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
@@ -287,7 +322,7 @@ export function SupplierReportTab() {
   const locationEntries = Object.values(bookingsByLocation) as any[];
   const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
   const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
-    return sum + Math.floor(loc.totalDays / minDaysPerLocation);
+    return sum + countConsecutivePlacements(loc.bookings, minDaysPerLocation);
   }, 0);
 
   // Calculate YTD revenue (for annual_revenue type)
@@ -719,7 +754,7 @@ export function SupplierReportTab() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {locationEntries.reduce((sum: number, loc: any) => sum + loc.bookings.length, 0)} samlede bookinger
                     </p>
-                    <p className="text-xs text-muted-foreground">1 placering = min. {minDaysPerLocation} dage på samme lokation</p>
+                    <p className="text-xs text-muted-foreground">1 placering = min. {minDaysPerLocation} sammenhængende dage på samme lokation</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Rabattrin</p>
