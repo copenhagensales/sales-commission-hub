@@ -140,7 +140,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       : "";
 
   const placementNote = config.minDaysPerLocation > 1
-    ? `<p class="placement-note">1 placering = min. ${config.minDaysPerLocation} dage på samme lokation</p>`
+    ? `<p class="placement-note">1 placering = min. ${config.minDaysPerLocation} sammenhængende dage på samme lokation</p>`
     : "";
 
   const discountSectionHtml = isAnnualRevenue
