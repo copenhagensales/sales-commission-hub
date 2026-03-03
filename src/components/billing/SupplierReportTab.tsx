@@ -650,8 +650,12 @@ export function SupplierReportTab() {
                 /* Placement-based discount (original) */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Bookinger</p>
+                    <p className="text-sm text-muted-foreground">Bookinger (min. {minDaysPerLocation} dage)</p>
                     <p className="text-2xl font-bold">{totalPlacements}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {locationEntries.reduce((sum: number, loc: any) => sum + loc.bookings.length, 0)} samlede bookinger
+                    </p>
+                    <p className="text-xs text-muted-foreground">Hver {minDaysPerLocation} dage = 1 booking</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Rabattrin</p>
