@@ -1,37 +1,42 @@
 
 
-## Problem
+# Nøgleaflevering med billede
 
-Confirmation is currently tied to a specific `booking_vehicle_id` — which is a per-day, per-vehicle record. If two employees share the same vehicle on the last booking day, each has their own `booking_vehicle` row (same `booking_id`, same `vehicle_id`, same `date`). When Employee A confirms, Employee B still sees the unconfirmed callout because their `booking_vehicle_id` is different.
+## Ændringer
 
-Worse: both could confirm independently, triggering two email notifications to FM leaders for the same car.
+### 1. Tekst-ændringer i `VehicleReturnCallout.tsx`
+- Overskrift: "Aflevering af bil i dag" → "Aflevering af nøgle i dag"
+- Knap: "Bekræft aflevering af bil" → "Bekræft aflevering af nøgle"
+- Bekræftet-tekst: "afleveret" → "Nøgle afleveret"
+- Toast: "Bil aflevering bekræftet!" → "Nøgle aflevering bekræftet!"
+- Email subject/body opdateres tilsvarende
 
-## Solution
+### 2. Billede-upload funktion i `VehicleReturnCallout.tsx`
+- Tilføj en billedsektion over knappen med to muligheder:
+  - **Kamera-knap** (Camera-ikon) — åbner kamera direkte via `<input type="file" accept="image/*" capture="environment">`
+  - **Upload-knap** (ImagePlus-ikon) — vælg fra galleri/filer
+- Vis preview af valgt billede med mulighed for at fjerne det
+- Billedet er valgfrit — man kan stadig bekræfte uden
 
-Change the confirmation lookup from matching on `booking_vehicle_id` to matching on **`booking_id` + `vehicle_id` + `booking_date`**. This way:
+### 3. Storage bucket: `vehicle-return-photos`
+- Opret public bucket via migration
+- RLS: authenticated kan uploade, alle kan læse (så emailen kan linke til billedet)
 
-1. **When Employee A confirms** → a record is inserted with the `booking_id`, `vehicle_id`, and `date`
-2. **Employee B's view** immediately shows the green "Afleveret" state because the query matches on the same booking+vehicle+date combination
-3. Only **one** email notification is sent (the first person to confirm)
+### 4. Upload-flow i `MyBookingSchedule.tsx`
+- Før upsert til `vehicle_return_confirmation`, upload billedet til storage bucket
+- Gem den offentlige URL i en ny `photo_url` kolonne på `vehicle_return_confirmation`
+- Send `photo_url` med til edge function
 
-### Changes
+### 5. Database: Tilføj `photo_url` kolonne
+- `ALTER TABLE vehicle_return_confirmation ADD COLUMN photo_url TEXT`
 
-1. **`MyBookingSchedule.tsx`** — Update the confirmation query and lookup:
-   - Query `vehicle_return_confirmation` by `booking_date` IN the relevant dates (instead of by `booking_vehicle_id`)
-   - Match confirmations using `vehicle_name` + `booking_date` (or add `vehicle_id`/`booking_id` columns)
-   - On insert, include `booking_id` and `vehicle_id` so lookups are reliable
+### 6. Edge function: `notify-vehicle-returned`
+- Modtag `photo_url` parameter
+- Hvis den findes, inkluder billedet i emailen som `<img>` tag
 
-2. **Database migration** — Add `booking_id` and `vehicle_id` columns to `vehicle_return_confirmation`:
-   - `booking_id UUID REFERENCES booking(id)`
-   - `vehicle_id UUID REFERENCES vehicle(id)`
-   - Add a unique constraint on `(booking_id, vehicle_id, booking_date)` to prevent duplicate confirmations
-
-3. **Mutation logic** — Use `upsert` or check-before-insert to gracefully handle the case where the other person already confirmed (no error, no duplicate email).
-
-4. **`VehicleReturnCallout`** — No changes needed; it already handles the confirmed/unconfirmed states.
-
-### Result
-- First person to click "Bekræft aflevering" → record saved, email sent
-- Second person sees green "Afleveret kl. HH:MM" immediately (or after refetch)
-- No duplicate emails, no confusion
+### Rækkefølge
+1. Database migration (ny kolonne + storage bucket)
+2. Opdater `VehicleReturnCallout.tsx` med nye tekster + billedupload UI
+3. Opdater mutation i `MyBookingSchedule.tsx` med upload-logik
+4. Opdater edge function med billede i email
 
