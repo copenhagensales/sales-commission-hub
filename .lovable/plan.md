@@ -1,14 +1,25 @@
 
 
-## Plan: Ret dagsberegning i faktureringsoversigtens Billing.tsx
+## Plan: Ret ugedags-konvertering i countBookedDays
 
-**Problem:** `Billing.tsx` bruger `bookedDaysArr.length` — det giver kun antal unikke ugedagstyper (fx 2 for `[2,3]`), ikke det faktiske antal dage over hele perioden. Fx `booked_days: [1,3,5]` over 2 uger burde give 6 dage, men giver kun 3.
+**Problem:** `booked_days` i databasen bruger ISO-konvention (0=mandag, 4=fredag, 6=søndag), men JavaScript's `getDay()` returnerer 0=søndag, 1=mandag, 5=fredag. Det giver off-by-one: fredag tælles aldrig, søndag tælles forkert.
 
-**Ændring i `src/pages/vagt-flow/Billing.tsx`:**
+**Verifikation:** Med ISO-konvertering giver Herning 15 dage og Frederiksberg 19 dage — præcis som jeres manuelle optælling.
 
-1. Tilføj `countBookedDays`-hjælpefunktion (identisk med den i SupplierReportTab) — itererer fra `start_date` til `end_date` og tæller kun dage hvor `getDay()` matcher `booked_days`-arrayet.
+**Ændring i 2 filer:**
 
-2. Erstat begge steder hvor `bookedDaysArr.length` bruges (linje ~102 og ~109) med `countBookedDays(booking)`.
+1. `src/pages/vagt-flow/Billing.tsx` (linje 101-102)
+2. `src/components/billing/SupplierReportTab.tsx` (linje 207-208)
 
-Dette retter dagantal, beløb og dagspris for alle lokationer i den generelle faktureringsosigt.
+I begge filer ændres:
+```typescript
+// FRA:
+if (bookedDays.includes(d.getDay())) count++;
+
+// TIL:
+const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+if (bookedDays.includes(isoDay)) count++;
+```
+
+Dette konverterer JS-ugedag (0=søn) til ISO (0=man) inden sammenligning med `booked_days`-arrayet.
 
