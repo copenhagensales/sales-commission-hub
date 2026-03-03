@@ -1,72 +1,37 @@
 
 
-# Bil-aflevering påmindelse og bekræftelse
+## Problem
 
-## Oversigt
-Pa den sidste dag en bil er booket til en medarbejder, vises en detaljeret instruktions-callout om aflevering. Medarbejderen kan bekrafte afleveringen med en knap, som sender en email-notifikation til Fieldmarketing-lederne. GreenMobility-biler er undtaget.
+Confirmation is currently tied to a specific `booking_vehicle_id` — which is a per-day, per-vehicle record. If two employees share the same vehicle on the last booking day, each has their own `booking_vehicle` row (same `booking_id`, same `vehicle_id`, same `date`). When Employee A confirms, Employee B still sees the unconfirmed callout because their `booking_vehicle_id` is different.
 
-## UI/UX Design
+Worse: both could confirm independently, triggering two email notifications to FM leaders for the same car.
 
-### Callout pa sidste bil-dag (gul/amber tema, matcher bil-badge stilen)
-En kompakt, men synlig callout vises KUN pa den sidste dag bilen er booket. Den indeholder:
+## Solution
 
-```text
-+--------------------------------------------------+
-|  CAR  AFLEVERING AF BIL I DAG                    |
-|                                                   |
-|  Parker bilen pa parkeringspladsen i de           |
-|  afmaerkede base med "Copenhagen Sales".          |
-|                                                   |
-|  Hvis porten er last, brug noeglebrik fra         |
-|  noegleboksen til hoejre for porten (kode 2109).  |
-|  Aflever noeglen pa det lille kontor.             |
-|                                                   |
-|  ! Afleveres noeglen ikke, kan kollegaer ikke     |
-|    bruge bilen. Parkerer du udenfor porten, er    |
-|    du selv ansvarlig for parkeringsboeder.        |
-|                                                   |
-|  [check] Bekraeft aflevering                      |
-+--------------------------------------------------+
-```
+Change the confirmation lookup from matching on `booking_vehicle_id` to matching on **`booking_id` + `vehicle_id` + `booking_date`**. This way:
 
-- Farvetema: Amber/gul (matcher eksisterende bil-badge)
-- "Bekraeft aflevering"-knappen skifter til en gron "Afleveret"-tilstand efter klik
-- GreenMobility-biler viser IKKE denne callout
+1. **When Employee A confirms** → a record is inserted with the `booking_id`, `vehicle_id`, and `date`
+2. **Employee B's view** immediately shows the green "Afleveret" state because the query matches on the same booking+vehicle+date combination
+3. Only **one** email notification is sent (the first person to confirm)
 
-### Bekraeftelses-flow
-1. Medarbejder klikker "Bekraeft aflevering"
-2. En record gemmes i en ny `vehicle_return_confirmation`-tabel
-3. En edge function sender email til FM-lederne (William Krogh Bornak + Thomas Wehage)
-4. Knappen viser "Afleveret kl. HH:MM" i gron
+### Changes
 
-## Tekniske aendringer
+1. **`MyBookingSchedule.tsx`** — Update the confirmation query and lookup:
+   - Query `vehicle_return_confirmation` by `booking_date` IN the relevant dates (instead of by `booking_vehicle_id`)
+   - Match confirmations using `vehicle_name` + `booking_date` (or add `vehicle_id`/`booking_id` columns)
+   - On insert, include `booking_id` and `vehicle_id` so lookups are reliable
 
-### 1. Database: Ny tabel `vehicle_return_confirmation`
-```sql
-CREATE TABLE vehicle_return_confirmation (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_vehicle_id UUID REFERENCES booking_vehicle(id) ON DELETE CASCADE,
-  employee_id UUID REFERENCES employee_master_data(id),
-  confirmed_at TIMESTAMPTZ DEFAULT now(),
-  vehicle_name TEXT,
-  booking_date DATE
-);
--- RLS: authenticated kan INSERT egne og SELECT egne
-```
+2. **Database migration** — Add `booking_id` and `vehicle_id` columns to `vehicle_return_confirmation`:
+   - `booking_id UUID REFERENCES booking(id)`
+   - `vehicle_id UUID REFERENCES vehicle(id)`
+   - Add a unique constraint on `(booking_id, vehicle_id, booking_date)` to prevent duplicate confirmations
 
-### 2. Edge function: `notify-vehicle-returned`
-- Modtager: employee_id, vehicle_name, booking_date
-- Slar op hvem der er FM-ledere (job_title ILIKE '%fieldmarketing leder%' eller 'Assisterende Teamleder FM')
-- Sender email via M365 Graph API (samme monstre som andre send-funktioner)
-- Emailen indeholder: Hvem afleverede, hvilken bil, hvilken dato
+3. **Mutation logic** — Use `upsert` or check-before-insert to gracefully handle the case where the other person already confirmed (no error, no duplicate email).
 
-### 3. Frontend: `MyBookingSchedule.tsx`
-- **Logik**: For hvert assignment med en bil, beregn om det er den sidste dag bilen er booket for det booking (ved at se alle booking_vehicle datoer for samme booking_id og vehicle_id). Undtag biler hvor `vehicle.name` matcher "Greenmobility" (case-insensitive).
-- **Query**: Hent eksisterende `vehicle_return_confirmation` records for at vise "allerede bekraeftet" tilstand.
-- **Mutation**: `useMutation` til at indsaette i `vehicle_return_confirmation` og kalde `notify-vehicle-returned` edge function.
-- **UI**: Amber-farvet callout med instruktioner + bekraeft-knap, kun pa sidste bil-dag og kun for ikke-GreenMobility biler.
+4. **`VehicleReturnCallout`** — No changes needed; it already handles the confirmed/unconfirmed states.
 
-### 4. Raekkefoelge
-1. Opret database-tabel + RLS
-2. Opret edge function `notify-vehicle-returned`
-3. Opdater `MyBookingSchedule.tsx` med logik, UI og mutation
+### Result
+- First person to click "Bekræft aflevering" → record saved, email sent
+- Second person sees green "Afleveret kl. HH:MM" immediately (or after refetch)
+- No duplicate emails, no confusion
+
