@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEEKDAY_LABELS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+const WEEKDAY_SHORT = ["M", "Ti", "O", "To", "F", "L", "S"];
 
 function renderWeekdayBadges(weekdays: Array<{ week: number; days: number[] }> | undefined): string {
   if (!weekdays || weekdays.length === 0) return '<span style="color:#94a3b8;">—</span>';
@@ -17,16 +17,18 @@ function renderWeekdayBadges(weekdays: Array<{ week: number; days: number[] }> |
       const weekdayOnly = sorted.filter((d) => d <= 4);
       const isFullWeek = [0, 1, 2, 3, 4].every((d) => weekdayOnly.includes(d)) && weekdayOnly.length === 5;
 
+      const weekLabel = `<span style="display:inline-block;background:#e2e8f0;color:#334155;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:0.3px;">Uge ${w.week}</span>`;
+
       const badges = isFullWeek
-        ? '<span style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;background:#dcfce7;color:#166534;">Man–Fre</span>'
+        ? '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#dcfce7;color:#166534;">M–F</span>'
         : sorted
             .map(
               (d) =>
-                `<span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;background:#f1f5f9;color:#475569;">${WEEKDAY_LABELS[d] || d}</span>`
+                `<span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:500;background:#f1f5f9;color:#475569;margin:0 1px;">${WEEKDAY_SHORT[d] || d}</span>`
             )
-            .join(" ");
+            .join("");
 
-      return `<div style="margin-bottom:4px;"><span style="font-size:11px;color:#475569;font-weight:700;">Uge ${w.week}</span>&nbsp; ${badges}</div>`;
+      return `<div style="margin-bottom:5px;">${weekLabel} ${badges}</div>`;
     })
     .join("");
 }
