@@ -10188,29 +10188,42 @@ export type Database = {
       vehicle_return_confirmation: {
         Row: {
           booking_date: string | null
+          booking_id: string | null
           booking_vehicle_id: string
           confirmed_at: string
           employee_id: string
           id: string
+          vehicle_id: string | null
           vehicle_name: string | null
         }
         Insert: {
           booking_date?: string | null
+          booking_id?: string | null
           booking_vehicle_id: string
           confirmed_at?: string
           employee_id: string
           id?: string
+          vehicle_id?: string | null
           vehicle_name?: string | null
         }
         Update: {
           booking_date?: string | null
+          booking_id?: string | null
           booking_vehicle_id?: string
           confirmed_at?: string
           employee_id?: string
           id?: string
+          vehicle_id?: string | null
           vehicle_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vehicle_return_confirmation_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehicle_return_confirmation_booking_vehicle_id_fkey"
             columns: ["booking_vehicle_id"]
@@ -10237,6 +10250,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_return_confirmation_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle"
             referencedColumns: ["id"]
           },
         ]
