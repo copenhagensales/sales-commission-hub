@@ -99,7 +99,8 @@ function BillingOverviewTab() {
     const start = new Date(booking.start_date);
     const end = new Date(booking.end_date);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      if (bookedDays.includes(d.getDay())) count++;
+      const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      if (bookedDays.includes(isoDay)) count++;
     }
     return count || 1;
   };
