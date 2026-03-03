@@ -1,24 +1,26 @@
 
 
-## Fix: Smartere dag-badges i email-rapport
+## Problem: "Sidst besøgt" og Cooldown virker ikke
 
-### Problem
-Når individuelle dage vises (f.eks. Man, Tir, Ons, Fre), flyder badges sammen med ugenummeret og ser rodet ud. "Man–Fre" fungerer fint fordi det er ét badge.
+### Årsag
 
-### Løsning
-Omstrukturér `renderWeekdayBadges()` i `send-supplier-report/index.ts`:
+I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
 
-1. **Ugenummer som egen linje/label** — giv den en tydelig styling med lidt mere spacing
-2. **Dag-badges på ny linje under ugenummeret** — wrap badges i en flex-lignende container med `display:inline-block` og lille gap
-3. **Kortere dag-labels** — brug enkeltbogstaver (M, Ti, O, To, F) i stedet for 3-bogstavs forkortelser for at spare plads
-4. **Kompakt layout** — sæt badges tættere med mindre padding (2px 6px) og mindre font (10px) så de fylder mindre
-5. **Visuel adskillelse** — tilføj en tynd border eller baggrund på ugenummer-labelen så den skiller sig ud fra dagene
+Det betyder:
+- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
+- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
+- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
 
-### Konkret ændring
+### Fix
 
-**Fil:** `supabase/functions/send-supplier-report/index.ts` — `renderWeekdayBadges()` (linje 10-31)
+**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
 
-- Ugenummer: bold label med lille baggrund (`#e2e8f0`, padding, border-radius)
-- Dag-badges: kompakte, 10px font, `padding:2px 6px`, `margin:1px` — placeret på linje under ugenummer
-- Behold "Man–Fre" som samlet grøn badge (fungerer allerede godt)
+1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
+   ```
+   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
+   ```
+
+2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
+
+Kun én fil ændres, og det er en ren data-fetching bug.
 
