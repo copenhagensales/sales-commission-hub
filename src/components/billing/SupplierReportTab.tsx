@@ -719,7 +719,7 @@ export function SupplierReportTab() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {locationEntries.reduce((sum: number, loc: any) => sum + loc.bookings.length, 0)} samlede bookinger
                     </p>
-                    <p className="text-xs text-muted-foreground">Hver {minDaysPerLocation} dage = 1 booking</p>
+                    <p className="text-xs text-muted-foreground">1 placering = min. {minDaysPerLocation} dage på samme lokation</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Rabattrin</p>
