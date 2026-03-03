@@ -90,25 +90,31 @@ function BillingOverviewTab() {
     return matchesClient && matchesLocationType;
   });
 
+  const countBookedDays = (booking: any): number => {
+    const bookedDays = booking.booked_days as number[] | null;
+    if (!bookedDays || bookedDays.length === 0) {
+      return differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+    }
+    let count = 0;
+    const start = new Date(booking.start_date);
+    const end = new Date(booking.end_date);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (bookedDays.includes(d.getDay())) count++;
+    }
+    return count || 1;
+  };
+
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
     let bookingTotal: number;
     let dailyRate: number;
-    let days: number;
+    const days = countBookedDays(booking);
 
     if (booking.total_price != null) {
       bookingTotal = booking.total_price;
-      const bookedDaysArr1 = booking.booked_days as number[] | null;
-      days = bookedDaysArr1 && bookedDaysArr1.length > 0
-        ? bookedDaysArr1.length
-        : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       dailyRate = days > 0 ? bookingTotal / days : bookingTotal;
     } else {
       dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-      const bookedDaysArr2 = booking.booked_days as number[] | null;
-      days = bookedDaysArr2 && bookedDaysArr2.length > 0
-        ? bookedDaysArr2.length
-        : differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       bookingTotal = dailyRate * days;
     }
 
