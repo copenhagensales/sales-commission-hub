@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
     const tableRows = locations.map((loc: any) => `
       <tr>
         <td style="padding:8px;border:1px solid #ddd;">${loc.locationName || ''}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${loc.externalId || ''}</td>
         <td style="padding:8px;border:1px solid #ddd;">${loc.city || ''}</td>
         <td style="padding:8px;border:1px solid #ddd;">${renderWeekdaysForEmail(loc.weekdays)}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.days || 0}</td>
@@ -114,6 +115,7 @@ Deno.serve(async (req) => {
             <thead>
               <tr style="background:#f5f5f5;">
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">Lokation</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:left;">ID</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">By</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">Uger & Dage</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Dage</th>
