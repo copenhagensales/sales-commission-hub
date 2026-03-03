@@ -1,18 +1,28 @@
 
 
-## Plan: Tydeliggør booking-tælling under rabatberegning
+## Plan: Ret dagsberegning til at bruge `booked_days`-arrayet
 
-**Problem:** Under "Rabatberegning" vises kun "Bookinger: 27" (totalPlacements), men det er uklart hvordan tallet fremkommer — man kan ikke se forskellen mellem det samlede antal bookinger og de der kvalificerer til rabat.
+**Problem:** `calcBookingTotal` (linje 199-207) beregner dage som `differenceInDays(end, start) + 1` (kalenderdage) i stedet for at tælle faktiske bookede dage fra `booked_days`-arrayet. Det giver forkerte dagantal for alle lokationer — ikke kun Vestsjællandscenteret.
 
 **Ændring i `src/components/billing/SupplierReportTab.tsx`:**
 
-I placement-based discount sektionen (linje 651-655), udvid "Bookinger"-feltet til at vise begge tal:
+Tilføj en hjælpefunktion der tæller faktiske bookede dage:
 
-1. Beregn det samlede antal booking-records: `locationEntries.reduce((sum, loc) => sum + loc.bookings.length, 0)`
-2. Vis under rabatberegning:
-   - **Samlede bookinger:** fx 34 (antal booking-records i alt)
-   - **Bookinger (min. 5 dage):** 27 (det tal der bruges til rabattrin)
-   - En lille forklaringstekst: "Hver 5 dage på en lokation tæller som 1 booking"
+```typescript
+const countBookedDays = (booking: any): number => {
+  const bookedDays = booking.booked_days as number[] | null;
+  if (!bookedDays || bookedDays.length === 0) {
+    return differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+  }
+  let count = 0;
+  const start = new Date(booking.start_date);
+  const end = new Date(booking.end_date);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    if (bookedDays.includes(d.getDay())) count++;
+  }
+  return count || 1;
+};
+```
 
-Konkret ændres det første grid-felt fra bare at vise `totalPlacements` til at vise begge tal med labels, så det er tydeligt hvordan rabatten beregnes.
+Opdater `calcBookingTotal` til at bruge `countBookedDays(booking)` i stedet for `differenceInDays(...)` på begge linjer (201 og 205). Dette retter dagantal, beløb, dagspris og rabatberegning for **alle** lokationer.
 
