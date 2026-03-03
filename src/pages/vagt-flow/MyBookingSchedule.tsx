@@ -1,21 +1,24 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, Package, CheckCircle2 } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { VehicleReturnCallout } from "@/components/vagt-flow/VehicleReturnCallout";
 
 const DAY_NAMES = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
 
 export default function MyBookingSchedule() {
   const { user } = useAuth();
   const [referenceDate, setReferenceDate] = useState(new Date());
+  const queryClient = useQueryClient();
 
   const weekStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -35,6 +38,21 @@ export default function MyBookingSchedule() {
       return data?.id ?? null;
     },
     enabled: !!user?.email,
+  });
+
+  // Fetch employee name for notifications
+  const { data: employeeName } = useQuery({
+    queryKey: ["my-employee-name", employeeId],
+    queryFn: async () => {
+      if (!employeeId) return null;
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("first_name, last_name")
+        .eq("id", employeeId)
+        .maybeSingle();
+      return data ? `${data.first_name} ${data.last_name}` : null;
+    },
+    enabled: !!employeeId,
   });
 
   // Fetch my assignments for this week
@@ -80,14 +98,12 @@ export default function MyBookingSchedule() {
       if (bookingIds.length === 0) return [];
       const { data } = await supabase
         .from("booking_vehicle")
-        .select("booking_id, date, vehicle:vehicle_id ( id, name, license_plate )")
+        .select("id, booking_id, date, vehicle:vehicle_id ( id, name, license_plate )")
         .in("booking_id", bookingIds);
       return data ?? [];
     },
     enabled: bookingIds.length > 0,
   });
-
-  // No separate allBookingDates query needed — we use booking.start_date/end_date directly
 
   // Fetch hotel bookings for my bookings this week
   const { data: bookingHotels } = useQuery({
@@ -133,6 +149,57 @@ export default function MyBookingSchedule() {
     enabled: !!employeeId && bookingIds.length > 0,
   });
 
+  // Fetch existing vehicle return confirmations
+  const bookingVehicleIds = useMemo(() => {
+    if (!vehicles) return [];
+    return vehicles.map((v: any) => v.id).filter(Boolean);
+  }, [vehicles]);
+
+  const { data: vehicleConfirmations } = useQuery({
+    queryKey: ["vehicle-return-confirmations", bookingVehicleIds],
+    queryFn: async () => {
+      if (bookingVehicleIds.length === 0) return [];
+      const { data } = await (supabase as any)
+        .from("vehicle_return_confirmation")
+        .select("id, booking_vehicle_id, confirmed_at")
+        .in("booking_vehicle_id", bookingVehicleIds);
+      return data ?? [];
+    },
+    enabled: bookingVehicleIds.length > 0,
+  });
+
+  // Vehicle return confirmation mutation
+  const confirmVehicleReturn = useMutation({
+    mutationFn: async ({ bookingVehicleId, vehicleName, bookingDate }: { bookingVehicleId: string; vehicleName: string; bookingDate: string }) => {
+      // Insert confirmation
+      const { error } = await (supabase as any)
+        .from("vehicle_return_confirmation")
+        .insert({
+          booking_vehicle_id: bookingVehicleId,
+          employee_id: employeeId,
+          vehicle_name: vehicleName,
+          booking_date: bookingDate,
+        });
+      if (error) throw error;
+
+      // Send notification
+      await supabase.functions.invoke("notify-vehicle-returned", {
+        body: {
+          employee_name: employeeName,
+          vehicle_name: vehicleName,
+          booking_date: bookingDate,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Bil aflevering bekræftet!");
+      queryClient.invalidateQueries({ queryKey: ["vehicle-return-confirmations"] });
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke bekræfte: " + err.message);
+    },
+  });
+
   // Group data by date
   const dayData = useMemo(() => {
     const days: Record<string, any> = {};
@@ -147,8 +214,6 @@ export default function MyBookingSchedule() {
       };
     }
 
-    // No need to pre-compute ranges — we use booking.start_date/end_date directly
-
     assignments?.forEach((a: any) => {
       if (days[a.date]) {
         const vehicleForDay = vehicles?.find(
@@ -161,7 +226,7 @@ export default function MyBookingSchedule() {
           (p: any) => p.booking_id === a.booking_id && p.date === a.date
         ) ?? [];
 
-        // Match hotel: find any hotel for this booking where date falls within check_in/check_out
+        // Match hotel
         const hotelForBooking = bookingHotels?.find((bh: any) => {
           if (bh.booking_id !== a.booking_id) return false;
           if (bh.check_in && bh.check_out) {
@@ -175,7 +240,6 @@ export default function MyBookingSchedule() {
           return false;
         });
 
-        // Determine if this is the first day the employee actually has a shift with this hotel
         const isFirstShiftDay = hotelForBooking ? (() => {
           const allDatesWithHotel = assignments
             ?.filter((ass: any) => {
@@ -203,13 +267,34 @@ export default function MyBookingSchedule() {
         const isFirstBookingDay = booking?.start_date ? a.date === booking.start_date : false;
         const isLastBookingDay = booking?.end_date ? a.date === booking.end_date : false;
 
+        // Vehicle last day: check if this is the last date this vehicle is booked for this booking
+        const isLastVehicleDay = vehicleForDay ? (() => {
+          const vehicleId = vehicleForDay.vehicle?.id;
+          const vehicleName = (vehicleForDay.vehicle?.name ?? "").toLowerCase();
+          // Exclude GreenMobility
+          if (vehicleName.includes("greenmobility") || vehicleName.includes("green mobility")) return false;
+          const allDatesForVehicle = vehicles
+            ?.filter((v: any) => v.booking_id === a.booking_id && v.vehicle?.id === vehicleId)
+            .map((v: any) => v.date)
+            .sort() ?? [];
+          return allDatesForVehicle[allDatesForVehicle.length - 1] === a.date;
+        })() : false;
+
+        // Check if vehicle return already confirmed
+        const vehicleReturnConfirmed = vehicleForDay && isLastVehicleDay
+          ? vehicleConfirmations?.find((c: any) => c.booking_vehicle_id === vehicleForDay.id)
+          : null;
+
         days[a.date].assignments.push({
           ...a,
           vehicle: vehicleForDay?.vehicle,
+          vehicleBookingId: vehicleForDay?.id,
           diet: dietForDay,
           partners: partnersForDay.map((p: any) => p.employee?.first_name).filter(Boolean),
           isFirstBookingDay,
           isLastBookingDay,
+          isLastVehicleDay,
+          vehicleReturnConfirmed,
           hotel: hotelForBooking ? {
             name: hotelForBooking.hotel?.name,
             address: hotelForBooking.hotel?.address,
@@ -228,7 +313,7 @@ export default function MyBookingSchedule() {
     });
 
     return Object.values(days);
-  }, [assignments, vehicles, diets, partners, bookingHotels, weekStart]);
+  }, [assignments, vehicles, diets, partners, bookingHotels, vehicleConfirmations, weekStart]);
 
   // Find next upcoming shift
   const nextShift = useMemo(() => {
@@ -245,7 +330,7 @@ export default function MyBookingSchedule() {
   return (
     <VagtFlowLayout>
       <div className="space-y-4">
-        {/* Header – compact on mobile */}
+        {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-foreground leading-tight">Min vagtplan</h1>
@@ -266,7 +351,7 @@ export default function MyBookingSchedule() {
           </div>
         </div>
 
-        {/* Next shift highlight – compact */}
+        {/* Next shift highlight */}
         {nextShift && nextShift.assignments.length > 0 && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
             <div className="flex items-center gap-1.5 text-primary font-semibold text-xs mb-0.5">
@@ -289,10 +374,8 @@ export default function MyBookingSchedule() {
               const isDayToday = isToday(day.date);
               const isPast = isBefore(day.date, new Date()) && !isDayToday;
 
-              // Hide empty past days completely
               if (isPast && day.assignments.length === 0) return null;
 
-              // Empty future/today days – minimal row
               if (day.assignments.length === 0) {
                 return (
                   <div
@@ -306,7 +389,6 @@ export default function MyBookingSchedule() {
                 );
               }
 
-              // Day with assignments – card
               return (
                 <Card
                   key={day.dateStr}
@@ -316,7 +398,6 @@ export default function MyBookingSchedule() {
                   )}
                 >
                   <CardContent className="p-3">
-                    {/* Day header */}
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-semibold text-sm text-foreground">
                         {day.dayName.slice(0, 3).toUpperCase()} {format(day.date, "d/M")}
@@ -335,12 +416,10 @@ export default function MyBookingSchedule() {
 
                         return (
                           <div key={idx} className="border-l-2 border-primary/40 pl-3 space-y-1">
-                            {/* Location name */}
                             <div className="font-semibold text-sm text-foreground leading-tight">
                               {location?.name || "Ukendt lokation"}
                             </div>
 
-                            {/* Address link */}
                             {(location?.address_street || location?.address_city) && (
                               <a
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([location.address_street, location.address_city].filter(Boolean).join(", "))}`}
@@ -353,14 +432,12 @@ export default function MyBookingSchedule() {
                               </a>
                             )}
 
-                            {/* Client / Campaign */}
                             {(client?.name || campaign?.name) && (
                               <p className="text-xs text-muted-foreground">
                                 {client?.name}{campaign?.name ? ` – ${campaign.name}` : ""}
                               </p>
                             )}
 
-                            {/* Time */}
                             <div className="flex items-center gap-1.5">
                               <Clock className="h-3 w-3 text-muted-foreground" />
                               <span className="text-xs text-foreground">
@@ -368,7 +445,6 @@ export default function MyBookingSchedule() {
                               </span>
                             </div>
 
-                            {/* Partners */}
                             {a.partners.length > 0 && (
                               <div className="flex items-center gap-1.5">
                                 <Users className="h-3 w-3 text-muted-foreground" />
@@ -378,7 +454,7 @@ export default function MyBookingSchedule() {
                               </div>
                             )}
 
-                            {/* Badges row – compact */}
+                            {/* Badges row */}
                             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                               {a.vehicle && (
                                 <Badge variant="outline" className="text-[11px] py-0 px-1.5 h-5 bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-100 dark:border-yellow-700 gap-1">
@@ -414,7 +490,23 @@ export default function MyBookingSchedule() {
                               </div>
                             )}
 
-                            {/* Hotel detail callout – compact */}
+                            {/* Vehicle return callout */}
+                            {a.isLastVehicleDay && (
+                              <VehicleReturnCallout
+                                vehicleName={(a.vehicle as any)?.name ?? "Bil"}
+                                confirmed={a.vehicleReturnConfirmed}
+                                isConfirming={confirmVehicleReturn.isPending}
+                                onConfirm={() =>
+                                  confirmVehicleReturn.mutate({
+                                    bookingVehicleId: a.vehicleBookingId,
+                                    vehicleName: (a.vehicle as any)?.name ?? "Bil",
+                                    bookingDate: a.date,
+                                  })
+                                }
+                              />
+                            )}
+
+                            {/* Hotel detail callout */}
                             {a.hotel && (
                               <div className="mt-1 px-2.5 py-1.5 rounded-md bg-blue-600/10 border border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-400/20">
                                 {a.hotel.isCheckInDay && (
@@ -449,7 +541,7 @@ export default function MyBookingSchedule() {
                               </div>
                             )}
 
-                            {/* Booking comment callout – compact */}
+                            {/* Booking comment callout */}
                             {booking?.comment && (
                               <div className="mt-1 px-2.5 py-1.5 rounded-md bg-accent/50 border border-border">
                                 <div className="flex items-center gap-1 mb-0.5">
