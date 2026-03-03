@@ -83,16 +83,36 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Find FM leaders to notify
-    const { data: fmLeaders } = await supabase
-      .from("employee_master_data")
-      .select("work_email, private_email, first_name")
-      .or("job_title.ilike.%fieldmarketing leder%,job_title.ilike.Assisterende Teamleder FM")
-      .eq("is_active", true);
+    // Find FM assistant team leaders via junction table
+    const { data: fmTeams } = await supabase
+      .from("teams")
+      .select("id")
+      .ilike("name", "%fieldmarketing%");
 
-    const recipientEmails = (fmLeaders ?? [])
-      .map((l: any) => l.work_email || l.private_email)
-      .filter(Boolean);
+    const fmTeamIds = (fmTeams ?? []).map((t: any) => t.id);
+
+    let recipientEmails: string[] = [];
+
+    if (fmTeamIds.length > 0) {
+      const { data: assistants } = await supabase
+        .from("team_assistant_leaders")
+        .select("employee_id")
+        .in("team_id", fmTeamIds);
+
+      const assistantIds = (assistants ?? []).map((a: any) => a.employee_id);
+
+      if (assistantIds.length > 0) {
+        const { data: employees } = await supabase
+          .from("employee_master_data")
+          .select("work_email, private_email, first_name")
+          .in("id", assistantIds)
+          .eq("is_active", true);
+
+        recipientEmails = (employees ?? [])
+          .map((e: any) => e.work_email || e.private_email)
+          .filter(Boolean);
+      }
+    }
 
     if (recipientEmails.length === 0) {
       console.warn("No FM leaders found to notify");
