@@ -23,6 +23,7 @@ interface SendToSupplierDialogProps {
   month: string;
   reportId: string;
   reportData: any;
+  hasDiscountRules?: boolean;
 }
 
 export function SendToSupplierDialog({
@@ -32,6 +33,7 @@ export function SendToSupplierDialog({
   month,
   reportId,
   reportData,
+  hasDiscountRules,
 }: SendToSupplierDialogProps) {
   const [extraEmail, setExtraEmail] = useState("");
   const [extraEmails, setExtraEmails] = useState<string[]>([]);
@@ -75,6 +77,7 @@ export function SendToSupplierDialog({
           message,
           reportId,
           reportData,
+          hasDiscountRules,
         },
       });
 

@@ -873,6 +873,7 @@ export function SupplierReportTab() {
                     maxDiscount: loc.maxDiscount,
                   })),
                   discountType,
+                  hasDiscountRules: !!(discountRules && discountRules.length > 0),
                   minDaysPerLocation,
                   totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
                   discountInfo: {
@@ -923,6 +924,7 @@ export function SupplierReportTab() {
               locationType={selectedLocationType}
               month={periodLabel}
               reportId={existingReport.id}
+              hasDiscountRules={!!(discountRules && discountRules.length > 0)}
               reportData={locationDiscounts.map((loc: any) => ({
                 locationName: loc.location?.name,
                 city: loc.location?.address_city,
