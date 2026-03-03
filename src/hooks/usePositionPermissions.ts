@@ -109,7 +109,7 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
 };
 
 // localStorage cache key for permissions
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v4';
+const PERMISSIONS_CACHE_KEY = 'cached-permissions-v5';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Force-clear old cache versions on load
@@ -117,6 +117,7 @@ try {
   localStorage.removeItem('cached-permissions-v1');
   localStorage.removeItem('cached-permissions-v2');
   localStorage.removeItem('cached-permissions-v3');
+  localStorage.removeItem('cached-permissions-v4');
 } catch (e) {
   // Ignore errors
 }
@@ -169,7 +170,7 @@ export function usePositionPermissions() {
         if (user?.id) {
           const { data: empById, error: errById } = await supabase
             .from("employee_master_data")
-            .select("job_title, auth_user_id")
+            .select("job_title, auth_user_id, position_id")
             .eq("auth_user_id", user.id)
             .eq("is_active", true)
             .maybeSingle();
@@ -190,7 +191,7 @@ export function usePositionPermissions() {
           // Try private_email
           const { data: empByPrivate, error: errPrivate } = await supabase
             .from("employee_master_data")
-            .select("job_title, auth_user_id")
+            .select("job_title, auth_user_id, position_id")
             .ilike("private_email", user.email)
             .eq("is_active", true)
             .maybeSingle();
@@ -207,7 +208,7 @@ export function usePositionPermissions() {
             // Try work_email
             const { data: empByWork, error: errWork } = await supabase
               .from("employee_master_data")
-              .select("job_title, auth_user_id")
+              .select("job_title, auth_user_id, position_id")
               .ilike("work_email", user.email)
               .eq("is_active", true)
               .maybeSingle();
@@ -236,12 +237,29 @@ export function usePositionPermissions() {
           return { position: null, permissions: {}, roleKey: 'medarbejder' };
         }
 
-        // Map job title to role key
-        const roleKey = mapJobTitleToRoleKey(employee.job_title);
-        console.log("usePositionPermissions: Mapped role", { 
+        // Determine roleKey: prefer system_role_key from job_positions via position_id
+        let roleKey = mapJobTitleToRoleKey(employee.job_title); // fallback
+        
+        if (employee.position_id) {
+          const { data: posData } = await supabase
+            .from("job_positions")
+            .select("system_role_key")
+            .eq("id", employee.position_id)
+            .maybeSingle();
+          
+          if (posData?.system_role_key) {
+            roleKey = posData.system_role_key;
+            console.log("usePositionPermissions: Using system_role_key from job_positions", {
+              position_id: employee.position_id,
+              system_role_key: posData.system_role_key,
+            });
+          }
+        }
+        
+        console.log("usePositionPermissions: Resolved role", { 
           jobTitle: employee.job_title, 
           roleKey,
-          cacheVersion: PERMISSIONS_CACHE_KEY
+          position_id: employee.position_id,
         });
 
         // Check if owner position - always full permissions
