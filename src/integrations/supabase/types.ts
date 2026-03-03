@@ -10189,7 +10189,7 @@ export type Database = {
         Row: {
           booking_date: string | null
           booking_id: string | null
-          booking_vehicle_id: string
+          booking_vehicle_id: string | null
           confirmed_at: string
           employee_id: string
           id: string
@@ -10200,7 +10200,7 @@ export type Database = {
         Insert: {
           booking_date?: string | null
           booking_id?: string | null
-          booking_vehicle_id: string
+          booking_vehicle_id?: string | null
           confirmed_at?: string
           employee_id: string
           id?: string
@@ -10211,7 +10211,7 @@ export type Database = {
         Update: {
           booking_date?: string | null
           booking_id?: string | null
-          booking_vehicle_id?: string
+          booking_vehicle_id?: string | null
           confirmed_at?: string
           employee_id?: string
           id?: string

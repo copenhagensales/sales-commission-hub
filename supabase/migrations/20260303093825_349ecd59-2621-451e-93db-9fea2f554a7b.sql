@@ -1,0 +1,1 @@
+ALTER TABLE public.vehicle_return_confirmation ALTER COLUMN booking_vehicle_id DROP NOT NULL;
