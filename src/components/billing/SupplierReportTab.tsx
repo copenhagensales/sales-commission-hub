@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { FileText, Check, Percent, MapPin, AlertTriangle, TrendingUp, Download, Send } from "lucide-react";
 import { SendToSupplierDialog } from "./SendToSupplierDialog";
-import { format, startOfMonth, endOfMonth, differenceInDays, getISOWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInDays, getISOWeek, startOfWeek, max as maxDate, min as minDate } from "date-fns";
 import { da } from "date-fns/locale";
 import {
   Select,
@@ -112,8 +112,8 @@ export function SupplierReportTab() {
           location(id, name, address_city, daily_rate, type, external_id),
           clients(id, name)
         `)
-        .gte("start_date", format(periodStart, "yyyy-MM-dd"))
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
+        .gte("end_date", format(periodStart, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
       return data.filter((b: any) => b.location?.type === selectedLocationType);
@@ -132,8 +132,8 @@ export function SupplierReportTab() {
           *,
           location(id, name, address_city, daily_rate, type, external_id)
         `)
-        .gte("start_date", format(yearStart, "yyyy-MM-dd"))
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
+        .gte("end_date", format(yearStart, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
       return data.filter((b: any) => b.location?.type === selectedLocationType);
@@ -195,45 +195,51 @@ export function SupplierReportTab() {
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
-  // Count actual booked days using booked_days array (weekday indices)
-  const countBookedDays = (booking: any): number => {
+  // Count actual booked days using booked_days array, clipped to a period
+  const countBookedDays = (booking: any, clipStart?: Date, clipEnd?: Date): number => {
     const bookedDays = booking.booked_days as number[] | null;
+    const bookStart = new Date(booking.start_date);
+    const bookEnd = new Date(booking.end_date);
+    const start = clipStart ? maxDate([bookStart, clipStart]) : bookStart;
+    const end = clipEnd ? minDate([bookEnd, clipEnd]) : bookEnd;
+    if (start > end) return 0;
     if (!bookedDays || bookedDays.length === 0) {
-      return differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+      return differenceInDays(end, start) + 1;
     }
     let count = 0;
-    const start = new Date(booking.start_date);
-    const end = new Date(booking.end_date);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
       if (bookedDays.includes(isoDay)) count++;
     }
-    return count || 1;
+    return count || 0;
   };
 
-  // Helper to calculate booking total
-  const calcBookingTotal = (booking: any) => {
-    const days = countBookedDays(booking);
+  // Count total (unclipped) booked days for proration
+  const countTotalBookedDays = (booking: any): number => {
+    return countBookedDays(booking);
+  };
+
+  // Helper to calculate booking total, clipped to the reporting period
+  const calcBookingTotal = (booking: any, clipStart?: Date, clipEnd?: Date) => {
+    const clippedDays = countBookedDays(booking, clipStart, clipEnd);
     if (booking.total_price != null) {
-      return { total: booking.total_price, days, dailyRate: days > 0 ? booking.total_price / days : booking.total_price, usesTotalPrice: true };
+      const totalDays = countTotalBookedDays(booking);
+      const ratio = totalDays > 0 ? clippedDays / totalDays : 1;
+      const proratedTotal = booking.total_price * ratio;
+      return { total: proratedTotal, days: clippedDays, dailyRate: clippedDays > 0 ? proratedTotal / clippedDays : booking.total_price, usesTotalPrice: true };
     }
     const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-    return { total: dailyRate * days, days, dailyRate, usesTotalPrice: false };
+    return { total: dailyRate * clippedDays, days: clippedDays, dailyRate, usesTotalPrice: false };
   };
 
-  // Build exception lookup
-  const exceptionMap = new Map<string, LocationException>();
-  locationExceptions?.forEach((exc) => {
-    exceptionMap.set(exc.location_name.toLowerCase(), exc);
-  });
-
-  const WEEKDAY_NAMES = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
-
-  const getBookedWeekdays = (booking: any): Map<number, Set<number>> => {
+  // Get booked weekdays grouped by ISO week, clipped to period
+  const getBookedWeekdays = (booking: any, clipStart?: Date, clipEnd?: Date): Map<number, Set<number>> => {
     const weeks = new Map<number, Set<number>>();
     const bookedDays = booking.booked_days as number[] | null;
-    const start = new Date(booking.start_date);
-    const end = new Date(booking.end_date);
+    const bookStart = new Date(booking.start_date);
+    const bookEnd = new Date(booking.end_date);
+    const start = clipStart ? maxDate([bookStart, clipStart]) : bookStart;
+    const end = clipEnd ? minDate([bookEnd, clipEnd]) : bookEnd;
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
       if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(isoDay)) {
@@ -245,14 +251,15 @@ export function SupplierReportTab() {
     return weeks;
   };
 
-  // Count consecutive-day placements: each unbroken sequence of ≥ minDays calendar dates = 1 placement
-  const countConsecutivePlacements = (bookings: any[], minDays: number): number => {
-    // Collect all actual booked calendar dates as YYYY-MM-DD strings
+  // Count consecutive-day placements clipped to period
+  const countConsecutivePlacements = (bookings: any[], minDays: number, clipStart?: Date, clipEnd?: Date): number => {
     const dateSet = new Set<string>();
     for (const booking of bookings) {
       const bookedDays = booking.booked_days as number[] | null;
-      const start = new Date(booking.start_date);
-      const end = new Date(booking.end_date);
+      const bookStart = new Date(booking.start_date);
+      const bookEnd = new Date(booking.end_date);
+      const start = clipStart ? maxDate([bookStart, clipStart]) : bookStart;
+      const end = clipEnd ? minDate([bookEnd, clipEnd]) : bookEnd;
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
         if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(isoDay)) {
@@ -260,7 +267,6 @@ export function SupplierReportTab() {
         }
       }
     }
-    // Sort dates and find consecutive sequences
     const sorted = [...dateSet].sort();
     if (sorted.length === 0) return 0;
     let placements = 0;
@@ -268,8 +274,7 @@ export function SupplierReportTab() {
     for (let i = 1; i < sorted.length; i++) {
       const prev = new Date(sorted[i - 1]);
       const curr = new Date(sorted[i]);
-      const diffMs = curr.getTime() - prev.getTime();
-      if (diffMs === 86400000) { // exactly 1 day apart
+      if (curr.getTime() - prev.getTime() === 86400000) {
         streak++;
       } else {
         if (streak >= minDays) placements++;
@@ -280,10 +285,83 @@ export function SupplierReportTab() {
     return placements;
   };
 
-  // Group bookings by location (current month)
+  // Count discount placements using week-start attribution:
+  // A full booked week counts as a placement in the month where the week STARTS (Monday).
+  // This prevents double-counting weeks that span month boundaries.
+  const countDiscountPlacementsWeekBased = (
+    allBookingsByLoc: Record<string, any[]>,
+    minDays: number,
+    targetPeriodStart: Date,
+    targetPeriodEnd: Date
+  ): number => {
+    const targetMonth = targetPeriodStart.getMonth();
+    const targetYear = targetPeriodStart.getFullYear();
+    let totalPlacements = 0;
+
+    for (const locBookings of Object.values(allBookingsByLoc)) {
+      // Collect ALL booked dates for this location (unclipped) to find full weeks
+      const dateSet = new Set<string>();
+      for (const booking of locBookings) {
+        const bookedDays = booking.booked_days as number[] | null;
+        const s = new Date(booking.start_date);
+        const e = new Date(booking.end_date);
+        for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+          const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+          if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(isoDay)) {
+            dateSet.add(d.toISOString().slice(0, 10));
+          }
+        }
+      }
+
+      // Group dates by ISO week and check consecutive streaks within each week
+      const sorted = [...dateSet].sort();
+      if (sorted.length === 0) continue;
+
+      // Find consecutive sequences of ≥ minDays
+      let streakDates: string[] = [sorted[0]];
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = new Date(sorted[i - 1]);
+        const curr = new Date(sorted[i]);
+        if (curr.getTime() - prev.getTime() === 86400000) {
+          streakDates.push(sorted[i]);
+        } else {
+          if (streakDates.length >= minDays) {
+            // Attribute this placement to the month where the streak's Monday falls
+            const streakStart = new Date(streakDates[0]);
+            const weekMonday = startOfWeek(streakStart, { weekStartsOn: 1 });
+            if (weekMonday.getMonth() === targetMonth && weekMonday.getFullYear() === targetYear) {
+              totalPlacements++;
+            }
+          }
+          streakDates = [sorted[i]];
+        }
+      }
+      if (streakDates.length >= minDays) {
+        const streakStart = new Date(streakDates[0]);
+        const weekMonday = startOfWeek(streakStart, { weekStartsOn: 1 });
+        if (weekMonday.getMonth() === targetMonth && weekMonday.getFullYear() === targetYear) {
+          totalPlacements++;
+        }
+      }
+    }
+
+    return totalPlacements;
+  };
+
+  // Build exception lookup
+  const exceptionMap = new Map<string, LocationException>();
+  locationExceptions?.forEach((exc) => {
+    exceptionMap.set(exc.location_name.toLowerCase(), exc);
+  });
+
+  const WEEKDAY_NAMES = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+  // Group bookings by location, clipped to current period
   const bookingsByLocation = bookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    const { total, days, dailyRate, usesTotalPrice } = calcBookingTotal(booking);
+    const { total, days, dailyRate, usesTotalPrice } = calcBookingTotal(booking, periodStart, periodEnd);
+
+    if (days === 0) return acc; // Skip bookings with no days in period
 
     if (!acc[locationId]) {
       acc[locationId] = {
@@ -304,8 +382,8 @@ export function SupplierReportTab() {
     acc[locationId].totalDays += days;
     acc[locationId].totalAmount += total;
 
-    // Merge weekdays
-    const bWeeks = getBookedWeekdays(booking);
+    // Merge weekdays (clipped to period)
+    const bWeeks = getBookedWeekdays(booking, periodStart, periodEnd);
     bWeeks.forEach((days_set, week) => {
       if (!acc[locationId].weekdaysByWeek.has(week)) {
         acc[locationId].weekdaysByWeek.set(week, new Set<number>());
@@ -321,14 +399,25 @@ export function SupplierReportTab() {
 
   const locationEntries = Object.values(bookingsByLocation) as any[];
   const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
-  const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
-    return sum + countConsecutivePlacements(loc.bookings, minDaysPerLocation);
-  }, 0);
 
-  // Calculate YTD revenue (for annual_revenue type)
+  // Discount placements: use week-start-based attribution
+  // Group all bookings by location_id for discount calculation
+  const allBookingsByLocForDiscount: Record<string, any[]> = {};
+  bookings?.forEach((b: any) => {
+    const lid = b.location_id;
+    if (!allBookingsByLocForDiscount[lid]) allBookingsByLocForDiscount[lid] = [];
+    allBookingsByLocForDiscount[lid].push(b);
+  });
+  const totalPlacements = countDiscountPlacementsWeekBased(
+    allBookingsByLocForDiscount,
+    minDaysPerLocation,
+    periodStart,
+    periodEnd
+  );
+
+  // Calculate YTD revenue (for annual_revenue type), clipped per booking to YTD period
   const ytdRevenue = ytdBookings?.reduce((sum, booking: any) => {
-    const { total } = calcBookingTotal(booking);
-    // Exclude excluded locations from YTD
+    const { total } = calcBookingTotal(booking, yearStart, periodEnd);
     const locName = booking.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
     if (exc?.exception_type === "excluded") return sum;
