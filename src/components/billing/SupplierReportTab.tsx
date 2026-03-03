@@ -496,6 +496,7 @@ export function SupplierReportTab() {
     mutationFn: async () => {
       const reportData = locationDiscounts.map((loc) => ({
         locationName: loc.location?.name,
+        externalId: loc.location?.external_id || "",
         city: loc.location?.address_city,
         client: loc.client?.name,
         days: loc.totalDays,
@@ -927,6 +928,7 @@ export function SupplierReportTab() {
               hasDiscountRules={!!(discountRules && discountRules.length > 0)}
               reportData={locationDiscounts.map((loc: any) => ({
                 locationName: loc.location?.name,
+                externalId: loc.location?.external_id || "",
                 city: loc.location?.address_city,
                 weekdays: [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
                   .map(([week, daysSet]) => ({ week, days: [...daysSet].sort((a: number, b: number) => a - b) })),
