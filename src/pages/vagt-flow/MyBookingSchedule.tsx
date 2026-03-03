@@ -149,47 +149,51 @@ export default function MyBookingSchedule() {
     enabled: !!employeeId && bookingIds.length > 0,
   });
 
-  // Fetch existing vehicle return confirmations
-  const bookingVehicleIds = useMemo(() => {
-    if (!vehicles) return [];
-    return vehicles.map((v: any) => v.id).filter(Boolean);
-  }, [vehicles]);
-
+  // Fetch existing vehicle return confirmations by booking_id + vehicle_id
   const { data: vehicleConfirmations } = useQuery({
-    queryKey: ["vehicle-return-confirmations", bookingVehicleIds],
+    queryKey: ["vehicle-return-confirmations", bookingIds],
     queryFn: async () => {
-      if (bookingVehicleIds.length === 0) return [];
+      if (bookingIds.length === 0) return [];
       const { data } = await (supabase as any)
         .from("vehicle_return_confirmation")
-        .select("id, booking_vehicle_id, confirmed_at")
-        .in("booking_vehicle_id", bookingVehicleIds);
+        .select("id, booking_id, vehicle_id, booking_date, confirmed_at")
+        .in("booking_id", bookingIds);
       return data ?? [];
     },
-    enabled: bookingVehicleIds.length > 0,
+    enabled: bookingIds.length > 0,
   });
 
   // Vehicle return confirmation mutation
   const confirmVehicleReturn = useMutation({
-    mutationFn: async ({ bookingVehicleId, vehicleName, bookingDate }: { bookingVehicleId: string; vehicleName: string; bookingDate: string }) => {
-      // Insert confirmation
-      const { error } = await (supabase as any)
+    mutationFn: async ({ bookingId, vehicleId, vehicleName, bookingDate }: { bookingId: string; vehicleId: string; vehicleName: string; bookingDate: string }) => {
+      // Upsert confirmation (unique on booking_id + vehicle_id + booking_date)
+      const { data, error } = await (supabase as any)
         .from("vehicle_return_confirmation")
-        .insert({
-          booking_vehicle_id: bookingVehicleId,
+        .upsert({
+          booking_id: bookingId,
+          vehicle_id: vehicleId,
           employee_id: employeeId,
           vehicle_name: vehicleName,
           booking_date: bookingDate,
-        });
+        }, { onConflict: "booking_id,vehicle_id,booking_date" })
+        .select("id, confirmed_at")
+        .single();
       if (error) throw error;
 
-      // Send notification
-      await supabase.functions.invoke("notify-vehicle-returned", {
-        body: {
-          employee_name: employeeName,
-          vehicle_name: vehicleName,
-          booking_date: bookingDate,
-        },
-      });
+      // Only send notification if this was just created (confirmed_at is very recent)
+      const confirmedAt = new Date(data.confirmed_at);
+      const now = new Date();
+      const justCreated = now.getTime() - confirmedAt.getTime() < 5000;
+
+      if (justCreated) {
+        await supabase.functions.invoke("notify-vehicle-returned", {
+          body: {
+            employee_name: employeeName,
+            vehicle_name: vehicleName,
+            booking_date: bookingDate,
+          },
+        });
+      }
     },
     onSuccess: () => {
       toast.success("Bil aflevering bekræftet!");
@@ -282,7 +286,7 @@ export default function MyBookingSchedule() {
 
         // Check if vehicle return already confirmed
         const vehicleReturnConfirmed = vehicleForDay && isLastVehicleDay
-          ? vehicleConfirmations?.find((c: any) => c.booking_vehicle_id === vehicleForDay.id)
+          ? vehicleConfirmations?.find((c: any) => c.booking_id === a.booking_id && c.vehicle_id === vehicleForDay.vehicle?.id && c.booking_date === a.date)
           : null;
 
         days[a.date].assignments.push({
@@ -498,7 +502,8 @@ export default function MyBookingSchedule() {
                                 isConfirming={confirmVehicleReturn.isPending}
                                 onConfirm={() =>
                                   confirmVehicleReturn.mutate({
-                                    bookingVehicleId: a.vehicleBookingId,
+                                    bookingId: a.booking_id,
+                                    vehicleId: (a.vehicle as any)?.id,
                                     vehicleName: (a.vehicle as any)?.name ?? "Bil",
                                     bookingDate: a.date,
                                   })
