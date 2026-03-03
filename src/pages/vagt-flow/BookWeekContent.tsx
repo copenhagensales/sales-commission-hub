@@ -69,6 +69,17 @@ export default function BookWeekContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [locationType, setLocationType] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<LocationTab>("mulige");
+  const [sortColumn, setSortColumn] = useState<string>("weeksSince");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === "weeksSince" ? "desc" : "asc");
+    }
+  };
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>("");
@@ -310,8 +321,40 @@ export default function BookWeekContent() {
       locs = locs.filter((loc: any) => loc.type === locationType);
     }
 
+    // Apply sorting
+    locs = [...locs].sort((a: any, b: any) => {
+      // Favorites always first
+      if (a.is_favorite && !b.is_favorite) return -1;
+      if (!a.is_favorite && b.is_favorite) return 1;
+
+      let cmp = 0;
+      switch (sortColumn) {
+        case "weeksSince":
+          cmp = (a.weeksSince ?? 999) - (b.weeksSince ?? 999);
+          break;
+        case "lastVisit": {
+          const aDate = a.lastBooking?.end_date ? new Date(a.lastBooking.end_date).getTime() : 0;
+          const bDate = b.lastBooking?.end_date ? new Date(b.lastBooking.end_date).getTime() : 0;
+          cmp = aDate - bDate;
+          break;
+        }
+        case "name":
+          cmp = (a.name || "").localeCompare(b.name || "");
+          break;
+        case "type":
+          cmp = (a.type || "").localeCompare(b.type || "");
+          break;
+        case "city":
+          cmp = (a.address_city || "").localeCompare(b.address_city || "");
+          break;
+        default:
+          cmp = (a.weeksSince ?? 999) - (b.weeksSince ?? 999);
+      }
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+
     return locs;
-  }, [processedLocations, activeTab, searchQuery, locationType]);
+  }, [processedLocations, activeTab, searchQuery, locationType, sortColumn, sortDirection]);
 
   const handlePrevWeek = () => {
     let newWeek = selectedWeek - 1;
@@ -466,11 +509,21 @@ export default function BookWeekContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Lokation ↕</TableHead>
-                  <TableHead>Type ↕</TableHead>
-                  <TableHead>By ↕</TableHead>
-                  <TableHead>Uger siden ↓</TableHead>
-                  <TableHead>Sidst besøgt</TableHead>
+                  <TableHead className="w-[250px] cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("name")}>
+                    Lokation {sortColumn === "name" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("type")}>
+                    Type {sortColumn === "type" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("city")}>
+                    By {sortColumn === "city" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("weeksSince")}>
+                    Uger siden {sortColumn === "weeksSince" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("lastVisit")}>
+                    Sidst besøgt {sortColumn === "lastVisit" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                  </TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Handlinger</TableHead>
                 </TableRow>
