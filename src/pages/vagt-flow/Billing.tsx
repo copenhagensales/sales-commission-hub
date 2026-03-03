@@ -495,9 +495,6 @@ function BillingOverviewTab() {
                               </div>
                             );
                           })}
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {format(new Date(loc.minDate), "dd/MM")} – {format(new Date(loc.maxDate), "dd/MM")}
-                        </p>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{loc.bookings.length}</TableCell>
