@@ -1,25 +1,19 @@
 
 
-## Plan: Ret ugedags-konvertering i countBookedDays
+## Analyse: Hvorfor steg oversigts-totalen til 280k?
 
-**Problem:** `booked_days` i databasen bruger ISO-konvention (0=mandag, 4=fredag, 6=søndag), men JavaScript's `getDay()` returnerer 0=søndag, 1=mandag, 5=fredag. Det giver off-by-one: fredag tælles aldrig, søndag tælles forkert.
+**Årsag:** Begge tabs bruger nu den korrekte ISO-konvertering, men effekten er modsat for de to beregningstyper:
 
-**Verifikation:** Med ISO-konvertering giver Herning 15 dage og Frederiksberg 19 dage — præcis som jeres manuelle optælling.
+### Oversigten (steg)
+For bookinger **uden** `total_price` (de fleste Coop-lokationer) beregnes beløbet som `dagspris × dage`. Før rettelsen blev fredage sprunget over, så der blev talt færre dage → lavere beløb. Nu tælles fredage korrekt med → flere dage → højere beløb. **Det nye tal (280k) er det korrekte.**
 
-**Ændring i 2 filer:**
+Eksempel fra skærmbilledet: Herning Centeret viser nu 15 dage × 1.200 kr = 18.000 kr. Før rettelsen var det måske 12-13 dage × 1.200 kr.
 
-1. `src/pages/vagt-flow/Billing.tsx` (linje 101-102)
-2. `src/components/billing/SupplierReportTab.tsx` (linje 207-208)
+### Leverandørrapporten (faldt)
+Leverandørrapporten har rabatlogik baseret på `min_days_per_location`. Når dagantallet stiger, kan flere lokationer nu opfylde minimumskravet → flere "placeringer" tælles → større rabat → lavere nettopris. Det er også korrekt.
 
-I begge filer ændres:
-```typescript
-// FRA:
-if (bookedDays.includes(d.getDay())) count++;
+### Konklusion
+Der er **ingen fejl** — begge tal er nu mere præcise end før. Oversigten viser brutto (dagspris × korrekte dage), og leverandørrapporten anvender rabatter korrekt baseret på de opdaterede dagantal.
 
-// TIL:
-const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
-if (bookedDays.includes(isoDay)) count++;
-```
-
-Dette konverterer JS-ugedag (0=søn) til ISO (0=man) inden sammenligning med `booked_days`-arrayet.
+Ingen kodeændringer nødvendige.
 
