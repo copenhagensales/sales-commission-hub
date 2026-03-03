@@ -1,30 +1,39 @@
 
-# Fix: Sæt `auth_user_id` ved oprettelse af brugerkonti
+# Påmindelser om stande/roll-ups på vagtplanen
 
-## Problem
-Når en medarbejder får oprettet en konto via "Opret bruger" eller "Sæt adgangskode", bliver `auth_user_id` ikke sat på medarbejderens record i databasen. Systemet bruger `auth_user_id` til at koble den loggede bruger til medarbejderdata -- uden det link kan medarbejderen logge ind, men systemet finder ikke deres profil, teams, vagter osv.
+## Hvad
+Vis en diskret, men tydelig påmindelse til medarbejdere om at medbringe stande og roll-ups den første dag de er booket på en lokation, og at tage dem med hjem på den sidste dag.
 
-Kun `complete-employee-registration` (invitation-flowet) og `batch-set-fieldmarketing-passwords` sætter `auth_user_id` korrekt. De to andre edge functions gør det ikke.
+## Hvor
+`src/pages/vagt-flow/MyBookingSchedule.tsx` — medarbejdernes vagtplan.
 
-## Berørte funktioner
+## Logik
+I `dayData`-opbygningen (useMemo) beregnes for hvert assignment om det er den **første** eller **sidste** dag for den pågældende booking (ikke kun for ugen, men baseret på alle assignments medarbejderen har for det booking_id):
 
-### 1. `create-employee-user` (bruges fra Medarbejdere-siden og Staff-fanen)
-- Opretter auth-bruger og employee_master_data, men sætter aldrig `auth_user_id` på employee-recorden.
-- **Fix:** Efter oprettelse af auth-brugeren, opdater `employee_master_data` med `auth_user_id` -- både for nye og eksisterende employee records.
+- **Første dag for bookingen:** Vis en grøn callout: "Husk stande og roll-ups"
+- **Sidste dag for bookingen:** Vis en orange callout: "Husk at tage stande og roll-ups med hjem"
 
-### 2. `set-user-password` (bruges fra Medarbejder-detaljesiden)
-- Opretter evt. en ny auth-bruger, men sætter heller aldrig `auth_user_id`.
-- **Fix:** Efter oprettelse/find af auth-brugeren, opdater `employee_master_data` med `auth_user_id` via `private_email` match.
+Da vi allerede fetcher assignments pr. uge, udviddes queryen til også at hente alle datoer for hvert booking_id (for at finde den absolutte første/sidste dag, også på tværs af uger). Alternativt kan vi bruge booking-objektets `start_date`/`end_date` — men da assignments allerede er fetched, bruges en ekstra query for alle datoer pr. booking.
+
+## UI-design
+Kompakt callout i samme stil som hotel- og note-callouts:
+- **Første dag:** Grøn baggrund, ikon (PackageOpen/ArrowUp), kort tekst
+- **Sidste dag:** Orange baggrund, ikon (PackageMinus/ArrowDown), kort tekst
+- Placeres lige under badges-rækken (bil/diæt/hotel), før hotel-detaljen
+- Tager minimal plads og skiller sig ud uden at forstyrre
 
 ## Tekniske ændringer
 
-### `supabase/functions/create-employee-user/index.ts`
-- Linje ~120-147: Når en eksisterende employee findes (via email), tilføj `.update({ auth_user_id: authData.user.id })`.
-- Når en ny employee oprettes, inkluder `auth_user_id` i insert-data.
-- Når en eksisterende bruger får opdateret password (linje 53-77), find og opdater employee med `auth_user_id`.
+### `src/pages/vagt-flow/MyBookingSchedule.tsx`
+1. **Ny query** — hent alle assignment-datoer for de aktuelle booking_ids (ikke begrænset til ugen) for at bestemme absolut første/sidste dag:
+   ```
+   SELECT booking_id, date FROM booking_assignment
+   WHERE employee_id = :employeeId AND booking_id IN (:bookingIds)
+   ORDER BY booking_id, date
+   ```
 
-### `supabase/functions/set-user-password/index.ts`
-- Linje 86-117 (ny bruger oprettet): Tilføj `auth_user_id` update på `employee_master_data` via `private_email`.
-- Linje 120-148 (eksisterende bruger): Tilføj `auth_user_id` update her også, da det kan mangle fra tidligere oprettelser.
+2. **I useMemo (dayData)** — tilføj `isFirstBookingDay` og `isLastBookingDay` pr. assignment ved at sammenligne med alle datoer for det booking.
 
-Begge ændringer er bagudkompatible -- de tilføjer blot det manglende link uden at ændre eksisterende adfærd.
+3. **I renderingen** — tilføj to kompakte callouts efter badges-rækken:
+   - Grøn callout for første dag med `Package`-ikon og teksten "Husk at medbringe stande og roll-ups"
+   - Orange callout for sidste dag med `Package`-ikon og teksten "Husk at tage stande og roll-ups med hjem"
