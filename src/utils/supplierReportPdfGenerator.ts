@@ -3,12 +3,17 @@
  * Uses browser's print-to-PDF functionality
  */
 
+interface WeekDays {
+  week: number;
+  days: number[];
+}
+
 interface LocationRow {
   locationName: string;
   externalId?: string;
   city: string;
   client: string;
-  period: string;
+  weekdays: WeekDays[];
   bookings: number;
   days: number;
   dailyRate: number | string;
@@ -25,6 +30,7 @@ interface SupplierReportPdfConfig {
   month: string;
   locations: LocationRow[];
   discountType: "placements" | "annual_revenue" | string;
+  minDaysPerLocation: number;
   totals: {
     subtotal: number;
     discountAmount: number;
@@ -42,6 +48,27 @@ interface SupplierReportPdfConfig {
 
 function fmtKr(n: number): string {
   return n.toLocaleString("da-DK") + " kr";
+}
+
+const WEEKDAY_LABELS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+function renderWeekdaysBadges(weekdays: WeekDays[]): string {
+  if (!weekdays || weekdays.length === 0) return "-";
+
+  return weekdays
+    .sort((a, b) => a.week - b.week)
+    .map((w) => {
+      const sorted = [...w.days].sort((a, b) => a - b);
+      const weekdayOnly = sorted.filter((d) => d <= 4);
+      const isFullWeek = [0, 1, 2, 3, 4].every((d) => weekdayOnly.includes(d)) && weekdayOnly.length === 5;
+
+      const badges = isFullWeek
+        ? '<span class="day-badge full">Man–Fre</span>'
+        : sorted.map((d) => `<span class="day-badge">${WEEKDAY_LABELS[d] || d}</span>`).join("");
+
+      return `<div class="week-row"><span class="week-label">Uge ${w.week}</span>${badges}</div>`;
+    })
+    .join("");
 }
 
 export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
@@ -65,7 +92,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
         <td>${loc.externalId || "-"}</td>
         <td>${loc.city || "-"}</td>
         <td>${loc.client || "-"}</td>
-        <td>${loc.period}</td>
+        <td class="cell-weekdays">${renderWeekdaysBadges(loc.weekdays)}</td>
         <td class="num">${loc.bookings}</td>
         <td class="num">${loc.days}</td>
         <td class="num">${typeof loc.dailyRate === "number" ? fmtKr(loc.dailyRate) : loc.dailyRate}</td>
@@ -112,6 +139,10 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       </div>`
       : "";
 
+  const placementNote = config.minDaysPerLocation > 1
+    ? `<p class="placement-note">1 placering = min. ${config.minDaysPerLocation} dage på samme lokation</p>`
+    : "";
+
   const discountSectionHtml = isAnnualRevenue
     ? `
       <div class="kpi-grid">
@@ -136,8 +167,9 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
     : `
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">Bookinger</span>
+          <span class="kpi-label">Placeringer</span>
           <span class="kpi-value">${config.discountInfo.uniquePlacements}</span>
+          ${placementNote}
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Rabattrin</span>
@@ -174,7 +206,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 
 /* Table */
 table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden;table-layout:fixed}
-col.col-loc{width:20%}col.col-id{width:8%}col.col-by{width:11%}col.col-kunde{width:10%}col.col-periode{width:11%}col.col-book{width:6%}col.col-dage{width:5%}col.col-dagspris{width:11%}col.col-belob{width:11%}col.col-rabat{width:7%}col.col-efter{width:11%}
+col.col-loc{width:17%}col.col-id{width:7%}col.col-by{width:9%}col.col-kunde{width:9%}col.col-uger{width:16%}col.col-book{width:5%}col.col-dage{width:5%}col.col-dagspris{width:9%}col.col-belob{width:9%}col.col-rabat{width:7%}col.col-efter{width:9%}
 th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}
 td{padding:7px 6px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
 tbody tr{background:#151d27}
@@ -183,6 +215,13 @@ tbody tr:hover{background:#1e2d3d}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cell-name{font-weight:500;color:#f1f5f9}
 tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid rgba(255,255,255,0.08);border-bottom:none}
+
+/* Weekdays badges */
+.cell-weekdays{vertical-align:top}
+.week-row{display:flex;align-items:center;gap:3px;margin-bottom:2px;flex-wrap:wrap}
+.week-label{font-size:9px;font-weight:600;color:#64748b;min-width:32px;flex-shrink:0}
+.day-badge{display:inline-block;padding:1px 4px;border-radius:3px;font-size:8px;font-weight:500;background:rgba(99,102,241,0.15);color:#818cf8;white-space:nowrap}
+.day-badge.full{background:rgba(52,211,153,0.15);color:#34d399}
 
 /* Excluded rows */
 .excluded td{opacity:.45}
@@ -203,6 +242,7 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
 .kpi-label{display:block;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi-value{display:block;font-size:15px;font-weight:700;color:#f1f5f9;white-space:nowrap}
 .kpi-value.accent{color:#34d399}
+.placement-note{font-size:9px;color:#64748b;margin-top:4px}
 
 /* Staircase */
 .staircase{margin-top:16px}
@@ -232,13 +272,13 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
     <h3>Bookinger</h3>
     <table>
       <colgroup>
-        <col class="col-loc"><col class="col-id"><col class="col-by"><col class="col-kunde"><col class="col-periode">
+        <col class="col-loc"><col class="col-id"><col class="col-by"><col class="col-kunde"><col class="col-uger">
         <col class="col-book"><col class="col-dage"><col class="col-dagspris"><col class="col-belob">
         ${isAnnualRevenue ? '<col class="col-rabat"><col class="col-efter">' : ""}
       </colgroup>
       <thead>
         <tr>
-          <th>Lokation</th><th>ID</th><th>By</th><th>Kunde</th><th>Periode</th>
+          <th>Lokation</th><th>ID</th><th>By</th><th>Kunde</th><th>Uger & Dage</th>
           <th class="num">Book.</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
           ${isAnnualRevenue ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
         </tr>

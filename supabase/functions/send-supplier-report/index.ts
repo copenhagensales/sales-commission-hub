@@ -5,6 +5,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const WEEKDAY_LABELS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+function renderWeekdaysForEmail(weekdays: Array<{ week: number; days: number[] }> | undefined): string {
+  if (!weekdays || weekdays.length === 0) return "-";
+
+  return weekdays
+    .sort((a, b) => a.week - b.week)
+    .map((w) => {
+      const sorted = [...w.days].sort((a, b) => a - b);
+      const weekdayOnly = sorted.filter((d) => d <= 4);
+      const isFullWeek = [0, 1, 2, 3, 4].every((d) => weekdayOnly.includes(d)) && weekdayOnly.length === 5;
+
+      const badges = isFullWeek
+        ? '<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;background:#d1fae5;color:#065f46;">Man–Fre</span>'
+        : sorted
+            .map(
+              (d) =>
+                `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;background:#e0e7ff;color:#3730a3;">${WEEKDAY_LABELS[d] || d}</span>`
+            )
+            .join(" ");
+
+      return `<div style="margin-bottom:2px;"><span style="font-size:10px;color:#6b7280;font-weight:600;">Uge ${w.week}</span> ${badges}</div>`;
+    })
+    .join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -63,6 +89,7 @@ Deno.serve(async (req) => {
       <tr>
         <td style="padding:8px;border:1px solid #ddd;">${loc.locationName || ''}</td>
         <td style="padding:8px;border:1px solid #ddd;">${loc.city || ''}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${renderWeekdaysForEmail(loc.weekdays)}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.days || 0}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${(loc.amount || 0).toLocaleString('da-DK')} kr</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
@@ -84,6 +111,7 @@ Deno.serve(async (req) => {
               <tr style="background:#f5f5f5;">
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">Lokation</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">By</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:left;">Uger & Dage</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Dage</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Beløb</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Rabat</th>
