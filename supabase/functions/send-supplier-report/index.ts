@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { locationType, month, recipients, subject, message, reportId, reportData } = await req.json();
+    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules } = await req.json();
 
     if (!recipients?.length || !subject) {
       return new Response(
@@ -83,6 +83,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const showDiscount = hasDiscountRules !== false; // default true for backwards compat
+
     // Build HTML report table
     const locations = reportData || [];
     const tableRows = locations.map((loc: any) => `
@@ -92,8 +94,10 @@ Deno.serve(async (req) => {
         <td style="padding:8px;border:1px solid #ddd;">${renderWeekdaysForEmail(loc.weekdays)}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.days || 0}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${(loc.amount || 0).toLocaleString('da-DK')} kr</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${(loc.finalAmount || loc.amount || 0).toLocaleString('da-DK')} kr</td>
+        ${showDiscount ? `
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${(loc.finalAmount || loc.amount || 0).toLocaleString('da-DK')} kr</td>
+        ` : ''}
       </tr>
     `).join('');
 
@@ -114,8 +118,10 @@ Deno.serve(async (req) => {
                 <th style="padding:8px;border:1px solid #ddd;text-align:left;">Uger & Dage</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Dage</th>
                 <th style="padding:8px;border:1px solid #ddd;text-align:right;">Beløb</th>
-                <th style="padding:8px;border:1px solid #ddd;text-align:right;">Rabat</th>
-                <th style="padding:8px;border:1px solid #ddd;text-align:right;">Efter rabat</th>
+                ${showDiscount ? `
+                  <th style="padding:8px;border:1px solid #ddd;text-align:right;">Rabat</th>
+                  <th style="padding:8px;border:1px solid #ddd;text-align:right;">Efter rabat</th>
+                ` : ''}
               </tr>
             </thead>
             <tbody>${tableRows}</tbody>
