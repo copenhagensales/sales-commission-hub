@@ -222,6 +222,26 @@ export default function MyBookingSchedule() {
     },
   });
 
+  // Undo vehicle return confirmation
+  const undoVehicleReturn = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, bookingDate }: { bookingId: string; vehicleId: string; bookingDate: string }) => {
+      const { error } = await (supabase as any)
+        .from("vehicle_return_confirmation")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("vehicle_id", vehicleId)
+        .eq("booking_date", bookingDate);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Aflevering fortrudt");
+      queryClient.invalidateQueries({ queryKey: ["vehicle-return-confirmations"] });
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke fortryde: " + err.message);
+    },
+  });
+
   // Group data by date
   const dayData = useMemo(() => {
     const days: Record<string, any> = {};
@@ -518,6 +538,7 @@ export default function MyBookingSchedule() {
                                 vehicleName={(a.vehicle as any)?.name ?? "Bil"}
                                 confirmed={a.vehicleReturnConfirmed}
                                 isConfirming={confirmVehicleReturn.isPending}
+                                isUndoing={undoVehicleReturn.isPending}
                                 onConfirm={(photo?: File) =>
                                   confirmVehicleReturn.mutate({
                                     bookingId: a.booking_id,
@@ -525,6 +546,13 @@ export default function MyBookingSchedule() {
                                     vehicleName: (a.vehicle as any)?.name ?? "Bil",
                                     bookingDate: a.date,
                                     photo,
+                                  })
+                                }
+                                onUndo={() =>
+                                  undoVehicleReturn.mutate({
+                                    bookingId: a.booking_id,
+                                    vehicleId: (a.vehicle as any)?.id,
+                                    bookingDate: a.date,
                                   })
                                 }
                               />

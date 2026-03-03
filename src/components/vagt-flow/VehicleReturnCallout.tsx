@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Car, CheckCircle2, AlertTriangle, Camera, ImagePlus, X } from "lucide-react";
+import { Car, CheckCircle2, AlertTriangle, Camera, ImagePlus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
 
@@ -7,10 +7,12 @@ interface VehicleReturnCalloutProps {
   vehicleName: string;
   confirmed: { confirmed_at: string } | null;
   isConfirming: boolean;
+  isUndoing?: boolean;
   onConfirm: (photo?: File) => void;
+  onUndo?: () => void;
 }
 
-export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, onConfirm }: VehicleReturnCalloutProps) {
+export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isUndoing, onConfirm, onUndo }: VehicleReturnCalloutProps) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -32,11 +34,25 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, onC
   if (confirmed) {
     return (
       <div className="mt-1 px-2.5 py-2 rounded-md bg-green-600/10 border border-green-500/20 dark:bg-green-500/10 dark:border-green-400/20">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
-          <span className="text-[11px] font-semibold text-green-700 dark:text-green-300">
-            Nøgle afleveret kl. {format(parseISO(confirmed.confirmed_at), "HH:mm")}
-          </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
+            <span className="text-[11px] font-semibold text-green-700 dark:text-green-300">
+              Nøgle afleveret kl. {format(parseISO(confirmed.confirmed_at), "HH:mm")}
+            </span>
+          </div>
+          {onUndo && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+              disabled={isUndoing}
+              onClick={onUndo}
+            >
+              <Undo2 className="w-3 h-3 mr-1" />
+              {isUndoing ? "Fortryder..." : "Fortryd"}
+            </Button>
+          )}
         </div>
       </div>
     );
