@@ -6,7 +6,7 @@ import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, Package } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -87,6 +87,22 @@ export default function MyBookingSchedule() {
     enabled: bookingIds.length > 0,
   });
 
+  // Fetch ALL assignment dates for these bookings (across all weeks) to find absolute first/last day
+  const { data: allBookingDates } = useQuery({
+    queryKey: ["my-booking-all-dates", employeeId, bookingIds],
+    queryFn: async () => {
+      if (!employeeId || bookingIds.length === 0) return [];
+      const { data } = await supabase
+        .from("booking_assignment")
+        .select("booking_id, date")
+        .eq("employee_id", employeeId)
+        .in("booking_id", bookingIds)
+        .order("date");
+      return data ?? [];
+    },
+    enabled: !!employeeId && bookingIds.length > 0,
+  });
+
   // Fetch hotel bookings for my bookings this week
   const { data: bookingHotels } = useQuery({
     queryKey: ["my-booking-hotels", bookingIds],
@@ -145,6 +161,17 @@ export default function MyBookingSchedule() {
       };
     }
 
+    // Pre-compute first/last dates per booking from allBookingDates
+    const bookingDateRanges: Record<string, { first: string; last: string }> = {};
+    allBookingDates?.forEach((d: any) => {
+      if (!bookingDateRanges[d.booking_id]) {
+        bookingDateRanges[d.booking_id] = { first: d.date, last: d.date };
+      } else {
+        if (d.date < bookingDateRanges[d.booking_id].first) bookingDateRanges[d.booking_id].first = d.date;
+        if (d.date > bookingDateRanges[d.booking_id].last) bookingDateRanges[d.booking_id].last = d.date;
+      }
+    });
+
     assignments?.forEach((a: any) => {
       if (days[a.date]) {
         const vehicleForDay = vehicles?.find(
@@ -158,7 +185,6 @@ export default function MyBookingSchedule() {
         ) ?? [];
 
         // Match hotel: find any hotel for this booking where date falls within check_in/check_out
-        // Also check across all bookings in case check-in day is on a different booking
         const hotelForBooking = bookingHotels?.find((bh: any) => {
           if (bh.booking_id !== a.booking_id) return false;
           if (bh.check_in && bh.check_out) {
@@ -166,7 +192,6 @@ export default function MyBookingSchedule() {
           }
           return true;
         }) ?? bookingHotels?.find((bh: any) => {
-          // Fallback: match any hotel whose date range covers this day
           if (bh.check_in && bh.check_out) {
             return a.date >= bh.check_in && a.date <= bh.check_out;
           }
@@ -196,11 +221,18 @@ export default function MyBookingSchedule() {
           return allDatesWithHotel[allDatesWithHotel.length - 1] === a.date;
         })() : false;
 
+        // Stands/roll-ups: absolute first/last day for this booking
+        const range = bookingDateRanges[a.booking_id];
+        const isFirstBookingDay = range ? a.date === range.first : false;
+        const isLastBookingDay = range ? a.date === range.last : false;
+
         days[a.date].assignments.push({
           ...a,
           vehicle: vehicleForDay?.vehicle,
           diet: dietForDay,
           partners: partnersForDay.map((p: any) => p.employee?.first_name).filter(Boolean),
+          isFirstBookingDay,
+          isLastBookingDay,
           hotel: hotelForBooking ? {
             name: hotelForBooking.hotel?.name,
             address: hotelForBooking.hotel?.address,
@@ -219,7 +251,7 @@ export default function MyBookingSchedule() {
     });
 
     return Object.values(days);
-  }, [assignments, vehicles, diets, partners, bookingHotels, weekStart]);
+  }, [assignments, vehicles, diets, partners, bookingHotels, allBookingDates, weekStart]);
 
   // Find next upcoming shift
   const nextShift = useMemo(() => {
@@ -390,6 +422,20 @@ export default function MyBookingSchedule() {
                                 </Badge>
                               )}
                             </div>
+
+                            {/* Stands/roll-ups reminders */}
+                            {a.isFirstBookingDay && (
+                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-600/10 border border-green-500/20 dark:bg-green-500/10 dark:border-green-400/20">
+                                <Package className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
+                                <span className="text-[11px] font-medium text-green-700 dark:text-green-300">Husk at medbringe stande og roll-ups</span>
+                              </div>
+                            )}
+                            {a.isLastBookingDay && !a.isFirstBookingDay && (
+                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/10 border border-orange-500/20 dark:bg-orange-500/10 dark:border-orange-400/20">
+                                <Package className="w-3.5 h-3.5 text-orange-700 dark:text-orange-300 shrink-0" />
+                                <span className="text-[11px] font-medium text-orange-700 dark:text-orange-300">Husk at tage stande og roll-ups med hjem</span>
+                              </div>
+                            )}
 
                             {/* Hotel detail callout – compact */}
                             {a.hotel && (
