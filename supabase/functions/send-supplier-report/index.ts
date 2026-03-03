@@ -48,11 +48,11 @@ function buildReportHtml(locationType: string, month: string, locations: any[], 
       <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:11px;font-family:monospace;">${loc.externalId || ''}</td>
       <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#475569;">${loc.city || ''}</td>
       <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;">${renderWeekdayBadges(loc.weekdays)}</td>
-      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#334155;font-weight:600;">${loc.days || 0}</td>
-      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.amount || 0)}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap;color:#334155;font-weight:600;">${loc.days || 0}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.amount || 0)}</td>
       ${showDiscount ? `
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:${loc.isExcluded ? '#b45309' : '#059669'};font-weight:600;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.finalAmount || loc.amount || 0)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap;color:${loc.isExcluded ? '#b45309' : '#059669'};font-weight:600;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.finalAmount || loc.amount || 0)}</td>
       ` : ''}
     </tr>`;
   }).join('');
@@ -67,11 +67,11 @@ function buildReportHtml(locationType: string, month: string, locations: any[], 
   const subtotalRow = `
     <tr style="background:#0f172a;">
       <td colspan="${colSpan}" style="padding:18px 16px;font-weight:700;color:#ffffff;font-size:14px;">Total</td>
-      <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:15px;">${totalDays}</td>
-      <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalAmount)}</td>
+      <td style="padding:18px 16px;text-align:right;white-space:nowrap;font-weight:800;color:#ffffff;font-size:15px;">${totalDays}</td>
+      <td style="padding:18px 16px;text-align:right;white-space:nowrap;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalAmount)}</td>
       ${showDiscount ? `
         <td style="padding:18px 16px;"></td>
-        <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalFinal)}</td>
+        <td style="padding:18px 16px;text-align:right;white-space:nowrap;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalFinal)}</td>
       ` : ''}
     </tr>`;
 
