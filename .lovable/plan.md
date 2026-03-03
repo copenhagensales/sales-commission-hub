@@ -1,48 +1,24 @@
 
 
-## Plan: Fix manglende ID i email + vedhæft PDF
+## Plan: Redesign email-rapport — inline med subtotal og premium design
 
-### Problem 1: ID er tomt i email
-`reportData` der sendes til `SendToSupplierDialog` mangler `externalId`. Feltet inkluderes i email-templaten, men værdien sendes aldrig med fra frontend.
+### Ændringer i `supabase/functions/send-supplier-report/index.ts`
 
-**Fix i `src/components/billing/SupplierReportTab.tsx`:**
-- Linje ~928-939: Tilføj `externalId: loc.location?.external_id || ""` til reportData-mappingen i SendToSupplierDialog
-- Linje ~497-510: Tilføj samme felt i approveMutation's reportData
+**Fjern vedhæftningslogik** — rapporten bygges direkte i email-body'en igen (ingen attachment).
 
-### Problem 2: Vedhæft rapport som PDF
-I stedet for at bygge HTML-tabellen inline i emailen, genererer vi PDF'en server-side og vedhæfter den.
+**Redesign `buildReportHtml()`** med premium email-design:
+- Professionelt header-banner med gradient baggrund, firmanavn og periode
+- Brugerens besked i et tydeligt afsnit over tabellen
+- Tabel med alternerende rækkefarver, afrundede hjørner-effekt, og pæne badges for ugedage
+- **Subtotal-footer** i bunden af tabellen med summeret beløb (og finalAmount hvis rabat)
+- Total-dage summeret
+- Footer med firmanavn og genereringsdato
+- Farvepalette: Mørkeblå header (#1e293b), hvid baggrund, blød grå på ulige rækker (#f8fafc), accent-farve til totaler
 
-**Tilgang:** Generer HTML-rapporten (samme layout som PDF-generatoren) i Edge Function'en og konverter til PDF via en headless browser-service. Da vi ikke har adgang til en headless browser i Edge Functions, bruger vi en alternativ tilgang:
+**Fjern attachment-kode** — ingen `attachments` array i Graph API-kaldet, ingen base64-encoding.
 
-**Realistisk tilgang:** Vedhæft rapporten som en velformateret HTML-fil (.html) — eller brug Microsoft Graph API's file attachment med base64-encoded HTML. Email-body'en forbliver en kort besked, og den detaljerede rapport vedhæftes.
-
-**Ændringer:**
-
-1. **`src/components/billing/SupplierReportTab.tsx`** — Tilføj `externalId` til begge reportData-mappings
-
-2. **`supabase/functions/send-supplier-report/index.ts`** — Restructurer til:
-   - Email body: Kort besked (den brugerindtastede message)
-   - Attachment: Den fulde HTML-rapport som `.html` vedhæftning via Microsoft Graph API's attachment-funktionalitet (base64-encoded)
-   - Graph API understøtter `attachments` array i message-objektet med `contentBytes` (base64)
-
-### Teknisk detalje: Graph API attachment
-```json
-{
-  "message": {
-    "subject": "...",
-    "body": { "contentType": "HTML", "content": "<kort besked>" },
-    "toRecipients": [...],
-    "attachments": [{
-      "@odata.type": "#microsoft.graph.fileAttachment",
-      "name": "Rapport-Coop-februar-2026.html",
-      "contentType": "text/html",
-      "contentBytes": "<base64-encoded HTML>"
-    }]
-  }
-}
-```
+**Email body** bliver hele rapporten inklusive brugerens besked øverst.
 
 ### Filer der ændres
-- `src/components/billing/SupplierReportTab.tsx` — tilføj externalId til reportData
-- `supabase/functions/send-supplier-report/index.ts` — tilføj externalId fix + vedhæft rapport som HTML-fil
+- `supabase/functions/send-supplier-report/index.ts`
 
