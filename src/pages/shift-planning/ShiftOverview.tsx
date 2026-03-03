@@ -1432,10 +1432,10 @@ export default function ShiftOverview() {
                               })}
 
                               {/* Status Tags */}
-                              {!hasShift && isLate && (
+                              {isLate && (
                                 <div className="flex flex-col items-center gap-1">
-                                  {/* Show the NEW meeting time instead of planned time */}
-                                  {(lateness.new_start_time || workTimes) && (
+                                  {/* Show the NEW meeting time instead of planned time (only when no shift card) */}
+                                  {!hasShift && (lateness.new_start_time || workTimes) && (
                                     <span className="text-[10px] font-medium text-muted-foreground">
                                       {lateness.new_start_time 
                                         ? `${lateness.new_start_time.slice(0, 5)}-${workTimes?.split('-')[1] || ''}`
