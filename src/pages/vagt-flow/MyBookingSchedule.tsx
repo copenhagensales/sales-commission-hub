@@ -50,7 +50,7 @@ export default function MyBookingSchedule() {
         .select(`
           id, date, start_time, end_time, booking_id,
           booking:booking_id (
-            id, week_number, year,
+            id, week_number, year, start_date, end_date,
             location:location_id ( id, name, address_city, address_street ),
             client:client_id ( name ),
             campaign:campaign_id ( name ),
@@ -87,20 +87,7 @@ export default function MyBookingSchedule() {
     enabled: bookingIds.length > 0,
   });
 
-  // Fetch ALL assignment dates for these bookings (across all weeks) to find absolute first/last day
-  const { data: allBookingDates } = useQuery({
-    queryKey: ["all-booking-dates", bookingIds],
-    queryFn: async () => {
-      if (bookingIds.length === 0) return [];
-      const { data } = await supabase
-        .from("booking_assignment")
-        .select("booking_id, date")
-        .in("booking_id", bookingIds)
-        .order("date");
-      return data ?? [];
-    },
-    enabled: bookingIds.length > 0,
-  });
+  // No separate allBookingDates query needed — we use booking.start_date/end_date directly
 
   // Fetch hotel bookings for my bookings this week
   const { data: bookingHotels } = useQuery({
@@ -160,16 +147,7 @@ export default function MyBookingSchedule() {
       };
     }
 
-    // Pre-compute first/last dates per booking from allBookingDates
-    const bookingDateRanges: Record<string, { first: string; last: string }> = {};
-    allBookingDates?.forEach((d: any) => {
-      if (!bookingDateRanges[d.booking_id]) {
-        bookingDateRanges[d.booking_id] = { first: d.date, last: d.date };
-      } else {
-        if (d.date < bookingDateRanges[d.booking_id].first) bookingDateRanges[d.booking_id].first = d.date;
-        if (d.date > bookingDateRanges[d.booking_id].last) bookingDateRanges[d.booking_id].last = d.date;
-      }
-    });
+    // No need to pre-compute ranges — we use booking.start_date/end_date directly
 
     assignments?.forEach((a: any) => {
       if (days[a.date]) {
@@ -220,10 +198,10 @@ export default function MyBookingSchedule() {
           return allDatesWithHotel[allDatesWithHotel.length - 1] === a.date;
         })() : false;
 
-        // Stands/roll-ups: absolute first/last day for this booking
-        const range = bookingDateRanges[a.booking_id];
-        const isFirstBookingDay = range ? a.date === range.first : false;
-        const isLastBookingDay = range ? a.date === range.last : false;
+        // Stands/roll-ups: use booking's start_date/end_date
+        const booking = a.booking;
+        const isFirstBookingDay = booking?.start_date ? a.date === booking.start_date : false;
+        const isLastBookingDay = booking?.end_date ? a.date === booking.end_date : false;
 
         days[a.date].assignments.push({
           ...a,
@@ -250,7 +228,7 @@ export default function MyBookingSchedule() {
     });
 
     return Object.values(days);
-  }, [assignments, vehicles, diets, partners, bookingHotels, allBookingDates, weekStart]);
+  }, [assignments, vehicles, diets, partners, bookingHotels, weekStart]);
 
   // Find next upcoming shift
   const nextShift = useMemo(() => {
@@ -423,13 +401,13 @@ export default function MyBookingSchedule() {
                             </div>
 
                             {/* Stands/roll-ups reminders */}
-                            {a.isFirstBookingDay && allBookingDates && (
+                            {a.isFirstBookingDay && (
                               <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-600/10 border border-green-500/20 dark:bg-green-500/10 dark:border-green-400/20">
                                 <Package className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
                                 <span className="text-[11px] font-medium text-green-700 dark:text-green-300">Husk at medbringe stande og roll-ups</span>
                               </div>
                             )}
-                            {a.isLastBookingDay && !a.isFirstBookingDay && allBookingDates && (
+                            {a.isLastBookingDay && !a.isFirstBookingDay && (
                               <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/10 border border-orange-500/20 dark:bg-orange-500/10 dark:border-orange-400/20">
                                 <Package className="w-3.5 h-3.5 text-orange-700 dark:text-orange-300 shrink-0" />
                                 <span className="text-[11px] font-medium text-orange-700 dark:text-orange-300">Husk at tage stande og roll-ups med hjem</span>
