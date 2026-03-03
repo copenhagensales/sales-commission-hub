@@ -195,14 +195,28 @@ export function SupplierReportTab() {
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
+  // Count actual booked days using booked_days array (weekday indices)
+  const countBookedDays = (booking: any): number => {
+    const bookedDays = booking.booked_days as number[] | null;
+    if (!bookedDays || bookedDays.length === 0) {
+      return differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+    }
+    let count = 0;
+    const start = new Date(booking.start_date);
+    const end = new Date(booking.end_date);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (bookedDays.includes(d.getDay())) count++;
+    }
+    return count || 1;
+  };
+
   // Helper to calculate booking total
   const calcBookingTotal = (booking: any) => {
+    const days = countBookedDays(booking);
     if (booking.total_price != null) {
-      const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
       return { total: booking.total_price, days, dailyRate: days > 0 ? booking.total_price / days : booking.total_price, usesTotalPrice: true };
     }
     const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-    const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
     return { total: dailyRate * days, days, dailyRate, usesTotalPrice: false };
   };
 
