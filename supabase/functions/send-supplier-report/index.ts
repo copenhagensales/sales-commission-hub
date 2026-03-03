@@ -18,15 +18,15 @@ function renderWeekdayBadges(weekdays: Array<{ week: number; days: number[] }> |
       const isFullWeek = [0, 1, 2, 3, 4].every((d) => weekdayOnly.includes(d)) && weekdayOnly.length === 5;
 
       const badges = isFullWeek
-        ? '<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;letter-spacing:0.3px;">Man–Fre</span>'
+        ? '<span style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;background:#dcfce7;color:#166534;">Man–Fre</span>'
         : sorted
             .map(
               (d) =>
-                `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:500;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);color:#3730a3;">${WEEKDAY_LABELS[d] || d}</span>`
+                `<span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;background:#f1f5f9;color:#475569;">${WEEKDAY_LABELS[d] || d}</span>`
             )
             .join(" ");
 
-      return `<div style="margin-bottom:3px;"><span style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Uge ${w.week}</span> ${badges}</div>`;
+      return `<div style="margin-bottom:4px;"><span style="font-size:11px;color:#475569;font-weight:700;">Uge ${w.week}</span>&nbsp; ${badges}</div>`;
     })
     .join("");
 }
@@ -35,100 +35,98 @@ function fmtDKK(value: number): string {
   return new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value) + " kr";
 }
 
-function buildReportHtml(locationType: string, month: string, locations: any[], showDiscount: boolean, userMessage: string): string {
+function buildReportHtml(locationType: string, month: string, locations: any[], showDiscount: boolean, userMessage: string, supplierName?: string): string {
   const totalDays = locations.reduce((sum: number, loc: any) => sum + (Number(loc.days) || 0), 0);
   const totalAmount = locations.reduce((sum: number, loc: any) => sum + (Number(loc.amount) || 0), 0);
   const totalFinal = locations.reduce((sum: number, loc: any) => sum + (Number(loc.finalAmount) || Number(loc.amount) || 0), 0);
 
   const tableRows = locations.map((loc: any, i: number) => {
-    const bgColor = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+    const bgColor = i % 2 === 0 ? '#ffffff' : '#f1f5f9';
     return `
     <tr style="background:${bgColor};">
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#1e293b;">${loc.locationName || ''}</td>
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;color:#475569;font-family:'Courier New',monospace;font-size:12px;">${loc.externalId || ''}</td>
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;color:#475569;">${loc.city || ''}</td>
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;">${renderWeekdayBadges(loc.weekdays)}</td>
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;text-align:right;color:#334155;font-weight:600;">${loc.days || 0}</td>
-      <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;text-align:right;color:#334155;font-weight:500;">${fmtDKK(loc.amount || 0)}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f172a;">${loc.locationName || ''}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:11px;font-family:monospace;">${loc.externalId || ''}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#475569;">${loc.city || ''}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;">${renderWeekdayBadges(loc.weekdays)}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#334155;font-weight:600;">${loc.days || 0}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.amount || 0)}</td>
       ${showDiscount ? `
-        <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;text-align:right;color:${loc.isExcluded ? '#b45309' : '#059669'};font-weight:600;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
-        <td style="padding:12px 14px;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;">${fmtDKK(loc.finalAmount || loc.amount || 0)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:${loc.isExcluded ? '#b45309' : '#059669'};font-weight:600;">${loc.isExcluded ? 'Separat' : `-${loc.discount || 0}%`}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;font-size:14px;">${fmtDKK(loc.finalAmount || loc.amount || 0)}</td>
       ` : ''}
     </tr>`;
   }).join('');
 
   const discountHeaders = showDiscount ? `
-    <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Rabat</th>
-    <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Netto</th>
+    <th style="padding:12px 16px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Rabat</th>
+    <th style="padding:12px 16px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Netto</th>
   ` : '';
 
   const colSpan = showDiscount ? 5 : 4;
+
   const subtotalRow = `
-    <tr style="background:linear-gradient(135deg,#f1f5f9,#e2e8f0);">
-      <td colspan="${colSpan}" style="padding:14px;font-weight:700;color:#1e293b;font-size:14px;border-top:2px solid #cbd5e1;">Subtotal</td>
-      <td style="padding:14px;text-align:right;font-weight:700;color:#1e293b;font-size:14px;border-top:2px solid #cbd5e1;">${totalDays}</td>
-      <td style="padding:14px;text-align:right;font-weight:700;color:#1e293b;font-size:14px;border-top:2px solid #cbd5e1;">${fmtDKK(totalAmount)}</td>
+    <tr style="background:#0f172a;">
+      <td colspan="${colSpan}" style="padding:18px 16px;font-weight:700;color:#ffffff;font-size:14px;">Total</td>
+      <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:15px;">${totalDays}</td>
+      <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalAmount)}</td>
       ${showDiscount ? `
-        <td style="padding:14px;border-top:2px solid #cbd5e1;"></td>
-        <td style="padding:14px;text-align:right;font-weight:800;color:#0f172a;font-size:15px;border-top:2px solid #cbd5e1;">${fmtDKK(totalFinal)}</td>
+        <td style="padding:18px 16px;"></td>
+        <td style="padding:18px 16px;text-align:right;font-weight:800;color:#ffffff;font-size:16px;">${fmtDKK(totalFinal)}</td>
       ` : ''}
     </tr>`;
 
   const escapedMessage = userMessage ? userMessage.replace(/\n/g, '<br/>') : '';
+  const displaySupplier = supplierName || locationType;
 
   return `
 <!DOCTYPE html>
 <html lang="da">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Leverandørrapport – ${locationType} – ${month}</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport – ${displaySupplier} – ${month}</title></head>
+<body style="margin:0;padding:0;background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;padding:40px 16px;">
     <tr><td align="center">
-      <table width="700" cellpadding="0" cellspacing="0" style="max-width:700px;width:100%;">
+      <table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;">
 
         <!-- HEADER -->
-        <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#334155 100%);padding:40px 36px;border-radius:16px 16px 0 0;">
+        <tr><td style="background:#0f172a;padding:36px 40px 32px;border-radius:12px 12px 0 0;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td>
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:#94a3b8;margin-bottom:8px;">Leverandørrapport</div>
-                <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">COPENHAGEN SALES</div>
+                <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:#64748b;margin-bottom:16px;">Leverandørrapport</div>
+                <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;margin-bottom:6px;">${displaySupplier}</div>
+                <div style="font-size:13px;color:#94a3b8;">Copenhagen Sales · ${locationType}</div>
               </td>
               <td align="right" valign="top">
-                <div style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 18px;display:inline-block;">
-                  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:2px;">Periode</div>
-                  <div style="font-size:16px;font-weight:700;color:#ffffff;">${month}</div>
+                <div style="background:#1e293b;border-radius:8px;padding:14px 20px;display:inline-block;">
+                  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px;">Periode</div>
+                  <div style="font-size:20px;font-weight:800;color:#ffffff;">${month}</div>
                 </div>
               </td>
             </tr>
           </table>
         </td></tr>
 
-        <!-- TYPE BANNER -->
-        <tr><td style="background:linear-gradient(135deg,#3b82f6,#2563eb);padding:14px 36px;">
-          <div style="font-size:13px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:1.5px;">📍 ${locationType}</div>
-        </td></tr>
-
         <!-- BODY -->
-        <tr><td style="background:#ffffff;padding:36px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+        <tr><td style="background:#ffffff;padding:32px 40px 40px;border-radius:0 0 12px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
 
           ${escapedMessage ? `
           <!-- USER MESSAGE -->
-          <div style="background:#fefce8;border-left:4px solid #eab308;border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:28px;">
-            <p style="margin:0;color:#713f12;font-size:14px;line-height:1.6;">${escapedMessage}</p>
+          <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;margin-bottom:28px;border:1px solid #e2e8f0;">
+            <p style="margin:0;color:#334155;font-size:14px;line-height:1.7;">${escapedMessage}</p>
           </div>
           ` : ''}
 
           <!-- TABLE -->
-          <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
               <thead>
                 <tr style="background:#f8fafc;">
-                  <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Lokation</th>
-                  <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">ID</th>
-                  <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">By</th>
-                  <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Uger & Dage</th>
-                  <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Dage</th>
-                  <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;border-bottom:2px solid #e2e8f0;">Beløb</th>
+                  <th style="padding:12px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Lokation</th>
+                  <th style="padding:12px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Ref</th>
+                  <th style="padding:12px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">By</th>
+                  <th style="padding:12px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Uger & Dage</th>
+                  <th style="padding:12px 16px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Dage</th>
+                  <th style="padding:12px 16px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;border-bottom:2px solid #cbd5e1;">Beløb</th>
                   ${discountHeaders}
                 </tr>
               </thead>
@@ -137,37 +135,14 @@ function buildReportHtml(locationType: string, month: string, locations: any[], 
             </table>
           </div>
 
-          <!-- SUMMARY CARDS -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-            <tr>
-              <td width="33%" style="padding:0 6px 0 0;">
-                <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:10px;padding:16px;text-align:center;">
-                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0284c7;margin-bottom:4px;">Lokationer</div>
-                  <div style="font-size:22px;font-weight:800;color:#0c4a6e;">${locations.length}</div>
-                </div>
-              </td>
-              <td width="33%" style="padding:0 3px;">
-                <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:10px;padding:16px;text-align:center;">
-                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin-bottom:4px;">Dage i alt</div>
-                  <div style="font-size:22px;font-weight:800;color:#14532d;">${totalDays}</div>
-                </div>
-              </td>
-              <td width="33%" style="padding:0 0 0 6px;">
-                <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border-radius:10px;padding:16px;text-align:center;">
-                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#ca8a04;margin-bottom:4px;">${showDiscount ? 'Netto total' : 'Total'}</div>
-                  <div style="font-size:22px;font-weight:800;color:#713f12;">${fmtDKK(showDiscount ? totalFinal : totalAmount)}</div>
-                </div>
-              </td>
-            </tr>
-          </table>
-
         </td></tr>
 
         <!-- FOOTER -->
-        <tr><td style="padding:28px 36px;text-align:center;">
-          <div style="font-size:12px;color:#94a3b8;line-height:1.6;">
+        <tr><td style="padding:28px 40px;text-align:center;">
+          <div style="font-size:12px;color:#94a3b8;line-height:1.8;">
             <strong style="color:#64748b;">Copenhagen Sales ApS</strong><br/>
-            Rapport genereret ${new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' })}
+            Genereret ${new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' })}<br/>
+            <span style="font-size:11px;">Ved spørgsmål kontakt venligst jeres kontaktperson hos Copenhagen Sales</span>
           </div>
         </td></tr>
 
@@ -184,7 +159,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules } = await req.json();
+    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules, supplierName } = await req.json();
 
     if (!recipients?.length || !subject) {
       return new Response(
@@ -233,10 +208,8 @@ Deno.serve(async (req) => {
     const showDiscount = hasDiscountRules !== false;
     const locations = reportData || [];
 
-    // Build the full inline report HTML
-    const emailBodyHtml = buildReportHtml(locationType, month, locations, showDiscount, message || '');
+    const emailBodyHtml = buildReportHtml(locationType, month, locations, showDiscount, message || '', supplierName);
 
-    // Send email — inline body, no attachments
     const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
     const toRecipients = recipients.map((email: string) => ({
       emailAddress: { address: email },
