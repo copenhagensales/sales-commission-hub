@@ -1,39 +1,23 @@
 
-# Påmindelser om stande/roll-ups på vagtplanen
 
-## Hvad
-Vis en diskret, men tydelig påmindelse til medarbejdere om at medbringe stande og roll-ups den første dag de er booket på en lokation, og at tage dem med hjem på den sidste dag.
+# Fix: Stande/roll-ups påmindelser kun på første og sidste dag
 
-## Hvor
-`src/pages/vagt-flow/MyBookingSchedule.tsx` — medarbejdernes vagtplan.
+## Problem
+Påmindelsen om stande og roll-ups vises i dag på mellemliggende dage i en booking, i stedet for kun den absolut forste og sidste dag.
 
-## Logik
-I `dayData`-opbygningen (useMemo) beregnes for hvert assignment om det er den **første** eller **sidste** dag for den pågældende booking (ikke kun for ugen, men baseret på alle assignments medarbejderen har for det booking_id):
+## Arsag
+Queryen der henter alle booking-datoer (`allBookingDates`) filtrerer pa `employee_id`, hvilket betyder den kun finder datoer hvor den specifikke medarbejder er tildelt. Hvis medarbejderen ikke er tildelt alle dage i bookingen, kan "forste" og "sidste" dag beregnes forkert. Derudover kan timing-problemer betyde at `allBookingDates` ikke er loadet endnu nar `dayData` beregnes, sa `range` bliver `undefined` og logikken falder igennem.
 
-- **Første dag for bookingen:** Vis en grøn callout: "Husk stande og roll-ups"
-- **Sidste dag for bookingen:** Vis en orange callout: "Husk at tage stande og roll-ups med hjem"
+## Losning
+Andre queryen til at hente alle datoer for bookingen uafhaengigt af medarbejder -- sa vi far den rigtige forste og sidste dag for hele bookingen (ikke kun for den enkelte medarbejder). Derudover tilfojes en ekstra sikkerhed sa callouts aldrig vises nar data mangler.
 
-Da vi allerede fetcher assignments pr. uge, udviddes queryen til også at hente alle datoer for hvert booking_id (for at finde den absolutte første/sidste dag, også på tværs af uger). Alternativt kan vi bruge booking-objektets `start_date`/`end_date` — men da assignments allerede er fetched, bruges en ekstra query for alle datoer pr. booking.
-
-## UI-design
-Kompakt callout i samme stil som hotel- og note-callouts:
-- **Første dag:** Grøn baggrund, ikon (PackageOpen/ArrowUp), kort tekst
-- **Sidste dag:** Orange baggrund, ikon (PackageMinus/ArrowDown), kort tekst
-- Placeres lige under badges-rækken (bil/diæt/hotel), før hotel-detaljen
-- Tager minimal plads og skiller sig ud uden at forstyrre
-
-## Tekniske ændringer
+## Tekniske aendringer
 
 ### `src/pages/vagt-flow/MyBookingSchedule.tsx`
-1. **Ny query** — hent alle assignment-datoer for de aktuelle booking_ids (ikke begrænset til ugen) for at bestemme absolut første/sidste dag:
-   ```
-   SELECT booking_id, date FROM booking_assignment
-   WHERE employee_id = :employeeId AND booking_id IN (:bookingIds)
-   ORDER BY booking_id, date
-   ```
+1. **Ret `allBookingDates` queryen** -- fjern `.eq("employee_id", employeeId)` filteret, sa den henter ALLE assignment-datoer for de relevante bookings (uanset medarbejder). Dette giver den korrekte forste/sidste dag for hele bookingen.
 
-2. **I useMemo (dayData)** — tilføj `isFirstBookingDay` og `isLastBookingDay` pr. assignment ved at sammenligne med alle datoer for det booking.
+2. **Opdater query key** -- fjern `employeeId` fra query key da det ikke laengere bruges som filter.
 
-3. **I renderingen** — tilføj to kompakte callouts efter badges-rækken:
-   - Grøn callout for første dag med `Package`-ikon og teksten "Husk at medbringe stande og roll-ups"
-   - Orange callout for sidste dag med `Package`-ikon og teksten "Husk at tage stande og roll-ups med hjem"
+3. **Tilfoej guard i renderingen** -- Vis kun callouts nar `allBookingDates` er loaded (ikke `undefined`), sa der aldrig vises forkerte paemindelser mens data hentes.
+
+4. **Behold UI uaendret** -- Gronne og orange callouts forbliver som de er, bare med korrekt logik bag.
