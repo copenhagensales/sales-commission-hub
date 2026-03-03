@@ -10193,6 +10193,7 @@ export type Database = {
           confirmed_at: string
           employee_id: string
           id: string
+          photo_url: string | null
           vehicle_id: string | null
           vehicle_name: string | null
         }
@@ -10203,6 +10204,7 @@ export type Database = {
           confirmed_at?: string
           employee_id: string
           id?: string
+          photo_url?: string | null
           vehicle_id?: string | null
           vehicle_name?: string | null
         }
@@ -10213,6 +10215,7 @@ export type Database = {
           confirmed_at?: string
           employee_id?: string
           id?: string
+          photo_url?: string | null
           vehicle_id?: string | null
           vehicle_name?: string | null
         }
