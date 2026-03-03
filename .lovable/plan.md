@@ -2,13 +2,23 @@
 
 ## Problem
 
-The "Ændre vagt" (Change shift) button in the cell context menu is only visible when the employee already has work times assigned (`hasWorkTimes`). This means you can't create a custom shift for a day where no shift exists yet — e.g., setting a different time for a future day.
+When Thomas registers lateness ("forsinkelse") for employees who have individual shifts in the `shift` table, the lateness indicator is **hidden** in the shift overview UI. 
+
+The root cause is in `ShiftOverview.tsx` line 1435:
+```tsx
+{!hasShift && isLate && (
+```
+
+This condition means the lateness tag (orange "Forsinket" badge) is only rendered when there is **no individual shift**. When an employee has both a shift and a lateness record, only the `ShiftCard` is displayed, and `ShiftCard` has no awareness of lateness data.
 
 ## Plan
 
-1. **Remove the `hasWorkTimes` guard** around the "Ændre vagt" button (line 1576 in `ShiftOverview.tsx`), so the button is always visible in the popover menu.
+1. **Show lateness indicator alongside shift cards** — In `ShiftOverview.tsx`, add a lateness indicator block that renders when `isLate` is true, regardless of `hasShift`. When both exist, show the shift card AND an orange lateness badge below it.
 
-2. **Adjust the click handler** — it already handles both cases (edit existing shift vs. create new), so no logic change is needed. The existing code at lines 1582-1591 checks `hasShift` and either opens the edit dialog or the create dialog.
+2. **Update the rendering logic** around lines 1423-1453 to:
+   - Keep shift cards rendering as-is when `hasShift` is true
+   - Add a separate lateness indicator that shows when `isLate` is true (remove the `!hasShift` guard)
+   - The lateness display when `hasShift` is true should be a compact orange badge showing the delay minutes and adjusted time
 
-This is a one-line change: remove the `{hasWorkTimes && (` wrapper and its closing `)}`.
+This ensures that no matter whether an employee has an individual shift or uses standard team times, the lateness registration will always be visible in the shift overview.
 
