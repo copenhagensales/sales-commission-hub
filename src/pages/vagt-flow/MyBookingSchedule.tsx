@@ -197,13 +197,9 @@ export default function MyBookingSchedule() {
         .single();
       if (error) throw error;
 
-      // Only send notification if this was just created (confirmed_at is very recent)
-      const confirmedAt = new Date(data.confirmed_at);
-      const now = new Date();
-      const justCreated = now.getTime() - confirmedAt.getTime() < 5000;
-
-      if (justCreated) {
-        await supabase.functions.invoke("notify-vehicle-returned", {
+      // Always send notification on confirm action
+      try {
+        const { error: fnError } = await supabase.functions.invoke("notify-vehicle-returned", {
           body: {
             employee_name: employeeName,
             vehicle_name: vehicleName,
@@ -211,6 +207,9 @@ export default function MyBookingSchedule() {
             photo_url: photoUrl,
           },
         });
+        if (fnError) console.error("Notification error:", fnError);
+      } catch (notifyErr) {
+        console.error("Failed to send vehicle return notification:", notifyErr);
       }
     },
     onSuccess: () => {
