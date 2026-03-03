@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { FileText, Calendar, MapPin, TrendingUp, Percent } from "lucide-react";
-import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInDays, getISOWeek } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
 import {
@@ -118,6 +118,8 @@ function BillingOverviewTab() {
     return matchesClient && matchesLocationType;
   });
 
+  const WEEKDAY_NAMES = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
   const countBookedDays = (booking: any): number => {
     const bookedDays = booking.booked_days as number[] | null;
     if (!bookedDays || bookedDays.length === 0) {
@@ -131,6 +133,22 @@ function BillingOverviewTab() {
       if (bookedDays.includes(isoDay)) count++;
     }
     return count || 1;
+  };
+
+  const getBookedWeekdays = (booking: any): Map<number, Set<number>> => {
+    const weeks = new Map<number, Set<number>>();
+    const bookedDays = booking.booked_days as number[] | null;
+    const start = new Date(booking.start_date);
+    const end = new Date(booking.end_date);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(isoDay)) {
+        const week = getISOWeek(d);
+        if (!weeks.has(week)) weeks.set(week, new Set());
+        weeks.get(week)!.add(isoDay);
+      }
+    }
+    return weeks;
   };
 
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
@@ -158,12 +176,22 @@ function BillingOverviewTab() {
         usesTotalPrice: booking.total_price != null,
         minDate: booking.start_date,
         maxDate: booking.end_date,
+        weekdaysByWeek: new Map<number, Set<number>>(),
       };
     }
 
     acc[locationId].bookings.push(booking);
     acc[locationId].totalDays += days;
     acc[locationId].totalAmount += bookingTotal;
+
+    // Merge weekdays
+    const bWeeks = getBookedWeekdays(booking);
+    bWeeks.forEach((days_set, week) => {
+      if (!acc[locationId].weekdaysByWeek.has(week)) {
+        acc[locationId].weekdaysByWeek.set(week, new Set<number>());
+      }
+      days_set.forEach((d: number) => acc[locationId].weekdaysByWeek.get(week)!.add(d));
+    });
 
     if (booking.start_date < acc[locationId].minDate) acc[locationId].minDate = booking.start_date;
     if (booking.end_date > acc[locationId].maxDate) acc[locationId].maxDate = booking.end_date;
@@ -426,7 +454,7 @@ function BillingOverviewTab() {
                 <TableRow>
                   <TableHead>Lokation</TableHead>
                   <TableHead>Kunde</TableHead>
-                  <TableHead>Dato Periode</TableHead>
+                  <TableHead>Uger & Dage</TableHead>
                   <TableHead className="text-right">Bookinger</TableHead>
                   <TableHead className="text-right">Dage</TableHead>
                   <TableHead className="text-right">Dagspris</TableHead>
@@ -447,7 +475,31 @@ function BillingOverviewTab() {
                     <TableCell>
                       <Badge variant="outline">{loc.client?.name || "Ukendt kunde"}</Badge>
                     </TableCell>
-                    <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {[...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
+                          .sort(([a], [b]) => a - b)
+                          .map(([week, daysSet]) => {
+                            const sorted = [...daysSet].sort((a, b) => a - b);
+                            const isFullWeek = [0, 1, 2, 3, 4].every(d => daysSet.has(d));
+                            return (
+                              <div key={week} className="flex items-center gap-1 flex-wrap">
+                                <span className="text-xs font-medium text-muted-foreground w-10 shrink-0">Uge {week}</span>
+                                {isFullWeek ? (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Man–Fre</Badge>
+                                ) : (
+                                  sorted.map(d => (
+                                    <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">{WEEKDAY_NAMES[d]}</Badge>
+                                  ))
+                                )}
+                              </div>
+                            );
+                          })}
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {format(new Date(loc.minDate), "dd/MM")} – {format(new Date(loc.maxDate), "dd/MM")}
+                        </p>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">{loc.bookings.length}</TableCell>
                     <TableCell className="text-right">{loc.totalDays}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
