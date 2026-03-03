@@ -100,7 +100,7 @@ serve(async (req) => {
         );
       }
 
-      // Assign medarbejder role
+      // Assign medarbejder role and link auth_user_id
       if (newUser?.user) {
         const { error: roleError } = await supabaseAdmin
           .from("system_roles")
@@ -109,6 +109,14 @@ serve(async (req) => {
         if (roleError) {
           console.error("Error assigning role:", roleError);
         }
+
+        // Link auth_user_id on employee record
+        const { error: linkError } = await supabaseAdmin
+          .from("employee_master_data")
+          .update({ auth_user_id: newUser.user.id })
+          .ilike("private_email", email)
+          .is("auth_user_id", null);
+        if (linkError) console.error("Error linking auth_user_id:", linkError);
       }
 
       return new Response(
@@ -131,15 +139,14 @@ serve(async (req) => {
       );
     }
 
-    // Update invitation_status to completed for the employee
+    // Update invitation_status and link auth_user_id for the employee
     const { error: statusError } = await supabaseAdmin
       .from("employee_master_data")
-      .update({ invitation_status: "completed" })
-      .eq("private_email", email.toLowerCase());
+      .update({ invitation_status: "completed", auth_user_id: user.id })
+      .ilike("private_email", email);
 
     if (statusError) {
-      console.error("Error updating invitation_status:", statusError);
-      // Don't fail the request, password was updated successfully
+      console.error("Error updating employee record:", statusError);
     }
 
     return new Response(
