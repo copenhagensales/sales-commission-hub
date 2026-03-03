@@ -1,14 +1,19 @@
 
 
-## Plan: Fjern eller forbedre dato-range teksten under uge-badges
+## Plan: Ret forvirrende tekst om bookinger og dage
 
-**Problem:** Datoteksten "02/02 – 20/02" under uge-badges er forvirrende — den er svær at koble til ugerne ovenover og tilføjer ikke reel værdi, da ugerne allerede viser hvornår der er booket.
-
-**Løsning:** Fjern den lille dato-range tekst helt. Uge-badges giver allerede al den nødvendige information. Dato-rangen er redundant og skaber forvirring.
+**Problem:** Teksten "Hver 5 dage = 1 booking" giver indtryk af at 5 dage resulterer i én booking. Men meningen er at én booking tæller som kvalificeret ("placement") når den dækker mindst 5 dage.
 
 ### Ændring i `src/components/billing/SupplierReportTab.tsx`
 
-Fjern linje 567-569 — `<p>` tagget med `format(loc.minDate) – format(loc.maxDate)`. Det er den eneste ændring.
+**Linje 722** — Erstat:
+```
+Hver {minDaysPerLocation} dage = 1 booking
+```
+med:
+```
+1 placering = min. {minDaysPerLocation} dage på samme lokation
+```
 
-Samme ændring laves i `src/pages/vagt-flow/Billing.tsx` (Oversigten) for konsistens, da den også viser dato-range under badges.
+Det gør det klart at en placering kræver minimum X dage — ikke at X dage automatisk skaber en booking.
 
