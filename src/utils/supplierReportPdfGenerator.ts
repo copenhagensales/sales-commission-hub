@@ -1,6 +1,6 @@
 /**
  * Utility to generate and download a supplier report as PDF
- * Uses browser's print-to-PDF functionality
+ * Uses browser's print-to-PDF functionality — optimised for A4 landscape
  */
 
 interface WeekDays {
@@ -64,7 +64,7 @@ function renderWeekdaysBadges(weekdays: WeekDays[]): string {
 
       const badges = isFullWeek
         ? '<span class="day-badge full">Man–Fre</span>'
-        : sorted.map((d) => `<span class="day-badge">${WEEKDAY_LABELS[d] || d}</span>`).join("");
+        : sorted.map((d) => `<span class="day-badge">${WEEKDAY_LABELS[d] || d}</span>`).join(" ");
 
       return `<div class="week-row"><span class="week-label">Uge ${w.week}</span>${badges}</div>`;
     })
@@ -72,7 +72,7 @@ function renderWeekdaysBadges(weekdays: WeekDays[]): string {
 }
 
 export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
-  const printWindow = window.open("", "_blank", "width=900,height=700");
+  const printWindow = window.open("", "_blank", "width=1100,height=800");
   if (!printWindow) {
     alert("Pop-up blokeret. Tillad venligst pop-ups for at downloade rapporten.");
     return;
@@ -191,74 +191,71 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 <meta charset="UTF-8">
 <title>Leverandørrapport – ${config.locationType} – ${config.month}</title>
 <style>
-@page{size:A4;margin:15mm}
+@page{size:A4 landscape;margin:12mm 10mm}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;color:#e2e8f0;background:#0f1419;padding:15mm;max-width:210mm;margin:0 auto;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+body{font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;line-height:1.5;color:#1e293b;background:#ffffff;padding:12mm 10mm;margin:0 auto;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 
 /* Header */
-.header{padding:16px 20px;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,0.08);background:#0f1419}
-.header h1{font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em}
-.header .meta{color:#64748b;font-size:13px;margin-top:4px}
+.header{padding:12px 0;margin-bottom:20px;border-bottom:2px solid #1e293b}
+.header h1{font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.01em}
+.header .meta{color:#64748b;font-size:12px;margin-top:2px}
 
 /* Section */
-.section{margin-bottom:28px}
-.section h3{font-size:14px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px}
+.section{margin-bottom:24px}
+.section h3{font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px}
 
 /* Table */
-table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:24px;border-radius:8px;overflow:hidden;table-layout:fixed}
-col.col-loc{width:17%}col.col-id{width:7%}col.col-by{width:9%}col.col-kunde{width:9%}col.col-uger{width:16%}col.col-book{width:5%}col.col-dage{width:5%}col.col-dagspris{width:9%}col.col-belob{width:9%}col.col-rabat{width:7%}col.col-efter{width:9%}
-th{background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}
-td{padding:7px 6px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#cbd5e1}
-tbody tr{background:#151d27}
-tbody tr:nth-child(even){background:#1a2332}
-tbody tr:hover{background:#1e2d3d}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:11px}
+th{background:#f1f5f9;color:#334155;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:8px 10px;text-align:left;border:1px solid #cbd5e1;white-space:nowrap}
+td{padding:7px 10px;border:1px solid #e2e8f0;color:#1e293b;vertical-align:top}
+tbody tr:nth-child(even){background:#f8fafc}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cell-name{font-weight:500;color:#f1f5f9}
-tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid rgba(255,255,255,0.08);border-bottom:none}
+.cell-name{font-weight:600;color:#0f172a;white-space:nowrap}
+tfoot td{font-weight:700;background:#f1f5f9;color:#0f172a;border-top:2px solid #94a3b8}
 
 /* Weekdays badges */
-.cell-weekdays{vertical-align:top}
-.week-row{display:flex;align-items:center;gap:3px;margin-bottom:2px;flex-wrap:wrap}
-.week-label{font-size:9px;font-weight:600;color:#64748b;min-width:32px;flex-shrink:0}
-.day-badge{display:inline-block;padding:1px 4px;border-radius:3px;font-size:8px;font-weight:500;background:rgba(99,102,241,0.15);color:#818cf8;white-space:nowrap}
-.day-badge.full{background:rgba(52,211,153,0.15);color:#34d399}
+.cell-weekdays{min-width:120px}
+.week-row{display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:nowrap}
+.week-label{font-size:9px;font-weight:700;color:#64748b;min-width:36px;flex-shrink:0}
+.day-badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:#e2e8f0;color:#334155;white-space:nowrap}
+.day-badge.full{background:#d1fae5;color:#065f46}
 
 /* Excluded rows */
-.excluded td{opacity:.45}
+.excluded td{opacity:.5}
 
 /* Badges */
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle}
-.badge-excluded{background:rgba(239,68,68,0.15);color:#f87171}
-.badge-max{background:rgba(99,102,241,0.15);color:#818cf8}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:4px;vertical-align:middle}
+.badge-excluded{background:#fee2e2;color:#b91c1c}
+.badge-max{background:#e0e7ff;color:#3730a3}
 
 /* Accent color for discount */
-.accent{color:#34d399}
-.muted{color:#475569;font-style:italic;font-size:11px}
+.accent{color:#059669}
+.muted{color:#94a3b8;font-style:italic}
 
 /* KPI Grid */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-.kpi-card{background:#1e293b;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
-.kpi-card.highlight{border-color:rgba(99,102,241,0.3);background:#1e2747}
-.kpi-label{display:block;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi-value{display:block;font-size:15px;font-weight:700;color:#f1f5f9;white-space:nowrap}
-.kpi-value.accent{color:#34d399}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi-card{background:#f8fafc;padding:14px 16px;border-radius:6px;border:1px solid #e2e8f0}
+.kpi-card.highlight{border-color:#6366f1;background:#eef2ff}
+.kpi-label{display:block;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;font-weight:600}
+.kpi-value{display:block;font-size:16px;font-weight:700;color:#0f172a;white-space:nowrap}
+.kpi-value.accent{color:#059669}
 .placement-note{font-size:9px;color:#64748b;margin-top:4px}
 
 /* Staircase */
 .staircase{margin-top:16px}
-.staircase h4{font-size:13px;color:#94a3b8;margin-bottom:8px;font-weight:600}
+.staircase h4{font-size:12px;color:#475569;margin-bottom:8px;font-weight:700}
 .staircase-row{display:flex;gap:8px}
-.staircase-step{flex:1;text-align:center;background:#1e293b;border:1px solid rgba(255,255,255,0.06);padding:12px 8px;border-radius:6px;font-size:14px;font-weight:700;color:#94a3b8}
-.staircase-step.active{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#818cf8}
-.step-label{font-size:10px;font-weight:500;color:#64748b}
+.staircase-step{flex:1;text-align:center;background:#f8fafc;border:1px solid #e2e8f0;padding:12px 8px;border-radius:6px;font-size:14px;font-weight:700;color:#64748b}
+.staircase-step.active{background:#eef2ff;border-color:#6366f1;color:#4f46e5}
+.step-label{font-size:10px;font-weight:500;color:#94a3b8}
 
 /* Exceptions */
-.exceptions{margin-left:20px;font-size:12px;color:#94a3b8}
+.exceptions{margin-left:20px;font-size:12px;color:#475569}
 .exceptions li{margin-bottom:4px}
-.exceptions strong{color:#cbd5e1}
+.exceptions strong{color:#1e293b}
 
 /* Footer */
-.footer{margin-top:36px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;color:#475569;font-size:11px}
+.footer{margin-top:30px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:10px}
 
 </style>
 </head>
@@ -271,11 +268,6 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
   <div class="section">
     <h3>Bookinger</h3>
     <table>
-      <colgroup>
-        <col class="col-loc"><col class="col-id"><col class="col-by"><col class="col-kunde"><col class="col-uger">
-        <col class="col-book"><col class="col-dage"><col class="col-dagspris"><col class="col-belob">
-        ${isAnnualRevenue ? '<col class="col-rabat"><col class="col-efter">' : ""}
-      </colgroup>
       <thead>
         <tr>
           <th>Lokation</th><th>ID</th><th>By</th><th>Kunde</th><th>Uger & Dage</th>
@@ -286,7 +278,7 @@ tfoot td{font-weight:700;background:#1e293b;color:#f1f5f9;border-top:2px solid r
       <tbody>${locationRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="8">Subtotal</td>
+          <td colspan="${isAnnualRevenue ? 8 : 8}">Subtotal</td>
           <td class="num">${fmtKr(config.totals.subtotal)}</td>
           ${isAnnualRevenue ? `<td class="num accent">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
         </tr>
