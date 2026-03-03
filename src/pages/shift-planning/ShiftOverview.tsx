@@ -1573,29 +1573,25 @@ export default function ShiftOverview() {
                                 <CalendarX2 className="h-4 w-4" />
                                 Fridag
                               </Button>
-                              {hasWorkTimes && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start gap-2 h-8"
-                                  onClick={() => {
-                                    if (hasShift) {
-                                      // Edit existing shift
-                                      setSelectedShift(dayShifts[0]);
-                                      setShiftDialogOpen(true);
-                                    } else {
-                                      // Create new shift based on standard times
-                                      setSelectedDate(day);
-                                      setSelectedEmployeeId(employee.id);
-                                      setCreateDialogOpen(true);
-                                    }
-                                    setOpenPopoverKey(null);
-                                  }}
-                                >
-                                  <Clock className="h-4 w-4" />
-                                  Ændre vagt
-                                </Button>
-                              )}
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="justify-start gap-2 h-8"
+                                 onClick={() => {
+                                   if (hasShift) {
+                                     setSelectedShift(dayShifts[0]);
+                                     setShiftDialogOpen(true);
+                                   } else {
+                                     setSelectedDate(day);
+                                     setSelectedEmployeeId(employee.id);
+                                     setCreateDialogOpen(true);
+                                   }
+                                   setOpenPopoverKey(null);
+                                 }}
+                               >
+                                 <Clock className="h-4 w-4" />
+                                 Ændre vagt
+                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
