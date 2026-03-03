@@ -244,7 +244,7 @@ export function SupplierReportTab() {
   const locationEntries = Object.values(bookingsByLocation) as any[];
   const minDaysPerLocation = discountRules?.[0]?.min_days_per_location ?? 1;
   const totalPlacements = locationEntries.reduce((sum: number, loc: any) => {
-    return sum + (loc.totalDays >= minDaysPerLocation ? 1 : 0);
+    return sum + Math.floor(loc.totalDays / minDaysPerLocation);
   }, 0);
 
   // Calculate YTD revenue (for annual_revenue type)
