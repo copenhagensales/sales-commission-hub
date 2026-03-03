@@ -65,6 +65,14 @@ serve(async (req) => {
         );
       }
 
+      // Link auth_user_id on employee record
+      const { error: linkError } = await supabase
+        .from("employee_master_data")
+        .update({ auth_user_id: existingUser.id })
+        .or(`private_email.ilike.${email},work_email.ilike.${email}`)
+        .is("auth_user_id", null);
+      if (linkError) console.error("Error linking auth_user_id:", linkError);
+
       console.log(`Updated password for existing user ${email}`);
       return new Response(
         JSON.stringify({ 
@@ -119,12 +127,21 @@ serve(async (req) => {
       .or(`private_email.eq.${email},work_email.eq.${email}`)
       .maybeSingle();
 
-    if (!existingEmployee) {
+    if (existingEmployee) {
+      // Link auth_user_id on existing employee record
+      const { error: linkError } = await supabase
+        .from("employee_master_data")
+        .update({ auth_user_id: authData.user.id })
+        .eq("id", existingEmployee.id);
+      if (linkError) console.error("Error linking auth_user_id:", linkError);
+      else console.log(`Linked auth_user_id for existing employee ${email}`);
+    } else {
       const employeeData: Record<string, unknown> = {
         first_name: firstName,
         last_name: lastName || '',
         private_email: email,
-        is_active: true
+        is_active: true,
+        auth_user_id: authData.user.id,
       };
       
       // Add job_title and is_staff_employee if provided
