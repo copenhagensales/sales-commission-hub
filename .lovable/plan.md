@@ -1,64 +1,30 @@
 
-
-# Giv teamledere deaktiverings-rettighed + bedre fejlhåndtering
+# Fix: Sæt `auth_user_id` ved oprettelse af brugerkonti
 
 ## Problem
-Jonas (teamleder) forsøgte at deaktivere en medarbejder. Frontenden viste ingen fejl, men databasen blokerede opdateringen fordi der ikke findes en UPDATE RLS-politik for teamledere på `employee_master_data`. Rettighedseditoren viser allerede `can_edit: true` for teamledere under "Medarbejdere", men databasen håndhæver det ikke.
+Når en medarbejder får oprettet en konto via "Opret bruger" eller "Sæt adgangskode", bliver `auth_user_id` ikke sat på medarbejderens record i databasen. Systemet bruger `auth_user_id` til at koble den loggede bruger til medarbejderdata -- uden det link kan medarbejderen logge ind, men systemet finder ikke deres profil, teams, vagter osv.
 
-## Løsning
+Kun `complete-employee-registration` (invitation-flowet) og `batch-set-fieldmarketing-passwords` sætter `auth_user_id` korrekt. De to andre edge functions gør det ikke.
 
-### 1. Tilføj UPDATE RLS-politik for teamledere (database migration)
-Tilføj en ny RLS-politik på `employee_master_data` der tillader teamledere at opdatere medarbejdere i deres eget team:
+## Berørte funktioner
 
-```sql
-CREATE POLICY "Teamledere can update their team employees"
-ON public.employee_master_data
-FOR UPDATE
-TO authenticated
-USING (
-  is_teamleder_or_above(auth.uid())
-  AND can_view_employee(id, auth.uid())
-)
-WITH CHECK (
-  is_teamleder_or_above(auth.uid())
-  AND can_view_employee(id, auth.uid())
-);
-```
+### 1. `create-employee-user` (bruges fra Medarbejdere-siden og Staff-fanen)
+- Opretter auth-bruger og employee_master_data, men sætter aldrig `auth_user_id` på employee-recorden.
+- **Fix:** Efter oprettelse af auth-brugeren, opdater `employee_master_data` med `auth_user_id` -- både for nye og eksisterende employee records.
 
-Dette genbruger de eksisterende `is_teamleder_or_above` og `can_view_employee` funktioner, som allerede bruges til SELECT-politikken. Teamledere kan kun opdatere medarbejdere de kan se (dvs. i deres team).
+### 2. `set-user-password` (bruges fra Medarbejder-detaljesiden)
+- Opretter evt. en ny auth-bruger, men sætter heller aldrig `auth_user_id`.
+- **Fix:** Efter oprettelse/find af auth-brugeren, opdater `employee_master_data` med `auth_user_id` via `private_email` match.
 
-### 2. Tilføj en specifik deaktiverings-rettighed i permissionKeys.ts
-Tilføj en ny permission key `action_employee_deactivate` under `menu_employees` for finere kontrol:
+## Tekniske ændringer
 
-```text
-action_employee_deactivate: { label: 'Deaktiver medarbejder', section: 'personale', parent: 'menu_employees' }
-```
+### `supabase/functions/create-employee-user/index.ts`
+- Linje ~120-147: Når en eksisterende employee findes (via email), tilføj `.update({ auth_user_id: authData.user.id })`.
+- Når en ny employee oprettes, inkluder `auth_user_id` i insert-data.
+- Når en eksisterende bruger får opdateret password (linje 53-77), find og opdater employee med `auth_user_id`.
 
-### 3. Brug rettigheden i frontend (EmployeeMasterData.tsx)
-- Tjek `canEdit('action_employee_deactivate')` eller `canEdit('menu_employees')` før deaktiverings-switchen vises/aktiveres.
-- Vis en tydelig fejlbesked i `onError` hvis opdateringen fejler pga. manglende rettigheder (RLS-fejl).
+### `supabase/functions/set-user-password/index.ts`
+- Linje 86-117 (ny bruger oprettet): Tilføj `auth_user_id` update på `employee_master_data` via `private_email`.
+- Linje 120-148 (eksisterende bruger): Tilføj `auth_user_id` update her også, da det kan mangle fra tidligere oprettelser.
 
-### 4. Bedre fejlhåndtering i toggleActiveMutation
-Frontenden viser allerede en toast ved fejl (linje 558-560), men `supabase.update()` returnerer fejlen korrekt - problemet var at Jonas aldrig så den fordi databasen returnerer en "tom" success ved RLS-blokering. Vi tilføjer et ekstra tjek:
-
-```typescript
-const { error, count } = await supabase
-  .from("employee_master_data")
-  .update(updateData)
-  .eq("id", id)
-  .select();
-
-if (error) throw error;
-if (!data || data.length === 0) {
-  throw new Error("Du har ikke rettighed til at ændre denne medarbejder");
-}
-```
-
-## Teknisk opsummering
-
-| Ændring | Fil |
-|---------|-----|
-| RLS UPDATE-politik for teamledere | Database migration (SQL) |
-| Ny permission key `action_employee_deactivate` | `src/config/permissionKeys.ts` |
-| Frontend-rettigheds-tjek + fejlhåndtering | `src/pages/EmployeeMasterData.tsx` |
-
+Begge ændringer er bagudkompatible -- de tilføjer blot det manglende link uden at ændre eksisterende adfærd.
