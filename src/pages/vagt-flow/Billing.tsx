@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { FileText, Calendar, MapPin, TrendingUp } from "lucide-react";
+import { FileText, Calendar, MapPin, TrendingUp, Percent } from "lucide-react";
 import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
 import {
   Select,
@@ -58,6 +59,33 @@ function BillingOverviewTab() {
         .gte("start_date", format(periodStart, "yyyy-MM-dd"))
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .order("start_date");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch all active discount rules for netto calculation
+  const { data: allDiscountRules } = useQuery({
+    queryKey: ["billing-all-discount-rules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_discount_rules")
+        .select("*")
+        .eq("is_active", true)
+        .order("min_placements", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch all location exceptions
+  const { data: allLocationExceptions } = useQuery({
+    queryKey: ["billing-all-location-exceptions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_location_exceptions")
+        .select("*")
+        .eq("is_active", true);
       if (error) throw error;
       return data;
     },
@@ -152,6 +180,84 @@ function BillingOverviewTab() {
   );
   const uniqueLocations = Object.keys(bookingsByLocation || {}).length;
 
+  // Calculate netto amount using discount rules per location type
+  const nettoAmount = (() => {
+    if (!allDiscountRules || !bookingsByLocation) return totalAmount;
+
+    const locationEntries = Object.values(bookingsByLocation) as any[];
+
+    // Group locations by type
+    const byType: Record<string, any[]> = {};
+    locationEntries.forEach((loc: any) => {
+      const type = loc.location?.type || "unknown";
+      if (!byType[type]) byType[type] = [];
+      byType[type].push(loc);
+    });
+
+    // Build exception lookup
+    const exceptionMap = new Map<string, any>();
+    allLocationExceptions?.forEach((exc: any) => {
+      exceptionMap.set(exc.location_name.toLowerCase(), exc);
+    });
+
+    let totalNetto = 0;
+
+    Object.entries(byType).forEach(([type, locs]) => {
+      const rulesForType = allDiscountRules.filter((r: any) => r.location_type === type);
+
+      if (rulesForType.length === 0) {
+        // No discount rules for this type — use brutto
+        totalNetto += locs.reduce((s: number, l: any) => s + l.totalAmount, 0);
+        return;
+      }
+
+      const discountType = rulesForType[0]?.discount_type || "placement";
+      const minDaysPerLoc = rulesForType[0]?.min_days_per_location ?? 1;
+
+      // Calculate placements for this type
+      const placements = locs.reduce((s: number, l: any) => s + Math.floor(l.totalDays / minDaysPerLoc), 0);
+
+      // Find applicable discount
+      let appliedDiscount = 0;
+      if (discountType === "annual_revenue") {
+        // For annual_revenue, we'd need YTD data — simplify by using the lowest tier
+        const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+        // Use lowest tier (0 revenue) as approximation since we don't have YTD in this tab
+        appliedDiscount = sorted[sorted.length - 1]?.discount_percent ?? 0;
+      } else {
+        const sorted = [...rulesForType].sort((a: any, b: any) => b.min_placements - a.min_placements);
+        for (const rule of sorted) {
+          if (placements >= rule.min_placements) {
+            appliedDiscount = Number(rule.discount_percent);
+            break;
+          }
+        }
+      }
+
+      // Apply per-location with exceptions
+      locs.forEach((loc: any) => {
+        const locName = loc.location?.name?.toLowerCase() || "";
+        const exc = exceptionMap.get(locName);
+
+        if (exc?.exception_type === "excluded") {
+          totalNetto += loc.totalAmount;
+          return;
+        }
+
+        let effectiveDiscount = appliedDiscount;
+        if (exc?.exception_type === "max_discount" && exc.max_discount_percent != null) {
+          effectiveDiscount = Math.min(appliedDiscount, Number(exc.max_discount_percent));
+        }
+
+        totalNetto += loc.totalAmount * (1 - effectiveDiscount / 100);
+      });
+    });
+
+    return totalNetto;
+  })();
+
+  const totalDiscount = totalAmount - nettoAmount;
+
   const monthOptions = [];
   for (let i = -6; i <= 6; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -212,7 +318,7 @@ function BillingOverviewTab() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
@@ -259,9 +365,9 @@ function BillingOverviewTab() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Beløb</p>
+                <p className="text-sm font-medium text-muted-foreground">Brutto Beløb</p>
                 <p className="text-3xl font-bold mt-1">{totalAmount.toLocaleString("da-DK")}</p>
-                <p className="text-xs text-muted-foreground mt-1">kr ex moms</p>
+                <p className="text-xs text-muted-foreground mt-1">kr ex moms (før rabat)</p>
               </div>
               <div className="p-2 bg-muted rounded-lg">
                 <TrendingUp className="h-5 w-5 text-muted-foreground" />
@@ -269,6 +375,31 @@ function BillingOverviewTab() {
             </div>
           </CardContent>
         </Card>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Netto Beløb</p>
+                      <p className="text-3xl font-bold mt-1">{nettoAmount.toLocaleString("da-DK", { maximumFractionDigits: 0 })}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        kr ex moms (−{totalDiscount.toLocaleString("da-DK", { maximumFractionDigits: 0 })} rabat)
+                      </p>
+                    </div>
+                    <div className="p-2 bg-muted rounded-lg">
+                      <Percent className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Beregnet med rabatregler per leverandørtype</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Table */}
