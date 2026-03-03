@@ -165,7 +165,23 @@ export default function MyBookingSchedule() {
 
   // Vehicle return confirmation mutation
   const confirmVehicleReturn = useMutation({
-    mutationFn: async ({ bookingId, vehicleId, vehicleName, bookingDate }: { bookingId: string; vehicleId: string; vehicleName: string; bookingDate: string }) => {
+    mutationFn: async ({ bookingId, vehicleId, vehicleName, bookingDate, photo }: { bookingId: string; vehicleId: string; vehicleName: string; bookingDate: string; photo?: File }) => {
+      let photoUrl: string | null = null;
+
+      // Upload photo if provided
+      if (photo) {
+        const ext = photo.name.split(".").pop() || "jpg";
+        const path = `${bookingId}/${vehicleId}_${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("vehicle-return-photos")
+          .upload(path, photo, { contentType: photo.type });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage
+          .from("vehicle-return-photos")
+          .getPublicUrl(path);
+        photoUrl = urlData.publicUrl;
+      }
+
       // Upsert confirmation (unique on booking_id + vehicle_id + booking_date)
       const { data, error } = await (supabase as any)
         .from("vehicle_return_confirmation")
@@ -175,6 +191,7 @@ export default function MyBookingSchedule() {
           employee_id: employeeId,
           vehicle_name: vehicleName,
           booking_date: bookingDate,
+          ...(photoUrl ? { photo_url: photoUrl } : {}),
         }, { onConflict: "booking_id,vehicle_id,booking_date" })
         .select("id, confirmed_at")
         .single();
@@ -191,12 +208,13 @@ export default function MyBookingSchedule() {
             employee_name: employeeName,
             vehicle_name: vehicleName,
             booking_date: bookingDate,
+            photo_url: photoUrl,
           },
         });
       }
     },
     onSuccess: () => {
-      toast.success("Bil aflevering bekræftet!");
+      toast.success("Nøgle aflevering bekræftet!");
       queryClient.invalidateQueries({ queryKey: ["vehicle-return-confirmations"] });
     },
     onError: (err: any) => {
@@ -500,12 +518,13 @@ export default function MyBookingSchedule() {
                                 vehicleName={(a.vehicle as any)?.name ?? "Bil"}
                                 confirmed={a.vehicleReturnConfirmed}
                                 isConfirming={confirmVehicleReturn.isPending}
-                                onConfirm={() =>
+                                onConfirm={(photo?: File) =>
                                   confirmVehicleReturn.mutate({
                                     bookingId: a.booking_id,
                                     vehicleId: (a.vehicle as any)?.id,
                                     vehicleName: (a.vehicle as any)?.name ?? "Bil",
                                     bookingDate: a.date,
+                                    photo,
                                   })
                                 }
                               />

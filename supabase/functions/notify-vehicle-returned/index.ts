@@ -77,7 +77,7 @@ serve(async (req) => {
   }
 
   try {
-    const { employee_name, vehicle_name, booking_date } = await req.json();
+    const { employee_name, vehicle_name, booking_date, photo_url } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,17 +103,22 @@ serve(async (req) => {
 
     const accessToken = await getM365AccessToken();
 
+    const photoHtml = photo_url
+      ? `<p style="margin-top: 12px;"><strong>Billede af nøgleaflevering:</strong></p><img src="${photo_url}" alt="Nøgle aflevering" style="max-width: 400px; border-radius: 8px; border: 1px solid #e5e7eb;" />`
+      : "";
+
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-        <h2 style="color: #b45309;">🚗 Bil afleveret</h2>
-        <p><strong>${employee_name}</strong> har bekræftet aflevering af <strong>${vehicle_name}</strong>.</p>
+        <h2 style="color: #b45309;">🔑 Nøgle afleveret</h2>
+        <p><strong>${employee_name}</strong> har bekræftet aflevering af nøgle til <strong>${vehicle_name}</strong>.</p>
         <p>Dato: <strong>${booking_date}</strong></p>
+        ${photoHtml}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
         <p style="font-size: 12px; color: #6b7280;">Denne email er sendt automatisk fra Copenhagen Sales vagtplan.</p>
       </div>
     `;
 
-    await sendEmail(accessToken, recipientEmails, `Bil afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
+    await sendEmail(accessToken, recipientEmails, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
 
     return new Response(JSON.stringify({ ok: true, notified: recipientEmails.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
