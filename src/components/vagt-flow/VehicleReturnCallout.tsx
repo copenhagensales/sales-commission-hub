@@ -44,16 +44,15 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, onC
         </p>
       </div>
 
-      <div className="ml-5 pt-0.5">
+      <div className="pt-1">
         <Button
           size="sm"
-          variant="outline"
-          className="h-7 text-[11px] px-3 bg-yellow-100 hover:bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60 dark:text-yellow-100 dark:border-yellow-600"
+          className="w-full h-9 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-sm dark:bg-amber-600 dark:hover:bg-amber-700"
           disabled={isConfirming}
           onClick={onConfirm}
         >
-          <CheckCircle2 className="w-3 h-3 mr-1" />
-          {isConfirming ? "Bekræfter..." : "Bekræft aflevering"}
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+          {isConfirming ? "Bekræfter..." : "Bekræft aflevering af bil"}
         </Button>
       </div>
     </div>
