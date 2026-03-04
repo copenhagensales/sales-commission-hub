@@ -50,6 +50,12 @@ export default function TeamGoals() {
     year: currentYear,
     sales_target: 0,
     bonus_description: "",
+    bonus_tier1_amount: 500,
+    bonus_tier1_description: "Spisning på Retour Steak",
+    bonus_tier2_amount: 750,
+    bonus_tier2_description: "",
+    bonus_tier3_amount: 1000,
+    bonus_tier3_description: "Valgfrit",
   });
 
   const { forecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
@@ -101,6 +107,12 @@ export default function TeamGoals() {
             year: goal.year,
             sales_target: goal.sales_target,
             bonus_description: goal.bonus_description || null,
+            bonus_tier1_amount: goal.bonus_tier1_amount,
+            bonus_tier1_description: goal.bonus_tier1_description || null,
+            bonus_tier2_amount: goal.bonus_tier2_amount,
+            bonus_tier2_description: goal.bonus_tier2_description || null,
+            bonus_tier3_amount: goal.bonus_tier3_amount,
+            bonus_tier3_description: goal.bonus_tier3_description || null,
           })
           .eq("id", goal.id);
         if (error) throw error;
@@ -113,6 +125,12 @@ export default function TeamGoals() {
             year: goal.year,
             sales_target: goal.sales_target,
             bonus_description: goal.bonus_description || null,
+            bonus_tier1_amount: goal.bonus_tier1_amount,
+            bonus_tier1_description: goal.bonus_tier1_description || null,
+            bonus_tier2_amount: goal.bonus_tier2_amount,
+            bonus_tier2_description: goal.bonus_tier2_description || null,
+            bonus_tier3_amount: goal.bonus_tier3_amount,
+            bonus_tier3_description: goal.bonus_tier3_description || null,
           });
         if (error) throw error;
       }
@@ -154,6 +172,12 @@ export default function TeamGoals() {
       year: currentYear,
       sales_target: 0,
       bonus_description: "",
+      bonus_tier1_amount: 500,
+      bonus_tier1_description: "Spisning på Retour Steak",
+      bonus_tier2_amount: 750,
+      bonus_tier2_description: "",
+      bonus_tier3_amount: 1000,
+      bonus_tier3_description: "Valgfrit",
     });
   };
 
@@ -165,6 +189,12 @@ export default function TeamGoals() {
       year: filterYear,
       sales_target: 0,
       bonus_description: "",
+      bonus_tier1_amount: 500,
+      bonus_tier1_description: "Spisning på Retour Steak",
+      bonus_tier2_amount: 750,
+      bonus_tier2_description: "",
+      bonus_tier3_amount: 1000,
+      bonus_tier3_description: "Valgfrit",
     });
     setDialogOpen(true);
   };
@@ -177,6 +207,12 @@ export default function TeamGoals() {
       year: goal.year,
       sales_target: goal.sales_target,
       bonus_description: goal.bonus_description || "",
+      bonus_tier1_amount: goal.bonus_tier1_amount ?? 500,
+      bonus_tier1_description: goal.bonus_tier1_description ?? "Spisning på Retour Steak",
+      bonus_tier2_amount: goal.bonus_tier2_amount ?? 750,
+      bonus_tier2_description: goal.bonus_tier2_description ?? "",
+      bonus_tier3_amount: goal.bonus_tier3_amount ?? 1000,
+      bonus_tier3_description: goal.bonus_tier3_description ?? "Valgfrit",
     });
     setDialogOpen(true);
   };
@@ -287,8 +323,8 @@ export default function TeamGoals() {
                         <TableCell className="text-right font-semibold tabular-nums">
                           {goal.sales_target.toLocaleString("da-DK")}
                         </TableCell>
-                        <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
-                          {goal.bonus_description || "—"}
+                        <TableCell className="text-muted-foreground">
+                          <BonusTiersSummary goal={goal} />
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-end">
@@ -452,14 +488,18 @@ export default function TeamGoals() {
                 </div>
               )}
             </div>
-            <div>
-              <Textarea
-                value={form.bonus_description}
-                onChange={(e) => setForm((f) => ({ ...f, bonus_description: e.target.value }))}
-                placeholder="F.eks. 2.000 kr bonus ved 120% af mål"
-                rows={3}
-              />
-            </div>
+            <BonusStaircase
+              tiers={{
+                bonus_tier1_amount: form.bonus_tier1_amount,
+                bonus_tier1_description: form.bonus_tier1_description,
+                bonus_tier2_amount: form.bonus_tier2_amount,
+                bonus_tier2_description: form.bonus_tier2_description,
+                bonus_tier3_amount: form.bonus_tier3_amount,
+                bonus_tier3_description: form.bonus_tier3_description,
+              }}
+              onChange={(partial) => setForm((f) => ({ ...f, ...partial }))}
+              salesTarget={form.sales_target}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Annuller</Button>
