@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { BonusStaircase, BonusTiersSummary, type BonusTiers } from "@/components/team-goals/BonusStaircase";
+import { BonusStaircase, type BonusTiers } from "@/components/team-goals/BonusStaircase";
 
 const MONTH_NAMES = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni",
@@ -307,7 +307,7 @@ export default function TeamGoals() {
                       <TableHead>Team</TableHead>
                       <TableHead>Måned</TableHead>
                       <TableHead className="text-right">Salgsmål</TableHead>
-                      <TableHead>Bonustrappe (pr. medarb.)</TableHead>
+                      
                       <TableHead className="w-24" />
                     </TableRow>
                   </TableHeader>
@@ -322,9 +322,6 @@ export default function TeamGoals() {
                         </TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">
                           {goal.sales_target.toLocaleString("da-DK")}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <BonusTiersSummary goal={goal} />
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-end">
