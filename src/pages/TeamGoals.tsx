@@ -44,6 +44,7 @@ export default function TeamGoals() {
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterMonth, setFilterMonth] = useState<number | null>(currentMonth);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [overriddenEmployees, setOverriddenEmployees] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<GoalForm>({
     team_id: "",
     month: currentMonth,
