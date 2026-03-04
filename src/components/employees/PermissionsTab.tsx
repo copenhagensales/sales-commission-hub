@@ -220,7 +220,7 @@ const sectionChildren: Record<string, string[]> = {
   menu_section_personal: [
     'menu_home', 'menu_h2h', 'menu_commission_league', 'menu_league_admin',
     'menu_liga_test_board', 'menu_h2h_admin', 'menu_team_h2h', 'menu_messages',
-    'menu_my_schedule', 'menu_my_profile', 'menu_my_goals', 'menu_my_contracts',
+    'menu_my_schedule', 'menu_my_profile', 'menu_my_goals', 'menu_team_goals', 'menu_my_contracts',
     'menu_career_wishes', 'menu_my_feedback', 'menu_refer_friend',
     'menu_my_sales', 'menu_my_shifts', 'menu_my_absence', 'menu_my_coaching'
   ],
