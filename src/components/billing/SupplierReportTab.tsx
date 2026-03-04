@@ -642,7 +642,7 @@ export function SupplierReportTab() {
                      <TableHead className="text-right">Dage</TableHead>
                      <TableHead className="text-right">Dagspris</TableHead>
                     <TableHead className="text-right">Beløb</TableHead>
-                    {discountType === "annual_revenue" && (
+                    {discountRules && discountRules.length > 0 && (
                       <>
                         <TableHead className="text-right">Rabat</TableHead>
                         <TableHead className="text-right">Efter rabat</TableHead>
@@ -703,7 +703,7 @@ export function SupplierReportTab() {
                       <TableCell className="text-right font-semibold">
                         {loc.totalAmount.toLocaleString("da-DK")} kr
                       </TableCell>
-                      {discountType === "annual_revenue" && (
+                      {discountRules && discountRules.length > 0 && (
                         <>
                           <TableCell className="text-right">
                             {loc.isExcluded ? (
@@ -728,7 +728,7 @@ export function SupplierReportTab() {
                     <TableCell className="text-right font-bold">
                       {totalAmountAll.toLocaleString("da-DK")} kr
                     </TableCell>
-                    {discountType === "annual_revenue" && (
+                    {discountRules && discountRules.length > 0 && (
                       <>
                         <TableCell className="text-right font-bold text-green-600">
                           -{totalDiscountAmount.toLocaleString("da-DK")} kr
