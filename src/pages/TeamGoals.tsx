@@ -436,7 +436,8 @@ export default function TeamGoals() {
                   ) : null}
                 </div>
               )}
-              <Label>Bonus beskrivelse (valgfrit)</Label>
+            </div>
+            <div>
               <Textarea
                 value={form.bonus_description}
                 onChange={(e) => setForm((f) => ({ ...f, bonus_description: e.target.value }))}
