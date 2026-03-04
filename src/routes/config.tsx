@@ -120,6 +120,7 @@ import {
   EconomicPosteringer,
   Cancellations,
   SystemStability,
+  TeamGoals,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
