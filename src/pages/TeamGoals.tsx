@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
-import { useTeamGoalForecast } from "@/hooks/useTeamGoalForecast";
+import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp, Sparkles, RotateCcw } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useTeamGoalForecast, type EmployeeForecast } from "@/hooks/useTeamGoalForecast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
