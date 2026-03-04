@@ -141,6 +141,7 @@ export default function TeamGoals() {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingId(null);
+    setShowBreakdown(false);
     setForm({
       team_id: "",
       month: currentMonth,
