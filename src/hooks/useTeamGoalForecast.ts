@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from "date-fns";
 
 export interface EmployeeForecast {
+  employeeId: string;
   name: string;
   prevSales: number;
   prevShifts: number;
   salesPerDay: number;
   targetShifts: number;
   forecast: number;
+  isNew: boolean;
+  startDate: string | null;
 }
 
 export interface TeamGoalForecast {
