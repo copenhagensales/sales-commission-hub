@@ -91,7 +91,24 @@ export function useTeamGoalForecast(
         }
       });
 
-      // 3. Fetch sales for prev month (counts_as_sale only)
+      // 3. Get team's clients and their campaigns for sales filtering
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id")
+        .eq("team_id", teamId);
+
+      const clientIds = (teamClients || []).map(tc => tc.client_id);
+
+      let campaignIds: string[] = [];
+      if (clientIds.length > 0) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .in("client_id", clientIds);
+        campaignIds = (campaigns || []).map(c => c.id);
+      }
+
+      // 4. Fetch sales for prev month (counts_as_sale only, filtered by team's campaigns)
       const allEmails = Array.from(new Set(
         Array.from(empEmailMap.values()).flat()
       ));
@@ -100,13 +117,14 @@ export function useTeamGoalForecast(
       const prevEndStr = format(prevEnd, "yyyy-MM-dd");
 
       let salesByEmail: Record<string, number> = {};
-      if (allEmails.length > 0) {
+      if (allEmails.length > 0 && campaignIds.length > 0) {
         const { data: salesData } = await supabase
           .from("sales")
           .select("agent_email, sale_items!inner(quantity, product_id, products!inner(counts_as_sale))")
           .gte("sale_datetime", prevStartStr)
           .lte("sale_datetime", prevEndStr + "T23:59:59")
-          .in("agent_email", allEmails);
+          .in("agent_email", allEmails)
+          .in("client_campaign_id", campaignIds);
 
         (salesData || []).forEach((s: any) => {
           const email = s.agent_email?.toLowerCase();

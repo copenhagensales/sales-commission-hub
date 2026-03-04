@@ -1,26 +1,26 @@
 
 
-## Problem
+## Problem: "Sidst besøgt" og Cooldown virker ikke
 
-The forecast hook (`useTeamGoalForecast.ts`) currently fetches **all sales** by an employee's agent email, regardless of which team/client the sale belongs to. This means when Benjamin and Hans switched from Eesy to Relatel, their Eesy sales are incorrectly included in the Relatel forecast.
+### Årsag
 
-Per the business rule documented in memory: sales ownership is determined by the **client's team assignment** via the `team_clients` table, not the seller's team membership.
+I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
 
-## Fix
+Det betyder:
+- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
+- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
+- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
 
-In `useTeamGoalForecast.ts`, add a filter so that only sales for clients assigned to the selected team are counted:
+### Fix
 
-1. **Fetch `team_clients`** for the selected `teamId` to get the list of `client_id`s belonging to that team
-2. **Fetch `client_campaigns`** for those client IDs to get the relevant `campaign_id`s
-3. **Filter the sales query** by adding `.in("client_campaign_id", campaignIds)` so only sales attributed to the team's clients are included
+**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
 
-This ensures that when an employee moves teams, their historical sales stay with the old team's clients, matching how the rest of the system attributes sales.
+1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
+   ```
+   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
+   ```
 
-## Changes
+2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
 
-**`src/hooks/useTeamGoalForecast.ts`** — Between fetching employee emails and fetching sales (around line 94):
-- Query `team_clients` for the selected `teamId` → get `client_id[]`
-- Query `client_campaigns` for those client IDs → get campaign `id[]`  
-- Add `.in("client_campaign_id", campaignIds)` to the sales query on line 104-109
-- If no campaigns found, skip sales fetch (all zeros)
+Kun én fil ændres, og det er en ren data-fetching bug.
 
