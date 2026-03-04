@@ -59,11 +59,33 @@ export default function TeamGoals() {
     bonus_tier3_description: "Valgfrit",
   });
 
-  const { forecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
+  const { forecast: rawForecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
     form.team_id || undefined,
     form.month,
     form.year
   );
+
+  // Calculate team average S/D from established (non-new) employees
+  const { avgSalesPerDay, adjustedForecast, adjustedPerEmployee } = useMemo(() => {
+    const established = perEmployee.filter(e => !e.isNew);
+    const totalSales = established.reduce((s, e) => s + e.prevSales, 0);
+    const totalShifts = established.reduce((s, e) => s + e.prevShifts, 0);
+    const avgSD = totalShifts > 0 ? Math.round((totalSales / totalShifts) * 100) / 100 : 0;
+
+    const adjusted = perEmployee.map(e => {
+      if (e.isNew && overriddenEmployees.has(e.employeeId)) {
+        const newForecast = Math.round(avgSD * e.targetShifts);
+        return { ...e, salesPerDay: avgSD, forecast: newForecast };
+      }
+      return e;
+    });
+
+    return {
+      avgSalesPerDay: avgSD,
+      adjustedForecast: adjusted.reduce((s, e) => s + e.forecast, 0),
+      adjustedPerEmployee: adjusted,
+    };
+  }, [perEmployee, overriddenEmployees]);
 
   const { data: teams } = useQuery({
     queryKey: ["teams-for-goals"],
