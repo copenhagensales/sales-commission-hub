@@ -461,8 +461,13 @@ export default function TeamGoals() {
                           );
                         })}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Baseret på {perEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
+                       <p className="text-xs text-muted-foreground">
+                        Baseret på {adjustedPerEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
+                        {overriddenEmployees.size > 0 && (
+                          <span className="ml-1 text-primary">
+                            ({overriddenEmployees.size} bruger gns. {avgSalesPerDay.toFixed(2)} S/D)
+                          </span>
+                        )}
                       </p>
                       <button
                         type="button"
@@ -486,16 +491,52 @@ export default function TeamGoals() {
                               </tr>
                             </thead>
                             <tbody>
-                              {perEmployee.map((e, i) => (
-                                <tr key={i} className="border-t border-border/50">
-                                  <td className="py-0.5 truncate max-w-[120px]">{e.name}</td>
-                                  <td className="text-right tabular-nums">{e.prevSales}</td>
-                                  <td className="text-right tabular-nums">{e.prevShifts}</td>
-                                  <td className="text-right tabular-nums">{e.salesPerDay.toFixed(2)}</td>
-                                  <td className="text-right tabular-nums">{e.targetShifts}</td>
-                                  <td className="text-right tabular-nums font-medium">{e.forecast}</td>
-                                </tr>
-                              ))}
+                              {adjustedPerEmployee.map((e, i) => {
+                                const isOverridden = e.isNew && overriddenEmployees.has(e.employeeId);
+                                return (
+                                  <tr key={i} className={`border-t border-border/50 ${e.isNew ? 'bg-primary/5' : ''}`}>
+                                    <td className="py-0.5 truncate max-w-[120px] flex items-center gap-1">
+                                      {e.isNew && (
+                                        <button
+                                          type="button"
+                                          title={isOverridden ? "Brug eget S/D" : "Brug team-gennemsnit S/D"}
+                                          className={`inline-flex items-center justify-center h-4 w-4 rounded-sm transition-colors ${
+                                            isOverridden
+                                              ? 'bg-primary text-primary-foreground'
+                                              : 'bg-muted text-muted-foreground hover:bg-accent'
+                                          }`}
+                                          onClick={() => {
+                                            setOverriddenEmployees(prev => {
+                                              const next = new Set(prev);
+                                              if (next.has(e.employeeId)) {
+                                                next.delete(e.employeeId);
+                                              } else {
+                                                next.add(e.employeeId);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                        >
+                                          {isOverridden ? <RotateCcw className="h-2.5 w-2.5" /> : <Sparkles className="h-2.5 w-2.5" />}
+                                        </button>
+                                      )}
+                                      {e.name}
+                                      {e.isNew && (
+                                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 ml-0.5">NY</Badge>
+                                      )}
+                                    </td>
+                                    <td className="text-right tabular-nums">{e.prevSales}</td>
+                                    <td className="text-right tabular-nums">{e.prevShifts}</td>
+                                    <td className={`text-right tabular-nums ${isOverridden ? 'text-primary font-medium' : ''}`}>
+                                      {e.salesPerDay.toFixed(2)}
+                                    </td>
+                                    <td className="text-right tabular-nums">{e.targetShifts}</td>
+                                    <td className={`text-right tabular-nums font-medium ${isOverridden ? 'text-primary' : ''}`}>
+                                      {e.forecast}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                           <p className="text-muted-foreground mt-1">* Vagter i den valgte måned</p>
