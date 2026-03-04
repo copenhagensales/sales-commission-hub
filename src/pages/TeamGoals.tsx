@@ -189,6 +189,7 @@ export default function TeamGoals() {
     setDialogOpen(false);
     setEditingId(null);
     setShowBreakdown(false);
+    setOverriddenEmployees(new Set());
     setForm({
       team_id: "",
       month: currentMonth,
