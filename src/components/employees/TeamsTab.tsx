@@ -322,6 +322,34 @@ export function TeamsTab() {
     },
   });
 
+  // Remove employee from team mutation
+  const removeFromTeamMutation = useMutation({
+    mutationFn: async ({ employeeId, teamId }: { employeeId: string; teamId: string }) => {
+      const { error } = await supabase
+        .from("team_members")
+        .delete()
+        .eq("employee_id", employeeId)
+        .eq("team_id", teamId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { employeeId }) => {
+      queryClient.invalidateQueries({ queryKey: ["teams-tab"] });
+      queryClient.invalidateQueries({ queryKey: ["team-members-mappings"] });
+      setFormData(prev => ({
+        ...prev,
+        employee_ids: prev.employee_ids.filter(id => id !== employeeId),
+      }));
+      toast({ title: "Medarbejder fjernet fra team" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Helper: count how many teams an employee belongs to
+  const getEmployeeTeamCount = (employeeId: string) =>
+    teamMembers.filter(tm => tm.employee_id === employeeId).length;
+
   // Move employee to team mutation
   // Database trigger automatically removes non-staff employees from other teams
   const moveEmployeeToTeamMutation = useMutation({
@@ -1362,6 +1390,19 @@ export function TeamsTab() {
                                 </span>
                               )}
                             </div>
+                            {getEmployeeTeamCount(emp.id) === 1 && editingTeam && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive rounded-full shrink-0"
+                                onClick={() => removeFromTeamMutation.mutate({
+                                  employeeId: emp.id,
+                                  teamId: editingTeam.id,
+                                })}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         ))}
                     </div>
