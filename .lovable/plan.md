@@ -1,29 +1,24 @@
 
 
-## Årsag til difference på Noa R. (99 vs 98)
+## Problem: `tab_fm_hotels` mangler i permission-gruppen
 
-De to boards bruger **forskellige tællemetoder**:
+Rettigheden `tab_fm_hotels` er korrekt defineret i `permissionKeys.ts` med `parent: 'menu_fm_booking'`, men den er **ikke tilføjet** til `children`-arrayet i `permissionGroups.ts` under `menu_fm_booking`.
 
-### CS Top 20 (99 salg)
-Bruger `kpi_leaderboard_cache`, som beregnes af `calculate-leaderboard-incremental`. Denne tæller **sale_items quantities** — dvs. hvis ét salg har en sale_item med `quantity = 2`, tæller det som 2 salg:
+Det betyder at Hotel-fanen ikke vises som en del af Booking-gruppen i Permission Editor, og derfor kan den ikke tildeles til Thomas' rolle.
+
+### Fix
+
+**Fil: `src/components/employees/permissions/permissionGroups.ts`** (linje 13)
+
+Tilføj `'tab_fm_hotels'` til `menu_fm_booking.children`:
+
+```typescript
+// Fra:
+children: ['tab_fm_book_week', 'tab_fm_bookings', 'tab_fm_markets', 'tab_fm_locations', 'tab_fm_vagtplan']
+
+// Til:
+children: ['tab_fm_book_week', 'tab_fm_bookings', 'tab_fm_markets', 'tab_fm_locations', 'tab_fm_vagtplan', 'tab_fm_hotels']
 ```
-saleSales += item.quantity || 1;  // Tæller pr. item quantity
-```
 
-### Fieldmarketing Dashboard (98 salg)  
-Tæller **rå sales-rækker** fra databasen. Hver unik salgsrække = 1, uanset antal items eller quantities:
-```
-sellerStats[sellerId].count += 1;  // Tæller pr. salgsrække
-```
-
-### Konklusion
-Noa har sandsynligvis mindst ét salg hvor `sale_items.quantity > 1` (f.eks. 2 enheder på én transaktion), eller ét salg med flere sale_items. CS Top 20 tæller alle enheder, FM-dashboardet tæller kun transaktioner.
-
-### Anbefalet fix
-Opdater Fieldmarketing Dashboardet til at tælle `sale_items` quantities i stedet for rå salgsrækker, så begge boards er konsistente. Ændringen er i `FieldmarketingDashboard.tsx`:
-
-1. **Månedlige sælgere** (linje ~108-156): Fetch `sale_items` med quantity for hver sale, og summer quantities i stedet for `count += 1`.
-2. **Daglige sælgere** (linje ~161-210): Samme ændring.
-
-Alternativt kan man vælge at lade FM-dashboardet bruge den cached leaderboard data (som CS Top 20 gør), men det ville begrænse fleksibiliteten med klient-filtrering.
+Derefter skal rettigheden `tab_fm_hotels` tildeles Thomas' rolle (via Permission Editor), og han vil kunne se og redigere hoteller.
 
