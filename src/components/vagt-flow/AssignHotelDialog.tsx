@@ -53,8 +53,10 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
   const [newName, setNewName] = useState("");
   const [newCity, setNewCity] = useState(city);
   const [newAddress, setNewAddress] = useState("");
+  const [newPostalCode, setNewPostalCode] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newDefaultPrice, setNewDefaultPrice] = useState("");
 
   // Pre-fill when editing
   useEffect(() => {
@@ -99,7 +101,9 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
       if (!newName || !newCity) return;
       const created = await createHotel.mutateAsync({
         name: newName, city: newCity, address: newAddress || null,
+        postal_code: newPostalCode || null,
         phone: newPhone || null, email: newEmail || null, notes: null,
+        default_price_per_night: newDefaultPrice ? Number(newDefaultPrice) : null,
       });
       hotelId = created.id;
     }
@@ -140,7 +144,14 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
               {!showNewHotel ? (
                 <div className="space-y-2">
                   <Label>Vælg hotel</Label>
-                  <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
+    <Select value={selectedHotelId} onValueChange={(val) => {
+                      setSelectedHotelId(val);
+                      // Auto-fill price from hotel default
+                      const hotel = hotels.find(h => h.id === val);
+                      if (hotel?.default_price_per_night != null && !pricePerNight) {
+                        setPricePerNight(hotel.default_price_per_night.toString());
+                      }
+                    }}>
                     <SelectTrigger><SelectValue placeholder="Vælg et hotel..." /></SelectTrigger>
                     <SelectContent>
                       {sortedHotels.map((h) => (
@@ -182,12 +193,20 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
                       <Input value={newAddress} onChange={(e) => setNewAddress(e.target.value)} />
                     </div>
                     <div>
+                      <Label className="text-xs">Postnummer</Label>
+                      <Input value={newPostalCode} onChange={(e) => setNewPostalCode(e.target.value)} />
+                    </div>
+                    <div>
                       <Label className="text-xs">Telefon</Label>
                       <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <Label className="text-xs">Email</Label>
                       <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} type="email" />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Standardpris pr. nat (DKK)</Label>
+                      <Input type="number" value={newDefaultPrice} onChange={(e) => setNewDefaultPrice(e.target.value)} placeholder="F.eks. 895" />
                     </div>
                   </div>
                 </div>

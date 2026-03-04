@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Hotel as HotelIcon, Star, Phone, Mail, MapPin } from "lucide-react";
+import { Plus, Pencil, Hotel as HotelIcon, Star, Phone, Mail, MapPin, DollarSign } from "lucide-react";
 import type { Hotel } from "@/hooks/useBookingHotels";
 
 export function HotelRegistry() {
@@ -59,10 +59,18 @@ export function HotelRegistry() {
                       <div className="flex items-center gap-2">
                         <HotelIcon className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{hotel.name}</span>
+                        {hotel.postal_code && (
+                          <span className="text-muted-foreground text-xs">{hotel.postal_code}</span>
+                        )}
                         {hotel.times_used > 0 && (
                           <Badge variant="outline" className="text-xs">
                             <Star className="h-3 w-3 mr-1" />
                             {hotel.times_used}x brugt
+                          </Badge>
+                        )}
+                        {hotel.default_price_per_night != null && (
+                          <Badge variant="secondary" className="text-xs">
+                            {hotel.default_price_per_night} DKK/nat
                           </Badge>
                         )}
                       </div>
@@ -125,15 +133,17 @@ function HotelFormDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   hotel: Hotel | null;
-  onSubmit: (v: { name: string; city: string; address: string | null; phone: string | null; email: string | null; notes: string | null }) => Promise<void>;
+  onSubmit: (v: { name: string; city: string; address: string | null; postal_code: string | null; phone: string | null; email: string | null; notes: string | null; default_price_per_night: number | null }) => Promise<void>;
   isPending: boolean;
 }) {
   const [name, setName] = useState(hotel?.name || "");
   const [city, setCity] = useState(hotel?.city || "");
   const [address, setAddress] = useState(hotel?.address || "");
+  const [postalCode, setPostalCode] = useState(hotel?.postal_code || "");
   const [phone, setPhone] = useState(hotel?.phone || "");
   const [email, setEmail] = useState(hotel?.email || "");
   const [notes, setNotes] = useState(hotel?.notes || "");
+  const [defaultPrice, setDefaultPrice] = useState(hotel?.default_price_per_night?.toString() || "");
 
   // Reset when hotel changes
   const key = hotel?.id || "new";
@@ -153,9 +163,13 @@ function HotelFormDialog({
             <Label>By *</Label>
             <Input value={city} onChange={(e) => setCity(e.target.value)} defaultValue={hotel?.city} />
           </div>
-          <div className="col-span-2">
+          <div>
             <Label>Adresse</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} defaultValue={hotel?.address || ""} />
+          </div>
+          <div>
+            <Label>Postnummer</Label>
+            <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} defaultValue={hotel?.postal_code || ""} />
           </div>
           <div>
             <Label>Telefon</Label>
@@ -165,7 +179,11 @@ function HotelFormDialog({
             <Label>Email</Label>
             <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" defaultValue={hotel?.email || ""} />
           </div>
-          <div className="col-span-2">
+          <div>
+            <Label>Standardpris pr. nat (DKK)</Label>
+            <Input type="number" value={defaultPrice} onChange={(e) => setDefaultPrice(e.target.value)} placeholder="F.eks. 895" />
+          </div>
+          <div>
             <Label>Bemærkninger</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} defaultValue={hotel?.notes || ""} />
           </div>
@@ -179,9 +197,11 @@ function HotelFormDialog({
                 name,
                 city,
                 address: address || null,
+                postal_code: postalCode || null,
                 phone: phone || null,
                 email: email || null,
                 notes: notes || null,
+                default_price_per_night: defaultPrice ? Number(defaultPrice) : null,
               })
             }
           >
