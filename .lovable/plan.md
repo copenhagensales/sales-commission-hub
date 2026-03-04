@@ -1,26 +1,35 @@
 
 
-## Problem: "Sidst besøgt" og Cooldown virker ikke
+## Bonustrappe for Teammål
 
-### Årsag
+### Koncept
+Erstat det frie tekstfelt "Bonus beskrivelse" med en struktureret 3-trins bonustrappe baseret på forecast-procenterne (+5%, +10%, +15%). Hver trin har et fast beløb pr. medarbejder og en beskrivelse.
 
-I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
+### Database-ændring
+Tilføj 3 nye kolonner til `team_monthly_goals`:
+- `bonus_tier1_amount` (integer, default 500) — beløb pr. medarbejder ved +5%
+- `bonus_tier1_description` (text, default 'Spisning på Retour Steak')
+- `bonus_tier2_amount` (integer, default 750) — beløb pr. medarbejder ved +10%
+- `bonus_tier2_description` (text, nullable)
+- `bonus_tier3_amount` (integer, default 1000) — beløb pr. medarbejder ved +15%
+- `bonus_tier3_description` (text, default 'Valgfrit')
 
-Det betyder:
-- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
-- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
-- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
+Behold `bonus_description` for bagudkompatibilitet (men skjul i UI).
 
-### Fix
+### UI-ændringer i TeamGoals.tsx
 
-**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
+**Opret/Rediger dialog:**
+- Erstat det frie tekstfelt med en visuel "trappe" med 3 trin
+- Hvert trin viser: procentmærke (+5/+10/+15%), forecast-baseret salgsmål, beløb pr. medarbejder (redigerbart), og kort beskrivelse (redigerbart)
+- Standardværdier udfyldes automatisk: 500/750/1.000 DKK
 
-1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
-   ```
-   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
-   ```
+**Tabel-visning:**
+- Erstat "Bonus beskrivelse" kolonnen med en kompakt visning af de 3 bonustrin (f.eks. "500 → 750 → 1.000 kr/medarbejder")
 
-2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
-
-Kun én fil ændres, og det er en ren data-fetching bug.
+### Teknisk implementering
+1. **Migration**: Tilføj de 6 nye kolonner
+2. **Form state**: Udvid `GoalForm` interface med bonus-trin felter
+3. **Dialog UI**: 3 rækker med ikon (trappe/medal), procent-badge, input for beløb, input for beskrivelse
+4. **Tabel**: Vis trinene kompakt i én kolonne
+5. **Upsert mutation**: Gem de nye felter ved opret/opdater
 
