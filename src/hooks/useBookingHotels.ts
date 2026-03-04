@@ -11,6 +11,8 @@ export interface Hotel {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  postal_code: string | null;
+  default_price_per_night: number | null;
   times_used: number;
   created_at: string;
 }

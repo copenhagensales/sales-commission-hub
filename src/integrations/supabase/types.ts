@@ -5655,33 +5655,39 @@ export type Database = {
           address: string | null
           city: string
           created_at: string
+          default_price_per_night: number | null
           email: string | null
           id: string
           name: string
           notes: string | null
           phone: string | null
+          postal_code: string | null
           times_used: number
         }
         Insert: {
           address?: string | null
           city: string
           created_at?: string
+          default_price_per_night?: number | null
           email?: string | null
           id?: string
           name: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           times_used?: number
         }
         Update: {
           address?: string | null
           city?: string
           created_at?: string
+          default_price_per_night?: number | null
           email?: string | null
           id?: string
           name?: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           times_used?: number
         }
         Relationships: []
