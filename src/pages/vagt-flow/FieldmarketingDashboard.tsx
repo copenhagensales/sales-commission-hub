@@ -112,19 +112,32 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
       const monthSales = await fetchAllRows<{
-        agent_name: string; raw_payload: any; sale_datetime: string;
+        id: string; agent_name: string; raw_payload: any; sale_datetime: string;
       }>(
         "sales",
-        "agent_name, raw_payload, sale_datetime",
+        "id, agent_name, raw_payload, sale_datetime",
         (q) => q.eq("source", "fieldmarketing")
           .contains("raw_payload", { fm_client_id: clientId })
           .gte("sale_datetime", monthStart),
         { orderBy: "sale_datetime", ascending: false }
       );
-      
 
+      // Fetch sale_items for these sales to get quantities
+      const saleIds = (monthSales || []).map(s => s.id);
+      const saleItemsMap: Record<string, number> = {};
+      if (saleIds.length > 0) {
+        const items = await fetchAllRows<{ sale_id: string; quantity: number }>(
+          "sale_items",
+          "sale_id, quantity",
+          (q) => q.in("sale_id", saleIds),
+          { orderBy: "sale_id", ascending: true }
+        );
+        (items || []).forEach((item: any) => {
+          saleItemsMap[item.sale_id] = (saleItemsMap[item.sale_id] || 0) + (item.quantity || 1);
+        });
+      }
 
-      // We need to fetch employee names separately
+      // Fetch employee names
       const sellerIds = [...new Set((monthSales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
       const { data: employeeData } = await supabase
         .from("employee_master_data")
@@ -133,7 +146,7 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       
       const employeeMap = new Map((employeeData || []).map(e => [e.id, e]));
       
-      // Group by seller
+      // Group by seller – count sale_items quantities instead of raw sales rows
       const sellerStats: Record<string, { name: string; count: number; commission: number }> = {};
       (monthSales || []).forEach((sale: any) => {
         const rawPayload = sale.raw_payload as any;
@@ -142,13 +155,14 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
         const sellerName = employee ? `${employee.first_name} ${employee.last_name}` : (sale.agent_name || "Ukendt");
         const productName = rawPayload?.fm_product_name;
         const commission = productCommissions?.[productName] || 0;
+        const unitCount = saleItemsMap[sale.id] || 1;
         
         if (!sellerId) return;
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, count: 0, commission: 0 };
         }
-        sellerStats[sellerId].count += 1;
-        sellerStats[sellerId].commission += commission;
+        sellerStats[sellerId].count += unitCount;
+        sellerStats[sellerId].commission += commission * unitCount;
       });
 
       // Convert to array and sort by commission
@@ -162,18 +176,31 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
     queryKey: ["fieldmarketing-day-sellers", clientId, productCommissions, dayStart],
     queryFn: async () => {
       const daySales = await fetchAllRows<{
-        agent_name: string; raw_payload: any; sale_datetime: string;
+        id: string; agent_name: string; raw_payload: any; sale_datetime: string;
       }>(
         "sales",
-        "agent_name, raw_payload, sale_datetime",
+        "id, agent_name, raw_payload, sale_datetime",
         (q) => q.eq("source", "fieldmarketing")
           .contains("raw_payload", { fm_client_id: clientId })
           .gte("sale_datetime", dayStart)
           .lte("sale_datetime", dayEnd),
         { orderBy: "sale_datetime", ascending: false }
       );
-      
 
+      // Fetch sale_items for these sales to get quantities
+      const saleIds = (daySales || []).map(s => s.id);
+      const saleItemsMap: Record<string, number> = {};
+      if (saleIds.length > 0) {
+        const items = await fetchAllRows<{ sale_id: string; quantity: number }>(
+          "sale_items",
+          "sale_id, quantity",
+          (q) => q.in("sale_id", saleIds),
+          { orderBy: "sale_id", ascending: true }
+        );
+        (items || []).forEach((item: any) => {
+          saleItemsMap[item.sale_id] = (saleItemsMap[item.sale_id] || 0) + (item.quantity || 1);
+        });
+      }
 
       // Fetch employee names
       const sellerIds = [...new Set((daySales || []).map((s: any) => (s.raw_payload as any)?.fm_seller_id).filter(Boolean))] as string[];
@@ -184,7 +211,7 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
       
       const employeeMap = new Map((employeeData || []).map(e => [e.id, e]));
 
-      // Group by seller
+      // Group by seller – count sale_items quantities instead of raw sales rows
       const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
       (daySales || []).forEach((sale: any) => {
         const rawPayload = sale.raw_payload as any;
@@ -193,13 +220,14 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
         const sellerName = employee ? `${employee.first_name} ${employee.last_name}` : (sale.agent_name || "Ukendt");
         const productName = rawPayload?.fm_product_name;
         const commission = productCommissions?.[productName] || 0;
+        const unitCount = saleItemsMap[sale.id] || 1;
         
         if (!sellerId) return;
         if (!sellerStats[sellerId]) {
           sellerStats[sellerId] = { name: sellerName, sales: 0, commission: 0 };
         }
-        sellerStats[sellerId].sales += 1;
-        sellerStats[sellerId].commission += commission;
+        sellerStats[sellerId].sales += unitCount;
+        sellerStats[sellerId].commission += commission * unitCount;
       });
 
       // Convert to array and sort by commission
