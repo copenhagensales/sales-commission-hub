@@ -9441,6 +9441,12 @@ export type Database = {
       team_monthly_goals: {
         Row: {
           bonus_description: string | null
+          bonus_tier1_amount: number
+          bonus_tier1_description: string | null
+          bonus_tier2_amount: number
+          bonus_tier2_description: string | null
+          bonus_tier3_amount: number
+          bonus_tier3_description: string | null
           created_at: string
           id: string
           month: number
@@ -9451,6 +9457,12 @@ export type Database = {
         }
         Insert: {
           bonus_description?: string | null
+          bonus_tier1_amount?: number
+          bonus_tier1_description?: string | null
+          bonus_tier2_amount?: number
+          bonus_tier2_description?: string | null
+          bonus_tier3_amount?: number
+          bonus_tier3_description?: string | null
           created_at?: string
           id?: string
           month: number
@@ -9461,6 +9473,12 @@ export type Database = {
         }
         Update: {
           bonus_description?: string | null
+          bonus_tier1_amount?: number
+          bonus_tier1_description?: string | null
+          bonus_tier2_amount?: number
+          bonus_tier2_description?: string | null
+          bonus_tier3_amount?: number
+          bonus_tier3_description?: string | null
           created_at?: string
           id?: string
           month?: number
