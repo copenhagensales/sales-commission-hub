@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
-import { useTeamGoalForecast } from "@/hooks/useTeamGoalForecast";
+import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp, Sparkles, RotateCcw } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useTeamGoalForecast, type EmployeeForecast } from "@/hooks/useTeamGoalForecast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ export default function TeamGoals() {
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterMonth, setFilterMonth] = useState<number | null>(currentMonth);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [overriddenEmployees, setOverriddenEmployees] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<GoalForm>({
     team_id: "",
     month: currentMonth,
@@ -58,11 +59,33 @@ export default function TeamGoals() {
     bonus_tier3_description: "Valgfrit",
   });
 
-  const { forecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
+  const { forecast: rawForecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
     form.team_id || undefined,
     form.month,
     form.year
   );
+
+  // Calculate team average S/D from established (non-new) employees
+  const { avgSalesPerDay, adjustedForecast, adjustedPerEmployee } = useMemo(() => {
+    const established = perEmployee.filter(e => !e.isNew);
+    const totalSales = established.reduce((s, e) => s + e.prevSales, 0);
+    const totalShifts = established.reduce((s, e) => s + e.prevShifts, 0);
+    const avgSD = totalShifts > 0 ? Math.round((totalSales / totalShifts) * 100) / 100 : 0;
+
+    const adjusted = perEmployee.map(e => {
+      if (e.isNew && overriddenEmployees.has(e.employeeId)) {
+        const newForecast = Math.round(avgSD * e.targetShifts);
+        return { ...e, salesPerDay: avgSD, forecast: newForecast };
+      }
+      return e;
+    });
+
+    return {
+      avgSalesPerDay: avgSD,
+      adjustedForecast: adjusted.reduce((s, e) => s + e.forecast, 0),
+      adjustedPerEmployee: adjusted,
+    };
+  }, [perEmployee, overriddenEmployees]);
 
   const { data: teams } = useQuery({
     queryKey: ["teams-for-goals"],
@@ -166,6 +189,7 @@ export default function TeamGoals() {
     setDialogOpen(false);
     setEditingId(null);
     setShowBreakdown(false);
+    setOverriddenEmployees(new Set());
     setForm({
       team_id: "",
       month: currentMonth,
@@ -413,17 +437,17 @@ export default function TeamGoals() {
                 <div className="mt-2 space-y-1">
                   {forecastLoading ? (
                     <p className="text-xs text-muted-foreground">Beregner forecast...</p>
-                  ) : forecast > 0 ? (
+                  ) : adjustedForecast > 0 ? (
                     <>
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
                         <span className="text-sm font-medium">
-                          Forecast: {forecast.toLocaleString("da-DK")}
+                          Forecast: {adjustedForecast.toLocaleString("da-DK")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         {[5, 10, 15].map((pct) => {
-                          const target = Math.round(forecast * (1 + pct / 100));
+                          const target = Math.round(adjustedForecast * (1 + pct / 100));
                           return (
                             <Button
                               key={pct}
@@ -438,8 +462,13 @@ export default function TeamGoals() {
                           );
                         })}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Baseret på {perEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
+                       <p className="text-xs text-muted-foreground">
+                        Baseret på {adjustedPerEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
+                        {overriddenEmployees.size > 0 && (
+                          <span className="ml-1 text-primary">
+                            ({overriddenEmployees.size} bruger gns. {avgSalesPerDay.toFixed(2)} S/D)
+                          </span>
+                        )}
                       </p>
                       <button
                         type="button"
@@ -463,23 +492,59 @@ export default function TeamGoals() {
                               </tr>
                             </thead>
                             <tbody>
-                              {perEmployee.map((e, i) => (
-                                <tr key={i} className="border-t border-border/50">
-                                  <td className="py-0.5 truncate max-w-[120px]">{e.name}</td>
-                                  <td className="text-right tabular-nums">{e.prevSales}</td>
-                                  <td className="text-right tabular-nums">{e.prevShifts}</td>
-                                  <td className="text-right tabular-nums">{e.salesPerDay.toFixed(2)}</td>
-                                  <td className="text-right tabular-nums">{e.targetShifts}</td>
-                                  <td className="text-right tabular-nums font-medium">{e.forecast}</td>
-                                </tr>
-                              ))}
+                              {adjustedPerEmployee.map((e, i) => {
+                                const isOverridden = e.isNew && overriddenEmployees.has(e.employeeId);
+                                return (
+                                  <tr key={i} className={`border-t border-border/50 ${e.isNew ? 'bg-primary/5' : ''}`}>
+                                    <td className="py-0.5 truncate max-w-[120px] flex items-center gap-1">
+                                      {e.isNew && (
+                                        <button
+                                          type="button"
+                                          title={isOverridden ? "Brug eget S/D" : "Brug team-gennemsnit S/D"}
+                                          className={`inline-flex items-center justify-center h-4 w-4 rounded-sm transition-colors ${
+                                            isOverridden
+                                              ? 'bg-primary text-primary-foreground'
+                                              : 'bg-muted text-muted-foreground hover:bg-accent'
+                                          }`}
+                                          onClick={() => {
+                                            setOverriddenEmployees(prev => {
+                                              const next = new Set(prev);
+                                              if (next.has(e.employeeId)) {
+                                                next.delete(e.employeeId);
+                                              } else {
+                                                next.add(e.employeeId);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                        >
+                                          {isOverridden ? <RotateCcw className="h-2.5 w-2.5" /> : <Sparkles className="h-2.5 w-2.5" />}
+                                        </button>
+                                      )}
+                                      {e.name}
+                                      {e.isNew && (
+                                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 ml-0.5">NY</Badge>
+                                      )}
+                                    </td>
+                                    <td className="text-right tabular-nums">{e.prevSales}</td>
+                                    <td className="text-right tabular-nums">{e.prevShifts}</td>
+                                    <td className={`text-right tabular-nums ${isOverridden ? 'text-primary font-medium' : ''}`}>
+                                      {e.salesPerDay.toFixed(2)}
+                                    </td>
+                                    <td className="text-right tabular-nums">{e.targetShifts}</td>
+                                    <td className={`text-right tabular-nums font-medium ${isOverridden ? 'text-primary' : ''}`}>
+                                      {e.forecast}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                           <p className="text-muted-foreground mt-1">* Vagter i den valgte måned</p>
                         </div>
                       )}
                     </>
-                  ) : forecast === 0 && !forecastLoading && form.team_id ? (
+                  ) : adjustedForecast === 0 && !forecastLoading && form.team_id ? (
                     <p className="text-xs text-muted-foreground">Ingen salgsdata fra {prevMonthLabel}</p>
                   ) : null}
                 </div>

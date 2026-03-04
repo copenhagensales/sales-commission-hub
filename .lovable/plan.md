@@ -1,33 +1,29 @@
 
 
-## Ny-medarbejder toggle i forecast breakdown
+## Årsag til difference på Noa R. (99 vs 98)
 
-### Mål
-I forecast-breakdown-tabellen (når man opretter teammål) skal medarbejdere der er startet inden for de seneste 20 dage markeres med et ikon. En toggle-knap ved siden af deres navn lader brugeren erstatte deres individuelle S/D med teamets gennemsnit-S/D, så forecasted opdateres tilsvarende.
+De to boards bruger **forskellige tællemetoder**:
 
-### Ændringer
-
-**1. `src/hooks/useTeamGoalForecast.ts`**
-- Tilføj `employment_start_date` til `employee_master_data` query
-- Tilføj `employeeId` og `startDate` felter til `EmployeeForecast` interfacet
-- Beregn `isNew` (startet inden for 20 dage fra nu) og inkluder i output
-
-**2. `src/pages/TeamGoals.tsx`**
-- Tilføj state: `overriddenEmployees: Set<string>` — tracker hvilke nye medarbejdere der bruger gennemsnit
-- Beregn `avgSalesPerDay` fra alle medarbejdere der IKKE er overridden og IKKE er nye (eller kun fra dem med data)
-- I breakdown-tabellen:
-  - Vis et 🆕 ikon/badge ved nye medarbejdere (< 20 dage)
-  - Vis en toggle-knap ved nye medarbejdere
-  - Når toggled: erstat S/D med teamgennemsnit, genberegn forecast for den medarbejder
-- Opdater total forecast-tallet dynamisk baseret på overrides
-- Forecast-knapperne (+5%, +10%, +15%) bruger det justerede total
-
-### UI i breakdown-tabellen
-```text
-Navn              Salg  Vagter  S/D    Vagter*  Forecast
-Christoffer L.    112   20      5.60   22       123
-🆕 [⟳] Ny Medarbj  5    20      0.25   22       → 94  (bruger avg 4.25)
+### CS Top 20 (99 salg)
+Bruger `kpi_leaderboard_cache`, som beregnes af `calculate-leaderboard-incremental`. Denne tæller **sale_items quantities** — dvs. hvis ét salg har en sale_item med `quantity = 2`, tæller det som 2 salg:
+```
+saleSales += item.quantity || 1;  // Tæller pr. item quantity
 ```
 
-Toggle-knappen skifter mellem medarbejderens eget S/D og teamgennemsnittet. Forecast-totalen opdateres live.
+### Fieldmarketing Dashboard (98 salg)  
+Tæller **rå sales-rækker** fra databasen. Hver unik salgsrække = 1, uanset antal items eller quantities:
+```
+sellerStats[sellerId].count += 1;  // Tæller pr. salgsrække
+```
+
+### Konklusion
+Noa har sandsynligvis mindst ét salg hvor `sale_items.quantity > 1` (f.eks. 2 enheder på én transaktion), eller ét salg med flere sale_items. CS Top 20 tæller alle enheder, FM-dashboardet tæller kun transaktioner.
+
+### Anbefalet fix
+Opdater Fieldmarketing Dashboardet til at tælle `sale_items` quantities i stedet for rå salgsrækker, så begge boards er konsistente. Ændringen er i `FieldmarketingDashboard.tsx`:
+
+1. **Månedlige sælgere** (linje ~108-156): Fetch `sale_items` med quantity for hver sale, og summer quantities i stedet for `count += 1`.
+2. **Daglige sælgere** (linje ~161-210): Samme ændring.
+
+Alternativt kan man vælge at lade FM-dashboardet bruge den cached leaderboard data (som CS Top 20 gør), men det ville begrænse fleksibiliteten med klient-filtrering.
 
