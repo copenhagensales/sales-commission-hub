@@ -634,6 +634,7 @@ export function usePermissions() {
     canViewCommissionLeague: hasPermission("menu_commission_league"),
     canViewMyProfile: canView("menu_my_profile"),
     canViewMyGoals: hasPermission("menu_my_goals"),
+    canViewTeamGoals: hasPermission("menu_team_goals"),
     canViewMyContracts: hasPermission("menu_my_contracts"),
     canViewCareerWishes: hasPermission("menu_career_wishes"),
     canViewMyFeedback: hasPermission("menu_my_feedback"),

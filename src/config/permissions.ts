@@ -76,6 +76,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_my_schedule", label: "Min kalender", description: "Adgang til egen kalender", hasEditOption: false },
       { key: "menu_my_profile", label: "Min profil", description: "Adgang til egen profil", hasEditOption: true },
       { key: "menu_my_goals", label: "Mine Mål", description: "Adgang til personlige mål", hasEditOption: false },
+      { key: "menu_team_goals", label: "Teammål", description: "Adgang til teammål", hasEditOption: false },
       {
         key: "menu_my_contracts",
         label: "Mine kontrakter",
