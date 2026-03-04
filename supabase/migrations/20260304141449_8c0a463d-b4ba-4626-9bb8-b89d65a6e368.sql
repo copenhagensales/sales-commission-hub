@@ -1,0 +1,1 @@
+UPDATE role_page_permissions SET permission_type = 'page' WHERE permission_key = 'menu_fm_travel_expenses' AND permission_type = 'tab';
