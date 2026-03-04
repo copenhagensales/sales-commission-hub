@@ -1,26 +1,27 @@
 
 
-## Problem: "Sidst besøgt" og Cooldown virker ikke
+## Plan: Add "Teammål" page under "Mit Hjem"
 
-### Årsag
+### What we'll build
+A new "Teammål" (Team Goals) page accessible from the "Mit Hjem" sidebar menu, placed after "Løn & Mål". Initially a placeholder page that can be filled with content later.
 
-I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
+### Steps
 
-Det betyder:
-- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
-- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
-- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
+1. **Add permission key** `menu_team_goals` in `src/config/permissionKeys.ts` under the MIT HJEM section.
 
-### Fix
+2. **Add permission to config** in `src/config/permissions.ts` under the "menu_mit_hjem" group.
 
-**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
+3. **Add permission mapping** in `src/hooks/usePositionPermissions.ts` — add `canViewTeamGoals: hasPermission("menu_team_goals")`.
 
-1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
-   ```
-   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
-   ```
+4. **Create page component** `src/pages/TeamGoals.tsx` — simple placeholder page wrapped in `MainLayout` with a title "Teammål".
 
-2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
+5. **Export lazy page** in `src/routes/pages.ts` — add `TeamGoals` lazy import.
 
-Kun én fil ændres, og det er en ren data-fetching bug.
+6. **Add route** in `src/routes/config.tsx` — path `/team-goals`, permission `menu_team_goals`, under the personal menu routes.
+
+7. **Add sidebar link** in `src/components/layout/AppSidebar.tsx` — add a NavLink to `/team-goals` after the "Løn & Mål" entry, gated by `p.canViewTeamGoals`, using the `Users` or `Target` icon.
+
+8. **Add to PreviewSidebar** in `src/components/layout/PreviewSidebar.tsx` — add `menu_team_goals` entry to the personal menu items map.
+
+9. **Add icon mapping** in `src/components/employees/PermissionsTab.tsx` for the new permission key.
 
