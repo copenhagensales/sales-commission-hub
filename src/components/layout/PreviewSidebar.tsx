@@ -33,6 +33,7 @@ const PERSONAL_MENU_ITEMS = {
   menu_my_schedule: { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   menu_my_profile: { name: "Min profil", href: "/my-profile", icon: User },
   menu_my_contracts: { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  menu_team_goals: { name: "Teammål", href: "/team-goals", icon: UserCheck },
   menu_career_wishes: { name: "Karriereønsker", href: "/career-wishes", icon: Sparkles },
   menu_time_stamp: { name: "Stempel ind/ud", href: "/time-stamp", icon: Clock },
   menu_tdc_opsummering: { name: "TDC Opsummering", href: "/tdc-opsummering", icon: FileText },

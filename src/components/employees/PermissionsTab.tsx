@@ -66,6 +66,7 @@ const permissionIconMap: Record<string, React.ReactNode> = {
   menu_my_schedule: <UserCheck className="h-4 w-4" />,
   menu_my_profile: <User className="h-4 w-4" />,
   menu_my_goals: <Target className="h-4 w-4" />,
+  menu_team_goals: <Users className="h-4 w-4" />,
   menu_my_contracts: <FileText className="h-4 w-4" />,
   menu_career_wishes: <Sparkles className="h-4 w-4" />,
   menu_my_feedback: <MessageSquare className="h-4 w-4" />,

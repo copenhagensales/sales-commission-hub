@@ -62,6 +62,7 @@ export const PERMISSION_KEYS = {
   menu_my_schedule: { label: 'Min vagtplan', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_my_profile: { label: 'Min profil', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_my_goals: { label: 'Mine mål', section: 'mit_hjem', parent: 'menu_section_personal' },
+  menu_team_goals: { label: 'Teammål', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_my_contracts: { label: 'Mine kontrakter', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_career_wishes: { label: 'Karriereønsker', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_my_feedback: { label: 'Min feedback', section: 'mit_hjem', parent: 'menu_section_personal' },

@@ -136,6 +136,7 @@ export const routes: RouteConfig[] = [
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
   { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/my-goals/:employeeId", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
+  { path: "/team-goals", component: TeamGoals, access: "role", positionPermission: "menu_team_goals" },
   { path: "/my-contracts", component: MyContractsRedirect, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
   { path: "/career-wishes", component: CareerWishesRedirect, access: "protected" },
