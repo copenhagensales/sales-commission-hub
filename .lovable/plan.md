@@ -1,26 +1,20 @@
 
 
-## Problem: "Sidst besøgt" og Cooldown virker ikke
+## Hvorfor Thomas Wehage ikke kan se diæter
 
 ### Årsag
+Thomas Wehage har **0 rækker** i `booking_diet`-tabellen. Diæter er kun oprettet for specifikke medarbejdere (Theo, Jonathan, Michelle, Lucas, Frederik) — ikke for Thomas.
 
-I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
+Medarbejdervisningen ("Min vagtplan") filtrerer diæter med `.eq("employee_id", employeeId)`, så Thomas ser kun sine egne diæter — og han har ingen.
 
-Det betyder:
-- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
-- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
-- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
+### To mulige løsninger
 
-### Fix
+**A) Dataproblem (mest sandsynligt):** Thomas mangler simpelthen diæt-tildelinger i databasen. Når diæter oprettes for en booking, skal alle tildelte medarbejdere på den booking+dato også få en `booking_diet`-række. → Tjek om diætoprettelsen i admin-UI'et automatisk opretter rækker for alle tildelte medarbejdere, eller kun for udvalgte.
 
-**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
+**B) UI-ændring:** Vis diæt-badge til ALLE medarbejdere på en booking+dato, selvom de ikke personligt har en `booking_diet`-række. Ændring i `MyBookingSchedule.tsx`: hent diæter for hele bookingen (uden `employee_id`-filter) og vis badge hvis der eksisterer en diæt for booking+dato.
 
-1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
-   ```
-   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
-   ```
+### Anbefaling
+**Løsning B** — ændre `MyBookingSchedule.tsx` til at vise diæt-badgen for alle medarbejdere på en given booking+dato, uanset om de personligt har en `booking_diet`-række. Dermed ser Thomas at der er diæt tildelt på markedet, selvom hans specifikke diætrække mangler.
 
-2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
-
-Kun én fil ændres, og det er en ren data-fetching bug.
+Ændringen er lille: fjern `.eq("employee_id", employeeId)` fra diæt-queryen i `MyBookingSchedule.tsx`, så den henter alle diæter for de relevante bookinger og viser badge hvis mindst én diæt findes for booking+dato.
 
