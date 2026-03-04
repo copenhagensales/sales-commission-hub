@@ -37,6 +37,7 @@ export default function TeamGoals() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterMonth, setFilterMonth] = useState<number | null>(currentMonth);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [form, setForm] = useState<GoalForm>({
     team_id: "",
     month: currentMonth,
@@ -44,6 +45,12 @@ export default function TeamGoals() {
     sales_target: 0,
     bonus_description: "",
   });
+
+  const { forecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
+    form.team_id || undefined,
+    form.month,
+    form.year
+  );
 
   const { data: teams } = useQuery({
     queryKey: ["teams-for-goals"],
