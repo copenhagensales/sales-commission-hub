@@ -233,7 +233,7 @@ export const PERMISSION_KEYS = {
   menu_fm_vehicles: { label: 'Køretøjer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_sales_registration: { label: 'Salgsregistrering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_billing: { label: 'Fakturering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_travel_expenses: { label: 'Rejseudgifter', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
+  menu_fm_travel_expenses: { label: 'Rejsekort og diæter', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_edit_sales: { label: 'Ret salg', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_time_off: { label: 'Fraværsanmodninger', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_book_week: { label: 'Book uge', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
