@@ -1,26 +1,46 @@
 
 
-## Problem: "Sidst besøgt" og Cooldown virker ikke
+## Plan: Forecast-baseret salgsmål i TeamGoals
 
-### Årsag
+### Mål
+Når et team og en måned/år er valgt i "Opret teammål"-dialogen, beregnes et foreslået salgsmål baseret på forrige måneds salg/dag per medarbejder × antal vagter i den valgte måned.
 
-I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
+### Beregningslogik
 
-Det betyder:
-- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
-- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
-- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
+**For hver medarbejder i teamet:**
 
-### Fix
+1. **Forrige måned**: Beregn antal "normale vagter" og antal salg (counts_as_sale)
+2. **Salg/dag** = salg ÷ normale vagter i forrige måned
+3. **Vagter i valgt måned** = antal normale vagter i den valgte måned
+4. **Forecast for medarbejder** = salg/dag × vagter i valgt måned
+5. **Team forecast** = sum af alle medarbejderes forecasts
 
-**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
+**Normal vagt** = dag hvor vagt eksisterer (hierarki: `shift` → `employee_standard_shifts` → `team_standard_shifts/team_standard_shift_days`) OG IKKE godkendt fravær (sick/vacation/no_show).
 
-1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
-   ```
-   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
-   ```
+### Tekniske ændringer
 
-2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
+**Ny hook: `src/hooks/useTeamGoalForecast.ts`**
+- Input: `teamId`, `month`, `year`
+- Beregner `previousMonth` = valgt måned - 1
+- Henter:
+  - Team-medarbejdere via `team_members` + `employee_master_data` (is_active)
+  - Agent emails via `employee_agent_mapping`
+  - Salg i forrige måned via `useSalesAggregatesExtended` (counts_as_sale, groupBy employee)
+  - Vagtdata: `shift`, `employee_standard_shifts`, `team_standard_shifts`, `team_standard_shift_days`
+  - Fravær: `absence_request_v2` (approved, type in sick/vacation/no_show) for begge måneder
+- Beregner normale vagter per medarbejder for begge måneder (genbruger hierarki-logikken fra `useKpiTest.ts` linje 609-816)
+- Returnerer: `{ forecast: number, perEmployee: Array<{name, prevSales, prevShifts, salesPerDay, targetShifts, forecast}>, isLoading }`
 
-Kun én fil ændres, og det er en ren data-fetching bug.
+**Ændring: `src/pages/TeamGoals.tsx`**
+- Kald `useTeamGoalForecast(form.team_id, form.month, form.year)` i dialogen
+- Vis forslaget som et badge/label under Salgsmål-feltet: "Foreslået: 342" med en "Anvend" knap
+- Klik på "Anvend" sætter `form.sales_target` til forecast-værdien
+- Vis eventuelt en tooltip/expandable med per-medarbejder breakdown
+
+### UI
+- Under `Salgsmål` inputfeltet vises (når forecast er loaded og > 0):
+  ```
+  💡 Foreslået mål: 342  [Anvend]
+  ```
+- Lille tekst: "Baseret på X medarbejderes salg/dag i [forrige måned]"
 
