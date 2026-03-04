@@ -1,6 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Target, Plus, Pencil, Trash2, Users, Calendar } from "lucide-react";
+import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { useTeamGoalForecast } from "@/hooks/useTeamGoalForecast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,7 @@ export default function TeamGoals() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterMonth, setFilterMonth] = useState<number | null>(currentMonth);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [form, setForm] = useState<GoalForm>({
     team_id: "",
     month: currentMonth,
@@ -43,6 +45,12 @@ export default function TeamGoals() {
     sales_target: 0,
     bonus_description: "",
   });
+
+  const { forecast, perEmployee, isLoading: forecastLoading, prevMonthLabel } = useTeamGoalForecast(
+    form.team_id || undefined,
+    form.month,
+    form.year
+  );
 
   const { data: teams } = useQuery({
     queryKey: ["teams-for-goals"],
@@ -133,6 +141,7 @@ export default function TeamGoals() {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingId(null);
+    setShowBreakdown(false);
     setForm({
       team_id: "",
       month: currentMonth,
@@ -360,9 +369,76 @@ export default function TeamGoals() {
                 onChange={(e) => setForm((f) => ({ ...f, sales_target: Number(e.target.value) }))}
                 placeholder="F.eks. 500"
               />
+              {/* Forecast suggestion */}
+              {form.team_id && !editingId && (
+                <div className="mt-2 space-y-1">
+                  {forecastLoading ? (
+                    <p className="text-xs text-muted-foreground">Beregner forecast...</p>
+                  ) : forecast > 0 ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-medium">
+                          Foreslået mål: {forecast.toLocaleString("da-DK")}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setForm((f) => ({ ...f, sales_target: forecast }))}
+                        >
+                          Anvend
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Baseret på {perEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
+                      </p>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        onClick={() => setShowBreakdown((v) => !v)}
+                      >
+                        {showBreakdown ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        {showBreakdown ? "Skjul detaljer" : "Vis detaljer"}
+                      </button>
+                      {showBreakdown && (
+                        <div className="rounded-md border bg-muted/50 p-2 text-xs max-h-48 overflow-y-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="text-muted-foreground">
+                                <th className="text-left pb-1">Navn</th>
+                                <th className="text-right pb-1">Salg</th>
+                                <th className="text-right pb-1">Vagter</th>
+                                <th className="text-right pb-1">S/D</th>
+                                <th className="text-right pb-1">Vagter*</th>
+                                <th className="text-right pb-1">Forecast</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {perEmployee.map((e, i) => (
+                                <tr key={i} className="border-t border-border/50">
+                                  <td className="py-0.5 truncate max-w-[120px]">{e.name}</td>
+                                  <td className="text-right tabular-nums">{e.prevSales}</td>
+                                  <td className="text-right tabular-nums">{e.prevShifts}</td>
+                                  <td className="text-right tabular-nums">{e.salesPerDay.toFixed(2)}</td>
+                                  <td className="text-right tabular-nums">{e.targetShifts}</td>
+                                  <td className="text-right tabular-nums font-medium">{e.forecast}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <p className="text-muted-foreground mt-1">* Vagter i den valgte måned</p>
+                        </div>
+                      )}
+                    </>
+                  ) : forecast === 0 && !forecastLoading && form.team_id ? (
+                    <p className="text-xs text-muted-foreground">Ingen salgsdata fra {prevMonthLabel}</p>
+                  ) : null}
+                </div>
+              )}
             </div>
             <div>
-              <Label>Bonus beskrivelse (valgfrit)</Label>
               <Textarea
                 value={form.bonus_description}
                 onChange={(e) => setForm((f) => ({ ...f, bonus_description: e.target.value }))}
