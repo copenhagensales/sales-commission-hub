@@ -70,7 +70,7 @@ export function useTeamGoalForecast(
       const [empRes, agentRes] = await Promise.all([
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id")
+          .select("id, first_name, last_name, team_id, employment_start_date")
           .in("id", employeeIds)
           .eq("is_active", true),
         supabase
@@ -261,13 +261,20 @@ export function useTeamGoalForecast(
         const salesPerDay = prevShifts > 0 ? prevSales / prevShifts : 0;
         const forecast = Math.round(salesPerDay * targetShifts);
 
+        const isNew = emp.employment_start_date
+          ? differenceInDays(new Date(), new Date(emp.employment_start_date)) <= 20
+          : false;
+
         perEmployee.push({
+          employeeId: emp.id,
           name: `${emp.first_name} ${emp.last_name}`,
           prevSales,
           prevShifts,
           salesPerDay: Math.round(salesPerDay * 100) / 100,
           targetShifts,
           forecast,
+          isNew,
+          startDate: emp.employment_start_date || null,
         });
       }
 
