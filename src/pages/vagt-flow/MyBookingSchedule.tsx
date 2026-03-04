@@ -127,7 +127,6 @@ export default function MyBookingSchedule() {
       const { data } = await supabase
         .from("booking_diet")
         .select("booking_id, date, amount")
-        .eq("employee_id", employeeId)
         .in("booking_id", bookingIds);
       return data ?? [];
     },
