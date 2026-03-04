@@ -307,7 +307,7 @@ export default function TeamGoals() {
                       <TableHead>Team</TableHead>
                       <TableHead>Måned</TableHead>
                       <TableHead className="text-right">Salgsmål</TableHead>
-                      <TableHead>Bonus beskrivelse</TableHead>
+                      <TableHead>Bonustrappe (pr. medarb.)</TableHead>
                       <TableHead className="w-24" />
                     </TableRow>
                   </TableHeader>
