@@ -379,17 +379,25 @@ export default function TeamGoals() {
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
                         <span className="text-sm font-medium">
-                          Foreslået mål: {forecast.toLocaleString("da-DK")}
+                          Forecast: {forecast.toLocaleString("da-DK")}
                         </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          onClick={() => setForm((f) => ({ ...f, sales_target: forecast }))}
-                        >
-                          Anvend
-                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {[5, 10, 15].map((pct) => {
+                          const target = Math.round(forecast * (1 + pct / 100));
+                          return (
+                            <Button
+                              key={pct}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setForm((f) => ({ ...f, sales_target: target }))}
+                            >
+                              +{pct}%: {target.toLocaleString("da-DK")}
+                            </Button>
+                          );
+                        })}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Baseret på {perEmployee.length} medarbejderes salg/dag i {prevMonthLabel}
