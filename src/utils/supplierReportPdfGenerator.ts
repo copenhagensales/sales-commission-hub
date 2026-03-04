@@ -100,7 +100,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
         <td class="num">${typeof loc.dailyRate === "number" ? fmtKr(loc.dailyRate) : loc.dailyRate}</td>
         <td class="num">${fmtKr(loc.amount)}</td>
         ${
-          showDiscount && isAnnualRevenue
+          showDiscount
             ? `<td class="num accent">${loc.isExcluded ? '<span class="muted">Separat</span>' : `-${loc.discount}%`}</td>
                <td class="num">${loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</td>`
             : ""
@@ -276,15 +276,15 @@ tfoot td{font-weight:700;background:#f1f5f9;color:#0f172a;border-top:2px solid #
         <tr>
           <th>Lokation</th><th>ID</th><th>By</th><th>Kunde</th><th>Uger & Dage</th>
           <th class="num">Book.</th><th class="num">Dage</th><th class="num">Dagspris</th><th class="num">Beløb</th>
-          ${showDiscount && isAnnualRevenue ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
+          ${showDiscount ? '<th class="num">Rabat</th><th class="num">Efter rabat</th>' : ""}
         </tr>
       </thead>
       <tbody>${locationRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="${showDiscount && isAnnualRevenue ? 8 : 8}">Subtotal</td>
+          <td colspan="${showDiscount ? 8 : 8}">Subtotal</td>
           <td class="num">${fmtKr(config.totals.subtotal)}</td>
-          ${showDiscount && isAnnualRevenue ? `<td class="num accent">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
+          ${showDiscount ? `<td class="num accent">-${fmtKr(config.totals.discountAmount)}</td><td class="num">${fmtKr(config.totals.finalAmount)}</td>` : ""}
         </tr>
       </tfoot>
     </table>
