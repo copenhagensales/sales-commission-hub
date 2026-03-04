@@ -1,26 +1,26 @@
 
 
-## Plan: Erstat "Anvend" med 3 target-niveauer
+## Problem: "Sidst besøgt" og Cooldown virker ikke
 
-### Ændring
+### Årsag
 
-I `src/pages/TeamGoals.tsx` (linje 378-393) erstattes den nuværende "Foreslået mål: X [Anvend]" sektion med 3 klikbare target-knapper baseret på forecast-beregningen:
+I booking-queryen (linje 126) bruges Supabase-relationen `clients:client_id(id, name)`, som **erstatter** `client_id` med et `clients`-objekt i det returnerede data. Derefter filtrerer koden på `b.client_id` (linje 262, 266), som nu er `undefined`.
 
-- **+5%**: `Math.round(forecast * 1.05)`
-- **+10%**: `Math.round(forecast * 1.10)`  
-- **+15%**: `Math.round(forecast * 1.15)`
+Det betyder:
+- `lastBooking` er altid `undefined` → "Sidst besøgt" viser altid "-"  
+- `weeksSince` er altid 999 → "Uger siden" viser altid "Aldrig"  
+- `isInCooldown` er altid `false` → Cooldown-tabet viser altid 0
 
-### UI
+### Fix
 
-```text
-💡 Forecast: 510
-  Baseret på 13 medarbejderes salg/dag i Februar 2026
+**`src/pages/vagt-flow/BookWeekContent.tsx`** — to ændringer:
 
-  [+5%: 536]  [+10%: 561]  [+15%: 587]
-```
+1. **Tilføj `client_id` eksplicit i select-queryen** (linje 126):
+   ```
+   booking(id, client_id, campaign_id, week_number, year, end_date, ...)
+   ```
 
-Klik på en knap sætter `form.sales_target` til den valgte værdi. Forecast-basetallet vises stadig som reference men uden "Anvend"-knap.
+2. **Opdater filteret** til at bruge `b.client_id` (som nu faktisk eksisterer), eller alternativt `b.clients?.id`. Tilføjelse af `client_id` i select er den reneste løsning.
 
-### Fil
-- `src/pages/TeamGoals.tsx` — Erstat linje 379-393 med forecast-label + 3 target-knapper
+Kun én fil ændres, og det er en ren data-fetching bug.
 
