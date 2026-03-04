@@ -8,12 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { BonusStaircase, BonusTiersSummary, type BonusTiers } from "@/components/team-goals/BonusStaircase";
 
 const MONTH_NAMES = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni",
@@ -26,6 +26,12 @@ interface GoalForm {
   year: number;
   sales_target: number;
   bonus_description: string;
+  bonus_tier1_amount: number;
+  bonus_tier1_description: string;
+  bonus_tier2_amount: number;
+  bonus_tier2_description: string;
+  bonus_tier3_amount: number;
+  bonus_tier3_description: string;
 }
 
 const currentYear = new Date().getFullYear();
