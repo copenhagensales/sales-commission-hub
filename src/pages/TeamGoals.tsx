@@ -436,17 +436,17 @@ export default function TeamGoals() {
                 <div className="mt-2 space-y-1">
                   {forecastLoading ? (
                     <p className="text-xs text-muted-foreground">Beregner forecast...</p>
-                  ) : forecast > 0 ? (
+                  ) : adjustedForecast > 0 ? (
                     <>
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
                         <span className="text-sm font-medium">
-                          Forecast: {forecast.toLocaleString("da-DK")}
+                          Forecast: {adjustedForecast.toLocaleString("da-DK")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         {[5, 10, 15].map((pct) => {
-                          const target = Math.round(forecast * (1 + pct / 100));
+                          const target = Math.round(adjustedForecast * (1 + pct / 100));
                           return (
                             <Button
                               key={pct}
@@ -502,7 +502,7 @@ export default function TeamGoals() {
                         </div>
                       )}
                     </>
-                  ) : forecast === 0 && !forecastLoading && form.team_id ? (
+                  ) : adjustedForecast === 0 && !forecastLoading && form.team_id ? (
                     <p className="text-xs text-muted-foreground">Ingen salgsdata fra {prevMonthLabel}</p>
                   ) : null}
                 </div>
