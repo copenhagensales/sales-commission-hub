@@ -1,27 +1,40 @@
 
 
-## Fix: Bevar mellemrum og linjeskift fra skabelonen i kontraktvisningen
+## Fix: Sørg for at kontraktens visning matcher skabelonens opsætning
 
 ### Problem
-Når der laves linjeskift (Enter/Shift+Enter) i kontraktskabelonens rich text editor, gemmes de som `<br>` tags og tomme `<p>` tags i HTML'en. Men i kontraktvisningen (både `ContractSign.tsx` og `Contracts.tsx` preview) overskrives deres naturlige spacing af disse CSS-regler:
+Skabelonen redigeres i en Tiptap rich text editor med `prose prose-sm` (standard Tailwind Typography styling). Men kontraktvisningen (`ContractSign.tsx` og `Contracts.tsx`) overskriver næsten al prose-styling med custom CSS-regler der ændrer mellemrum, margins og line-heights markant. Resultatet er at den endelige kontrakt ser anderledes ud end skabelonen.
 
-```css
-[&_br]:block [&_br]:content-[''] [&_br]:h-0.5   /* Kollapser <br> til 2px */
-prose-p:my-5                                       /* Fast margin på alle <p> */
-```
-
-`<br>` tags får kun 2px højde i stedet for en normal linjehøjde, så mellemrum forsvinder.
+Konkrete forskelle:
+- **Paragraffer**: Editoren bruger `prose-sm` default (`my-4` ~16px margin). Vieweren sætter `prose-p:my-5` (20px) + `text-justify` + `hyphens-auto` — ændrer layout.
+- **`<br>` tags**: Nu sat til `h-[1em]` men mangler stadig naturlig line-height rendering i visse kontekster.
+- **Overskrifter**: Editoren bruger `prose-sm` defaults. Vieweren overskriver med custom `font-size`, `mt/mb` og `tracking-wider` — ændrer spacing.
+- **Lister**: Editoren har default indrykning. Vieweren sætter `list-none` på `<ol>` og fjerner standard nummerering, tilføjer custom spacing.
+- **Tomme paragraffer**: `[&_p:empty]:min-h-[1em]` er tilføjet men Tiptap genererer ofte `<p><br></p>` for tomme linjer, ikke `<p></p>` — så reglen rammer ikke altid.
 
 ### Løsning
-1. **`src/pages/ContractSign.tsx`** (linje 468): Ændr `[&_br]:h-0.5` til `[&_br]:h-[1em]` så linjeskift respekterer den naturlige linjehøjde. Fjern `content-['']` så `<br>` opfører sig normalt.
+Tilpas viewerens CSS så den matcher editorens output tættere:
 
-2. **`src/pages/Contracts.tsx`** (preview-modal): Tilføj samme fix så preview også viser korrekte mellemrum.
+1. **`ContractSign.tsx`** — Juster prose-overrides:
+   - Ændr `prose-p:my-5` → `prose-p:my-4` (matcher editor default)
+   - Fjern `prose-p:text-justify prose-p:hyphens-auto` (editoren viser venstrejusteret)
+   - Tilføj `[&_p_br]:h-auto` så `<br>` inde i paragraffer opfører sig normalt
+   - Tilføj `[&_p:has(br:only-child)]:min-h-[1em]` for Tiptaps tomme linjer (`<p><br></p>`)
+   - Behold `[&_p:empty]:min-h-[1em]` som fallback
 
-3. Bevar tomme `<p>` tags' spacing ved at tilføje `[&_p:empty]:min-h-[1em]` så tomme paragraffer fra editoren også vises som mellemrum.
+2. **`Contracts.tsx`** (preview-modal) — Samme justeringer som ovenfor.
+
+3. **`ContractSign.tsx`** — Fjern `[&_br]:h-[1em]` og erstat med mere nuanceret tilgang:
+   - `[&_br]:block` (behold)
+   - Fjern den faste højde — lad `<br>` bruge sin naturlige linjehøjde
+   - Tilføj `[&_p+p]:mt-4` for at sikre paragraf-spacing er konsistent
+
+4. **PDF-generering** (`contractPdfGenerator.ts` og edge function) — Opdater `.content p` CSS i PDF'en med tilsvarende spacing så PDF også matcher.
 
 ### Ændringer
-- **Fil 1**: `src/pages/ContractSign.tsx` — opdater `<br>` CSS-regel og tilføj `p:empty` regel
-- **Fil 2**: `src/pages/Contracts.tsx` — samme ændring i preview-prose-styling
+- **`src/pages/ContractSign.tsx`**: Juster 4-5 prose CSS-regler i content-containeren
+- **`src/pages/Contracts.tsx`**: Samme justeringer i preview-prose-styling
+- **`src/utils/contractPdfGenerator.ts`**: Juster `.content p` margin til at matche
 
-Ingen database-ændringer. Ren CSS-fix.
+Ingen database-ændringer. Ren CSS/styling-fix.
 
