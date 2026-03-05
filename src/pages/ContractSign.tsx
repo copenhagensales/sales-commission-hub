@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine, Shield, Building2, ChevronDown, Eye, FileCheck, Pen } from "lucide-react";
+import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine, Shield, Building2, ChevronDown, Eye, FileCheck, Pen, List, User } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
@@ -35,7 +36,6 @@ function ContractProgressStepper({ steps }: { steps: StepperStep[] }) {
     <div className="flex items-center justify-between w-full max-w-xl mx-auto">
       {steps.map((step, i) => (
         <div key={i} className="flex items-center flex-1 last:flex-initial">
-          {/* Step circle + label */}
           <div className="flex flex-col items-center gap-1.5 relative z-10">
             <div
               className={`h-9 w-9 rounded-full flex items-center justify-center transition-all duration-300 ${
@@ -56,7 +56,6 @@ function ContractProgressStepper({ steps }: { steps: StepperStep[] }) {
               {step.label}
             </span>
           </div>
-          {/* Connector line */}
           {i < steps.length - 1 && (
             <div className="flex-1 mx-2 mt-[-18px]">
               <div
@@ -72,22 +71,122 @@ function ContractProgressStepper({ steps }: { steps: StepperStep[] }) {
   );
 }
 
+/* ─── Table of Contents ─── */
+interface TocItem {
+  id: string;
+  text: string;
+  index: number;
+}
+
+function TableOfContents({ content, activeId }: { content: string; activeId: string }) {
+  const items = useMemo(() => {
+    const regex = /<h2[^>]*>(.*?)<\/h2>/gi;
+    const result: TocItem[] = [];
+    let match;
+    let idx = 0;
+    while ((match = regex.exec(content)) !== null) {
+      const text = match[1].replace(/<[^>]+>/g, "").trim();
+      if (text) {
+        result.push({ id: `section-${idx}`, text, index: idx });
+        idx++;
+      }
+    }
+    return result;
+  }, [content]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <nav className="space-y-1">
+      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-3">
+        <List className="h-3.5 w-3.5" />
+        Indhold
+      </div>
+      {items.map((item) => (
+        <a
+          key={item.id}
+          href={`#${item.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className={`block text-[13px] px-3 py-1.5 rounded-md transition-all duration-200 ${
+            activeId === item.id
+              ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <span className="text-muted-foreground/60 mr-1.5">§{item.index + 1}</span>
+          {item.text}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/* ─── Inject IDs into H2 tags for anchor navigation ─── */
+function injectSectionIds(html: string): string {
+  let idx = 0;
+  return html.replace(/<h2([^>]*)>/gi, (match, attrs) => {
+    const id = `section-${idx}`;
+    idx++;
+    return `<h2${attrs} id="${id}">`;
+  });
+}
+
 export default function ContractSign() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [accepted, setAccepted] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [signSectionVisible, setSignSectionVisible] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeTocId, setActiveTocId] = useState("");
   const signSectionRef = useRef<HTMLDivElement>(null);
   const contentEndRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
 
   const scrollToSignSection = () => {
     signSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
+
+  /* ─── Scroll progress tracking ─── */
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight > 0) {
+        setScrollProgress(Math.min(100, (scrollTop / docHeight) * 100));
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  /* ─── Track active TOC section via IntersectionObserver ─── */
+  useEffect(() => {
+    if (!documentRef.current) return;
+    const headings = documentRef.current.querySelectorAll("h2[id]");
+    if (headings.length === 0) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveTocId(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: "-80px 0px -60% 0px", threshold: 0.1 }
+    );
+    headings.forEach((h) => observer.observe(h));
+    return () => observer.disconnect();
+  }, [documentRef.current?.innerHTML]);
 
   /* ─── Scroll tracking: detect when user scrolls to bottom of contract ─── */
   useEffect(() => {
@@ -331,21 +430,28 @@ export default function ContractSign() {
     { label: "Underskrevet", icon: <Pen className="h-4 w-4" />, done: isSigned || !!alreadySigned, active: accepted && !isSigned && !alreadySigned },
   ];
 
-  /* ─── Metadata pills ─── */
-  const metadataPills: { label: string; value: string }[] = [];
+  /* ─── Metadata grid ─── */
+  const metadataItems: { label: string; value: string; icon: React.ReactNode }[] = [];
   if (contract.sent_at) {
-    metadataPills.push({ label: "Udsendt", value: format(new Date(contract.sent_at), "d. MMM yyyy", { locale: da }) });
+    metadataItems.push({ label: "Udsendt", value: format(new Date(contract.sent_at), "d. MMM yyyy", { locale: da }), icon: <Clock className="h-3.5 w-3.5" /> });
   }
-  metadataPills.push({ label: "Status", value: status.label });
+  metadataItems.push({ label: "Status", value: status.label, icon: <FileCheck className="h-3.5 w-3.5" /> });
   if (contract.type) {
-    metadataPills.push({ label: "Type", value: contract.type });
+    metadataItems.push({ label: "Type", value: contract.type, icon: <FileText className="h-3.5 w-3.5" /> });
+  }
+  // Find sender name from manager signature
+  const senderSig = contract.signatures?.find((s: any) => s.signer_type === "manager");
+  if (senderSig?.signer_name) {
+    metadataItems.push({ label: "Afsender", value: senderSig.signer_name, icon: <User className="h-3.5 w-3.5" /> });
   }
 
+  const processedContent = contract.content ? injectSectionIds(contract.content) : "";
+
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Floating Header */}
+    <div className={`min-h-screen bg-muted/30 ${canSign && isMobile ? "pb-28" : ""}`}>
+      {/* ═══ Sticky Header + Progress Bar ═══ */}
       <div className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {user && (
               <Button 
@@ -355,7 +461,7 @@ export default function ContractSign() {
                 onClick={() => navigate("/my-contracts")}
               >
                 <ArrowLeft className="h-4 w-4 mr-1.5" />
-                Tilbage
+                <span className="hidden sm:inline">Tilbage</span>
               </Button>
             )}
             <div className="h-5 w-px bg-border" />
@@ -364,7 +470,7 @@ export default function ContractSign() {
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            {canSign && (
+            {canSign && !isMobile && (
               <Button
                 size="sm"
                 onClick={scrollToSignSection}
@@ -387,355 +493,460 @@ export default function ContractSign() {
             </Button>
           </div>
         </div>
+        {/* Reading progress bar */}
+        <div className="h-[3px] bg-muted/50 w-full">
+          <div
+            className="h-full bg-primary/70 transition-all duration-150 ease-out"
+            style={{ width: `${scrollProgress}%` }}
+          />
+        </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        {/* ═══ Progress Stepper ═══ */}
-        <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
-          <ContractProgressStepper steps={stepperSteps} />
-        </div>
-
-        {/* ═══ Contract Header Card ═══ */}
-        <div className="bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
-          <div className="bg-primary/5 px-8 py-8 border-b border-border">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
-                  <Building2 className="h-4 w-4" />
-                  <span>Copenhagen Sales</span>
+      {/* ═══ Main layout: TOC sidebar + content ═══ */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="lg:flex lg:gap-8">
+          {/* ─── Desktop TOC Sidebar ─── */}
+          {!isMobile && contract.content && (
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+                  <TableOfContents content={contract.content} activeId={activeTocId} />
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">{contract.title}</h1>
-                {/* Metadata pills */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {metadataPills.map((pill, i) => (
-                    <div key={i} className="inline-flex items-center gap-1.5 text-xs bg-muted/80 text-muted-foreground rounded-full px-3 py-1.5 border border-border/50">
-                      <span className="font-medium text-foreground/70">{pill.label}:</span>
-                      <span>{pill.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {isSigned && (
-                <div className="flex-shrink-0 transform rotate-[-8deg]">
-                  <div className="w-24 h-24 rounded-full border-[3px] border-primary/60 flex items-center justify-center bg-primary/10">
-                    <div className="text-center">
-                      <Check className="h-6 w-6 text-primary mx-auto mb-0.5" />
-                      <span className="text-primary text-[10px] font-bold tracking-wider block">GODKENDT</span>
-                      <span className="text-primary/70 text-[8px]">
-                        {format(new Date(), "dd.MM.yy")}
-                      </span>
-                    </div>
+                {/* Mini progress info */}
+                <div className="mt-4 px-3 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span>Læsefremgang</span>
+                    <span className="font-medium text-foreground">{Math.round(scrollProgress)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/60 rounded-full transition-all duration-150" style={{ width: `${scrollProgress}%` }} />
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </aside>
+          )}
 
-          {/* ═══ Contract Content — Paper-like document ═══ */}
-          <div className="relative">
-            {/* Left accent border */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20" />
-            
-            <div className="py-12 px-6 md:px-12 lg:px-20 bg-card">
-              {/* Narrow column container - max 65 characters per line */}
-              <div className="max-w-[42rem] mx-auto">
-                <div
-                  className="prose prose-invert
-                    /* Base typography - optimized for legal documents */
-                    prose-base
-                    text-[15px] leading-[1.8]
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       DOCUMENT TITLE - Very prominent, centered
-                       ═══════════════════════════════════════════════════════════ */
-                    prose-h1:text-xl prose-h1:font-bold prose-h1:text-center prose-h1:text-foreground 
-                    prose-h1:tracking-[0.15em] prose-h1:uppercase prose-h1:mb-16 prose-h1:mt-4
-                    prose-h1:pb-6 prose-h1:border-b prose-h1:border-foreground/20
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       SECTION TITLES (§1, §2 etc.) - Clear separation
-                       ═══════════════════════════════════════════════════════════ */
-                    prose-h2:text-base prose-h2:font-bold prose-h2:text-foreground 
-                    prose-h2:tracking-wide prose-h2:uppercase
-                    prose-h2:mt-14 prose-h2:mb-5 prose-h2:pt-6
-                    prose-h2:border-t prose-h2:border-foreground/10
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       SUBSECTION TITLES - Slightly smaller
-                       ═══════════════════════════════════════════════════════════ */
-                    prose-h3:text-[15px] prose-h3:font-semibold prose-h3:text-foreground
-                    prose-h3:mt-8 prose-h3:mb-3
-                    
-                    prose-h4:text-sm prose-h4:font-semibold prose-h4:text-muted-foreground
-                    prose-h4:uppercase prose-h4:tracking-wider
-                    prose-h4:mt-6 prose-h4:mb-2
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       PARAGRAPHS - Generous spacing, readable line length
-                       ═══════════════════════════════════════════════════════════ */
-                    prose-p:text-muted-foreground prose-p:leading-[1.9] prose-p:my-4
-                    prose-p:text-[15px]
-                    
-                    prose-strong:text-foreground prose-strong:font-semibold
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       LISTS - Proper indentation for numbered items
-                       ═══════════════════════════════════════════════════════════ */
-                    prose-ul:my-6 prose-ul:pl-5 prose-ul:space-y-3
-                    prose-ol:my-6 prose-ol:pl-0 prose-ol:space-y-4 prose-ol:list-none
-                    prose-li:text-muted-foreground prose-li:text-[15px] prose-li:leading-[1.8]
-                    prose-li:my-0
-                    
-                    /* Nested list indentation */
-                    [&_ol_ol]:pl-8 [&_ol_ol]:mt-3 [&_ol_ol]:mb-0
-                    [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
-                    
-                    /* Line breaks */
-                    [&_br]:block
-                    [&_p:empty]:min-h-[1em]
-                    [&_p:has(br:only-child)]:min-h-[1em]
-                    [&_p+p]:mt-4
-                    
-                    /* Horizontal rules */
-                    [&_hr]:my-14 [&_hr]:border-foreground/10
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       TABLES - Clean grid for structured data (notice periods etc.)
-                       ═══════════════════════════════════════════════════════════ */
-                    [&_table]:w-full [&_table]:my-8 [&_table]:text-sm
-                    [&_table]:border [&_table]:border-border/40 [&_table]:rounded
-                    [&_th]:bg-muted/30 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left 
-                    [&_th]:font-semibold [&_th]:text-foreground [&_th]:text-xs 
-                    [&_th]:uppercase [&_th]:tracking-wider [&_th]:border-b [&_th]:border-border/40
-                    [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border/20 
-                    [&_td]:text-muted-foreground [&_td]:align-top
-                    [&_tr:last-child_td]:border-b-0
-                    [&_td:first-child]:font-medium [&_td:first-child]:text-foreground
-                    [&_td:last-child]:text-right
-                    
-                    /* ═══════════════════════════════════════════════════════════
-                       PARTY BLOCKS - Clear visual separation for Medarbejder/Arbejdsgiver
-                       ═══════════════════════════════════════════════════════════ */
-                    [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 
-                    [&_blockquote]:pl-6 [&_blockquote]:ml-0 [&_blockquote]:mr-0
-                    [&_blockquote]:my-8 [&_blockquote]:py-4
-                    [&_blockquote]:bg-muted/10 [&_blockquote]:rounded-r
-                    [&_blockquote_p]:my-1.5 [&_blockquote_p]:text-foreground/90
-                    [&_blockquote_p]:text-[14px] [&_blockquote_p]:leading-relaxed
-                    [&_blockquote_strong]:text-foreground
-                    
-                    /* Definition lists for structured info */
-                    [&_dl]:my-6 [&_dl]:grid [&_dl]:grid-cols-[auto_1fr] [&_dl]:gap-x-6 [&_dl]:gap-y-2
-                    [&_dt]:font-medium [&_dt]:text-foreground [&_dt]:text-sm
-                    [&_dd]:text-muted-foreground [&_dd]:text-sm [&_dd]:m-0
-                    
-                    /* Pre blocks for special formatting */
-                    [&_pre]:whitespace-pre-wrap [&_pre]:font-sans [&_pre]:text-sm 
-                    [&_pre]:bg-muted/20 [&_pre]:p-5 [&_pre]:rounded [&_pre]:my-6 
-                    [&_pre]:border [&_pre]:border-border/20 [&_pre]:leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: contract.content }}
-                />
-                {/* Invisible sentinel for scroll tracking */}
-                <div ref={contentEndRef} className="h-px" />
+          {/* ─── Main Content Column ─── */}
+          <div className="flex-1 min-w-0 space-y-8">
+            {/* ═══ Progress Stepper ═══ */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+              <ContractProgressStepper steps={stepperSteps} />
+            </div>
+
+            {/* ═══ Contract Header Card ═══ */}
+            <div className="bg-card rounded-2xl shadow-lg overflow-hidden border border-border">
+              <div className="bg-primary/5 px-6 md:px-8 py-6 md:py-8 border-b border-border">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
+                      <Building2 className="h-4 w-4" />
+                      <span>Copenhagen Sales</span>
+                    </div>
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">{contract.title}</h1>
+                    {/* Metadata grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                      {metadataItems.map((item, i) => (
+                        <div key={i} className="flex flex-col gap-1 p-2.5 bg-muted/40 rounded-lg border border-border/30">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            {item.icon}
+                            <span className="text-[10px] font-semibold uppercase tracking-wider">{item.label}</span>
+                          </div>
+                          <span className="text-sm font-medium text-foreground truncate">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {isSigned && (
+                    <div className="flex-shrink-0 hidden sm:block">
+                      <div className="px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 inline-flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
+                        <span className="text-primary text-xs font-bold tracking-wider uppercase">Godkendt</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ═══ Contract Content — Paper-like document ═══ */}
+              <div className="relative" ref={documentRef}>
+                {/* Left accent border */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20" />
+                
+                <div className="py-12 px-6 md:px-12 lg:px-16 bg-[hsl(var(--card))] shadow-inner">
+                  {/* Paper container */}
+                  <div className="max-w-[42rem] mx-auto bg-background rounded-lg shadow-xl border border-border/40 p-8 md:p-12 lg:p-16">
+                    <div
+                      className="prose prose-invert
+                        /* Base typography - optimized for legal documents */
+                        prose-base
+                        text-[15px] leading-[1.8]
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           DOCUMENT TITLE - Very prominent, centered
+                           ═══════════════════════════════════════════════════════════ */
+                        prose-h1:text-xl prose-h1:font-bold prose-h1:text-center prose-h1:text-foreground 
+                        prose-h1:tracking-[0.15em] prose-h1:uppercase prose-h1:mb-16 prose-h1:mt-4
+                        prose-h1:pb-6 prose-h1:border-b prose-h1:border-foreground/20
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           SECTION TITLES (§1, §2 etc.) - Clear separation
+                           ═══════════════════════════════════════════════════════════ */
+                        prose-h2:text-base prose-h2:font-bold prose-h2:text-foreground 
+                        prose-h2:tracking-wide prose-h2:uppercase
+                        prose-h2:mt-14 prose-h2:mb-5 prose-h2:pt-6
+                        prose-h2:border-t prose-h2:border-foreground/10
+                        prose-h2:scroll-mt-24
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           SUBSECTION TITLES - Slightly smaller
+                           ═══════════════════════════════════════════════════════════ */
+                        prose-h3:text-[15px] prose-h3:font-semibold prose-h3:text-foreground
+                        prose-h3:mt-8 prose-h3:mb-3
+                        
+                        prose-h4:text-sm prose-h4:font-semibold prose-h4:text-muted-foreground
+                        prose-h4:uppercase prose-h4:tracking-wider
+                        prose-h4:mt-6 prose-h4:mb-2
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           PARAGRAPHS - Generous spacing, readable line length
+                           ═══════════════════════════════════════════════════════════ */
+                        prose-p:text-muted-foreground prose-p:leading-[1.9] prose-p:my-4
+                        prose-p:text-[15px]
+                        
+                        prose-strong:text-foreground prose-strong:font-semibold
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           LISTS - Proper indentation for numbered items
+                           ═══════════════════════════════════════════════════════════ */
+                        prose-ul:my-6 prose-ul:pl-5 prose-ul:space-y-3
+                        prose-ol:my-6 prose-ol:pl-0 prose-ol:space-y-4 prose-ol:list-none
+                        prose-li:text-muted-foreground prose-li:text-[15px] prose-li:leading-[1.8]
+                        prose-li:my-0
+                        
+                        /* Nested list indentation */
+                        [&_ol_ol]:pl-8 [&_ol_ol]:mt-3 [&_ol_ol]:mb-0
+                        [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
+                        
+                        /* Line breaks */
+                        [&_br]:block
+                        [&_p:empty]:min-h-[1em]
+                        [&_p:has(br:only-child)]:min-h-[1em]
+                        [&_p+p]:mt-4
+                        
+                        /* Horizontal rules */
+                        [&_hr]:my-14 [&_hr]:border-foreground/10
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           TABLES - Clean grid for structured data
+                           ═══════════════════════════════════════════════════════════ */
+                        [&_table]:w-full [&_table]:my-8 [&_table]:text-sm
+                        [&_table]:border [&_table]:border-border/40 [&_table]:rounded
+                        [&_th]:bg-muted/30 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left 
+                        [&_th]:font-semibold [&_th]:text-foreground [&_th]:text-xs 
+                        [&_th]:uppercase [&_th]:tracking-wider [&_th]:border-b [&_th]:border-border/40
+                        [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border/20 
+                        [&_td]:text-muted-foreground [&_td]:align-top
+                        [&_tr:last-child_td]:border-b-0
+                        [&_td:first-child]:font-medium [&_td:first-child]:text-foreground
+                        [&_td:last-child]:text-right
+                        
+                        /* ═══════════════════════════════════════════════════════════
+                           PARTY BLOCKS
+                           ═══════════════════════════════════════════════════════════ */
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 
+                        [&_blockquote]:pl-6 [&_blockquote]:ml-0 [&_blockquote]:mr-0
+                        [&_blockquote]:my-8 [&_blockquote]:py-4
+                        [&_blockquote]:bg-muted/10 [&_blockquote]:rounded-r
+                        [&_blockquote_p]:my-1.5 [&_blockquote_p]:text-foreground/90
+                        [&_blockquote_p]:text-[14px] [&_blockquote_p]:leading-relaxed
+                        [&_blockquote_strong]:text-foreground
+                        
+                        /* Definition lists */
+                        [&_dl]:my-6 [&_dl]:grid [&_dl]:grid-cols-[auto_1fr] [&_dl]:gap-x-6 [&_dl]:gap-y-2
+                        [&_dt]:font-medium [&_dt]:text-foreground [&_dt]:text-sm
+                        [&_dd]:text-muted-foreground [&_dd]:text-sm [&_dd]:m-0
+                        
+                        /* Pre blocks */
+                        [&_pre]:whitespace-pre-wrap [&_pre]:font-sans [&_pre]:text-sm 
+                        [&_pre]:bg-muted/20 [&_pre]:p-5 [&_pre]:rounded [&_pre]:my-6 
+                        [&_pre]:border [&_pre]:border-border/20 [&_pre]:leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: processedContent }}
+                    />
+                    {/* Invisible sentinel for scroll tracking */}
+                    <div ref={contentEndRef} className="h-px" />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* ═══ Signatures Card — Timeline layout ═══ */}
-        <div className="bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
-          <div className="px-6 py-4 border-b border-border bg-muted/50">
-            <h2 className="font-semibold text-foreground flex items-center gap-2">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              Underskrifter
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="relative">
-              {/* Timeline line */}
-              {contract.signatures && contract.signatures.length > 1 && (
-                <div className="absolute left-6 top-6 bottom-6 w-px bg-border" />
-              )}
-              <div className="space-y-0">
-                {contract.signatures?.map((sig: any, i: number) => (
-                  <div key={sig.id} className="relative flex items-start gap-5 py-4">
-                    {/* Timeline dot */}
-                    <div className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      sig.signed_at 
-                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
-                        : 'bg-muted border-2 border-border text-muted-foreground'
-                    }`}>
-                      {sig.signed_at ? (
-                        <Check className="h-5 w-5" />
-                      ) : (
-                        <span className="text-sm font-bold">
-                          {sig.signer_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-semibold text-foreground">{sig.signer_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {sig.signer_type === "employee" ? "Medarbejder" : "For arbejdsgiver"}
-                          </p>
+            {/* ═══ Signatures Card ═══ */}
+            <div className="bg-card rounded-2xl shadow-lg overflow-hidden border border-border">
+              <div className="px-6 py-4 border-b border-border bg-muted/50">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  Underskrifter
+                </h2>
+              </div>
+              <div className="p-6">
+                {isSigned || contract.signatures?.every((s: any) => s.signed_at) ? (
+                  /* ─── Grid layout for fully signed contracts ─── */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {contract.signatures?.map((sig: any) => (
+                      <div key={sig.id} className="rounded-xl border border-primary/20 bg-primary/5 p-5 relative overflow-hidden">
+                        <div className="absolute top-2 right-2">
+                          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <Check className="h-4 w-4 text-primary" />
+                          </div>
                         </div>
-                        {sig.signed_at ? (
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-sm font-medium text-primary">Underskrevet</p>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                            {sig.signer_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground text-sm">{sig.signer_name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                              {sig.signer_type === "employee" ? "Medarbejder" : "For arbejdsgiver"}
                             </p>
-                            {sig.ip_address && (
-                              <p className="text-xs text-muted-foreground/70 mt-0.5">
-                                IP: {sig.ip_address}
-                              </p>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground border-t border-border/50 pt-3 mt-1">
+                          <p>
+                            <span className="font-medium text-foreground/70">Dato:</span>{" "}
+                            {sig.signed_at ? format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da }) : "—"}
+                          </p>
+                          {sig.ip_address && (
+                            <p>
+                              <span className="font-medium text-foreground/70">IP:</span> {sig.ip_address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* ─── Timeline layout for pending contracts ─── */
+                  <div className="relative">
+                    {contract.signatures && contract.signatures.length > 1 && (
+                      <div className="absolute left-6 top-6 bottom-6 w-px bg-border" />
+                    )}
+                    <div className="space-y-0">
+                      {contract.signatures?.map((sig: any, i: number) => (
+                        <div key={sig.id} className="relative flex items-start gap-5 py-4">
+                          <div className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            sig.signed_at 
+                              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
+                              : 'bg-muted border-2 border-border text-muted-foreground'
+                          }`}>
+                            {sig.signed_at ? (
+                              <Check className="h-5 w-5" />
+                            ) : (
+                              <span className="text-sm font-bold">
+                                {sig.signer_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </span>
                             )}
                           </div>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground border-border flex-shrink-0">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Afventer
-                          </Badge>
-                        )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-semibold text-foreground">{sig.signer_name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {sig.signer_type === "employee" ? "Medarbejder" : "For arbejdsgiver"}
+                                </p>
+                              </div>
+                              {sig.signed_at ? (
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-sm font-medium text-primary">Underskrevet</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                                  </p>
+                                  {sig.ip_address && (
+                                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                                      IP: {sig.ip_address}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground border-border flex-shrink-0">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Afventer
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ═══ Sign Section (Desktop) ═══ */}
+            {canSign && (
+              <div 
+                ref={signSectionRef}
+                className="relative overflow-hidden rounded-2xl shadow-2xl border-2 border-emerald-500/30"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wOCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHpNMzYgMjRoNHYxaC00ek0yNiAzNGg0djFoLTR6TTI2IDI0aDR2MWgtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50" />
+                
+                <div className="relative p-8 md:p-10">
+                  <div className="flex items-start gap-5 mb-8">
+                    <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-lg">
+                      <PenLine className="h-7 w-7 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white drop-shadow-sm">Underskriv kontrakt</h2>
+                      <p className="text-white/90 mt-1">Bekræft din accept af kontraktens vilkår og betingelser</p>
+                    </div>
+                  </div>
+
+                  <div 
+                    className={`p-5 rounded-xl cursor-pointer transition-all duration-300 ${
+                      accepted 
+                        ? 'bg-white shadow-2xl scale-[1.02]' 
+                        : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 border border-white/20'
+                    }`}
+                    onClick={() => setAccepted(!accepted)}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`mt-0.5 h-7 w-7 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                        accepted 
+                          ? 'border-emerald-500 bg-emerald-500' 
+                          : 'border-white/60 bg-transparent'
+                      }`}>
+                        {accepted && <Check className="h-4 w-4 text-white" />}
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${accepted ? 'text-gray-900' : 'text-white'}`}>
+                          Jeg accepterer kontraktens betingelser
+                        </p>
+                        <p className={`text-sm mt-1 ${accepted ? 'text-gray-600' : 'text-white/80'}`}>
+                          Ved at markere denne boks bekræfter jeg, at jeg har læst og forstået indholdet af denne kontrakt.
+                        </p>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* ═══ Sign Section ═══ */}
-        {canSign && (
-          <div 
-            ref={signSectionRef}
-            className="relative overflow-hidden rounded-2xl shadow-2xl border-2 border-emerald-500/30"
-          >
-            {/* Green gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600" />
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wOCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHpNMzYgMjRoNHYxaC00ek0yNiAzNGg0djFoLTR6TTI2IDI0aDR2MWgtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50" />
-            
-            <div className="relative p-8 md:p-10">
-              <div className="flex items-start gap-5 mb-8">
-                <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <PenLine className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white drop-shadow-sm">Underskriv kontrakt</h2>
-                  <p className="text-white/90 mt-1">Bekræft din accept af kontraktens vilkår og betingelser</p>
+                  {!isMobile && (
+                    <div className="flex gap-3 mt-6">
+                      <Button
+                        size="lg"
+                        className={`flex-1 h-14 text-base font-bold transition-all duration-300 ${
+                          accepted 
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-2xl shadow-orange-500/30 hover:scale-[1.02]' 
+                            : 'bg-white/20 text-white/50 cursor-not-allowed border border-white/20'
+                        }`}
+                        disabled={!accepted || signMutation.isPending}
+                        onClick={() => signMutation.mutate()}
+                      >
+                        {signMutation.isPending ? (
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        ) : (
+                          <Check className="h-5 w-5 mr-2" />
+                        )}
+                        Underskriv kontrakt
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="ghost"
+                        className="h-14 px-6 text-white/80 hover:text-white hover:bg-red-500/20 border border-white/20 hover:border-red-300/50"
+                        onClick={() => setRejectDialogOpen(true)}
+                        disabled={rejectMutation.isPending}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-center text-white/70 mt-6">
+                    <Shield className="h-3 w-3 inline mr-1" />
+                    Din underskrift registreres sikkert med tidsstempel og IP-adresse
+                  </p>
                 </div>
               </div>
+            )}
 
-              <div 
-                className={`p-5 rounded-xl cursor-pointer transition-all duration-300 ${
-                  accepted 
-                    ? 'bg-white shadow-2xl scale-[1.02]' 
-                    : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 border border-white/20'
-                }`}
-                onClick={() => setAccepted(!accepted)}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`mt-0.5 h-7 w-7 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                    accepted 
-                      ? 'border-emerald-500 bg-emerald-500' 
-                      : 'border-white/60 bg-transparent'
-                  }`}>
-                    {accepted && <Check className="h-4 w-4 text-white" />}
+            {/* Login prompt */}
+            {needsLogin && (
+              <div className="bg-warning/10 border border-warning/30 rounded-2xl p-8 text-center">
+                <div className="w-14 h-14 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+                  <PenLine className="h-7 w-7 text-warning" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Log ind for at underskrive</h3>
+                <p className="text-muted-foreground mb-6">Du skal være logget ind for at underskrive denne kontrakt</p>
+                <Button onClick={() => navigate(`/auth?redirect=/contract/${id}`)} size="lg">
+                  Log ind
+                </Button>
+              </div>
+            )}
+
+            {/* Already signed */}
+            {alreadySigned && (
+              <div className="bg-primary/10 border border-primary/30 rounded-2xl p-8">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Check className="h-7 w-7 text-primary" />
                   </div>
                   <div>
-                    <p className={`font-semibold ${accepted ? 'text-gray-900' : 'text-white'}`}>
-                      Jeg accepterer kontraktens betingelser
-                    </p>
-                    <p className={`text-sm mt-1 ${accepted ? 'text-gray-600' : 'text-white/80'}`}>
-                      Ved at markere denne boks bekræfter jeg, at jeg har læst og forstået indholdet af denne kontrakt.
+                    <h3 className="text-lg font-semibold text-foreground">Du har underskrevet denne kontrakt</h3>
+                    <p className="text-muted-foreground">
+                      {format(new Date(alreadySigned), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
                     </p>
                   </div>
                 </div>
               </div>
-
-              <div className="flex gap-3 mt-6">
-                <Button
-                  size="lg"
-                  className={`flex-1 h-14 text-base font-bold transition-all duration-300 ${
-                    accepted 
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-2xl shadow-orange-500/30 hover:scale-[1.02]' 
-                      : 'bg-white/20 text-white/50 cursor-not-allowed border border-white/20'
-                  }`}
-                  disabled={!accepted || signMutation.isPending}
-                  onClick={() => signMutation.mutate()}
-                >
-                  {signMutation.isPending ? (
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  ) : (
-                    <Check className="h-5 w-5 mr-2" />
-                  )}
-                  Underskriv kontrakt
-                </Button>
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  className="h-14 px-6 text-white/80 hover:text-white hover:bg-red-500/20 border border-white/20 hover:border-red-300/50"
-                  onClick={() => setRejectDialogOpen(true)}
-                  disabled={rejectMutation.isPending}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-
-              <p className="text-xs text-center text-white/70 mt-6">
-                <Shield className="h-3 w-3 inline mr-1" />
-                Din underskrift registreres sikkert med tidsstempel og IP-adresse
-              </p>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* Login prompt */}
-        {needsLogin && (
-          <div className="bg-warning/10 border border-warning/30 rounded-2xl p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
-              <PenLine className="h-7 w-7 text-warning" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">Log ind for at underskrive</h3>
-            <p className="text-muted-foreground mb-6">Du skal være logget ind for at underskrive denne kontrakt</p>
-            <Button onClick={() => navigate(`/auth?redirect=/contract/${id}`)} size="lg">
-              Log ind
-            </Button>
-          </div>
-        )}
-
-        {/* Already signed */}
-        {alreadySigned && (
-          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-8">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center">
-                <Check className="h-7 w-7 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Du har underskrevet denne kontrakt</h3>
-                <p className="text-muted-foreground">
-                  {format(new Date(alreadySigned), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* ═══ Floating "Scroll ned for at underskrive" ═══ */}
-      {canSign && !signSectionVisible && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-bounce">
-          <Button
-            onClick={scrollToSignSection}
-            className="rounded-full shadow-2xl px-6 h-11 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <ChevronDown className="h-4 w-4 mr-2" />
-            Scroll ned for at underskrive
-          </Button>
+      {/* ═══ Mobile: Fixed Bottom Action Bar ═══ */}
+      {canSign && isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl shadow-black/20 p-4 safe-area-pb">
+          <div className="flex items-center gap-3">
+            <div 
+              className={`flex items-center gap-2 flex-1 p-3 rounded-lg cursor-pointer transition-all ${
+                accepted ? 'bg-primary/10 border border-primary/30' : 'bg-muted border border-border'
+              }`}
+              onClick={() => setAccepted(!accepted)}
+            >
+              <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                accepted ? 'border-primary bg-primary' : 'border-muted-foreground/40'
+              }`}>
+                {accepted && <Check className="h-3 w-3 text-primary-foreground" />}
+              </div>
+              <span className={`text-xs font-medium ${accepted ? 'text-primary' : 'text-muted-foreground'}`}>
+                Acceptér vilkår
+              </span>
+            </div>
+            <Button
+              className={`h-12 px-6 font-bold transition-all ${
+                accepted 
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg' 
+                  : ''
+              }`}
+              disabled={!accepted || signMutation.isPending}
+              onClick={() => signMutation.mutate()}
+            >
+              {signMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Pen className="h-4 w-4 mr-1.5" />
+                  Underskriv
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12 text-destructive hover:bg-destructive/10 border border-border"
+              onClick={() => setRejectDialogOpen(true)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
