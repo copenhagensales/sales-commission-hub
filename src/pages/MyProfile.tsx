@@ -1334,7 +1334,7 @@ export default function MyProfile() {
                           {getContractStatusBadge(contract.status || "draft")}
                           {contract.status === "pending_employee" ? (
                             <Button size="sm" onClick={() => navigate(`/contract/${contract.id}`)}>
-                              Underskriv
+                              Læs og underskriv
                             </Button>
                           ) : (
                             <Button 
