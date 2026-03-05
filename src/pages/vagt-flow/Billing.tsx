@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { FileText, Calendar, MapPin, TrendingUp, Percent } from "lucide-react";
+import { FileText, Calendar, MapPin, TrendingUp, Percent, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { format, startOfMonth, endOfMonth, differenceInDays, getISOWeek } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
@@ -286,6 +287,45 @@ function BillingOverviewTab() {
 
   const totalDiscount = totalAmount - nettoAmount;
 
+  const formatWeekdaysText = (weekdaysByWeek: Map<number, Set<number>>): string => {
+    return [...weekdaysByWeek.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([week, daysSet]) => {
+        const sorted = [...daysSet].sort((a, b) => a - b);
+        const isFullWeek = [0, 1, 2, 3, 4].every(d => daysSet.has(d));
+        const daysText = isFullWeek ? "Man–Fre" : sorted.map(d => WEEKDAY_NAMES[d]).join(", ");
+        return `Uge ${week}: ${daysText}`;
+      })
+      .join(" | ");
+  };
+
+  const handleExportExcel = () => {
+    if (!bookingsByLocation) return;
+    const headers = ["Lokation", "By", "Kunde", "Uger & Dage", "Bookinger", "Dage", "Dagspris", "Beløb"];
+    const rows = Object.values(bookingsByLocation).map((loc: any) => [
+      loc.location?.name || "",
+      loc.location?.address_city || "",
+      loc.client?.name || "Ukendt kunde",
+      formatWeekdaysText(loc.weekdaysByWeek),
+      loc.bookings.length,
+      loc.totalDays,
+      loc.usesTotalPrice ? "samlet" : loc.dailyRate,
+      loc.totalAmount,
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 40 },
+      { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fakturering");
+    const periodLabel = periodType === "payroll"
+      ? `${format(periodStart, "dd-MM")}_${format(periodEnd, "dd-MM-yyyy")}`
+      : format(monthDate, "yyyy-MM");
+    XLSX.writeFile(wb, `Fakturering_${periodLabel}.xlsx`);
+  };
+
   const monthOptions = [];
   for (let i = -6; i <= 6; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -343,6 +383,14 @@ function BillingOverviewTab() {
             ))}
           </SelectContent>
         </Select>
+        <button
+          onClick={handleExportExcel}
+          disabled={!bookingsByLocation || Object.keys(bookingsByLocation).length === 0}
+          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <Download className="h-4 w-4" />
+          Download Excel
+        </button>
       </div>
 
       {/* KPI Cards */}
