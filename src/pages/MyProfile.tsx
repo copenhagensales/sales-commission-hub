@@ -225,14 +225,27 @@ export default function MyProfile() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
 
-      const lowerEmail = userData.user.email?.toLowerCase() || '';
-      const { data, error } = await supabase
+      // Try auth_user_id first (most reliable), fallback to email matching
+      let data, error;
+      ({ data, error } = await supabase
         .from("employee_master_data")
         .select("*")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle());
+      
+      if (!data && !error) {
+        const lowerEmail = userData.user.email?.toLowerCase() || '';
+        ({ data, error } = await supabase
+          .from("employee_master_data")
+          .select("*")
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+          .maybeSingle());
+      }
+      
       if (error) throw error;
       if (!data) return null;
+      
+      console.log("[MyProfile] Employee found:", data.id, "via", data.auth_user_id === userData.user.id ? "auth_user_id" : "email");
       
       // Fetch team names for this employee
       const { data: teamMemberships } = await supabase
@@ -362,11 +375,13 @@ export default function MyProfile() {
     queryKey: ["my-contracts-profile", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
+      console.log("[MyProfile] Fetching contracts for employee:", employee.id);
       const { data, error } = await supabase
         .from("contracts")
         .select("*, contract_signatures(*)")
         .eq("employee_id", employee.id)
         .order("created_at", { ascending: false });
+      console.log("[MyProfile] Contracts result:", { count: data?.length, error, data });
       if (error) throw error;
       return data;
     },

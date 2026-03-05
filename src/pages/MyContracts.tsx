@@ -46,26 +46,27 @@ export default function MyContracts() {
     queryKey: ["my-contracts"],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
-      console.log("MyContracts - Auth user:", userData.user?.email);
-      if (!userData.user) {
-        console.log("MyContracts - No auth user");
-        return [];
-      }
+      if (!userData.user) return [];
 
-      // Get employee ID from email
-      const lowerEmail = userData.user.email?.toLowerCase() || '';
-      const { data: employee, error: empError } = await supabase
+      // Try auth_user_id first (most reliable), fallback to email
+      let employee, empError;
+      ({ data: employee, error: empError } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle());
 
-      console.log("MyContracts - Employee lookup:", { employee, empError, email: userData.user.email });
-
-      if (!employee) {
-        console.log("MyContracts - No employee found for email");
-        return [];
+      if (!employee && !empError) {
+        const lowerEmail = userData.user.email?.toLowerCase() || '';
+        ({ data: employee, error: empError } = await supabase
+          .from("employee_master_data")
+          .select("id")
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+          .maybeSingle());
       }
+
+      console.log("MyContracts - Employee lookup:", { employee, empError });
+      if (!employee) return [];
 
       const { data, error } = await supabase
         .from("contracts")
