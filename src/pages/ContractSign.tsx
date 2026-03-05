@@ -465,7 +465,8 @@ export default function ContractSign() {
                     [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
                     
                     /* Line breaks - minimal for addresses */
-                    [&_br]:block [&_br]:content-[''] [&_br]:h-0.5
+                     [&_br]:block [&_br]:h-[1em]
+                     [&_p:empty]:min-h-[1em]
                     
                     /* Horizontal rules */
                     [&_hr]:my-14 [&_hr]:border-foreground/10
