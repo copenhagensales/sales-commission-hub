@@ -228,11 +228,37 @@ export default function ContractSign() {
         .eq("id", contract.id);
 
       if (contractError) throw contractError;
+
+      return { signedAt, ipAddress };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["contract", id] });
       toast.success("Kontrakten er underskrevet");
       window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // Fire-and-forget: send confirmation email with contract copy
+      if (result && contract) {
+        const signerName = contract.signatures?.find(
+          (s: any) => s.signer_employee_id === currentEmployee?.id
+        )?.signer_name || `${currentEmployee?.first_name || ""} ${currentEmployee?.last_name || ""}`.trim() || "Medarbejder";
+
+        supabase.functions
+          .invoke("send-contract-signed-confirmation", {
+            body: {
+              contractId: contract.id,
+              employeeName: signerName,
+              employeeEmail: currentEmployee?.private_email || "",
+              contractTitle: contract.title,
+              signedAt: result.signedAt,
+              ipAddress: result.ipAddress,
+            },
+          })
+          .then(({ error }) => {
+            if (error) console.error("Email confirmation error:", error);
+            else console.log("Contract confirmation email sent");
+          })
+          .catch((err) => console.error("Email confirmation error:", err));
+      }
     },
     onError: (err: any) => {
       console.error("Sign error:", err);
