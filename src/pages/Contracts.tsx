@@ -620,8 +620,10 @@ export default function Contracts() {
                   [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
                   
                   /* Line breaks */
-                   [&_br]:block [&_br]:h-[1em]
-                   [&_p:empty]:min-h-[1em]
+                  [&_br]:block
+                  [&_p:empty]:min-h-[1em]
+                  [&_p:has(br:only-child)]:min-h-[1em]
+                  [&_p+p]:mt-4
                   
                   /* Horizontal rules */
                   [&_hr]:my-10 [&_hr]:border-foreground/10

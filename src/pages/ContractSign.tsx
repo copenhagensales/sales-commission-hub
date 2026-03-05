@@ -447,8 +447,8 @@ export default function ContractSign() {
                     /* ═══════════════════════════════════════════════════════════
                        PARAGRAPHS - Generous spacing, readable line length
                        ═══════════════════════════════════════════════════════════ */
-                    prose-p:text-muted-foreground prose-p:leading-[1.9] prose-p:my-5
-                    prose-p:text-[15px] prose-p:text-justify prose-p:hyphens-auto
+                    prose-p:text-muted-foreground prose-p:leading-[1.9] prose-p:my-4
+                    prose-p:text-[15px]
                     
                     prose-strong:text-foreground prose-strong:font-semibold
                     
@@ -464,9 +464,11 @@ export default function ContractSign() {
                     [&_ol_ol]:pl-8 [&_ol_ol]:mt-3 [&_ol_ol]:mb-0
                     [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
                     
-                    /* Line breaks - minimal for addresses */
-                     [&_br]:block [&_br]:h-[1em]
-                     [&_p:empty]:min-h-[1em]
+                    /* Line breaks */
+                    [&_br]:block
+                    [&_p:empty]:min-h-[1em]
+                    [&_p:has(br:only-child)]:min-h-[1em]
+                    [&_p+p]:mt-4
                     
                     /* Horizontal rules */
                     [&_hr]:my-14 [&_hr]:border-foreground/10
