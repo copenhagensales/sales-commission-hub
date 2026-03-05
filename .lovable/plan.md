@@ -1,23 +1,36 @@
 
 
-## Excel-eksport til Faktureringsrapport
+## Gør periode og totaler tydeligere i Excel-eksporten
 
-### Hvad der bygges
-En "Download Excel"-knap i Billing Overview-tabben der eksporterer den filtrerede tabeldata til en `.xlsx`-fil med samme kolonner som vist i UI'et.
+### Problem
+Excel-filen mangler kontekst — leverandøren kan ikke se hvilken periode data dækker, eller hvad totalbeløbet er.
 
-### Teknisk tilgang
+### Løsning
+Tilføj **header-rækker** øverst i arket og en **totalrække** nederst:
 
-**Fil: `src/pages/vagt-flow/Billing.tsx`**
+**Fil: `src/components/billing/SupplierReportTab.tsx`** (Excel-logikken, linje ~901-938)
 
-1. Import `xlsx` (allerede installeret) og `Download`-ikon fra lucide
-2. Tilføj en `handleExportExcel`-funktion der:
-   - Mapper `bookingsByLocation` til rækker med: Lokation, By, ID, Kunde, Uger & Dage (som tekst), Bookinger, Dage, Dagspris, Beløb
-   - Opretter et worksheet fra array-of-arrays med header-række
-   - Sætter kolonnebredder for læsbarhed
-   - Genererer og downloader `.xlsx`-filen med et filnavn der inkluderer periode
-3. Placér knappen ved siden af filtrene (øverst i toolbaren)
+1. **Tilføj 2-3 header-rækker før tabeldata:**
+   - Række 1: `Leverandørrapport: [lokationstype]`
+   - Række 2: `Periode: [dato-range eller måned]`
+   - Række 3: tom (separator)
+   - Række 4: kolonneoverskrifter (nuværende headers)
 
-Uger & Dage-kolonnen formateres som tekst, f.eks. "Uge 6: Man–Fre" eller "Uge 7: Man, Tir, Ons, Fre".
+2. **Tilføj totalrække efter data:**
+   - Tom i tekst-kolonner, sum af Dage, sum af Beløb
+   - Hvis rabat: også sum af Rabat og Efter rabat
 
-Ingen database-ændringer. Ingen nye dependencies.
+3. **Fed skrift** på header-rækker og totalrække (via cell styling i xlsx)
+
+Eksempel output:
+```text
+A1: Leverandørrapport: Kvickly
+A2: Periode: Februar 2026
+A3: (tom)
+A4: Lokation | ID | By | Uger & Dage | Dage | Beløb
+A5-A17: (data)
+A18: Total | | | | 56 | 57.000
+```
+
+Ingen database-ændringer. Ingen nye filer.
 
