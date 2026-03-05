@@ -925,16 +925,51 @@ export function SupplierReportTab() {
                   ];
                 });
 
-                const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                // Period label
+                const filePeriod = periodType === "payroll"
+                  ? `${format(periodStart, "dd-MM")}_${format(periodEnd, "dd-MM-yyyy")}`
+                  : format(monthDate, "yyyy-MM");
+                const periodLabel = periodType === "payroll"
+                  ? `${format(periodStart, "dd/MM/yyyy")} – ${format(periodEnd, "dd/MM/yyyy")}`
+                  : format(monthDate, "MMMM yyyy", { locale: da });
+
+                // Header rows + separator
+                const metaRows: any[][] = [
+                  [`Leverandørrapport: ${selectedLocationType}`],
+                  [`Periode: ${periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}`],
+                  [],
+                ];
+
+                // Total row
+                const sumDays = locationDiscounts.reduce((s: number, l: any) => s + (l.totalDays || 0), 0);
+                const sumAmount = locationDiscounts.reduce((s: number, l: any) => s + (l.totalAmount || 0), 0);
+                const totalRow: any[] = ["Total", "", "", "", sumDays, sumAmount];
+                if (hasDiscount) {
+                  const sumDisc = locationDiscounts.reduce((s: number, l: any) => s + (l.discountAmount || 0), 0);
+                  const sumFinal = locationDiscounts.reduce((s: number, l: any) => s + (l.finalAmount || 0), 0);
+                  totalRow.push("", sumDisc, sumFinal);
+                }
+
+                const allData = [...metaRows, headers, ...rows, totalRow];
+                const ws = XLSX.utils.aoa_to_sheet(allData);
                 ws["!cols"] = [
                   { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 8 }, { wch: 12 },
                   ...(hasDiscount ? [{ wch: 10 }, { wch: 12 }, { wch: 12 }] : []),
                 ];
+
+                // Bold styling
+                const boldRowIdxs = [0, 1, 3, allData.length - 1];
+                for (const r of boldRowIdxs) {
+                  for (let c = 0; c < headers.length; c++) {
+                    const ref = XLSX.utils.encode_cell({ r, c });
+                    if (ws[ref]) {
+                      ws[ref].s = { font: { bold: true } };
+                    }
+                  }
+                }
+
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Leverandørrapport");
-                const filePeriod = periodType === "payroll"
-                  ? `${format(periodStart, "dd-MM")}_${format(periodEnd, "dd-MM-yyyy")}`
-                  : format(monthDate, "yyyy-MM");
                 XLSX.writeFile(wb, `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`);
               }}
               disabled={locationDiscounts.length === 0}
