@@ -129,7 +129,13 @@ export function downloadContractAsPdf(contract: ContractData) {
         }
         
         .content p {
-          margin-bottom: 12px;
+          margin-top: 16px;
+          margin-bottom: 16px;
+        }
+        
+        .content p:empty,
+        .content p:has(br:only-child) {
+          min-height: 1em;
         }
         
         .content ul, .content ol {
