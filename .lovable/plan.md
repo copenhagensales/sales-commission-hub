@@ -1,70 +1,51 @@
 
 
-## Forbedret kontraktvisning — UI/UX opgradering
+## Debug: Emma Sylvest kan ikke se kontrakter under profil
 
-### Nuværende tilstand
-Siden har allerede en god grundstruktur med progress stepper, header card, dokumentindhold og signatur-sektion. Men der er plads til forbedringer i overblik, hierarki og professionelt udtryk.
+### Analyse
+Database og RLS er korrekt konfigureret:
+- Emma har `auth_user_id` korrekt linket
+- 2 kontrakter eksisterer med hendes `employee_id`
+- `get_current_employee_id()` er `SECURITY DEFINER` og burde virke
+- RLS policies på `contracts` og `contract_signatures` ser korrekte ud
 
-### Foreslåede forbedringer
+Fejlen er sandsynligvis en stille fejl i enten employee-lookup eller contracts-query der sker client-side. For at diagnosticere og samtidig gøre koden mere robust:
 
-**1. Sidebar-navigation med indholdsfortegnelse (Table of Contents)**
-Tilføj en sticky sidebar (kun desktop) der viser kontraktens sektioner (H2-overskrifter) som klikbare links. Giver overblik over hele dokumentet og mulighed for at springe til specifikke sektioner. Parseres automatisk fra kontraktens HTML-indhold.
+### Plan
 
-**2. Læse-progress-indikator**
-En tynd progress-bar i toppen (under sticky header) der viser hvor langt brugeren er i dokumentet. Giver en fornemmelse af fremdrift og hvor meget der er tilbage at læse.
+**Fil: `src/pages/MyProfile.tsx`**
 
-**3. Forbedret header-layout**
-- Flyt metadata-pills til en mere struktureret grid-layout i stedet for wrappende badges
-- Tilføj afsender-info (hvem sendte kontrakten) som et dedikeret felt
-- Gør "GODKENDT"-stemplet mere subtilt og placér det inline
+1. **Tilføj console.log** til contracts-queryen for at logge hvad der returneres (og eventuelle fejl)
+2. **Brug `auth_user_id` som primær lookup** for employee i stedet for email-matching via `.or()`. Emmas `auth_user_id` er allerede linket, og dette eliminerer potentielle problemer med PostgREST filter-parsing af email-adresser med punktummer
+3. **Fallback til email-matching** hvis `auth_user_id` ikke finder en record (bagudkompatibilitet)
 
-**4. Forbedret dokument-container**
-- Tilføj sidenumre-lignende sektionsindikatorer i marginen
-- Lys baggrund på selve dokumentet for bedre kontrast mod siden (paper-on-background effekt)
-- Subtil skygge for at give "papir"-fornemmelsen
+Ændringen i employee-lookup (linje ~225-233):
+```typescript
+// Primary: lookup by auth_user_id
+const { data: userData } = await supabase.auth.getUser();
+if (!userData.user) return null;
 
-**5. Forbedret signatur-sektion**
-- Vis signaturer som en tabel/grid i stedet for timeline når kontrakten er underskrevet
-- Tilføj et visuelt "certifikat"-look for færdigunderskrevne kontrakter
+let data, error;
 
-**6. Sticky action-bar ved bunden (mobil)**
-Erstat den bouncing floating button med en fast action-bar i bunden på mobil med accept-checkbox og underskriv-knap synlig hele tiden.
+// Try auth_user_id first (most reliable)
+({ data, error } = await supabase
+  .from("employee_master_data")
+  .select("*")
+  .eq("auth_user_id", userData.user.id)
+  .maybeSingle());
 
-### Tekniske ændringer
-
-**Fil: `src/pages/ContractSign.tsx`**
-- Tilføj `TableOfContents` komponent der parser H2-tags fra `contract.content` via regex og renderer som klikbare anchor-links
-- Tilføj scroll-progress state via `useEffect` + `scroll` event listener
-- Restructurer layout til `flex` med sidebar + main content på desktop (`lg:flex lg:gap-8`)
-- Tilføj progress-bar `<div>` i sticky header med dynamisk width
-- Opdater dokument-container med eksplicit hvid/lys baggrund: `bg-white dark:bg-card` med `shadow-xl`
-- Forbedret mobil action-bar: fast `fixed bottom-0` bar i stedet for floating bounce-button
-- Refaktor signatur-kort med grid-layout for underskrevne kontrakter
-
-### Struktur efter ændring
-```text
-┌─────────────────────────────────────────────┐
-│ Sticky Header  [Status] [Progress ████░░░] │
-├───────────────┬─────────────────────────────┤
-│ TOC Sidebar   │  Contract Header Card       │
-│ (sticky,      │  ─────────────────────────  │
-│  desktop only)│  Document Content            │
-│               │  (paper-style container)     │
-│ § 1 Parterne  │                              │
-│ § 2 Stilling  │  ...contract text...         │
-│ § 3 Løn       │                              │
-│ § 4 Ferie     │  ─────────────────────────  │
-│ ...           │  Signatures Grid             │
-│               │  ─────────────────────────  │
-│               │  Sign Action Section         │
-├───────────────┴─────────────────────────────┤
-│ Mobile: Fixed Bottom Action Bar             │
-└─────────────────────────────────────────────┘
+// Fallback to email matching
+if (!data && !error) {
+  const lowerEmail = userData.user.email?.toLowerCase() || '';
+  ({ data, error } = await supabase
+    .from("employee_master_data")
+    .select("*")
+    .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+    .maybeSingle());
+}
 ```
 
-### Omfang
-- **1 fil ændres**: `src/pages/ContractSign.tsx`
-- Ingen database-ændringer
-- Ingen nye dependencies
-- Alle ændringer er rent visuelle/UX
+Plus debug logging i contracts-queryen for at bekræfte data hentes korrekt.
+
+Ingen database-ændringer. Ingen nye filer.
 
