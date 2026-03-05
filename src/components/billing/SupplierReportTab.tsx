@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -894,6 +895,52 @@ export function SupplierReportTab() {
             >
               <Download className="h-4 w-4 mr-2" />
               Download PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const WEEKDAY_NAMES_SHORT = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+                const hasDiscount = discountRules && discountRules.length > 0;
+                const headers = [
+                  "Lokation", "ID", "By", "Uger & Dage", "Dage", "Beløb",
+                  ...(hasDiscount ? ["Rabat %", "Rabat", "Efter rabat"] : []),
+                ];
+                const rows = locationDiscounts.map((loc: any) => {
+                  const weekText = [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
+                    .sort(([a]: [number, any], [b]: [number, any]) => a - b)
+                    .map(([week, daysSet]: [number, Set<number>]) => {
+                      const sorted = [...daysSet].sort((a, b) => a - b);
+                      const isFullWeek = [0,1,2,3,4].every(d => daysSet.has(d));
+                      return `Uge ${week}: ${isFullWeek ? "Man–Fre" : sorted.map(d => WEEKDAY_NAMES_SHORT[d]).join(", ")}`;
+                    })
+                    .join(" | ");
+                  return [
+                    loc.location?.name || "",
+                    loc.location?.external_id || "",
+                    loc.location?.address_city || "",
+                    weekText,
+                    loc.totalDays,
+                    loc.totalAmount,
+                    ...(hasDiscount ? [loc.discount, loc.discountAmount, loc.finalAmount] : []),
+                  ];
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                ws["!cols"] = [
+                  { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 8 }, { wch: 12 },
+                  ...(hasDiscount ? [{ wch: 10 }, { wch: 12 }, { wch: 12 }] : []),
+                ];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Leverandørrapport");
+                const filePeriod = periodType === "payroll"
+                  ? `${format(periodStart, "dd-MM")}_${format(periodEnd, "dd-MM-yyyy")}`
+                  : format(monthDate, "yyyy-MM");
+                XLSX.writeFile(wb, `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`);
+              }}
+              disabled={locationDiscounts.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Excel
             </Button>
             {isApproved && (
               <Button
