@@ -1,22 +1,41 @@
 
 
-## Tilføj rabat pr. lokation i tabellen for alle rabattyper
+## Professionelt kontraktdesign med bedre layout og progress
 
-### Problem
-Rabatkolonnerne ("Rabat" og "Efter rabat") vises kun i tabellen når rabattypen er `annual_revenue`. For `placements`-baserede rabatter beregnes rabatten allerede korrekt pr. lokation (inkl. undtagelser), men den vises ikke i tabellen.
+### Overordnet tilgang
+Redesigne `ContractSign.tsx` med tre fokusområder: bedre kontraktindhold-layout, visuelt redesign og progress/status overblik.
 
-### Løsning
-Vis "Rabat" og "Efter rabat" kolonnerne for **alle** rabattyper når der er aktive rabatregler — ikke kun for `annual_revenue`.
+### 1. Progress/Status overblik (top)
+Tilføj en visuel stepper under headeren der viser kontraktens flow:
+- Step 1: "Kontrakt modtaget" (altid done)
+- Step 2: "Gennemlæst" (done når bruger scroller til bunds)
+- Step 3: "Accepteret" (done når checkbox er markeret)  
+- Step 4: "Underskrevet" (done når signeret)
 
-### Ændringer i `src/components/billing/SupplierReportTab.tsx`
+Implementeres som en horisontal stepper med ikoner, forbindelseslinjer og status-farver.
 
-1. **Table header** (~linje 645-650): Ændr betingelsen `{discountType === "annual_revenue" && (...)}` til `{hasActiveDiscountRules && (...)}` hvor `hasActiveDiscountRules = discountRules && discountRules.length > 0`.
+### 2. Visuelt redesign
+- **Header-kort**: Tilføj en mere professionel header med tydeligere hierarki. Tilføj metadata-grid (udsendt dato, status, kontrakttype) i small pills/badges under titlen.
+- **Kontraktindhold**: Indpak i et "papir"-lignende container med hvid/lys baggrund, subtil skygge, og en tynd venstre-border accent. Dette giver kontrast mod den mørke baggrund og ligner et rigtigt dokument.
+- **Underskrift-kort**: Mere kompakt og elegant design med tidslinje-layout i stedet for listevisning.
+- **Spacing**: Konsekvent brug af `space-y-8` og bedre padding.
 
-2. **Table body** (~linje 706-719): Samme betingelsesændring for rabat-cellerne pr. lokationsrække.
+### 3. Bedre kontraktindhold-layout
+- Tilføj et **resumé-kort** øverst i kontrakten med nøgleinformation (medarbejder, stilling, startdato, løn) trukket fra kontraktens metadata — hvis data er tilgængelig.
+- Behold den eksisterende prose-styling men tilføj en subtil sektionsnummerering via CSS counters.
+- Tilføj en "Scroll ned for at underskrive" floating hint i bunden der forsvinder når underskriftssektionen er synlig.
 
-3. **Table footer** (~linje 731-740): Samme betingelsesændring for subtotal-rabatkolonnerne.
+### Teknisk implementering
 
-4. **Footer colSpan** (~linje 725): Juster colSpan fra 8 til korrekt antal.
+**Fil**: `src/pages/ContractSign.tsx`
 
-Dette er en ren UI-ændring — al rabatlogik pr. lokation er allerede implementeret i `locationDiscounts`.
+**Ændringer**:
+1. Tilføj `ContractProgressStepper` komponent inline (4 steps med cirkel-ikoner og linjer)
+2. Tilføj scroll-tracking via `IntersectionObserver` for at detektere om bruger har scrollet kontrakten igennem
+3. Redesign header-sektionen med metadata-grid
+4. Wrap kontraktindhold i papir-lignende container med `bg-white dark:bg-slate-900` og `shadow-2xl`
+5. Tilføj floating "Scroll ned" indikator
+6. Opdater underskrift-sektionen med tidslinje-design
+
+Ingen database-ændringer. Ingen nye filer nødvendige — alt kan implementeres i den eksisterende fil.
 
