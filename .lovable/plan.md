@@ -1,41 +1,27 @@
 
 
-## Professionelt kontraktdesign med bedre layout og progress
+## Fix: Bevar mellemrum og linjeskift fra skabelonen i kontraktvisningen
 
-### Overordnet tilgang
-Redesigne `ContractSign.tsx` med tre fokusområder: bedre kontraktindhold-layout, visuelt redesign og progress/status overblik.
+### Problem
+Når der laves linjeskift (Enter/Shift+Enter) i kontraktskabelonens rich text editor, gemmes de som `<br>` tags og tomme `<p>` tags i HTML'en. Men i kontraktvisningen (både `ContractSign.tsx` og `Contracts.tsx` preview) overskrives deres naturlige spacing af disse CSS-regler:
 
-### 1. Progress/Status overblik (top)
-Tilføj en visuel stepper under headeren der viser kontraktens flow:
-- Step 1: "Kontrakt modtaget" (altid done)
-- Step 2: "Gennemlæst" (done når bruger scroller til bunds)
-- Step 3: "Accepteret" (done når checkbox er markeret)  
-- Step 4: "Underskrevet" (done når signeret)
+```css
+[&_br]:block [&_br]:content-[''] [&_br]:h-0.5   /* Kollapser <br> til 2px */
+prose-p:my-5                                       /* Fast margin på alle <p> */
+```
 
-Implementeres som en horisontal stepper med ikoner, forbindelseslinjer og status-farver.
+`<br>` tags får kun 2px højde i stedet for en normal linjehøjde, så mellemrum forsvinder.
 
-### 2. Visuelt redesign
-- **Header-kort**: Tilføj en mere professionel header med tydeligere hierarki. Tilføj metadata-grid (udsendt dato, status, kontrakttype) i small pills/badges under titlen.
-- **Kontraktindhold**: Indpak i et "papir"-lignende container med hvid/lys baggrund, subtil skygge, og en tynd venstre-border accent. Dette giver kontrast mod den mørke baggrund og ligner et rigtigt dokument.
-- **Underskrift-kort**: Mere kompakt og elegant design med tidslinje-layout i stedet for listevisning.
-- **Spacing**: Konsekvent brug af `space-y-8` og bedre padding.
+### Løsning
+1. **`src/pages/ContractSign.tsx`** (linje 468): Ændr `[&_br]:h-0.5` til `[&_br]:h-[1em]` så linjeskift respekterer den naturlige linjehøjde. Fjern `content-['']` så `<br>` opfører sig normalt.
 
-### 3. Bedre kontraktindhold-layout
-- Tilføj et **resumé-kort** øverst i kontrakten med nøgleinformation (medarbejder, stilling, startdato, løn) trukket fra kontraktens metadata — hvis data er tilgængelig.
-- Behold den eksisterende prose-styling men tilføj en subtil sektionsnummerering via CSS counters.
-- Tilføj en "Scroll ned for at underskrive" floating hint i bunden der forsvinder når underskriftssektionen er synlig.
+2. **`src/pages/Contracts.tsx`** (preview-modal): Tilføj samme fix så preview også viser korrekte mellemrum.
 
-### Teknisk implementering
+3. Bevar tomme `<p>` tags' spacing ved at tilføje `[&_p:empty]:min-h-[1em]` så tomme paragraffer fra editoren også vises som mellemrum.
 
-**Fil**: `src/pages/ContractSign.tsx`
+### Ændringer
+- **Fil 1**: `src/pages/ContractSign.tsx` — opdater `<br>` CSS-regel og tilføj `p:empty` regel
+- **Fil 2**: `src/pages/Contracts.tsx` — samme ændring i preview-prose-styling
 
-**Ændringer**:
-1. Tilføj `ContractProgressStepper` komponent inline (4 steps med cirkel-ikoner og linjer)
-2. Tilføj scroll-tracking via `IntersectionObserver` for at detektere om bruger har scrollet kontrakten igennem
-3. Redesign header-sektionen med metadata-grid
-4. Wrap kontraktindhold i papir-lignende container med `bg-white dark:bg-slate-900` og `shadow-2xl`
-5. Tilføj floating "Scroll ned" indikator
-6. Opdater underskrift-sektionen med tidslinje-design
-
-Ingen database-ændringer. Ingen nye filer nødvendige — alt kan implementeres i den eksisterende fil.
+Ingen database-ændringer. Ren CSS-fix.
 
