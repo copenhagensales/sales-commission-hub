@@ -163,19 +163,31 @@ export function buildCronExpression(frequencyMinutes: number, offsetMinutes: num
 }
 
 /**
- * Estimate frequency in minutes from a cron expression.
+ * Estimate the effective frequency (minimum gap between firings)
+ * from a cron expression, including wrap-around across the hour boundary.
+ *
+ * Uses minimum circular gap — the shortest interval between any two
+ * consecutive fire-minutes. This is the correct metric for overlap
+ * detection: it answers "how close can two firings get?"
+ *
+ * Edge-case contracts:
+ *  - ≤1 minute-entry → 60 (fires at most once per hour)
+ *  - ≥60 minute-entries → 1 (fires every minute)
  */
 export function estimateFrequencyFromCron(cronExpression: string): number {
   const minutes = parseCronMinutes(cronExpression);
   if (minutes.length <= 1) return 60;
   if (minutes.length >= 60) return 1;
 
-  // Calculate average gap between consecutive minutes
-  let totalGap = 0;
+  let minGap = Infinity;
   for (let i = 1; i < minutes.length; i++) {
-    totalGap += minutes[i] - minutes[i - 1];
+    minGap = Math.min(minGap, minutes[i] - minutes[i - 1]);
   }
-  return Math.round(totalGap / (minutes.length - 1));
+  // Wrap-around gap: from last firing to first firing in next hour
+  const wrapGap = 60 - minutes[minutes.length - 1] + minutes[0];
+  minGap = Math.min(minGap, wrapGap);
+
+  return minGap;
 }
 
 /**
