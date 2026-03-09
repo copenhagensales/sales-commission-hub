@@ -43,6 +43,43 @@ const WHITELISTED_EMAILS = [
   "rasmusventura700@gmail.com",
 ];
 
+// ============= ASE LØNSIKRING NORMALIZATION =============
+// All Lønsikring variant product IDs that should be normalized to the standard one
+// for correct pricing rule matching during sync (mirrors rematch-pricing-rules logic)
+const ASE_LOENSIKRING_STANDARD_ID = "f9a8362f-3839-4247-961c-d5cd1e7cd37d";
+const LOENSIKRING_VARIANT_IDS = new Set([
+  "fb4763a0-ae8e-4abf-85da-30da06a56294",  // Lønsikring Udvidet - 6000
+  "e1d43ddb-4340-4066-a1b8-b699d837f4ce",  // Lønsikring Udvidet
+  "b75db9ae-f486-4385-ae9e-a065b51e2481",  // Lønsikring Udvidet - 18000
+  "acc29102-1e2c-495e-b5e6-feb90ef932b6",  // Lønsikring Udvidet - 16000
+  "fe1fc1e7-2fbb-4f84-8679-3f032864213a",  // Lønsikring Udvidet - 19000
+  "379be89f-4e17-4a22-ac65-136ba0d421d2",  // Lønsikring Udvidet - 50000
+  "ca2730b0-97f3-4133-8f6d-1b22a9236bb9",  // Lønsikring Super
+  "7cd5a845-3ffb-4696-857d-8d4499b5216f",  // Lønsikring Super - 6000
+  "bfd4c21f-76db-4450-b928-3ae6a5deeb0c",  // Lønsikring under 5000
+  "965abda5-5ae8-4fe6-acd8-2ec4dcc9b603",  // Fagforening med lønsikring
+]);
+
+/**
+ * Normalize Lønsikring variant product IDs to the standard ID.
+ * Also detects Lønsikring by product title if the ID doesn't match.
+ */
+function normalizeLoensikringProductId(
+  productId: string | undefined | null,
+  productTitle: string | undefined | null,
+  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
+): string | undefined | null {
+  if (productId && LOENSIKRING_VARIANT_IDS.has(productId)) {
+    log?.("INFO", `Normalizing Lønsikring variant ${productId} → ${ASE_LOENSIKRING_STANDARD_ID}`);
+    return ASE_LOENSIKRING_STANDARD_ID;
+  }
+  if (productId && productId !== ASE_LOENSIKRING_STANDARD_ID && productTitle && /lønsikring/i.test(productTitle)) {
+    log?.("INFO", `Normalizing Lønsikring by title "${productTitle}" → ${ASE_LOENSIKRING_STANDARD_ID}`);
+    return ASE_LOENSIKRING_STANDARD_ID;
+  }
+  return productId;
+}
+
 const EXCLUDED_EMAIL_PATTERNS = [
   /^agent-\d+@adversus\.local$/i,
 ];
