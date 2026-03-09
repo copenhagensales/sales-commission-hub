@@ -1,7 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Car, CheckCircle2, AlertTriangle, Camera, ImagePlus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface VehicleReturnCalloutProps {
   vehicleName: string;
