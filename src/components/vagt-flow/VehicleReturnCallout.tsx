@@ -95,6 +95,34 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isU
         </p>
       </div>
 
+      {/* Checklist */}
+      <div className="ml-5 space-y-2 pt-1">
+        {([
+          { key: "equipment" as const, label: "Jeg har båret alt udstyr op fra bilen" },
+          { key: "cleaned" as const, label: "Jeg har rengjort bilen indvendig" },
+          { key: "key" as const, label: "Jeg har lagt nøglen tilbage i nøgleboksen" },
+        ]).map(({ key, label }) => (
+          <label
+            key={key}
+            className={cn(
+              "flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 border transition-all",
+              checklist[key]
+                ? "border-green-500/30 bg-green-500/5"
+                : showReminder
+                  ? "border-yellow-500/40 bg-yellow-500/10 animate-pulse"
+                  : "border-border bg-background"
+            )}
+          >
+            <Checkbox
+              checked={checklist[key]}
+              onCheckedChange={(v) => setChecklist((prev) => ({ ...prev, [key]: !!v }))}
+              className="shrink-0"
+            />
+            <span className="text-[11px] text-foreground select-none">{label}</span>
+          </label>
+        ))}
+      </div>
+
       {/* Photo section */}
       <div className="ml-5 space-y-1.5">
         {preview ? (
