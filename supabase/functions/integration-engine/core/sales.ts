@@ -333,6 +333,8 @@ function prepareSaleItems(
       const prod = productMapByName.get(p.name.toLowerCase())
       if (prod) productId = prod.id
     }
+    // Normalize Lønsikring variant IDs to the standard product ID for correct pricing rule matching
+    productId = normalizeLoensikringProductId(productId, p.name, log) as string | undefined
     let commission = 0
     let revenue = 0
     let matchedRuleId: string | null = null
