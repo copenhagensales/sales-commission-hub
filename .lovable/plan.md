@@ -1,36 +1,43 @@
 
 
-## Gør periode og totaler tydeligere i Excel-eksporten
+## Problem: 'some' rollen kan ikke se kandidat-data (RLS blokerer)
 
-### Problem
-Excel-filen mangler kontekst — leverandøren kan ikke se hvilken periode data dækker, eller hvad totalbeløbet er.
+### Årsag
+
+Problemet er **ikke** i UI-rettigheder — det er i databasens Row Level Security (RLS). 
+
+`candidates` tabellen har disse SELECT-policies:
+- `is_rekruttering()` — tjekker for rolle `rekruttering`
+- `is_teamleder_or_above()` — tjekker for `teamleder`, `ejer`, og specifikke jobtitler
+
+**Rollen `some` er ikke inkluderet i nogen af disse funktioner**, så databasen returnerer 0 rækker — uanset hvad der står i permission-editoren.
 
 ### Løsning
-Tilføj **header-rækker** øverst i arket og en **totalrække** nederst:
 
-**Fil: `src/components/billing/SupplierReportTab.tsx`** (Excel-logikken, linje ~901-938)
+Tilføj en ny RLS-policy på `candidates` tabellen der giver `some`-rollen SELECT-adgang:
 
-1. **Tilføj 2-3 header-rækker før tabeldata:**
-   - Række 1: `Leverandørrapport: [lokationstype]`
-   - Række 2: `Periode: [dato-range eller måned]`
-   - Række 3: tom (separator)
-   - Række 4: kolonneoverskrifter (nuværende headers)
-
-2. **Tilføj totalrække efter data:**
-   - Tom i tekst-kolonner, sum af Dage, sum af Beløb
-   - Hvis rabat: også sum af Rabat og Efter rabat
-
-3. **Fed skrift** på header-rækker og totalrække (via cell styling i xlsx)
-
-Eksempel output:
-```text
-A1: Leverandørrapport: Kvickly
-A2: Periode: Februar 2026
-A3: (tom)
-A4: Lokation | ID | By | Uger & Dage | Dage | Beløb
-A5-A17: (data)
-A18: Total | | | | 56 | 57.000
+```sql
+CREATE POLICY "Some role can view candidates"
+ON public.candidates
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.system_roles
+    WHERE user_id = auth.uid() AND role = 'some'
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.employee_master_data
+    WHERE auth_user_id = auth.uid()
+      AND is_active = true
+      AND LOWER(job_title) = 'some'
+  )
+);
 ```
 
-Ingen database-ændringer. Ingen nye filer.
+**Alternativt** (mere fremtidssikret): Opdatér `is_rekruttering` eller opret en ny helper-funktion `is_some()` og tilføj den til den eksisterende policy, så man slipper for at lave en ny policy for hver rolle.
+
+### Ingen kodeændringer nødvendige
+
+Kun én database-migration. UI-koden og hooks virker allerede korrekt — det er kun RLS der blokerer.
 
