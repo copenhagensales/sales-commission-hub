@@ -124,7 +124,7 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isU
       </div>
 
       {/* Photo section */}
-      <div className="ml-5 space-y-1.5">
+      <div className={cn("ml-5 space-y-1.5 transition-all", allChecked ? "opacity-100" : "opacity-40 pointer-events-none")}>
         {preview ? (
           <div className="relative w-full max-w-[200px]">
             <img src={preview} alt="Preview" className="w-full rounded-md border border-border" />
