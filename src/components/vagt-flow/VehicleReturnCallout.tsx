@@ -18,8 +18,21 @@ interface VehicleReturnCalloutProps {
 export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isUndoing, onConfirm, onUndo }: VehicleReturnCalloutProps) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState({ equipment: false, cleaned: false, key: false });
+  const [showReminder, setShowReminder] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  const allChecked = checklist.equipment && checklist.cleaned && checklist.key;
+
+  useEffect(() => {
+    if (allChecked || confirmed) return;
+    const timer = setTimeout(() => {
+      setShowReminder(true);
+      toast({ title: "Husk tjeklisten", description: "Tjek alle punkter før du afleverer nøglen" });
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [allChecked, confirmed]);
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
