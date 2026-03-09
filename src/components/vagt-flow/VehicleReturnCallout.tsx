@@ -1,7 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Car, CheckCircle2, AlertTriangle, Camera, ImagePlus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface VehicleReturnCalloutProps {
   vehicleName: string;
@@ -15,8 +18,21 @@ interface VehicleReturnCalloutProps {
 export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isUndoing, onConfirm, onUndo }: VehicleReturnCalloutProps) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState({ equipment: false, cleaned: false, key: false });
+  const [showReminder, setShowReminder] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  const allChecked = checklist.equipment && checklist.cleaned && checklist.key;
+
+  useEffect(() => {
+    if (allChecked || confirmed) return;
+    const timer = setTimeout(() => {
+      setShowReminder(true);
+      toast({ title: "Husk tjeklisten", description: "Tjek alle punkter før du afleverer nøglen" });
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [allChecked, confirmed]);
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
@@ -79,8 +95,36 @@ export function VehicleReturnCallout({ vehicleName, confirmed, isConfirming, isU
         </p>
       </div>
 
+      {/* Checklist */}
+      <div className="ml-5 space-y-2 pt-1">
+        {([
+          { key: "equipment" as const, label: "Jeg har båret alt udstyr op fra bilen" },
+          { key: "cleaned" as const, label: "Jeg har rengjort bilen indvendig" },
+          { key: "key" as const, label: "Jeg har lagt nøglen tilbage i nøgleboksen" },
+        ]).map(({ key, label }) => (
+          <label
+            key={key}
+            className={cn(
+              "flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 border transition-all",
+              checklist[key]
+                ? "border-green-500/30 bg-green-500/5"
+                : showReminder
+                  ? "border-yellow-500/40 bg-yellow-500/10 animate-pulse"
+                  : "border-border bg-background"
+            )}
+          >
+            <Checkbox
+              checked={checklist[key]}
+              onCheckedChange={(v) => setChecklist((prev) => ({ ...prev, [key]: !!v }))}
+              className="shrink-0"
+            />
+            <span className="text-[11px] text-foreground select-none">{label}</span>
+          </label>
+        ))}
+      </div>
+
       {/* Photo section */}
-      <div className="ml-5 space-y-1.5">
+      <div className={cn("ml-5 space-y-1.5 transition-all", allChecked ? "opacity-100" : "opacity-40 pointer-events-none")}>
         {preview ? (
           <div className="relative w-full max-w-[200px]">
             <img src={preview} alt="Preview" className="w-full rounded-md border border-border" />
