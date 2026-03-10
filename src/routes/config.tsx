@@ -121,6 +121,7 @@ import {
   Cancellations,
   SystemStability,
   TeamGoals,
+  OnboardingAnalyse,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
