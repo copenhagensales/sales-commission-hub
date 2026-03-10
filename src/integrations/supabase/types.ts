@@ -2520,6 +2520,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_confidential: boolean
           name: string
           type: Database["public"]["Enums"]["contract_type"]
           updated_at: string | null
@@ -2532,6 +2533,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_confidential?: boolean
           name: string
           type: Database["public"]["Enums"]["contract_type"]
           updated_at?: string | null
@@ -2544,6 +2546,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_confidential?: boolean
           name?: string
           type?: Database["public"]["Enums"]["contract_type"]
           updated_at?: string | null

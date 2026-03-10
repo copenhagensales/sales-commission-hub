@@ -28,6 +28,7 @@ interface ContractTemplate {
   description: string | null;
   content: string;
   is_active: boolean;
+  is_confidential: boolean;
   version: number;
   created_at: string;
 }
@@ -188,6 +189,22 @@ export default function Contracts() {
       toast.success("Skabelon gemt");
     },
     onError: () => toast.error("Kunne ikke gemme skabelon"),
+  });
+
+  // Toggle template confidential mutation
+  const toggleTemplateConfidentialMutation = useMutation({
+    mutationFn: async ({ id, isConfidential }: { id: string; isConfidential: boolean }) => {
+      const { error } = await supabase
+        .from("contract_templates")
+        .update({ is_confidential: !isConfidential } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["contract-templates"] });
+      toast.success(variables.isConfidential ? "Skabelon er ikke længere fortrolig" : "Skabelon markeret som fortrolig");
+    },
+    onError: () => toast.error("Kunne ikke ændre fortrolighedsstatus"),
   });
 
   // Delete template mutation
@@ -497,12 +514,27 @@ export default function Contracts() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-lg">{template.name}</CardTitle>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            {template.is_confidential && (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            {template.name}
+                          </CardTitle>
                           <Badge variant="outline" className="mt-1">
                             {contractTypeLabels[template.type]}
                           </Badge>
                         </div>
                         <div className="flex gap-1">
+                          {canMarkConfidential && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleTemplateConfidentialMutation.mutate({ id: template.id, isConfidential: template.is_confidential })}
+                              title={template.is_confidential ? "Fjern fortrolighed" : "Markér som fortrolig"}
+                            >
+                              {template.is_confidential ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
