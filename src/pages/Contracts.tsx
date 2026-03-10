@@ -514,12 +514,27 @@ export default function Contracts() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-lg">{template.name}</CardTitle>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            {template.is_confidential && (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            {template.name}
+                          </CardTitle>
                           <Badge variant="outline" className="mt-1">
                             {contractTypeLabels[template.type]}
                           </Badge>
                         </div>
                         <div className="flex gap-1">
+                          {canMarkConfidential && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleTemplateConfidentialMutation.mutate({ id: template.id, isConfidential: template.is_confidential })}
+                              title={template.is_confidential ? "Fjern fortrolighed" : "Markér som fortrolig"}
+                            >
+                              {template.is_confidential ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
