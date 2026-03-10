@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, startOfWeek, addDays, isSameDay, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { Palmtree, Thermometer, AlarmClock, Check } from "lucide-react";
+import { Palmtree, Thermometer, AlarmClock, Check, CalendarX2, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Absence {
