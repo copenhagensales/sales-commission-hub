@@ -288,6 +288,46 @@ export default function OnboardingAnalyse() {
     return teamStats.map((t) => t.team);
   }, [teamStats]);
 
+  // Initialize selectedTeams when activeTeams changes
+  const visibleTeams = useMemo(() => {
+    if (selectedTeams.size === 0) return activeTeams;
+    return activeTeams.filter((t) => selectedTeams.has(t));
+  }, [activeTeams, selectedTeams]);
+
+  const toggleSelectedTeam = (team: string) => {
+    setSelectedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(team)) {
+        next.delete(team);
+      } else {
+        next.add(team);
+      }
+      return next;
+    });
+  };
+
+  // Transform data for grouped bar chart
+  const barChartData = useMemo(() => {
+    return monthlyTeamTrend.map((point) => {
+      const entry: Record<string, any> = { label: point.label };
+      visibleTeams.forEach((team) => {
+        entry[team] = point[team];
+        // Store cohort details for tooltip
+        const monthIdx = monthlyTeamTrend.indexOf(point);
+        const monthDate = [...months].reverse()[monthIdx];
+        if (monthDate) {
+          const end = endOfMonth(monthDate);
+          const cohort = filteredData.filter(
+            (r) => r.team === team && !isBefore(r.startDate, monthDate) && !isAfter(r.startDate, end)
+          );
+          entry[`${team}_starters`] = cohort.length;
+          entry[`${team}_exits`] = cohort.filter((r) => r.leftWithin60).length;
+        }
+      });
+      return entry;
+    });
+  }, [monthlyTeamTrend, visibleTeams, months, filteredData]);
+
   // Monthly cohorts
   const monthlyCohorts = useMemo(() => {
     return months.map((month) => {
