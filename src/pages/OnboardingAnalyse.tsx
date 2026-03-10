@@ -474,7 +474,7 @@ export default function OnboardingAnalyse() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -504,7 +504,7 @@ export default function OnboardingAnalyse() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600">{filteredData.filter((r) => r.leftWithin60).length}</div>
+            <div className="text-3xl font-bold text-destructive">{filteredData.filter((r) => r.leftWithin60).length}</div>
             <p className="text-xs text-muted-foreground mt-1">early leavers</p>
           </CardContent>
         </Card>
@@ -517,6 +517,24 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{retentionRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">{totalActive} stadig ansat</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Shield className="h-4 w-4" /> Post-60d retention
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600">{postOnboardingRetention.rate}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {postOnboardingRetention.active} aktive / {postOnboardingRetention.survivors} survivors
+            </p>
+            {postOnboardingRetention.stopped > 0 && (
+              <p className="text-xs text-destructive mt-0.5">
+                {postOnboardingRetention.stopped} stoppet efter 60d
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
