@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
-import { differenceInDays, parseISO, format, startOfMonth, subMonths, isAfter, isBefore, endOfMonth } from "date-fns";
+import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
@@ -57,7 +57,7 @@ const getChurnLabel = (rate: number) => {
 };
 
 export default function OnboardingAnalyse() {
-  const [monthRange, setMonthRange] = useState("6");
+  const [periodKey, setPeriodKey] = useState("6m");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
@@ -158,20 +158,36 @@ export default function OnboardingAnalyse() {
     },
   });
 
+  const periodConfig = useMemo(() => {
+    const now = new Date();
+    switch (periodKey) {
+      case "30d": return { label: "30 dage", cutoff: subDays(now, 30) };
+      case "60d": return { label: "60 dage", cutoff: subDays(now, 60) };
+      case "90d": return { label: "90 dage", cutoff: subDays(now, 90) };
+      case "1m": return { label: "1 måned", cutoff: startOfMonth(now) };
+      case "3m": return { label: "3 måneder", cutoff: startOfMonth(subMonths(now, 2)) };
+      case "6m": return { label: "6 måneder", cutoff: startOfMonth(subMonths(now, 5)) };
+      case "12m": return { label: "12 måneder", cutoff: startOfMonth(subMonths(now, 11)) };
+      case "24m": return { label: "24 måneder", cutoff: startOfMonth(subMonths(now, 23)) };
+      default: return { label: "6 måneder", cutoff: startOfMonth(subMonths(now, 5)) };
+    }
+  }, [periodKey]);
+
   const months = useMemo(() => {
-    const count = parseInt(monthRange);
     const result: Date[] = [];
-    for (let i = 0; i < count; i++) {
-      result.push(startOfMonth(subMonths(new Date(), i)));
+    let current = startOfMonth(new Date());
+    const earliest = startOfMonth(periodConfig.cutoff);
+    while (!isBefore(current, earliest)) {
+      result.push(current);
+      current = startOfMonth(subMonths(current, 1));
     }
     return result;
-  }, [monthRange]);
+  }, [periodConfig]);
 
   const filteredData = useMemo(() => {
     if (!data) return [];
-    const earliest = months[months.length - 1];
-    return data.filter((r) => !isBefore(r.startDate, earliest));
-  }, [data, months]);
+    return data.filter((r) => !isBefore(r.startDate, periodConfig.cutoff));
+  }, [data, periodConfig]);
 
   // Team stats
   const teamStats = useMemo(() => {
@@ -258,15 +274,19 @@ export default function OnboardingAnalyse() {
           <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
           <p className="text-muted-foreground text-sm">60-dages churn breakdown per team og måned</p>
         </div>
-        <Select value={monthRange} onValueChange={setMonthRange}>
-          <SelectTrigger className="w-[180px]">
+        <Select value={periodKey} onValueChange={setPeriodKey}>
+          <SelectTrigger className="w-[200px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3">Seneste 3 mdr.</SelectItem>
-            <SelectItem value="6">Seneste 6 mdr.</SelectItem>
-            <SelectItem value="12">Seneste 12 mdr.</SelectItem>
-            <SelectItem value="24">Seneste 24 mdr.</SelectItem>
+            <SelectItem value="1m">Denne måned</SelectItem>
+            <SelectItem value="30d">Seneste 30 dage</SelectItem>
+            <SelectItem value="60d">Seneste 60 dage</SelectItem>
+            <SelectItem value="90d">Seneste 90 dage</SelectItem>
+            <SelectItem value="3m">Seneste 3 mdr.</SelectItem>
+            <SelectItem value="6m">Seneste 6 mdr.</SelectItem>
+            <SelectItem value="12m">Seneste 12 mdr.</SelectItem>
+            <SelectItem value="24m">Seneste 24 mdr.</SelectItem>
           </SelectContent>
         </Select>
       </div>
