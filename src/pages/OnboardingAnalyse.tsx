@@ -253,6 +253,40 @@ export default function OnboardingAnalyse() {
       .sort((a, b) => b.churn - a.churn);
   }, [filteredData]);
 
+  // Monthly churn per team (for line chart)
+  const TEAM_COLORS: Record<string, string> = {
+    "FM YouSee": "hsl(210, 70%, 50%)",
+    "FM Eesy": "hsl(280, 60%, 55%)",
+    "FM Øvrig": "hsl(45, 80%, 50%)",
+    "Eesy TM": "hsl(330, 65%, 50%)",
+    "Relatel": "hsl(160, 60%, 45%)",
+    "TDC Erhverv": "hsl(200, 70%, 45%)",
+    "United": "hsl(20, 75%, 50%)",
+    "Eesy FM": "hsl(280, 60%, 55%)",
+    "Fieldmarketing": "hsl(210, 70%, 50%)",
+  };
+
+  const monthlyTeamTrend = useMemo(() => {
+    const allTeams = new Set(filteredData.map((r) => r.team));
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const label = format(month, "MMM yy", { locale: da });
+      const point: Record<string, any> = { label };
+      allTeams.forEach((team) => {
+        const cohort = filteredData.filter(
+          (r) => r.team === team && !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
+        );
+        const exits = cohort.filter((r) => r.leftWithin60).length;
+        point[team] = cohort.length > 0 ? Math.round((exits / cohort.length) * 1000) / 10 : null;
+      });
+      return point;
+    });
+  }, [months, filteredData]);
+
+  const activeTeams = useMemo(() => {
+    return teamStats.map((t) => t.team);
+  }, [teamStats]);
+
   // Monthly cohorts
   const monthlyCohorts = useMemo(() => {
     return months.map((month) => {
