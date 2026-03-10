@@ -265,6 +265,7 @@ export default function OnboardingAnalyse() {
         exits60: s.exits60,
         churn30: s.total > 0 ? Math.round((s.exits30 / s.total) * 1000) / 10 : 0,
         churn60: s.total > 0 ? Math.round((s.exits60 / s.total) * 1000) / 10 : 0,
+        avgTenureDays: s.total > 0 ? Math.round(s.employees.reduce((sum, r) => sum + r.tenureDays, 0) / s.total) : 0,
         employees: s.employees.sort((a, b) => b.startDate.getTime() - a.startDate.getTime()),
       }))
       .sort((a, b) => b.churn60 - a.churn60);
