@@ -126,25 +126,16 @@ export default function OnboardingAnalyse() {
         }
       });
 
-      const resolveFmSubTeam = (empName: string): string => {
-        const norm = empName.toLowerCase().replace(/\s+/g, " ").trim();
-        const primaryClient = fmAgentPrimaryClient.get(norm);
-        if (primaryClient === "Yousee") return "FM YouSee";
-        if (primaryClient === "Eesy FM") return "FM Eesy";
-        return "FM Øvrig";
-      };
-
       const resolveTeam = (empId: string, empName: string): string => {
         const fromTeamMembers = employeeTeamMap.get(empId);
         const baseTeam = fromTeamMembers
           ? normalizeTeamName(fromTeamMembers)
           : normalizeTeamName(histNameTeamMap.get(normName(empName)) || null);
         
-        if (baseTeam === "Fieldmarketing") return resolveFmSubTeam(empName);
         if (baseTeam === "Ukendt") {
-          // Check if they have FM sales
+          // Check if they have FM sales → assign to Fieldmarketing
           const fmClient = fmAgentPrimaryClient.get(normName(empName));
-          if (fmClient) return resolveFmSubTeam(empName);
+          if (fmClient) return "Fieldmarketing";
         }
         return baseTeam || "Ukendt";
       };
