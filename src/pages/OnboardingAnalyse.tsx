@@ -265,6 +265,7 @@ export default function OnboardingAnalyse() {
         exits60: s.exits60,
         churn30: s.total > 0 ? Math.round((s.exits30 / s.total) * 1000) / 10 : 0,
         churn60: s.total > 0 ? Math.round((s.exits60 / s.total) * 1000) / 10 : 0,
+        avgTenureDays: s.total > 0 ? Math.round(s.employees.reduce((sum, r) => sum + r.tenureDays, 0) / s.total) : 0,
         employees: s.employees.sort((a, b) => b.startDate.getTime() - a.startDate.getTime()),
       }))
       .sort((a, b) => b.churn60 - a.churn60);
@@ -732,6 +733,7 @@ export default function OnboardingAnalyse() {
                 <TableHead className="text-right">30d Churn</TableHead>
                 <TableHead className="text-right">≤60d</TableHead>
                 <TableHead className="text-right">60d Churn</TableHead>
+                <TableHead className="text-right">Gns. anciennitet</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -751,6 +753,7 @@ export default function OnboardingAnalyse() {
                         <TableCell className="text-right">
                           <span className={`font-semibold ${getChurnColor(t.churn60)}`}>{t.churn60}%</span>
                         </TableCell>
+                        <TableCell className="text-right font-medium">{t.avgTenureDays}d</TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
                     <CollapsibleContent asChild>
