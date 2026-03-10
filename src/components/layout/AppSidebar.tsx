@@ -962,6 +962,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   </NavLink>
                 )}
                 {p.canViewContracts && (
+                  <NavLink to="/onboarding-analyse" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/onboarding-analyse" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <TrendingDown className="h-4 w-4" />
+                    Onboarding Analyse
+                  </NavLink>
+                )}
+                {p.canViewContracts && (
                   <NavLink to="/contracts" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/contracts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
