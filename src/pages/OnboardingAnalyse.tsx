@@ -179,6 +179,7 @@ export default function OnboardingAnalyse() {
           endDate,
           tenureDays: Math.max(0, tenureDays),
           isCurrent: emp.is_active ?? false,
+          leftWithin30: !emp.is_active && endDate != null && differenceInDays(endDate, startDate) <= 30,
           leftWithin60: !emp.is_active && endDate != null && differenceInDays(endDate, startDate) <= 60,
         });
       });
