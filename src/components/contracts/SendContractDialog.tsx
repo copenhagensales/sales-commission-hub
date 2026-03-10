@@ -499,6 +499,24 @@ export function SendContractDialog({
                   />
                 </div>
 
+                {canMarkConfidential && (
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Fortrolig kontrakt
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Kun du, mg@ og medarbejderen selv kan se denne kontrakt
+                      </p>
+                    </div>
+                    <Switch
+                      checked={isConfidential}
+                      onCheckedChange={setIsConfidential}
+                    />
+                  </div>
+                )}
+
                 <div className="bg-muted/50 rounded-lg p-4 space-y-4">
                   <h4 className="font-medium text-sm">Medarbejderdata der flettes ind:</h4>
                   

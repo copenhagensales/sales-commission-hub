@@ -379,7 +379,14 @@ export default function Contracts() {
                         <TableCell className="font-medium">
                           {contract.employee?.first_name} {contract.employee?.last_name}
                         </TableCell>
-                        <TableCell>{contract.title}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {(contract as any).is_confidential && (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            {contract.title}
+                          </div>
+                        </TableCell>
                         <TableCell>{contractTypeLabels[contract.type]}</TableCell>
                         <TableCell>
                           <Badge className={statusColors[contract.status]}>
