@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from "recharts";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
