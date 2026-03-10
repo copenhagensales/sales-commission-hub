@@ -56,6 +56,7 @@ function BillingOverviewTab() {
           location(id, name, address_city, daily_rate, type),
           clients(id, name)
         `)
+        .eq("status", "confirmed")
         .gte("start_date", format(periodStart, "yyyy-MM-dd"))
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .order("start_date");

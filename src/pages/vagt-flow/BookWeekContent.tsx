@@ -230,12 +230,13 @@ export default function BookWeekContent() {
         total_price: parsedTotalPrice,
         placement_id: selectedPlacement?.id || null,
         daily_rate_override: selectedPlacement?.daily_rate || null,
+        status: 'draft',
       } as any);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Booking oprettet!" });
+      toast({ title: "Booking oprettet som kladde!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
       setSelectedPlacementId("");
@@ -395,6 +396,47 @@ export default function BookWeekContent() {
     Sortlistet: "bg-red-100 text-red-700",
   };
 
+  // Query draft bookings for the current week
+  const { data: weekDraftBookings } = useQuery({
+    queryKey: ["week-draft-bookings", selectedWeek, selectedYear],
+    queryFn: async () => {
+      const weekStart = getWeekStartDate(selectedYear, selectedWeek);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const { data, error } = await supabase
+        .from("booking")
+        .select("id, location:location_id(name), clients:client_id(name), booked_days, status")
+        .eq("status", "draft")
+        .eq("week_number", selectedWeek)
+        .eq("year", selectedYear);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const confirmWeekMutation = useMutation({
+    mutationFn: async () => {
+      if (!weekDraftBookings || weekDraftBookings.length === 0) return;
+      const ids = weekDraftBookings.map((b: any) => b.id);
+      const { error } = await supabase
+        .from("booking")
+        .update({ status: "confirmed" } as any)
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: `${weekDraftBookings?.length || 0} bookinger bekræftet!` });
+      queryClient.invalidateQueries({ queryKey: ["week-draft-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const draftCount = weekDraftBookings?.length || 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -403,17 +445,28 @@ export default function BookWeekContent() {
           <h2 className="text-2xl font-bold tracking-tight">Book uge</h2>
           <p className="text-muted-foreground">Planlæg bookinger for en hel uge med fuldt overblik</p>
         </div>
-        <div className="flex items-center gap-3 bg-card px-6 py-4 rounded-xl border">
-          <Button variant="outline" size="icon" onClick={handlePrevWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="text-center min-w-[80px]">
-            <div className="text-3xl font-bold">{selectedWeek}</div>
-            <div className="text-xs text-muted-foreground">{selectedYear}</div>
+        <div className="flex items-center gap-3">
+          {draftCount > 0 && (
+            <Button
+              onClick={() => confirmWeekMutation.mutate()}
+              disabled={confirmWeekMutation.isPending}
+              className="gap-2"
+            >
+              Bekræft uge ({draftCount} kladder)
+            </Button>
+          )}
+          <div className="flex items-center gap-3 bg-card px-6 py-4 rounded-xl border">
+            <Button variant="outline" size="icon" onClick={handlePrevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-center min-w-[80px]">
+              <div className="text-3xl font-bold">{selectedWeek}</div>
+              <div className="text-xs text-muted-foreground">{selectedYear}</div>
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="outline" size="icon" onClick={handleNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 

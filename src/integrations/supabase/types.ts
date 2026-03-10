@@ -435,6 +435,7 @@ export type Database = {
           location_id: string
           placement_id: string | null
           start_date: string
+          status: string
           total_price: number | null
           updated_at: string | null
           week_number: number
@@ -454,6 +455,7 @@ export type Database = {
           location_id: string
           placement_id?: string | null
           start_date: string
+          status?: string
           total_price?: number | null
           updated_at?: string | null
           week_number: number
@@ -473,6 +475,7 @@ export type Database = {
           location_id?: string
           placement_id?: string | null
           start_date?: string
+          status?: string
           total_price?: number | null
           updated_at?: string | null
           week_number?: number
