@@ -353,6 +353,7 @@ export function SendContractDialog({
           status: "pending_employee",
           sent_at: new Date().toISOString(),
           sent_by: user.user?.id,
+          is_confidential: isConfidential,
           notes,
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
         })
