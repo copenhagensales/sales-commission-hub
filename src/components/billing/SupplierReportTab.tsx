@@ -113,6 +113,7 @@ export function SupplierReportTab() {
           location(id, name, address_city, daily_rate, type, external_id),
           clients(id, name)
         `)
+        .eq("status", "confirmed")
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .gte("end_date", format(periodStart, "yyyy-MM-dd"))
         .order("start_date");
