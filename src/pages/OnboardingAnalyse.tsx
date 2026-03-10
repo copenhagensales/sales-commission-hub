@@ -273,15 +273,19 @@ export default function OnboardingAnalyse() {
           <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
           <p className="text-muted-foreground text-sm">60-dages churn breakdown per team og måned</p>
         </div>
-        <Select value={monthRange} onValueChange={setMonthRange}>
-          <SelectTrigger className="w-[180px]">
+        <Select value={periodKey} onValueChange={setPeriodKey}>
+          <SelectTrigger className="w-[200px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3">Seneste 3 mdr.</SelectItem>
-            <SelectItem value="6">Seneste 6 mdr.</SelectItem>
-            <SelectItem value="12">Seneste 12 mdr.</SelectItem>
-            <SelectItem value="24">Seneste 24 mdr.</SelectItem>
+            <SelectItem value="1m">Denne måned</SelectItem>
+            <SelectItem value="30d">Seneste 30 dage</SelectItem>
+            <SelectItem value="60d">Seneste 60 dage</SelectItem>
+            <SelectItem value="90d">Seneste 90 dage</SelectItem>
+            <SelectItem value="3m">Seneste 3 mdr.</SelectItem>
+            <SelectItem value="6m">Seneste 6 mdr.</SelectItem>
+            <SelectItem value="12m">Seneste 12 mdr.</SelectItem>
+            <SelectItem value="24m">Seneste 24 mdr.</SelectItem>
           </SelectContent>
         </Select>
       </div>
