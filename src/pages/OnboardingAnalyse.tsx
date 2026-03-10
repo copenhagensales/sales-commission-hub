@@ -396,7 +396,8 @@ export default function OnboardingAnalyse() {
     if (prevData.length === 0) return null;
 
     const prevEarlyLeavers = prevData.filter((r) => r.leftWithin60).length;
-    const prevChurn = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevChurn60 = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevChurn30 = Math.round((prevData.filter((r) => r.leftWithin30).length / prevData.length) * 1000) / 10;
     const prevActive = prevData.filter((r) => r.isCurrent).length;
     const prevRetention = Math.round((prevActive / prevData.length) * 1000) / 10;
 
@@ -407,7 +408,8 @@ export default function OnboardingAnalyse() {
       : 0;
 
     return {
-      churn: prevChurn,
+      churn60: prevChurn60,
+      churn30: prevChurn30,
       starts: prevData.length,
       earlyLeavers: prevEarlyLeavers,
       retention: prevRetention,
