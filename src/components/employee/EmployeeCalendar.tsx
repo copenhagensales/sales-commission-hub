@@ -178,7 +178,6 @@ export function EmployeeCalendar({
                     iconColor = "text-amber-600";
                     statusLabel = "Ferie";
                   } else if (absence.type === "sick") {
-                    // ENHANCED: Much more visible sick day styling
                     cellBg = "bg-red-500/25";
                     iconBg = "bg-red-500/40";
                     Icon = Thermometer;
@@ -186,6 +185,20 @@ export function EmployeeCalendar({
                     statusLabel = "Syg";
                     cellRing = "ring-2 ring-red-500/60 ring-inset";
                     badgeStyle = "bg-red-500 text-white";
+                  } else if (absence.type === "day_off") {
+                    cellBg = "bg-blue-500/15";
+                    iconBg = "bg-blue-500/25";
+                    Icon = CalendarX2;
+                    iconColor = "text-blue-600";
+                    statusLabel = "Fridag";
+                  } else if (absence.type === "no_show") {
+                    cellBg = "bg-slate-500/25";
+                    iconBg = "bg-slate-500/40";
+                    Icon = UserX;
+                    iconColor = "text-slate-600";
+                    statusLabel = "Udeblivelse";
+                    cellRing = "ring-2 ring-slate-500/60 ring-inset";
+                    badgeStyle = "bg-slate-500 text-white";
                   }
                 } else if (lateness) {
                   // ENHANCED: Much more visible lateness styling
