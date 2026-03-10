@@ -14,7 +14,7 @@ import { da } from "date-fns/locale";
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
   const lower = name.toLowerCase().trim();
-  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
+  if (lower.includes("eesy fm") || lower === "eesy fm") return "Fieldmarketing";
   if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
   if (lower.includes("fieldmarketing")) return "Fieldmarketing";
   if (lower.includes("relatel")) return "Relatel";
@@ -126,25 +126,16 @@ export default function OnboardingAnalyse() {
         }
       });
 
-      const resolveFmSubTeam = (empName: string): string => {
-        const norm = empName.toLowerCase().replace(/\s+/g, " ").trim();
-        const primaryClient = fmAgentPrimaryClient.get(norm);
-        if (primaryClient === "Yousee") return "FM YouSee";
-        if (primaryClient === "Eesy FM") return "FM Eesy";
-        return "FM Øvrig";
-      };
-
       const resolveTeam = (empId: string, empName: string): string => {
         const fromTeamMembers = employeeTeamMap.get(empId);
         const baseTeam = fromTeamMembers
           ? normalizeTeamName(fromTeamMembers)
           : normalizeTeamName(histNameTeamMap.get(normName(empName)) || null);
         
-        if (baseTeam === "Fieldmarketing") return resolveFmSubTeam(empName);
         if (baseTeam === "Ukendt") {
-          // Check if they have FM sales
+          // Check if they have FM sales → assign to Fieldmarketing
           const fmClient = fmAgentPrimaryClient.get(normName(empName));
-          if (fmClient) return resolveFmSubTeam(empName);
+          if (fmClient) return "Fieldmarketing";
         }
         return baseTeam || "Ukendt";
       };
@@ -256,15 +247,11 @@ export default function OnboardingAnalyse() {
 
   // Monthly churn per team (for line chart)
   const TEAM_COLORS: Record<string, string> = {
-    "FM YouSee": "hsl(210, 70%, 50%)",
-    "FM Eesy": "hsl(280, 60%, 55%)",
-    "FM Øvrig": "hsl(45, 80%, 50%)",
+    "Fieldmarketing": "hsl(210, 70%, 50%)",
     "Eesy TM": "hsl(330, 65%, 50%)",
     "Relatel": "hsl(160, 60%, 45%)",
     "TDC Erhverv": "hsl(200, 70%, 45%)",
     "United": "hsl(20, 75%, 50%)",
-    "Eesy FM": "hsl(280, 60%, 55%)",
-    "Fieldmarketing": "hsl(210, 70%, 50%)",
   };
 
   const monthlyTeamTrend = useMemo(() => {
