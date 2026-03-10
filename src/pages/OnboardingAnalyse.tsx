@@ -68,11 +68,10 @@ function DeltaIndicator({ current, previous, suffix = "", invertColors = false }
   const isPositive = delta > 0;
   const isGood = invertColors ? !isPositive : isPositive;
   const Icon = isPositive ? TrendingUp : TrendingDown;
-  const sign = isPositive ? "+" : "";
   return (
     <p className={`text-xs mt-1.5 flex items-center gap-1 ${isGood ? "text-green-600" : "text-red-600"}`}>
       <Icon className="h-3 w-3" />
-      {sign}{delta}{suffix} ift. forrige periode
+      {previous}{suffix} forrige periode
     </p>
   );
 }
