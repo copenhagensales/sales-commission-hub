@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2 } from "lucide-react";
 import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
@@ -61,6 +61,7 @@ export default function BookingsContent() {
     yearParam ? parseInt(yearParam) : getWeekYear(now)
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [deleteAssignmentData, setDeleteAssignmentData] = useState<{
     id: string;
@@ -488,9 +489,32 @@ export default function BookingsContent() {
     },
   });
 
+  // Confirm week mutation
+  const confirmWeekMutation = useMutation({
+    mutationFn: async () => {
+      const draftIds = bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || [];
+      if (draftIds.length === 0) return;
+      const { error } = await supabase
+        .from("booking")
+        .update({ status: 'confirmed' })
+        .in("id", draftIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Uge bekræftet", description: "Alle kladder er nu bekræftet." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const draftCount = bookings?.filter((b: any) => b.status === 'draft').length || 0;
+
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
-    return matchesClient;
+    const matchesStatus = statusFilter === "all" || b.status === statusFilter;
+    return matchesClient && matchesStatus;
   });
 
   const groupedByClient = filtered?.reduce((acc: any, booking: any) => {
@@ -580,20 +604,42 @@ export default function BookingsContent() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Alle kunder" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle kunder</SelectItem>
-                {fieldmarketingClients?.map((client: any) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex gap-4">
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Alle kunder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle kunder</SelectItem>
+                  {fieldmarketingClients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Alle statusser" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle statusser</SelectItem>
+                  <SelectItem value="draft">Kladder</SelectItem>
+                  <SelectItem value="confirmed">Bekræftede</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {draftCount > 0 && canEditFmBookings && (
+              <Button
+                onClick={() => confirmWeekMutation.mutate()}
+                disabled={confirmWeekMutation.isPending}
+                className="gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Bekræft uge ({draftCount} {draftCount === 1 ? 'kladde' : 'kladder'})
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -641,16 +687,26 @@ export default function BookingsContent() {
               <CollapsibleContent>
                 <div className="border-t">
                   {clientBookings.map((booking: any) => (
-                    <div key={booking.id} className="p-4 border-b last:border-b-0 hover:bg-muted/50">
+                    <div key={booking.id} className={cn(
+                      "p-4 border-b last:border-b-0 hover:bg-muted/50",
+                      booking.status === 'draft' && "border-l-4 border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/10"
+                    )}>
                       <div className="flex items-center justify-between mb-3">
-                        <div 
-                          className="cursor-pointer"
-                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
-                        >
-                          <p className="font-medium hover:underline">{booking.location?.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {booking.location?.address_city} • {booking.location?.type}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
+                          >
+                            <p className="font-medium hover:underline">{booking.location?.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {booking.location?.address_city} • {booking.location?.type}
+                            </p>
+                          </div>
+                          {booking.status === 'draft' && (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700">
+                              Kladde
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {canEditFmBookings && (
