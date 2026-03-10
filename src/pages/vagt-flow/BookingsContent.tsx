@@ -687,16 +687,26 @@ export default function BookingsContent() {
               <CollapsibleContent>
                 <div className="border-t">
                   {clientBookings.map((booking: any) => (
-                    <div key={booking.id} className="p-4 border-b last:border-b-0 hover:bg-muted/50">
+                    <div key={booking.id} className={cn(
+                      "p-4 border-b last:border-b-0 hover:bg-muted/50",
+                      booking.status === 'draft' && "border-l-4 border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/10"
+                    )}>
                       <div className="flex items-center justify-between mb-3">
-                        <div 
-                          className="cursor-pointer"
-                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
-                        >
-                          <p className="font-medium hover:underline">{booking.location?.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {booking.location?.address_city} • {booking.location?.type}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
+                          >
+                            <p className="font-medium hover:underline">{booking.location?.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {booking.location?.address_city} • {booking.location?.type}
+                            </p>
+                          </div>
+                          {booking.status === 'draft' && (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700">
+                              Kladde
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {canEditFmBookings && (
