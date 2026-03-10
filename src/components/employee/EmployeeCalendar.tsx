@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { format, startOfWeek, addDays, isSameDay, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { Palmtree, Thermometer, AlarmClock, Check } from "lucide-react";
+import { Palmtree, Thermometer, AlarmClock, Check, CalendarX2, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Absence {
   id: string;
-  type: "sick" | "vacation";
+  type: "sick" | "vacation" | "day_off" | "no_show";
   start_date: string;
   end_date: string;
 }
@@ -96,6 +96,18 @@ export function EmployeeCalendar({
           </div>
           <span className="text-orange-600 font-semibold">Forsinket</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-blue-500/20 flex items-center justify-center ring-1 ring-blue-500/30">
+            <CalendarX2 className="h-4 w-4 text-blue-600" />
+          </div>
+          <span className="text-muted-foreground font-medium">Fridag</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-slate-500/20 flex items-center justify-center ring-2 ring-slate-500/50">
+            <UserX className="h-4 w-4 text-slate-600" />
+          </div>
+          <span className="text-slate-600 font-semibold">Udeblivelse</span>
+        </div>
       </div>
 
       {/* Calendar Table - Enhanced styling */}
@@ -166,7 +178,6 @@ export function EmployeeCalendar({
                     iconColor = "text-amber-600";
                     statusLabel = "Ferie";
                   } else if (absence.type === "sick") {
-                    // ENHANCED: Much more visible sick day styling
                     cellBg = "bg-red-500/25";
                     iconBg = "bg-red-500/40";
                     Icon = Thermometer;
@@ -174,6 +185,20 @@ export function EmployeeCalendar({
                     statusLabel = "Syg";
                     cellRing = "ring-2 ring-red-500/60 ring-inset";
                     badgeStyle = "bg-red-500 text-white";
+                  } else if (absence.type === "day_off") {
+                    cellBg = "bg-blue-500/15";
+                    iconBg = "bg-blue-500/25";
+                    Icon = CalendarX2;
+                    iconColor = "text-blue-600";
+                    statusLabel = "Fridag";
+                  } else if (absence.type === "no_show") {
+                    cellBg = "bg-slate-500/25";
+                    iconBg = "bg-slate-500/40";
+                    Icon = UserX;
+                    iconColor = "text-slate-600";
+                    statusLabel = "Udeblivelse";
+                    cellRing = "ring-2 ring-slate-500/60 ring-inset";
+                    badgeStyle = "bg-slate-500 text-white";
                   }
                 } else if (lateness) {
                   // ENHANCED: Much more visible lateness styling
