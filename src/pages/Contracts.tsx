@@ -28,6 +28,7 @@ interface ContractTemplate {
   description: string | null;
   content: string;
   is_active: boolean;
+  is_confidential: boolean;
   version: number;
   created_at: string;
 }
