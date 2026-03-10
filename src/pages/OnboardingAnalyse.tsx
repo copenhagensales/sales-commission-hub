@@ -61,6 +61,8 @@ export default function OnboardingAnalyse() {
   const [periodKey, setPeriodKey] = useState("6m");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding-analyse"],
