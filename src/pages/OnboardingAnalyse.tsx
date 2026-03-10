@@ -692,7 +692,7 @@ export default function OnboardingAnalyse() {
                   );
                 }}
               />
-              <ReferenceLine y={overallChurn} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <ReferenceLine y={overallChurn60} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn60}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               {visibleTeams.map((team) => (
                 <Bar
                   key={team}
