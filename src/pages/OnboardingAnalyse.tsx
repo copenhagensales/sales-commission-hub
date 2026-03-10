@@ -799,8 +799,10 @@ export default function OnboardingAnalyse() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Måned</TableHead>
                 <TableHead className="text-right">Starter</TableHead>
-                <TableHead className="text-right">Stoppet ≤60d</TableHead>
-                <TableHead className="text-right">Churn%</TableHead>
+                <TableHead className="text-right">≤30d</TableHead>
+                <TableHead className="text-right">30d Churn</TableHead>
+                <TableHead className="text-right">≤60d</TableHead>
+                <TableHead className="text-right">60d Churn</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -812,10 +814,16 @@ export default function OnboardingAnalyse() {
                         <TableCell>{expandedMonths.has(c.label) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                         <TableCell className="font-medium capitalize">{c.label}</TableCell>
                         <TableCell className="text-right">{c.total}</TableCell>
-                        <TableCell className="text-right">{c.exits}</TableCell>
+                        <TableCell className="text-right">{c.exits30}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${getChurnColor(c.churn)}`}>
-                            {c.total > 0 ? `${c.churn}%` : "—"}
+                          <span className={`font-semibold ${getChurnColor(c.churn30)}`}>
+                            {c.total > 0 ? `${c.churn30}%` : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">{c.exits60}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${getChurnColor(c.churn60)}`}>
+                            {c.total > 0 ? `${c.churn60}%` : "—"}
                           </span>
                         </TableCell>
                       </TableRow>
