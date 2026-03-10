@@ -433,6 +433,7 @@ export function SendContractDialog({
     setNotes("");
     setPreviewContent("");
     setShowPreview(false);
+    setIsConfidential(false);
   };
 
   return (
