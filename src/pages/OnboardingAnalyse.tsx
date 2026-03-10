@@ -661,7 +661,7 @@ export default function OnboardingAnalyse() {
                 {team}
                 {teamStats.find((t) => t.team === team) && (
                   <span className="text-muted-foreground">
-                    ({teamStats.find((t) => t.team === team)!.churn}%)
+                    ({teamStats.find((t) => t.team === team)!.churn60}%)
                   </span>
                 )}
               </button>
