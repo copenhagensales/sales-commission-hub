@@ -125,7 +125,7 @@ export default function Contracts() {
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Contract[];
+      return (data as unknown as Contract[]);
     },
   });
 
