@@ -447,6 +447,20 @@ export default function Contracts() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            {canMarkConfidential && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleConfidentialMutation.mutate({ id: contract.id, isConfidential: contract.is_confidential })}
+                                title={contract.is_confidential ? "Fjern fortrolighed" : "Markér som fortrolig"}
+                              >
+                                {contract.is_confidential ? (
+                                  <Lock className="h-4 w-4 text-amber-600" />
+                                ) : (
+                                  <LockOpen className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </Button>
+                            )}
                             {canEditContracts && contract.status !== "signed" && (
                               <Button
                                 variant="ghost"
