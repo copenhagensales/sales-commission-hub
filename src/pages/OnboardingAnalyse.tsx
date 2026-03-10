@@ -358,8 +358,11 @@ export default function OnboardingAnalyse() {
   }, [months, filteredData]);
 
   // Overall KPIs
-  const overallChurn = filteredData.length > 0
+  const overallChurn60 = filteredData.length > 0
     ? Math.round((filteredData.filter((r) => r.leftWithin60).length / filteredData.length) * 1000) / 10
+    : 0;
+  const overallChurn30 = filteredData.length > 0
+    ? Math.round((filteredData.filter((r) => r.leftWithin30).length / filteredData.length) * 1000) / 10
     : 0;
   const totalStarts = filteredData.length;
   const earlyLeavers = filteredData.filter((r) => r.leftWithin60).length;
