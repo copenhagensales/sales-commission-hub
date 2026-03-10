@@ -35,6 +35,7 @@ interface EmployeeRecord {
   endDate: Date | null;
   tenureDays: number;
   isCurrent: boolean;
+  leftWithin30: boolean;
   leftWithin60: boolean;
 }
 
