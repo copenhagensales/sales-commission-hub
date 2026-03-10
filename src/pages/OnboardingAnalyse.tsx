@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -438,19 +439,22 @@ export default function OnboardingAnalyse() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}><CardContent className="p-6"><div className="h-16 bg-muted rounded animate-pulse" /></CardContent></Card>
-          ))}
+      <MainLayout>
+        <div className="container mx-auto space-y-6">
+          <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}><CardContent className="p-6"><div className="h-16 bg-muted rounded animate-pulse" /></CardContent></Card>
+            ))}
+          </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <MainLayout>
+    <div className="container mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
@@ -881,5 +885,6 @@ export default function OnboardingAnalyse() {
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }
