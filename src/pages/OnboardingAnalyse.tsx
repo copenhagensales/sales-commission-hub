@@ -246,6 +246,21 @@ export default function OnboardingAnalyse() {
     return data.filter((r) => !isBefore(r.startDate, periodConfig.cutoff));
   }, [data, periodConfig]);
 
+  // Team-wide average tenure (all employees, not just cohort)
+  const teamAvgTenure = useMemo(() => {
+    if (!data) return new Map<string, number>();
+    const map = new Map<string, { sum: number; count: number }>();
+    data.forEach((r) => {
+      if (!map.has(r.team)) map.set(r.team, { sum: 0, count: 0 });
+      const s = map.get(r.team)!;
+      s.sum += r.tenureDays;
+      s.count++;
+    });
+    const result = new Map<string, number>();
+    map.forEach((v, team) => result.set(team, v.count > 0 ? Math.round(v.sum / v.count) : 0));
+    return result;
+  }, [data]);
+
   // Team stats
   const teamStats = useMemo(() => {
     const map = new Map<string, { total: number; exits30: number; exits60: number; employees: EmployeeRecord[] }>();
@@ -265,11 +280,11 @@ export default function OnboardingAnalyse() {
         exits60: s.exits60,
         churn30: s.total > 0 ? Math.round((s.exits30 / s.total) * 1000) / 10 : 0,
         churn60: s.total > 0 ? Math.round((s.exits60 / s.total) * 1000) / 10 : 0,
-        avgTenureDays: s.total > 0 ? Math.round(s.employees.reduce((sum, r) => sum + r.tenureDays, 0) / s.total) : 0,
+        avgTenureDays: teamAvgTenure.get(team) ?? 0,
         employees: s.employees.sort((a, b) => b.startDate.getTime() - a.startDate.getTime()),
       }))
       .sort((a, b) => b.churn60 - a.churn60);
-  }, [filteredData]);
+  }, [filteredData, teamAvgTenure]);
 
   // Monthly churn per team (for line chart)
   const TEAM_COLORS: Record<string, string> = {
