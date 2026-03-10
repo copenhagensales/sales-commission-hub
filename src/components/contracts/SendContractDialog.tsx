@@ -156,6 +156,17 @@ export function SendContractDialog({
   const [notes, setNotes] = useState("");
   const [previewContent, setPreviewContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [isConfidential, setIsConfidential] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  // Check if current user is authorized to mark contracts as confidential
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.toLowerCase() ?? null);
+    });
+  }, []);
+
+  const canMarkConfidential = currentUserEmail === "km@copenhagensales.dk" || currentUserEmail === "mg@copenhagensales.dk";
 
   // Fetch templates
   const { data: templates = [] } = useQuery({
