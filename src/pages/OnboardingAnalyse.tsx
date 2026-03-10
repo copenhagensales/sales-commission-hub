@@ -828,6 +828,7 @@ export default function OnboardingAnalyse() {
                             {c.total > 0 ? `${c.churn60}%` : "—"}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right font-medium">{c.avgTenureDays}d</TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
                     <CollapsibleContent asChild>
