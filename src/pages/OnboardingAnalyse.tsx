@@ -439,14 +439,16 @@ export default function OnboardingAnalyse() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}><CardContent className="p-6"><div className="h-16 bg-muted rounded animate-pulse" /></CardContent></Card>
-          ))}
+      <MainLayout>
+        <div className="container mx-auto space-y-6">
+          <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}><CardContent className="p-6"><div className="h-16 bg-muted rounded animate-pulse" /></CardContent></Card>
+            ))}
+          </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
