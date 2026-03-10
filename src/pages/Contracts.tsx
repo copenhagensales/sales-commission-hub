@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock } from "lucide-react";
+import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock, LockOpen } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -92,11 +92,36 @@ export default function Contracts() {
   const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
   const [previewContract, setPreviewContract] = useState<Contract | null>(null);
   const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [templateForm, setTemplateForm] = useState({
     name: "",
     type: "employment" as ContractType,
     description: "",
     content: "",
+  });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.toLowerCase() || null);
+    });
+  }, []);
+
+  const canMarkConfidential = currentUserEmail === "km@copenhagensales.dk" || currentUserEmail === "mg@copenhagensales.dk";
+
+  // Toggle confidential mutation
+  const toggleConfidentialMutation = useMutation({
+    mutationFn: async ({ id, isConfidential }: { id: string; isConfidential: boolean }) => {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ is_confidential: !isConfidential })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success(variables.isConfidential ? "Kontrakt er ikke længere fortrolig" : "Kontrakt markeret som fortrolig");
+    },
+    onError: () => toast.error("Kunne ikke ændre fortrolighedsstatus"),
   });
 
   // Fetch templates
@@ -422,6 +447,20 @@ export default function Contracts() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            {canMarkConfidential && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleConfidentialMutation.mutate({ id: contract.id, isConfidential: contract.is_confidential })}
+                                title={contract.is_confidential ? "Fjern fortrolighed" : "Markér som fortrolig"}
+                              >
+                                {contract.is_confidential ? (
+                                  <Lock className="h-4 w-4 text-amber-600" />
+                                ) : (
+                                  <LockOpen className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </Button>
+                            )}
                             {canEditContracts && contract.status !== "signed" && (
                               <Button
                                 variant="ghost"
