@@ -365,6 +365,20 @@ export default function OnboardingAnalyse() {
       );
       const exits30 = cohort.filter((r) => r.leftWithin30);
       const exits60 = cohort.filter((r) => r.leftWithin60);
+
+      // Average tenure for ALL employees active during this month
+      const allActiveThisMonth = (data || []).filter((r) => {
+        const started = !isAfter(r.startDate, end);
+        const notYetLeft = !r.endDate || !isBefore(r.endDate, month);
+        return started && notYetLeft;
+      });
+      const avgTenureAll = allActiveThisMonth.length > 0
+        ? Math.round(allActiveThisMonth.reduce((sum, r) => {
+            const tenureAtMonth = differenceInDays(end, r.startDate);
+            return sum + Math.max(0, tenureAtMonth);
+          }, 0) / allActiveThisMonth.length)
+        : 0;
+
       return {
         month,
         label: format(month, "MMMM yyyy", { locale: da }),
@@ -373,12 +387,12 @@ export default function OnboardingAnalyse() {
         exits60: exits60.length,
         churn30: cohort.length > 0 ? Math.round((exits30.length / cohort.length) * 1000) / 10 : 0,
         churn60: cohort.length > 0 ? Math.round((exits60.length / cohort.length) * 1000) / 10 : 0,
-        avgTenureDays: cohort.length > 0 ? Math.round(cohort.reduce((sum, r) => sum + r.tenureDays, 0) / cohort.length) : 0,
+        avgTenureDays: avgTenureAll,
         exitNames: exits60.map((e) => e.name),
         employees: cohort.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
       };
     });
-  }, [months, filteredData]);
+  }, [months, filteredData, data]);
 
   // Overall KPIs
   const overallChurn60 = filteredData.length > 0
