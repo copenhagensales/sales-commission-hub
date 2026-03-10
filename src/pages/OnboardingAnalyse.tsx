@@ -733,6 +733,7 @@ export default function OnboardingAnalyse() {
                 <TableHead className="text-right">30d Churn</TableHead>
                 <TableHead className="text-right">≤60d</TableHead>
                 <TableHead className="text-right">60d Churn</TableHead>
+                <TableHead className="text-right">Gns. anciennitet</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
