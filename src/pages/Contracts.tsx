@@ -510,13 +510,16 @@ export default function Contracts() {
               {templates
                 .filter((t) => t.is_active)
                 .map((template) => (
-                  <Card key={template.id} className="hover:shadow-md transition-shadow">
+                  <Card key={template.id} className={`hover:shadow-md transition-shadow ${template.is_confidential ? "border-amber-500/50 bg-amber-500/5" : ""}`}>
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div>
                           <CardTitle className="text-lg flex items-center gap-2">
                             {template.is_confidential && (
-                              <Lock className="h-4 w-4 text-muted-foreground" />
+                              <div className="flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5">
+                                <Lock className="h-3.5 w-3.5 text-amber-500" />
+                                <span className="text-xs font-medium text-amber-500">Fortrolig</span>
+                              </div>
                             )}
                             {template.name}
                           </CardTitle>
