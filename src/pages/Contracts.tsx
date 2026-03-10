@@ -43,6 +43,7 @@ interface Contract {
   sent_at: string | null;
   expires_at: string | null;
   notes: string | null;
+  is_confidential: boolean;
   created_at: string;
   employee?: {
     first_name: string;
