@@ -157,20 +157,36 @@ export default function OnboardingAnalyse() {
     },
   });
 
+  const periodConfig = useMemo(() => {
+    const now = new Date();
+    switch (periodKey) {
+      case "30d": return { label: "30 dage", cutoff: subDays(now, 30) };
+      case "60d": return { label: "60 dage", cutoff: subDays(now, 60) };
+      case "90d": return { label: "90 dage", cutoff: subDays(now, 90) };
+      case "1m": return { label: "1 måned", cutoff: startOfMonth(now) };
+      case "3m": return { label: "3 måneder", cutoff: startOfMonth(subMonths(now, 2)) };
+      case "6m": return { label: "6 måneder", cutoff: startOfMonth(subMonths(now, 5)) };
+      case "12m": return { label: "12 måneder", cutoff: startOfMonth(subMonths(now, 11)) };
+      case "24m": return { label: "24 måneder", cutoff: startOfMonth(subMonths(now, 23)) };
+      default: return { label: "6 måneder", cutoff: startOfMonth(subMonths(now, 5)) };
+    }
+  }, [periodKey]);
+
   const months = useMemo(() => {
-    const count = parseInt(monthRange);
     const result: Date[] = [];
-    for (let i = 0; i < count; i++) {
-      result.push(startOfMonth(subMonths(new Date(), i)));
+    let current = startOfMonth(new Date());
+    const earliest = startOfMonth(periodConfig.cutoff);
+    while (!isBefore(current, earliest)) {
+      result.push(current);
+      current = startOfMonth(subMonths(current, 1));
     }
     return result;
-  }, [monthRange]);
+  }, [periodConfig]);
 
   const filteredData = useMemo(() => {
     if (!data) return [];
-    const earliest = months[months.length - 1];
-    return data.filter((r) => !isBefore(r.startDate, earliest));
-  }, [data, months]);
+    return data.filter((r) => !isBefore(r.startDate, periodConfig.cutoff));
+  }, [data, periodConfig]);
 
   // Team stats
   const teamStats = useMemo(() => {
