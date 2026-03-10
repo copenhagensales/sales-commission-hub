@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Send, Eye, AlertTriangle } from "lucide-react";
+import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 
@@ -155,6 +156,17 @@ export function SendContractDialog({
   const [notes, setNotes] = useState("");
   const [previewContent, setPreviewContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [isConfidential, setIsConfidential] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  // Check if current user is authorized to mark contracts as confidential
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.toLowerCase() ?? null);
+    });
+  }, []);
+
+  const canMarkConfidential = currentUserEmail === "km@copenhagensales.dk" || currentUserEmail === "mg@copenhagensales.dk";
 
   // Fetch templates
   const { data: templates = [] } = useQuery({
@@ -341,6 +353,7 @@ export function SendContractDialog({
           status: "pending_employee",
           sent_at: new Date().toISOString(),
           sent_by: user.user?.id,
+          is_confidential: isConfidential,
           notes,
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
         })
@@ -420,6 +433,7 @@ export function SendContractDialog({
     setNotes("");
     setPreviewContent("");
     setShowPreview(false);
+    setIsConfidential(false);
   };
 
   return (
@@ -484,6 +498,24 @@ export function SendContractDialog({
                     placeholder="Tilføj evt. interne noter..."
                   />
                 </div>
+
+                {canMarkConfidential && (
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Fortrolig kontrakt
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Kun du, mg@ og medarbejderen selv kan se denne kontrakt
+                      </p>
+                    </div>
+                    <Switch
+                      checked={isConfidential}
+                      onCheckedChange={setIsConfidential}
+                    />
+                  </div>
+                )}
 
                 <div className="bg-muted/50 rounded-lg p-4 space-y-4">
                   <h4 className="font-medium text-sm">Medarbejderdata der flettes ind:</h4>

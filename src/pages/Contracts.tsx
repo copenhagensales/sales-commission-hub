@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2 } from "lucide-react";
+import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -43,6 +43,7 @@ interface Contract {
   sent_at: string | null;
   expires_at: string | null;
   notes: string | null;
+  is_confidential: boolean;
   created_at: string;
   employee?: {
     first_name: string;
@@ -124,7 +125,7 @@ export default function Contracts() {
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Contract[];
+      return (data as unknown as Contract[]);
     },
   });
 
@@ -379,7 +380,14 @@ export default function Contracts() {
                         <TableCell className="font-medium">
                           {contract.employee?.first_name} {contract.employee?.last_name}
                         </TableCell>
-                        <TableCell>{contract.title}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {contract.is_confidential && (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            {contract.title}
+                          </div>
+                        </TableCell>
                         <TableCell>{contractTypeLabels[contract.type]}</TableCell>
                         <TableCell>
                           <Badge className={statusColors[contract.status]}>

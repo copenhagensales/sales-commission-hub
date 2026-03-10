@@ -2558,6 +2558,7 @@ export type Database = {
           employee_id: string
           expires_at: string | null
           id: string
+          is_confidential: boolean | null
           last_reminder_at: string | null
           notes: string | null
           reminder_count: number | null
@@ -2575,6 +2576,7 @@ export type Database = {
           employee_id: string
           expires_at?: string | null
           id?: string
+          is_confidential?: boolean | null
           last_reminder_at?: string | null
           notes?: string | null
           reminder_count?: number | null
@@ -2592,6 +2594,7 @@ export type Database = {
           employee_id?: string
           expires_at?: string | null
           id?: string
+          is_confidential?: boolean | null
           last_reminder_at?: string | null
           notes?: string | null
           reminder_count?: number | null
@@ -10559,6 +10562,10 @@ export type Database = {
         Returns: undefined
       }
       auto_suggest_konto_mapping: { Args: never; Returns: number }
+      can_access_confidential_contract: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }
