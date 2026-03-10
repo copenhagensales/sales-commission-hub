@@ -382,7 +382,7 @@ export default function Contracts() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {(contract as any).is_confidential && (
+                            {contract.is_confidential && (
                               <Lock className="h-4 w-4 text-muted-foreground" />
                             )}
                             {contract.title}
