@@ -1,38 +1,19 @@
 
 
-# Onboarding Churn Analyse — per-team breakdown med navne
 
-## Oversigt
-Ny side `/onboarding-analyse` der viser en detaljeret per-team og per-måned churn-analyse med individuelle navne, så ledelsen kan tracke forbedringer over tid.
+## Draft-booking workflow ✅
 
-## Datakilder (eksisterende)
-- `historical_employment` — stoppede medarbejdere med `employee_name`, `team_name`, `start_date`, `end_date`, `tenure_days`
-- `employee_master_data` — aktive/inaktive med `first_name`, `last_name`, `employment_start_date`, `employment_end_date`
-- `team_members` + `teams` — team-tilknytning
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-Ingen database-ændringer nødvendige.
+## Fortrolige kontrakter ✅
 
-## Ny side: `src/pages/OnboardingAnalyse.tsx`
-
-### Layout
-1. **KPI-kort øverst** — Samlet 60-dages churn, antal starter denne måned, aktuel retention rate
-2. **Månedsfilter** — Vælg tidsperiode (default: seneste 6 måneder)
-3. **Per-team breakdown tabel**:
-   - Team | Kohorte-størrelse | Stoppet ≤60d | Churn% | Trend-ikon
-   - Expanderbar række → viser individuelle navne:
-     - Navn | Startdato | Slutdato | Ansættelsesdage | Status (stoppet/aktiv)
-4. **Per-måned kohorte-tabel**:
-   - Måned | Starter | Stoppet ≤60d | Churn% | Navne på stoppede
-
-### Funktionalitet
-- Genbruger `normalizeTeamName` og `EXCLUDED_TEAMS` fra eksisterende kode
-- Henter data med React Query (samme mønster som `NewHireChurnKpi`)
-- Collapsible team-rækker via Radix Collapsible
-- Farvekodet churn-rate (grøn/gul/rød)
-- Sortérbar efter churn%
-
-## Filer der ændres/oprettes
-1. **Ny:** `src/pages/OnboardingAnalyse.tsx` — Hovedside
-2. **Ændring:** `src/routes/pages.ts` — Tilføj lazy import
-3. **Ændring:** `src/routes/config.tsx` — Tilføj route (`/onboarding-analyse`, permission: `menu_contracts`)
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.

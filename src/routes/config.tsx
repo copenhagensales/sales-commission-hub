@@ -121,6 +121,7 @@ import {
   Cancellations,
   SystemStability,
   TeamGoals,
+  OnboardingAnalyse,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -218,6 +219,7 @@ export const routes: RouteConfig[] = [
   { path: "/extra-work-admin", component: ExtraWorkAdmin, access: "role", positionPermission: "menu_extra_work_admin" },
   { path: "/contracts", component: Contracts, access: "role", positionPermission: "menu_contracts" },
   { path: "/company-overview", component: CompanyOverview, access: "role", positionPermission: "menu_contracts" },
+  { path: "/onboarding-analyse", component: OnboardingAnalyse, access: "role", positionPermission: "menu_contracts" },
   { path: "/email-templates", component: SystemEmailTemplates, access: "role", positionPermission: "menu_contracts" },
   {
     path: "/pulse-survey-results",
