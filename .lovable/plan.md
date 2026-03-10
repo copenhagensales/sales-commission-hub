@@ -1,18 +1,19 @@
 
 
-# Tilføj team-sammenlignings graf til Onboarding Analyse
 
-## Hvad
-En bar chart der viser 60-dages churn % per team side om side, så man hurtigt kan sammenligne teams visuelt.
+## Draft-booking workflow ✅
 
-## Hvordan
-- Tilføj en ny `Card` med en Recharts `BarChart` i `OnboardingAnalyse.tsx`, placeret mellem KPI-kort og per-team tabellen.
-- Genbruger den allerede beregnede `teamStats` data (team, churn%, total, exits).
-- Hver bar farves efter churn-niveau (grøn/gul/rød) via den eksisterende `getChurnBg` helper.
-- X-akse: team-navne, Y-akse: churn %.
-- Tooltip viser kohorte-størrelse og antal stoppet.
-- En ReferenceLine ved den samlede `overallChurn` som benchmark.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-## Fil
-- `src/pages/OnboardingAnalyse.tsx` — tilføj ~40 linjer chart-sektion med Recharts BarChart.
+## Fortrolige kontrakter ✅
 
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.

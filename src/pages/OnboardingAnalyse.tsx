@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
@@ -338,6 +339,34 @@ export default function OnboardingAnalyse() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Team comparison chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Team sammenligning – 60-dages churn %</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={teamStats} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+              <XAxis dataKey="team" tick={{ fontSize: 12 }} />
+              <YAxis unit="%" tick={{ fontSize: 12 }} />
+              <Tooltip
+                formatter={(value: number, _name: string, props: any) => [`${value}%`, "Churn"]}
+                labelFormatter={(label) => {
+                  const t = teamStats.find((s) => s.team === label);
+                  return t ? `${label} — ${t.total} startere, ${t.exits} stoppet` : label;
+                }}
+              />
+              <ReferenceLine y={overallChurn} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <Bar dataKey="churn" radius={[4, 4, 0, 0]}>
+                {teamStats.map((t) => (
+                  <Cell key={t.team} fill={t.churn <= 5 ? "hsl(142, 71%, 45%)" : t.churn <= 10 ? "hsl(160, 84%, 39%)" : t.churn <= 20 ? "hsl(38, 92%, 50%)" : "hsl(0, 84%, 60%)"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {/* Per-team breakdown */}
       <Card>
