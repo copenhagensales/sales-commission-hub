@@ -357,6 +357,7 @@ export default function OnboardingAnalyse() {
         exits60: exits60.length,
         churn30: cohort.length > 0 ? Math.round((exits30.length / cohort.length) * 1000) / 10 : 0,
         churn60: cohort.length > 0 ? Math.round((exits60.length / cohort.length) * 1000) / 10 : 0,
+        avgTenureDays: cohort.length > 0 ? Math.round(cohort.reduce((sum, r) => sum + r.tenureDays, 0) / cohort.length) : 0,
         exitNames: exits60.map((e) => e.name),
         employees: cohort.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
       };
@@ -803,6 +804,7 @@ export default function OnboardingAnalyse() {
                 <TableHead className="text-right">30d Churn</TableHead>
                 <TableHead className="text-right">≤60d</TableHead>
                 <TableHead className="text-right">60d Churn</TableHead>
+                <TableHead className="text-right">Gns. anciennitet</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -826,6 +828,7 @@ export default function OnboardingAnalyse() {
                             {c.total > 0 ? `${c.churn60}%` : "—"}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right font-medium">{c.avgTenureDays}d</TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
                     <CollapsibleContent asChild>
