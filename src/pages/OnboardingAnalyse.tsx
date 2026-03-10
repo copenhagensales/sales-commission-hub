@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
@@ -61,6 +61,7 @@ export default function OnboardingAnalyse() {
   const [periodKey, setPeriodKey] = useState("6m");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding-analyse"],
@@ -287,6 +288,46 @@ export default function OnboardingAnalyse() {
     return teamStats.map((t) => t.team);
   }, [teamStats]);
 
+  // Initialize selectedTeams when activeTeams changes
+  const visibleTeams = useMemo(() => {
+    if (selectedTeams.size === 0) return activeTeams;
+    return activeTeams.filter((t) => selectedTeams.has(t));
+  }, [activeTeams, selectedTeams]);
+
+  const toggleSelectedTeam = (team: string) => {
+    setSelectedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(team)) {
+        next.delete(team);
+      } else {
+        next.add(team);
+      }
+      return next;
+    });
+  };
+
+  // Transform data for grouped bar chart
+  const barChartData = useMemo(() => {
+    return monthlyTeamTrend.map((point) => {
+      const entry: Record<string, any> = { label: point.label };
+      visibleTeams.forEach((team) => {
+        entry[team] = point[team];
+        // Store cohort details for tooltip
+        const monthIdx = monthlyTeamTrend.indexOf(point);
+        const monthDate = [...months].reverse()[monthIdx];
+        if (monthDate) {
+          const end = endOfMonth(monthDate);
+          const cohort = filteredData.filter(
+            (r) => r.team === team && !isBefore(r.startDate, monthDate) && !isAfter(r.startDate, end)
+          );
+          entry[`${team}_starters`] = cohort.length;
+          entry[`${team}_exits`] = cohort.filter((r) => r.leftWithin60).length;
+        }
+      });
+      return entry;
+    });
+  }, [monthlyTeamTrend, visibleTeams, months, filteredData]);
+
   // Monthly cohorts
   const monthlyCohorts = useMemo(() => {
     return months.map((month) => {
@@ -416,32 +457,90 @@ export default function OnboardingAnalyse() {
         </Card>
       </div>
 
-      {/* Team comparison line chart */}
+      {/* Team comparison grouped bar chart */}
       <Card>
         <CardHeader>
           <CardTitle>Team sammenligning – 60-dages churn % per måned</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={monthlyTeamTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+        <CardContent className="space-y-4">
+          {/* Team filter toggles */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedTeams(new Set())}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                selectedTeams.size === 0
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted text-muted-foreground border-border hover:bg-accent"
+              }`}
+            >
+              Alle teams
+            </button>
+            {activeTeams.map((team) => (
+              <button
+                key={team}
+                onClick={() => toggleSelectedTeam(team)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                  selectedTeams.size === 0 || selectedTeams.has(team)
+                    ? "border-foreground/30 bg-background text-foreground"
+                    : "border-border bg-muted/50 text-muted-foreground/50 hover:bg-accent"
+                }`}
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: TEAM_COLORS[team] || "hsl(var(--foreground))" }}
+                />
+                {team}
+                {teamStats.find((t) => t.team === team) && (
+                  <span className="text-muted-foreground">
+                    ({teamStats.find((t) => t.team === team)!.churn}%)
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <ResponsiveContainer width="100%" height={380}>
+            <BarChart data={barChartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis unit="%" tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value: number) => [`${value}%`, ""]} />
-              <Legend />
+              <YAxis unit="%" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1.5">
+                      <p className="font-semibold text-sm">{label}</p>
+                      {payload
+                        .filter((p) => p.value != null)
+                        .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+                        .map((p) => {
+                          const team = p.dataKey as string;
+                          const starters = p.payload[`${team}_starters`] || 0;
+                          const exits = p.payload[`${team}_exits`] || 0;
+                          return (
+                            <div key={team} className="flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.fill as string }} />
+                              <span className="font-medium">{team}</span>
+                              <span className="ml-auto font-mono tabular-nums font-semibold">{p.value}%</span>
+                              <span className="text-muted-foreground">({exits}/{starters})</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  );
+                }}
+              />
               <ReferenceLine y={overallChurn} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              {activeTeams.map((team) => (
-                <Line
+              {visibleTeams.map((team) => (
+                <Bar
                   key={team}
-                  type="monotone"
                   dataKey={team}
                   name={team}
-                  stroke={TEAM_COLORS[team] || "hsl(var(--foreground))"}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  connectNulls={false}
+                  fill={TEAM_COLORS[team] || "hsl(var(--foreground))"}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={28}
                 />
               ))}
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
