@@ -699,7 +699,7 @@ export default function OnboardingAnalyse() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" /> Gns. anciennitet for survivors (>60d) per team
+            <Shield className="h-5 w-5" /> Gns. anciennitet for survivors (&gt;60d) per team
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             For medarbejdere der overlevede onboarding — hvor længe bliver de i gennemsnit? (dage)
