@@ -727,8 +727,10 @@ export default function OnboardingAnalyse() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Kohorte</TableHead>
-                <TableHead className="text-right">Stoppet ≤60d</TableHead>
-                <TableHead className="text-right">Churn%</TableHead>
+                <TableHead className="text-right">≤30d</TableHead>
+                <TableHead className="text-right">30d Churn</TableHead>
+                <TableHead className="text-right">≤60d</TableHead>
+                <TableHead className="text-right">60d Churn</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -740,9 +742,13 @@ export default function OnboardingAnalyse() {
                         <TableCell>{expandedTeams.has(t.team) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                         <TableCell className="font-medium">{t.team}</TableCell>
                         <TableCell className="text-right">{t.total}</TableCell>
-                        <TableCell className="text-right">{t.exits}</TableCell>
+                        <TableCell className="text-right">{t.exits30}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${getChurnColor(t.churn)}`}>{t.churn}%</span>
+                          <span className={`font-semibold ${getChurnColor(t.churn30)}`}>{t.churn30}%</span>
+                        </TableCell>
+                        <TableCell className="text-right">{t.exits60}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${getChurnColor(t.churn60)}`}>{t.churn60}%</span>
                         </TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
