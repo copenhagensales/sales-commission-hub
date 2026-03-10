@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
-import { differenceInDays, parseISO, format, startOfMonth, subMonths, isAfter, isBefore, endOfMonth } from "date-fns";
+import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
