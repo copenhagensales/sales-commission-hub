@@ -191,6 +191,22 @@ export default function Contracts() {
     onError: () => toast.error("Kunne ikke gemme skabelon"),
   });
 
+  // Toggle template confidential mutation
+  const toggleTemplateConfidentialMutation = useMutation({
+    mutationFn: async ({ id, isConfidential }: { id: string; isConfidential: boolean }) => {
+      const { error } = await supabase
+        .from("contract_templates")
+        .update({ is_confidential: !isConfidential } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["contract-templates"] });
+      toast.success(variables.isConfidential ? "Skabelon er ikke længere fortrolig" : "Skabelon markeret som fortrolig");
+    },
+    onError: () => toast.error("Kunne ikke ændre fortrolighedsstatus"),
+  });
+
   // Delete template mutation
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
