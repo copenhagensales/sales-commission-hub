@@ -230,6 +230,7 @@ export default function BookWeekContent() {
         total_price: parsedTotalPrice,
         placement_id: selectedPlacement?.id || null,
         daily_rate_override: selectedPlacement?.daily_rate || null,
+        status: 'draft',
       } as any);
 
       if (error) throw error;
