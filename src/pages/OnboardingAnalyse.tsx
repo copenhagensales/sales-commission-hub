@@ -248,23 +248,26 @@ export default function OnboardingAnalyse() {
 
   // Team stats
   const teamStats = useMemo(() => {
-    const map = new Map<string, { total: number; exits: number; employees: EmployeeRecord[] }>();
+    const map = new Map<string, { total: number; exits30: number; exits60: number; employees: EmployeeRecord[] }>();
     filteredData.forEach((r) => {
-      if (!map.has(r.team)) map.set(r.team, { total: 0, exits: 0, employees: [] });
+      if (!map.has(r.team)) map.set(r.team, { total: 0, exits30: 0, exits60: 0, employees: [] });
       const s = map.get(r.team)!;
       s.total++;
-      if (r.leftWithin60) s.exits++;
+      if (r.leftWithin30) s.exits30++;
+      if (r.leftWithin60) s.exits60++;
       s.employees.push(r);
     });
     return Array.from(map.entries())
       .map(([team, s]) => ({
         team,
         total: s.total,
-        exits: s.exits,
-        churn: s.total > 0 ? Math.round((s.exits / s.total) * 1000) / 10 : 0,
+        exits30: s.exits30,
+        exits60: s.exits60,
+        churn30: s.total > 0 ? Math.round((s.exits30 / s.total) * 1000) / 10 : 0,
+        churn60: s.total > 0 ? Math.round((s.exits60 / s.total) * 1000) / 10 : 0,
         employees: s.employees.sort((a, b) => b.startDate.getTime() - a.startDate.getTime()),
       }))
-      .sort((a, b) => b.churn - a.churn);
+      .sort((a, b) => b.churn60 - a.churn60);
   }, [filteredData]);
 
   // Monthly churn per team (for line chart)
@@ -344,14 +347,17 @@ export default function OnboardingAnalyse() {
       const cohort = filteredData.filter(
         (r) => !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
       );
-      const exits = cohort.filter((r) => r.leftWithin60);
+      const exits30 = cohort.filter((r) => r.leftWithin30);
+      const exits60 = cohort.filter((r) => r.leftWithin60);
       return {
         month,
         label: format(month, "MMMM yyyy", { locale: da }),
         total: cohort.length,
-        exits: exits.length,
-        churn: cohort.length > 0 ? Math.round((exits.length / cohort.length) * 1000) / 10 : 0,
-        exitNames: exits.map((e) => e.name),
+        exits30: exits30.length,
+        exits60: exits60.length,
+        churn30: cohort.length > 0 ? Math.round((exits30.length / cohort.length) * 1000) / 10 : 0,
+        churn60: cohort.length > 0 ? Math.round((exits60.length / cohort.length) * 1000) / 10 : 0,
+        exitNames: exits60.map((e) => e.name),
         employees: cohort.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
       };
     });
@@ -655,7 +661,7 @@ export default function OnboardingAnalyse() {
                 {team}
                 {teamStats.find((t) => t.team === team) && (
                   <span className="text-muted-foreground">
-                    ({teamStats.find((t) => t.team === team)!.churn}%)
+                    ({teamStats.find((t) => t.team === team)!.churn60}%)
                   </span>
                 )}
               </button>
@@ -721,8 +727,10 @@ export default function OnboardingAnalyse() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Kohorte</TableHead>
-                <TableHead className="text-right">Stoppet ≤60d</TableHead>
-                <TableHead className="text-right">Churn%</TableHead>
+                <TableHead className="text-right">≤30d</TableHead>
+                <TableHead className="text-right">30d Churn</TableHead>
+                <TableHead className="text-right">≤60d</TableHead>
+                <TableHead className="text-right">60d Churn</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -734,9 +742,13 @@ export default function OnboardingAnalyse() {
                         <TableCell>{expandedTeams.has(t.team) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                         <TableCell className="font-medium">{t.team}</TableCell>
                         <TableCell className="text-right">{t.total}</TableCell>
-                        <TableCell className="text-right">{t.exits}</TableCell>
+                        <TableCell className="text-right">{t.exits30}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${getChurnColor(t.churn)}`}>{t.churn}%</span>
+                          <span className={`font-semibold ${getChurnColor(t.churn30)}`}>{t.churn30}%</span>
+                        </TableCell>
+                        <TableCell className="text-right">{t.exits60}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${getChurnColor(t.churn60)}`}>{t.churn60}%</span>
                         </TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
@@ -787,8 +799,10 @@ export default function OnboardingAnalyse() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Måned</TableHead>
                 <TableHead className="text-right">Starter</TableHead>
-                <TableHead className="text-right">Stoppet ≤60d</TableHead>
-                <TableHead className="text-right">Churn%</TableHead>
+                <TableHead className="text-right">≤30d</TableHead>
+                <TableHead className="text-right">30d Churn</TableHead>
+                <TableHead className="text-right">≤60d</TableHead>
+                <TableHead className="text-right">60d Churn</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -800,10 +814,16 @@ export default function OnboardingAnalyse() {
                         <TableCell>{expandedMonths.has(c.label) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                         <TableCell className="font-medium capitalize">{c.label}</TableCell>
                         <TableCell className="text-right">{c.total}</TableCell>
-                        <TableCell className="text-right">{c.exits}</TableCell>
+                        <TableCell className="text-right">{c.exits30}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${getChurnColor(c.churn)}`}>
-                            {c.total > 0 ? `${c.churn}%` : "—"}
+                          <span className={`font-semibold ${getChurnColor(c.churn30)}`}>
+                            {c.total > 0 ? `${c.churn30}%` : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">{c.exits60}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${getChurnColor(c.churn60)}`}>
+                            {c.total > 0 ? `${c.churn60}%` : "—"}
                           </span>
                         </TableCell>
                       </TableRow>
