@@ -627,7 +627,126 @@ export default function OnboardingAnalyse() {
         </CardContent>
       </Card>
 
-      {/* Per-team breakdown */}
+      {/* Tenure distribution histogram */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" /> Anciennitet-fordeling
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Hvor lang tid bliver folk? Aktive vs. stoppede per bucket.</p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={tenureDistribution} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1">
+                        <p className="font-semibold text-sm">{label}</p>
+                        <p>Aktive: <span className="font-mono font-semibold">{d?.aktive}</span></p>
+                        <p>Stoppede: <span className="font-mono font-semibold">{d?.stoppede}</span></p>
+                        <p className="text-muted-foreground">Total: {d?.total}</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="aktive" name="Aktive" stackId="a" fill="hsl(142, 60%, 45%)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="stoppede" name="Stoppede" stackId="a" fill="hsl(0, 65%, 55%)" radius={[2, 2, 0, 0]} />
+                <Legend />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" /> Median anciennitet per kohorte
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Median anciennitet (dage) for alle medarbejdere per startmåned.</p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={medianTenureByCohort} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} unit="d" />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1">
+                        <p className="font-semibold text-sm">{label}</p>
+                        <p>Median: <span className="font-mono font-semibold">{d?.median} dage</span></p>
+                        <p className="text-muted-foreground">Kohorte: {d?.count} medarbejdere</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="median" name="Median anciennitet" fill="hsl(210, 70%, 50%)" radius={[2, 2, 0, 0]} maxBarSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Survivor tenure trend per team */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" /> Gns. anciennitet for survivors (>60d) per team
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            For medarbejdere der overlevede onboarding — hvor længe bliver de i gennemsnit? (dage)
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={survivorTenureTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} unit="d" />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1.5">
+                      <p className="font-semibold text-sm">{label}</p>
+                      {payload
+                        .filter((p) => p.value != null)
+                        .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+                        .map((p) => (
+                          <div key={p.dataKey as string} className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.stroke as string }} />
+                            <span className="font-medium">{p.dataKey as string}</span>
+                            <span className="ml-auto font-mono tabular-nums font-semibold">{p.value} dage</span>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                }}
+              />
+              {visibleTeams.map((team) => (
+                <Line
+                  key={team}
+                  type="monotone"
+                  dataKey={team}
+                  stroke={TEAM_COLORS[team] || "hsl(var(--foreground))"}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  connectNulls
+                />
+              ))}
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Per team</CardTitle>
