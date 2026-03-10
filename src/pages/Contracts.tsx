@@ -92,11 +92,36 @@ export default function Contracts() {
   const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
   const [previewContract, setPreviewContract] = useState<Contract | null>(null);
   const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [templateForm, setTemplateForm] = useState({
     name: "",
     type: "employment" as ContractType,
     description: "",
     content: "",
+  });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.toLowerCase() || null);
+    });
+  }, []);
+
+  const canMarkConfidential = currentUserEmail === "km@copenhagensales.dk" || currentUserEmail === "mg@copenhagensales.dk";
+
+  // Toggle confidential mutation
+  const toggleConfidentialMutation = useMutation({
+    mutationFn: async ({ id, isConfidential }: { id: string; isConfidential: boolean }) => {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ is_confidential: !isConfidential })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success(variables.isConfidential ? "Kontrakt er ikke længere fortrolig" : "Kontrakt markeret som fortrolig");
+    },
+    onError: () => toast.error("Kunne ikke ændre fortrolighedsstatus"),
   });
 
   // Fetch templates
