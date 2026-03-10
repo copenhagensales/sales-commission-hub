@@ -57,8 +57,7 @@ const getChurnLabel = (rate: number) => {
 };
 
 export default function OnboardingAnalyse() {
-  const [monthRange, setMonthRange] = useState("6");
-  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+  const [periodKey, setPeriodKey] = useState("6m");
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
