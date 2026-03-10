@@ -236,7 +236,7 @@ export default function BookWeekContent() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Booking oprettet!" });
+      toast({ title: "Booking oprettet som kladde!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
       setSelectedPlacementId("");
