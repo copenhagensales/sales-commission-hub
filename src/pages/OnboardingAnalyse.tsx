@@ -248,23 +248,26 @@ export default function OnboardingAnalyse() {
 
   // Team stats
   const teamStats = useMemo(() => {
-    const map = new Map<string, { total: number; exits: number; employees: EmployeeRecord[] }>();
+    const map = new Map<string, { total: number; exits30: number; exits60: number; employees: EmployeeRecord[] }>();
     filteredData.forEach((r) => {
-      if (!map.has(r.team)) map.set(r.team, { total: 0, exits: 0, employees: [] });
+      if (!map.has(r.team)) map.set(r.team, { total: 0, exits30: 0, exits60: 0, employees: [] });
       const s = map.get(r.team)!;
       s.total++;
-      if (r.leftWithin60) s.exits++;
+      if (r.leftWithin30) s.exits30++;
+      if (r.leftWithin60) s.exits60++;
       s.employees.push(r);
     });
     return Array.from(map.entries())
       .map(([team, s]) => ({
         team,
         total: s.total,
-        exits: s.exits,
-        churn: s.total > 0 ? Math.round((s.exits / s.total) * 1000) / 10 : 0,
+        exits30: s.exits30,
+        exits60: s.exits60,
+        churn30: s.total > 0 ? Math.round((s.exits30 / s.total) * 1000) / 10 : 0,
+        churn60: s.total > 0 ? Math.round((s.exits60 / s.total) * 1000) / 10 : 0,
         employees: s.employees.sort((a, b) => b.startDate.getTime() - a.startDate.getTime()),
       }))
-      .sort((a, b) => b.churn - a.churn);
+      .sort((a, b) => b.churn60 - a.churn60);
   }, [filteredData]);
 
   // Monthly churn per team (for line chart)
