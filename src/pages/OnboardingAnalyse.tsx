@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from "recharts";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
@@ -65,7 +65,7 @@ export default function OnboardingAnalyse() {
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding-analyse"],
     queryFn: async () => {
-      const [empRes, histRes, tmRes] = await Promise.all([
+      const [empRes, histRes, tmRes, fmSalesRes] = await Promise.all([
         supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, employment_start_date, employment_end_date, is_active")
@@ -76,11 +76,38 @@ export default function OnboardingAnalyse() {
         supabase
           .from("team_members")
           .select("employee_id, team:teams(name)"),
+        supabase
+          .from("sales")
+          .select("agent_name, client_campaign_id, client_campaigns:client_campaign_id(client_id, clients:client_id(name))")
+          .eq("source", "fieldmarketing")
+          .not("client_campaign_id", "is", null),
       ]);
 
       if (empRes.error) throw empRes.error;
       if (histRes.error) throw histRes.error;
       if (tmRes.error) throw tmRes.error;
+      // FM sales query is best-effort
+      
+      // Build FM agent → primary client map (by sale count majority)
+      const fmAgentClientCounts = new Map<string, Map<string, number>>();
+      (fmSalesRes.data || []).forEach((s: any) => {
+        const clientName = s.client_campaigns?.clients?.name;
+        const agentName = s.agent_name;
+        if (!clientName || !agentName) return;
+        const normAgent = agentName.toLowerCase().replace(/\s+/g, " ").trim();
+        if (!fmAgentClientCounts.has(normAgent)) fmAgentClientCounts.set(normAgent, new Map());
+        const counts = fmAgentClientCounts.get(normAgent)!;
+        counts.set(clientName, (counts.get(clientName) || 0) + 1);
+      });
+      const fmAgentPrimaryClient = new Map<string, string>();
+      fmAgentClientCounts.forEach((counts, agent) => {
+        let maxClient = "";
+        let maxCount = 0;
+        counts.forEach((count, client) => {
+          if (count > maxCount) { maxCount = count; maxClient = client; }
+        });
+        if (maxClient) fmAgentPrimaryClient.set(agent, maxClient);
+      });
 
       const employeeTeamMap = new Map<string, string>();
       (tmRes.data || []).forEach((tm: any) => {
@@ -98,12 +125,27 @@ export default function OnboardingAnalyse() {
         }
       });
 
+      const resolveFmSubTeam = (empName: string): string => {
+        const norm = empName.toLowerCase().replace(/\s+/g, " ").trim();
+        const primaryClient = fmAgentPrimaryClient.get(norm);
+        if (primaryClient === "Yousee") return "FM YouSee";
+        if (primaryClient === "Eesy FM") return "FM Eesy";
+        return "FM Øvrig";
+      };
+
       const resolveTeam = (empId: string, empName: string): string => {
         const fromTeamMembers = employeeTeamMap.get(empId);
-        if (fromTeamMembers) return normalizeTeamName(fromTeamMembers);
-        const fromHist = histNameTeamMap.get(normName(empName));
-        if (fromHist) return normalizeTeamName(fromHist);
-        return "Ukendt";
+        const baseTeam = fromTeamMembers
+          ? normalizeTeamName(fromTeamMembers)
+          : normalizeTeamName(histNameTeamMap.get(normName(empName)) || null);
+        
+        if (baseTeam === "Fieldmarketing") return resolveFmSubTeam(empName);
+        if (baseTeam === "Ukendt") {
+          // Check if they have FM sales
+          const fmClient = fmAgentPrimaryClient.get(normName(empName));
+          if (fmClient) return resolveFmSubTeam(empName);
+        }
+        return baseTeam || "Ukendt";
       };
 
       const today = new Date();
@@ -210,6 +252,40 @@ export default function OnboardingAnalyse() {
       }))
       .sort((a, b) => b.churn - a.churn);
   }, [filteredData]);
+
+  // Monthly churn per team (for line chart)
+  const TEAM_COLORS: Record<string, string> = {
+    "FM YouSee": "hsl(210, 70%, 50%)",
+    "FM Eesy": "hsl(280, 60%, 55%)",
+    "FM Øvrig": "hsl(45, 80%, 50%)",
+    "Eesy TM": "hsl(330, 65%, 50%)",
+    "Relatel": "hsl(160, 60%, 45%)",
+    "TDC Erhverv": "hsl(200, 70%, 45%)",
+    "United": "hsl(20, 75%, 50%)",
+    "Eesy FM": "hsl(280, 60%, 55%)",
+    "Fieldmarketing": "hsl(210, 70%, 50%)",
+  };
+
+  const monthlyTeamTrend = useMemo(() => {
+    const allTeams = new Set(filteredData.map((r) => r.team));
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const label = format(month, "MMM yy", { locale: da });
+      const point: Record<string, any> = { label };
+      allTeams.forEach((team) => {
+        const cohort = filteredData.filter(
+          (r) => r.team === team && !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
+        );
+        const exits = cohort.filter((r) => r.leftWithin60).length;
+        point[team] = cohort.length > 0 ? Math.round((exits / cohort.length) * 1000) / 10 : null;
+      });
+      return point;
+    });
+  }, [months, filteredData]);
+
+  const activeTeams = useMemo(() => {
+    return teamStats.map((t) => t.team);
+  }, [teamStats]);
 
   // Monthly cohorts
   const monthlyCohorts = useMemo(() => {
@@ -340,30 +416,32 @@ export default function OnboardingAnalyse() {
         </Card>
       </div>
 
-      {/* Team comparison chart */}
+      {/* Team comparison line chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Team sammenligning – 60-dages churn %</CardTitle>
+          <CardTitle>Team sammenligning – 60-dages churn % per måned</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={teamStats} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-              <XAxis dataKey="team" tick={{ fontSize: 12 }} />
-              <YAxis unit="%" tick={{ fontSize: 12 }} />
-              <Tooltip
-                formatter={(value: number, _name: string, props: any) => [`${value}%`, "Churn"]}
-                labelFormatter={(label) => {
-                  const t = teamStats.find((s) => s.team === label);
-                  return t ? `${label} — ${t.total} startere, ${t.exits} stoppet` : label;
-                }}
-              />
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={monthlyTeamTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis unit="%" tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value: number) => [`${value}%`, ""]} />
+              <Legend />
               <ReferenceLine y={overallChurn} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <Bar dataKey="churn" radius={[4, 4, 0, 0]}>
-                {teamStats.map((t) => (
-                  <Cell key={t.team} fill={t.churn <= 5 ? "hsl(142, 71%, 45%)" : t.churn <= 10 ? "hsl(160, 84%, 39%)" : t.churn <= 20 ? "hsl(38, 92%, 50%)" : "hsl(0, 84%, 60%)"} />
-                ))}
-              </Bar>
-            </BarChart>
+              {activeTeams.map((team) => (
+                <Line
+                  key={team}
+                  type="monotone"
+                  dataKey={team}
+                  name={team}
+                  stroke={TEAM_COLORS[team] || "hsl(var(--foreground))"}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  connectNulls={false}
+                />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
