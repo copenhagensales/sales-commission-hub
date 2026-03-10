@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Send, Eye, AlertTriangle } from "lucide-react";
+import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 
