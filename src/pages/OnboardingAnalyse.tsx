@@ -885,5 +885,6 @@ export default function OnboardingAnalyse() {
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }
