@@ -247,15 +247,11 @@ export default function OnboardingAnalyse() {
 
   // Monthly churn per team (for line chart)
   const TEAM_COLORS: Record<string, string> = {
-    "FM YouSee": "hsl(210, 70%, 50%)",
-    "FM Eesy": "hsl(280, 60%, 55%)",
-    "FM Øvrig": "hsl(45, 80%, 50%)",
+    "Fieldmarketing": "hsl(210, 70%, 50%)",
     "Eesy TM": "hsl(330, 65%, 50%)",
     "Relatel": "hsl(160, 60%, 45%)",
     "TDC Erhverv": "hsl(200, 70%, 45%)",
     "United": "hsl(20, 75%, 50%)",
-    "Eesy FM": "hsl(280, 60%, 55%)",
-    "Fieldmarketing": "hsl(210, 70%, 50%)",
   };
 
   const monthlyTeamTrend = useMemo(() => {
