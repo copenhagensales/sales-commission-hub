@@ -35,6 +35,7 @@ interface EmployeeRecord {
   endDate: Date | null;
   tenureDays: number;
   isCurrent: boolean;
+  leftWithin30: boolean;
   leftWithin60: boolean;
 }
 
@@ -178,6 +179,7 @@ export default function OnboardingAnalyse() {
           endDate,
           tenureDays: Math.max(0, tenureDays),
           isCurrent: emp.is_active ?? false,
+          leftWithin30: !emp.is_active && endDate != null && differenceInDays(endDate, startDate) <= 30,
           leftWithin60: !emp.is_active && endDate != null && differenceInDays(endDate, startDate) <= 60,
         });
       });
@@ -204,6 +206,7 @@ export default function OnboardingAnalyse() {
           endDate,
           tenureDays: emp.tenure_days,
           isCurrent: false,
+          leftWithin30: emp.tenure_days <= 30,
           leftWithin60: emp.tenure_days <= 60,
         });
       });
@@ -355,8 +358,11 @@ export default function OnboardingAnalyse() {
   }, [months, filteredData]);
 
   // Overall KPIs
-  const overallChurn = filteredData.length > 0
+  const overallChurn60 = filteredData.length > 0
     ? Math.round((filteredData.filter((r) => r.leftWithin60).length / filteredData.length) * 1000) / 10
+    : 0;
+  const overallChurn30 = filteredData.length > 0
+    ? Math.round((filteredData.filter((r) => r.leftWithin30).length / filteredData.length) * 1000) / 10
     : 0;
   const totalStarts = filteredData.length;
   const earlyLeavers = filteredData.filter((r) => r.leftWithin60).length;
@@ -390,7 +396,8 @@ export default function OnboardingAnalyse() {
     if (prevData.length === 0) return null;
 
     const prevEarlyLeavers = prevData.filter((r) => r.leftWithin60).length;
-    const prevChurn = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevChurn60 = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevChurn30 = Math.round((prevData.filter((r) => r.leftWithin30).length / prevData.length) * 1000) / 10;
     const prevActive = prevData.filter((r) => r.isCurrent).length;
     const prevRetention = Math.round((prevActive / prevData.length) * 1000) / 10;
 
@@ -401,7 +408,8 @@ export default function OnboardingAnalyse() {
       : 0;
 
     return {
-      churn: prevChurn,
+      churn60: prevChurn60,
+      churn30: prevChurn30,
       starts: prevData.length,
       earlyLeavers: prevEarlyLeavers,
       retention: prevRetention,
@@ -530,7 +538,19 @@ export default function OnboardingAnalyse() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <TrendingDown className="h-4 w-4" /> 30-dages Churn
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${getChurnColor(overallChurn30)}`}>{overallChurn30}%</div>
+            <Badge className={`mt-1 ${getChurnBg(overallChurn30)} text-white border-0`}>{getChurnLabel(overallChurn30)}</Badge>
+            {previousPeriodKPIs && <DeltaIndicator current={overallChurn30} previous={previousPeriodKPIs.churn30} suffix="%" invertColors />}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -538,9 +558,9 @@ export default function OnboardingAnalyse() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${getChurnColor(overallChurn)}`}>{overallChurn}%</div>
-            <Badge className={`mt-1 ${getChurnBg(overallChurn)} text-white border-0`}>{getChurnLabel(overallChurn)}</Badge>
-            {previousPeriodKPIs && <DeltaIndicator current={overallChurn} previous={previousPeriodKPIs.churn} suffix="pp" invertColors />}
+            <div className={`text-3xl font-bold ${getChurnColor(overallChurn60)}`}>{overallChurn60}%</div>
+            <Badge className={`mt-1 ${getChurnBg(overallChurn60)} text-white border-0`}>{getChurnLabel(overallChurn60)}</Badge>
+            {previousPeriodKPIs && <DeltaIndicator current={overallChurn60} previous={previousPeriodKPIs.churn60} suffix="%" invertColors />}
           </CardContent>
         </Card>
         <Card>
@@ -672,7 +692,7 @@ export default function OnboardingAnalyse() {
                   );
                 }}
               />
-              <ReferenceLine y={overallChurn} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <ReferenceLine y={overallChurn60} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Gns. ${overallChurn60}%`, position: "right", fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               {visibleTeams.map((team) => (
                 <Bar
                   key={team}
