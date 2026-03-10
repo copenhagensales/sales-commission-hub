@@ -1,36 +1,49 @@
 
 
-## Gør periode og totaler tydeligere i Excel-eksporten
+## Draft-booking workflow
 
-### Problem
-Excel-filen mangler kontekst — leverandøren kan ikke se hvilken periode data dækker, eller hvad totalbeløbet er.
+### Problemet
+Når en booking oprettes, er den med det samme "live" — synlig for alle, tæller i fakturering og leverandørrapporter. Lederen ønsker at kunne lave en foreløbig plan (draft), gennemgå den, og først derefter bekræfte og offentliggøre.
 
 ### Løsning
-Tilføj **header-rækker** øverst i arket og en **totalrække** nederst:
+Genindføre en `status`-kolonne på `booking`-tabellen med to tilstande: **`draft`** og **`confirmed`**. Drafts er kun synlige for ledere og ignoreres af fakturering/leverandørrapporter.
 
-**Fil: `src/components/billing/SupplierReportTab.tsx`** (Excel-logikken, linje ~901-938)
+### Database-ændring
 
-1. **Tilføj 2-3 header-rækker før tabeldata:**
-   - Række 1: `Leverandørrapport: [lokationstype]`
-   - Række 2: `Periode: [dato-range eller måned]`
-   - Række 3: tom (separator)
-   - Række 4: kolonneoverskrifter (nuværende headers)
+```sql
+ALTER TABLE public.booking 
+  ADD COLUMN status text NOT NULL DEFAULT 'draft';
 
-2. **Tilføj totalrække efter data:**
-   - Tom i tekst-kolonner, sum af Dage, sum af Beløb
-   - Hvis rabat: også sum af Rabat og Efter rabat
+-- Eksisterende bookings sættes til confirmed
+UPDATE public.booking SET status = 'confirmed' WHERE status = 'draft';
 
-3. **Fed skrift** på header-rækker og totalrække (via cell styling i xlsx)
-
-Eksempel output:
-```text
-A1: Leverandørrapport: Kvickly
-A2: Periode: Februar 2026
-A3: (tom)
-A4: Lokation | ID | By | Uger & Dage | Dage | Beløb
-A5-A17: (data)
-A18: Total | | | | 56 | 57.000
+-- Fremadrettet: nye bookings starter som draft
+ALTER TABLE public.booking ALTER COLUMN status SET DEFAULT 'draft';
 ```
 
-Ingen database-ændringer. Ingen nye filer.
+### Berørte områder
+
+1. **BookWeekContent.tsx** — Ny booking indsættes med `status: 'draft'`. Tilføj en "Bekræft uge"-knap der batch-opdaterer alle drafts for en given uge til `confirmed`.
+
+2. **Draft-indikator i UI** — Bookings med `status = 'draft'` vises med en visuel markering (f.eks. stiplet kant, gul badge "Kladde") så det er tydeligt at de ikke er bekræftede endnu.
+
+3. **Fakturering / Leverandørrapport** — Filtrér `WHERE status = 'confirmed'` så drafts ikke tæller med i omsætning eller leverandørafregning.
+
+4. **Vagtplan (medarbejdere)** — Vis kun `confirmed` bookings til almindelige medarbejdere. Ledere kan se begge.
+
+5. **Bekræftelses-flow** — En dedikeret "Uge-oversigt" sektion hvor lederen kan:
+   - Se alle drafts for en uge samlet
+   - Fjerne/redigere inden bekræftelse
+   - Trykke "Bekræft alle" for at publicere hele ugen
+
+### Teknisk plan
+
+| Trin | Fil/Område | Ændring |
+|------|-----------|---------|
+| 1 | Database migration | Tilføj `status text DEFAULT 'draft'`, opdater eksisterende til `confirmed` |
+| 2 | `BookWeekContent.tsx` | Insert med `status: 'draft'`, tilføj "Bekræft uge" knap |
+| 3 | `BookWeekContent.tsx` | Visuel draft-indikator (badge/styling) på draft-bookings |
+| 4 | Fakturering (`SupplierReportTab.tsx`, `Billing.tsx`) | Tilføj `status = 'confirmed'` filter |
+| 5 | Vagtplan-queries | Filtrér baseret på rolle: medarbejdere ser kun confirmed |
+| 6 | Booking-oversigter (`BookingsContent.tsx`) | Vis status-badge, tillad bulk-bekræftelse |
 
