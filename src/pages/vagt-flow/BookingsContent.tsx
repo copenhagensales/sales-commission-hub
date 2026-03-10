@@ -489,9 +489,32 @@ export default function BookingsContent() {
     },
   });
 
+  // Confirm week mutation
+  const confirmWeekMutation = useMutation({
+    mutationFn: async () => {
+      const draftIds = bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || [];
+      if (draftIds.length === 0) return;
+      const { error } = await supabase
+        .from("booking")
+        .update({ status: 'confirmed' })
+        .in("id", draftIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Uge bekræftet", description: "Alle kladder er nu bekræftet." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const draftCount = bookings?.filter((b: any) => b.status === 'draft').length || 0;
+
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
-    return matchesClient;
+    const matchesStatus = statusFilter === "all" || b.status === statusFilter;
+    return matchesClient && matchesStatus;
   });
 
   const groupedByClient = filtered?.reduce((acc: any, booking: any) => {
