@@ -89,17 +89,18 @@ export default function OnboardingAnalyse() {
       });
 
       // Build name→team fallback from historical_employment for stopped employees
+      const normName = (n: string) => n.toLowerCase().replace(/\s+/g, " ").trim();
       const histNameTeamMap = new Map<string, string>();
       (histRes.data || []).forEach((h) => {
         if (h.employee_name && h.team_name) {
-          histNameTeamMap.set(h.employee_name.toLowerCase().trim(), h.team_name);
+          histNameTeamMap.set(normName(h.employee_name), h.team_name);
         }
       });
 
       const resolveTeam = (empId: string, empName: string): string => {
         const fromTeamMembers = employeeTeamMap.get(empId);
         if (fromTeamMembers) return normalizeTeamName(fromTeamMembers);
-        const fromHist = histNameTeamMap.get(empName.toLowerCase().trim());
+        const fromHist = histNameTeamMap.get(normName(empName));
         if (fromHist) return normalizeTeamName(fromHist);
         return "Ukendt";
       };
