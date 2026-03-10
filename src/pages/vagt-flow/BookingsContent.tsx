@@ -604,20 +604,42 @@ export default function BookingsContent() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Alle kunder" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle kunder</SelectItem>
-                {fieldmarketingClients?.map((client: any) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex gap-4">
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Alle kunder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle kunder</SelectItem>
+                  {fieldmarketingClients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Alle statusser" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle statusser</SelectItem>
+                  <SelectItem value="draft">Kladder</SelectItem>
+                  <SelectItem value="confirmed">Bekræftede</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {draftCount > 0 && canEditFmBookings && (
+              <Button
+                onClick={() => confirmWeekMutation.mutate()}
+                disabled={confirmWeekMutation.isPending}
+                className="gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Bekræft uge ({draftCount} {draftCount === 1 ? 'kladde' : 'kladder'})
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
