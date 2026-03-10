@@ -8,7 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, LineChart, Line, Legend, Cell } from "recharts";
+import { Shield, Clock, BarChart3 } from "lucide-react";
 import { da } from "date-fns/locale";
 
 const normalizeTeamName = (name: string | null): string => {
@@ -343,6 +344,82 @@ export default function OnboardingAnalyse() {
   const totalActive = filteredData.filter((r) => r.isCurrent).length;
   const retentionRate = totalStarts > 0 ? Math.round((totalActive / totalStarts) * 1000) / 10 : 0;
 
+  // Post-60d retention: of those who survived 60 days, how many are still active?
+  const postOnboardingRetention = useMemo(() => {
+    const survivors = filteredData.filter((r) => !r.leftWithin60);
+    const survivorsStillActive = survivors.filter((r) => r.isCurrent);
+    const stoppedAfter60 = survivors.filter((r) => !r.isCurrent);
+    const rate = survivors.length > 0 ? Math.round((survivorsStillActive.length / survivors.length) * 1000) / 10 : 0;
+    const avgTenureSurvivors = survivors.length > 0
+      ? Math.round(survivors.reduce((sum, r) => sum + r.tenureDays, 0) / survivors.length)
+      : 0;
+    return { survivors: survivors.length, active: survivorsStillActive.length, stopped: stoppedAfter60.length, rate, avgTenureDays: avgTenureSurvivors };
+  }, [filteredData]);
+
+  // Tenure distribution histogram (all employees, buckets)
+  const tenureDistribution = useMemo(() => {
+    const buckets = [
+      { label: "0-30d", min: 0, max: 30 },
+      { label: "31-60d", min: 31, max: 60 },
+      { label: "61-90d", min: 61, max: 90 },
+      { label: "91-180d", min: 91, max: 180 },
+      { label: "6-12 mdr", min: 181, max: 365 },
+      { label: "1-2 år", min: 366, max: 730 },
+      { label: "2+ år", min: 731, max: Infinity },
+    ];
+    return buckets.map((b) => {
+      const inBucket = filteredData.filter((r) => r.tenureDays >= b.min && r.tenureDays <= b.max);
+      return {
+        label: b.label,
+        aktive: inBucket.filter((r) => r.isCurrent).length,
+        stoppede: inBucket.filter((r) => !r.isCurrent).length,
+        total: inBucket.length,
+      };
+    });
+  }, [filteredData]);
+
+  // Survivor tenure trend per team (avg tenure for those who passed 60d)
+  const survivorTenureTrend = useMemo(() => {
+    const allTeams = new Set(filteredData.map((r) => r.team));
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const label = format(month, "MMM yy", { locale: da });
+      const point: Record<string, any> = { label };
+      allTeams.forEach((team) => {
+        const cohort = filteredData.filter(
+          (r) => r.team === team && !isBefore(r.startDate, month) && !isAfter(r.startDate, end) && !r.leftWithin60
+        );
+        if (cohort.length > 0) {
+          point[team] = Math.round(cohort.reduce((s, r) => s + r.tenureDays, 0) / cohort.length);
+        } else {
+          point[team] = null;
+        }
+      });
+      return point;
+    });
+  }, [months, filteredData]);
+
+  // Median tenure per monthly cohort
+  const medianTenureByCohort = useMemo(() => {
+    const median = (arr: number[]) => {
+      if (!arr.length) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    };
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const cohort = filteredData.filter(
+        (r) => !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
+      );
+      return {
+        label: format(month, "MMM yy", { locale: da }),
+        median: median(cohort.map((r) => r.tenureDays)),
+        count: cohort.length,
+      };
+    });
+  }, [months, filteredData]);
+
   const toggleTeam = (team: string) => {
     setExpandedTeams((prev) => {
       const next = new Set(prev);
@@ -397,7 +474,7 @@ export default function OnboardingAnalyse() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -427,7 +504,7 @@ export default function OnboardingAnalyse() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600">{filteredData.filter((r) => r.leftWithin60).length}</div>
+            <div className="text-3xl font-bold text-destructive">{filteredData.filter((r) => r.leftWithin60).length}</div>
             <p className="text-xs text-muted-foreground mt-1">early leavers</p>
           </CardContent>
         </Card>
@@ -440,6 +517,24 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{retentionRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">{totalActive} stadig ansat</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Shield className="h-4 w-4" /> Post-60d retention
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600">{postOnboardingRetention.rate}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {postOnboardingRetention.active} aktive / {postOnboardingRetention.survivors} survivors
+            </p>
+            {postOnboardingRetention.stopped > 0 && (
+              <p className="text-xs text-destructive mt-0.5">
+                {postOnboardingRetention.stopped} stoppet efter 60d
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -532,7 +627,126 @@ export default function OnboardingAnalyse() {
         </CardContent>
       </Card>
 
-      {/* Per-team breakdown */}
+      {/* Tenure distribution histogram */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" /> Anciennitet-fordeling
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Hvor lang tid bliver folk? Aktive vs. stoppede per bucket.</p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={tenureDistribution} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1">
+                        <p className="font-semibold text-sm">{label}</p>
+                        <p>Aktive: <span className="font-mono font-semibold">{d?.aktive}</span></p>
+                        <p>Stoppede: <span className="font-mono font-semibold">{d?.stoppede}</span></p>
+                        <p className="text-muted-foreground">Total: {d?.total}</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="aktive" name="Aktive" stackId="a" fill="hsl(142, 60%, 45%)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="stoppede" name="Stoppede" stackId="a" fill="hsl(0, 65%, 55%)" radius={[2, 2, 0, 0]} />
+                <Legend />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" /> Median anciennitet per kohorte
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Median anciennitet (dage) for alle medarbejdere per startmåned.</p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={medianTenureByCohort} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} unit="d" />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1">
+                        <p className="font-semibold text-sm">{label}</p>
+                        <p>Median: <span className="font-mono font-semibold">{d?.median} dage</span></p>
+                        <p className="text-muted-foreground">Kohorte: {d?.count} medarbejdere</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="median" name="Median anciennitet" fill="hsl(210, 70%, 50%)" radius={[2, 2, 0, 0]} maxBarSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Survivor tenure trend per team */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" /> Gns. anciennitet for survivors (&gt;60d) per team
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            For medarbejdere der overlevede onboarding — hvor længe bliver de i gennemsnit? (dage)
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={survivorTenureTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} unit="d" />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="rounded-lg border bg-background p-3 shadow-lg text-xs space-y-1.5">
+                      <p className="font-semibold text-sm">{label}</p>
+                      {payload
+                        .filter((p) => p.value != null)
+                        .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+                        .map((p) => (
+                          <div key={p.dataKey as string} className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.stroke as string }} />
+                            <span className="font-medium">{p.dataKey as string}</span>
+                            <span className="ml-auto font-mono tabular-nums font-semibold">{p.value} dage</span>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                }}
+              />
+              {visibleTeams.map((team) => (
+                <Line
+                  key={team}
+                  type="monotone"
+                  dataKey={team}
+                  stroke={TEAM_COLORS[team] || "hsl(var(--foreground))"}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  connectNulls
+                />
+              ))}
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Per team</CardTitle>
