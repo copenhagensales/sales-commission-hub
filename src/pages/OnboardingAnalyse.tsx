@@ -206,6 +206,7 @@ export default function OnboardingAnalyse() {
           endDate,
           tenureDays: emp.tenure_days,
           isCurrent: false,
+          leftWithin30: emp.tenure_days <= 30,
           leftWithin60: emp.tenure_days <= 60,
         });
       });
