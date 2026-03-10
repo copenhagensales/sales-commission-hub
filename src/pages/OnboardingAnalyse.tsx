@@ -65,7 +65,7 @@ export default function OnboardingAnalyse() {
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding-analyse"],
     queryFn: async () => {
-      const [empRes, histRes, tmRes] = await Promise.all([
+      const [empRes, histRes, tmRes, fmSalesRes] = await Promise.all([
         supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, employment_start_date, employment_end_date, is_active")
@@ -76,11 +76,38 @@ export default function OnboardingAnalyse() {
         supabase
           .from("team_members")
           .select("employee_id, team:teams(name)"),
+        supabase
+          .from("sales")
+          .select("agent_name, client_campaign_id, client_campaigns:client_campaign_id(client_id, clients:client_id(name))")
+          .eq("source", "fieldmarketing")
+          .not("client_campaign_id", "is", null),
       ]);
 
       if (empRes.error) throw empRes.error;
       if (histRes.error) throw histRes.error;
       if (tmRes.error) throw tmRes.error;
+      // FM sales query is best-effort
+      
+      // Build FM agent → primary client map (by sale count majority)
+      const fmAgentClientCounts = new Map<string, Map<string, number>>();
+      (fmSalesRes.data || []).forEach((s: any) => {
+        const clientName = s.client_campaigns?.clients?.name;
+        const agentName = s.agent_name;
+        if (!clientName || !agentName) return;
+        const normAgent = agentName.toLowerCase().replace(/\s+/g, " ").trim();
+        if (!fmAgentClientCounts.has(normAgent)) fmAgentClientCounts.set(normAgent, new Map());
+        const counts = fmAgentClientCounts.get(normAgent)!;
+        counts.set(clientName, (counts.get(clientName) || 0) + 1);
+      });
+      const fmAgentPrimaryClient = new Map<string, string>();
+      fmAgentClientCounts.forEach((counts, agent) => {
+        let maxClient = "";
+        let maxCount = 0;
+        counts.forEach((count, client) => {
+          if (count > maxCount) { maxCount = count; maxClient = client; }
+        });
+        if (maxClient) fmAgentPrimaryClient.set(agent, maxClient);
+      });
 
       const employeeTeamMap = new Map<string, string>();
       (tmRes.data || []).forEach((tm: any) => {
@@ -98,12 +125,27 @@ export default function OnboardingAnalyse() {
         }
       });
 
+      const resolveFmSubTeam = (empName: string): string => {
+        const norm = empName.toLowerCase().replace(/\s+/g, " ").trim();
+        const primaryClient = fmAgentPrimaryClient.get(norm);
+        if (primaryClient === "Yousee") return "FM YouSee";
+        if (primaryClient === "Eesy FM") return "FM Eesy";
+        return "FM Øvrig";
+      };
+
       const resolveTeam = (empId: string, empName: string): string => {
         const fromTeamMembers = employeeTeamMap.get(empId);
-        if (fromTeamMembers) return normalizeTeamName(fromTeamMembers);
-        const fromHist = histNameTeamMap.get(normName(empName));
-        if (fromHist) return normalizeTeamName(fromHist);
-        return "Ukendt";
+        const baseTeam = fromTeamMembers
+          ? normalizeTeamName(fromTeamMembers)
+          : normalizeTeamName(histNameTeamMap.get(normName(empName)) || null);
+        
+        if (baseTeam === "Fieldmarketing") return resolveFmSubTeam(empName);
+        if (baseTeam === "Ukendt") {
+          // Check if they have FM sales
+          const fmClient = fmAgentPrimaryClient.get(normName(empName));
+          if (fmClient) return resolveFmSubTeam(empName);
+        }
+        return baseTeam || "Ukendt";
       };
 
       const today = new Date();
