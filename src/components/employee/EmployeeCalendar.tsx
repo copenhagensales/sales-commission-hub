@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface Absence {
   id: string;
-  type: "sick" | "vacation";
+  type: "sick" | "vacation" | "day_off" | "no_show";
   start_date: string;
   end_date: string;
 }
