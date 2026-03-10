@@ -1,19 +1,26 @@
 
 
+# Fortrolig-toggle på Skabeloner-fanen
 
-## Draft-booking workflow ✅
+## Problem
+Skabeloner kan i dag ikke markeres som fortrolige. Kun kontrakter har `is_confidential`. Brugeren ønsker at kunne låse skabeloner, så fortrolige skabeloner kun er synlige for km@ og mg@, og ikke dukker op som valg i SendContractDialog for andre.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+## Ændringer
 
-## Fortrolige kontrakter ✅
+### 1. Database-migration
+- Tilføj `is_confidential BOOLEAN DEFAULT false` til `contract_templates`.
+- Opret `can_access_confidential_contract`-check i RLS for templates (genbruger den eksisterende funktion).
+- Opdater RLS-policies på `contract_templates`, så templates med `is_confidential = true` kun kan ses af brugere med adgang via `can_access_confidential_contract(auth.uid())`.
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+### 2. `src/pages/Contracts.tsx` — Skabeloner-fanen
+- Tilføj lås-toggle-knap på hvert skabelon-kort (ved siden af Edit/Trash), kun synlig for `canMarkConfidential`-brugere.
+- Opret mutation til at toggle `is_confidential` på `contract_templates`.
+- Vis lås-ikon på skabelonens titel når `is_confidential = true`.
+
+### 3. `src/components/contracts/SendContractDialog.tsx`
+- Fortrolige skabeloner filtreres allerede fra via RLS for uautoriserede brugere — ingen kodeændring nødvendig.
+
+### Filer der ændres
+- Database: ny migration (tilføj kolonne + RLS-opdatering)
+- `src/pages/Contracts.tsx` — lås-knap og mutation på skabelon-kort
+
