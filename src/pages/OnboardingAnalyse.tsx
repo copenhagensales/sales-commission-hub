@@ -342,6 +342,7 @@ export default function OnboardingAnalyse() {
     ? Math.round((filteredData.filter((r) => r.leftWithin60).length / filteredData.length) * 1000) / 10
     : 0;
   const totalStarts = filteredData.length;
+  const earlyLeavers = filteredData.filter((r) => r.leftWithin60).length;
   const totalActive = filteredData.filter((r) => r.isCurrent).length;
   const retentionRate = totalStarts > 0 ? Math.round((totalActive / totalStarts) * 1000) / 10 : 0;
 
@@ -356,6 +357,40 @@ export default function OnboardingAnalyse() {
       : 0;
     return { survivors: survivors.length, active: survivorsStillActive.length, stopped: stoppedAfter60.length, rate, avgTenureDays: avgTenureSurvivors };
   }, [filteredData]);
+
+  // Previous period comparison
+  const previousPeriodKPIs = useMemo(() => {
+    if (!data) return null;
+    const now = new Date();
+    const currentCutoff = periodConfig.cutoff;
+    const periodLengthMs = now.getTime() - currentCutoff.getTime();
+    const prevEnd = currentCutoff;
+    const prevStart = new Date(currentCutoff.getTime() - periodLengthMs);
+
+    const prevData = data.filter(
+      (r) => !isBefore(r.startDate, prevStart) && isBefore(r.startDate, prevEnd)
+    );
+    if (prevData.length === 0) return null;
+
+    const prevEarlyLeavers = prevData.filter((r) => r.leftWithin60).length;
+    const prevChurn = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevActive = prevData.filter((r) => r.isCurrent).length;
+    const prevRetention = Math.round((prevActive / prevData.length) * 1000) / 10;
+
+    const prevSurvivors = prevData.filter((r) => !r.leftWithin60);
+    const prevSurvivorsActive = prevSurvivors.filter((r) => r.isCurrent).length;
+    const prevPost60Retention = prevSurvivors.length > 0
+      ? Math.round((prevSurvivorsActive / prevSurvivors.length) * 1000) / 10
+      : 0;
+
+    return {
+      churn: prevChurn,
+      starts: prevData.length,
+      earlyLeavers: prevEarlyLeavers,
+      retention: prevRetention,
+      post60Retention: prevPost60Retention,
+    };
+  }, [data, periodConfig]);
 
   // Tenure distribution histogram (all employees, buckets)
   const tenureDistribution = useMemo(() => {
