@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Users, TrendingDown, UserCheck, UserMinus } from "lucide-react";
+import { ChevronDown, ChevronRight, Users, TrendingDown, TrendingUp, UserCheck, UserMinus } from "lucide-react";
 import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, isAfter, isBefore, endOfMonth } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, LineChart, Line, Legend, Cell } from "recharts";
 import { Shield, Clock, BarChart3 } from "lucide-react";
@@ -58,6 +58,24 @@ const getChurnLabel = (rate: number) => {
   if (rate <= 20) return "Advarsel";
   return "Rødt flag";
 };
+
+/** Shows a delta vs previous period with colored arrow */
+function DeltaIndicator({ current, previous, suffix = "", invertColors = false }: {
+  current: number; previous: number; suffix?: string; invertColors?: boolean;
+}) {
+  const delta = Math.round((current - previous) * 10) / 10;
+  if (delta === 0) return <p className="text-xs text-muted-foreground mt-1.5">— ift. forrige periode</p>;
+  const isPositive = delta > 0;
+  const isGood = invertColors ? !isPositive : isPositive;
+  const Icon = isPositive ? TrendingUp : TrendingDown;
+  const sign = isPositive ? "+" : "";
+  return (
+    <p className={`text-xs mt-1.5 flex items-center gap-1 ${isGood ? "text-green-600" : "text-red-600"}`}>
+      <Icon className="h-3 w-3" />
+      {sign}{delta}{suffix} ift. forrige periode
+    </p>
+  );
+}
 
 export default function OnboardingAnalyse() {
   const [periodKey, setPeriodKey] = useState("6m");
@@ -342,6 +360,7 @@ export default function OnboardingAnalyse() {
     ? Math.round((filteredData.filter((r) => r.leftWithin60).length / filteredData.length) * 1000) / 10
     : 0;
   const totalStarts = filteredData.length;
+  const earlyLeavers = filteredData.filter((r) => r.leftWithin60).length;
   const totalActive = filteredData.filter((r) => r.isCurrent).length;
   const retentionRate = totalStarts > 0 ? Math.round((totalActive / totalStarts) * 1000) / 10 : 0;
 
@@ -356,6 +375,40 @@ export default function OnboardingAnalyse() {
       : 0;
     return { survivors: survivors.length, active: survivorsStillActive.length, stopped: stoppedAfter60.length, rate, avgTenureDays: avgTenureSurvivors };
   }, [filteredData]);
+
+  // Previous period comparison
+  const previousPeriodKPIs = useMemo(() => {
+    if (!data) return null;
+    const now = new Date();
+    const currentCutoff = periodConfig.cutoff;
+    const periodLengthMs = now.getTime() - currentCutoff.getTime();
+    const prevEnd = currentCutoff;
+    const prevStart = new Date(currentCutoff.getTime() - periodLengthMs);
+
+    const prevData = data.filter(
+      (r) => !isBefore(r.startDate, prevStart) && isBefore(r.startDate, prevEnd)
+    );
+    if (prevData.length === 0) return null;
+
+    const prevEarlyLeavers = prevData.filter((r) => r.leftWithin60).length;
+    const prevChurn = Math.round((prevEarlyLeavers / prevData.length) * 1000) / 10;
+    const prevActive = prevData.filter((r) => r.isCurrent).length;
+    const prevRetention = Math.round((prevActive / prevData.length) * 1000) / 10;
+
+    const prevSurvivors = prevData.filter((r) => !r.leftWithin60);
+    const prevSurvivorsActive = prevSurvivors.filter((r) => r.isCurrent).length;
+    const prevPost60Retention = prevSurvivors.length > 0
+      ? Math.round((prevSurvivorsActive / prevSurvivors.length) * 1000) / 10
+      : 0;
+
+    return {
+      churn: prevChurn,
+      starts: prevData.length,
+      earlyLeavers: prevEarlyLeavers,
+      retention: prevRetention,
+      post60Retention: prevPost60Retention,
+    };
+  }, [data, periodConfig]);
 
   // Tenure distribution histogram (all employees, buckets)
   const tenureDistribution = useMemo(() => {
@@ -488,6 +541,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className={`text-3xl font-bold ${getChurnColor(overallChurn)}`}>{overallChurn}%</div>
             <Badge className={`mt-1 ${getChurnBg(overallChurn)} text-white border-0`}>{getChurnLabel(overallChurn)}</Badge>
+            {previousPeriodKPIs && <DeltaIndicator current={overallChurn} previous={previousPeriodKPIs.churn} suffix="pp" invertColors />}
           </CardContent>
         </Card>
         <Card>
@@ -499,6 +553,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold">{totalStarts}</div>
             <p className="text-xs text-muted-foreground mt-1">nye medarbejdere</p>
+            {previousPeriodKPIs && <DeltaIndicator current={totalStarts} previous={previousPeriodKPIs.starts} />}
           </CardContent>
         </Card>
         <Card>
@@ -508,8 +563,9 @@ export default function OnboardingAnalyse() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-destructive">{filteredData.filter((r) => r.leftWithin60).length}</div>
+            <div className="text-3xl font-bold text-destructive">{earlyLeavers}</div>
             <p className="text-xs text-muted-foreground mt-1">early leavers</p>
+            {previousPeriodKPIs && <DeltaIndicator current={earlyLeavers} previous={previousPeriodKPIs.earlyLeavers} invertColors />}
           </CardContent>
         </Card>
         <Card>
@@ -521,6 +577,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{retentionRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">{totalActive} stadig ansat</p>
+            {previousPeriodKPIs && <DeltaIndicator current={retentionRate} previous={previousPeriodKPIs.retention} suffix="pp" />}
           </CardContent>
         </Card>
         <Card>
@@ -539,6 +596,7 @@ export default function OnboardingAnalyse() {
                 {postOnboardingRetention.stopped} stoppet efter 60d
               </p>
             )}
+            {previousPeriodKPIs && <DeltaIndicator current={postOnboardingRetention.rate} previous={previousPeriodKPIs.post60Retention} suffix="pp" />}
           </CardContent>
         </Card>
       </div>
