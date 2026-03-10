@@ -347,14 +347,17 @@ export default function OnboardingAnalyse() {
       const cohort = filteredData.filter(
         (r) => !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
       );
-      const exits = cohort.filter((r) => r.leftWithin60);
+      const exits30 = cohort.filter((r) => r.leftWithin30);
+      const exits60 = cohort.filter((r) => r.leftWithin60);
       return {
         month,
         label: format(month, "MMMM yyyy", { locale: da }),
         total: cohort.length,
-        exits: exits.length,
-        churn: cohort.length > 0 ? Math.round((exits.length / cohort.length) * 1000) / 10 : 0,
-        exitNames: exits.map((e) => e.name),
+        exits30: exits30.length,
+        exits60: exits60.length,
+        churn30: cohort.length > 0 ? Math.round((exits30.length / cohort.length) * 1000) / 10 : 0,
+        churn60: cohort.length > 0 ? Math.round((exits60.length / cohort.length) * 1000) / 10 : 0,
+        exitNames: exits60.map((e) => e.name),
         employees: cohort.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
       };
     });
