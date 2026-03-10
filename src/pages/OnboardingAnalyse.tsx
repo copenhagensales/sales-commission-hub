@@ -344,6 +344,82 @@ export default function OnboardingAnalyse() {
   const totalActive = filteredData.filter((r) => r.isCurrent).length;
   const retentionRate = totalStarts > 0 ? Math.round((totalActive / totalStarts) * 1000) / 10 : 0;
 
+  // Post-60d retention: of those who survived 60 days, how many are still active?
+  const postOnboardingRetention = useMemo(() => {
+    const survivors = filteredData.filter((r) => !r.leftWithin60);
+    const survivorsStillActive = survivors.filter((r) => r.isCurrent);
+    const stoppedAfter60 = survivors.filter((r) => !r.isCurrent);
+    const rate = survivors.length > 0 ? Math.round((survivorsStillActive.length / survivors.length) * 1000) / 10 : 0;
+    const avgTenureSurvivors = survivors.length > 0
+      ? Math.round(survivors.reduce((sum, r) => sum + r.tenureDays, 0) / survivors.length)
+      : 0;
+    return { survivors: survivors.length, active: survivorsStillActive.length, stopped: stoppedAfter60.length, rate, avgTenureDays: avgTenureSurvivors };
+  }, [filteredData]);
+
+  // Tenure distribution histogram (all employees, buckets)
+  const tenureDistribution = useMemo(() => {
+    const buckets = [
+      { label: "0-30d", min: 0, max: 30 },
+      { label: "31-60d", min: 31, max: 60 },
+      { label: "61-90d", min: 61, max: 90 },
+      { label: "91-180d", min: 91, max: 180 },
+      { label: "6-12 mdr", min: 181, max: 365 },
+      { label: "1-2 år", min: 366, max: 730 },
+      { label: "2+ år", min: 731, max: Infinity },
+    ];
+    return buckets.map((b) => {
+      const inBucket = filteredData.filter((r) => r.tenureDays >= b.min && r.tenureDays <= b.max);
+      return {
+        label: b.label,
+        aktive: inBucket.filter((r) => r.isCurrent).length,
+        stoppede: inBucket.filter((r) => !r.isCurrent).length,
+        total: inBucket.length,
+      };
+    });
+  }, [filteredData]);
+
+  // Survivor tenure trend per team (avg tenure for those who passed 60d)
+  const survivorTenureTrend = useMemo(() => {
+    const allTeams = new Set(filteredData.map((r) => r.team));
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const label = format(month, "MMM yy", { locale: da });
+      const point: Record<string, any> = { label };
+      allTeams.forEach((team) => {
+        const cohort = filteredData.filter(
+          (r) => r.team === team && !isBefore(r.startDate, month) && !isAfter(r.startDate, end) && !r.leftWithin60
+        );
+        if (cohort.length > 0) {
+          point[team] = Math.round(cohort.reduce((s, r) => s + r.tenureDays, 0) / cohort.length);
+        } else {
+          point[team] = null;
+        }
+      });
+      return point;
+    });
+  }, [months, filteredData]);
+
+  // Median tenure per monthly cohort
+  const medianTenureByCohort = useMemo(() => {
+    const median = (arr: number[]) => {
+      if (!arr.length) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    };
+    return [...months].reverse().map((month) => {
+      const end = endOfMonth(month);
+      const cohort = filteredData.filter(
+        (r) => !isBefore(r.startDate, month) && !isAfter(r.startDate, end)
+      );
+      return {
+        label: format(month, "MMM yy", { locale: da }),
+        median: median(cohort.map((r) => r.tenureDays)),
+        count: cohort.length,
+      };
+    });
+  }, [months, filteredData]);
+
   const toggleTeam = (team: string) => {
     setExpandedTeams((prev) => {
       const next = new Set(prev);
