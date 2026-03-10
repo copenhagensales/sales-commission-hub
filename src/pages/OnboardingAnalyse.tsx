@@ -59,6 +59,24 @@ const getChurnLabel = (rate: number) => {
   return "Rødt flag";
 };
 
+/** Shows a delta vs previous period with colored arrow */
+function DeltaIndicator({ current, previous, suffix = "", invertColors = false }: {
+  current: number; previous: number; suffix?: string; invertColors?: boolean;
+}) {
+  const delta = Math.round((current - previous) * 10) / 10;
+  if (delta === 0) return <p className="text-xs text-muted-foreground mt-1.5">— ift. forrige periode</p>;
+  const isPositive = delta > 0;
+  const isGood = invertColors ? !isPositive : isPositive;
+  const Icon = isPositive ? TrendingUp : TrendingDown;
+  const sign = isPositive ? "+" : "";
+  return (
+    <p className={`text-xs mt-1.5 flex items-center gap-1 ${isGood ? "text-green-600" : "text-red-600"}`}>
+      <Icon className="h-3 w-3" />
+      {sign}{delta}{suffix} ift. forrige periode
+    </p>
+  );
+}
+
 export default function OnboardingAnalyse() {
   const [periodKey, setPeriodKey] = useState("6m");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
