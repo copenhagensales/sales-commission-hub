@@ -96,6 +96,18 @@ export function EmployeeCalendar({
           </div>
           <span className="text-orange-600 font-semibold">Forsinket</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-blue-500/20 flex items-center justify-center ring-1 ring-blue-500/30">
+            <CalendarX2 className="h-4 w-4 text-blue-600" />
+          </div>
+          <span className="text-muted-foreground font-medium">Fridag</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-slate-500/20 flex items-center justify-center ring-2 ring-slate-500/50">
+            <UserX className="h-4 w-4 text-slate-600" />
+          </div>
+          <span className="text-slate-600 font-semibold">Udeblivelse</span>
+        </div>
       </div>
 
       {/* Calendar Table - Enhanced styling */}
