@@ -1,19 +1,24 @@
 
 
+# Fortrolig-toggle direkte på kontraktoversigten
 
-## Draft-booking workflow ✅
+## Problem
+I dag kan man kun markere en kontrakt som fortrolig ved oprettelse (SendContractDialog). Man mangler muligheden for at låse/låse op eksisterende kontrakter direkte fra `/contracts`-siden. Derudover skal fortrolige kontrakter skjules fra medarbejdervælgeren i SendContractDialog, så andre brugere ikke kan se dem som "muligheder".
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+## Ændringer
 
-## Fortrolige kontrakter ✅
+### 1. `src/pages/Contracts.tsx`
+- Tilføj `currentUserEmail`-check (som i SendContractDialog) for at afgøre om brugeren er km@/mg@.
+- Tilføj en toggle-knap (lås-ikon) i action-kolonnen for hver kontrakt, kun synlig for km@/mg@.
+- Klik toggler `is_confidential` via en mutation (`UPDATE contracts SET is_confidential = !current`).
+- Lås-ikonet ændrer udseende: fyldt/farvet når fortrolig, outline når ikke.
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+### 2. `src/components/contracts/SendContractDialog.tsx`
+- Kontraktoversigten/medarbejdervælgeren påvirkes allerede af RLS — fortrolige kontrakter filtreres automatisk fra for uautoriserede brugere. Ingen yderligere ændring nødvendig her.
+
+### Ingen database-ændringer
+`is_confidential`-kolonnen og RLS-policies er allerede på plads. Det er kun frontend der mangler toggle-funktionalitet.
+
+### Filer der ændres
+- `src/pages/Contracts.tsx` — tilføj email-check, toggle-mutation og lås-knap i tabellen
+
