@@ -179,3 +179,6 @@ export const Cancellations = lazyPage(() => import("@/pages/salary/Cancellations
 
 // System Stability
 export const SystemStability = lazyPage(() => import("@/pages/SystemStability"));
+
+// Onboarding Analyse
+export const OnboardingAnalyse = lazyPage(() => import("@/pages/OnboardingAnalyse"));
