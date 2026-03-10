@@ -1,19 +1,15 @@
 
+# Fix: Inkluder stoppede medarbejdere i Onboarding Analyse
 
+## Problem
+Deaktiverede medarbejdere fjernes fra `team_members`-tabellen, så de får team "Ukendt" → filtreres væk af `EXCLUDED_TEAMS`. Resultatet er at kun aktive medarbejdere vises.
 
-## Draft-booking workflow ✅
+## Løsning
+I `OnboardingAnalyse.tsx` queryFn:
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+1. **Byg et navn→team lookup fra `historical_employment`** — dette har team-data for alle stoppede medarbejdere.
+2. **For `employee_master_data`-records uden team i `team_members`**: Slå op i historical_employment-data via navn-match for at finde korrekt team.
+3. Prioritet: `team_members` → `historical_employment` match → "Ukendt"
 
-## Fortrolige kontrakter ✅
-
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+## Fil der ændres
+- `src/pages/OnboardingAnalyse.tsx` — Udvid team-resolution logik i queryFn (~10 linjer ændring)
