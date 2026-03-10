@@ -753,6 +753,7 @@ export default function OnboardingAnalyse() {
                         <TableCell className="text-right">
                           <span className={`font-semibold ${getChurnColor(t.churn60)}`}>{t.churn60}%</span>
                         </TableCell>
+                        <TableCell className="text-right font-medium">{t.avgTenureDays}d</TableCell>
                       </TableRow>
                     </CollapsibleTrigger>
                     <CollapsibleContent asChild>
