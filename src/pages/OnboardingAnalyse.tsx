@@ -523,6 +523,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className={`text-3xl font-bold ${getChurnColor(overallChurn)}`}>{overallChurn}%</div>
             <Badge className={`mt-1 ${getChurnBg(overallChurn)} text-white border-0`}>{getChurnLabel(overallChurn)}</Badge>
+            {previousPeriodKPIs && <DeltaIndicator current={overallChurn} previous={previousPeriodKPIs.churn} suffix="pp" invertColors />}
           </CardContent>
         </Card>
         <Card>
@@ -534,6 +535,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold">{totalStarts}</div>
             <p className="text-xs text-muted-foreground mt-1">nye medarbejdere</p>
+            {previousPeriodKPIs && <DeltaIndicator current={totalStarts} previous={previousPeriodKPIs.starts} />}
           </CardContent>
         </Card>
         <Card>
@@ -543,8 +545,9 @@ export default function OnboardingAnalyse() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-destructive">{filteredData.filter((r) => r.leftWithin60).length}</div>
+            <div className="text-3xl font-bold text-destructive">{earlyLeavers}</div>
             <p className="text-xs text-muted-foreground mt-1">early leavers</p>
+            {previousPeriodKPIs && <DeltaIndicator current={earlyLeavers} previous={previousPeriodKPIs.earlyLeavers} invertColors />}
           </CardContent>
         </Card>
         <Card>
@@ -556,6 +559,7 @@ export default function OnboardingAnalyse() {
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{retentionRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">{totalActive} stadig ansat</p>
+            {previousPeriodKPIs && <DeltaIndicator current={retentionRate} previous={previousPeriodKPIs.retention} suffix="pp" />}
           </CardContent>
         </Card>
         <Card>
@@ -574,6 +578,7 @@ export default function OnboardingAnalyse() {
                 {postOnboardingRetention.stopped} stoppet efter 60d
               </p>
             )}
+            {previousPeriodKPIs && <DeltaIndicator current={postOnboardingRetention.rate} previous={previousPeriodKPIs.post60Retention} suffix="pp" />}
           </CardContent>
         </Card>
       </div>
