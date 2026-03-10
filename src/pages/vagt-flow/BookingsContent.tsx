@@ -61,6 +61,7 @@ export default function BookingsContent() {
     yearParam ? parseInt(yearParam) : getWeekYear(now)
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [deleteAssignmentData, setDeleteAssignmentData] = useState<{
     id: string;
