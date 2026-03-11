@@ -363,52 +363,63 @@ export default function ContractSign() {
     <div className={`min-h-screen bg-muted/30 ${canSign && isMobile ? "pb-28" : ""}`}>
       {/* ═══ Sticky Header + Progress Bar ═══ */}
       <div className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
             {user && (
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-muted-foreground hover:text-foreground -ml-2"
+                className="text-muted-foreground hover:text-foreground -ml-2 flex-shrink-0"
                 onClick={() => navigate("/my-contracts")}
               >
-                <ArrowLeft className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Tilbage</span>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline text-xs">Tilbage</span>
               </Button>
             )}
-            <div className="h-5 w-px bg-border" />
-            <Badge variant={status.variant}>
+            <div className="h-4 w-px bg-border flex-shrink-0" />
+            <Badge variant={status.variant} className="flex-shrink-0 text-[10px]">
               {status.label}
             </Badge>
+            <span className="text-xs text-muted-foreground truncate hidden md:inline">
+              {contract.title}
+            </span>
+            {metadataItems.filter(m => m.label === "Udsendt" || m.label === "Afsender").map((item, i) => (
+              <span key={i} className="text-[11px] text-muted-foreground hidden lg:inline-flex items-center gap-1">
+                <span className="text-border">·</span>
+                {item.icon}
+                {item.value}
+              </span>
+            ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {canSign && !isMobile && (
               <Button
                 size="sm"
+                className="h-7 text-xs"
                 onClick={scrollToSignSection}
               >
-                <PenLine className="h-4 w-4 mr-1.5" />
+                <PenLine className="h-3.5 w-3.5 mr-1" />
                 Underskriv
               </Button>
             )}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground"
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
             >
               {downloadingPdf ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Download className="h-4 w-4" />
+                <Download className="h-3.5 w-3.5" />
               )}
             </Button>
           </div>
         </div>
-        {/* Reading progress bar */}
-        <div className="h-[3px] bg-muted/50 w-full">
+        <div className="h-[2px] bg-muted/40 w-full">
           <div
-            className="h-full bg-primary/70 transition-all duration-150 ease-out"
+            className="h-full bg-primary/60 transition-all duration-150 ease-out"
             style={{ width: `${scrollProgress}%` }}
           />
         </div>
