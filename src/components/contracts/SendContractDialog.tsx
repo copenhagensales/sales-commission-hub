@@ -758,6 +758,7 @@ export function SendContractDialog({
                             <span className="font-medium">{assistTeam}</span>
                           </div>
                         )}
+                        {assistTimelon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Timeløn:</span>
                             <span className="font-medium">{Number(assistTimelon).toLocaleString("da-DK")} DKK</span>
