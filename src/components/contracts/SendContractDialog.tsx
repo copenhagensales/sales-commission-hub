@@ -448,6 +448,9 @@ export function SendContractDialog({
     setPreviewContent("");
     setShowPreview(false);
     setIsConfidential(false);
+    setTeamlederOpgave("");
+    setTeamlederDbProcent("");
+    setTeamlederMinimumslon("");
   };
 
   return (
