@@ -6,7 +6,7 @@
 
 const BASE_PROSE = `
   prose-base
-  text-[15px] leading-[1.7]
+  text-[15px] leading-[1.6]
 
   /* Document Title */
   prose-h1:text-xl prose-h1:font-bold prose-h1:text-center
@@ -29,7 +29,7 @@ const BASE_PROSE = `
   prose-h4:mt-5 prose-h4:mb-2
 
   /* Paragraphs */
-  prose-p:leading-[1.7] prose-p:my-2
+  prose-p:leading-[1.6] prose-p:my-0.5
   prose-p:text-[15px]
 
   prose-strong:font-semibold
@@ -48,7 +48,7 @@ const BASE_PROSE = `
   [&_br]:block
   [&_p:empty]:min-h-[1em]
   [&_p:has(br:only-child)]:min-h-[1em]
-  [&_p+p]:mt-2
+  [&_p+p]:mt-1
 
   /* Horizontal rules */
   [&_hr]:my-10
