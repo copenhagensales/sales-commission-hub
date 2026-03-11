@@ -662,7 +662,7 @@ export default function Contracts() {
                 </span>
               </div>
               <div
-                className={`${CONTRACT_PROSE_CLASSES} max-w-none border rounded-lg p-8 bg-card`}
+                className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-lg shadow-lg p-8 bg-white`}
                 dangerouslySetInnerHTML={{ __html: previewContract?.content || "" }}
               />
               {previewContract?.signatures && previewContract.signatures.length > 0 && (
