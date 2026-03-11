@@ -268,7 +268,16 @@ export default function BookingsContent() {
     return [...new Set(ids)];
   }, [bookings, marketBookings]);
 
-  // Fetch booking_vehicle data for vehicle tags
+  // Fetch hotel assignments for all bookings
+  const { data: bookingHotels } = useBookingHotels(allBookingIds.length > 0 ? allBookingIds : undefined);
+  const hotelMap = useMemo(() => {
+    const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
+    (bookingHotels || []).forEach((bh: any) => {
+      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status, checkIn: bh.check_in || null, checkOut: bh.check_out || null };
+    });
+    return map;
+  }, [bookingHotels]);
+
   const { data: bookingVehicles = [] } = useQuery({
     queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear, allBookingIds],
     queryFn: async () => {
