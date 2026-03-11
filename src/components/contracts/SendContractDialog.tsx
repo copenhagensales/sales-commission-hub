@@ -598,6 +598,7 @@ export function SendContractDialog({
                       </div>
                     </div>
                   </div>
+                )}
 
                 {canMarkConfidential && (
                   <div className="flex items-center justify-between rounded-lg border p-4">
