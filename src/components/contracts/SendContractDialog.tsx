@@ -136,6 +136,31 @@ interface SendContractDialogProps {
   managerName?: string;
 }
 
+// --- Amount formatting helpers ---
+/** Strip non-digits, return raw digit string */
+const stripToDigits = (v: string) => v.replace(/\D/g, "");
+
+/** Format a raw digit string with Danish thousand separators (.) */
+const formatWithSeparator = (digits: string) => {
+  if (!digits) return "";
+  return Number(digits).toLocaleString("da-DK");
+};
+
+/** Parse a formatted string back to raw number */
+const parseFormattedAmount = (v: string): number => {
+  const digits = stripToDigits(v);
+  return digits ? Number(digits) : 0;
+};
+
+/** Validate digit count; returns error message or null */
+const validateDigits = (v: string, maxDigits: number, label: string): string | null => {
+  const digits = stripToDigits(v);
+  if (digits.length > maxDigits) {
+    return `${label} må maks. være ${maxDigits} cifre`;
+  }
+  return null;
+};
+
 const salaryTypeLabels: Record<string, string> = {
   provision: "Provision",
   fixed: "Fast løn",
