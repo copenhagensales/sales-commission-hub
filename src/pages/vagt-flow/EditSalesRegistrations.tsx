@@ -18,7 +18,7 @@ import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { buildFmPricingMap } from "@/lib/calculations/fmPricing";
+// buildFmPricingMap removed — pricing is handled by database triggers
 
 interface SaleRecord {
   id: string;
