@@ -193,9 +193,28 @@ export function SendContractDialog({
     },
   });
 
+  // Normalize contract type to avoid broken UI when template type was changed accidentally
+  const normalizeContractType = (template?: ContractTemplate | null): ContractType | null => {
+    if (!template) return null;
+
+    if (template.type === "assistant_team_leader" || template.type === "team_leader") {
+      return template.type;
+    }
+
+    const templateName = template.name.toLowerCase();
+    if (templateName.includes("assisterende") && templateName.includes("teamleder")) {
+      return "assistant_team_leader";
+    }
+    if (templateName.includes("teamleder")) {
+      return "team_leader";
+    }
+
+    return template.type ?? null;
+  };
+
   // Get selected template's contract type for validation
   const selectedTemplate = templates?.find((t: ContractTemplate) => t.id === selectedTemplateId);
-  const selectedContractType: ContractType | null = selectedTemplate?.type || null;
+  const selectedContractType: ContractType | null = normalizeContractType(selectedTemplate);
 
   // Check for missing required fields based on contract type
   const missingFields = getMissingFields(employee, selectedContractType);
@@ -369,6 +388,8 @@ export function SendContractDialog({
       const template = templates.find((t) => t.id === selectedTemplateId);
       if (!template) throw new Error("Ingen skabelon valgt");
 
+      const normalizedType = normalizeContractType(template) ?? "other";
+
       const { data: user } = await supabase.auth.getUser();
       
       // Always merge content fresh to ensure employee data is included
@@ -380,7 +401,7 @@ export function SendContractDialog({
         .insert({
           template_id: template.id,
           employee_id: employee.id,
-          type: template.type,
+          type: normalizedType,
           title: customTitle || template.name,
           content: mergedContent,
           status: "pending_employee",
