@@ -1,19 +1,37 @@
 
 
+## Anciennitets-indkomst analyse — "Jo længere du er her, jo mere tjener du"
 
-## Draft-booking workflow ✅
+### Koncept
+En ny sektion på `/onboarding-analyse` der viser gennemsnitlig provision per anciennitetsmåned. For alle aktive sælgere beregnes: hvad tjente de i deres 1. måned, 2. måned, 3. måned osv.? Resultatet vises som et søjlediagram med en trendlinje.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Dataflow
+1. Hent aktive ikke-stab medarbejdere med `employment_start_date` og deres agent-mappings (emails)
+2. Hent salg grupperet per medarbejder per måned via `get_sales_aggregates_v2` (group_by = "both") for de seneste 12 måneder
+3. For hver medarbejder: beregn hvilken anciennitetsmåned (1, 2, 3…) hver kalendermåned svarer til ud fra `employment_start_date`
+4. Aggreger: gennemsnitlig provision per anciennitetsmåned (sum commission / antal medarbejdere der har data for den måned)
+5. Vis som BarChart + trendlinje + antal datapunkter per søjle
 
-## Fortrolige kontrakter ✅
+### Implementation
+**Ny komponent**: `src/components/onboarding-analyse/TenureEarningsChart.tsx`
+- Standalone komponent med egen data-fetching (React Query)
+- Henter employees + agent mappings + sales data
+- Beregner tenure-month buckets client-side
+- Viser: Søjlediagram (avg provision per måned), antal medarbejdere bag hver søjle, procentvis stigning fra måned 1
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**Ændring i**: `src/pages/OnboardingAnalyse.tsx`
+- Tilføj `<TenureEarningsChart />` som ny Card-sektion efter de eksisterende KPI-kort
+
+### UI
+- Card med titel "Indtjening per anciennitetsmåned"
+- Søjlediagram: X = "Måned 1", "Måned 2" osv., Y = gns. provision i DKK
+- Under hver søjle: antal medarbejdere (n=X)
+- Trendlinje der viser den opadgående tendens
+- Valgfri team-filter der genbruger eksisterende team-state
+
+### Tekniske detaljer
+- Bruger eksisterende `get_sales_aggregates_v2` RPC med group_by="both" for at få per-employee per-month data
+- Beregner `tenureMonth = differenceInMonths(saleMonth, employmentStartDate) + 1`
+- Filtrerer til maks 12 anciennitetsmåneder for læsbarhed
+- Ingen nye database-tabeller eller migrationer nødvendige
+
