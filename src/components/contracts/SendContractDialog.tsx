@@ -76,6 +76,8 @@ const getRequiredFieldsForType = (contractType: ContractType | null): RequiredFi
     case "nda":
     case "termination":
       return minimalRequiredFields;
+    case "team_leader":
+      return employmentRequiredFields;
     case "other":
     default:
       return baseRequiredFields;
