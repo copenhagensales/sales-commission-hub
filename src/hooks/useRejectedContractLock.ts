@@ -48,6 +48,17 @@ export function useRejectedContractLock() {
         new Date(c.created_at) > new Date(mostRecentRejected.created_at)
       );
 
+      console.log("useRejectedContractLock DEBUG:", {
+        totalContracts: allContracts.length,
+        mostRecentRejected: { id: mostRecentRejected.id, status: mostRecentRejected.status, created_at: mostRecentRejected.created_at },
+        newerContracts: allContracts.filter(c => 
+          (c.status === "signed" || c.status === "pending_employee") && 
+          new Date(c.created_at) > new Date(mostRecentRejected.created_at)
+        ).map(c => ({ id: c.id, status: c.status, created_at: c.created_at })),
+        hasNewerContract,
+        willLock: !hasNewerContract,
+      });
+
       if (hasNewerContract) {
         return { isLocked: false, contract: null };
       }
