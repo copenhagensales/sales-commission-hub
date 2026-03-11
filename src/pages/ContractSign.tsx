@@ -11,7 +11,7 @@ import { da } from "date-fns/locale";
 import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine, Shield, Building2, ChevronDown, Eye, FileCheck, Pen, User } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CONTRACT_PROSE_CLASSES } from "@/utils/contractProseStyles";
+import { CONTRACT_PROSE_CLASSES, CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
