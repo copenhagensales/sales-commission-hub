@@ -17,7 +17,7 @@ import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Uploa
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { CONTRACT_PROSE_CLASSES } from "@/utils/contractProseStyles";
+import { CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -662,7 +662,7 @@ export default function Contracts() {
                 </span>
               </div>
               <div
-                className={`${CONTRACT_PROSE_CLASSES} max-w-none border rounded-lg p-8 bg-card`}
+                className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-lg shadow-lg p-8 bg-white`}
                 dangerouslySetInnerHTML={{ __html: previewContract?.content || "" }}
               />
               {previewContract?.signatures && previewContract.signatures.length > 0 && (
