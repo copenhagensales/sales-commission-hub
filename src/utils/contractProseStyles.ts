@@ -29,7 +29,7 @@ const BASE_PROSE = `
   prose-h4:mt-5 prose-h4:mb-2
 
   /* Paragraphs */
-  prose-p:leading-[1.7] prose-p:my-2
+  prose-p:leading-[1.6] prose-p:my-0.5
   prose-p:text-[15px]
 
   prose-strong:font-semibold
