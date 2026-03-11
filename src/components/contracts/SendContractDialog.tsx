@@ -642,20 +642,36 @@ export function SendContractDialog({
                       <div className="space-y-2">
                         <Label>Timeløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={assistTimelon}
-                          onChange={(e) => setAssistTimelon(e.target.value)}
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 3) {
+                              setAssistTimelon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
                           placeholder="F.eks. 160"
                         />
+                        {validateDigits(assistTimelon, 3, "Timeløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(assistTimelon, 3, "Timeløn")}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Månedsløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={assistMaanedslon}
-                          onChange={(e) => setAssistMaanedslon(e.target.value)}
-                          placeholder="F.eks. 25000"
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 5) {
+                              setAssistMaanedslon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
+                          placeholder="F.eks. 25.000"
                         />
+                        {validateDigits(assistMaanedslon, 5, "Månedsløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(assistMaanedslon, 5, "Månedsløn")}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Bonus</Label>
