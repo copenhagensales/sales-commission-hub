@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { CandidateSourceSelect } from "@/components/recruitment/CandidateSourceSelect";
 
 interface NewCandidateDialogProps {
   open: boolean;
