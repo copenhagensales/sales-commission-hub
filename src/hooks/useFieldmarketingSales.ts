@@ -253,29 +253,8 @@ export function useCreateFieldmarketingSale() {
       }
       console.log("[FM-SALES] Insert successful!", insertedSales?.length, "rows");
 
-      // Create sale_items for each inserted sale with correct pricing
-      if (insertedSales && insertedSales.length > 0) {
-        const pricingMap = await buildFmPricingMap();
-        const saleItems = insertedSales.map((inserted, idx) => {
-          const productName = sales[idx]?.product_name || "Ukendt produkt";
-          const pricing = pricingMap.get(productName.toLowerCase());
-          return {
-            sale_id: inserted.id,
-            display_name: productName,
-            adversus_product_title: productName,
-            quantity: 1,
-            mapped_commission: pricing?.commission ?? 0,
-            mapped_revenue: pricing?.revenue ?? 0,
-          };
-        });
-        const { error: itemsError } = await supabase
-          .from("sale_items")
-          .insert(saleItems);
-        if (itemsError) {
-          console.error("[FM-SALES] sale_items insert error:", JSON.stringify(itemsError));
-          // Don't throw - the sale itself was created successfully
-        }
-      }
+      // sale_items are created automatically by the create_fm_sale_items trigger
+      // with correct campaign-aware pricing — no manual creation needed
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });

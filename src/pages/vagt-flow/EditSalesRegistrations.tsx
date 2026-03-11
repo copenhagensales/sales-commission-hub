@@ -560,33 +560,8 @@ export default function EditSalesRegistrations() {
     return matchesSearch && matchesSeller && matchesClient;
   });
 
-  // Create product name to commission/revenue map
-  const productPriceMap = useMemo(() => {
-    const map = new Map<string, { commission: number; revenue: number }>();
-    products?.forEach(p => {
-      if (p.name) {
-        map.set(p.name.toLowerCase(), { 
-          commission: p.commission_dkk || 0, 
-          revenue: p.revenue_dkk || 0 
-        });
-      }
-    });
-    return map;
-  }, [products]);
-
-  // Enrich sales with commission/revenue
-  const enrichedSales = useMemo(() => {
-    return filteredSales?.map(sale => {
-      const prices = sale.product_name 
-        ? productPriceMap.get(sale.product_name.toLowerCase()) 
-        : null;
-      return {
-        ...sale,
-        commission_dkk: prices?.commission || 0,
-        revenue_dkk: prices?.revenue || 0,
-      };
-    });
-  }, [filteredSales, productPriceMap]);
+  // Sales already have commission/revenue from sale_items (fetched in query)
+  const enrichedSales = filteredSales;
 
   // Group sales by seller + date + location + client
   const groupedSales = useMemo(() => {
