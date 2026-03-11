@@ -237,24 +237,27 @@ const handler = async (req: Request): Promise<Response> => {
     // Get M365 access token first
     const accessToken = await getM365AccessToken();
 
-    // Generate PDF and upload to SharePoint in background
+    // Generate PDF and upload to SharePoint (skip for confidential contracts)
     let sharePointUrl = "";
-    try {
-      console.log("Generating PDF for contract:", contractId);
-      const { base64, filename } = await generateContractPdf(contractId, supabaseUrl, supabaseKey);
-      
-      // Convert base64 to bytes
-      const pdfBytes = base64ToUint8Array(base64);
-      
-      // Upload to SharePoint
-      sharePointUrl = await uploadToSharePoint(accessToken, pdfBytes, filename, employeeName);
-      
-      if (sharePointUrl) {
-        console.log("Contract PDF uploaded to SharePoint:", sharePointUrl);
+    if (!isConfidential) {
+      try {
+        console.log("Generating PDF for contract:", contractId);
+        const { base64, filename } = await generateContractPdf(contractId, supabaseUrl, supabaseKey);
+        
+        // Convert base64 to bytes
+        const pdfBytes = base64ToUint8Array(base64);
+        
+        // Upload to SharePoint
+        sharePointUrl = await uploadToSharePoint(accessToken, pdfBytes, filename, employeeName);
+        
+        if (sharePointUrl) {
+          console.log("Contract PDF uploaded to SharePoint:", sharePointUrl);
+        }
+      } catch (pdfError) {
+        console.error("PDF generation/upload error (non-fatal):", pdfError);
       }
-    } catch (pdfError) {
-      console.error("PDF generation/upload error (non-fatal):", pdfError);
-      // Continue with email - PDF upload is optional
+    } else {
+      console.log("Skipping SharePoint upload for confidential contract:", contractId);
     }
 
     // Format signed date
