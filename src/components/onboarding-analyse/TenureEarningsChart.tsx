@@ -84,15 +84,15 @@ export function TenureEarningsChart() {
         employeeStartDates.set(emp.id, parseISO(emp.employment_start_date!));
       });
 
-      // Process: for each row (email|date), determine tenure month
+      // Process: for each row (employee_id|date), determine tenure month
       const tenureBuckets = new Map<number, { totalCommission: number; employeeIds: Set<string> }>();
 
       (rpcData || []).forEach((row: any) => {
-        const [email, dateStr] = (row.group_key || "").split("|");
-        if (!email || !dateStr) return;
+        const [empId, dateStr] = (row.group_key || "").split("|");
+        if (!empId || !dateStr) return;
 
-        const employeeId = emailToEmployeeId.get(email.toLowerCase());
-        if (!employeeId) return;
+        // empId from RPC could be employee UUID directly
+        const employeeId = empId;
 
         const startDate = employeeStartDates.get(employeeId);
         if (!startDate) return;
