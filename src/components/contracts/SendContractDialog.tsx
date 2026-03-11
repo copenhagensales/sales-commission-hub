@@ -193,9 +193,28 @@ export function SendContractDialog({
     },
   });
 
+  // Normalize contract type to avoid broken UI when template type was changed accidentally
+  const normalizeContractType = (template?: ContractTemplate | null): ContractType | null => {
+    if (!template) return null;
+
+    if (template.type === "assistant_team_leader" || template.type === "team_leader") {
+      return template.type;
+    }
+
+    const templateName = template.name.toLowerCase();
+    if (templateName.includes("assisterende") && templateName.includes("teamleder")) {
+      return "assistant_team_leader";
+    }
+    if (templateName.includes("teamleder")) {
+      return "team_leader";
+    }
+
+    return template.type ?? null;
+  };
+
   // Get selected template's contract type for validation
   const selectedTemplate = templates?.find((t: ContractTemplate) => t.id === selectedTemplateId);
-  const selectedContractType: ContractType | null = selectedTemplate?.type || null;
+  const selectedContractType: ContractType | null = normalizeContractType(selectedTemplate);
 
   // Check for missing required fields based on contract type
   const missingFields = getMissingFields(employee, selectedContractType);
