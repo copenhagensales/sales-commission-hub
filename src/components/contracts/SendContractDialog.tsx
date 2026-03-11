@@ -308,6 +308,15 @@ export function SendContractDialog({
       effective_date: "[Angiv dato]",
       new_salary_details: "[Angiv nye lønoplysninger]",
       vehicle_details: "[Angiv køretøjsoplysninger]",
+
+      // Teamleder-specifikke felter
+      opgave: teamlederOpgave || "[Opgave ikke angivet]",
+      teamleder_opgave: teamlederOpgave || "[Opgave ikke angivet]",
+      db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
+      teamleder_db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
+      'minimumsløn': teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      teamleder_minimumslon: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      minimum_salary: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
     };
 
     let merged = content;
