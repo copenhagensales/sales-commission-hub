@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { CONTRACT_PROSE_SIGN_CLASSES } from '@/utils/contractProseStyles';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -339,7 +340,9 @@ export function RichTextEditor({ value, onChange, placeholder = "Skriv indhold h
       </div>
 
       {/* Editor */}
-      <EditorContent editor={editor} className="bg-background" />
+      <div className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none bg-white p-4`}>
+        <EditorContent editor={editor} />
+      </div>
 
       {/* Variable hint */}
       <div className="p-2 border-t bg-muted/30 text-xs text-muted-foreground">
