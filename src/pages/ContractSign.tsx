@@ -11,7 +11,7 @@ import { da } from "date-fns/locale";
 import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine, Shield, Building2, ChevronDown, Eye, FileCheck, Pen, User } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CONTRACT_PROSE_CLASSES } from "@/utils/contractProseStyles";
+import { CONTRACT_PROSE_CLASSES, CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
@@ -432,30 +432,30 @@ export default function ContractSign() {
           <ContractProgressStepper steps={stepperSteps} />
         </div>
 
-        {/* ═══ Contract Document ═══ */}
-        <div className="bg-card rounded-xl shadow-lg border border-border overflow-hidden">
+        {/* ═══ Contract Document — formal white paper ═══ */}
+        <div className="bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-neutral-200 overflow-hidden">
           {/* Document header inside paper */}
           <div className="px-8 md:px-12 lg:px-16 pt-10 pb-0">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-3">
+            <div className="flex items-center gap-2 text-neutral-400 text-xs mb-3 tracking-wide uppercase">
               <Building2 className="h-3.5 w-3.5" />
               <span>Copenhagen Sales</span>
               {isSigned && (
                 <>
-                  <span className="text-border">·</span>
-                  <span className="text-primary font-semibold inline-flex items-center gap-1">
+                  <span className="text-neutral-300">·</span>
+                  <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
                     <Check className="h-3 w-3" />
                     Godkendt
                   </span>
                 </>
               )}
             </div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground mb-0">{contract.title}</h1>
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900 mb-0">{contract.title}</h1>
           </div>
 
           {/* Contract prose content */}
           <div className="px-8 md:px-12 lg:px-16 py-8">
             <div
-              className={CONTRACT_PROSE_CLASSES}
+              className={CONTRACT_PROSE_SIGN_CLASSES}
               dangerouslySetInnerHTML={{ __html: contract.content || "" }}
             />
             {/* Invisible sentinel for scroll tracking */}
