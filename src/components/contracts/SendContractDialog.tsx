@@ -566,6 +566,39 @@ export function SendContractDialog({
                   </div>
                 )}
 
+                {selectedContractType === "assistant_team_leader" && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <p className="text-sm font-medium">Assisterende teamleder-vilkår</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Timeløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={assistTimelon}
+                          onChange={(e) => setAssistTimelon(e.target.value)}
+                          placeholder="F.eks. 160"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Månedsløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={assistMaanedslon}
+                          onChange={(e) => setAssistMaanedslon(e.target.value)}
+                          placeholder="F.eks. 25000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Bonus</Label>
+                        <Input
+                          value={assistBonus}
+                          onChange={(e) => setAssistBonus(e.target.value)}
+                          placeholder="F.eks. 5% af omsætning"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                 {canMarkConfidential && (
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
