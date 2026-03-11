@@ -900,8 +900,6 @@ export default function OnboardingAnalyse() {
         </CardContent>
       </Card>
 
-      {/* Tenure Earnings Analysis */}
-      <TenureEarningsChart />
     </div>
     </MainLayout>
   );
