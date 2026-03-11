@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart, Cell } from "recharts";
 import { TrendingUp, Loader2 } from "lucide-react";
-import { differenceInMonths, parseISO, startOfMonth, subMonths, format } from "date-fns";
+import { differenceInMonths, parseISO, startOfMonth, subMonths } from "date-fns";
 
 interface TenureBucket {
   month: number;
@@ -33,37 +33,24 @@ export function TenureEarningsChart() {
       if (empRes.error) throw empRes.error;
       if (mappingRes.error) throw mappingRes.error;
 
-      // Filter non-staff employees
-      const employees = (empRes.data || []).filter((e) => !e.is_staff_employee);
-      console.log("[TenureEarnings] employees:", employees.length, "total fetched:", empRes.data?.length);
+      // Filter non-staff employees and build start-date map
+      const employeeStartDates = new Map<string, Date>();
+      (empRes.data || []).forEach((e) => {
+        if (!e.is_staff_employee && e.employment_start_date) {
+          employeeStartDates.set(e.id, parseISO(e.employment_start_date));
+        }
+      });
 
-      // Build employee_id → emails lookup
-      const employeeEmails = new Map<string, string[]>();
+      // Build employee_id → emails lookup (only for employees we care about)
+      const allEmails: string[] = [];
       (mappingRes.data || []).forEach((m: any) => {
         const email = m.agents?.email?.toLowerCase();
-        if (!email) return;
-        const existing = employeeEmails.get(m.employee_id) || [];
-        existing.push(email);
-        employeeEmails.set(m.employee_id, existing);
-      });
-      console.log("[TenureEarnings] agent mappings:", employeeEmails.size);
-
-      // Collect all agent emails for employees we care about
-      const allEmails: string[] = [];
-      const emailToEmployeeId = new Map<string, string>();
-      employees.forEach((emp) => {
-        const emails = employeeEmails.get(emp.id) || [];
-        emails.forEach((email) => {
+        if (email && employeeStartDates.has(m.employee_id)) {
           allEmails.push(email);
-          emailToEmployeeId.set(email, emp.id);
-        });
+        }
       });
 
-      console.log("[TenureEarnings] allEmails:", allEmails.length, "employees with mappings:", emailToEmployeeId.size);
-      if (allEmails.length === 0) {
-        console.warn("[TenureEarnings] No emails found - returning empty");
-        return { buckets: [] };
-      }
+      if (allEmails.length === 0) return { buckets: [] };
 
       // Fetch sales data for last 18 months using RPC
       const now = new Date();
@@ -83,45 +70,29 @@ export function TenureEarningsChart() {
       );
 
       if (rpcError) throw rpcError;
-      console.log("[TenureEarnings] RPC rows:", rpcData?.length, "sample:", rpcData?.[0]);
 
-      // Build employee_id → start_date map
-      const employeeStartDates = new Map<string, Date>();
-      employees.forEach((emp) => {
-        employeeStartDates.set(emp.id, parseISO(emp.employment_start_date!));
-      });
-
-      // Process: for each row (employee_id|date), determine tenure month
+      // Process: RPC returns group_key as "employee_id|date"
       const tenureBuckets = new Map<number, { totalCommission: number; employeeIds: Set<string> }>();
-      let matchCount = 0;
-      let noStartDate = 0;
-      let outOfRange = 0;
 
       (rpcData || []).forEach((row: any) => {
-        const [empId, dateStr] = (row.group_key || "").split("|");
-        if (!empId || !dateStr) return;
+        const pipeIdx = (row.group_key || "").indexOf("|");
+        if (pipeIdx === -1) return;
 
-        const employeeId = empId;
+        const employeeId = row.group_key.substring(0, pipeIdx);
+        const dateStr = row.group_key.substring(pipeIdx + 1);
 
         const startDate = employeeStartDates.get(employeeId);
-        if (!startDate) {
-          noStartDate++;
-          return;
-        }
+        if (!startDate) return;
 
         const saleMonth = startOfMonth(new Date(dateStr));
         const employeeStartMonth = startOfMonth(startDate);
         const tenureMonth = differenceInMonths(saleMonth, employeeStartMonth) + 1;
 
-        if (tenureMonth < 1 || tenureMonth > 12) {
-          outOfRange++;
-          return;
-        }
+        if (tenureMonth < 1 || tenureMonth > 12) return;
 
         const commission = Number(row.total_commission) || 0;
         if (commission === 0) return;
 
-        matchCount++;
         if (!tenureBuckets.has(tenureMonth)) {
           tenureBuckets.set(tenureMonth, { totalCommission: 0, employeeIds: new Set() });
         }
@@ -129,8 +100,6 @@ export function TenureEarningsChart() {
         bucket.totalCommission += commission;
         bucket.employeeIds.add(employeeId);
       });
-
-      console.log("[TenureEarnings] matched:", matchCount, "noStartDate:", noStartDate, "outOfRange:", outOfRange, "buckets:", tenureBuckets.size);
 
       // Convert to array
       const buckets: TenureBucket[] = [];
