@@ -78,6 +78,8 @@ const getRequiredFieldsForType = (contractType: ContractType | null): RequiredFi
       return minimalRequiredFields;
     case "team_leader":
       return employmentRequiredFields;
+    case "assistant_team_leader":
+      return employmentRequiredFields;
     case "other":
     default:
       return baseRequiredFields;
