@@ -1,19 +1,21 @@
 
 
+# Fix: Teamleder-skabeloner har forkert type
 
-## Draft-booking workflow ✅
+## Problem
+De to teamleder-skabeloner ("Teamleder kontrakt" og "Assisterende teamleder kontrakt") har stadig `type = 'employment'` i databasen. Koden viser kun de ekstra felter når `type = 'team_leader'`, så felterne dukker aldrig op.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+## Løsning
+Kør en database-migration der opdaterer de to skabeloner:
 
-## Fortrolige kontrakter ✅
+```sql
+UPDATE contract_templates 
+SET type = 'team_leader' 
+WHERE id IN (
+  '017b0f24-d274-4f5b-8d30-c7395340b446',
+  '8746ec14-b621-42fb-83f1-4a938d60b04b'
+);
+```
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+Ingen kodeændringer nødvendige — felterne er allerede implementeret korrekt i `SendContractDialog.tsx`.
+
