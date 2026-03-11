@@ -14,7 +14,7 @@ import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 
-type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
+type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "other";
 
 // Required fields for contract merge - varies by contract type
 interface RequiredField {
@@ -76,6 +76,8 @@ const getRequiredFieldsForType = (contractType: ContractType | null): RequiredFi
     case "nda":
     case "termination":
       return minimalRequiredFields;
+    case "team_leader":
+      return employmentRequiredFields;
     case "other":
     default:
       return baseRequiredFields;
@@ -158,6 +160,9 @@ export function SendContractDialog({
   const [showPreview, setShowPreview] = useState(false);
   const [isConfidential, setIsConfidential] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [teamlederOpgave, setTeamlederOpgave] = useState("");
+  const [teamlederDbProcent, setTeamlederDbProcent] = useState("");
+  const [teamlederMinimumslon, setTeamlederMinimumslon] = useState("");
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
@@ -303,6 +308,15 @@ export function SendContractDialog({
       effective_date: "[Angiv dato]",
       new_salary_details: "[Angiv nye lønoplysninger]",
       vehicle_details: "[Angiv køretøjsoplysninger]",
+
+      // Teamleder-specifikke felter
+      opgave: teamlederOpgave || "[Opgave ikke angivet]",
+      teamleder_opgave: teamlederOpgave || "[Opgave ikke angivet]",
+      db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
+      teamleder_db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
+      'minimumsløn': teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      teamleder_minimumslon: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      minimum_salary: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
     };
 
     let merged = content;
@@ -434,6 +448,9 @@ export function SendContractDialog({
     setPreviewContent("");
     setShowPreview(false);
     setIsConfidential(false);
+    setTeamlederOpgave("");
+    setTeamlederDbProcent("");
+    setTeamlederMinimumslon("");
   };
 
   return (
@@ -498,6 +515,40 @@ export function SendContractDialog({
                     placeholder="Tilføj evt. interne noter..."
                   />
                 </div>
+
+                {selectedContractType === "team_leader" && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <p className="text-sm font-medium">Teamleder-vilkår</p>
+                    <div className="space-y-2">
+                      <Label>Opgave / Klient</Label>
+                      <Input
+                        value={teamlederOpgave}
+                        onChange={(e) => setTeamlederOpgave(e.target.value)}
+                        placeholder="F.eks. TDC Erhverv"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>DB-procent (%)</Label>
+                        <Input
+                          type="number"
+                          value={teamlederDbProcent}
+                          onChange={(e) => setTeamlederDbProcent(e.target.value)}
+                          placeholder="F.eks. 15"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Minimumsløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={teamlederMinimumslon}
+                          onChange={(e) => setTeamlederMinimumslon(e.target.value)}
+                          placeholder="F.eks. 25000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {canMarkConfidential && (
                   <div className="flex items-center justify-between rounded-lg border p-4">
@@ -605,6 +656,32 @@ export function SendContractDialog({
                       </div>
                     </div>
                   </div>
+
+                  {selectedContractType === "team_leader" && (teamlederOpgave || teamlederDbProcent || teamlederMinimumslon) && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Teamleder-vilkår</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {teamlederOpgave && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Opgave:</span>
+                            <span className="font-medium">{teamlederOpgave}</span>
+                          </div>
+                        )}
+                        {teamlederDbProcent && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">DB-procent:</span>
+                            <span className="font-medium">{teamlederDbProcent}%</span>
+                          </div>
+                        )}
+                        {teamlederMinimumslon && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Minimumsløn:</span>
+                            <span className="font-medium">{Number(teamlederMinimumslon).toLocaleString("da-DK")} DKK</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}

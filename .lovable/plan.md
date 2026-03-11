@@ -1,37 +1,19 @@
 
 
-# Teamleder-kontrakt: Ekstra felter og merge tags
 
-## Overblik
-Når der sendes en teamleder-kontrakt, skal der vises tre ekstra inputfelter som brugeren udfylder manuelt. Værdierne gøres tilgængelige som merge tags i skabelonen.
+## Draft-booking workflow ✅
 
-## Ændringer
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### 1. Database: Tilføj "team_leader" til contract_type enum
-Ny migration der tilføjer `'team_leader'` til `contract_type` enum, så skabeloner kan oprettes med denne type.
+## Fortrolige kontrakter ✅
 
-### 2. SendContractDialog.tsx — Ekstra felter
-- Tilføj tre nye state-variable: `teamlederOpgave`, `teamlederDbProcent`, `teamlederMinimumslon`
-- Vis felterne **kun** når `selectedContractType === "team_leader"`:
-  - **Opgave** (tekst-input): Hvilken opgave/klient teamlederen er tilknyttet
-  - **DB-procent** (tal-input): Procent af dækningsbidrag
-  - **Minimumsløn** (tal-input): Aftalt minimumsløn i DKK
-- Placer felterne mellem titel/noter og data-oversigten
-- Tilføj `ContractType` til at inkludere `"team_leader"`
-
-### 3. Merge tags
-Tilføj disse til `replacements`-objektet i `mergeContent()`:
-- `{{opgave}}` / `{{teamleder_opgave}}` → opgave-tekst
-- `{{db_procent}}` / `{{teamleder_db_procent}}` → DB-procent
-- `{{minimumsløn}}` / `{{teamleder_minimumslon}}` / `{{minimum_salary}}` → minimumsløn (formateret med DKK)
-
-### 4. Data-oversigt
-Tilføj en "Teamleder-vilkår" sektion i data-oversigten (den der viser hvad der flettes ind) — kun synlig ved team_leader type.
-
-### Merge tag reference (til brug i skabeloner)
-```text
-{{opgave}}              → Den valgte opgave
-{{db_procent}}          → f.eks. "15"
-{{minimumsløn}}         → f.eks. "25.000 DKK"
-```
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
