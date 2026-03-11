@@ -89,6 +89,7 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
         phone: "",
         source: "",
         applied_position: "",
+        heard_about_us: "",
         notes: "",
       });
     },
