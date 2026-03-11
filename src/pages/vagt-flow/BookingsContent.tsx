@@ -509,6 +509,23 @@ export default function BookingsContent() {
     },
   });
 
+  const confirmSingleMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const { error } = await supabase
+        .from("booking")
+        .update({ status: 'confirmed' })
+        .eq("id", bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Booking bekræftet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const draftCount = bookings?.filter((b: any) => b.status === 'draft').length || 0;
 
   const filtered = bookings?.filter((b: any) => {
