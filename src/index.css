@@ -413,3 +413,30 @@
     opacity: 1;
   }
 }
+
+/* Reset Tiptap/ProseMirror default spacing so editor matches signing page */
+.tiptap p,
+.ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tiptap ul,
+.tiptap ol,
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tiptap blockquote,
+.ProseMirror blockquote {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tiptap h1, .tiptap h2, .tiptap h3,
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+  margin-top: 0;
+  margin-bottom: 0;
+}

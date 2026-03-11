@@ -1,47 +1,19 @@
 
 
-# Fix: Synkroniser Tiptap-editor med underskriftsside
 
-## Problem
-Tiptap (rich text editoren) injicerer sin egen CSS via `.tiptap` / `.ProseMirror` klassen, som sætter default margins på `<p>` tags (`margin: 1em 0`), lister, blockquotes osv. Disse interne styles eksisterer **kun** i editoren — de er ikke til stede på underskriftssiden, som bruger ren `dangerouslySetInnerHTML`. Derfor ser skabelonen anderledes ud end den endelige kontrakt, selvom begge bruger `CONTRACT_PROSE_SIGN_CLASSES`.
+## Draft-booking workflow ✅
 
-## Løsning
-Tilføj CSS-overrides i `src/index.css` der nulstiller Tiptap's default margins, så editoren arver 100% fra prose-klasserne — præcis som underskriftssiden gør.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### Fil: `src/index.css`
-Tilføj i bunden:
+## Fortrolige kontrakter ✅
 
-```css
-/* Reset Tiptap/ProseMirror default spacing so editor matches signing page */
-.tiptap p,
-.ProseMirror p {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.tiptap ul,
-.tiptap ol,
-.ProseMirror ul,
-.ProseMirror ol {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.tiptap blockquote,
-.ProseMirror blockquote {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.tiptap h1, .tiptap h2, .tiptap h3,
-.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-```
-
-Disse regler fjerner Tiptap's egne margins, så det udelukkende er Tailwind prose-klasserne (fra `CONTRACT_PROSE_SIGN_CLASSES`) der styrer afstande — identisk med underskriftssiden.
-
-## Resultat
-Editoren viser præcis samme linjeafstand og mellemrum som den kontrakt medarbejderen ser ved underskrift.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
