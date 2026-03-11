@@ -208,7 +208,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { contractId, employeeName, employeeEmail, contractTitle, signedAt, ipAddress }: ConfirmationRequest = await req.json();
+    const { contractId, employeeName, employeeEmail, contractTitle, signedAt, ipAddress, isConfidential }: ConfirmationRequest = await req.json();
 
     if (!employeeEmail || !contractId || !contractTitle) {
       return new Response(
