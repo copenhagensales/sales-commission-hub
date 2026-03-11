@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { CandidateSourceSelect } from "@/components/recruitment/CandidateSourceSelect";
 
 interface NewCandidateDialogProps {
   open: boolean;
@@ -50,6 +51,7 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
     phone: "",
     source: "",
     applied_position: "",
+    heard_about_us: "",
     notes: "",
   });
 
@@ -66,9 +68,10 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
           phone: formData.phone || null,
           source: formData.source || null,
           applied_position: formData.applied_position || null,
+          heard_about_us: formData.heard_about_us || null,
           notes: formData.notes || null,
           status: "new",
-        })
+        } as any)
         .select()
         .single();
 
@@ -86,6 +89,7 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
         phone: "",
         source: "",
         applied_position: "",
+        heard_about_us: "",
         notes: "",
       });
     },
@@ -195,6 +199,15 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Kender os fra</Label>
+            <CandidateSourceSelect
+              value={formData.heard_about_us}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, heard_about_us: value }))}
+              className="bg-background border-border"
+            />
           </div>
 
           <div className="space-y-2">
