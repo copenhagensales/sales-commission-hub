@@ -656,7 +656,6 @@ export function SendContractDialog({
                       </div>
                     </div>
                   </div>
-                </div>
 
                   {selectedContractType === "team_leader" && (teamlederOpgave || teamlederDbProcent || teamlederMinimumslon) && (
                     <div className="space-y-2">
