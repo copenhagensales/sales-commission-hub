@@ -165,6 +165,34 @@ export default function EditSalesRegistrations() {
       const locationsMap = new Map((locationsRes.data || []).map(l => [l.id, l]));
       const clientsMap = new Map((clientsRes.data || []).map(c => [c.id, c]));
       
+      // Fetch sale_items for all sales to get actual mapped prices
+      const saleIds = (data || []).map(s => s.id);
+      let saleItemsMap = new Map<string, { commission: number; revenue: number }>();
+      if (saleIds.length > 0) {
+        // Fetch in chunks of 200 to avoid URL length limits
+        const chunks = [];
+        for (let i = 0; i < saleIds.length; i += 200) {
+          chunks.push(saleIds.slice(i, i + 200));
+        }
+        const itemResults = await Promise.all(
+          chunks.map(chunk =>
+            supabase
+              .from("sale_items")
+              .select("sale_id, mapped_commission, mapped_revenue")
+              .in("sale_id", chunk)
+          )
+        );
+        for (const result of itemResults) {
+          for (const item of result.data || []) {
+            const existing = saleItemsMap.get(item.sale_id);
+            saleItemsMap.set(item.sale_id, {
+              commission: (existing?.commission || 0) + (item.mapped_commission || 0),
+              revenue: (existing?.revenue || 0) + (item.mapped_revenue || 0),
+            });
+          }
+        }
+      }
+      
       // Transform sales table data to SaleRecord interface
       return (data || []).map(sale => {
         const payload = sale.raw_payload as any || {};
