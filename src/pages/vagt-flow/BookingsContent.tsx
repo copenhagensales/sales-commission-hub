@@ -184,13 +184,7 @@ export default function BookingsContent() {
     },
   });
 
-  const hotelMap = useMemo(() => {
-    const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
-    (bookingHotels || []).forEach((bh: any) => {
-      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status, checkIn: bh.check_in || null, checkOut: bh.check_out || null };
-    });
-    return map;
-  }, [bookingHotels]);
+  // hotelMap built below after allBookingIds
 
   const { data: fieldmarketingClients } = useQuery({
     queryKey: ["fieldmarketing-team-clients-bookings"],
