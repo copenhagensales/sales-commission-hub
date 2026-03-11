@@ -923,6 +923,24 @@ export type Database = {
           },
         ]
       }
+      candidate_sources: {
+        Row: {
+          created_at: string | null
+          id: string
+          label: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          label: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       candidates: {
         Row: {
           applied_position: string | null
@@ -932,6 +950,7 @@ export type Database = {
           created_at: string
           email: string | null
           first_name: string
+          heard_about_us: string | null
           id: string
           interview_date: string | null
           last_name: string
@@ -953,6 +972,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           first_name: string
+          heard_about_us?: string | null
           id?: string
           interview_date?: string | null
           last_name: string
@@ -974,6 +994,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           first_name?: string
+          heard_about_us?: string | null
           id?: string
           interview_date?: string | null
           last_name?: string
