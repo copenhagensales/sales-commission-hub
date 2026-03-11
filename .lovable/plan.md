@@ -1,19 +1,34 @@
 
 
+# Individuel bekræftelse af bookinger + behold "Bekræft uge"
 
-## Draft-booking workflow ✅
+## Hvad
+Tilføj en "Bekræft"-knap på hver enkelt booking-kort der har status `draft`, så man kan godkende lokationer løbende. Den eksisterende "Bekræft uge"-knap bevares til batch-godkendelse.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+## Ændringer
 
-## Fortrolige kontrakter ✅
+**`src/pages/vagt-flow/BookingsContent.tsx`:**
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+1. **Ny mutation** `confirmSingleMutation` der opdaterer én booking fra `draft` → `confirmed`:
+   ```ts
+   const confirmSingleMutation = useMutation({
+     mutationFn: async (bookingId: string) => {
+       const { error } = await supabase
+         .from("booking")
+         .update({ status: 'confirmed' })
+         .eq("id", bookingId);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+       toast({ title: "Booking bekræftet" });
+     },
+   });
+   ```
+
+2. **Knap på hvert draft-kort** — ved siden af "Kladde"-badge, tilføj en lille "Bekræft"-knap (CheckCircle2-ikon, grøn variant), kun synlig når `booking.status === 'draft'` og brugeren har redigeringsrettigheder (`canEditFmBookings`).
+
+3. **"Bekræft uge"** bevares som den er — den bekræfter alle resterende drafts på én gang.
+
+Ingen database-ændringer, ingen nye filer.
+
