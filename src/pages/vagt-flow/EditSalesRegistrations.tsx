@@ -294,38 +294,13 @@ export default function EditSalesRegistrations() {
         .eq("id", id);
       if (error) throw error;
 
-      // Sync sale_items with updated product name and pricing
-      const pricingMap = await buildFmPricingMap();
-      const pricing = pricingMap.get(updates.product_name.toLowerCase());
-      
-      const { data: existingItem } = await supabase
-        .from("sale_items")
-        .select("id")
-        .eq("sale_id", id)
-        .maybeSingle();
-      
-      if (existingItem) {
-        await supabase
-          .from("sale_items")
-          .update({ 
-            display_name: updates.product_name, 
-            adversus_product_title: updates.product_name,
-            mapped_commission: pricing?.commission ?? 0,
-            mapped_revenue: pricing?.revenue ?? 0,
-          })
-          .eq("id", existingItem.id);
-      } else {
-        await supabase
-          .from("sale_items")
-          .insert({ 
-            sale_id: id, 
-            display_name: updates.product_name, 
-            adversus_product_title: updates.product_name, 
-            quantity: 1, 
-            mapped_commission: pricing?.commission ?? 0, 
-            mapped_revenue: pricing?.revenue ?? 0,
-          });
-      }
+      // Delete existing sale_items so the trigger can recreate with correct campaign-aware pricing
+      await supabase.from("sale_items").delete().eq("sale_id", id);
+      // Re-trigger sale_items creation by touching the sale (trigger fires on insert only)
+      // So we need to invoke rematch for this specific sale
+      await supabase.functions.invoke("rematch-pricing-rules", {
+        body: { sale_ids: [id] },
+      });
     },
     onSuccess: () => {
       toast.success("Salgsregistrering opdateret");
