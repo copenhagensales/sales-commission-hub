@@ -18,7 +18,7 @@ import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { buildFmPricingMap } from "@/lib/calculations/fmPricing";
+// buildFmPricingMap removed — pricing is handled by database triggers
 
 interface SaleRecord {
   id: string;
@@ -165,6 +165,34 @@ export default function EditSalesRegistrations() {
       const locationsMap = new Map((locationsRes.data || []).map(l => [l.id, l]));
       const clientsMap = new Map((clientsRes.data || []).map(c => [c.id, c]));
       
+      // Fetch sale_items for all sales to get actual mapped prices
+      const saleIds = (data || []).map(s => s.id);
+      let saleItemsMap = new Map<string, { commission: number; revenue: number }>();
+      if (saleIds.length > 0) {
+        // Fetch in chunks of 200 to avoid URL length limits
+        const chunks = [];
+        for (let i = 0; i < saleIds.length; i += 200) {
+          chunks.push(saleIds.slice(i, i + 200));
+        }
+        const itemResults = await Promise.all(
+          chunks.map(chunk =>
+            supabase
+              .from("sale_items")
+              .select("sale_id, mapped_commission, mapped_revenue")
+              .in("sale_id", chunk)
+          )
+        );
+        for (const result of itemResults) {
+          for (const item of result.data || []) {
+            const existing = saleItemsMap.get(item.sale_id);
+            saleItemsMap.set(item.sale_id, {
+              commission: (existing?.commission || 0) + (item.mapped_commission || 0),
+              revenue: (existing?.revenue || 0) + (item.mapped_revenue || 0),
+            });
+          }
+        }
+      }
+      
       // Transform sales table data to SaleRecord interface
       return (data || []).map(sale => {
         const payload = sale.raw_payload as any || {};
@@ -184,6 +212,8 @@ export default function EditSalesRegistrations() {
           seller: sellerId ? sellersMap.get(sellerId) || null : null,
           location: locationId ? locationsMap.get(locationId) || null : null,
           client: clientId ? clientsMap.get(clientId) || null : null,
+          commission_dkk: saleItemsMap.get(sale.id)?.commission || 0,
+          revenue_dkk: saleItemsMap.get(sale.id)?.revenue || 0,
         };
       }) as SaleRecord[];
     },
@@ -264,38 +294,13 @@ export default function EditSalesRegistrations() {
         .eq("id", id);
       if (error) throw error;
 
-      // Sync sale_items with updated product name and pricing
-      const pricingMap = await buildFmPricingMap();
-      const pricing = pricingMap.get(updates.product_name.toLowerCase());
-      
-      const { data: existingItem } = await supabase
-        .from("sale_items")
-        .select("id")
-        .eq("sale_id", id)
-        .maybeSingle();
-      
-      if (existingItem) {
-        await supabase
-          .from("sale_items")
-          .update({ 
-            display_name: updates.product_name, 
-            adversus_product_title: updates.product_name,
-            mapped_commission: pricing?.commission ?? 0,
-            mapped_revenue: pricing?.revenue ?? 0,
-          })
-          .eq("id", existingItem.id);
-      } else {
-        await supabase
-          .from("sale_items")
-          .insert({ 
-            sale_id: id, 
-            display_name: updates.product_name, 
-            adversus_product_title: updates.product_name, 
-            quantity: 1, 
-            mapped_commission: pricing?.commission ?? 0, 
-            mapped_revenue: pricing?.revenue ?? 0,
-          });
-      }
+      // Delete existing sale_items so the trigger can recreate with correct campaign-aware pricing
+      await supabase.from("sale_items").delete().eq("sale_id", id);
+      // Re-trigger sale_items creation by touching the sale (trigger fires on insert only)
+      // So we need to invoke rematch for this specific sale
+      await supabase.functions.invoke("rematch-pricing-rules", {
+        body: { sale_ids: [id] },
+      });
     },
     onSuccess: () => {
       toast.success("Salgsregistrering opdateret");
@@ -384,31 +389,11 @@ export default function EditSalesRegistrations() {
           .eq("id", item.id!);
         if (error) throw error;
 
-        // Sync sale_items with pricing
-        const pricingMap = await buildFmPricingMap();
-        const { data: existingItemRow } = await supabase
-          .from("sale_items")
-          .select("id")
-          .eq("sale_id", item.id!)
-          .maybeSingle();
-        const itemPricing = pricingMap.get(item.product_name.toLowerCase());
-        if (existingItemRow) {
-          await supabase.from("sale_items").update({ 
-            display_name: item.product_name, 
-            adversus_product_title: item.product_name,
-            mapped_commission: itemPricing?.commission ?? 0,
-            mapped_revenue: itemPricing?.revenue ?? 0,
-          }).eq("id", existingItemRow.id);
-        } else {
-          await supabase.from("sale_items").insert({ 
-            sale_id: item.id!, 
-            display_name: item.product_name, 
-            adversus_product_title: item.product_name, 
-            quantity: 1, 
-            mapped_commission: itemPricing?.commission ?? 0, 
-            mapped_revenue: itemPricing?.revenue ?? 0,
-          });
-        }
+        // Delete and rematch sale_items for correct campaign-aware pricing
+        await supabase.from("sale_items").delete().eq("sale_id", item.id!);
+        await supabase.functions.invoke("rematch-pricing-rules", {
+          body: { sale_ids: [item.id!] },
+        });
       }
       
       // Create new items via centralized sales table
@@ -448,23 +433,8 @@ export default function EditSalesRegistrations() {
           .select("id");
         if (error) throw error;
 
-        // Create sale_items for new sales with correct pricing
-        if (insertedNewSales && insertedNewSales.length > 0) {
-          const pricingMapForNew = await buildFmPricingMap();
-          const newSaleItems = insertedNewSales.map((inserted, idx) => {
-            const productName = toCreate[idx]?.product_name || "Ukendt produkt";
-            const p = pricingMapForNew.get(productName.toLowerCase());
-            return {
-              sale_id: inserted.id,
-              display_name: productName,
-              adversus_product_title: productName,
-              quantity: 1,
-              mapped_commission: p?.commission ?? 0,
-              mapped_revenue: p?.revenue ?? 0,
-            };
-          });
-          await supabase.from("sale_items").insert(newSaleItems);
-        }
+        // sale_items are created automatically by the create_fm_sale_items trigger
+        // with correct campaign-aware pricing — no manual creation needed
       }
     },
     onSuccess: () => {
@@ -590,33 +560,8 @@ export default function EditSalesRegistrations() {
     return matchesSearch && matchesSeller && matchesClient;
   });
 
-  // Create product name to commission/revenue map
-  const productPriceMap = useMemo(() => {
-    const map = new Map<string, { commission: number; revenue: number }>();
-    products?.forEach(p => {
-      if (p.name) {
-        map.set(p.name.toLowerCase(), { 
-          commission: p.commission_dkk || 0, 
-          revenue: p.revenue_dkk || 0 
-        });
-      }
-    });
-    return map;
-  }, [products]);
-
-  // Enrich sales with commission/revenue
-  const enrichedSales = useMemo(() => {
-    return filteredSales?.map(sale => {
-      const prices = sale.product_name 
-        ? productPriceMap.get(sale.product_name.toLowerCase()) 
-        : null;
-      return {
-        ...sale,
-        commission_dkk: prices?.commission || 0,
-        revenue_dkk: prices?.revenue || 0,
-      };
-    });
-  }, [filteredSales, productPriceMap]);
+  // Sales already have commission/revenue from sale_items (fetched in query)
+  const enrichedSales = filteredSales;
 
   // Group sales by seller + date + location + client
   const groupedSales = useMemo(() => {
