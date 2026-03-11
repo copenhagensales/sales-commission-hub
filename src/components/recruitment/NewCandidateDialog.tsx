@@ -202,6 +202,15 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
           </div>
 
           <div className="space-y-2">
+            <Label>Kender os fra</Label>
+            <CandidateSourceSelect
+              value={formData.heard_about_us}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, heard_about_us: value }))}
+              className="bg-background border-border"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="notes">Noter</Label>
             <Textarea
               id="notes"
