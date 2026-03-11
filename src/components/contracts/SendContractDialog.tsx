@@ -473,6 +473,7 @@ export function SendContractDialog({
     setAssistTimelon("");
     setAssistMaanedslon("");
     setAssistBonus("");
+    setAssistTeam("");
   };
 
   return (
