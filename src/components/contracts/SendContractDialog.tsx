@@ -748,11 +748,16 @@ export function SendContractDialog({
                     </div>
                   )}
 
-                  {selectedContractType === "assistant_team_leader" && (assistTimelon || assistMaanedslon || assistBonus) && (
+                  {selectedContractType === "assistant_team_leader" && (assistTimelon || assistMaanedslon || assistBonus || assistTeam) && (
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assisterende teamleder-vilkår</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                        {assistTimelon && (
+                        {assistTeam && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Team:</span>
+                            <span className="font-medium">{assistTeam}</span>
+                          </div>
+                        )}
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Timeløn:</span>
                             <span className="font-medium">{Number(assistTimelon).toLocaleString("da-DK")} DKK</span>
