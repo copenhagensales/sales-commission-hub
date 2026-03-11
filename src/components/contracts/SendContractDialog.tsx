@@ -168,6 +168,7 @@ export function SendContractDialog({
   const [assistTimelon, setAssistTimelon] = useState("");
   const [assistMaanedslon, setAssistMaanedslon] = useState("");
   const [assistBonus, setAssistBonus] = useState("");
+  const [assistTeam, setAssistTeam] = useState("");
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
@@ -332,6 +333,9 @@ export function SendContractDialog({
       monthly_salary: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
       bonus: assistBonus || "[Bonus ikke angivet]",
       assist_bonus: assistBonus || "[Bonus ikke angivet]",
+      team: assistTeam || "[Team ikke angivet]",
+      assist_team: assistTeam || "[Team ikke angivet]",
+      teams: assistTeam || "[Team ikke angivet]",
     };
 
     let merged = content;
@@ -469,6 +473,7 @@ export function SendContractDialog({
     setAssistTimelon("");
     setAssistMaanedslon("");
     setAssistBonus("");
+    setAssistTeam("");
   };
 
   return (
@@ -571,6 +576,14 @@ export function SendContractDialog({
                 {selectedContractType === "assistant_team_leader" && (
                   <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
                     <p className="text-sm font-medium">Assisterende teamleder-vilkår</p>
+                    <div className="space-y-2">
+                      <Label>Team</Label>
+                      <Input
+                        value={assistTeam}
+                        onChange={(e) => setAssistTeam(e.target.value)}
+                        placeholder="F.eks. Team Alpha"
+                      />
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Timeløn (DKK)</Label>
@@ -735,10 +748,16 @@ export function SendContractDialog({
                     </div>
                   )}
 
-                  {selectedContractType === "assistant_team_leader" && (assistTimelon || assistMaanedslon || assistBonus) && (
+                  {selectedContractType === "assistant_team_leader" && (assistTimelon || assistMaanedslon || assistBonus || assistTeam) && (
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assisterende teamleder-vilkår</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {assistTeam && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Team:</span>
+                            <span className="font-medium">{assistTeam}</span>
+                          </div>
+                        )}
                         {assistTimelon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Timeløn:</span>
