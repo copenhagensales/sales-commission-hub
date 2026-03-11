@@ -17,6 +17,7 @@ import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Uploa
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { CONTRACT_PROSE_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
