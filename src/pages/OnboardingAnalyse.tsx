@@ -899,6 +899,9 @@ export default function OnboardingAnalyse() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Tenure Earnings Analysis */}
+      <TenureEarningsChart />
     </div>
     </MainLayout>
   );
