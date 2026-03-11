@@ -14,7 +14,7 @@ import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 
-type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "other";
+type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "assistant_team_leader" | "other";
 
 // Required fields for contract merge - varies by contract type
 interface RequiredField {
@@ -77,6 +77,8 @@ const getRequiredFieldsForType = (contractType: ContractType | null): RequiredFi
     case "termination":
       return minimalRequiredFields;
     case "team_leader":
+      return employmentRequiredFields;
+    case "assistant_team_leader":
       return employmentRequiredFields;
     case "other":
     default:
@@ -163,6 +165,9 @@ export function SendContractDialog({
   const [teamlederOpgave, setTeamlederOpgave] = useState("");
   const [teamlederDbProcent, setTeamlederDbProcent] = useState("");
   const [teamlederMinimumslon, setTeamlederMinimumslon] = useState("");
+  const [assistTimelon, setAssistTimelon] = useState("");
+  const [assistMaanedslon, setAssistMaanedslon] = useState("");
+  const [assistBonus, setAssistBonus] = useState("");
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
@@ -317,6 +322,16 @@ export function SendContractDialog({
       'minimumsløn': teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
       teamleder_minimumslon: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
       minimum_salary: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+
+      // Assisterende teamleder-specifikke felter
+      timeløn: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      assist_timelon: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      hourly_rate: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      månedsløn: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      assist_maanedslon: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      monthly_salary: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      bonus: assistBonus || "[Bonus ikke angivet]",
+      assist_bonus: assistBonus || "[Bonus ikke angivet]",
     };
 
     let merged = content;
@@ -451,6 +466,9 @@ export function SendContractDialog({
     setTeamlederOpgave("");
     setTeamlederDbProcent("");
     setTeamlederMinimumslon("");
+    setAssistTimelon("");
+    setAssistMaanedslon("");
+    setAssistBonus("");
   };
 
   return (
@@ -544,6 +562,40 @@ export function SendContractDialog({
                           value={teamlederMinimumslon}
                           onChange={(e) => setTeamlederMinimumslon(e.target.value)}
                           placeholder="F.eks. 25000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedContractType === "assistant_team_leader" && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <p className="text-sm font-medium">Assisterende teamleder-vilkår</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Timeløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={assistTimelon}
+                          onChange={(e) => setAssistTimelon(e.target.value)}
+                          placeholder="F.eks. 160"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Månedsløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={assistMaanedslon}
+                          onChange={(e) => setAssistMaanedslon(e.target.value)}
+                          placeholder="F.eks. 25000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Bonus</Label>
+                        <Input
+                          value={assistBonus}
+                          onChange={(e) => setAssistBonus(e.target.value)}
+                          placeholder="F.eks. 5% af omsætning"
                         />
                       </div>
                     </div>
@@ -677,6 +729,32 @@ export function SendContractDialog({
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Minimumsløn:</span>
                             <span className="font-medium">{Number(teamlederMinimumslon).toLocaleString("da-DK")} DKK</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedContractType === "assistant_team_leader" && (assistTimelon || assistMaanedslon || assistBonus) && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assisterende teamleder-vilkår</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {assistTimelon && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Timeløn:</span>
+                            <span className="font-medium">{Number(assistTimelon).toLocaleString("da-DK")} DKK</span>
+                          </div>
+                        )}
+                        {assistMaanedslon && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Månedsløn:</span>
+                            <span className="font-medium">{Number(assistMaanedslon).toLocaleString("da-DK")} DKK</span>
+                          </div>
+                        )}
+                        {assistBonus && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Bonus:</span>
+                            <span className="font-medium">{assistBonus}</span>
                           </div>
                         )}
                       </div>
