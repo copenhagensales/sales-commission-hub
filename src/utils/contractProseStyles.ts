@@ -6,7 +6,7 @@
 
 const BASE_PROSE = `
   prose-base
-  text-[15px] leading-[1.7]
+  text-[15px] leading-[1.6]
 
   /* Document Title */
   prose-h1:text-xl prose-h1:font-bold prose-h1:text-center
