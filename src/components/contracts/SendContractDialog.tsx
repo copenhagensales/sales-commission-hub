@@ -320,6 +320,16 @@ export function SendContractDialog({
       'minimumsløn': teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
       teamleder_minimumslon: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
       minimum_salary: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+
+      // Assisterende teamleder-specifikke felter
+      timeløn: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      assist_timelon: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      hourly_rate: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      månedsløn: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      assist_maanedslon: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      monthly_salary: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      bonus: assistBonus || "[Bonus ikke angivet]",
+      assist_bonus: assistBonus || "[Bonus ikke angivet]",
     };
 
     let merged = content;
