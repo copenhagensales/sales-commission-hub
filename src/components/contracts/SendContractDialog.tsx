@@ -811,7 +811,7 @@ export function SendContractDialog({
                         {teamlederMinimumslon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Minimumsløn:</span>
-                            <span className="font-medium">{Number(teamlederMinimumslon).toLocaleString("da-DK")} DKK</span>
+                            <span className="font-medium">{teamlederMinimumslon} DKK</span>
                           </div>
                         )}
                       </div>
