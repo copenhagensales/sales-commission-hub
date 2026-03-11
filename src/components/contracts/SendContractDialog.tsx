@@ -657,6 +657,33 @@ export function SendContractDialog({
                     </div>
                   </div>
                 </div>
+
+                  {selectedContractType === "team_leader" && (teamlederOpgave || teamlederDbProcent || teamlederMinimumslon) && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Teamleder-vilkår</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {teamlederOpgave && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Opgave:</span>
+                            <span className="font-medium">{teamlederOpgave}</span>
+                          </div>
+                        )}
+                        {teamlederDbProcent && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">DB-procent:</span>
+                            <span className="font-medium">{teamlederDbProcent}%</span>
+                          </div>
+                        )}
+                        {teamlederMinimumslon && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Minimumsløn:</span>
+                            <span className="font-medium">{Number(teamlederMinimumslon).toLocaleString("da-DK")} DKK</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
