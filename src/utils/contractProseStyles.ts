@@ -48,7 +48,7 @@ const BASE_PROSE = `
   [&_br]:block
   [&_p:empty]:min-h-[1em]
   [&_p:has(br:only-child)]:min-h-[1em]
-  [&_p+p]:mt-2
+  [&_p+p]:mt-1
 
   /* Horizontal rules */
   [&_hr]:my-10
