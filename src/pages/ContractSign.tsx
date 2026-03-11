@@ -266,6 +266,7 @@ export default function ContractSign() {
               contractTitle: contract.title,
               signedAt: result.signedAt,
               ipAddress: result.ipAddress,
+              isConfidential: contract.is_confidential || false,
             },
           })
           .then(({ error }) => {

@@ -1,20 +1,19 @@
 
-# Fortrolige kontrakter: Stop HR-kopi ved underskrift
 
-## Problem
-Når en kontrakt underskrives, sender `send-contract-signed-confirmation` edge-funktionen **altid** en kopi til `job@copenhagensales.dk` (linje 366). Der er ingen check for om kontrakten er fortrolig. Derudover uploades kontrakten også til SharePoint uden fortrolighedscheck.
 
-## Ændringer
+## Draft-booking workflow ✅
 
-### 1. ContractSign.tsx — Send `is_confidential` flag med
-Tilføj `isConfidential: contract.is_confidential` til body-objektet der sendes til `send-contract-signed-confirmation`.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### 2. send-contract-signed-confirmation/index.ts — Respektér fortrolighed
-- Tilføj `isConfidential` til request-interfacet
-- **Skip** HR-kopi (job@copenhagensales.dk) når `isConfidential === true`
-- **Skip** SharePoint-upload når `isConfidential === true`
-- Bekræftelses-emailen til medarbejderen selv sendes stadig (de har ret til at se deres egen kontrakt)
+## Fortrolige kontrakter ✅
 
-### Resultat
-Fortrolige kontrakter: Kun medarbejderen modtager bekræftelse. Ingen kopi til HR, ingen upload til SharePoint.
-Normale kontrakter: Uændret adfærd.
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
