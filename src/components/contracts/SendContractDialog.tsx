@@ -609,11 +609,19 @@ export function SendContractDialog({
                       <div className="space-y-2">
                         <Label>Minimumsløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={teamlederMinimumslon}
-                          onChange={(e) => setTeamlederMinimumslon(e.target.value)}
-                          placeholder="F.eks. 25000"
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 5) {
+                              setTeamlederMinimumslon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
+                          placeholder="F.eks. 25.000"
                         />
+                        {validateDigits(teamlederMinimumslon, 5, "Minimumsløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(teamlederMinimumslon, 5, "Minimumsløn")}</p>
+                        )}
                       </div>
                     </div>
                   </div>
