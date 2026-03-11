@@ -11116,6 +11116,7 @@ export type Database = {
         | "company_car"
         | "termination"
         | "other"
+        | "team_leader"
       crm_type: "hubspot" | "salesforce" | "pipedrive" | "generic_api" | "excel"
       employment_type: "hourly" | "monthly"
       leadership_interest: "yes" | "maybe" | "no"
@@ -11299,6 +11300,7 @@ export const Constants = {
         "company_car",
         "termination",
         "other",
+        "team_leader",
       ],
       crm_type: ["hubspot", "salesforce", "pipedrive", "generic_api", "excel"],
       employment_type: ["hourly", "monthly"],
