@@ -68,9 +68,10 @@ export function NewCandidateDialog({ open, onOpenChange }: NewCandidateDialogPro
           phone: formData.phone || null,
           source: formData.source || null,
           applied_position: formData.applied_position || null,
+          heard_about_us: formData.heard_about_us || null,
           notes: formData.notes || null,
           status: "new",
-        })
+        } as any)
         .select()
         .single();
 
