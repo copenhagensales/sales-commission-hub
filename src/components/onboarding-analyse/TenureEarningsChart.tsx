@@ -113,11 +113,15 @@ export function TenureEarningsChart() {
         const employeeStartMonth = startOfMonth(startDate);
         const tenureMonth = differenceInMonths(saleMonth, employeeStartMonth) + 1;
 
-        if (tenureMonth < 1 || tenureMonth > 12) return;
+        if (tenureMonth < 1 || tenureMonth > 12) {
+          outOfRange++;
+          return;
+        }
 
         const commission = Number(row.total_commission) || 0;
         if (commission === 0) return;
 
+        matchCount++;
         if (!tenureBuckets.has(tenureMonth)) {
           tenureBuckets.set(tenureMonth, { totalCommission: 0, employeeIds: new Set() });
         }
@@ -125,6 +129,8 @@ export function TenureEarningsChart() {
         bucket.totalCommission += commission;
         bucket.employeeIds.add(employeeId);
       });
+
+      console.log("[TenureEarnings] matched:", matchCount, "noStartDate:", noStartDate, "outOfRange:", outOfRange, "buckets:", tenureBuckets.size);
 
       // Convert to array
       const buckets: TenureBucket[] = [];
