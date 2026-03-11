@@ -333,6 +333,9 @@ export function SendContractDialog({
       monthly_salary: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
       bonus: assistBonus || "[Bonus ikke angivet]",
       assist_bonus: assistBonus || "[Bonus ikke angivet]",
+      team: assistTeam || "[Team ikke angivet]",
+      assist_team: assistTeam || "[Team ikke angivet]",
+      teams: assistTeam || "[Team ikke angivet]",
     };
 
     let merged = content;
