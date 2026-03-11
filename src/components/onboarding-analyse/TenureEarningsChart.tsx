@@ -35,6 +35,7 @@ export function TenureEarningsChart() {
 
       // Filter non-staff employees
       const employees = (empRes.data || []).filter((e) => !e.is_staff_employee);
+      console.log("[TenureEarnings] employees:", employees.length, "total fetched:", empRes.data?.length);
 
       // Build employee_id → emails lookup
       const employeeEmails = new Map<string, string[]>();
@@ -45,6 +46,7 @@ export function TenureEarningsChart() {
         existing.push(email);
         employeeEmails.set(m.employee_id, existing);
       });
+      console.log("[TenureEarnings] agent mappings:", employeeEmails.size);
 
       // Collect all agent emails for employees we care about
       const allEmails: string[] = [];
@@ -57,7 +59,11 @@ export function TenureEarningsChart() {
         });
       });
 
-      if (allEmails.length === 0) return { buckets: [] };
+      console.log("[TenureEarnings] allEmails:", allEmails.length, "employees with mappings:", emailToEmployeeId.size);
+      if (allEmails.length === 0) {
+        console.warn("[TenureEarnings] No emails found - returning empty");
+        return { buckets: [] };
+      }
 
       // Fetch sales data for last 18 months using RPC
       const now = new Date();
