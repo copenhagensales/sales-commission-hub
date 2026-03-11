@@ -464,6 +464,9 @@ export function SendContractDialog({
     setTeamlederOpgave("");
     setTeamlederDbProcent("");
     setTeamlederMinimumslon("");
+    setAssistTimelon("");
+    setAssistMaanedslon("");
+    setAssistBonus("");
   };
 
   return (
