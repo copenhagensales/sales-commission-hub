@@ -831,7 +831,7 @@ export function SendContractDialog({
                         {assistTimelon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Timeløn:</span>
-                            <span className="font-medium">{Number(assistTimelon).toLocaleString("da-DK")} DKK</span>
+                            <span className="font-medium">{assistTimelon} DKK</span>
                           </div>
                         )}
                         {assistMaanedslon && (
