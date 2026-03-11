@@ -163,6 +163,9 @@ export function SendContractDialog({
   const [teamlederOpgave, setTeamlederOpgave] = useState("");
   const [teamlederDbProcent, setTeamlederDbProcent] = useState("");
   const [teamlederMinimumslon, setTeamlederMinimumslon] = useState("");
+  const [assistTimelon, setAssistTimelon] = useState("");
+  const [assistMaanedslon, setAssistMaanedslon] = useState("");
+  const [assistBonus, setAssistBonus] = useState("");
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
