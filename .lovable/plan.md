@@ -1,15 +1,19 @@
 
 
-# Fix: Fjern konflikerende prose-styles fra Tiptap editor
 
-## Problem
-`RichTextEditor.tsx` linje 87 sætter `prose prose-sm` på selve editor-elementet. Den ydre wrapper (linje 343) har `CONTRACT_PROSE_SIGN_CLASSES` som inkluderer `prose prose-neutral` med `prose-base` og specifikke line-heights. De to prose-lag konflikter — `prose-sm` vinder og giver tættere linjeafstand end underskriftssiden.
+## Draft-booking workflow ✅
 
-## Løsning
-Fjern `prose prose-sm` fra `editorProps.attributes.class` i `RichTextEditor.tsx` (linje 87). Behold kun layout-klasser (`max-w-none focus:outline-none min-h-[300px]`). Fjern også den redundante `p-4` da wrapperen allerede har padding.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### Fil: `src/components/contracts/RichTextEditor.tsx`
-- **Linje 87**: Ændr `class` fra `'prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4'` til `'max-w-none focus:outline-none min-h-[300px]'`
+## Fortrolige kontrakter ✅
 
-Resultat: Editoren arver korrekt prose-styling fra den ydre `CONTRACT_PROSE_SIGN_CLASSES` wrapper — identisk linjeafstand som underskriftssiden.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
