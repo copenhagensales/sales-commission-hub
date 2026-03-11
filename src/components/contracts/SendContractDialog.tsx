@@ -136,6 +136,31 @@ interface SendContractDialogProps {
   managerName?: string;
 }
 
+// --- Amount formatting helpers ---
+/** Strip non-digits, return raw digit string */
+const stripToDigits = (v: string) => v.replace(/\D/g, "");
+
+/** Format a raw digit string with Danish thousand separators (.) */
+const formatWithSeparator = (digits: string) => {
+  if (!digits) return "";
+  return Number(digits).toLocaleString("da-DK");
+};
+
+/** Parse a formatted string back to raw number */
+const parseFormattedAmount = (v: string): number => {
+  const digits = stripToDigits(v);
+  return digits ? Number(digits) : 0;
+};
+
+/** Validate digit count; returns error message or null */
+const validateDigits = (v: string, maxDigits: number, label: string): string | null => {
+  const digits = stripToDigits(v);
+  if (digits.length > maxDigits) {
+    return `${label} må maks. være ${maxDigits} cifre`;
+  }
+  return null;
+};
+
 const salaryTypeLabels: Record<string, string> = {
   provision: "Provision",
   fixed: "Fast løn",
@@ -339,17 +364,17 @@ export function SendContractDialog({
       teamleder_opgave: teamlederOpgave || "[Opgave ikke angivet]",
       db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
       teamleder_db_procent: teamlederDbProcent || "[DB-procent ikke angivet]",
-      'minimumsløn': teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
-      teamleder_minimumslon: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
-      minimum_salary: teamlederMinimumslon ? Number(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      'minimumsløn': teamlederMinimumslon ? parseFormattedAmount(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      teamleder_minimumslon: teamlederMinimumslon ? parseFormattedAmount(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
+      minimum_salary: teamlederMinimumslon ? parseFormattedAmount(teamlederMinimumslon).toLocaleString("da-DK") + " DKK" : "[Minimumsløn ikke angivet]",
 
       // Assisterende teamleder-specifikke felter
-      timeløn: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
-      assist_timelon: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
-      hourly_rate: assistTimelon ? Number(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
-      månedsløn: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
-      assist_maanedslon: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
-      monthly_salary: assistMaanedslon ? Number(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      timeløn: assistTimelon ? parseFormattedAmount(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      assist_timelon: assistTimelon ? parseFormattedAmount(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      hourly_rate: assistTimelon ? parseFormattedAmount(assistTimelon).toLocaleString("da-DK") + " DKK" : "[Timeløn ikke angivet]",
+      månedsløn: assistMaanedslon ? parseFormattedAmount(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      assist_maanedslon: assistMaanedslon ? parseFormattedAmount(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
+      monthly_salary: assistMaanedslon ? parseFormattedAmount(assistMaanedslon).toLocaleString("da-DK") + " DKK" : "[Månedsløn ikke angivet]",
       bonus: assistBonus || "[Bonus ikke angivet]",
       assist_bonus: assistBonus || "[Bonus ikke angivet]",
       team: assistTeam || "[Team ikke angivet]",
@@ -584,11 +609,19 @@ export function SendContractDialog({
                       <div className="space-y-2">
                         <Label>Minimumsløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={teamlederMinimumslon}
-                          onChange={(e) => setTeamlederMinimumslon(e.target.value)}
-                          placeholder="F.eks. 25000"
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 5) {
+                              setTeamlederMinimumslon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
+                          placeholder="F.eks. 25.000"
                         />
+                        {validateDigits(teamlederMinimumslon, 5, "Minimumsløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(teamlederMinimumslon, 5, "Minimumsløn")}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -609,20 +642,36 @@ export function SendContractDialog({
                       <div className="space-y-2">
                         <Label>Timeløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={assistTimelon}
-                          onChange={(e) => setAssistTimelon(e.target.value)}
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 3) {
+                              setAssistTimelon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
                           placeholder="F.eks. 160"
                         />
+                        {validateDigits(assistTimelon, 3, "Timeløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(assistTimelon, 3, "Timeløn")}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Månedsløn (DKK)</Label>
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={assistMaanedslon}
-                          onChange={(e) => setAssistMaanedslon(e.target.value)}
-                          placeholder="F.eks. 25000"
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            if (digits.length <= 5) {
+                              setAssistMaanedslon(digits ? formatWithSeparator(digits) : "");
+                            }
+                          }}
+                          placeholder="F.eks. 25.000"
                         />
+                        {validateDigits(assistMaanedslon, 5, "Månedsløn") && (
+                          <p className="text-xs text-destructive">{validateDigits(assistMaanedslon, 5, "Månedsløn")}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Bonus</Label>
@@ -762,7 +811,7 @@ export function SendContractDialog({
                         {teamlederMinimumslon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Minimumsløn:</span>
-                            <span className="font-medium">{Number(teamlederMinimumslon).toLocaleString("da-DK")} DKK</span>
+                            <span className="font-medium">{teamlederMinimumslon} DKK</span>
                           </div>
                         )}
                       </div>
@@ -782,13 +831,13 @@ export function SendContractDialog({
                         {assistTimelon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Timeløn:</span>
-                            <span className="font-medium">{Number(assistTimelon).toLocaleString("da-DK")} DKK</span>
+                            <span className="font-medium">{assistTimelon} DKK</span>
                           </div>
                         )}
                         {assistMaanedslon && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Månedsløn:</span>
-                            <span className="font-medium">{Number(assistMaanedslon).toLocaleString("da-DK")} DKK</span>
+                            <span className="font-medium">{assistMaanedslon} DKK</span>
                           </div>
                         )}
                         {assistBonus && (
