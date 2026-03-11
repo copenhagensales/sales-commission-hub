@@ -184,9 +184,13 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch hotel assignments for market bookings
-  const marketBookingIds = useMemo(() => (marketBookings || []).map((b: any) => b.id), [marketBookings]);
-  const { data: bookingHotels } = useBookingHotels(marketBookingIds.length > 0 ? marketBookingIds : undefined);
+  // Fetch hotel assignments for all bookings (regular + market)
+  const allBookingIds = useMemo(() => {
+    const regularIds = (bookings || []).map((b: any) => b.id);
+    const marketIds = (marketBookings || []).map((b: any) => b.id);
+    return [...regularIds, ...marketIds];
+  }, [bookings, marketBookings]);
+  const { data: bookingHotels } = useBookingHotels(allBookingIds.length > 0 ? allBookingIds : undefined);
   const hotelMap = useMemo(() => {
     const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
     (bookingHotels || []).forEach((bh: any) => {
