@@ -83,6 +83,7 @@ export function TenureEarningsChart() {
       );
 
       if (rpcError) throw rpcError;
+      console.log("[TenureEarnings] RPC rows:", rpcData?.length, "sample:", rpcData?.[0]);
 
       // Build employee_id → start_date map
       const employeeStartDates = new Map<string, Date>();
@@ -92,16 +93,21 @@ export function TenureEarningsChart() {
 
       // Process: for each row (employee_id|date), determine tenure month
       const tenureBuckets = new Map<number, { totalCommission: number; employeeIds: Set<string> }>();
+      let matchCount = 0;
+      let noStartDate = 0;
+      let outOfRange = 0;
 
       (rpcData || []).forEach((row: any) => {
         const [empId, dateStr] = (row.group_key || "").split("|");
         if (!empId || !dateStr) return;
 
-        // empId from RPC could be employee UUID directly
         const employeeId = empId;
 
         const startDate = employeeStartDates.get(employeeId);
-        if (!startDate) return;
+        if (!startDate) {
+          noStartDate++;
+          return;
+        }
 
         const saleMonth = startOfMonth(new Date(dateStr));
         const employeeStartMonth = startOfMonth(startDate);
