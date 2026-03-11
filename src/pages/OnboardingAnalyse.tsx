@@ -12,6 +12,7 @@ import { differenceInDays, parseISO, format, startOfMonth, subMonths, subDays, i
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, LineChart, Line, Legend, Cell } from "recharts";
 import { Shield, Clock, BarChart3 } from "lucide-react";
 import { da } from "date-fns/locale";
+import { TenureEarningsChart } from "@/components/onboarding-analyse/TenureEarningsChart";
 
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
@@ -898,6 +899,9 @@ export default function OnboardingAnalyse() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Tenure Earnings Analysis */}
+      <TenureEarningsChart />
     </div>
     </MainLayout>
   );
