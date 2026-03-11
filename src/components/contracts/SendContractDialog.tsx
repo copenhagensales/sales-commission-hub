@@ -388,6 +388,8 @@ export function SendContractDialog({
       const template = templates.find((t) => t.id === selectedTemplateId);
       if (!template) throw new Error("Ingen skabelon valgt");
 
+      const normalizedType = normalizeContractType(template) ?? "other";
+
       const { data: user } = await supabase.auth.getUser();
       
       // Always merge content fresh to ensure employee data is included
@@ -399,7 +401,7 @@ export function SendContractDialog({
         .insert({
           template_id: template.id,
           employee_id: employee.id,
-          type: template.type,
+          type: normalizedType,
           title: customTitle || template.name,
           content: mergedContent,
           status: "pending_employee",
