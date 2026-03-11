@@ -1,19 +1,18 @@
 
 
+# Stram linjeafstand i kontraktskabeloner
 
-## Draft-booking workflow ✅
+## Problem
+Hvert linjeskift i editoren opretter et nyt `<p>`-tag. Prose-reglerne giver hvert afsnit `my-2` (8px margin top+bottom) plus `[&_p+p]:mt-2` oveni. Det giver synlige "huller" mellem linjer der hører sammen (fx adresseblokke), og ser uprofessionelt ud på underskriftssiden.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+## Løsning
+Stram paragraph-spacing i `contractProseStyles.ts` så kontrakten ligner et rigtigt juridisk dokument:
 
-## Fortrolige kontrakter ✅
+### `src/utils/contractProseStyles.ts`
+- `prose-p:my-2` → `prose-p:my-0.5` — minimale margins mellem afsnit
+- `[&_p+p]:mt-2` → `[&_p+p]:mt-1` — tættere konsekutive afsnit
+- `[&_p:empty]:min-h-[1em]` beholdes — tomme linjer fungerer stadig som bevidste mellemrum
+- `leading-[1.7]` → `leading-[1.6]` — lidt strammere linjeafstand i brødtekst
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+Disse ændringer slår igennem i editor, admin-preview OG underskriftsside, da alle tre bruger den samme `BASE_PROSE`.
+
