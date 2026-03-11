@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
-import { buildFmPricingMap } from "@/lib/calculations/fmPricing";
+// buildFmPricingMap removed — pricing is handled by database triggers
 
 export interface FieldmarketingSale {
   id: string;
