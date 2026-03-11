@@ -1,21 +1,20 @@
 
-
-# Fix: Teamleder-skabeloner har forkert type
+# Fortrolige kontrakter: Stop HR-kopi ved underskrift
 
 ## Problem
-De to teamleder-skabeloner ("Teamleder kontrakt" og "Assisterende teamleder kontrakt") har stadig `type = 'employment'` i databasen. Koden viser kun de ekstra felter når `type = 'team_leader'`, så felterne dukker aldrig op.
+Når en kontrakt underskrives, sender `send-contract-signed-confirmation` edge-funktionen **altid** en kopi til `job@copenhagensales.dk` (linje 366). Der er ingen check for om kontrakten er fortrolig. Derudover uploades kontrakten også til SharePoint uden fortrolighedscheck.
 
-## Løsning
-Kør en database-migration der opdaterer de to skabeloner:
+## Ændringer
 
-```sql
-UPDATE contract_templates 
-SET type = 'team_leader' 
-WHERE id IN (
-  '017b0f24-d274-4f5b-8d30-c7395340b446',
-  '8746ec14-b621-42fb-83f1-4a938d60b04b'
-);
-```
+### 1. ContractSign.tsx — Send `is_confidential` flag med
+Tilføj `isConfidential: contract.is_confidential` til body-objektet der sendes til `send-contract-signed-confirmation`.
 
-Ingen kodeændringer nødvendige — felterne er allerede implementeret korrekt i `SendContractDialog.tsx`.
+### 2. send-contract-signed-confirmation/index.ts — Respektér fortrolighed
+- Tilføj `isConfidential` til request-interfacet
+- **Skip** HR-kopi (job@copenhagensales.dk) når `isConfidential === true`
+- **Skip** SharePoint-upload når `isConfidential === true`
+- Bekræftelses-emailen til medarbejderen selv sendes stadig (de har ret til at se deres egen kontrakt)
 
+### Resultat
+Fortrolige kontrakter: Kun medarbejderen modtager bekræftelse. Ingen kopi til HR, ingen upload til SharePoint.
+Normale kontrakter: Uændret adfærd.
