@@ -389,31 +389,11 @@ export default function EditSalesRegistrations() {
           .eq("id", item.id!);
         if (error) throw error;
 
-        // Sync sale_items with pricing
-        const pricingMap = await buildFmPricingMap();
-        const { data: existingItemRow } = await supabase
-          .from("sale_items")
-          .select("id")
-          .eq("sale_id", item.id!)
-          .maybeSingle();
-        const itemPricing = pricingMap.get(item.product_name.toLowerCase());
-        if (existingItemRow) {
-          await supabase.from("sale_items").update({ 
-            display_name: item.product_name, 
-            adversus_product_title: item.product_name,
-            mapped_commission: itemPricing?.commission ?? 0,
-            mapped_revenue: itemPricing?.revenue ?? 0,
-          }).eq("id", existingItemRow.id);
-        } else {
-          await supabase.from("sale_items").insert({ 
-            sale_id: item.id!, 
-            display_name: item.product_name, 
-            adversus_product_title: item.product_name, 
-            quantity: 1, 
-            mapped_commission: itemPricing?.commission ?? 0, 
-            mapped_revenue: itemPricing?.revenue ?? 0,
-          });
-        }
+        // Delete and rematch sale_items for correct campaign-aware pricing
+        await supabase.from("sale_items").delete().eq("sale_id", item.id!);
+        await supabase.functions.invoke("rematch-pricing-rules", {
+          body: { sale_ids: [item.id!] },
+        });
       }
       
       // Create new items via centralized sales table
