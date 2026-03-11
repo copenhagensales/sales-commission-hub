@@ -14,7 +14,7 @@ import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 
-type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
+type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "other";
 
 // Required fields for contract merge - varies by contract type
 interface RequiredField {
