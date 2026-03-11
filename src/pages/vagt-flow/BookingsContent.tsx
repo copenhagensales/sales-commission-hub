@@ -184,16 +184,7 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch hotel assignments for market bookings
-  const marketBookingIds = useMemo(() => (marketBookings || []).map((b: any) => b.id), [marketBookings]);
-  const { data: bookingHotels } = useBookingHotels(marketBookingIds.length > 0 ? marketBookingIds : undefined);
-  const hotelMap = useMemo(() => {
-    const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
-    (bookingHotels || []).forEach((bh: any) => {
-      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status, checkIn: bh.check_in || null, checkOut: bh.check_out || null };
-    });
-    return map;
-  }, [bookingHotels]);
+  // hotelMap built below after allBookingIds
 
   const { data: fieldmarketingClients } = useQuery({
     queryKey: ["fieldmarketing-team-clients-bookings"],
@@ -277,7 +268,16 @@ export default function BookingsContent() {
     return [...new Set(ids)];
   }, [bookings, marketBookings]);
 
-  // Fetch booking_vehicle data for vehicle tags
+  // Fetch hotel assignments for all bookings
+  const { data: bookingHotels } = useBookingHotels(allBookingIds.length > 0 ? allBookingIds : undefined);
+  const hotelMap = useMemo(() => {
+    const map: Record<string, { hotelName: string; status: string; checkIn: string | null; checkOut: string | null }> = {};
+    (bookingHotels || []).forEach((bh: any) => {
+      map[bh.booking_id] = { hotelName: bh.hotel?.name || "Ukendt hotel", status: bh.status, checkIn: bh.check_in || null, checkOut: bh.check_out || null };
+    });
+    return map;
+  }, [bookingHotels]);
+
   const { data: bookingVehicles = [] } = useQuery({
     queryKey: ["vagt-booking-vehicles", selectedWeek, selectedYear, allBookingIds],
     queryFn: async () => {
@@ -705,6 +705,17 @@ export default function BookingsContent() {
                           {booking.status === 'draft' && (
                             <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700">
                               Kladde
+                            </Badge>
+                          )}
+                          {hotelMap[booking.id] && (
+                            <Badge className={cn(
+                              "flex items-center gap-1",
+                              hotelMap[booking.id].status === 'confirmed'
+                                ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700"
+                                : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700"
+                            )}>
+                              <Hotel className="h-3 w-3" />
+                              {hotelMap[booking.id].hotelName}
                             </Badge>
                           )}
                         </div>
