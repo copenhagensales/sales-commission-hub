@@ -112,24 +112,24 @@ export const CONTRACT_PROSE_CLASSES = `
  * Signing page: formal white paper with black text — no dark mode tokens.
  */
 export const CONTRACT_PROSE_SIGN_CLASSES = `
-  prose dark:prose-invert ${BASE_PROSE}
-  !prose-h1:text-neutral-900 !prose-h1:border-neutral-200
-  !prose-h2:text-neutral-900 !prose-h2:border-neutral-200
-  !prose-h3:text-neutral-900
-  !prose-h4:text-neutral-500
-  !prose-p:text-neutral-700
-  !prose-strong:text-neutral-900
-  !prose-li:text-neutral-700
-  ![&_hr]:border-neutral-200
-  ![&_table]:border-neutral-200
-  ![&_th]:bg-neutral-50 ![&_th]:text-neutral-900 ![&_th]:border-neutral-200
-  ![&_td]:text-neutral-600 ![&_td]:border-neutral-100
-  ![&_td:first-child]:text-neutral-900
-  ![&_blockquote]:border-neutral-300 ![&_blockquote]:bg-neutral-50
-  ![&_blockquote_p]:text-neutral-700
-  ![&_blockquote_strong]:text-neutral-900
-  ![&_dt]:text-neutral-900
-  ![&_dd]:text-neutral-600
-  ![&_pre]:bg-neutral-50 ![&_pre]:border-neutral-200
+  prose prose-neutral ${BASE_PROSE}
+  [&_h1]:!text-neutral-900 [&_h1]:!border-neutral-200
+  [&_h2]:!text-neutral-900 [&_h2]:!border-neutral-200
+  [&_h3]:!text-neutral-900
+  [&_h4]:!text-neutral-500
+  [&_p]:!text-neutral-700
+  [&_strong]:!text-neutral-900
+  [&_li]:!text-neutral-700
+  [&_hr]:!border-neutral-200
+  [&_table]:!border-neutral-200
+  [&_th]:!bg-neutral-50 [&_th]:!text-neutral-900 [&_th]:!border-neutral-200
+  [&_td]:!text-neutral-600 [&_td]:!border-neutral-100
+  [&_td:first-child]:!text-neutral-900
+  [&_blockquote]:!border-neutral-300 [&_blockquote]:!bg-neutral-50
+  [&_blockquote_p]:!text-neutral-700
+  [&_blockquote_strong]:!text-neutral-900
+  [&_dt]:!text-neutral-900
+  [&_dd]:!text-neutral-600
+  [&_pre]:!bg-neutral-50 [&_pre]:!border-neutral-200
   !text-neutral-700
 `.replace(/\n\s*/g, ' ').trim();
