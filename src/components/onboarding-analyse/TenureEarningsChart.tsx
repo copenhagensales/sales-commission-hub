@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart, Cell } from "recharts";
 import { TrendingUp, Loader2 } from "lucide-react";
-import { differenceInMonths, parseISO, startOfMonth, subMonths } from "date-fns";
+import { differenceInMonths, parseISO, startOfMonth, subMonths, isSameMonth } from "date-fns";
 
 interface TenureBucket {
   month: number;
@@ -18,12 +18,11 @@ export function TenureEarningsChart() {
   const { data, isLoading } = useQuery({
     queryKey: ["tenure-earnings-analysis"],
     queryFn: async () => {
-      // Fetch active non-staff employees with start dates and agent mappings
+      // Fetch ALL non-staff employees (active + former) with start/end dates
       const [empRes, mappingRes] = await Promise.all([
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, employment_start_date, is_staff_employee")
-          .eq("is_active", true)
+          .select("id, first_name, last_name, employment_start_date, employment_end_date, is_staff_employee")
           .not("employment_start_date", "is", null),
         supabase
           .from("employee_agent_mapping")
@@ -33,27 +32,30 @@ export function TenureEarningsChart() {
       if (empRes.error) throw empRes.error;
       if (mappingRes.error) throw mappingRes.error;
 
-      // Filter non-staff employees and build start-date map
-      const employeeStartDates = new Map<string, Date>();
+      // Build employee info map (no is_active filter)
+      const employeeInfo = new Map<string, { startDate: Date; endDate: Date | null; startDay: number }>();
       (empRes.data || []).forEach((e) => {
         if (!e.is_staff_employee && e.employment_start_date) {
-          employeeStartDates.set(e.id, parseISO(e.employment_start_date));
+          const startDate = parseISO(e.employment_start_date);
+          const endDate = e.employment_end_date ? parseISO(e.employment_end_date) : null;
+          employeeInfo.set(e.id, { startDate, endDate, startDay: startDate.getDate() });
         }
       });
 
-      // Build employee_id → emails lookup (only for employees we care about)
+      // Build emails lookup
       const allEmails: string[] = [];
       (mappingRes.data || []).forEach((m: any) => {
         const email = m.agents?.email?.toLowerCase();
-        if (email && employeeStartDates.has(m.employee_id)) {
+        if (email && employeeInfo.has(m.employee_id)) {
           allEmails.push(email);
         }
       });
 
       if (allEmails.length === 0) return { buckets: [] };
 
-      // Fetch sales data for last 18 months using RPC
+      // Fetch sales data for last 18 months
       const now = new Date();
+      const currentMonth = startOfMonth(now);
       const periodStart = startOfMonth(subMonths(now, 17));
 
       const { data: rpcData, error: rpcError } = await supabase.rpc(
@@ -71,7 +73,6 @@ export function TenureEarningsChart() {
 
       if (rpcError) throw rpcError;
 
-      // Process: RPC returns group_key as "employee_id|date"
       const tenureBuckets = new Map<number, { totalCommission: number; employeeIds: Set<string> }>();
 
       (rpcData || []).forEach((row: any) => {
@@ -81,12 +82,30 @@ export function TenureEarningsChart() {
         const employeeId = row.group_key.substring(0, pipeIdx);
         const dateStr = row.group_key.substring(pipeIdx + 1);
 
-        const startDate = employeeStartDates.get(employeeId);
-        if (!startDate) return;
+        const info = employeeInfo.get(employeeId);
+        if (!info) return;
 
         const saleMonth = startOfMonth(new Date(dateStr));
-        const employeeStartMonth = startOfMonth(startDate);
-        const tenureMonth = differenceInMonths(saleMonth, employeeStartMonth) + 1;
+        const saleCalendarMonth = saleMonth.getMonth();
+
+        // Skip July (6) and December (11) — holiday months
+        if (saleCalendarMonth === 6 || saleCalendarMonth === 11) return;
+
+        // Skip current (incomplete) month
+        if (isSameMonth(saleMonth, currentMonth)) return;
+
+        // Skip employee's last month if they left before the 20th
+        if (info.endDate && isSameMonth(saleMonth, info.endDate) && info.endDate.getDate() < 20) return;
+
+        // Calculate tenure month with partial-month adjustment
+        const employeeStartMonth = startOfMonth(info.startDate);
+        let tenureMonth = differenceInMonths(saleMonth, employeeStartMonth) + 1;
+
+        // If employee started after the 10th, their first partial month doesn't count
+        // Shift tenure months down by 1 (so next full month becomes "Month 1")
+        if (info.startDay > 10) {
+          tenureMonth = tenureMonth - 1;
+        }
 
         if (tenureMonth < 1 || tenureMonth > 12) return;
 
@@ -178,7 +197,7 @@ export function TenureEarningsChart() {
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Gennemsnitlig provision per medarbejder, grupperet efter hvor mange måneder de har været ansat
+          Gennemsnitlig provision per medarbejder, grupperet efter anciennitetsmåned (inkl. tidligere medarbejdere · ekskl. ufuldstændige måneder, juli og december)
         </p>
       </CardHeader>
       <CardContent>

@@ -1,35 +1,19 @@
 
 
-## Problem
-Måned 1 viser kunstigt lavt gennemsnit (3.804 kr) fordi medarbejdere der startede midt/sent i måneden kun har få dages salg, men tæller fuldt med i gennemsnittet. En medarbejder der starter d. 28. har kun 2-3 dages salg men trækker gennemsnittet ned som om det var en fuld måned.
 
-## Løsning: Minimumskrav + proportional justering
+## Draft-booking workflow ✅
 
-### 1. Ekskludér ufuldstændige første måneder
-Hvis en medarbejder starter **efter d. 10** i en måned, tæller den måned IKKE som deres "måned 1" — deres måned 1 bliver i stedet den næste fulde kalendermåned. Dermed sikres at alle har mindst ~20 dages salgsdata i hver bucket.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### 2. Ekskludér ufuldstændige sidste måneder
-Tilsvarende: Hvis en medarbejder stopper midt i en måned (eller vi er midt i indeværende måned), medregnes den ufuldstændige måned ikke.
+## Fortrolige kontrakter ✅
 
-### 3. Filtrér juli og december (allerede godkendt)
-
-### 4. Inkludér alle medarbejdere (aktive + stoppede, allerede godkendt)
-
-### Ændringer i `TenureEarningsChart.tsx`
-
-**Data-hentning:**
-- Fjern `is_active`-filter
-- Hent også `employment_end_date` for at kende stoppede medarbejderes slutdato
-
-**Beregningslogik (i forEach-loopet):**
-- Beregn `dayOfMonthStarted = startDate.getDate()`
-- Hvis `tenureMonth === 1` og `dayOfMonthStarted > 10`: skip (ufuldstændig første måned), og forskyd alle tenure-months med -1
-- Skip juli/december (`saleMonth.getMonth() === 6 || === 11`)
-- Skip indeværende (ufuldstændige) måned
-- Skip slutmåned hvis medarbejder stoppede før d. 20 i den måned
-
-**Undertekst:** Tilføj note om at ufuldstændige måneder og feriemåneder er udeladt.
-
-### Resultat
-Gennemsnittet per anciennitetsmåned afspejler kun medarbejdere med (næsten) fulde måneders salgsdata, hvilket giver et retvisende billede af den forventede udvikling.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
