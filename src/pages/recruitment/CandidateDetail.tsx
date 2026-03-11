@@ -517,7 +517,7 @@ export default function CandidateDetail() {
 
           {/* Contact & Stats Bar */}
           <div className="border-t bg-muted/30 px-4 sm:px-6 py-3 sm:py-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
               {/* Contact Info */}
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Email</p>
@@ -536,6 +536,24 @@ export default function CandidateDetail() {
                 <p className="text-xs sm:text-sm font-medium">
                   {sourceLabels[candidate.source?.toLowerCase() || ""] || candidate.source || <span className="text-muted-foreground italic">Ukendt</span>}
                 </p>
+              </div>
+              <div className="space-y-0.5 sm:space-y-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Kender os fra</p>
+                <CandidateSourceSelect
+                  value={(candidate as any).heard_about_us || ""}
+                  onValueChange={async (val) => {
+                    const { error } = await supabase
+                      .from("candidates")
+                      .update({ heard_about_us: val } as any)
+                      .eq("id", candidate.id);
+                    if (error) {
+                      toast.error("Kunne ikke opdatere");
+                    } else {
+                      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+                    }
+                  }}
+                  className="h-7 text-xs sm:text-sm"
+                />
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Ansøgningsdato</p>
