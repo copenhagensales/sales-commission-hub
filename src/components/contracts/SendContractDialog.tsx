@@ -575,6 +575,14 @@ export function SendContractDialog({
                 {selectedContractType === "assistant_team_leader" && (
                   <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
                     <p className="text-sm font-medium">Assisterende teamleder-vilkår</p>
+                    <div className="space-y-2">
+                      <Label>Team</Label>
+                      <Input
+                        value={assistTeam}
+                        onChange={(e) => setAssistTeam(e.target.value)}
+                        placeholder="F.eks. Team Alpha"
+                      />
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Timeløn (DKK)</Label>
