@@ -212,6 +212,8 @@ export default function EditSalesRegistrations() {
           seller: sellerId ? sellersMap.get(sellerId) || null : null,
           location: locationId ? locationsMap.get(locationId) || null : null,
           client: clientId ? clientsMap.get(clientId) || null : null,
+          commission_dkk: saleItemsMap.get(sale.id)?.commission || 0,
+          revenue_dkk: saleItemsMap.get(sale.id)?.revenue || 0,
         };
       }) as SaleRecord[];
     },
