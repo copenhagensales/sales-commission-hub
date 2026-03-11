@@ -433,23 +433,8 @@ export default function EditSalesRegistrations() {
           .select("id");
         if (error) throw error;
 
-        // Create sale_items for new sales with correct pricing
-        if (insertedNewSales && insertedNewSales.length > 0) {
-          const pricingMapForNew = await buildFmPricingMap();
-          const newSaleItems = insertedNewSales.map((inserted, idx) => {
-            const productName = toCreate[idx]?.product_name || "Ukendt produkt";
-            const p = pricingMapForNew.get(productName.toLowerCase());
-            return {
-              sale_id: inserted.id,
-              display_name: productName,
-              adversus_product_title: productName,
-              quantity: 1,
-              mapped_commission: p?.commission ?? 0,
-              mapped_revenue: p?.revenue ?? 0,
-            };
-          });
-          await supabase.from("sale_items").insert(newSaleItems);
-        }
+        // sale_items are created automatically by the create_fm_sale_items trigger
+        // with correct campaign-aware pricing — no manual creation needed
       }
     },
     onSuccess: () => {
