@@ -13,6 +13,7 @@ interface ConfirmationRequest {
   contractTitle: string;
   signedAt: string;
   ipAddress: string;
+  isConfidential?: boolean;
 }
 
 // Get M365 access token
