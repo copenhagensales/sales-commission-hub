@@ -516,6 +516,40 @@ export function SendContractDialog({
                   />
                 </div>
 
+                {selectedContractType === "team_leader" && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <p className="text-sm font-medium">Teamleder-vilkår</p>
+                    <div className="space-y-2">
+                      <Label>Opgave / Klient</Label>
+                      <Input
+                        value={teamlederOpgave}
+                        onChange={(e) => setTeamlederOpgave(e.target.value)}
+                        placeholder="F.eks. TDC Erhverv"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>DB-procent (%)</Label>
+                        <Input
+                          type="number"
+                          value={teamlederDbProcent}
+                          onChange={(e) => setTeamlederDbProcent(e.target.value)}
+                          placeholder="F.eks. 15"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Minimumsløn (DKK)</Label>
+                        <Input
+                          type="number"
+                          value={teamlederMinimumslon}
+                          onChange={(e) => setTeamlederMinimumslon(e.target.value)}
+                          placeholder="F.eks. 25000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {canMarkConfidential && (
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
