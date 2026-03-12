@@ -44,6 +44,7 @@ import {
 import { MarketCalendarWidget } from "@/components/vagt-flow/MarketCalendarWidget";
 import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
 import { getWeekStartDate } from "@/lib/calculations";
+import { cn } from "@/lib/utils";
 
 // Market/Fair location types
 const MARKET_TYPES = ["Markeder", "Messer"];
