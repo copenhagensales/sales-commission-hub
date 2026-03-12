@@ -713,7 +713,70 @@ export default function MarketsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit booking dialog */}
+      {/* Delete assignment confirmation */}
+      <AlertDialog open={!!deleteAssignmentData} onOpenChange={() => setDeleteAssignmentData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern medarbejder fra vagt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil fjerne <strong>{deleteAssignmentData?.employeeName}</strong> fra {deleteAssignmentData?.dayName} d. {deleteAssignmentData?.date}?
+              <br /><br />
+              Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteAssignmentData) {
+                  deleteAssignmentMutation.mutate(deleteAssignmentData.id);
+                  setDeleteAssignmentData(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete day confirmation */}
+      <AlertDialog open={!!deleteDayData} onOpenChange={() => setDeleteDayData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern dag fra booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vil du fjerne <strong>{deleteDayData?.dateLabel}</strong> fra denne booking?
+              {(deleteDayData?.assignmentCount ?? 0) > 0 && (
+                <>
+                  <br /><br />
+                  {deleteDayData?.assignmentCount} medarbejder{deleteDayData?.assignmentCount !== 1 ? 'e' : ''} vil også blive fjernet.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteDayData) {
+                  removeDayMutation.mutate({
+                    bookingId: deleteDayData.bookingId,
+                    dayIndex: deleteDayData.dayIndex,
+                    date: deleteDayData.date,
+                    currentBookedDays: deleteDayData.currentBookedDays,
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern dag
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {editBookingDialogBooking && (
         <EditBookingDialog
           open={!!editBookingDialogBooking}
