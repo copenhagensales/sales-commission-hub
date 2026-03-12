@@ -1,19 +1,36 @@
 
 
+## Problem
 
-## Draft-booking workflow ✅
+Market bookings mangler slettefunktionalitet på tre niveauer, som regulære bookinger (fx Yousee) allerede har:
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+1. **Hele ugen/bookingen** — Markeder i "Bookinger"-fanen har ingen slet-knap (linje 944-955 mangler Trash2-ikon)
+2. **Enkelt dag** — Ingen X-knap på dag-celler for at fjerne en dag fra markedsbookingen
+3. **Enkelt medarbejder** — Ingen X-knap på medarbejdernavne for at fjerne en tildeling
 
-## Fortrolige kontrakter ✅
+Regulære bookinger har allerede alt dette (linje 764-771 for booking-slet, 795-815 for dag-slet, 837-855 for medarbejder-slet).
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+## Berørte filer
+
+| Fil | Ændring |
+|-----|---------|
+| `BookingsContent.tsx` (linje 930-1037) | Tilføj alle 3 slet-niveauer til "Markeder denne uge" sektionen |
+| `MarketsContent.tsx` | Tilføj dag-slet og medarbejder-slet mutations + UI til marked-kort |
+
+## Ændringer
+
+### 1. BookingsContent.tsx — "Markeder denne uge" sektion
+
+- **Booking-slet**: Tilføj Trash2-knap i header (linje ~944-955), der kalder eksisterende `setDeleteBookingId`. Tilføj også invalidering af `vagt-market-bookings-week` i `deleteBookingMutation.onSuccess`.
+- **Dag-slet**: Tilføj `group/day` class + X-knap på booked dag-celler (kopier mønster fra linje 795-815), der kalder eksisterende `setDeleteDayData`. Tilføj invalidering af `vagt-market-bookings-week` i `removeDayMutation.onSuccess`.
+- **Medarbejder-slet**: Tilføj `group` class + X-knap på medarbejdernavne (kopier mønster fra linje 837-855), der kalder eksisterende `setDeleteAssignmentData`. Tilføj invalidering af `vagt-market-bookings-week` i `deleteAssignmentMutation.onSuccess`.
+
+Alle mutations og confirmation dialogs eksisterer allerede — de skal bare genbruge dem + tilføje ekstra query invalidering.
+
+### 2. MarketsContent.tsx — Markeder-fanen
+
+- Tilføj state for `deleteAssignmentData` og `deleteDayData` (samme typer som BookingsContent)
+- Tilføj `deleteAssignmentMutation` og `removeDayMutation` (kopier fra BookingsContent, invalidér `vagt-market-bookings`)
+- I booking-kortene (linje 384-462): Ændr fra simpel employee badge-liste til dag-grid med X-knapper på dage og medarbejdere
+- Tilføj AlertDialogs for dag-slet og medarbejder-slet bekræftelse
+
