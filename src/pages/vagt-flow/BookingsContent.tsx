@@ -449,6 +449,8 @@ export default function BookingsContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Medarbejder fjernet fra vagt" });
     },
     onError: (error: any) => {
