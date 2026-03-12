@@ -1,19 +1,16 @@
 
 
+## Fjern Thomas Wehage fra Eesy TM
 
-## Draft-booking workflow ✅
+Thomas Wehage er staff-medarbejder (`is_staff_employee = true`) og medlem af 3 teams: **Eesy TM**, **Fieldmarketing** og **Stab**.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Handling
+Slet hans team_members-record for Eesy TM via en database migration:
 
-## Fortrolige kontrakter ✅
+```sql
+DELETE FROM public.team_members 
+WHERE id = '2c0e7888-f346-42cf-a05d-50566b25fe86';
+```
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+Han forbliver på Fieldmarketing og Stab.
+
