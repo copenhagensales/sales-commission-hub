@@ -229,7 +229,59 @@ export default function MarketsContent() {
     },
   });
 
-  // Filter bookings
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("booking_assignment").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejder fjernet fra vagt" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeDayMutation = useMutation({
+    mutationFn: async ({ bookingId, dayIndex, date, currentBookedDays }: {
+      bookingId: string; dayIndex: number; date: string; currentBookedDays: number[];
+    }) => {
+      const { error: delErr } = await supabase
+        .from("booking_assignment")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("date", date);
+      if (delErr) throw delErr;
+
+      const newBookedDays = currentBookedDays.filter(d => d !== dayIndex);
+
+      if (newBookedDays.length === 0) {
+        const { error: bookErr } = await supabase.from("booking").delete().eq("id", bookingId);
+        if (bookErr) throw bookErr;
+      } else {
+        const { error: updErr } = await supabase
+          .from("booking")
+          .update({ booked_days: newBookedDays })
+          .eq("id", bookingId);
+        if (updErr) throw updErr;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Dag fjernet fra booking" });
+      setDeleteDayData(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      setDeleteDayData(null);
+    },
+  });
+
   const filtered = useMemo(() => {
     return bookings?.filter((b: any) => {
       const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
