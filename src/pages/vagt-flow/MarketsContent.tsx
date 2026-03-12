@@ -12,7 +12,8 @@ import {
   Tent,
   Users,
   MapPin,
-  Clock
+  Clock,
+  X
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
