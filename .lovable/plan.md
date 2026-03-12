@@ -1,31 +1,19 @@
 
 
-## Problem: "Nej tak" viser fejl og popup'en forsvinder ikke
 
-### Root Cause
+## Draft-booking workflow ✅
 
-Knappen virker faktisk — deltagerstatus (`not_attending`) **bliver** gemt korrekt i `event_attendees`. Men umiddelbart efter fejler `markSeenMutation`, som forsøger at indsætte i `event_invitation_views`.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-**Årsagen**: `event_invitation_views.employee_id` har en foreign key til `employee`-tabellen, men brugeren (William Krogh Bornak, ID: `89e43ed9`) eksisterer kun i `employee_master_data` — IKKE i `employee`-tabellen. Dermed fejler FK-constraint, og popup'en vises igen og igen fordi "set" aldrig registreres.
+## Fortrolige kontrakter ✅
 
-`event_attendees` derimod refererer til `employee_master_data`, og derfor virker selve svar-registreringen fint.
-
-### Fix
-
-**Database migration**: Ændre foreign key på `event_invitation_views.employee_id` fra `employee(id)` til `employee_master_data(id)`:
-
-```sql
-ALTER TABLE public.event_invitation_views
-  DROP CONSTRAINT event_invitation_views_employee_id_fkey;
-
-ALTER TABLE public.event_invitation_views
-  ADD CONSTRAINT event_invitation_views_employee_id_fkey
-  FOREIGN KEY (employee_id) REFERENCES public.employee_master_data(id) ON DELETE CASCADE;
-```
-
-### Effekt
-- Popup'en vil korrekt registrere at brugeren har set invitationen
-- Fejltoast forsvinder
-- Alle medarbejdere i `employee_master_data` (som er den primære medarbejdertabel) kan nu bruge funktionen korrekt
-- Ingen kodeændringer nødvendige — kun database-fix
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
