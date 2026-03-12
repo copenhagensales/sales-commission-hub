@@ -59,6 +59,20 @@ export default function MarketsContent() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
   const [pastSectionOpen, setPastSectionOpen] = useState(false);
+  const [deleteAssignmentData, setDeleteAssignmentData] = useState<{
+    id: string;
+    employeeName: string;
+    dayName: string;
+    date: string;
+  } | null>(null);
+  const [deleteDayData, setDeleteDayData] = useState<{
+    bookingId: string;
+    dayIndex: number;
+    dateLabel: string;
+    date: string;
+    assignmentCount: number;
+    currentBookedDays: number[];
+  } | null>(null);
 
   // Fetch market bookings (next 12 months)
   const { data: bookings, isLoading } = useQuery({
