@@ -12,9 +12,10 @@ import {
   Tent,
   Users,
   MapPin,
-  Clock
+  Clock,
+  X
 } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
+import { format, addMonths, addDays, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,7 @@ import {
 import { MarketCalendarWidget } from "@/components/vagt-flow/MarketCalendarWidget";
 import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
 import { getWeekStartDate } from "@/lib/calculations";
+import { cn } from "@/lib/utils";
 
 // Market/Fair location types
 const MARKET_TYPES = ["Markeder", "Messer"];
@@ -57,6 +59,20 @@ export default function MarketsContent() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [editBookingDialogBooking, setEditBookingDialogBooking] = useState<any>(null);
   const [pastSectionOpen, setPastSectionOpen] = useState(false);
+  const [deleteAssignmentData, setDeleteAssignmentData] = useState<{
+    id: string;
+    employeeName: string;
+    dayName: string;
+    date: string;
+  } | null>(null);
+  const [deleteDayData, setDeleteDayData] = useState<{
+    bookingId: string;
+    dayIndex: number;
+    dateLabel: string;
+    date: string;
+    assignmentCount: number;
+    currentBookedDays: number[];
+  } | null>(null);
 
   // Fetch market bookings (next 12 months)
   const { data: bookings, isLoading } = useQuery({
@@ -213,7 +229,59 @@ export default function MarketsContent() {
     },
   });
 
-  // Filter bookings
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("booking_assignment").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejder fjernet fra vagt" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeDayMutation = useMutation({
+    mutationFn: async ({ bookingId, dayIndex, date, currentBookedDays }: {
+      bookingId: string; dayIndex: number; date: string; currentBookedDays: number[];
+    }) => {
+      const { error: delErr } = await supabase
+        .from("booking_assignment")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("date", date);
+      if (delErr) throw delErr;
+
+      const newBookedDays = currentBookedDays.filter(d => d !== dayIndex);
+
+      if (newBookedDays.length === 0) {
+        const { error: bookErr } = await supabase.from("booking").delete().eq("id", bookingId);
+        if (bookErr) throw bookErr;
+      } else {
+        const { error: updErr } = await supabase
+          .from("booking")
+          .update({ booked_days: newBookedDays })
+          .eq("id", bookingId);
+        if (updErr) throw updErr;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Dag fjernet fra booking" });
+      setDeleteDayData(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+      setDeleteDayData(null);
+    },
+  });
+
   const filtered = useMemo(() => {
     return bookings?.filter((b: any) => {
       const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
@@ -439,24 +507,88 @@ export default function MarketsContent() {
                             </Button>
                           </div>
                           
-                          {/* Assigned employees */}
-                          {booking.booking_assignment && booking.booking_assignment.length > 0 && (
-                            <div className="mt-3 pt-3 border-t">
-                              <p className="text-xs text-muted-foreground mb-1">Tildelte medarbejdere:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {booking.booking_assignment.slice(0, 5).map((a: any) => (
-                                  <Badge key={a.id} variant="secondary" className="text-xs">
-                                    {a.employee_name}
-                                  </Badge>
-                                ))}
-                                {booking.booking_assignment.length > 5 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{booking.booking_assignment.length - 5} mere
-                                  </Badge>
-                                )}
+                          {/* Day grid with assignments */}
+                          {(() => {
+                            const weekStartDate = getWeekStartDate(booking.year, booking.week_number);
+                            const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+                            return (
+                              <div className="mt-3 pt-3 border-t">
+                                <div className="grid grid-cols-7 gap-2">
+                                  {DAYS.map((day, idx) => {
+                                    const isBooked = booking.booked_days?.includes(idx);
+                                    const dayDate = addDays(weekStartDate, idx);
+                                    const dayAssignments = booking.booking_assignment?.filter(
+                                      (a: any) => format(new Date(a.date), "yyyy-MM-dd") === format(dayDate, "yyyy-MM-dd")
+                                    );
+
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className={cn(
+                                          "p-2 rounded-lg text-center text-xs relative group/day",
+                                          isBooked ? "bg-primary/10 border border-primary/20" : "bg-muted/50"
+                                        )}
+                                      >
+                                        {/* Delete day button */}
+                                        {isBooked && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteDayData({
+                                                bookingId: booking.id,
+                                                dayIndex: idx,
+                                                dateLabel: `${day} d. ${format(dayDate, "d/M")}`,
+                                                date: format(dayDate, "yyyy-MM-dd"),
+                                                assignmentCount: dayAssignments?.length || 0,
+                                                currentBookedDays: booking.booked_days || [],
+                                              });
+                                            }}
+                                            className="absolute top-1 right-1 opacity-0 group-hover/day:opacity-100 
+                                                       bg-destructive text-destructive-foreground rounded-full p-0.5
+                                                       hover:bg-destructive/90 transition-opacity z-10"
+                                            title="Fjern denne dag"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                        <p className="font-medium">{day}</p>
+                                        <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
+                                        {isBooked && dayAssignments?.length > 0 && (
+                                          <div className="mt-1 space-y-0.5">
+                                            {dayAssignments.map((assignment: any) => (
+                                              <div
+                                                key={assignment.id}
+                                                className="text-[10px] font-medium truncate flex items-center justify-center gap-0.5 group relative text-primary"
+                                              >
+                                                <span>{assignment.employee_name?.split(' ')[0]}</span>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteAssignmentData({
+                                                      id: assignment.id,
+                                                      employeeName: assignment.employee_name,
+                                                      dayName: day,
+                                                      date: format(dayDate, "d. MMM", { locale: da })
+                                                    });
+                                                  }}
+                                                  className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 
+                                                             bg-destructive text-destructive-foreground rounded-full p-0.5 
+                                                             hover:bg-destructive/90 transition-opacity z-10"
+                                                  title="Fjern medarbejder"
+                                                >
+                                                  <X className="h-2.5 w-2.5" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -581,7 +713,70 @@ export default function MarketsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit booking dialog */}
+      {/* Delete assignment confirmation */}
+      <AlertDialog open={!!deleteAssignmentData} onOpenChange={() => setDeleteAssignmentData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern medarbejder fra vagt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil fjerne <strong>{deleteAssignmentData?.employeeName}</strong> fra {deleteAssignmentData?.dayName} d. {deleteAssignmentData?.date}?
+              <br /><br />
+              Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteAssignmentData) {
+                  deleteAssignmentMutation.mutate(deleteAssignmentData.id);
+                  setDeleteAssignmentData(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete day confirmation */}
+      <AlertDialog open={!!deleteDayData} onOpenChange={() => setDeleteDayData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern dag fra booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vil du fjerne <strong>{deleteDayData?.dateLabel}</strong> fra denne booking?
+              {(deleteDayData?.assignmentCount ?? 0) > 0 && (
+                <>
+                  <br /><br />
+                  {deleteDayData?.assignmentCount} medarbejder{deleteDayData?.assignmentCount !== 1 ? 'e' : ''} vil også blive fjernet.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteDayData) {
+                  removeDayMutation.mutate({
+                    bookingId: deleteDayData.bookingId,
+                    dayIndex: deleteDayData.dayIndex,
+                    date: deleteDayData.date,
+                    currentBookedDays: deleteDayData.currentBookedDays,
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Fjern dag
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {editBookingDialogBooking && (
         <EditBookingDialog
           open={!!editBookingDialogBooking}

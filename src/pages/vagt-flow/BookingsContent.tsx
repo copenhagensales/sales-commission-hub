@@ -432,6 +432,8 @@ export default function BookingsContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Booking slettet" });
       setDeleteBookingId(null);
     },
@@ -447,6 +449,8 @@ export default function BookingsContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Medarbejder fjernet fra vagt" });
     },
     onError: (error: any) => {
@@ -480,6 +484,8 @@ export default function BookingsContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Dag fjernet fra booking" });
       setDeleteDayData(null);
     },
@@ -943,14 +949,24 @@ export default function BookingsContent() {
                     </div>
                     <div className="flex items-center gap-2">
                       {canEditFmBookings && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditBookingDialogBooking(booking)}
-                          title="Rediger booking"
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditBookingDialogBooking(booking)}
+                            title="Rediger booking"
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteBookingId(booking.id)}
+                            title="Slet booking"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -968,10 +984,32 @@ export default function BookingsContent() {
                         <div
                           key={idx}
                           className={cn(
-                            "p-2 rounded-lg text-center text-xs",
+                            "p-2 rounded-lg text-center text-xs relative group/day",
                             isBooked ? "bg-primary/10 border border-primary/20" : "bg-muted/50"
                           )}
                         >
+                          {/* Delete day button - hover only */}
+                          {canEditFmBookings && isBooked && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteDayData({
+                                  bookingId: booking.id,
+                                  dayIndex: idx,
+                                  dateLabel: `${day} d. ${format(dayDate, "d/M")}`,
+                                  date: format(dayDate, "yyyy-MM-dd"),
+                                  assignmentCount: dayAssignments?.length || 0,
+                                  currentBookedDays: booking.booked_days || [],
+                                });
+                              }}
+                              className="absolute top-1 right-1 opacity-0 group-hover/day:opacity-100 
+                                         bg-destructive text-destructive-foreground rounded-full p-0.5
+                                         hover:bg-destructive/90 transition-opacity z-10"
+                              title="Fjern denne dag fra bookingen"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                           <p className="font-medium">{day}</p>
                           <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                           {isBooked && dayAssignments?.length > 0 && (
@@ -979,9 +1017,33 @@ export default function BookingsContent() {
                               {dayAssignments.map((assignment: any) => (
                                 <div
                                   key={assignment.id}
-                                  className="text-[10px] font-medium truncate text-primary"
+                                  className={cn(
+                                    "text-[10px] font-medium truncate flex items-center justify-center gap-0.5 group relative",
+                                    "text-primary"
+                                  )}
                                 >
-                                  {assignment.employee_name?.split(' ')[0]}
+                                  <span>{assignment.employee_name?.split(' ')[0]}</span>
+                                  
+                                  {/* Delete employee button - hover only */}
+                                  {canEditFmBookings && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteAssignmentData({
+                                          id: assignment.id,
+                                          employeeName: assignment.employee_name,
+                                          dayName: day,
+                                          date: format(dayDate, "d. MMM", { locale: da })
+                                        });
+                                      }}
+                                      className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 
+                                                 bg-destructive text-destructive-foreground rounded-full p-0.5 
+                                                 hover:bg-destructive/90 transition-opacity z-10"
+                                      title="Fjern medarbejder fra denne dag"
+                                    >
+                                      <X className="h-2.5 w-2.5" />
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
