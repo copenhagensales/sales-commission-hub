@@ -15,7 +15,7 @@ import {
   Clock,
   X
 } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
+import { format, addMonths, addDays, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
