@@ -308,6 +308,22 @@ export default function BookingsContent() {
     enabled: allBookingIds.length > 0,
   });
 
+  // Fetch diet salary type for quick-add
+  const { data: dietSalaryType } = useQuery({
+    queryKey: ["diet-salary-type"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id, name, amount")
+        .ilike("name", "%diæt%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Build lookup: booking_id + date -> has diet
   const dietByBookingDate = useMemo(() => {
     const map = new Set<string>();
