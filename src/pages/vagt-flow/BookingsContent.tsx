@@ -751,7 +751,10 @@ export default function BookingsContent() {
   // Confirm week mutation
   const confirmWeekMutation = useMutation({
     mutationFn: async () => {
-      const draftIds = bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || [];
+      const draftIds = [
+        ...(bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || []),
+        ...(marketBookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || []),
+      ];
       if (draftIds.length === 0) return;
       const { error } = await supabase
         .from("booking")
@@ -785,7 +788,7 @@ export default function BookingsContent() {
     },
   });
 
-  const draftCount = bookings?.filter((b: any) => b.status === 'draft').length || 0;
+  const draftCount = (bookings?.filter((b: any) => b.status === 'draft').length || 0) + (marketBookings?.filter((b: any) => b.status === 'draft').length || 0);
 
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
@@ -1258,6 +1261,25 @@ export default function BookingsContent() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {booking.status === 'draft' && (
+                        <>
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700">
+                            Kladde
+                          </Badge>
+                          {canEditFmBookings && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950"
+                              onClick={(e) => { e.stopPropagation(); confirmSingleMutation.mutate(booking.id); }}
+                              disabled={confirmSingleMutation.isPending}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Bekræft
+                            </Button>
+                          )}
+                        </>
+                      )}
                       {canEditFmBookings && (
                         <>
                           <Button

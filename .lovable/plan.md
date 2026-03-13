@@ -1,32 +1,19 @@
 
 
-## Problem
 
-Hillerød Kræmmermarked-bookingen for uge 11 **er** draft i databasen, men markedssektionen i Bookinger-tabben viser **hverken** et "Kladde"-badge eller en "Bekræft"-knap. Det er kun de almindelige bookinger der har draft-visning og bekræftelse — markeder er blevet glemt.
+## Draft-booking workflow ✅
 
-Det betyder at:
-- August kan ikke se sine weekendvagter (fordi `MyBookingSchedule` kun viser confirmed)
-- Manageren kan ikke se at bookingen mangler bekræftelse
-- Der er ingen knap til at bekræfte den
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-## Plan
+## Fortrolige kontrakter ✅
 
-### 1. Tilføj draft-badge og bekræft-knap til markedsbookinger
-
-**Fil**: `src/pages/vagt-flow/BookingsContent.tsx`
-
-- Tilføj "Kladde"-badge ved hver markedsbooking der har `status === 'draft'` (samme gule badge som regulære bookinger)
-- Tilføj en per-booking "Bekræft"-knap for draft-markeder
-- Inkluder market drafts i `draftCount` og `confirmWeekMutation` så "Bekræft uge"-knappen også bekræfter markeder
-
-### Ændringer i detaljer:
-
-1. **`draftCount`** (linje ~788): Tilføj market drafts til optællingen
-2. **`confirmWeekMutation`** (linje ~752-769): Inkluder market draft IDs i batch-bekræftelsen  
-3. **Market booking rendering** (linje ~1248-1282): Tilføj "Kladde" badge + "Bekræft" knap (samme mønster som regulære bookinger i linje ~982-986)
-
-### Resultat
-- Manageren kan se at markeds-bookingen er en kladde
-- "Bekræft uge"-knappen inkluderer nu også markeder
-- Når den bekræftes, vil August kunne se sine weekendvagter
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
