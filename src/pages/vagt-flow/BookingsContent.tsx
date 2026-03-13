@@ -1248,7 +1248,7 @@ export default function BookingsContent() {
             <CollapsibleContent>
               <div className="border-t px-6 pb-6 pt-4 space-y-4">
               {marketBookings.map((booking: any) => (
-                <div key={booking.id} className="p-4 border rounded-lg bg-card hover:bg-muted/50">
+                <div key={booking.id} className={`p-4 border rounded-lg hover:bg-muted/50 ${booking.status === 'draft' ? 'border-l-4 border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/10' : 'bg-card'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div
                       className="cursor-pointer"
