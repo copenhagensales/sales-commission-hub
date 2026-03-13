@@ -722,6 +722,28 @@ export default function BookingsContent() {
             </div>
           </PopoverContent>
         </Popover>
+        {/* Diet toggle button - only show if no diet on this day yet */}
+        {!dietByBookingDate.has(`${booking.id}_${dateStr}`) && dietSalaryType && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const employeeIds = dayAssignments?.map((a: any) => a.employee_id) || [];
+              if (employeeIds.length === 0) {
+                toast({ title: "Ingen medarbejdere", description: "Tilføj medarbejdere først", variant: "destructive" });
+                return;
+              }
+              addDietToDayMutation.mutate({
+                bookingId: booking.id,
+                date: dateStr,
+                employeeIds,
+              });
+            }}
+            className="bg-orange-200/60 text-orange-800 rounded-full p-0.5 hover:bg-orange-200 transition-colors dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/60"
+            title="Tilføj diæt"
+          >
+            <Utensils className="h-3 w-3" />
+          </button>
+        )}
       </div>
     );
   };
