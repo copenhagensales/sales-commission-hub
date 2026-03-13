@@ -1416,6 +1416,21 @@ export default function BookingsContent() {
                                 <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
                                   <Utensils className="h-2 w-2" />
                                   Diæt
+                                  {canEditFmBookings && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeDietFromDayMutation.mutate({
+                                          bookingId: booking.id,
+                                          date: dateStr,
+                                        });
+                                      }}
+                                      className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                      title="Fjern diæt fra dag"
+                                    >
+                                      <X className="h-2 w-2" />
+                                    </button>
+                                  )}
                                 </Badge>
                               </div>
                             );
