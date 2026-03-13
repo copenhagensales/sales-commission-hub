@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus } from "lucide-react";
 import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
@@ -517,6 +517,126 @@ export default function BookingsContent() {
     },
   });
 
+  const addVehicleToDayMutation = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, date }: {
+      bookingId: string; vehicleId: string; date: string;
+    }) => {
+      const { error } = await supabase.from("booking_vehicle").insert({
+        booking_id: bookingId,
+        vehicle_id: vehicleId,
+        date,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      toast({ title: "Bil tilføjet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Helper component for quick-add employee/vehicle popovers on a booked day
+  const DayQuickAddButtons = ({ booking, dayDate, dayAssignments }: {
+    booking: any;
+    dayDate: Date;
+    dayAssignments: any[];
+  }) => {
+    const dateStr = format(dayDate, "yyyy-MM-dd");
+    const assignedEmployeeIds = new Set(dayAssignments?.map((a: any) => a.employee_id) || []);
+    const availableEmployees = employees.filter(e => !assignedEmployeeIds.has(e.id));
+    
+    const dayVehicleIds = new Set(
+      (bookingVehicles as any[])
+        .filter(bv => bv.booking_id === booking.id && bv.date === dateStr)
+        .map(bv => bv.vehicle_id)
+    );
+    const availableVehicles = vehicles.filter(v => !dayVehicleIds.has(v.id));
+
+    return (
+      <div className="mt-1 flex items-center justify-center gap-1 opacity-0 group-hover/day:opacity-100 transition-opacity">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="bg-primary/20 text-primary rounded-full p-0.5 hover:bg-primary/30 transition-colors"
+              title="Tilføj medarbejder"
+            >
+              <UserPlus className="h-3 w-3" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="center" side="bottom">
+            <p className="text-xs font-medium mb-1 text-muted-foreground">Tilføj medarbejder</p>
+            <div className="max-h-40 overflow-y-auto space-y-0.5">
+              {availableEmployees.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">Ingen ledige</p>
+              ) : (
+                availableEmployees.map(emp => (
+                  <button
+                    key={emp.id}
+                    className="w-full text-left text-xs px-2 py-1 rounded hover:bg-accent transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      bulkAssignMutation.mutate([{
+                        bookingId: booking.id,
+                        employeeId: emp.id,
+                        dates: [dateStr],
+                        startTime: booking.start_date ? "09:00" : "09:00",
+                        endTime: booking.end_date ? "17:00" : "17:00",
+                      }]);
+                    }}
+                  >
+                    {emp.full_name}
+                  </button>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="bg-yellow-200/60 text-yellow-800 rounded-full p-0.5 hover:bg-yellow-200 transition-colors dark:bg-yellow-900/40 dark:text-yellow-300 dark:hover:bg-yellow-900/60"
+              title="Tilføj bil"
+            >
+              <Car className="h-3 w-3" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="center" side="bottom">
+            <p className="text-xs font-medium mb-1 text-muted-foreground">Tilføj bil</p>
+            <div className="max-h-40 overflow-y-auto space-y-0.5">
+              {availableVehicles.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">Ingen ledige</p>
+              ) : (
+                availableVehicles.map(v => (
+                  <button
+                    key={v.id}
+                    className="w-full text-left text-xs px-2 py-1 rounded hover:bg-accent transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addVehicleToDayMutation.mutate({
+                        bookingId: booking.id,
+                        vehicleId: v.id,
+                        date: dateStr,
+                      });
+                    }}
+                  >
+                    {v.name} {v.license_plate ? `(${v.license_plate})` : ''}
+                  </button>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  };
+
   // Confirm week mutation
   const confirmWeekMutation = useMutation({
     mutationFn: async () => {
@@ -932,6 +1052,13 @@ export default function BookingsContent() {
                                   </div>
                                 );
                               })()}
+                              {canEditFmBookings && isBooked && (
+                                <DayQuickAddButtons
+                                  booking={booking}
+                                  dayDate={dayDate}
+                                  dayAssignments={dayAssignments || []}
+                                />
+                              )}
                             </div>
                           );
                         })}
@@ -1151,6 +1278,13 @@ export default function BookingsContent() {
                               </div>
                             );
                           })()}
+                          {canEditFmBookings && isBooked && (
+                            <DayQuickAddButtons
+                              booking={booking}
+                              dayDate={dayDate}
+                              dayAssignments={dayAssignments || []}
+                            />
+                          )}
                         </div>
                       );
                     })}
