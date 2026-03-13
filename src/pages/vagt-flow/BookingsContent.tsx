@@ -1059,6 +1059,22 @@ export default function BookingsContent() {
                                       <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">
                                         <Car className="h-2 w-2" />
                                         {v.name}
+                                        {canEditFmBookings && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeVehicleFromDayMutation.mutate({
+                                                bookingId: booking.id,
+                                                vehicleId: v.vehicleId,
+                                                date: dateStr,
+                                              });
+                                            }}
+                                            className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                            title="Fjern bil fra dag"
+                                          >
+                                            <X className="h-2 w-2" />
+                                          </button>
+                                        )}
                                       </Badge>
                                     ))}
                                   </div>
