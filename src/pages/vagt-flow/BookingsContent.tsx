@@ -540,6 +540,30 @@ export default function BookingsContent() {
     },
   });
 
+  const removeVehicleFromDayMutation = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, date }: {
+      bookingId: string; vehicleId: string; date: string;
+    }) => {
+      const { error } = await supabase
+        .from("booking_vehicle")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("vehicle_id", vehicleId)
+        .eq("date", date);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      toast({ title: "Bil fjernet fra dag" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Helper component for quick-add employee/vehicle popovers on a booked day
   const DayQuickAddButtons = ({ booking, dayDate, dayAssignments }: {
     booking: any;
