@@ -580,7 +580,56 @@ export default function BookingsContent() {
     },
   });
 
-  // Helper component for quick-add employee/vehicle popovers on a booked day
+  const addDietToDayMutation = useMutation({
+    mutationFn: async ({ bookingId, date, employeeIds }: {
+      bookingId: string; date: string; employeeIds: string[];
+    }) => {
+      if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
+      const inserts = employeeIds.map(employeeId => ({
+        booking_id: bookingId,
+        employee_id: employeeId,
+        salary_type_id: dietSalaryType.id,
+        date,
+        amount: dietSalaryType.amount || 0,
+      }));
+      if (inserts.length === 0) throw new Error("Ingen medarbejdere tildelt denne dag");
+      const { error } = await supabase.from("booking_diet").upsert(inserts, { onConflict: "booking_id,employee_id,date" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-diets"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      toast({ title: "Diæt tilføjet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeDietFromDayMutation = useMutation({
+    mutationFn: async ({ bookingId, date }: {
+      bookingId: string; date: string;
+    }) => {
+      const { error } = await supabase
+        .from("booking_diet")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("date", date);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-diets"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      toast({ title: "Diæt fjernet fra dag" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+
   const DayQuickAddButtons = ({ booking, dayDate, dayAssignments }: {
     booking: any;
     dayDate: Date;
