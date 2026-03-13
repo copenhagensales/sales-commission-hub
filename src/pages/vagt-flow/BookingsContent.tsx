@@ -1309,6 +1309,18 @@ export default function BookingsContent() {
                           )}
                         </>
                       )}
+                      {booking.status === 'confirmed' && canEditFmBookings && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950"
+                          onClick={(e) => { e.stopPropagation(); revertToDraftMutation.mutate(booking.id); }}
+                          disabled={revertToDraftMutation.isPending}
+                        >
+                          <Undo2 className="h-3 w-3" />
+                          Til kladde
+                        </Button>
+                      )}
                       {canEditFmBookings && (
                         <>
                           <Button
