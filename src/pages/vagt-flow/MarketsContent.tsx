@@ -13,7 +13,8 @@ import {
   Users,
   MapPin,
   Clock,
-  X
+  X,
+  Plus
 } from "lucide-react";
 import { format, addMonths, addDays, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
