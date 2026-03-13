@@ -788,6 +788,23 @@ export default function BookingsContent() {
     },
   });
 
+  const revertToDraftMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const { error } = await supabase
+        .from('booking')
+        .update({ status: 'draft' })
+        .eq('id', bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Booking sat tilbage til kladde" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const draftCount = (bookings?.filter((b: any) => b.status === 'draft').length || 0) + (marketBookings?.filter((b: any) => b.status === 'draft').length || 0);
 
   const filtered = bookings?.filter((b: any) => {
