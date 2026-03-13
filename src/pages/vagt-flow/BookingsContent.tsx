@@ -320,14 +320,14 @@ export default function BookingsContent() {
 
   // Build lookup: booking_id + date -> unique vehicles
   const vehiclesByBookingDate = useMemo(() => {
-    const map = new Map<string, { name: string; plate: string }[]>();
+    const map = new Map<string, { name: string; plate: string; vehicleId: string }[]>();
     for (const bv of bookingVehicles as any[]) {
       if (!bv.vehicle || !bv.date) continue;
       const key = `${bv.booking_id}_${bv.date}`;
       const existing = map.get(key) || [];
-      const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
+      const alreadyAdded = existing.some(v => v.vehicleId === bv.vehicle_id);
       if (!alreadyAdded) {
-        existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
+        existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate, vehicleId: bv.vehicle_id });
       }
       map.set(key, existing);
     }
@@ -534,6 +534,30 @@ export default function BookingsContent() {
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       toast({ title: "Bil tilføjet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeVehicleFromDayMutation = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, date }: {
+      bookingId: string; vehicleId: string; date: string;
+    }) => {
+      const { error } = await supabase
+        .from("booking_vehicle")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("vehicle_id", vehicleId)
+        .eq("date", date);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      toast({ title: "Bil fjernet fra dag" });
     },
     onError: (error: any) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -1035,6 +1059,22 @@ export default function BookingsContent() {
                                       <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">
                                         <Car className="h-2 w-2" />
                                         {v.name}
+                                        {canEditFmBookings && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeVehicleFromDayMutation.mutate({
+                                                bookingId: booking.id,
+                                                vehicleId: v.vehicleId,
+                                                date: dateStr,
+                                              });
+                                            }}
+                                            className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                            title="Fjern bil fra dag"
+                                          >
+                                            <X className="h-2 w-2" />
+                                          </button>
+                                        )}
                                       </Badge>
                                     ))}
                                   </div>
@@ -1245,6 +1285,22 @@ export default function BookingsContent() {
                                   <Badge key={i} variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">
                                     <Car className="h-2 w-2" />
                                     {v.name}
+                                    {canEditFmBookings && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeVehicleFromDayMutation.mutate({
+                                            bookingId: booking.id,
+                                            vehicleId: v.vehicleId,
+                                            date: dateStr,
+                                          });
+                                        }}
+                                        className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                        title="Fjern bil fra dag"
+                                      >
+                                        <X className="h-2 w-2" />
+                                      </button>
+                                    )}
                                   </Badge>
                                 ))}
                               </div>
