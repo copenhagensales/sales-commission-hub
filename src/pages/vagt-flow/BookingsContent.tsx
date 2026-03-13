@@ -751,7 +751,10 @@ export default function BookingsContent() {
   // Confirm week mutation
   const confirmWeekMutation = useMutation({
     mutationFn: async () => {
-      const draftIds = bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || [];
+      const draftIds = [
+        ...(bookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || []),
+        ...(marketBookings?.filter((b: any) => b.status === 'draft').map((b: any) => b.id) || []),
+      ];
       if (draftIds.length === 0) return;
       const { error } = await supabase
         .from("booking")
