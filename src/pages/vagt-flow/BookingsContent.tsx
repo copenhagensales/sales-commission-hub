@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus, Undo2 } from "lucide-react";
 import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
@@ -788,6 +788,23 @@ export default function BookingsContent() {
     },
   });
 
+  const revertToDraftMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const { error } = await supabase
+        .from('booking')
+        .update({ status: 'draft' })
+        .eq('id', bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Booking sat tilbage til kladde" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const draftCount = (bookings?.filter((b: any) => b.status === 'draft').length || 0) + (marketBookings?.filter((b: any) => b.status === 'draft').length || 0);
 
   const filtered = bookings?.filter((b: any) => {
@@ -999,6 +1016,18 @@ export default function BookingsContent() {
                                 </Button>
                               )}
                             </>
+                          )}
+                          {booking.status === 'confirmed' && canEditFmBookings && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950"
+                              onClick={(e) => { e.stopPropagation(); revertToDraftMutation.mutate(booking.id); }}
+                              disabled={revertToDraftMutation.isPending}
+                            >
+                              <Undo2 className="h-3 w-3" />
+                              Til kladde
+                            </Button>
                           )}
                           {hotelMap[booking.id] && (
                             <Badge className={cn(
@@ -1279,6 +1308,18 @@ export default function BookingsContent() {
                             </Button>
                           )}
                         </>
+                      )}
+                      {booking.status === 'confirmed' && canEditFmBookings && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950"
+                          onClick={(e) => { e.stopPropagation(); revertToDraftMutation.mutate(booking.id); }}
+                          disabled={revertToDraftMutation.isPending}
+                        >
+                          <Undo2 className="h-3 w-3" />
+                          Til kladde
+                        </Button>
                       )}
                       {canEditFmBookings && (
                         <>
