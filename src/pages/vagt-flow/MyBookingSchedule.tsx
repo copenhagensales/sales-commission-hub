@@ -68,7 +68,7 @@ export default function MyBookingSchedule() {
         .select(`
           id, date, start_time, end_time, booking_id,
           booking:booking_id (
-            id, week_number, year, start_date, end_date,
+            id, status, week_number, year, start_date, end_date,
             location:location_id ( id, name, address_city, address_street ),
             client:client_id ( name ),
             campaign:campaign_id ( name ),
@@ -81,7 +81,10 @@ export default function MyBookingSchedule() {
         .order("date")
         .order("start_time");
 
-      return data ?? [];
+      const confirmed = (data ?? []).filter(
+        (a: any) => a.booking?.status === 'confirmed'
+      );
+      return confirmed;
     },
     enabled: !!employeeId,
   });
