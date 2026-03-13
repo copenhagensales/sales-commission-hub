@@ -1278,6 +1278,13 @@ export default function BookingsContent() {
                               </div>
                             );
                           })()}
+                          {canEditFmBookings && isBooked && (
+                            <DayQuickAddButtons
+                              booking={booking}
+                              dayDate={dayDate}
+                              dayAssignments={dayAssignments || []}
+                            />
+                          )}
                         </div>
                       );
                     })}
