@@ -1051,7 +1051,25 @@ export default function BookingsContent() {
                               <X className="h-3 w-3" />
                             </button>
                           )}
-                          <p className="font-medium">{day}</p>
+                          {/* Add day button - hover only on non-booked days */}
+                          {canEditFmBookings && !isBooked && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addDayMutation.mutate({
+                                  bookingId: booking.id,
+                                  dayIndex: idx,
+                                  currentBookedDays: booking.booked_days || [],
+                                });
+                              }}
+                              className="absolute top-1 right-1 opacity-0 group-hover/day:opacity-100 
+                                         bg-primary text-primary-foreground rounded-full p-0.5
+                                         hover:bg-primary/90 transition-opacity z-10"
+                              title="Tilføj denne dag til bookingen"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )}
                           <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                           {isBooked && dayAssignments?.length > 0 && (
                             <div className="mt-1 space-y-0.5">
