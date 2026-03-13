@@ -283,6 +283,28 @@ export default function MarketsContent() {
     },
   });
 
+  const addDayMutation = useMutation({
+    mutationFn: async ({ bookingId, dayIndex, currentBookedDays }: {
+      bookingId: string; dayIndex: number; currentBookedDays: number[];
+    }) => {
+      const newBookedDays = [...currentBookedDays, dayIndex].sort((a, b) => a - b);
+      const { error } = await supabase
+        .from("booking")
+        .update({ booked_days: newBookedDays })
+        .eq("id", bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Dag tilføjet til booking" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const filtered = useMemo(() => {
     return bookings?.filter((b: any) => {
       const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
