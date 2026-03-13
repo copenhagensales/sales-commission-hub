@@ -308,6 +308,22 @@ export default function BookingsContent() {
     enabled: allBookingIds.length > 0,
   });
 
+  // Fetch diet salary type for quick-add
+  const { data: dietSalaryType } = useQuery({
+    queryKey: ["diet-salary-type"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id, name, amount")
+        .ilike("name", "%diæt%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Build lookup: booking_id + date -> has diet
   const dietByBookingDate = useMemo(() => {
     const map = new Set<string>();
@@ -564,7 +580,56 @@ export default function BookingsContent() {
     },
   });
 
-  // Helper component for quick-add employee/vehicle popovers on a booked day
+  const addDietToDayMutation = useMutation({
+    mutationFn: async ({ bookingId, date, employeeIds }: {
+      bookingId: string; date: string; employeeIds: string[];
+    }) => {
+      if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
+      const inserts = employeeIds.map(employeeId => ({
+        booking_id: bookingId,
+        employee_id: employeeId,
+        salary_type_id: dietSalaryType.id,
+        date,
+        amount: dietSalaryType.amount || 0,
+      }));
+      if (inserts.length === 0) throw new Error("Ingen medarbejdere tildelt denne dag");
+      const { error } = await supabase.from("booking_diet").upsert(inserts, { onConflict: "booking_id,employee_id,date" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-diets"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      toast({ title: "Diæt tilføjet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeDietFromDayMutation = useMutation({
+    mutationFn: async ({ bookingId, date }: {
+      bookingId: string; date: string;
+    }) => {
+      const { error } = await supabase
+        .from("booking_diet")
+        .delete()
+        .eq("booking_id", bookingId)
+        .eq("date", date);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-booking-diets"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      toast({ title: "Diæt fjernet fra dag" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+
   const DayQuickAddButtons = ({ booking, dayDate, dayAssignments }: {
     booking: any;
     dayDate: Date;
@@ -657,6 +722,28 @@ export default function BookingsContent() {
             </div>
           </PopoverContent>
         </Popover>
+        {/* Diet toggle button - only show if no diet on this day yet */}
+        {!dietByBookingDate.has(`${booking.id}_${dateStr}`) && dietSalaryType && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const employeeIds = dayAssignments?.map((a: any) => a.employee_id) || [];
+              if (employeeIds.length === 0) {
+                toast({ title: "Ingen medarbejdere", description: "Tilføj medarbejdere først", variant: "destructive" });
+                return;
+              }
+              addDietToDayMutation.mutate({
+                bookingId: booking.id,
+                date: dateStr,
+                employeeIds,
+              });
+            }}
+            className="bg-orange-200/60 text-orange-800 rounded-full p-0.5 hover:bg-orange-200 transition-colors dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/60"
+            title="Tilføj diæt"
+          >
+            <Utensils className="h-3 w-3" />
+          </button>
+        )}
       </div>
     );
   };
@@ -1088,6 +1175,21 @@ export default function BookingsContent() {
                                     <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
                                       <Utensils className="h-2 w-2" />
                                       Diæt
+                                      {canEditFmBookings && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeDietFromDayMutation.mutate({
+                                              bookingId: booking.id,
+                                              date: dateStr,
+                                            });
+                                          }}
+                                          className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                          title="Fjern diæt fra dag"
+                                        >
+                                          <X className="h-2 w-2" />
+                                        </button>
+                                      )}
                                     </Badge>
                                   </div>
                                 );
@@ -1314,6 +1416,21 @@ export default function BookingsContent() {
                                 <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
                                   <Utensils className="h-2 w-2" />
                                   Diæt
+                                  {canEditFmBookings && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeDietFromDayMutation.mutate({
+                                          bookingId: booking.id,
+                                          date: dateStr,
+                                        });
+                                      }}
+                                      className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                      title="Fjern diæt fra dag"
+                                    >
+                                      <X className="h-2 w-2" />
+                                    </button>
+                                  )}
                                 </Badge>
                               </div>
                             );
