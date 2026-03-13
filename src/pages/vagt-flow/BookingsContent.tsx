@@ -788,7 +788,7 @@ export default function BookingsContent() {
     },
   });
 
-  const draftCount = bookings?.filter((b: any) => b.status === 'draft').length || 0;
+  const draftCount = (bookings?.filter((b: any) => b.status === 'draft').length || 0) + (marketBookings?.filter((b: any) => b.status === 'draft').length || 0);
 
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
