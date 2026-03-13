@@ -1,19 +1,43 @@
 
 
+## Tilføj medarbejder og bil direkte på en dag
 
-## Draft-booking workflow ✅
+### Idé
+På bookede dage i griddet vises to hover-knapper ved siden af den eksisterende "X"-knap:
+- **Bruger-ikon (+)**: Åbner en lille popover med medarbejderliste — vælg en og de tilføjes direkte på den dag
+- **Bil-ikon (+)**: Åbner en lille popover med billiste — vælg en og den tilføjes direkte på den dag
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+Dette gør det muligt at tilføje en enkelt medarbejder eller bil på én specifik dag uden at åbne EditBookingDialog.
 
-## Fortrolige kontrakter ✅
+### Ændringer i `BookingsContent.tsx`
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+1. **To nye inline popovers per booked day cell** — placeres i bunden af cellen (under eksisterende indhold):
+   - `UserPlus` ikon → Popover med Select af tilgængelige medarbejdere (fra eksisterende `employees`-query). Ved valg køres `bulkAssignMutation` med én dato.
+   - `Car` ikon (med +) → Popover med Select af tilgængelige biler (fra eksisterende `vehicles`-query). Ved valg insertes i `booking_vehicle`.
+
+2. **Knapperne vises kun** når `canEditFmBookings && isBooked` — samme mønster som "X" knappen, med `opacity-0 group-hover/day:opacity-100`.
+
+3. **Layout**: Knapperne placeres i bunden af dag-cellen som små ikoner, fx:
+   ```
+   ┌─────────┐
+   │  Man  X  │
+   │  13/3    │
+   │  Anders  │
+   │  🚗 Bil1 │
+   │ [+👤][+🚗]│  ← hover-only
+   └─────────┘
+   ```
+
+4. **Mutation for enkelt medarbejder**: Genbruger eksisterende `bulkAssignMutation` med én assignment og booking's start/end times.
+
+5. **Mutation for enkelt bil**: Genbruger den eksisterende inline insert-logik fra `onAddVehicleAssignment`.
+
+6. **Filtrering**: Medarbejdere der allerede er tildelt den dag filtreres fra. Biler der allerede er tildelt den dag filtreres fra.
+
+7. **Anvendes i begge grids** (regular bookings + market bookings).
+
+### Omfang
+- Kun `BookingsContent.tsx`
+- Ingen nye filer, komponenter eller database-ændringer
+- Importér `UserPlus` fra lucide-react
+
