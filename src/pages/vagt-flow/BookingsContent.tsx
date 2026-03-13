@@ -320,14 +320,14 @@ export default function BookingsContent() {
 
   // Build lookup: booking_id + date -> unique vehicles
   const vehiclesByBookingDate = useMemo(() => {
-    const map = new Map<string, { name: string; plate: string }[]>();
+    const map = new Map<string, { name: string; plate: string; vehicleId: string }[]>();
     for (const bv of bookingVehicles as any[]) {
       if (!bv.vehicle || !bv.date) continue;
       const key = `${bv.booking_id}_${bv.date}`;
       const existing = map.get(key) || [];
-      const alreadyAdded = existing.some(v => v.name === bv.vehicle.name);
+      const alreadyAdded = existing.some(v => v.vehicleId === bv.vehicle_id);
       if (!alreadyAdded) {
-        existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate });
+        existing.push({ name: bv.vehicle.name, plate: bv.vehicle.license_plate, vehicleId: bv.vehicle_id });
       }
       map.set(key, existing);
     }
