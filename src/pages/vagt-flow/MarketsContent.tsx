@@ -13,7 +13,8 @@ import {
   Users,
   MapPin,
   Clock,
-  X
+  X,
+  Plus
 } from "lucide-react";
 import { format, addMonths, addDays, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
@@ -279,6 +280,28 @@ export default function MarketsContent() {
     onError: (error: any) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
       setDeleteDayData(null);
+    },
+  });
+
+  const addDayMutation = useMutation({
+    mutationFn: async ({ bookingId, dayIndex, currentBookedDays }: {
+      bookingId: string; dayIndex: number; currentBookedDays: number[];
+    }) => {
+      const newBookedDays = [...currentBookedDays, dayIndex].sort((a, b) => a - b);
+      const { error } = await supabase
+        .from("booking")
+        .update({ booked_days: newBookedDays })
+        .eq("id", bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings-week"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Dag tilføjet til booking" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
@@ -549,6 +572,25 @@ export default function MarketsContent() {
                                             title="Fjern denne dag"
                                           >
                                             <X className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                        {/* Add day button - hover only on non-booked days */}
+                                        {!isBooked && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              addDayMutation.mutate({
+                                                bookingId: booking.id,
+                                                dayIndex: idx,
+                                                currentBookedDays: booking.booked_days || [],
+                                              });
+                                            }}
+                                            className="absolute top-1 right-1 opacity-0 group-hover/day:opacity-100 
+                                                       bg-primary text-primary-foreground rounded-full p-0.5
+                                                       hover:bg-primary/90 transition-opacity z-10"
+                                            title="Tilføj denne dag til bookingen"
+                                          >
+                                            <Plus className="h-3 w-3" />
                                           </button>
                                         )}
                                         <p className="font-medium">{day}</p>
