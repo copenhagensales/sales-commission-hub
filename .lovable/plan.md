@@ -1,19 +1,31 @@
 
 
+## Skjul kladde-bookinger fra medarbejdernes vagtplan
 
-## Draft-booking workflow ✅
+### Problem
+Queryen i `MyBookingSchedule.tsx` (linje 66-82) henter alle `booking_assignment` uden at filtrere på booking-status. Medarbejdere kan derfor se vagter der stadig er kladder.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Løsning
+Tilføj et filter i assignment-queryen, så den kun inkluderer assignments hvor den tilhørende booking har `status = 'confirmed'`.
 
-## Fortrolige kontrakter ✅
+**Ændring i `MyBookingSchedule.tsx`** — udvid `.select()` til at inkludere `booking.status` og filtrer resultatet:
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+```ts
+// I queryen (linje 66-84):
+// Tilføj status til booking select
+booking:booking_id (
+  id, status, week_number, year, start_date, end_date, ...
+)
+
+// Efter fetch, filtrer kladder fra:
+const confirmed = (data ?? []).filter(
+  (a: any) => a.booking?.status === 'confirmed'
+);
+return confirmed;
+```
+
+### Omfang
+- Kun `MyBookingSchedule.tsx`
+- Ingen database-ændringer
+- Managers ser stadig kladder i BookingsContent (uændret)
+
