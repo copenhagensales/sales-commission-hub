@@ -1070,6 +1070,7 @@ export default function BookingsContent() {
                               <Plus className="h-3 w-3" />
                             </button>
                           )}
+                          <p className="font-medium">{day}</p>
                           <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                           {isBooked && dayAssignments?.length > 0 && (
                             <div className="mt-1 space-y-0.5">
