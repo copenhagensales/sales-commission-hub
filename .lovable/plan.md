@@ -1,16 +1,36 @@
 
 
-## Fjern Thomas Wehage fra Eesy TM
+## Tilføj dag til eksisterende booking
 
-Thomas Wehage er staff-medarbejder (`is_staff_employee = true`) og medlem af 3 teams: **Eesy TM**, **Fieldmarketing** og **Stab**.
+### Hvad
+En "+" knap vises ved hover over ikke-bookede dage i dag-griddet, som modstykke til den eksisterende "X" slet-knap på bookede dage. Klik tilføjer dagen til bookingen uden bekræftelsesdialog (da det ikke er destruktivt).
 
-### Handling
-Slet hans team_members-record for Eesy TM via en database migration:
+### Ændringer i `BookingsContent.tsx`
 
-```sql
-DELETE FROM public.team_members 
-WHERE id = '2c0e7888-f346-42cf-a05d-50566b25fe86';
-```
+1. **Ny `addDayMutation`** — opdaterer `booked_days`-arrayet på bookingen med den nye dag-index:
+   ```ts
+   addDayMutation = useMutation({
+     mutationFn: async ({ bookingId, dayIndex, currentBookedDays }) => {
+       const newBookedDays = [...currentBookedDays, dayIndex].sort();
+       await supabase.from("booking").update({ booked_days: newBookedDays }).eq("id", bookingId);
+     },
+     onSuccess: () => invalidate caches + toast
+   })
+   ```
 
-Han forbliver på Fieldmarketing og Stab.
+2. **"+" knap på ikke-bookede dage** — i begge dag-grids (almindelige og FM-bookinger), vis en `+` knap ved hover når `canEditFmBookings && !isBooked`:
+   ```tsx
+   {canEditFmBookings && !isBooked && (
+     <button onClick={() => addDayMutation.mutate({...})} className="...opacity-0 group-hover/day:opacity-100...">
+       <Plus className="h-3 w-3" />
+     </button>
+   )}
+   ```
+
+3. Samme mønster tilføjes i **MarketsContent.tsx** hvis den har tilsvarende dag-grid.
+
+### Omfang
+- Kun `BookingsContent.tsx` (+ evt. `MarketsContent.tsx`)
+- Ingen nye komponenter, dialoger eller database-ændringer
+- Importér `Plus` fra lucide-react
 
