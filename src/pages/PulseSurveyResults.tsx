@@ -162,6 +162,7 @@ const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
 ];
 
 export default function PulseSurveyResults() {
+  const navigate = useNavigate();
   const { data: surveys, isLoading: surveysLoading } = useAllPulseSurveys();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>();
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');

@@ -246,6 +246,12 @@ export default function PulseSurvey() {
   };
 
   const handleSubmit = async () => {
+    if (isTestMode) {
+      toast.success('Test afsluttet — ingen data blev gemt');
+      navigate('/pulse-survey-results');
+      return;
+    }
+
     // Validate required fields
     const requiredScales = ['nps_score', 'development_score', 'leadership_score', 'recognition_score', 
       'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score',
