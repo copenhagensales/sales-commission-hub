@@ -228,6 +228,10 @@ export default function PulseSurvey() {
         }
       });
 
+      // Delete draft after successful submission
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      deleteDraft.mutate(activeSurvey.id);
+
       toast.success('Tak for din besvarelse!');
     } catch (error) {
       console.error('Error submitting survey:', error);
