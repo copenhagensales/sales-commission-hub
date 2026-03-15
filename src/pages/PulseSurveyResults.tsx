@@ -10,7 +10,8 @@ import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } fro
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check, FileText } from "lucide-react";
+import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check, FileText, FlaskConical } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparisonBarChart";
@@ -161,6 +162,7 @@ const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
 ];
 
 export default function PulseSurveyResults() {
+  const navigate = useNavigate();
   const { data: surveys, isLoading: surveysLoading } = useAllPulseSurveys();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>();
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
@@ -310,7 +312,11 @@ export default function PulseSurveyResults() {
             <h1 className="text-3xl font-bold">Pulsmåling resultater</h1>
             <p className="text-muted-foreground">Anonymiseret oversigt over medarbejdertrivsel</p>
           </div>
-          <div className="flex gap-2">
+           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/pulse-survey?test=true')}>
+              <FlaskConical className="h-4 w-4 mr-2" />
+              Test pulsmåling
+            </Button>
             <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
               <Plus className="h-4 w-4 mr-2" />
               Aktiver ny pulsmåling

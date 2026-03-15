@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, usePulseSurveyDraft, useSavePulseSurveyDraft, useDeletePulseSurveyDraft, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, HeartHandshake, Save } from "lucide-react";
+import { CheckCircle, HeartHandshake, Save, FlaskConical } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const TENURE_OPTIONS = [
   { value: 'under_1_month', label: 'Under 1 måned' },
@@ -135,6 +136,8 @@ function ScaleSelector({ value, onChange, isNps = false }: { value: number | und
 
 export default function PulseSurvey() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isTestMode = searchParams.get('test') === 'true';
   const { user } = useAuth();
   const { data: activeSurvey, isLoading: surveyLoading } = useActivePulseSurvey();
   const { data: hasCompleted, isLoading: completionLoading } = useHasCompletedSurvey(activeSurvey?.id);
@@ -210,7 +213,7 @@ export default function PulseSurvey() {
 
   // Auto-save draft with debounce
   const triggerDraftSave = useCallback(() => {
-    if (!activeSurvey?.id || hasCompleted) return;
+    if (isTestMode || !activeSurvey?.id || hasCompleted) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       setDraftStatus('saving');
@@ -243,6 +246,12 @@ export default function PulseSurvey() {
   };
 
   const handleSubmit = async () => {
+    if (isTestMode) {
+      toast.success('Test afsluttet — ingen data blev gemt');
+      navigate('/pulse-survey-results');
+      return;
+    }
+
     // Validate required fields
     const requiredScales = ['nps_score', 'development_score', 'leadership_score', 'recognition_score', 
       'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score',
@@ -293,7 +302,7 @@ export default function PulseSurvey() {
     }
   };
 
-  if (surveyLoading || completionLoading || draftLoading) {
+  if (!isTestMode && (surveyLoading || completionLoading || draftLoading)) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -303,7 +312,7 @@ export default function PulseSurvey() {
     );
   }
 
-  if (!activeSurvey) {
+  if (!isTestMode && !activeSurvey) {
     return (
       <MainLayout>
         <div className="space-y-6">
@@ -325,7 +334,7 @@ export default function PulseSurvey() {
     );
   }
 
-  if (hasCompleted) {
+  if (!isTestMode && hasCompleted) {
     return (
       <MainLayout>
         <div className="space-y-6">
@@ -356,10 +365,18 @@ export default function PulseSurvey() {
   return (
     <MainLayout>
       <div className="space-y-6 max-w-3xl mx-auto">
+        {isTestMode && (
+          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <FlaskConical className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              Du er i test-tilstand — svar gemmes ikke.
+            </AlertDescription>
+          </Alert>
+        )}
         <div>
-          <h1 className="text-3xl font-bold">Pulsmåling</h1>
+          <h1 className="text-3xl font-bold">{isTestMode ? 'Pulsmåling (Test)' : 'Pulsmåling'}</h1>
           <p className="text-muted-foreground">
-            {monthNames[activeSurvey.month - 1]} {activeSurvey.year}
+            {isTestMode ? 'Test-tilstand — ingen data gemmes' : activeSurvey ? `${monthNames[activeSurvey.month - 1]} ${activeSurvey.year}` : 'Månedlig trivselsmåling'}
           </p>
         </div>
 
@@ -531,14 +548,14 @@ export default function PulseSurvey() {
               onClick={handleSubmit} 
               size="lg" 
               className="w-full"
-              disabled={submitSurvey.isPending}
+              disabled={!isTestMode && submitSurvey.isPending}
             >
-              {submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
+              {isTestMode ? 'Afslut test (gemmes ikke)' : submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
             </Button>
             <p className="text-sm text-muted-foreground text-center mt-3">
-              Din besvarelse er anonym og kan ikke ændres efter indsendelse.
+              {isTestMode ? 'Dette er en test — ingen data gemmes.' : 'Din besvarelse er anonym og kan ikke ændres efter indsendelse.'}
             </p>
-            {draftStatus !== 'idle' && (
+            {!isTestMode && draftStatus !== 'idle' && (
               <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1.5">
                 <Save className="h-3 w-3" />
                 {draftStatus === 'saving' ? 'Gemmer kladde...' : 'Kladde gemt'}
