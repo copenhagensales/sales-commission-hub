@@ -136,6 +136,8 @@ function ScaleSelector({ value, onChange, isNps = false }: { value: number | und
 
 export default function PulseSurvey() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isTestMode = searchParams.get('test') === 'true';
   const { user } = useAuth();
   const { data: activeSurvey, isLoading: surveyLoading } = useActivePulseSurvey();
   const { data: hasCompleted, isLoading: completionLoading } = useHasCompletedSurvey(activeSurvey?.id);
