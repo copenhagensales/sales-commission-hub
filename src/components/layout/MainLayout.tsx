@@ -120,6 +120,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           {/* League announcement popup - shown once to non-enrolled users */}
           {!isPreviewMode && <LeagueAnnouncementPopup />}
           
+          {/* Pulse survey popup - monthly anonymous survey for non-staff employees */}
+          {!isPreviewMode && <PulseSurveyPopup />}
+          
           {/* Softphone Widget */}
           <SoftphoneWidget />
         </div>
