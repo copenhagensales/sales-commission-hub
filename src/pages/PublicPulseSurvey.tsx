@@ -117,7 +117,7 @@ export default function PublicPulseSurvey() {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
       // Build payload dynamically - extract all score fields from form data
-      const { teamId, surveyId, tenure, nps_comment, improvement_suggestions, ...scores } = response;
+      const { teamId, surveyId, tenure, nps_comment, improvement_suggestions, campaign_improvement_suggestions, ...scores } = response;
       
       const res = await supabase.functions.invoke('submit-pulse-survey', {
         body: {
