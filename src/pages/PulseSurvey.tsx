@@ -318,6 +318,11 @@ export default function PulseSurvey() {
               Svarene er anonyme og bliver kun brugt til at forbedre vores måde at arbejde og lede på – ikke til at vurdere dig som medarbejder.
               <br /><br />
               <strong>NPS-spørgsmålet bruger skala 0-10. Øvrige spørgsmål bruger skala 1-10.</strong>
+              <br /><br />
+              <span className="flex items-center gap-1.5 text-sm">
+                <Save className="h-4 w-4" />
+                Dine svar gemmes automatisk som kladde, så du kan vende tilbage og fortsætte senere.
+              </span>
             </CardDescription>
           </CardHeader>
         </Card>
