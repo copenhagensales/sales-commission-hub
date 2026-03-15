@@ -240,6 +240,104 @@ export function useDismissPulseSurvey() {
   });
 }
 
+// Hook to load a draft for the current user
+export function usePulseSurveyDraft(surveyId?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['pulse-survey-draft', surveyId, user?.id],
+    queryFn: async () => {
+      if (!surveyId) return null;
+
+      const lowerEmail = user?.email?.toLowerCase() || '';
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id')
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!employee) return null;
+
+      const { data, error } = await supabase
+        .from('pulse_survey_drafts')
+        .select('draft_data')
+        .eq('survey_id', surveyId)
+        .eq('employee_id', employee.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data?.draft_data as Record<string, unknown> | null;
+    },
+    enabled: !!surveyId && !!user,
+  });
+}
+
+// Hook to save/upsert a draft
+export function useSavePulseSurveyDraft() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ surveyId, draftData }: { surveyId: string; draftData: Record<string, unknown> }) => {
+      const lowerEmail = user?.email?.toLowerCase() || '';
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id')
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!employee) throw new Error('Employee not found');
+
+      const { error } = await supabase
+        .from('pulse_survey_drafts')
+        .upsert(
+          {
+            survey_id: surveyId,
+            employee_id: employee.id,
+            draft_data: draftData as any,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'survey_id,employee_id' }
+        );
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pulse-survey-draft', variables.surveyId] });
+    },
+  });
+}
+
+// Hook to delete a draft after submission
+export function useDeletePulseSurveyDraft() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (surveyId: string) => {
+      const lowerEmail = user?.email?.toLowerCase() || '';
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id')
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!employee) return;
+
+      const { error } = await supabase
+        .from('pulse_survey_drafts')
+        .delete()
+        .eq('survey_id', surveyId)
+        .eq('employee_id', employee.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pulse-survey-draft'] });
+    },
+  });
+}
+
 // Hook to manually activate a survey (for testing or admin)
 export function useActivatePulseSurvey() {
   const queryClient = useQueryClient();

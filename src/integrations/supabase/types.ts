@@ -7961,6 +7961,59 @@ export type Database = {
           },
         ]
       }
+      pulse_survey_drafts: {
+        Row: {
+          draft_data: Json
+          employee_id: string
+          id: string
+          survey_id: string
+          updated_at: string
+        }
+        Insert: {
+          draft_data?: Json
+          employee_id: string
+          id?: string
+          survey_id: string
+          updated_at?: string
+        }
+        Update: {
+          draft_data?: Json
+          employee_id?: string
+          id?: string
+          survey_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_survey_drafts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_survey_drafts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_survey_drafts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_survey_drafts_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pulse_survey_responses: {
         Row: {
           attrition_risk_score: number | null

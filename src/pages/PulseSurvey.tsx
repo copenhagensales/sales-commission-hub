@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
+import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, usePulseSurveyDraft, useSavePulseSurveyDraft, useDeletePulseSurveyDraft, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, HeartHandshake } from "lucide-react";
+import { CheckCircle, HeartHandshake, Save } from "lucide-react";
 
 const TENURE_OPTIONS = [
   { value: 'under_1_month', label: 'Under 1 måned' },
@@ -114,6 +114,9 @@ export default function PulseSurvey() {
   const { data: activeSurvey, isLoading: surveyLoading } = useActivePulseSurvey();
   const { data: hasCompleted, isLoading: completionLoading } = useHasCompletedSurvey(activeSurvey?.id);
   const submitSurvey = useSubmitPulseSurvey();
+  const { data: draftData, isLoading: draftLoading } = usePulseSurveyDraft(activeSurvey?.id);
+  const saveDraft = useSavePulseSurveyDraft();
+  const deleteDraft = useDeletePulseSurveyDraft();
 
   // Get employee department
   const { data: employee } = useQuery({
@@ -133,6 +136,61 @@ export default function PulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const draftInitialized = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Load draft data on mount
+  useEffect(() => {
+    if (draftData && !draftInitialized.current) {
+      draftInitialized.current = true;
+      const draft = draftData as Record<string, any>;
+      setFormData({
+        nps_score: draft.nps_score,
+        tenure: draft.tenure,
+        development_score: draft.development_score,
+        leadership_score: draft.leadership_score,
+        recognition_score: draft.recognition_score,
+        energy_score: draft.energy_score,
+        seriousness_score: draft.seriousness_score,
+        leader_availability_score: draft.leader_availability_score,
+        wellbeing_score: draft.wellbeing_score,
+        psychological_safety_score: draft.psychological_safety_score,
+      });
+      setNpsComment(draft.nps_comment || '');
+      setImprovementSuggestions(draft.improvement_suggestions || '');
+    }
+  }, [draftData]);
+
+  // Auto-save draft with debounce
+  const triggerDraftSave = useCallback(() => {
+    if (!activeSurvey?.id || hasCompleted) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      setDraftStatus('saving');
+      saveDraft.mutate(
+        {
+          surveyId: activeSurvey.id,
+          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions },
+        },
+        {
+          onSuccess: () => {
+            setDraftStatus('saved');
+            setTimeout(() => setDraftStatus('idle'), 2000);
+          },
+          onError: () => setDraftStatus('idle'),
+        }
+      );
+    }, 3000);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, hasCompleted, saveDraft]);
+
+  // Trigger auto-save when form data changes (skip initial load)
+  useEffect(() => {
+    if (draftInitialized.current) {
+      triggerDraftSave();
+    }
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, [formData, npsComment, improvementSuggestions, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -170,6 +228,10 @@ export default function PulseSurvey() {
         }
       });
 
+      // Delete draft after successful submission
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      deleteDraft.mutate(activeSurvey.id);
+
       toast.success('Tak for din besvarelse!');
     } catch (error) {
       console.error('Error submitting survey:', error);
@@ -177,7 +239,7 @@ export default function PulseSurvey() {
     }
   };
 
-  if (surveyLoading || completionLoading) {
+  if (surveyLoading || completionLoading || draftLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -256,6 +318,11 @@ export default function PulseSurvey() {
               Svarene er anonyme og bliver kun brugt til at forbedre vores måde at arbejde og lede på – ikke til at vurdere dig som medarbejder.
               <br /><br />
               <strong>NPS-spørgsmålet bruger skala 0-10. Øvrige spørgsmål bruger skala 1-10.</strong>
+              <br /><br />
+              <span className="flex items-center gap-1.5 text-sm">
+                <Save className="h-4 w-4" />
+                Dine svar gemmes automatisk som kladde, så du kan vende tilbage og fortsætte senere.
+              </span>
             </CardDescription>
           </CardHeader>
         </Card>
@@ -376,6 +443,12 @@ export default function PulseSurvey() {
             <p className="text-sm text-muted-foreground text-center mt-3">
               Din besvarelse er anonym og kan ikke ændres efter indsendelse.
             </p>
+            {draftStatus !== 'idle' && (
+              <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1.5">
+                <Save className="h-3 w-3" />
+                {draftStatus === 'saving' ? 'Gemmer kladde...' : 'Kladde gemt'}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
