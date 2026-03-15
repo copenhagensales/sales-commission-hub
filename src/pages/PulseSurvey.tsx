@@ -239,7 +239,7 @@ export default function PulseSurvey() {
     }
   };
 
-  if (surveyLoading || completionLoading) {
+  if (surveyLoading || completionLoading || draftLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
