@@ -154,6 +154,10 @@ const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
   { id: 'wellbeing_score', label: 'Samlet trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
   { id: 'psychological_safety_score', label: 'Psykologisk tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
   { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 6 måneder?', type: 'rating', min: 1, max: 10 },
+  { id: 'product_competitiveness_score', label: 'Produktkonkurrenceevne', question: 'Hvad er din opfattelse af de produkter, du sælger – hvor konkurrencedygtige er de over for de kunder, du taler med?', type: 'rating', min: 1, max: 10 },
+  { id: 'market_fit_score', label: 'Markedsmatch', question: 'Hvor godt matcher kundens produkter det, markedet efterspørger?', type: 'rating', min: 1, max: 10 },
+  { id: 'interest_creation_score', label: 'Interesse for produkter', question: 'Hvor let er det at skabe interesse for kundens produkter?', type: 'rating', min: 1, max: 10 },
+  { id: 'campaign_attractiveness_score', label: 'Kampagneattraktivitet', question: 'Hvor attraktiv oplever du kampagnen, du sidder på, sammenlignet med andre kampagner hos Copenhagen Sales?', type: 'rating', min: 1, max: 10 },
 ];
 
 export default function PulseSurveyResults() {

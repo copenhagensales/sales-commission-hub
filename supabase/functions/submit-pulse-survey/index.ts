@@ -66,6 +66,7 @@ serve(async (req) => {
       tenure,
       nps_comment: nps_comment || null,
       improvement_suggestions: improvement_suggestions || null,
+      campaign_improvement_suggestions: campaign_improvement_suggestions || null,
       submitted_team_id: submitted_team_id || null,
       department: department || null,
     };

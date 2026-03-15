@@ -8017,16 +8017,21 @@ export type Database = {
       pulse_survey_responses: {
         Row: {
           attrition_risk_score: number | null
+          campaign_attractiveness_score: number | null
+          campaign_improvement_suggestions: string | null
           created_at: string
           department: string | null
           development_score: number | null
           energy_score: number | null
           id: string
           improvement_suggestions: string | null
+          interest_creation_score: number | null
           leader_availability_score: number | null
           leadership_score: number | null
+          market_fit_score: number | null
           nps_comment: string | null
           nps_score: number
+          product_competitiveness_score: number | null
           psychological_safety_score: number | null
           recognition_score: number | null
           seriousness_score: number | null
@@ -8038,16 +8043,21 @@ export type Database = {
         }
         Insert: {
           attrition_risk_score?: number | null
+          campaign_attractiveness_score?: number | null
+          campaign_improvement_suggestions?: string | null
           created_at?: string
           department?: string | null
           development_score?: number | null
           energy_score?: number | null
           id?: string
           improvement_suggestions?: string | null
+          interest_creation_score?: number | null
           leader_availability_score?: number | null
           leadership_score?: number | null
+          market_fit_score?: number | null
           nps_comment?: string | null
           nps_score: number
+          product_competitiveness_score?: number | null
           psychological_safety_score?: number | null
           recognition_score?: number | null
           seriousness_score?: number | null
@@ -8059,16 +8069,21 @@ export type Database = {
         }
         Update: {
           attrition_risk_score?: number | null
+          campaign_attractiveness_score?: number | null
+          campaign_improvement_suggestions?: string | null
           created_at?: string
           department?: string | null
           development_score?: number | null
           energy_score?: number | null
           id?: string
           improvement_suggestions?: string | null
+          interest_creation_score?: number | null
           leader_availability_score?: number | null
           leadership_score?: number | null
+          market_fit_score?: number | null
           nps_comment?: string | null
           nps_score?: number
+          product_competitiveness_score?: number | null
           psychological_safety_score?: number | null
           recognition_score?: number | null
           seriousness_score?: number | null
