@@ -548,14 +548,14 @@ export default function PulseSurvey() {
               onClick={handleSubmit} 
               size="lg" 
               className="w-full"
-              disabled={submitSurvey.isPending}
+              disabled={!isTestMode && submitSurvey.isPending}
             >
-              {submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
+              {isTestMode ? 'Afslut test (gemmes ikke)' : submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
             </Button>
             <p className="text-sm text-muted-foreground text-center mt-3">
-              Din besvarelse er anonym og kan ikke ændres efter indsendelse.
+              {isTestMode ? 'Dette er en test — ingen data gemmes.' : 'Din besvarelse er anonym og kan ikke ændres efter indsendelse.'}
             </p>
-            {draftStatus !== 'idle' && (
+            {!isTestMode && draftStatus !== 'idle' && (
               <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1.5">
                 <Save className="h-3 w-3" />
                 {draftStatus === 'saving' ? 'Gemmer kladde...' : 'Kladde gemt'}
