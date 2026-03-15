@@ -162,6 +162,20 @@ export default function PulseSurvey() {
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
   const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+
+  // Fetch teams for dropdown
+  const { data: teams } = useQuery({
+    queryKey: ['teams-for-pulse'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    }
+  });
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const draftInitialized = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
