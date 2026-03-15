@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { LeagueAnnouncementPopup } from "@/components/league/LeagueAnnouncementPopup";
+import { PulseSurveyPopup } from "@/components/pulse/PulseSurveyPopup";
 import { Menu, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -118,6 +119,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           
           {/* League announcement popup - shown once to non-enrolled users */}
           {!isPreviewMode && <LeagueAnnouncementPopup />}
+          
+          {/* Pulse survey popup - monthly anonymous survey for non-staff employees */}
+          {!isPreviewMode && <PulseSurveyPopup />}
           
           {/* Softphone Widget */}
           <SoftphoneWidget />

@@ -180,6 +180,66 @@ export function usePulseSurveyResults(surveyId?: string) {
   });
 }
 
+// Hook to check if user has dismissed/snoozed the survey
+export function usePulseSurveyDismissal(surveyId?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['pulse-survey-dismissal', surveyId, user?.id],
+    queryFn: async () => {
+      if (!surveyId) return null;
+
+      const lowerEmail = user?.email?.toLowerCase() || '';
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id, is_staff_employee')
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!employee) return { isDismissed: false, isStaff: false, employeeId: null };
+
+      const { data } = await supabase
+        .from('pulse_survey_dismissals')
+        .select('dismissed_until')
+        .eq('survey_id', surveyId)
+        .eq('employee_id', employee.id)
+        .maybeSingle();
+
+      const isDismissed = data ? new Date(data.dismissed_until) > new Date() : false;
+
+      return {
+        isDismissed,
+        isStaff: employee.is_staff_employee === true,
+        employeeId: employee.id,
+      };
+    },
+    enabled: !!surveyId && !!user,
+  });
+}
+
+// Hook to dismiss/snooze a survey for 24 hours
+export function useDismissPulseSurvey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ surveyId, employeeId }: { surveyId: string; employeeId: string }) => {
+      const dismissedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      const { error } = await supabase
+        .from('pulse_survey_dismissals')
+        .upsert(
+          { survey_id: surveyId, employee_id: employeeId, dismissed_until: dismissedUntil },
+          { onConflict: 'survey_id,employee_id' }
+        );
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pulse-survey-dismissal'] });
+    },
+  });
+}
+
 // Hook to manually activate a survey (for testing or admin)
 export function useActivatePulseSurvey() {
   const queryClient = useQueryClient();

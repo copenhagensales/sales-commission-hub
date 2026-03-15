@@ -1,22 +1,19 @@
 
 
-## Opdatering af planen: Ekskludér stabsmedarbejdere fra pulsmåling-popup
 
-### Nuværende situation
+## Draft-booking workflow ✅
 
-`useShouldShowPulseSurvey` filtrerer allerede på `roleData?.role === 'medarbejder'`, så teamledere, rekruttering, assistenter og ejere ser aldrig popup'en.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### Ekstra sikring i planen
+## Fortrolige kontrakter ✅
 
-I den nye `PulseSurveyPopup`-komponent tilføjer vi et ekstra tjek mod `is_staff_employee` fra `employee_master_data`, så selv hvis en stabsmedarbejder ved en fejl har rollen "medarbejder", vil de stadig blive ekskluderet.
-
-Konkret: Når popup'en henter medarbejderdata for at checke dismissal/completion, tjekkes `is_staff_employee`. Hvis `true`, vises popup'en ikke.
-
-Resten af planen (database-tabel, popup-komponent, hooks, MainLayout-integration) forbliver som godkendt — med denne tilføjelse bagt ind i popup-logikken.
-
-### Opsummeret filter-kæde
-
-```text
-Aktiv survey? → Rolle = medarbejder? → is_staff_employee = false? → Ikke udfyldt? → Ikke udsat? → Vis popup
-```
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
