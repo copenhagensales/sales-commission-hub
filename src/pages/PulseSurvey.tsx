@@ -160,6 +160,7 @@ export default function PulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const draftInitialized = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
