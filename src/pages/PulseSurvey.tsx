@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, usePulseSurveyDraft, useSavePulseSurveyDraft, useDeletePulseSurveyDraft, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
@@ -161,6 +162,20 @@ export default function PulseSurvey() {
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
   const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+
+  // Fetch teams for dropdown
+  const { data: teams } = useQuery({
+    queryKey: ['teams-for-pulse'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    }
+  });
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const draftInitialized = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -189,6 +204,7 @@ export default function PulseSurvey() {
       setNpsComment(draft.nps_comment || '');
       setImprovementSuggestions(draft.improvement_suggestions || '');
       setCampaignImprovementSuggestions(draft.campaign_improvement_suggestions || '');
+      if (draft.selected_team_id) setSelectedTeamId(draft.selected_team_id);
     }
   }, [draftData]);
 
@@ -201,7 +217,7 @@ export default function PulseSurvey() {
       saveDraft.mutate(
         {
           surveyId: activeSurvey.id,
-          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions, campaign_improvement_suggestions: campaignImprovementSuggestions },
+          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions, campaign_improvement_suggestions: campaignImprovementSuggestions, selected_team_id: selectedTeamId },
         },
         {
           onSuccess: () => {
@@ -212,7 +228,7 @@ export default function PulseSurvey() {
         }
       );
     }, 3000);
-  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, hasCompleted, saveDraft]);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, selectedTeamId, hasCompleted, saveDraft]);
 
   // Trigger auto-save when form data changes (skip initial load)
   useEffect(() => {
@@ -220,7 +236,7 @@ export default function PulseSurvey() {
       triggerDraftSave();
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, triggerDraftSave]);
+  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, selectedTeamId, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -244,6 +260,11 @@ export default function PulseSurvey() {
       return;
     }
 
+    if (!selectedTeamId) {
+      toast.error('Vælg venligst dit team');
+      return;
+    }
+
     if (!activeSurvey?.id) {
       toast.error('Ingen aktiv pulsmåling fundet');
       return;
@@ -252,6 +273,7 @@ export default function PulseSurvey() {
     try {
       await submitSurvey.mutateAsync({
         surveyId: activeSurvey.id,
+        selectedTeamId,
         response: {
           ...formData as PulseSurveyResponse,
           nps_comment: npsComment || undefined,
@@ -357,6 +379,28 @@ export default function PulseSurvey() {
               </span>
             </CardDescription>
           </CardHeader>
+        </Card>
+
+        {/* Team Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Vælg dit team</CardTitle>
+            <CardDescription>Hvilket team arbejder du på?</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg team..." />
+              </SelectTrigger>
+              <SelectContent>
+                {teams?.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
         </Card>
 
         {/* NPS Question */}
