@@ -61,6 +61,7 @@ export default function PublicPulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
 
   // Fetch template questions from database
   const { data: template, isLoading: templateLoading } = useQuizTemplate("pulse_survey");
