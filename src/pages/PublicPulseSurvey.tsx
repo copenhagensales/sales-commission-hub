@@ -130,7 +130,7 @@ export default function PublicPulseSurvey() {
     }
   });
 
-  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing'];
+  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing', 'Stab'];
   const { data: teams } = useQuery({
     queryKey: ['public-teams'],
     queryFn: async () => {
