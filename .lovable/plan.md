@@ -1,19 +1,24 @@
 
 
+## Opdel Fieldmarketing i Eesy FM og YouSee FM i pulsmålingen
 
-## Draft-booking workflow ✅
+### Hvad
+I pulsmålingens team-vælger skal "Fieldmarketing" erstattes af to separate valgmuligheder: **Eesy FM** og **YouSee FM**, så FM-medarbejdere kan angive hvilken klient de arbejder på.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Implementering
 
-## Fortrolige kontrakter ✅
+**1. Opret to nye teams i databasen**
+- Tilføj "Eesy FM" og "YouSee FM" i `teams`-tabellen via migration
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**2. Opdater `PulseSurvey.tsx` og `PublicPulseSurvey.tsx`**
+- Filtrér "Fieldmarketing"-teamet væk fra team-dropdown (eller erstat med de to nye)
+- Alternativt: behold alle teams og lad de nye FM-teams stå i listen naturligt
+
+**3. Resultatvisning (`PulseSurveyResults.tsx`)**
+- Sørg for at filtrering/gruppering på team inkluderer de nye teams — dette burde virke automatisk da det allerede bruger `submitted_team_id`
+
+### Beslutning
+Skal det eksisterende "Fieldmarketing"-team **skjules** fra pulsmålingen (men bibeholdes i systemet til andre formål), eller **helt erstattes** af de to nye teams overalt?
+
+Da FM-teamet bruges bredt i systemet (vagtplaner, medarbejdertildeling osv.), vil jeg **kun skjule det fra pulse survey team-vælgeren** og tilføje de to nye teams specifikt til survey-brug. De nye teams oprettes i `teams`-tabellen så resultaterne kan filtreres korrekt.
+
