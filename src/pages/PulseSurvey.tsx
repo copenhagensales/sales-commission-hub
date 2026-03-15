@@ -251,6 +251,7 @@ export default function PulseSurvey() {
           ...formData as PulseSurveyResponse,
           nps_comment: npsComment || undefined,
           improvement_suggestions: improvementSuggestions || undefined,
+          campaign_improvement_suggestions: campaignImprovementSuggestions || undefined,
         }
       });
 
