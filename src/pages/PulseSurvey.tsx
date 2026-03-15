@@ -213,7 +213,7 @@ export default function PulseSurvey() {
 
   // Auto-save draft with debounce
   const triggerDraftSave = useCallback(() => {
-    if (!activeSurvey?.id || hasCompleted) return;
+    if (isTestMode || !activeSurvey?.id || hasCompleted) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       setDraftStatus('saving');

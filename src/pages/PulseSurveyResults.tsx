@@ -311,7 +311,11 @@ export default function PulseSurveyResults() {
             <h1 className="text-3xl font-bold">Pulsmåling resultater</h1>
             <p className="text-muted-foreground">Anonymiseret oversigt over medarbejdertrivsel</p>
           </div>
-          <div className="flex gap-2">
+           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/pulse-survey?test=true')}>
+              <FlaskConical className="h-4 w-4 mr-2" />
+              Test pulsmåling
+            </Button>
             <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
               <Plus className="h-4 w-4 mr-2" />
               Aktiver ny pulsmåling
