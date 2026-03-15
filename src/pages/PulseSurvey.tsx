@@ -167,7 +167,8 @@ export default function PulseSurvey() {
   const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
 
-  // Fetch teams for dropdown
+  // Fetch teams for dropdown - hide generic "Fieldmarketing" in favor of specific FM teams
+  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing'];
   const { data: teams } = useQuery({
     queryKey: ['teams-for-pulse'],
     queryFn: async () => {
@@ -176,7 +177,7 @@ export default function PulseSurvey() {
         .select('id, name')
         .order('name');
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(t => !HIDDEN_PULSE_TEAMS.includes(t.name));
     }
   });
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
