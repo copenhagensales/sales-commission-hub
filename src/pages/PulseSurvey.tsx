@@ -272,6 +272,7 @@ export default function PulseSurvey() {
     try {
       await submitSurvey.mutateAsync({
         surveyId: activeSurvey.id,
+        selectedTeamId,
         response: {
           ...formData as PulseSurveyResponse,
           nps_comment: npsComment || undefined,
