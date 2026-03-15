@@ -224,7 +224,8 @@ export default function PulseSurvey() {
   const handleSubmit = async () => {
     // Validate required fields
     const requiredScales = ['nps_score', 'development_score', 'leadership_score', 'recognition_score', 
-      'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score'];
+      'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score',
+      'product_competitiveness_score', 'market_fit_score', 'interest_creation_score', 'campaign_attractiveness_score'];
     
     for (const key of requiredScales) {
       if (!formData[key as keyof PulseSurveyResponse]) {
