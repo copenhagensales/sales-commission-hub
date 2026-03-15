@@ -302,7 +302,7 @@ export default function PulseSurvey() {
     }
   };
 
-  if (surveyLoading || completionLoading || draftLoading) {
+  if (!isTestMode && (surveyLoading || completionLoading || draftLoading)) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -312,7 +312,7 @@ export default function PulseSurvey() {
     );
   }
 
-  if (!activeSurvey) {
+  if (!isTestMode && !activeSurvey) {
     return (
       <MainLayout>
         <div className="space-y-6">
@@ -334,7 +334,7 @@ export default function PulseSurvey() {
     );
   }
 
-  if (hasCompleted) {
+  if (!isTestMode && hasCompleted) {
     return (
       <MainLayout>
         <div className="space-y-6">
