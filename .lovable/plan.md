@@ -1,19 +1,36 @@
 
 
+## Kladde-funktionalitet til pulsmålingen
 
-## Draft-booking workflow ✅
+### Oversigt
+Tilføj en ny tabel `pulse_survey_drafts` der gemmer delvise besvarelser pr. medarbejder pr. survey. Surveyen auto-gemmer løbende og genindlæser kladden når medarbejderen vender tilbage.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Database
+Ny tabel `pulse_survey_drafts`:
+- `id` (uuid, PK)
+- `survey_id` (uuid, FK → pulse_surveys)
+- `employee_id` (uuid, FK → employee_master_data)
+- `draft_data` (jsonb) — alle formfelter serialiseret
+- `updated_at` (timestamptz)
+- Unique constraint på `(survey_id, employee_id)`
+- RLS: medarbejdere kan kun læse/skrive egne kladder
 
-## Fortrolige kontrakter ✅
+### Frontend-ændringer
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**Ny hook i `src/hooks/usePulseSurvey.ts`:**
+- `usePulseSurveyDraft(surveyId)` — henter eksisterende kladde ved load
+- `useSavePulseSurveyDraft()` — upsert kladde
+- `useDeletePulseSurveyDraft()` — slet kladde efter endelig indsendelse
+
+**Ændringer i `src/pages/PulseSurvey.tsx`:**
+- Ved mount: hent kladde og populer `formData`, `npsComment`, `improvementSuggestions`
+- Auto-gem kladde med debounce (3 sek) ved enhver ændring
+- Vis "Kladde gemt" indikator
+- Slet kladde efter succesfuld indsendelse
+- Vis info-tekst om at svar gemmes automatisk
+
+### Tekniske detaljer
+- Debounce via `useEffect` + `setTimeout` for at undgå for mange writes
+- Kladden gemmes som ét JSON-objekt med alle svar
+- Kladden slettes automatisk ved final submit (i `useSubmitPulseSurvey`)
+
