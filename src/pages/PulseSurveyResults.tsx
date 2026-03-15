@@ -174,13 +174,25 @@ export default function PulseSurveyResults() {
   const [templateQuestions, setTemplateQuestions] = useState<PulseSurveyQuestion[]>([]);
   const [templateInitialized, setTemplateInitialized] = useState(false);
 
-  // Initialize template questions from DB or defaults
+  // Initialize template questions from DB or defaults, auto-migrate missing questions
   useMemo(() => {
     if (!templateInitialized && !templateLoading) {
       if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
-        setTemplateQuestions(template.questions as PulseSurveyQuestion[]);
+        const existing = template.questions as PulseSurveyQuestion[];
+        const existingIds = new Set(existing.map(q => q.id));
+        const missing = INITIAL_DEFAULT_QUESTIONS.filter(q => !existingIds.has(q.id));
+        if (missing.length > 0) {
+          const merged = [...existing, ...missing];
+          setTemplateQuestions(merged);
+          // Auto-save merged template to DB
+          updateTemplate.mutate({ quizType: 'pulse_survey', questions: merged });
+        } else {
+          setTemplateQuestions(existing);
+        }
       } else {
         setTemplateQuestions(INITIAL_DEFAULT_QUESTIONS);
+        // Save defaults to DB on first load
+        updateTemplate.mutate({ quizType: 'pulse_survey', questions: INITIAL_DEFAULT_QUESTIONS });
       }
       setTemplateInitialized(true);
     }
@@ -588,6 +600,31 @@ export default function PulseSurveyResults() {
                       ))}
                     {filteredResponses.filter(r => r.nps_comment).length === 0 && (
                       <p className="text-muted-foreground text-sm">Ingen kommentarer</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Campaign Improvement Suggestions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Kampagneforbedringsforslag</CardTitle>
+                    <CardDescription>Anonyme forslag til kampagne- og produktforbedringer</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {filteredResponses
+                      .filter(r => r.campaign_improvement_suggestions)
+                      .map((r, i) => (
+                        <div key={i} className="p-3 bg-muted rounded-lg">
+                          {(r.team_id || r.submitted_team_id) && teams && (
+                            <Badge variant="secondary" className="mb-2">
+                              {teams.find(t => t.id === (r.team_id || r.submitted_team_id))?.name}
+                            </Badge>
+                          )}
+                          <p className="text-sm">{r.campaign_improvement_suggestions}</p>
+                        </div>
+                      ))}
+                    {filteredResponses.filter(r => r.campaign_improvement_suggestions).length === 0 && (
+                      <p className="text-muted-foreground text-sm">Ingen forslag</p>
                     )}
                   </CardContent>
                 </Card>

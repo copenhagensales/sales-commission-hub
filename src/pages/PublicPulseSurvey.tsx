@@ -61,6 +61,7 @@ export default function PublicPulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
 
   // Fetch template questions from database
   const { data: template, isLoading: templateLoading } = useQuizTemplate("pulse_survey");
@@ -116,7 +117,7 @@ export default function PublicPulseSurvey() {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
       // Build payload dynamically - extract all score fields from form data
-      const { teamId, surveyId, tenure, nps_comment, improvement_suggestions, ...scores } = response;
+      const { teamId, surveyId, tenure, nps_comment, improvement_suggestions, campaign_improvement_suggestions, ...scores } = response;
       
       const res = await supabase.functions.invoke('submit-pulse-survey', {
         body: {
@@ -124,6 +125,7 @@ export default function PublicPulseSurvey() {
           tenure: tenure,
           nps_comment: nps_comment || null,
           improvement_suggestions: improvement_suggestions || null,
+          campaign_improvement_suggestions: campaign_improvement_suggestions || null,
           submitted_team_id: teamId,
           department: teamName,
           // Spread all dynamic scores (nps_score, development_score, attrition_risk_score, etc.)
@@ -181,6 +183,7 @@ export default function PublicPulseSurvey() {
       ...formData as PulseSurveyResponse,
       nps_comment: npsComment || undefined,
       improvement_suggestions: improvementSuggestions || undefined,
+      campaign_improvement_suggestions: campaignImprovementSuggestions || undefined,
       teamId: selectedTeamId,
       surveyId: activeSurvey.id,
     });
@@ -376,10 +379,29 @@ export default function PublicPulseSurvey() {
           </Card>
         ))}
 
+        {/* Campaign Improvement Suggestions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Kampagneforbedring</CardTitle>
+            <CardDescription>
+              Hvad bør kunden forbedre for at gøre kampagnen og produkterne lettere at sælge?
+            </CardDescription>
+            <p className="text-sm text-muted-foreground">Valgfrit</p>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={campaignImprovementSuggestions}
+              onChange={(e) => setCampaignImprovementSuggestions(e.target.value)}
+              placeholder="Skriv dine forslag her..."
+              rows={4}
+            />
+          </CardContent>
+        </Card>
+
         {/* Improvement Suggestions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">12. Forbedringsforslag</CardTitle>
+            <CardTitle className="text-lg">Forbedringsforslag</CardTitle>
             <CardDescription>
               Har du idéer eller input til, hvad vi kunne gøre bedre i forhold til at arbejde i Copenhagen Sales?<br />
               (Alt er velkomment: ledelse, træning, stemning, rammer, løn/bonus, kommunikation osv.)
