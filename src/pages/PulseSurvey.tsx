@@ -12,7 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, usePulseSurveyDraft, useSavePulseSurveyDraft, useDeletePulseSurveyDraft, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, HeartHandshake, Save } from "lucide-react";
+import { CheckCircle, HeartHandshake, Save, FlaskConical } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const TENURE_OPTIONS = [
   { value: 'under_1_month', label: 'Under 1 måned' },
