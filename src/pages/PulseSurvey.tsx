@@ -24,7 +24,8 @@ const SCALE_QUESTIONS = [
   {
     key: 'nps_score',
     title: '1. NPS / anbefaling',
-    question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?',
+    question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads, hvis nogen spørger dig?',
+    extraHelpText: 'Tænk på, hvor tryg du ville være ved at anbefale Copenhagen Sales som arbejdsplads - ikke på om du konkret har nogen i dit netværk, du ville anbefale os til.',
     helpText: '0 = Slet ikke sandsynligt, 10 = Meget sandsynligt',
     isNps: true
   },
@@ -265,6 +266,9 @@ export default function PulseSurvey() {
             <CardTitle className="text-lg">{SCALE_QUESTIONS[0].title}</CardTitle>
             <CardDescription>{SCALE_QUESTIONS[0].question}</CardDescription>
             <p className="text-sm text-muted-foreground">{SCALE_QUESTIONS[0].helpText}</p>
+            {SCALE_QUESTIONS[0].extraHelpText && (
+              <p className="text-sm text-muted-foreground italic">{SCALE_QUESTIONS[0].extraHelpText}</p>
+            )}
             <div className="flex gap-4 text-xs mt-2">
               <span className="text-red-500">0-6: Kritiker</span>
               <span className="text-amber-500">7-8: Passiv</span>
