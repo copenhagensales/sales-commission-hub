@@ -228,7 +228,7 @@ export default function PulseSurvey() {
         }
       );
     }, 3000);
-  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, hasCompleted, saveDraft]);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, selectedTeamId, hasCompleted, saveDraft]);
 
   // Trigger auto-save when form data changes (skip initial load)
   useEffect(() => {
@@ -236,7 +236,7 @@ export default function PulseSurvey() {
       triggerDraftSave();
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, triggerDraftSave]);
+  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, selectedTeamId, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
