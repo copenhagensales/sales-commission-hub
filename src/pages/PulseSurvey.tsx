@@ -259,6 +259,11 @@ export default function PulseSurvey() {
       return;
     }
 
+    if (!selectedTeamId) {
+      toast.error('Vælg venligst dit team');
+      return;
+    }
+
     if (!activeSurvey?.id) {
       toast.error('Ingen aktiv pulsmåling fundet');
       return;
