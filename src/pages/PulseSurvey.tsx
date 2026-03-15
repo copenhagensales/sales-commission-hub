@@ -204,6 +204,7 @@ export default function PulseSurvey() {
       setNpsComment(draft.nps_comment || '');
       setImprovementSuggestions(draft.improvement_suggestions || '');
       setCampaignImprovementSuggestions(draft.campaign_improvement_suggestions || '');
+      if (draft.selected_team_id) setSelectedTeamId(draft.selected_team_id);
     }
   }, [draftData]);
 
