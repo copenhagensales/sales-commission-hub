@@ -217,7 +217,7 @@ export default function PulseSurvey() {
       saveDraft.mutate(
         {
           surveyId: activeSurvey.id,
-          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions, campaign_improvement_suggestions: campaignImprovementSuggestions },
+          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions, campaign_improvement_suggestions: campaignImprovementSuggestions, selected_team_id: selectedTeamId },
         },
         {
           onSuccess: () => {
