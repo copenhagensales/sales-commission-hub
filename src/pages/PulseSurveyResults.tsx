@@ -10,7 +10,8 @@ import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } fro
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check, FileText } from "lucide-react";
+import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check, FileText, FlaskConical } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparisonBarChart";
