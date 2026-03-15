@@ -181,9 +181,14 @@ export default function PulseSurvey() {
         leader_availability_score: draft.leader_availability_score,
         wellbeing_score: draft.wellbeing_score,
         psychological_safety_score: draft.psychological_safety_score,
+        product_competitiveness_score: draft.product_competitiveness_score,
+        market_fit_score: draft.market_fit_score,
+        interest_creation_score: draft.interest_creation_score,
+        campaign_attractiveness_score: draft.campaign_attractiveness_score,
       });
       setNpsComment(draft.nps_comment || '');
       setImprovementSuggestions(draft.improvement_suggestions || '');
+      setCampaignImprovementSuggestions(draft.campaign_improvement_suggestions || '');
     }
   }, [draftData]);
 
