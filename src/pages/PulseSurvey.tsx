@@ -365,10 +365,18 @@ export default function PulseSurvey() {
   return (
     <MainLayout>
       <div className="space-y-6 max-w-3xl mx-auto">
+        {isTestMode && (
+          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <FlaskConical className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              Du er i test-tilstand — svar gemmes ikke.
+            </AlertDescription>
+          </Alert>
+        )}
         <div>
-          <h1 className="text-3xl font-bold">Pulsmåling</h1>
+          <h1 className="text-3xl font-bold">{isTestMode ? 'Pulsmåling (Test)' : 'Pulsmåling'}</h1>
           <p className="text-muted-foreground">
-            {monthNames[activeSurvey.month - 1]} {activeSurvey.year}
+            {isTestMode ? 'Test-tilstand — ingen data gemmes' : activeSurvey ? `${monthNames[activeSurvey.month - 1]} ${activeSurvey.year}` : 'Månedlig trivselsmåling'}
           </p>
         </div>
 
