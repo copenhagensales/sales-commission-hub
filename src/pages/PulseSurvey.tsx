@@ -443,6 +443,12 @@ export default function PulseSurvey() {
             <p className="text-sm text-muted-foreground text-center mt-3">
               Din besvarelse er anonym og kan ikke ændres efter indsendelse.
             </p>
+            {draftStatus !== 'idle' && (
+              <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1.5">
+                <Save className="h-3 w-3" />
+                {draftStatus === 'saving' ? 'Gemmer kladde...' : 'Kladde gemt'}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
