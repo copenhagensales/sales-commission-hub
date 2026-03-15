@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  useActivePulseSurvey,
-  useHasCompletedSurvey,
+  useShouldShowPulseSurvey,
   usePulseSurveyDismissal,
   useDismissPulseSurvey,
+  usePulseSurveyHasDraft,
 } from "@/hooks/usePulseSurvey";
-import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, Clock } from "lucide-react";
+import { ClipboardCheck, Clock, PenLine } from "lucide-react";
 
 export function PulseSurveyPopup() {
   const navigate = useNavigate();
@@ -25,6 +24,7 @@ export function PulseSurveyPopup() {
 
   const { showMenuItem, activeSurvey, hasCompleted } = useShouldShowPulseSurvey();
   const { data: dismissalData, isLoading: dismissalLoading } = usePulseSurveyDismissal(activeSurvey?.id);
+  const { data: hasDraft, isLoading: draftLoading } = usePulseSurveyHasDraft(activeSurvey?.id);
   const dismissMutation = useDismissPulseSurvey();
 
   // 2 second delay before showing
@@ -35,19 +35,22 @@ export function PulseSurveyPopup() {
 
   // Determine if popup should show
   useEffect(() => {
-    if (!delayPassed || dismissalLoading) return;
+    if (!delayPassed || dismissalLoading || draftLoading) return;
 
-    const shouldShow =
+    const baseConditions =
       showMenuItem &&
       !!activeSurvey &&
       !hasCompleted &&
       dismissalData &&
       !dismissalData.isStaff &&
-      !dismissalData.isDismissed &&
       !!dismissalData.employeeId;
 
+    // If user has a draft, always show (ignore dismiss)
+    // If no draft, respect dismiss
+    const shouldShow = baseConditions && (hasDraft || !dismissalData?.isDismissed);
+
     setOpen(!!shouldShow);
-  }, [delayPassed, dismissalLoading, showMenuItem, activeSurvey, hasCompleted, dismissalData]);
+  }, [delayPassed, dismissalLoading, draftLoading, showMenuItem, activeSurvey, hasCompleted, dismissalData, hasDraft]);
 
   const handleAnswerNow = () => {
     setOpen(false);
@@ -64,19 +67,43 @@ export function PulseSurveyPopup() {
     setOpen(false);
   };
 
+  const title = hasDraft
+    ? "Du har en igangværende pulsmåling"
+    : "Din månedlige pulsmåling er klar";
+
+  const description = hasDraft
+    ? "Du er allerede i gang — det tager kun et par minutter at gøre den færdig. Dine svar er 100% anonyme."
+    : "Vi vil gerne høre, hvordan du har det. Det tager kun 2 minutter, og dine svar er 100% anonyme.";
+
+  const actionLabel = hasDraft ? "Fortsæt besvarelse" : "Besvar nu";
+  const ActionIcon = hasDraft ? PenLine : ClipboardCheck;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
+              {hasDraft ? (
+                <PenLine className="h-5 w-5 text-primary" />
+              ) : (
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+              )}
             </div>
-            <DialogTitle className="text-lg">Din månedlige pulsmåling er klar</DialogTitle>
+            <DialogTitle className="text-lg">{title}</DialogTitle>
           </div>
           <DialogDescription className="text-sm text-muted-foreground">
-            Vi vil gerne høre, hvordan du har det. Det tager kun 2 minutter, og dine svar er
-            <span className="font-medium text-foreground"> 100% anonyme</span>.
+            {hasDraft ? (
+              <>
+                Du er allerede i gang — det tager kun et par minutter at gøre den færdig. Dine svar er{" "}
+                <span className="font-medium text-foreground">100% anonyme</span>.
+              </>
+            ) : (
+              <>
+                Vi vil gerne høre, hvordan du har det. Det tager kun 2 minutter, og dine svar er
+                <span className="font-medium text-foreground"> 100% anonyme</span>.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -86,8 +113,8 @@ export function PulseSurveyPopup() {
             Påmind mig i morgen
           </Button>
           <Button onClick={handleAnswerNow} className="gap-2">
-            <ClipboardCheck className="h-4 w-4" />
-            Besvar nu
+            <ActionIcon className="h-4 w-4" />
+            {actionLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
