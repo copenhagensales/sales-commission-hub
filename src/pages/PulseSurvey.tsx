@@ -24,7 +24,8 @@ const SCALE_QUESTIONS = [
   {
     key: 'nps_score',
     title: '1. NPS / anbefaling',
-    question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?',
+    question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads, hvis nogen spørger dig?',
+    extraHelpText: 'Tænk på, hvor tryg du ville være ved at anbefale Copenhagen Sales som arbejdsplads - ikke på om du konkret har nogen i dit netværk, du ville anbefale os til.',
     helpText: '0 = Slet ikke sandsynligt, 10 = Meget sandsynligt',
     isNps: true
   },
