@@ -18,6 +18,10 @@ const KNOWN_SCORE_COLUMNS = [
   'wellbeing_score',
   'psychological_safety_score',
   'attrition_risk_score',
+  'product_competitiveness_score',
+  'market_fit_score',
+  'interest_creation_score',
+  'campaign_attractiveness_score',
 ];
 
 serve(async (req) => {
@@ -40,6 +44,7 @@ serve(async (req) => {
       tenure,
       nps_comment,
       improvement_suggestions,
+      campaign_improvement_suggestions,
       submitted_team_id,
       department,
       ...dynamicScores
@@ -61,6 +66,7 @@ serve(async (req) => {
       tenure,
       nps_comment: nps_comment || null,
       improvement_suggestions: improvement_suggestions || null,
+      campaign_improvement_suggestions: campaign_improvement_suggestions || null,
       submitted_team_id: submitted_team_id || null,
       department: department || null,
     };

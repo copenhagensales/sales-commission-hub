@@ -77,6 +77,30 @@ const SCALE_QUESTIONS = [
     question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?',
     helpText: '1 = Slet ikke, 10 = I meget høj grad'
   },
+  {
+    key: 'product_competitiveness_score',
+    title: '12. Produktkonkurrenceevne',
+    question: 'Hvad er din opfattelse af de produkter, du sælger – hvor konkurrencedygtige er de over for de kunder, du taler med?',
+    helpText: '1 = Slet ikke konkurrencedygtige, 10 = Meget konkurrencedygtige'
+  },
+  {
+    key: 'market_fit_score',
+    title: '13. Markedsmatch',
+    question: 'Hvor godt matcher kundens produkter det, markedet efterspørger?',
+    helpText: '1 = Meget dårligt, 10 = Meget godt'
+  },
+  {
+    key: 'interest_creation_score',
+    title: '14. Interesse for produkter',
+    question: 'Hvor let er det at skabe interesse for kundens produkter?',
+    helpText: '1 = Meget svært, 10 = Meget let'
+  },
+  {
+    key: 'campaign_attractiveness_score',
+    title: '15. Kampagneattraktivitet',
+    question: 'Hvor attraktiv oplever du kampagnen, du sidder på, sammenlignet med andre kampagner hos Copenhagen Sales?',
+    helpText: '1 = Jeg ville helst sidde på en anden kampagne, 10 = Jeg ville klart foretrække at blive på denne kampagne'
+  },
 ];
 
 function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
@@ -136,6 +160,7 @@ export default function PulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const draftInitialized = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -156,9 +181,14 @@ export default function PulseSurvey() {
         leader_availability_score: draft.leader_availability_score,
         wellbeing_score: draft.wellbeing_score,
         psychological_safety_score: draft.psychological_safety_score,
+        product_competitiveness_score: draft.product_competitiveness_score,
+        market_fit_score: draft.market_fit_score,
+        interest_creation_score: draft.interest_creation_score,
+        campaign_attractiveness_score: draft.campaign_attractiveness_score,
       });
       setNpsComment(draft.nps_comment || '');
       setImprovementSuggestions(draft.improvement_suggestions || '');
+      setCampaignImprovementSuggestions(draft.campaign_improvement_suggestions || '');
     }
   }, [draftData]);
 
@@ -171,7 +201,7 @@ export default function PulseSurvey() {
       saveDraft.mutate(
         {
           surveyId: activeSurvey.id,
-          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions },
+          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions, campaign_improvement_suggestions: campaignImprovementSuggestions },
         },
         {
           onSuccess: () => {
@@ -182,7 +212,7 @@ export default function PulseSurvey() {
         }
       );
     }, 3000);
-  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, hasCompleted, saveDraft]);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, hasCompleted, saveDraft]);
 
   // Trigger auto-save when form data changes (skip initial load)
   useEffect(() => {
@@ -190,7 +220,7 @@ export default function PulseSurvey() {
       triggerDraftSave();
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [formData, npsComment, improvementSuggestions, triggerDraftSave]);
+  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -199,7 +229,8 @@ export default function PulseSurvey() {
   const handleSubmit = async () => {
     // Validate required fields
     const requiredScales = ['nps_score', 'development_score', 'leadership_score', 'recognition_score', 
-      'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score'];
+      'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score',
+      'product_competitiveness_score', 'market_fit_score', 'interest_creation_score', 'campaign_attractiveness_score'];
     
     for (const key of requiredScales) {
       if (!formData[key as keyof PulseSurveyResponse]) {
@@ -225,6 +256,7 @@ export default function PulseSurvey() {
           ...formData as PulseSurveyResponse,
           nps_comment: npsComment || undefined,
           improvement_suggestions: improvementSuggestions || undefined,
+          campaign_improvement_suggestions: campaignImprovementSuggestions || undefined,
         }
       });
 
@@ -409,10 +441,29 @@ export default function PulseSurvey() {
           </Card>
         ))}
 
+        {/* Campaign Improvement Suggestions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">16. Kampagneforbedring</CardTitle>
+            <CardDescription>
+              Hvad bør kunden forbedre for at gøre kampagnen og produkterne lettere at sælge?
+            </CardDescription>
+            <p className="text-sm text-muted-foreground">Valgfrit</p>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={campaignImprovementSuggestions}
+              onChange={(e) => setCampaignImprovementSuggestions(e.target.value)}
+              placeholder="Skriv dine forslag her..."
+              rows={4}
+            />
+          </CardContent>
+        </Card>
+
         {/* Improvement Suggestions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">12. Forbedringsforslag</CardTitle>
+            <CardTitle className="text-lg">17. Forbedringsforslag</CardTitle>
             <CardDescription>
               Har du idéer eller input til, hvad vi kunne gøre bedre i forhold til at arbejde i Copenhagen Sales?<br />
               (Alt er velkomment: ledelse, træning, stemning, rammer, løn/bonus, kommunikation osv.)
