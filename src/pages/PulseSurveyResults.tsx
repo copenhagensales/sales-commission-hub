@@ -604,6 +604,31 @@ export default function PulseSurveyResults() {
                   </CardContent>
                 </Card>
 
+                {/* Campaign Improvement Suggestions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Kampagneforbedringsforslag</CardTitle>
+                    <CardDescription>Anonyme forslag til kampagne- og produktforbedringer</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {filteredResponses
+                      .filter(r => r.campaign_improvement_suggestions)
+                      .map((r, i) => (
+                        <div key={i} className="p-3 bg-muted rounded-lg">
+                          {(r.team_id || r.submitted_team_id) && teams && (
+                            <Badge variant="secondary" className="mb-2">
+                              {teams.find(t => t.id === (r.team_id || r.submitted_team_id))?.name}
+                            </Badge>
+                          )}
+                          <p className="text-sm">{r.campaign_improvement_suggestions}</p>
+                        </div>
+                      ))}
+                    {filteredResponses.filter(r => r.campaign_improvement_suggestions).length === 0 && (
+                      <p className="text-muted-foreground text-sm">Ingen forslag</p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Improvement Suggestions */}
                 <Card>
                   <CardHeader>

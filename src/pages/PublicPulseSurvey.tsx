@@ -379,10 +379,29 @@ export default function PublicPulseSurvey() {
           </Card>
         ))}
 
+        {/* Campaign Improvement Suggestions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Kampagneforbedring</CardTitle>
+            <CardDescription>
+              Hvad bør kunden forbedre for at gøre kampagnen og produkterne lettere at sælge?
+            </CardDescription>
+            <p className="text-sm text-muted-foreground">Valgfrit</p>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={campaignImprovementSuggestions}
+              onChange={(e) => setCampaignImprovementSuggestions(e.target.value)}
+              placeholder="Skriv dine forslag her..."
+              rows={4}
+            />
+          </CardContent>
+        </Card>
+
         {/* Improvement Suggestions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">12. Forbedringsforslag</CardTitle>
+            <CardTitle className="text-lg">Forbedringsforslag</CardTitle>
             <CardDescription>
               Har du idéer eller input til, hvad vi kunne gøre bedre i forhold til at arbejde i Copenhagen Sales?<br />
               (Alt er velkomment: ledelse, træning, stemning, rammer, løn/bonus, kommunikation osv.)
