@@ -77,6 +77,30 @@ const SCALE_QUESTIONS = [
     question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?',
     helpText: '1 = Slet ikke, 10 = I meget høj grad'
   },
+  {
+    key: 'product_competitiveness_score',
+    title: '12. Produktkonkurrenceevne',
+    question: 'Hvad er din opfattelse af de produkter, du sælger – hvor konkurrencedygtige er de over for de kunder, du taler med?',
+    helpText: '1 = Slet ikke konkurrencedygtige, 10 = Meget konkurrencedygtige'
+  },
+  {
+    key: 'market_fit_score',
+    title: '13. Markedsmatch',
+    question: 'Hvor godt matcher kundens produkter det, markedet efterspørger?',
+    helpText: '1 = Meget dårligt, 10 = Meget godt'
+  },
+  {
+    key: 'interest_creation_score',
+    title: '14. Interesse for produkter',
+    question: 'Hvor let er det at skabe interesse for kundens produkter?',
+    helpText: '1 = Meget svært, 10 = Meget let'
+  },
+  {
+    key: 'campaign_attractiveness_score',
+    title: '15. Kampagneattraktivitet',
+    question: 'Hvor attraktiv oplever du kampagnen, du sidder på, sammenlignet med andre kampagner hos Copenhagen Sales?',
+    helpText: '1 = Jeg ville helst sidde på en anden kampagne, 10 = Jeg ville klart foretrække at blive på denne kampagne'
+  },
 ];
 
 function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
