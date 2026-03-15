@@ -380,6 +380,28 @@ export default function PulseSurvey() {
           </CardHeader>
         </Card>
 
+        {/* Team Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Vælg dit team</CardTitle>
+            <CardDescription>Hvilket team arbejder du på?</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg team..." />
+              </SelectTrigger>
+              <SelectContent>
+                {teams?.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         {/* NPS Question */}
         <Card>
           <CardHeader>
