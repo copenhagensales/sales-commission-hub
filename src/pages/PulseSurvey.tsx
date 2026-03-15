@@ -215,7 +215,7 @@ export default function PulseSurvey() {
       triggerDraftSave();
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [formData, npsComment, improvementSuggestions, triggerDraftSave]);
+  }, [formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
