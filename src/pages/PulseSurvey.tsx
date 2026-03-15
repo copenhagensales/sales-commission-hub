@@ -266,6 +266,9 @@ export default function PulseSurvey() {
             <CardTitle className="text-lg">{SCALE_QUESTIONS[0].title}</CardTitle>
             <CardDescription>{SCALE_QUESTIONS[0].question}</CardDescription>
             <p className="text-sm text-muted-foreground">{SCALE_QUESTIONS[0].helpText}</p>
+            {SCALE_QUESTIONS[0].extraHelpText && (
+              <p className="text-sm text-muted-foreground italic">{SCALE_QUESTIONS[0].extraHelpText}</p>
+            )}
             <div className="flex gap-4 text-xs mt-2">
               <span className="text-red-500">0-6: Kritiker</span>
               <span className="text-amber-500">7-8: Passiv</span>
