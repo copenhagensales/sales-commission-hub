@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
+import { useActivePulseSurvey, useHasCompletedSurvey, useSubmitPulseSurvey, usePulseSurveyDraft, useSavePulseSurveyDraft, useDeletePulseSurveyDraft, PulseSurveyResponse } from "@/hooks/usePulseSurvey";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, HeartHandshake } from "lucide-react";
+import { CheckCircle, HeartHandshake, Save } from "lucide-react";
 
 const TENURE_OPTIONS = [
   { value: 'under_1_month', label: 'Under 1 måned' },
