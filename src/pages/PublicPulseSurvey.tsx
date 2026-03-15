@@ -97,7 +97,8 @@ export default function PublicPulseSurvey() {
     }
   });
 
-  // Fetch teams
+  // Fetch teams - hide generic "Fieldmarketing" in favor of specific FM teams (Eesy FM, YouSee FM)
+  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing'];
   const { data: teams } = useQuery({
     queryKey: ['public-teams'],
     queryFn: async () => {
@@ -107,7 +108,7 @@ export default function PublicPulseSurvey() {
         .order('name');
       
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(t => !HIDDEN_PULSE_TEAMS.includes(t.name));
     }
   });
 
