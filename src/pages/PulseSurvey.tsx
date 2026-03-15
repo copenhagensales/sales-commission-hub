@@ -114,6 +114,9 @@ export default function PulseSurvey() {
   const { data: activeSurvey, isLoading: surveyLoading } = useActivePulseSurvey();
   const { data: hasCompleted, isLoading: completionLoading } = useHasCompletedSurvey(activeSurvey?.id);
   const submitSurvey = useSubmitPulseSurvey();
+  const { data: draftData, isLoading: draftLoading } = usePulseSurveyDraft(activeSurvey?.id);
+  const saveDraft = useSavePulseSurveyDraft();
+  const deleteDraft = useDeletePulseSurveyDraft();
 
   // Get employee department
   const { data: employee } = useQuery({
@@ -133,6 +136,61 @@ export default function PulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const draftInitialized = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Load draft data on mount
+  useEffect(() => {
+    if (draftData && !draftInitialized.current) {
+      draftInitialized.current = true;
+      const draft = draftData as Record<string, any>;
+      setFormData({
+        nps_score: draft.nps_score,
+        tenure: draft.tenure,
+        development_score: draft.development_score,
+        leadership_score: draft.leadership_score,
+        recognition_score: draft.recognition_score,
+        energy_score: draft.energy_score,
+        seriousness_score: draft.seriousness_score,
+        leader_availability_score: draft.leader_availability_score,
+        wellbeing_score: draft.wellbeing_score,
+        psychological_safety_score: draft.psychological_safety_score,
+      });
+      setNpsComment(draft.nps_comment || '');
+      setImprovementSuggestions(draft.improvement_suggestions || '');
+    }
+  }, [draftData]);
+
+  // Auto-save draft with debounce
+  const triggerDraftSave = useCallback(() => {
+    if (!activeSurvey?.id || hasCompleted) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      setDraftStatus('saving');
+      saveDraft.mutate(
+        {
+          surveyId: activeSurvey.id,
+          draftData: { ...formData, nps_comment: npsComment, improvement_suggestions: improvementSuggestions },
+        },
+        {
+          onSuccess: () => {
+            setDraftStatus('saved');
+            setTimeout(() => setDraftStatus('idle'), 2000);
+          },
+          onError: () => setDraftStatus('idle'),
+        }
+      );
+    }, 3000);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, hasCompleted, saveDraft]);
+
+  // Trigger auto-save when form data changes (skip initial load)
+  useEffect(() => {
+    if (draftInitialized.current) {
+      triggerDraftSave();
+    }
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, [formData, npsComment, improvementSuggestions, triggerDraftSave]);
 
   const handleScaleChange = (key: string, value: number) => {
     setFormData(prev => ({ ...prev, [key]: value }));
