@@ -122,7 +122,7 @@ export default function PulseSurvey() {
   const [campaignImprovementSuggestions, setCampaignImprovementSuggestions] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
 
-  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing'];
+  const HIDDEN_PULSE_TEAMS = ['Fieldmarketing', 'Stab'];
   const { data: teams } = useQuery({
     queryKey: ['teams-for-pulse'],
     queryFn: async () => {
