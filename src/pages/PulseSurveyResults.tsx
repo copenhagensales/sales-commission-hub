@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -175,27 +175,24 @@ export default function PulseSurveyResults() {
   const [templateInitialized, setTemplateInitialized] = useState(false);
 
   // Initialize template questions from DB or defaults, auto-migrate missing questions
-  useMemo(() => {
-    if (!templateInitialized && !templateLoading) {
-      if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
-        const existing = template.questions as PulseSurveyQuestion[];
-        const existingIds = new Set(existing.map(q => q.id));
-        const missing = INITIAL_DEFAULT_QUESTIONS.filter(q => !existingIds.has(q.id));
-        if (missing.length > 0) {
-          const merged = [...existing, ...missing];
-          setTemplateQuestions(merged);
-          // Auto-save merged template to DB
-          updateTemplate.mutate({ quizType: 'pulse_survey', questions: merged });
-        } else {
-          setTemplateQuestions(existing);
-        }
+  useEffect(() => {
+    if (templateInitialized || templateLoading) return;
+    if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
+      const existing = template.questions as PulseSurveyQuestion[];
+      const existingIds = new Set(existing.map(q => q.id));
+      const missing = INITIAL_DEFAULT_QUESTIONS.filter(q => !existingIds.has(q.id));
+      if (missing.length > 0) {
+        const merged = [...existing, ...missing];
+        setTemplateQuestions(merged);
+        updateTemplate.mutate({ quizType: 'pulse_survey', questions: merged });
       } else {
-        setTemplateQuestions(INITIAL_DEFAULT_QUESTIONS);
-        // Save defaults to DB on first load
-        updateTemplate.mutate({ quizType: 'pulse_survey', questions: INITIAL_DEFAULT_QUESTIONS });
+        setTemplateQuestions(existing);
       }
-      setTemplateInitialized(true);
+    } else {
+      setTemplateQuestions(INITIAL_DEFAULT_QUESTIONS);
+      updateTemplate.mutate({ quizType: 'pulse_survey', questions: INITIAL_DEFAULT_QUESTIONS });
     }
+    setTemplateInitialized(true);
   }, [template, templateLoading, templateInitialized]);
 
   // Build questionData dynamically from template
