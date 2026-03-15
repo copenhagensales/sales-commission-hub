@@ -144,7 +144,7 @@ function AveragesChart({ averages, questionData, responses = [] }: { averages: R
 
 // Initial default questions used when no template exists - will be saved to DB on first load
 const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
-  { id: 'nps_score', label: 'NPS / anbefaling', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
+  { id: 'nps_score', label: 'NPS / anbefaling', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads, hvis nogen spørger dig?', type: 'rating', min: 0, max: 10 },
   { id: 'development_score', label: 'Udvikling og træning', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
   { id: 'leadership_score', label: 'Teamlederens ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
   { id: 'recognition_score', label: 'Anerkendelse og belønning', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
