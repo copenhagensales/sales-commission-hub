@@ -367,3 +367,34 @@ export function useActivatePulseSurvey() {
     }
   });
 }
+
+// Hook to check if current user has a saved draft
+export function usePulseSurveyHasDraft(surveyId?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['pulse-survey-has-draft', surveyId, user?.id],
+    queryFn: async () => {
+      if (!surveyId) return false;
+
+      const lowerEmail = user?.email?.toLowerCase() || '';
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id')
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!employee) return false;
+
+      const { data } = await supabase
+        .from('pulse_survey_drafts')
+        .select('id')
+        .eq('survey_id', surveyId)
+        .eq('employee_id', employee.id)
+        .maybeSingle();
+
+      return !!data;
+    },
+    enabled: !!surveyId && !!user,
+  });
+}
