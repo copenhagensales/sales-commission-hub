@@ -44,6 +44,7 @@ serve(async (req) => {
       tenure,
       nps_comment,
       improvement_suggestions,
+      campaign_improvement_suggestions,
       submitted_team_id,
       department,
       ...dynamicScores
