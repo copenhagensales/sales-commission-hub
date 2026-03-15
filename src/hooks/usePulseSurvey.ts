@@ -135,9 +135,6 @@ export function useSubmitPulseSurvey() {
         if (completionError) throw completionError;
       }
 
-        if (completionError) throw completionError;
-      }
-
       return { success: true };
     },
     onSuccess: () => {
