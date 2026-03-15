@@ -207,7 +207,7 @@ export default function PulseSurvey() {
         }
       );
     }, 3000);
-  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, hasCompleted, saveDraft]);
+  }, [activeSurvey?.id, formData, npsComment, improvementSuggestions, campaignImprovementSuggestions, hasCompleted, saveDraft]);
 
   // Trigger auto-save when form data changes (skip initial load)
   useEffect(() => {
