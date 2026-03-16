@@ -289,6 +289,9 @@ Deno.serve(async (req) => {
 
     console.log(`[calculate-kpi-values] Starting with chunk=${chunk || "all"} (kpis=${runKpis}, leaderboards=${runLeaderboards})`);
 
+    // Auto-transition season statuses based on dates
+    await autoTransitionSeasonStatuses(supabase);
+
     const now = new Date();
     const periods = [
       { type: "today", start: getStartOfDay(now), end: now },
