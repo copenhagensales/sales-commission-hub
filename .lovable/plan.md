@@ -1,19 +1,27 @@
 
 
+## Tilføj "Overvejelser om frafald"-spørgsmålet til pulsmålingen
 
-## Draft-booking workflow ✅
+### Problem
+Spørgsmålet `attrition_risk_score` ("Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 6 måneder?") eksisterer i databasen og vises som kolonne i heatmappet, men det bliver aldrig stillet i selve surveyet. Derfor er kolonnen altid "-".
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Ændringer
 
-## Fortrolige kontrakter ✅
+**1. `src/pages/PulseSurvey.tsx`** — Tilføj spørgsmålet til QUESTIONS-arrayet
+- Indsæt efter `psychological_safety_score` (linje 43):
+  ```
+  { key: 'attrition_risk_score', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 6 måneder?', lowLabel: 'Meget usandsynligt', highLabel: 'Meget sandsynligt', section: 'wellbeing' }
+  ```
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**2. `src/pages/PublicPulseSurvey.tsx`** — Tilføj til SECTION_CONFIG
+- Tilføj `'attrition_risk_score'` til `wellbeing`-sektionens `questionIds` (linje 31)
+
+**3. `src/hooks/usePulseSurvey.ts`** — Tilføj til PulseSurveyResponse interface
+- Tilføj `attrition_risk_score: number;` til interfacet
+
+**4. `supabase/functions/submit-pulse-survey/index.ts`** — Sikr at feltet gemmes
+- Tilføj `attrition_risk_score` til insert-objektet i edge function
+
+### Ingen database-ændringer
+Kolonnen `attrition_risk_score` eksisterer allerede i `pulse_survey_responses`-tabellen.
+
