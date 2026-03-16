@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wallet, AlertCircle, ArrowLeft } from "lucide-react";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { Button } from "@/components/ui/button";
-import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
+import { usePersonalSalesStats } from "@/hooks/usePersonalSalesStats";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/lib/calculations";
 import { PayrollErrorReportDialog } from "@/components/my-profile/PayrollErrorReportDialog";
