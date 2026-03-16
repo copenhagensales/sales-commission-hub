@@ -274,8 +274,9 @@ export default function CommissionLeague() {
         />
       )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
-        <div className="max-w-6xl mx-auto space-y-6" ref={headerRef}>
+        <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Collapsible */}
+          <div ref={headerRef}>
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="w-full text-left">
               <div className="flex items-center justify-between gap-4">
