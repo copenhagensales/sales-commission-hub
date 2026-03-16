@@ -29,7 +29,17 @@ export interface LeagueEnrollment {
   season_id: string;
   enrolled_at: string;
   is_active: boolean;
+  is_spectator: boolean;
 }
+
+// Roles that cannot participate as players (only fan/spectator)
+export const NON_PARTICIPATING_ROLES = [
+  'ejer',
+  'assisterende_teamleder_fm',
+  'some',
+  'rekruttering',
+  'fm_leder',
+];
 
 export interface QualificationStanding {
   id: string;
@@ -91,7 +101,7 @@ export function useMyEnrollment(seasonId: string | undefined) {
       
       const { data, error } = await supabase
         .from("league_enrollments")
-        .select("*")
+        .select("id, employee_id, season_id, enrolled_at, is_active, is_spectator")
         .eq("season_id", seasonId)
         .eq("employee_id", employee.id)
         .eq("is_active", true)
@@ -298,8 +308,62 @@ export function useEnrollInSeason() {
     },
   });
 }
+// Enroll as fan/spectator
+export function useEnrollAsFan() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (seasonId: string) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      
+      const { data: employee, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single();
+      
+      if (empError) throw empError;
+      
+      // Check existing enrollment
+      const { data: existing } = await supabase
+        .from("league_enrollments")
+        .select("id")
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id)
+        .maybeSingle();
+      
+      if (existing) {
+        const { data, error } = await supabase
+          .from("league_enrollments")
+          .update({ is_active: true, is_spectator: true })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from("league_enrollments")
+          .insert({
+            season_id: seasonId,
+            employee_id: employee.id,
+            is_spectator: true,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: (_, seasonId) => {
+      queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-enrollment-count", seasonId] });
+    },
+  });
+}
 
-// Unenroll from a season (soft delete - sets is_active to false)
+
 export function useUnenrollFromSeason() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

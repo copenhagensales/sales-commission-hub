@@ -1,62 +1,19 @@
 
 
-## "Fan"-tilmelding og rollebegrænsning i Salgsligaen
 
-### Hvad skal laves
+## Draft-booking workflow ✅
 
-1. **Definér ikke-deltagende roller** — roller som ejer, ass. teamleder, some, rekruttering, FM leder osv. må ikke deltage som spillere. De kan kun tilmelde sig som "fan" (spectator).
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-2. **Ny "Bliv fan"-knap** på landing-sektionen — vises for alle, ved siden af "Tilmeld mig nu". Fans tilmeldes med `is_spectator = true` og ser leaderboardet, men optræder ikke i standings.
+## Fortrolige kontrakter ✅
 
-3. **Bloker deltagelse for ikke-spillende roller** — "Tilmeld mig nu"-knappen skjules for ejer, ass. teamleder, some, rekruttering m.fl. De ser kun "Bliv fan"-knappen.
-
-### Ændringer
-
-**`src/hooks/useLeagueData.ts`**
-- Tilføj ny `useEnrollAsFan()` mutation der altid sætter `is_spectator = true`
-- I `useEnrollInSeason()` — tilføj tjek af brugerens `system_role_key` via `position_id`. Hvis rollen er i en blocklist (`ejer`, `some`, `rekruttering`, `assisterende_teamleder_fm`, `fm_leder`), kast en fejl ("Din rolle tillader ikke deltagelse")
-
-**`src/pages/CommissionLeague.tsx`**
-- Hent brugerens rolle via `useUnifiedPermissions()` (allerede tilgængelig)
-- Definer `canParticipate` boolean: `true` kun for `medarbejder` og `teamleder` roller
-- Landing-sektion:
-  - Vis "Tilmeld mig nu" kun hvis `canParticipate`
-  - Vis altid "Bliv fan 👀"-knap for alle
-- Enrolled-sektion:
-  - Hvis fan (`enrollment.is_spectator`): vis leaderboard men **ikke** `MyQualificationStatus`, og vis "Du følger med som fan" badge
-  - Skjul "Afmeld liga" → vis "Stop med at følge" for fans
-
-**`src/hooks/useLeagueData.ts` — `LeagueEnrollment` interface**
-- Tilføj `is_spectator?: boolean` til interfacet
-- Opdater `useMyEnrollment` select til at inkludere `is_spectator`
-
-### Rolleblocklist (kan ikke deltage, kun fan)
-| Rolle | system_role_key |
-|-------|----------------|
-| Ejer | `ejer` |
-| Ass. teamleder FM | `assisterende_teamleder_fm` |
-| SoMe | `some` |
-| Rekruttering | `rekruttering` |
-| FM Leder | `fm_leder` |
-
-### UI-flow
-
-```text
-Ikke tilmeldt + kan deltage:
-  [🏆 Tilmeld mig nu]  [👀 Følg som fan]
-
-Ikke tilmeldt + kan IKKE deltage (ejer etc.):
-  [👀 Følg som fan]
-
-Tilmeldt som deltager:
-  → Ser standings + egen placering
-  → [Afmeld liga]
-
-Tilmeldt som fan:
-  → Ser standings (uden egen placering)
-  → Badge: "Du følger med som fan"
-  → [Stop med at følge]
-```
-
-Ingen databaseændringer — `is_spectator` kolonne eksisterer allerede i `league_enrollments`.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.

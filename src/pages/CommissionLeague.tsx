@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { usePositionPermissions } from "@/hooks/usePositionPermissions";
+import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   useActiveSeason,
   useMyEnrollment,
@@ -18,6 +18,8 @@ import {
   useEnrollInSeason,
   useUnenrollFromSeason,
   useEnrollmentCount,
+  useEnrollAsFan,
+  NON_PARTICIPATING_ROLES,
 } from "@/hooks/useLeagueData";
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
@@ -29,8 +31,8 @@ import { da } from "date-fns/locale";
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const positionQuery = usePositionPermissions();
-  const isOwner = positionQuery.data?.position?.name?.toLowerCase() === "ejer";
+  const { role, isOwner } = useUnifiedPermissions();
+  const canParticipate = !NON_PARTICIPATING_ROLES.includes(role);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -52,6 +54,10 @@ export default function CommissionLeague() {
   const { data: enrollmentCount } = useEnrollmentCount(season?.id);
   const enrollMutation = useEnrollInSeason();
   const unenrollMutation = useUnenrollFromSeason();
+  const fanMutation = useEnrollAsFan();
+
+  const isEnrolled = !!enrollment;
+  const isFan = enrollment?.is_spectator === true;
 
   // Real-time subscription
   useEffect(() => {
@@ -84,10 +90,19 @@ export default function CommissionLeague() {
     try {
       await enrollMutation.mutateAsync(season.id);
       toast.success("Du er nu tilmeldt Salgsligaen! 🎉");
-      // Trigger standings calculation
       handleCalculateStandings();
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke tilmelde");
+    }
+  };
+
+  const handleEnrollAsFan = async () => {
+    if (!season?.id) return;
+    try {
+      await fanMutation.mutateAsync(season.id);
+      toast.success("Du følger nu med som fan! 👀");
+    } catch (error: any) {
+      toast.error(error.message || "Kunne ikke tilmelde som fan");
     }
   };
 
@@ -95,7 +110,7 @@ export default function CommissionLeague() {
     if (!season?.id) return;
     try {
       await unenrollMutation.mutateAsync(season.id);
-      toast.success("Du er nu afmeldt ligaen");
+      toast.success(isFan ? "Du følger ikke længere med" : "Du er nu afmeldt ligaen");
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke afmelde");
     }
@@ -113,7 +128,6 @@ export default function CommissionLeague() {
       toast.success("Stillinger opdateret!");
     } catch (error: any) {
       console.error("Calculate standings error:", error);
-      // Don't show error if function doesn't exist yet
     } finally {
       setIsCalculating(false);
     }
@@ -153,7 +167,6 @@ export default function CommissionLeague() {
   }
 
   const isQualificationPhase = season.status === "qualification";
-  const isEnrolled = !!enrollment;
 
   return (
     <MainLayout>
@@ -166,6 +179,12 @@ export default function CommissionLeague() {
                 <Trophy className="h-8 w-8 text-yellow-500" />
                 <h1 className="text-2xl md:text-3xl font-bold">Salgsligaen</h1>
                 <Badge variant="secondary">Sæson {season.season_number}</Badge>
+                {isFan && (
+                  <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Fan
+                  </Badge>
+                )}
               </div>
               <p className="text-muted-foreground mt-1">
                 {isQualificationPhase ? "Kvalifikationsperiode" : "Sæson i gang"}
@@ -224,18 +243,35 @@ export default function CommissionLeague() {
                       </div>
                     </div>
 
-                    <Button
-                      size="lg"
-                      onClick={handleEnroll}
-                      disabled={enrollMutation.isPending}
-                    >
-                      {enrollMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Trophy className="h-4 w-4 mr-2" />
+                    <div className="flex flex-wrap gap-3">
+                      {canParticipate && (
+                        <Button
+                          size="lg"
+                          onClick={handleEnroll}
+                          disabled={enrollMutation.isPending}
+                        >
+                          {enrollMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Trophy className="h-4 w-4 mr-2" />
+                          )}
+                          Tilmeld mig nu
+                        </Button>
                       )}
-                      Tilmeld mig nu
-                    </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleEnrollAsFan}
+                        disabled={fanMutation.isPending}
+                      >
+                        {fanMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
+                        Følg som fan 👀
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="bg-slate-900/50 rounded-xl p-6">
@@ -270,14 +306,16 @@ export default function CommissionLeague() {
           {/* Enrolled - show dashboard */}
           {isEnrolled && (
             <>
-              {/* My Status */}
-              <MyQualificationStatus
-                standing={myStanding || null}
-                totalPlayers={standings?.length || 0}
-                playersPerDivision={playersPerDivision}
-              />
+              {/* My Status - only for active participants, not fans */}
+              {!isFan && (
+                <MyQualificationStatus
+                  standing={myStanding || null}
+                  totalPlayers={standings?.length || 0}
+                  playersPerDivision={playersPerDivision}
+                />
+              )}
 
-              {/* Unenroll button */}
+              {/* Unenroll / stop following button */}
               <div className="flex justify-end">
                 <Button
                   variant="ghost"
@@ -289,7 +327,7 @@ export default function CommissionLeague() {
                   {unenrollMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  Afmeld liga
+                  {isFan ? "Stop med at følge" : "Afmeld liga"}
                 </Button>
               </div>
 
@@ -314,7 +352,7 @@ export default function CommissionLeague() {
                   <Tabs defaultValue="all">
                     <TabsList className="mb-4">
                       <TabsTrigger value="all">Alle Divisioner</TabsTrigger>
-                      <TabsTrigger value="my">Min Division</TabsTrigger>
+                      {!isFan && <TabsTrigger value="my">Min Division</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="all">
@@ -326,16 +364,18 @@ export default function CommissionLeague() {
                       />
                     </TabsContent>
 
-                    <TabsContent value="my">
-                      <QualificationBoard
-                        standings={(standings || []).filter(
-                          (s) => s.projected_division === myStanding?.projected_division
-                        )}
-                        playersPerDivision={playersPerDivision}
-                        isLoading={standingsLoading}
-                        currentEmployeeId={currentEmployeeId}
-                      />
-                    </TabsContent>
+                    {!isFan && (
+                      <TabsContent value="my">
+                        <QualificationBoard
+                          standings={(standings || []).filter(
+                            (s) => s.projected_division === myStanding?.projected_division
+                          )}
+                          playersPerDivision={playersPerDivision}
+                          isLoading={standingsLoading}
+                          currentEmployeeId={currentEmployeeId}
+                        />
+                      </TabsContent>
+                    )}
                   </Tabs>
                 </CardContent>
               </Card>
