@@ -123,9 +123,19 @@ export default function CommissionLeague() {
     if (!season?.id) return;
     try {
       await unenrollMutation.mutateAsync(season.id);
-      toast.success(isFan ? "Du følger ikke længere med" : "Du er nu afmeldt ligaen");
+      toast.success("Du følger ikke længere med");
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke afmelde");
+    }
+  };
+
+  const handleUnenrollAndBecomeFan = async () => {
+    if (!season?.id) return;
+    try {
+      await unenrollAndFanMutation.mutateAsync(season.id);
+      toast.success("Du er nu fan og kan følge med! 👀");
+    } catch (error: any) {
+      toast.error(error.message || "Kunne ikke skifte til fan");
     }
   };
 
