@@ -294,7 +294,10 @@ export default function CommissionLeague() {
                     Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
                   </p>
                 </div>
-                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                <div className="flex items-center gap-2">
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                  <LeagueRulesSheet />
+                </div>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-3">
