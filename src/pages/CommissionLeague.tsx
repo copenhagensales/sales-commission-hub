@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye } from "lucide-react";
+import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,10 +17,22 @@ import {
   useMyQualificationStanding,
   useEnrollInSeason,
   useUnenrollFromSeason,
+  useUnenrollAndBecomeFan,
   useEnrollmentCount,
   useEnrollAsFan,
   NON_PARTICIPATING_ROLES,
 } from "@/hooks/useLeagueData";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
@@ -54,6 +66,7 @@ export default function CommissionLeague() {
   const { data: enrollmentCount } = useEnrollmentCount(season?.id);
   const enrollMutation = useEnrollInSeason();
   const unenrollMutation = useUnenrollFromSeason();
+  const unenrollAndFanMutation = useUnenrollAndBecomeFan();
   const fanMutation = useEnrollAsFan();
 
   const isEnrolled = !!enrollment;
@@ -110,9 +123,19 @@ export default function CommissionLeague() {
     if (!season?.id) return;
     try {
       await unenrollMutation.mutateAsync(season.id);
-      toast.success(isFan ? "Du følger ikke længere med" : "Du er nu afmeldt ligaen");
+      toast.success("Du følger ikke længere med");
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke afmelde");
+    }
+  };
+
+  const handleUnenrollAndBecomeFan = async () => {
+    if (!season?.id) return;
+    try {
+      await unenrollAndFanMutation.mutateAsync(season.id);
+      toast.success("Du er nu fan og kan følge med! 👀");
+    } catch (error: any) {
+      toast.error(error.message || "Kunne ikke skifte til fan");
     }
   };
 
@@ -317,18 +340,53 @@ export default function CommissionLeague() {
 
               {/* Unenroll / stop following button */}
               <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleUnenroll}
-                  disabled={unenrollMutation.isPending}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  {unenrollMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isFan ? "Stop med at følge" : "Afmeld liga"}
-                </Button>
+                {isFan ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleUnenroll}
+                    disabled={unenrollMutation.isPending}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    {unenrollMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Stop med at følge
+                  </Button>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        Træk mig fra ligaen – bliv fan
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-destructive" />
+                          Træk dig fra ligaen?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                          <p>Du vil blive fjernet fra ranglisten og konverteret til fan, så du stadig kan følge med.</p>
+                          <p className="font-semibold text-destructive">⚠️ Bemærk: Hvis du tilmelder dig igen senere, starter du i bunden af ranglisten.</p>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Nej, fortryd</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleUnenrollAndBecomeFan}
+                          disabled={unenrollAndFanMutation.isPending}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {unenrollAndFanMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                          Ja, træk mig og bliv fan
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
 
               {/* Leaderboard */}

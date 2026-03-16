@@ -372,7 +372,6 @@ export function useUnenrollFromSeason() {
     mutationFn: async (seasonId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
       
-      // Get employee_id
       const { data: employee, error: empError } = await supabase
         .from("employee_master_data")
         .select("id")
@@ -381,7 +380,6 @@ export function useUnenrollFromSeason() {
       
       if (empError) throw empError;
       
-      // Soft delete by setting is_active to false
       const { error } = await supabase
         .from("league_enrollments")
         .update({ is_active: false })
@@ -390,7 +388,48 @@ export function useUnenrollFromSeason() {
 
       if (error) throw error;
       
-      // Also remove from standings
+      await supabase
+        .from("league_qualification_standings")
+        .delete()
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id);
+    },
+    onSuccess: (_, seasonId) => {
+      queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-qualification-standings", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-enrollment-count", seasonId] });
+      queryClient.invalidateQueries({ queryKey: ["league-my-qualification-standing", seasonId] });
+    },
+  });
+}
+
+// Unenroll as player but stay as fan/spectator
+export function useUnenrollAndBecomeFan() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (seasonId: string) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      
+      const { data: employee, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single();
+      
+      if (empError) throw empError;
+      
+      // Convert to spectator instead of deactivating
+      const { error } = await supabase
+        .from("league_enrollments")
+        .update({ is_spectator: true })
+        .eq("season_id", seasonId)
+        .eq("employee_id", employee.id);
+
+      if (error) throw error;
+      
+      // Remove from standings
       await supabase
         .from("league_qualification_standings")
         .delete()
