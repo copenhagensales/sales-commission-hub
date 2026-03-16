@@ -196,12 +196,13 @@ export default function MyGoals() {
               employeeId={employee.id}
               payrollPeriod={payrollPeriod}
               commissionStats={{
-                periodTotal: periodCommission,
-                periodSales: periodSalesCount,
-                monthTotal: periodCommission,
-                monthSales: periodSalesCount,
-                todayTotal: todayCommission,
-                todaySales: todaySalesCount,
+                periodTotal: salesStats.periodTotal,
+                periodSales: salesStats.periodSales,
+                monthTotal: salesStats.monthTotal,
+                monthSales: salesStats.monthSales,
+                todayTotal: salesStats.todayTotal,
+                todaySales: salesStats.todaySales,
+                weekTotal: salesStats.weekTotal,
               }}
               absences={absences}
               danishHolidays={danishHolidays}
