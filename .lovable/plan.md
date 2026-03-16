@@ -1,27 +1,31 @@
 
 
-## Fix: Lucas' beregner viser 0 – brug live-data i stedet for cache
 
-### Problem
-`MyGoals.tsx` henter Lucas' provision og salgstal fra **cached KPIs** (`usePrecomputedKpis`), som opdateres af `calculate-kpi-incremental` edge-funktionen. Denne cache kan have problemer med agent-mapping for specifikke medarbejdere, hvilket resulterer i 0-værdier. Derudover henter `SalesGoalTracker` ugens provision via `agent_name`-match (linje 151-158), som kun virker for medarbejdere med en specifik agent-mapping og et matchende navn.
+## Draft-booking workflow ✅
 
-### Løsning
-Erstat cached KPIs med **live-data** via `usePersonalSalesStats`, som bruger den centrale `useSalesAggregatesExtended`-hook. Denne hook resolver agent-emails korrekt (via `employee_agent_mapping` + `work_email` fallback) og henter direkte fra databasen.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-### Ændringer
+## Fortrolige kontrakter ✅
 
-**1. `src/pages/MyGoals.tsx`**
-- Fjern `usePrecomputedKpis` og `getKpiValue` imports/calls
-- Tilføj `usePersonalSalesStats(employee.id, payrollPeriod.start, payrollPeriod.end)`
-- Send live-data til `SalesGoalTracker` via `commissionStats`
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-**2. `src/components/my-profile/SalesGoalTracker.tsx`**
-- Fjern den separate `weekSalesData` useQuery (linje 141-170) som bruger `agent_name`-match
-- Erstat med data fra `usePersonalSalesStats` (som allerede beregner ugens total korrekt)
-- Tilføj `weekTotal` til `SalesGoalTrackerProps` og brug den i stedet
+## Liga Gameplay med Division-først Ranking ✅
 
-### Fordele
-- Salgstal opdateres live uden at afvente cache-opfriskning
-- Agent-identitet resolves korrekt for alle medarbejdere (inkl. Lucas)
-- Fjerner en redundant og fejlbehæftet database-query
-
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
+4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
+5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
+8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".

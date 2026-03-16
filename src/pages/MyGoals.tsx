@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wallet, AlertCircle, ArrowLeft } from "lucide-react";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { Button } from "@/components/ui/button";
-import { usePrecomputedKpis, getKpiValue, type KpiPeriod } from "@/hooks/usePrecomputedKpi";
+import { usePersonalSalesStats } from "@/hooks/usePersonalSalesStats";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/lib/calculations";
 import { PayrollErrorReportDialog } from "@/components/my-profile/PayrollErrorReportDialog";
@@ -77,27 +77,12 @@ export default function MyGoals() {
   // Calculate payroll period (15th to 14th)
   const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
 
-  // Fetch KPIs from cache for payroll period
-  const { data: payrollKpis } = usePrecomputedKpis(
-    ["sales_count", "total_commission"],
-    "payroll_period" as KpiPeriod,
-    "employee",
-    employee?.id
+  // Fetch live sales stats for payroll period
+  const salesStats = usePersonalSalesStats(
+    employee?.id || "",
+    payrollPeriod.start,
+    payrollPeriod.end
   );
-
-  // Fetch KPIs from cache for today
-  const { data: todayKpis } = usePrecomputedKpis(
-    ["sales_count", "total_commission"],
-    "today" as KpiPeriod,
-    "employee",
-    employee?.id
-  );
-
-  // Extract values from cached KPIs
-  const periodCommission = getKpiValue(payrollKpis?.total_commission);
-  const periodSalesCount = getKpiValue(payrollKpis?.sales_count);
-  const todayCommission = getKpiValue(todayKpis?.total_commission);
-  const todaySalesCount = getKpiValue(todayKpis?.sales_count);
 
   // Get absences for the employee
   const { data: absences = [] } = useQuery({
@@ -211,12 +196,13 @@ export default function MyGoals() {
               employeeId={employee.id}
               payrollPeriod={payrollPeriod}
               commissionStats={{
-                periodTotal: periodCommission,
-                periodSales: periodSalesCount,
-                monthTotal: periodCommission,
-                monthSales: periodSalesCount,
-                todayTotal: todayCommission,
-                todaySales: todaySalesCount,
+                periodTotal: salesStats.periodTotal,
+                periodSales: salesStats.periodSales,
+                monthTotal: salesStats.monthTotal,
+                monthSales: salesStats.monthSales,
+                todayTotal: salesStats.todayTotal,
+                todaySales: salesStats.todaySales,
+                weekTotal: salesStats.weekTotal,
               }}
               absences={absences}
               danishHolidays={danishHolidays}

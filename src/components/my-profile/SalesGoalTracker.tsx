@@ -24,7 +24,7 @@ import {
   ReferenceLine,
   Scatter,
 } from "recharts";
-import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay, startOfWeek } from "date-fns";
+import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
@@ -57,6 +57,7 @@ interface SalesGoalTrackerProps {
     monthSales: number;
     todayTotal: number;
     todaySales: number;
+    weekTotal?: number;
   };
   absences: Array<{
     start_date: string;
@@ -134,42 +135,8 @@ export function SalesGoalTracker({
     },
   });
 
-  // Fetch current week commission
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const weekStartStr = format(weekStart, "yyyy-MM-dd");
-
-  const { data: weekSalesData } = useQuery({
-    queryKey: ["week-commission", employeeId, weekStartStr],
-    queryFn: async () => {
-      // First get the employee's agent mapping
-      const { data: mapping } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(name)")
-        .eq("employee_id", employeeId)
-        .maybeSingle();
-
-      const agentName = mapping?.agents?.name;
-      if (!agentName) return 0;
-
-      // Get sale items for the current week using agent_name
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select("mapped_commission, sales!inner(agent_name, sale_datetime, validation_status)")
-        .eq("sales.agent_name", agentName)
-        .gte("sales.sale_datetime", `${weekStartStr}T00:00:00`)
-        .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
-      
-      if (error) throw error;
-      
-      const total = (data || []).reduce((sum, item) => 
-        sum + (item.mapped_commission || 0), 0
-      );
-      return total;
-    },
-    enabled: !!employeeId,
-  });
-
-  const currentWeekTotal = weekSalesData || 0;
+  // Week commission from live data (passed via commissionStats)
+  const currentWeekTotal = commissionStats.weekTotal || 0;
 
   // Initialize input when goal loads
   useEffect(() => {
