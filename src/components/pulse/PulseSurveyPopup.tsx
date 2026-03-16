@@ -100,8 +100,8 @@ export function PulseSurveyPopup() {
               </>
             ) : (
               <>
-                Vi vil gerne høre, hvordan du har det. Det tager kun 2 minutter, og dine svar er
-                <span className="font-medium text-foreground"> 100% anonyme</span>.
+                Vi beklager ulejligheden — din tidligere besvarelse blev desværre ikke registreret korrekt, og vi har derfor brug for, at du besvarer pulsmålingen igen. Det tager kun 2 minutter, og dine svar er fortsat{" "}
+                <span className="font-medium text-foreground">100% anonyme</span>.
               </>
             )}
           </DialogDescription>
