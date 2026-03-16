@@ -4,21 +4,12 @@ import { da } from "date-fns/locale";
 import { CalendarIcon, Loader2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LeagueSeason, useUpdateSeasonDates } from "@/hooks/useLeagueData";
@@ -33,16 +24,19 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
   const [qualSourceEnd, setQualSourceEnd] = useState<Date | undefined>();
   const [qualStartAt, setQualStartAt] = useState<Date | undefined>();
   const [qualEndAt, setQualEndAt] = useState<Date | undefined>();
-  
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
   const updateDatesMutation = useUpdateSeasonDates();
 
-  // Initialize dates from season
   useEffect(() => {
     if (season) {
       setQualSourceStart(new Date(season.qualification_source_start));
       setQualSourceEnd(new Date(season.qualification_source_end));
       setQualStartAt(new Date(season.qualification_start_at));
       setQualEndAt(new Date(season.qualification_end_at));
+      setStartDate(season.start_date ? new Date(season.start_date) : undefined);
+      setEndDate(season.end_date ? new Date(season.end_date) : undefined);
     }
   }, [season]);
 
@@ -60,6 +54,8 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
           qualification_source_end: qualSourceEnd.toISOString(),
           qualification_start_at: qualStartAt.toISOString(),
           qualification_end_at: qualEndAt.toISOString(),
+          start_date: startDate ? startDate.toISOString().split("T")[0] : undefined,
+          end_date: endDate ? endDate.toISOString().split("T")[0] : undefined,
         },
       });
       toast.success("Sæson-datoer opdateret!");
@@ -80,82 +76,46 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Sæson Indstillinger
+            Sæson {season.season_number} – Indstillinger
           </DialogTitle>
           <DialogDescription>
-            Justér datoer for kvalifikationsperioden
+            Justér datoer for sæsonen
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Provision calculation period */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">
-              📊 Provision beregnes fra
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Salg i denne periode tæller til kvalifikationen
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Start dato</Label>
-                <DatePickerButton
-                  date={qualSourceStart}
-                  onSelect={setQualSourceStart}
-                  placeholder="Vælg start"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Slut dato</Label>
-                <DatePickerButton
-                  date={qualSourceEnd}
-                  onSelect={setQualSourceEnd}
-                  placeholder="Vælg slut"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Enrollment period */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">
-              📅 Tilmeldingsperiode
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Hvornår spillere kan tilmelde sig
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Start</Label>
-                <DatePickerButton
-                  date={qualStartAt}
-                  onSelect={setQualStartAt}
-                  placeholder="Vælg start"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Slut</Label>
-                <DatePickerButton
-                  date={qualEndAt}
-                  onSelect={setQualEndAt}
-                  placeholder="Vælg slut"
-                />
-              </div>
-            </div>
-          </div>
+          <DateRangeSection
+            label="📊 Provision beregnes fra"
+            description="Salg i denne periode tæller til kvalifikationen"
+            startDate={qualSourceStart}
+            endDate={qualSourceEnd}
+            onStartChange={setQualSourceStart}
+            onEndChange={setQualSourceEnd}
+          />
+          <DateRangeSection
+            label="📅 Tilmeldingsperiode"
+            description="Hvornår spillere kan tilmelde sig"
+            startDate={qualStartAt}
+            endDate={qualEndAt}
+            onStartChange={setQualStartAt}
+            onEndChange={setQualEndAt}
+          />
+          <DateRangeSection
+            label="🏆 Sæson periode"
+            description="Hvornår selve ligaen kører"
+            startDate={startDate}
+            endDate={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+          />
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Annuller
           </Button>
-          <Button 
-            onClick={handleSave}
-            disabled={updateDatesMutation.isPending}
-          >
-            {updateDatesMutation.isPending && (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            )}
+          <Button onClick={handleSave} disabled={updateDatesMutation.isPending}>
+            {updateDatesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Gem ændringer
           </Button>
         </DialogFooter>
@@ -164,13 +124,42 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
   );
 }
 
-interface DatePickerButtonProps {
-  date: Date | undefined;
-  onSelect: (date: Date | undefined) => void;
-  placeholder: string;
+function DateRangeSection({
+  label,
+  description,
+  startDate,
+  endDate,
+  onStartChange,
+  onEndChange,
+}: {
+  label: string;
+  description: string;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  onStartChange: (d: Date | undefined) => void;
+  onEndChange: (d: Date | undefined) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">{label}</Label>
+      <p className="text-xs text-muted-foreground">{description}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <DatePickerButton date={startDate} onSelect={onStartChange} placeholder="Start" />
+        <DatePickerButton date={endDate} onSelect={onEndChange} placeholder="Slut" />
+      </div>
+    </div>
+  );
 }
 
-function DatePickerButton({ date, onSelect, placeholder }: DatePickerButtonProps) {
+function DatePickerButton({
+  date,
+  onSelect,
+  placeholder,
+}: {
+  date: Date | undefined;
+  onSelect: (d: Date | undefined) => void;
+  placeholder: string;
+}) {
   return (
     <Popover>
       <PopoverTrigger asChild>

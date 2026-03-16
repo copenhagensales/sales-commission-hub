@@ -500,6 +500,97 @@ export function useQualificationStandingsRealtime(
   });
 }
 
+// Get all seasons (admin)
+export function useAllSeasons() {
+  return useQuery({
+    queryKey: ["league-all-seasons"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("league_seasons")
+        .select("*")
+        .order("season_number", { ascending: false });
+
+      if (error) throw error;
+      return data as LeagueSeason[];
+    },
+  });
+}
+
+// Create a new season (admin)
+export function useCreateSeason() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      qualification_source_start: string;
+      qualification_source_end: string;
+      qualification_start_at: string;
+      qualification_end_at: string;
+      start_date: string;
+      end_date: string;
+    }) => {
+      // Get max season_number
+      const { data: existing } = await supabase
+        .from("league_seasons")
+        .select("season_number")
+        .order("season_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nextNumber = (existing?.season_number || 0) + 1;
+
+      const { data, error } = await supabase
+        .from("league_seasons")
+        .insert({
+          season_number: nextNumber,
+          status: "draft",
+          is_active: false,
+          ...params,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["league-all-seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["league-active-season"] });
+    },
+  });
+}
+
+// Update season status (admin)
+export function useUpdateSeasonStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ seasonId, status }: { seasonId: string; status: string }) => {
+      // If setting to active, deactivate other seasons first
+      if (status === "active") {
+        await supabase
+          .from("league_seasons")
+          .update({ status: "completed", is_active: false })
+          .eq("status", "active")
+          .neq("id", seasonId);
+      }
+
+      const isActive = status === "qualification" || status === "active";
+
+      const { error } = await supabase
+        .from("league_seasons")
+        .update({ status, is_active: isActive })
+        .eq("id", seasonId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["league-all-seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["league-active-season"] });
+    },
+  });
+}
+
 // Update season dates (admin)
 export function useUpdateSeasonDates() {
   const queryClient = useQueryClient();
@@ -515,6 +606,8 @@ export function useUpdateSeasonDates() {
         qualification_source_end?: string;
         qualification_start_at?: string;
         qualification_end_at?: string;
+        start_date?: string;
+        end_date?: string;
       };
     }) => {
       const { error } = await supabase
@@ -526,6 +619,7 @@ export function useUpdateSeasonDates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league-active-season"] });
+      queryClient.invalidateQueries({ queryKey: ["league-all-seasons"] });
     },
   });
 }
