@@ -41,6 +41,7 @@ const SCALE_QUESTIONS = [
   { key: 'leader_availability_score', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', lowLabel: 'Slet ikke', highLabel: 'I meget høj grad', section: 'leadership' },
   { key: 'wellbeing_score', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', lowLabel: 'Slet ikke', highLabel: 'Rigtig godt', section: 'wellbeing' },
   { key: 'psychological_safety_score', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', lowLabel: 'Slet ikke', highLabel: 'I meget høj grad', section: 'wellbeing' },
+  { key: 'attrition_risk_score', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 6 måneder?', lowLabel: 'Meget usandsynligt', highLabel: 'Meget sandsynligt', section: 'wellbeing' },
   { key: 'product_competitiveness_score', question: 'Hvad er din opfattelse af de produkter, du sælger – hvor konkurrencedygtige er de over for de kunder, du taler med?', lowLabel: 'Slet ikke konkurrencedygtige', highLabel: 'Meget konkurrencedygtige', section: 'product' },
   { key: 'market_fit_score', question: 'Hvor godt matcher kundens produkter det, markedet efterspørger?', lowLabel: 'Meget dårligt', highLabel: 'Meget godt', section: 'product' },
   { key: 'interest_creation_score', question: 'Hvor let er det at skabe interesse for kundens produkter?', lowLabel: 'Meget svært', highLabel: 'Meget let', section: 'product' },

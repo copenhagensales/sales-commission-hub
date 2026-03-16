@@ -28,7 +28,7 @@ const TENURE_OPTIONS = [
 // Section definitions for grouping questions
 const SECTION_CONFIG = [
   { id: 'leadership', title: 'Ledelse og udvikling', icon: '📊', questionIds: ['development_score', 'leadership_score', 'recognition_score', 'leader_availability_score'] },
-  { id: 'wellbeing', title: 'Trivsel og kultur', icon: '💚', questionIds: ['energy_score', 'seriousness_score', 'wellbeing_score', 'psychological_safety_score'] },
+  { id: 'wellbeing', title: 'Trivsel og kultur', icon: '💚', questionIds: ['energy_score', 'seriousness_score', 'wellbeing_score', 'psychological_safety_score', 'attrition_risk_score'] },
   { id: 'product', title: 'Produkt og kampagne', icon: '🎯', questionIds: ['product_competitiveness_score', 'market_fit_score', 'interest_creation_score', 'campaign_attractiveness_score'] },
 ];
 
