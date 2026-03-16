@@ -1,31 +1,27 @@
 
 
+## Plan: Sæson 2 med kvalifikation denne uge
 
-## Draft-booking workflow ✅
+### Dataopdateringer (ingen skemaændringer)
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+**1. Afslut Sæson 1**
+- Sæt `status = 'completed'`, `is_active = false` på Season 1
+- Sæt Round 3 til `completed` (den er stadig `active`)
 
-## Fortrolige kontrakter ✅
+**2. Opret Sæson 2**
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+| Felt | Værdi | Begrundelse |
+|------|-------|-------------|
+| `qualification_source_start` | 15. mar 2026 | Provision beregnes fra i dag |
+| `qualification_source_end` | 22. mar 2026 | Slutning af denne uge |
+| `qualification_start_at` | 16. mar 2026 | Tilmelding åbner nu |
+| `qualification_end_at` | 22. mar 2026 (søndag 23:59) | Kvalifikation slutter søndag |
+| `start_date` | 23. mar 2026 (mandag) | Sæsonen starter mandag efter kvalifikation |
+| `end_date` | `NULL` | Kører uendeligt |
+| `status` | `qualification` | Aktiv kvalifikation nu |
+| `is_active` | `true` | Synlig for brugere |
 
-## Liga Gameplay med Division-først Ranking ✅
+### Handlinger
+- 2× data-opdateringer via insert-tool (UPDATE Season 1 + Round 3, INSERT Season 2)
+- Ingen kodeændringer nødvendige — eksisterende hooks henter automatisk den aktive sæson
 
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
-4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
-5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
-8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
