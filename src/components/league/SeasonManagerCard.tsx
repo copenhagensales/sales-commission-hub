@@ -236,7 +236,8 @@ export function SeasonManagerCard() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
