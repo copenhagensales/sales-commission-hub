@@ -51,6 +51,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
+  const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
