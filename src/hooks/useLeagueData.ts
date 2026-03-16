@@ -29,7 +29,17 @@ export interface LeagueEnrollment {
   season_id: string;
   enrolled_at: string;
   is_active: boolean;
+  is_spectator: boolean;
 }
+
+// Roles that cannot participate as players (only fan/spectator)
+export const NON_PARTICIPATING_ROLES = [
+  'ejer',
+  'assisterende_teamleder_fm',
+  'some',
+  'rekruttering',
+  'fm_leder',
+];
 
 export interface QualificationStanding {
   id: string;
