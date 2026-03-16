@@ -15,6 +15,7 @@ export interface PulseSurveyResponse {
   leader_availability_score: number;
   wellbeing_score: number;
   psychological_safety_score: number;
+  attrition_risk_score: number;
   product_competitiveness_score: number;
   market_fit_score: number;
   interest_creation_score: number;
