@@ -222,3 +222,6 @@ verify_jwt = true
 
 [functions.snapshot-payroll-period]
 verify_jwt = false
+
+[functions.league-process-round]
+verify_jwt = false
