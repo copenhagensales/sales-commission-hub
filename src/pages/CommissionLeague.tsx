@@ -209,6 +209,7 @@ export default function CommissionLeague() {
   }
 
   const isQualificationPhase = season.status === "qualification";
+  const isActivePhase = season.status === "active";
 
   return (
     <MainLayout>
