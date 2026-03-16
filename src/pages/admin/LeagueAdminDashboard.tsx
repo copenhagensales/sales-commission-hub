@@ -14,8 +14,9 @@ import { Trophy, Users, BarChart3, Calendar, RefreshCw, Search, UserMinus, Loade
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
-import { useActiveSeason } from "@/hooks/useLeagueData";
+import { useActiveSeason, useAllSeasons } from "@/hooks/useLeagueData";
 import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
+import { SeasonManagerCard } from "@/components/league/SeasonManagerCard";
 
 interface LeagueParticipant {
   enrollment_id: string;
