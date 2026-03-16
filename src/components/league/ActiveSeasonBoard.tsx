@@ -223,7 +223,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
             </div>
             <div className="text-[10px] text-muted-foreground">
-              {Number(standing.total_provision).toLocaleString("da-DK")} kr
+              {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">

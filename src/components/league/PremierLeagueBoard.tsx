@@ -332,7 +332,7 @@ export function PremierLeagueBoard({
                           {/* Provision */}
                           <div className="text-right">
                             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-                              {standing.current_provision.toLocaleString("da-DK")} kr
+                              {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
                             </div>
                             {isCurrentUser && zoneData && (
                               <DistanceToZone
