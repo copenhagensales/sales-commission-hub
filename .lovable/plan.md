@@ -1,30 +1,25 @@
 
 
-## Fjern inaktive og ikke-sælgere fra ligaen
+## Auto-fjern fra liga ved deaktivering
 
-### Hvem skal fjernes
+### Hvad skal ændres
 
-**12 stoppede medarbejdere** (is_active = false):
-- Liva Holmbom, Alem Dajic, Conrad Willadsen, Daniel Johansen, Flora Klug, Hjalte Christensen, Lucas Havmann, Noah Duus, Rasmus Krabsen, Sascha Jensen, Saxo Skibye, William Heegaard, Alfred Rud (SOME)
+Udvid den eksisterende `remove_deactivated_employee_from_teams()` trigger-funktion med 2 ekstra operationer når `is_active` går fra `true` → `false`:
 
-**9 aktive stab/ledere** (ikke sælgere):
-- Eline-Kirstine Jørgensen (Ass. Teamleder)
-- Thomas Wehage (Ass. Teamleder FM)
-- Kasper Mikkelsen (Ejer)
-- William Seiding (Ejer)
-- Oscar Belcher (Rekruttering)
-- Filip Møller (Teamleder)
-- Jonas Jensen (Teamleder)
-- Rasmus Hansen (Teamleder)
-
-**I alt: 21 tilmeldinger fjernes** (ud af 76).
+1. **Soft-delete league enrollment**: `UPDATE league_enrollments SET is_active = false WHERE employee_id = NEW.id`
+2. **Fjern standings**: `DELETE FROM league_qualification_standings WHERE employee_id = NEW.id`
 
 ### Teknisk plan
 
-**2 database-operationer** via insert-tool:
+**1 database-migration** — tilføj liga-oprydning til den eksisterende trigger-funktion:
 
-1. Sæt `is_active = false` på de 21 enrollments (soft delete)
-2. Slet tilhørende rækker i `league_qualification_standings`
+```sql
+CREATE OR REPLACE FUNCTION public.remove_deactivated_employee_from_teams()
+-- Eksisterende logik bevares (historical_employment, team_members, contracts)
+-- NYT: efter linje 71, tilføj:
+    UPDATE public.league_enrollments SET is_active = false WHERE employee_id = NEW.id;
+    DELETE FROM public.league_qualification_standings WHERE employee_id = NEW.id;
+```
 
-Ingen kodeændringer nødvendige — det er ren data-oprydning.
+Ingen kodeændringer i frontend — triggeren kører automatisk i databasen.
 
