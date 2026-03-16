@@ -8,7 +8,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { LogFn } from "./index.ts";
 
-const LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const LOCK_TTL_MS = 3 * 60 * 1000; // 3 minutes – short TTL prevents crashed syncs from blocking the next window
 
 /**
  * Generate a unique run ID for traceability
