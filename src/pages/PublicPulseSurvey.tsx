@@ -266,6 +266,12 @@ export default function PublicPulseSurvey() {
           <p className="text-muted-foreground">{monthNames[activeSurvey.month - 1]} {activeSurvey.year}</p>
         </div>
 
+        <div className="rounded-lg border border-blue-500/50 bg-blue-50 dark:bg-blue-950/20 p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            Vi beklager – din tidligere besvarelse blev desværre ikke registreret korrekt. Vi har derfor brug for, at du besvarer pulsmålingen igen. Tak for din forståelse.
+          </p>
+        </div>
+
         {/* Simplified intro */}
         <Card>
           <CardContent className="pt-6">
