@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye, AlertTriangle } from "lucide-react";
+import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye, AlertTriangle, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -215,44 +216,49 @@ export default function CommissionLeague() {
     <MainLayout>
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
+          {/* Header - Collapsible */}
+          <Collapsible defaultOpen={true}>
+            <CollapsibleTrigger className="w-full text-left">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-8 w-8 text-yellow-500" />
+                    <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
+                    {isFan && (
+                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Fan
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
+                  </p>
+                </div>
+                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</p>
               <div className="flex items-center gap-3">
-                <Trophy className="h-8 w-8 text-yellow-500" />
-                <h1 className="text-2xl md:text-3xl font-bold">Salgsligaen</h1>
-                <Badge variant="secondary">Sæson {season.season_number}</Badge>
-                {isFan && (
-                  <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
-                    <Eye className="h-3 w-3 mr-1" />
-                    Fan
-                  </Badge>
+                {isOwner && season && (
+                  <SeasonSettingsDialog season={season} />
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCalculateStandings}
+                  disabled={isCalculating}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? "animate-spin" : ""}`} />
+                  Opdater
+                </Button>
+                {isQualificationPhase && (
+                  <QualificationCountdown endDate={season.qualification_end_at} />
                 )}
               </div>
-              <p className="text-muted-foreground mt-1">
-                {isQualificationPhase ? "Kvalifikationsperiode" : "Sæson i gang"}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {isOwner && season && (
-                <SeasonSettingsDialog season={season} />
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCalculateStandings}
-                disabled={isCalculating}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? "animate-spin" : ""}`} />
-                Opdater
-              </Button>
-              {isQualificationPhase && (
-                <QualificationCountdown endDate={season.qualification_end_at} />
-              )}
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</p>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
