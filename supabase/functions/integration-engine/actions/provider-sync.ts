@@ -38,7 +38,7 @@ async function acquireLock(supabase: SupabaseClient, provider: string, log: LogF
       provider,
       locked_at: new Date().toISOString(),
       locked_by: `provider-sync-${provider}`,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
     });
 
   if (error) {
