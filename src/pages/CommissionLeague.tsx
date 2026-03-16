@@ -47,6 +47,8 @@ import { MyQualificationStatus } from "@/components/league/MyQualificationStatus
 import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
 import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
 import { RoundResultsCard } from "@/components/league/RoundResultsCard";
+import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
+import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
