@@ -1,40 +1,31 @@
 
 
-## Fix: Eesy `skipped_locked` ved :15 hvert time
 
-### Root cause
+## Draft-booking workflow ✅
 
-Eesy har to cron jobs:
-- **Meta** (users, campaigns, sessions): kører `:10` hver time
-- **Sales**: kører `:00, :15, :30, :45`
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-Begge bruger **samme per-integration run lock** (`integration_run_locks` keyed by `integration_id`). Meta sync starter `:10`, men i tilfælde hvor den crasher/timer ud, frigives låsen **ikke** — og TTL er 10 minutter. Sales-synkroniseringen ved `:15` finder låsen stadig aktiv og springer over.
+## Fortrolige kontrakter ✅
 
-Data bekræfter: der er ingen meta sync completion records efter kl. 11:10 i dag, men låsen bliver erhvervet. Sales ved `:30` og `:45` kører fint (låsen er udløbet).
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-### Plan (2 ændringer)
+## Liga Gameplay med Division-først Ranking ✅
 
-**1. Reducer lock TTL fra 10 min til 3 min** (`run-lock.ts`)
-
-Meta sync tager normalt 40-60 sek. En 3-minutters TTL giver rigeligt headroom, men sikrer at en crashed sync ikke blokerer næste sales window.
-
-```
-LOCK_TTL_MS: 10 * 60 * 1000  →  3 * 60 * 1000
-```
-
-**2. Flyt Eesy meta cron fra `:10` til `:05`**
-
-Giver 10 min headroom til sales ved `:15` i stedet for 5 min. Selv med en langsom meta sync (60 sek) vil låsen være frigivet i god tid.
-
-```sql
--- Fjern gammel
-SELECT cron.unschedule(130);
--- Tilføj ny med :05 schedule
-SELECT cron.schedule('enreach-eesy-meta', '5 * * * *', $$ ... $$);
-```
-
-### Resultat
-- Selv hvis meta sync crasher, udløber låsen efter 3 min (inden `:15` sales)
-- Normal meta (:05 → :06) frigiver låsen 9 min før sales (:15)
-- Ingen kodeændringer i sync-integration.ts nødvendige
-
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
+4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
+5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
+8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
