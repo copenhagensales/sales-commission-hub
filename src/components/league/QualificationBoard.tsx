@@ -90,9 +90,17 @@ export function QualificationBoard({
     );
   }
 
+  // Filter divisions: show top + user's division unless showAll
+  const visibleGroups = useMemo(() => {
+    if (showAll || !currentEmployeeId || myDivision === null) return divisionGroups;
+    return divisionGroups.filter(g => g.division === 1 || g.division === myDivision);
+  }, [divisionGroups, showAll, currentEmployeeId, myDivision]);
+
+  const hiddenCount = divisionGroups.length - visibleGroups.length;
+
   return (
     <div className="space-y-4">
-      {divisionGroups.map((group) => {
+      {visibleGroups.map((group) => {
         const isTopDivision = group.division === 1;
         const isBottomDivision = group.division === totalDivisions;
 
