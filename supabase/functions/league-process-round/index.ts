@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
     nextEnd.setDate(nextEnd.getDate() + 7);
 
     // Don't create if past season end
-    if (nextEnd <= new Date(season.end_date)) {
+    if (!season.end_date || nextEnd <= new Date(season.end_date)) {
       const { error: nextRoundError } = await supabase
         .from("league_rounds")
         .insert({

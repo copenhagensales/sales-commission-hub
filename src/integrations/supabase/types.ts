@@ -6809,7 +6809,7 @@ export type Database = {
         Row: {
           config: Json | null
           created_at: string | null
-          end_date: string
+          end_date: string | null
           id: string
           is_active: boolean | null
           qualification_end_at: string
@@ -6824,7 +6824,7 @@ export type Database = {
         Insert: {
           config?: Json | null
           created_at?: string | null
-          end_date: string
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           qualification_end_at: string
@@ -6839,7 +6839,7 @@ export type Database = {
         Update: {
           config?: Json | null
           created_at?: string | null
-          end_date?: string
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           qualification_end_at?: string

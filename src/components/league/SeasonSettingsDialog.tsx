@@ -41,8 +41,8 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
   }, [season]);
 
   const handleSave = async () => {
-    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt) {
-      toast.error("Alle datoer skal udfyldes");
+    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt || !startDate) {
+      toast.error("Alle påkrævede datoer skal udfyldes");
       return;
     }
 
@@ -55,7 +55,7 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
           qualification_start_at: qualStartAt.toISOString(),
           qualification_end_at: qualEndAt.toISOString(),
           start_date: startDate ? startDate.toISOString().split("T")[0] : undefined,
-          end_date: endDate ? endDate.toISOString().split("T")[0] : undefined,
+          end_date: endDate ? endDate.toISOString().split("T")[0] : null,
         },
       });
       toast.success("Sæson-datoer opdateret!");
@@ -102,11 +102,12 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
           />
           <DateRangeSection
             label="🏆 Sæson periode"
-            description="Hvornår selve ligaen kører"
+            description="Hvornår selve ligaen kører (slutdato er valgfri)"
             startDate={startDate}
             endDate={endDate}
             onStartChange={setStartDate}
             onEndChange={setEndDate}
+            endPlaceholder="Valgfri"
           />
         </div>
 
@@ -131,6 +132,7 @@ function DateRangeSection({
   endDate,
   onStartChange,
   onEndChange,
+  endPlaceholder,
 }: {
   label: string;
   description: string;
@@ -138,6 +140,7 @@ function DateRangeSection({
   endDate: Date | undefined;
   onStartChange: (d: Date | undefined) => void;
   onEndChange: (d: Date | undefined) => void;
+  endPlaceholder?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -145,7 +148,7 @@ function DateRangeSection({
       <p className="text-xs text-muted-foreground">{description}</p>
       <div className="grid grid-cols-2 gap-3">
         <DatePickerButton date={startDate} onSelect={onStartChange} placeholder="Start" />
-        <DatePickerButton date={endDate} onSelect={onEndChange} placeholder="Slut" />
+        <DatePickerButton date={endDate} onSelect={onEndChange} placeholder={endPlaceholder || "Slut"} />
       </div>
     </div>
   );
