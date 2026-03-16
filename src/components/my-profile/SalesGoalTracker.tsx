@@ -42,6 +42,7 @@ import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
 import { usePreviousPeriodComparison } from "@/hooks/usePreviousPeriodComparison";
 import { useAchievementTargets } from "@/hooks/useAchievementTargets";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEmployeeWorkingDays } from "@/hooks/useEmployeeWorkingDays";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
@@ -208,45 +209,13 @@ export function SalesGoalTracker({
     },
   });
 
-  // Calculate working days (excluding weekends, holidays, and absences)
-  const workingDaysData = useMemo(() => {
-    const allDays = eachDayOfInterval({
-      start: payrollPeriod.start,
-      end: payrollPeriod.end,
-    });
-
-    const holidayDates = new Set(danishHolidays.map((h) => h.date));
-    
-    const absenceDates = new Set<string>();
-    absences.forEach((absence) => {
-      const absenceStart = new Date(absence.start_date);
-      const absenceEnd = new Date(absence.end_date);
-      const absenceDays = eachDayOfInterval({ start: absenceStart, end: absenceEnd });
-      absenceDays.forEach((day) => {
-        absenceDates.add(format(day, "yyyy-MM-dd"));
-      });
-    });
-
-    const workingDays = allDays.filter((day) => {
-      const dateStr = format(day, "yyyy-MM-dd");
-      return !isWeekend(day) && !holidayDates.has(dateStr) && !absenceDates.has(dateStr);
-    });
-
-    const today = startOfDay(new Date());
-    const passedWorkingDays = workingDays.filter((day) => 
-      isBefore(day, today) || isSameDay(day, today)
-    );
-    const remainingWorkingDays = workingDays.filter((day) => 
-      isAfter(day, today)
-    );
-
-    return {
-      total: workingDays.length,
-      passed: passedWorkingDays.length,
-      remaining: remainingWorkingDays.length,
-      days: workingDays,
-    };
-  }, [payrollPeriod, danishHolidays, absences]);
+  // Calculate working days using shift hierarchy (individual → employee standard → team standard → fallback weekday)
+  const { data: workingDaysData } = useEmployeeWorkingDays(
+    employeeId,
+    payrollPeriod,
+    absences,
+    danishHolidays
+  );
 
   // Calculate KPIs
   const kpis = useMemo(() => {
