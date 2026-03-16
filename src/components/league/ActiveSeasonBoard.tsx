@@ -1,8 +1,9 @@
-import { useMemo, memo } from "react";
+import { useMemo, useState, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Medal, ArrowUp, ArrowDown, Swords } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Medal, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { PodiumBadge } from "./PodiumBadge";
@@ -14,6 +15,7 @@ interface ActiveSeasonBoardProps {
   playersPerDivision: number;
   isLoading: boolean;
   currentEmployeeId?: string;
+  defaultShowAll?: boolean;
 }
 
 export function ActiveSeasonBoard({
@@ -21,7 +23,16 @@ export function ActiveSeasonBoard({
   playersPerDivision,
   isLoading,
   currentEmployeeId,
+  defaultShowAll = false,
 }: ActiveSeasonBoardProps) {
+  const [showAll, setShowAll] = useState(defaultShowAll);
+
+  const myDivision = useMemo(() => {
+    if (!currentEmployeeId) return null;
+    const my = standings.find(s => s.employee_id === currentEmployeeId);
+    return my?.current_division ?? null;
+  }, [standings, currentEmployeeId]);
+
   const divisionGroups = useMemo(() => {
     const groups: { division: number; players: LeagueSeasonStanding[] }[] = [];
     
@@ -41,6 +52,13 @@ export function ActiveSeasonBoard({
   }, [standings]);
 
   const totalDivisions = divisionGroups.length;
+
+  const visibleGroups = useMemo(() => {
+    if (showAll || !currentEmployeeId || myDivision === null) return divisionGroups;
+    return divisionGroups.filter(g => g.division === 1 || g.division === myDivision);
+  }, [divisionGroups, showAll, currentEmployeeId, myDivision]);
+
+  const hiddenCount = divisionGroups.length - visibleGroups.length;
 
   if (isLoading) {
     return (
@@ -70,7 +88,7 @@ export function ActiveSeasonBoard({
 
   return (
     <div className="space-y-4">
-      {divisionGroups.map((group) => {
+      {visibleGroups.map((group) => {
         const isTopDivision = group.division === 1;
         const isBottomDivision = group.division === divisionGroups[divisionGroups.length - 1].division;
 
@@ -114,6 +132,17 @@ export function ActiveSeasonBoard({
           </Card>
         );
       })}
+
+      {hiddenCount > 0 && (
+        <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAll(!showAll)}>
+          {showAll ? (
+            <><EyeOff className="h-4 w-4 mr-2" />Vis kun min division</>
+          ) : (
+            <><Eye className="h-4 w-4 mr-2" />Vis alle {divisionGroups.length} divisioner</>
+          )}
+        </Button>
+      )}
+
       <ZoneLegend className="mt-3 px-1" />
     </div>
   );

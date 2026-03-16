@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,8 @@ import { MyQualificationStatus } from "@/components/league/MyQualificationStatus
 import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
 import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
 import { RoundResultsCard } from "@/components/league/RoundResultsCard";
+import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
+import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -57,6 +59,19 @@ export default function CommissionLeague() {
   const canParticipate = !NON_PARTICIPATING_ROLES.includes(role);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
+  const [stickyVisible, setStickyVisible] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Show sticky bar when header scrolls out of view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => setStickyVisible(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    const el = headerRef.current;
+    if (el) observer.observe(el);
+    return () => { if (el) observer.unobserve(el); };
+  }, []);
 
   // Fetch current employee ID using robust RPC with email fallback
   useEffect(() => {
@@ -212,11 +227,56 @@ export default function CommissionLeague() {
   const isQualificationPhase = season.status === "qualification";
   const isActivePhase = season.status === "active";
 
+  // Compute sticky bar data
+  const stickyData = (() => {
+    if (isFan) return null;
+    if (isActivePhase && mySeasonStanding) {
+      const div = mySeasonStanding.current_division;
+      const rank = mySeasonStanding.division_rank;
+      const isTop = div === 1;
+      const totalDivs = seasonStandings ? new Set(seasonStandings.map(s => s.current_division)).size : 1;
+      const isBottom = div === totalDivs;
+      let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
+      if (isTop && rank <= 2) zone = "top";
+      else if (!isTop && rank <= 2) zone = "promo";
+      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      return { rank: mySeasonStanding.overall_rank, division: div, points: Number(mySeasonStanding.total_points), zone, isQualification: false };
+    }
+    if (isQualificationPhase && myStanding) {
+      const div = myStanding.projected_division;
+      const rank = myStanding.projected_rank;
+      const isTop = div === 1;
+      const totalDivs = standings ? new Set(standings.map(s => s.projected_division)).size : 1;
+      const isBottom = div === totalDivs;
+      let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
+      if (isTop && rank <= 2) zone = "top";
+      else if (!isTop && rank <= 2) zone = "promo";
+      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      return { rank: myStanding.overall_rank, division: div, provision: myStanding.current_provision, zone, isQualification: true };
+    }
+    return null;
+  })();
+
   return (
     <MainLayout>
+      {/* Sticky status bar */}
+      {stickyData && isEnrolled && (
+        <LeagueStickyBar
+          rank={stickyData.rank}
+          division={stickyData.division}
+          points={stickyData.points}
+          provision={stickyData.provision}
+          zone={stickyData.zone}
+          isQualification={stickyData.isQualification}
+          visible={stickyVisible}
+        />
+      )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Collapsible */}
+          <div ref={headerRef}>
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="w-full text-left">
               <div className="flex items-center justify-between gap-4">
@@ -235,7 +295,10 @@ export default function CommissionLeague() {
                     Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
                   </p>
                 </div>
-                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                <div className="flex items-center gap-2">
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                  <LeagueRulesSheet />
+                </div>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-3">
@@ -259,6 +322,7 @@ export default function CommissionLeague() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+          </div>
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
@@ -580,34 +644,6 @@ export default function CommissionLeague() {
             </>
           )}
 
-          {/* Rules */}
-          <Card className="bg-slate-800/30 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-lg">📋 Sådan fungerer det</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-6">
-                <div>
-                  <h4 className="font-semibold mb-2 text-green-400">✅ Oprykning</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Top 2 i hver division rykker automatisk op til divisionen over.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-orange-400">⚔️ Duel</h4>
-                  <p className="text-sm text-muted-foreground">
-                    #8 i en division spiller duel mod #3 i divisionen under. Vinderen spiller oppe.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-red-400">⬇️ Nedrykning</h4>
-                  <p className="text-sm text-muted-foreground">
-                    #9 og #10 rykker automatisk ned til divisionen under.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </MainLayout>
