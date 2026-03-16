@@ -24,13 +24,29 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { seasonId } = await req.json();
+    let { seasonId } = await req.json().catch(() => ({}));
 
+    // Auto-detect active season if no seasonId provided (for cron jobs)
     if (!seasonId) {
-      return new Response(
-        JSON.stringify({ error: "seasonId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.log("[league-calculate-standings] No seasonId provided, auto-detecting active season...");
+      const { data: activeSeason, error: detectError } = await supabase
+        .from("league_seasons")
+        .select("id, status")
+        .in("status", ["qualification", "active"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (detectError || !activeSeason) {
+        console.log("[league-calculate-standings] No active/qualification season found, skipping.");
+        return new Response(
+          JSON.stringify({ success: true, message: "No active season found, nothing to calculate" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      seasonId = activeSeason.id;
+      console.log(`[league-calculate-standings] Auto-detected season: ${seasonId} (status: ${activeSeason.status})`);
     }
 
     console.log(`[league-calculate-standings] Starting calculation for season: ${seasonId}`);
