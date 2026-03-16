@@ -77,27 +77,12 @@ export default function MyGoals() {
   // Calculate payroll period (15th to 14th)
   const payrollPeriod = useMemo(() => getPayrollPeriod(), []);
 
-  // Fetch KPIs from cache for payroll period
-  const { data: payrollKpis } = usePrecomputedKpis(
-    ["sales_count", "total_commission"],
-    "payroll_period" as KpiPeriod,
-    "employee",
-    employee?.id
+  // Fetch live sales stats for payroll period
+  const salesStats = usePersonalSalesStats(
+    employee?.id || "",
+    payrollPeriod.start,
+    payrollPeriod.end
   );
-
-  // Fetch KPIs from cache for today
-  const { data: todayKpis } = usePrecomputedKpis(
-    ["sales_count", "total_commission"],
-    "today" as KpiPeriod,
-    "employee",
-    employee?.id
-  );
-
-  // Extract values from cached KPIs
-  const periodCommission = getKpiValue(payrollKpis?.total_commission);
-  const periodSalesCount = getKpiValue(payrollKpis?.sales_count);
-  const todayCommission = getKpiValue(todayKpis?.total_commission);
-  const todaySalesCount = getKpiValue(todayKpis?.sales_count);
 
   // Get absences for the employee
   const { data: absences = [] } = useQuery({
