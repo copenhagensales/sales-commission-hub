@@ -23,6 +23,13 @@ import {
   NON_PARTICIPATING_ROLES,
 } from "@/hooks/useLeagueData";
 import {
+  useCurrentRound,
+  useSeasonStandings,
+  useRoundStandings,
+  useRoundHistory,
+  useMySeasonStanding,
+} from "@/hooks/useLeagueActiveData";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -37,6 +44,8 @@ import { QualificationCountdown } from "@/components/league/QualificationCountdo
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
 import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
+import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
+import { RoundResultsCard } from "@/components/league/RoundResultsCard";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
