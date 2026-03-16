@@ -55,7 +55,7 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
           qualification_start_at: qualStartAt.toISOString(),
           qualification_end_at: qualEndAt.toISOString(),
           start_date: startDate ? startDate.toISOString().split("T")[0] : undefined,
-          end_date: endDate ? endDate.toISOString().split("T")[0] : undefined,
+          end_date: endDate ? endDate.toISOString().split("T")[0] : null,
         },
       });
       toast.success("Sæson-datoer opdateret!");
