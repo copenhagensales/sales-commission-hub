@@ -106,9 +106,12 @@ export function useSubmitPulseSurvey() {
   return useMutation({
     mutationFn: async ({ surveyId, selectedTeamId, response }: { 
       surveyId: string; 
-      selectedTeamId?: string;
+      selectedTeamId: string;
       response: PulseSurveyResponse;
     }) => {
+      if (!selectedTeamId) {
+        throw new Error('Team selection is required');
+      }
       // Get employee data for completion tracking
       const lowerEmail = user?.email?.toLowerCase() || '';
       const { data: employee } = await supabase

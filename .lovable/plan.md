@@ -1,30 +1,19 @@
 
 
-## Gør team-valg obligatorisk i pulsmålingen
 
-### Problem
-Selvom der er en validering ved submit (linje 201), er `selectedTeamId` markeret som **optional** i hooket (`selectedTeamId?: string`), og der er ingen visuel indikation af at feltet er påkrævet. 68 af 71 besvarelser mangler team-tilknytning.
+## Draft-booking workflow ✅
 
-### Ændringer
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-**1. `src/hooks/usePulseSurvey.ts`** — Gør `selectedTeamId` required
-- Ændr `selectedTeamId?: string` til `selectedTeamId: string` (linje 109)
-- Tilføj tidlig fejl: `if (!selectedTeamId) throw new Error('Team selection is required')`
+## Fortrolige kontrakter ✅
 
-**2. `src/pages/PulseSurvey.tsx`** — Visuel blokering + required-markering
-- Tilføj rød asterisk (`*`) ved team-dropdown label
-- Vis inline fejlbesked under dropdown hvis man forsøger at submitte uden team
-- Disable submit-knappen når `!selectedTeamId` (supplerende til eksisterende toast-validering)
-
-**3. `src/pages/PublicPulseSurvey.tsx`** — Samme ændringer
-- Rød asterisk ved team-label
-- Disable submit-knappen når `!selectedTeamId`
-- Inline fejlbesked ved manglende team
-
-**4. `supabase/functions/submit-pulse-survey/index.ts`** — Backend-validering
-- Tilføj `submitted_team_id` som required felt i valideringen (linje 53-57)
-- Returnér 400 hvis `submitted_team_id` mangler
-
-### Resultat
-Team-valg bliver obligatorisk i alle tre lag: UI (disabled knap + markering), frontend-validering (toast), og backend-validering (400-fejl). Ingen besvarelse kan indsendes uden team fremover.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.

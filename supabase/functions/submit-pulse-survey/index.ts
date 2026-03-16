@@ -51,10 +51,10 @@ serve(async (req) => {
     } = body;
 
     // Validate required fields
-    if (!survey_id || nps_score === undefined || !tenure) {
-      console.error("Missing required fields:", { survey_id, nps_score, tenure });
+    if (!survey_id || nps_score === undefined || !tenure || !submitted_team_id) {
+      console.error("Missing required fields:", { survey_id, nps_score, tenure, submitted_team_id });
       return new Response(
-        JSON.stringify({ error: "Missing required fields: survey_id, nps_score, tenure" }),
+        JSON.stringify({ error: "Missing required fields: survey_id, nps_score, tenure, submitted_team_id" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

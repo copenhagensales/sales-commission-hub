@@ -296,7 +296,7 @@ export default function PublicPulseSurvey() {
           <CardContent className="space-y-6">
             {/* Team */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Hvilket team arbejder du på?</Label>
+              <Label className="text-sm font-medium">Hvilket team arbejder du på? <span className="text-destructive">*</span></Label>
               <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Vælg team..." />
@@ -466,7 +466,7 @@ export default function PublicPulseSurvey() {
                 onClick={handleSubmit} 
                 size="lg" 
                 className="w-full"
-                disabled={submitMutation.isPending}
+                disabled={submitMutation.isPending || !selectedTeamId}
               >
                 {submitMutation.isPending ? 'Indsender...' : 'Indsend besvarelse'}
               </Button>

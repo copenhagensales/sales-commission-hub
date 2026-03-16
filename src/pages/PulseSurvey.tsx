@@ -321,7 +321,7 @@ export default function PulseSurvey() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Hvilket team arbejder du på?</Label>
+                <Label className="text-sm font-medium">Hvilket team arbejder du på? <span className="text-destructive">*</span></Label>
                 <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                   <SelectTrigger><SelectValue placeholder="Vælg team..." /></SelectTrigger>
                   <SelectContent>
@@ -415,7 +415,7 @@ export default function PulseSurvey() {
               </div>
               <div className="border-t border-border" />
               <div>
-                <Button onClick={handleSubmit} size="lg" className="w-full" disabled={!isTestMode && submitSurvey.isPending}>
+                <Button onClick={handleSubmit} size="lg" className="w-full" disabled={!isTestMode && (submitSurvey.isPending || !selectedTeamId)}>
                   {isTestMode ? 'Afslut test (gemmes ikke)' : submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center mt-3">
