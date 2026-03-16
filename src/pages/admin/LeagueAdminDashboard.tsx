@@ -260,9 +260,15 @@ export default function LeagueAdminDashboard() {
   if (!activeSeason) {
     return (
       <MainLayout>
-        <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <Trophy className="h-12 w-12 text-muted-foreground" />
-          <p className="text-muted-foreground">Ingen aktiv sæson fundet</p>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Trophy className="h-6 w-6 text-yellow-500" />
+              Liga Administration
+            </h1>
+            <p className="text-muted-foreground">Ingen aktiv sæson – opret eller aktivér en sæson herunder</p>
+          </div>
+          <SeasonManagerCard />
         </div>
       </MainLayout>
     );
