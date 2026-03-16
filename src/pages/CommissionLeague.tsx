@@ -59,6 +59,19 @@ export default function CommissionLeague() {
   const canParticipate = !NON_PARTICIPATING_ROLES.includes(role);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
+  const [stickyVisible, setStickyVisible] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Show sticky bar when header scrolls out of view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => setStickyVisible(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    const el = headerRef.current;
+    if (el) observer.observe(el);
+    return () => { if (el) observer.unobserve(el); };
+  }, []);
 
   // Fetch current employee ID using robust RPC with email fallback
   useEffect(() => {
