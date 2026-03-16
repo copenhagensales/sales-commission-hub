@@ -309,7 +309,7 @@ export default function CommissionLeague() {
               {/* My Status - only for active participants, not fans */}
               {!isFan && (
                 <MyQualificationStatus
-                  stand={myStanding || null}
+                  standing={myStanding || null}
                   totalPlayers={standings?.length || 0}
                   playersPerDivision={playersPerDivision}
                 />
