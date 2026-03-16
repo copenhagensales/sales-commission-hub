@@ -642,34 +642,6 @@ export default function CommissionLeague() {
             </>
           )}
 
-          {/* Rules */}
-          <Card className="bg-slate-800/30 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-lg">📋 Sådan fungerer det</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-6">
-                <div>
-                  <h4 className="font-semibold mb-2 text-green-400">✅ Oprykning</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Top 2 i hver division rykker automatisk op til divisionen over.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-orange-400">⚔️ Duel</h4>
-                  <p className="text-sm text-muted-foreground">
-                    #8 i en division spiller duel mod #3 i divisionen under. Vinderen spiller oppe.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-red-400">⬇️ Nedrykning</h4>
-                  <p className="text-sm text-muted-foreground">
-                    #9 og #10 rykker automatisk ned til divisionen under.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </MainLayout>
