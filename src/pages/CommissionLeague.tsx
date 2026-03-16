@@ -17,10 +17,22 @@ import {
   useMyQualificationStanding,
   useEnrollInSeason,
   useUnenrollFromSeason,
+  useUnenrollAndBecomeFan,
   useEnrollmentCount,
   useEnrollAsFan,
   NON_PARTICIPATING_ROLES,
 } from "@/hooks/useLeagueData";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
