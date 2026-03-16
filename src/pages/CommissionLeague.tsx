@@ -78,6 +78,16 @@ export default function CommissionLeague() {
   const unenrollAndFanMutation = useUnenrollAndBecomeFan();
   const fanMutation = useEnrollAsFan();
 
+  // Active season hooks
+  const { data: currentRound } = useCurrentRound(season?.status === "active" ? season?.id : undefined);
+  const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
+  const { data: roundStandings } = useRoundStandings(currentRound?.status === "completed" ? currentRound?.id : undefined);
+  const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
+  const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
+  const [selectedHistoryRoundId, setSelectedHistoryRoundId] = useState<string | undefined>();
+  const { data: historyRoundStandings } = useRoundStandings(selectedHistoryRoundId);
+
+
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
 
