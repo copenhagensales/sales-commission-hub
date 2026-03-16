@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List } from "lucide-react";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
+import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
@@ -50,10 +51,11 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
+  const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -597,6 +599,24 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 >
                   <MessageSquare className="h-4 w-4" />
                   Min Feedback
+                </NavLink>
+              )}
+
+              {/* Pulsmåling */}
+              {pulseSurvey.showMenuItem && (
+                <NavLink
+                  to="/pulse-survey"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/pulse-survey" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="flex-1">Pulsmåling</span>
+                  {pulseSurvey.showBadge && (
+                    <Badge variant="destructive" className="animate-pulse ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">1</Badge>
+                  )}
                 </NavLink>
               )}
               
