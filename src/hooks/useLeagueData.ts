@@ -101,7 +101,7 @@ export function useMyEnrollment(seasonId: string | undefined) {
       
       const { data, error } = await supabase
         .from("league_enrollments")
-        .select("*")
+        .select("id, employee_id, season_id, enrolled_at, is_active, is_spectator")
         .eq("season_id", seasonId)
         .eq("employee_id", employee.id)
         .eq("is_active", true)
