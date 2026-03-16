@@ -340,18 +340,53 @@ export default function CommissionLeague() {
 
               {/* Unenroll / stop following button */}
               <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleUnenroll}
-                  disabled={unenrollMutation.isPending}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  {unenrollMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isFan ? "Stop med at følge" : "Afmeld liga"}
-                </Button>
+                {isFan ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleUnenroll}
+                    disabled={unenrollMutation.isPending}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    {unenrollMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Stop med at følge
+                  </Button>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        Træk mig fra ligaen – bliv fan
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-destructive" />
+                          Træk dig fra ligaen?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                          <p>Du vil blive fjernet fra ranglisten og konverteret til fan, så du stadig kan følge med.</p>
+                          <p className="font-semibold text-destructive">⚠️ Bemærk: Hvis du tilmelder dig igen senere, starter du i bunden af ranglisten.</p>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Nej, fortryd</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleUnenrollAndBecomeFan}
+                          disabled={unenrollAndFanMutation.isPending}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {unenrollAndFanMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                          Ja, træk mig og bliv fan
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
 
               {/* Leaderboard */}
