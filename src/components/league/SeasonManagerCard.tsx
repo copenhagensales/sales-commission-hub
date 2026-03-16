@@ -150,11 +150,12 @@ export function SeasonManagerCard() {
               />
               <DateRangeSection
                 label="🏆 Sæson periode"
-                description="Hvornår selve ligaen kører"
+                description="Hvornår selve ligaen kører (slutdato er valgfri)"
                 startDate={startDate}
                 endDate={endDate}
                 onStartChange={setStartDate}
                 onEndChange={setEndDate}
+                endPlaceholder="Valgfri"
               />
             </div>
 
