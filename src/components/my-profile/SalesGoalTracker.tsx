@@ -42,6 +42,7 @@ import { useEffectiveHourlyRate } from "@/hooks/useEffectiveHourlyRate";
 import { usePreviousPeriodComparison } from "@/hooks/usePreviousPeriodComparison";
 import { useAchievementTargets } from "@/hooks/useAchievementTargets";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEmployeeWorkingDays } from "@/hooks/useEmployeeWorkingDays";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
