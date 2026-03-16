@@ -146,6 +146,22 @@ export function QualificationBoard({
         );
       })}
 
+      {/* Show all toggle */}
+      {hiddenCount > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => setShowAll(!showAll)}
+        >
+          {showAll ? (
+            <><EyeOff className="h-4 w-4 mr-2" />Vis kun min division</>
+          ) : (
+            <><Eye className="h-4 w-4 mr-2" />Vis alle {divisionGroups.length} divisioner</>
+          )}
+        </Button>
+      )}
+
       {/* Compact legend */}
       <ZoneLegend className="mt-3 px-1" />
     </div>
