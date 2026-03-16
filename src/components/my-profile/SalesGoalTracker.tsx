@@ -24,7 +24,7 @@ import {
   ReferenceLine,
   Scatter,
 } from "recharts";
-import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay, startOfWeek } from "date-fns";
+import { format, eachDayOfInterval, isBefore, isAfter, isSameDay, startOfDay, startOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
