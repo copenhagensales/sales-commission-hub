@@ -466,7 +466,7 @@ export default function PublicPulseSurvey() {
                 onClick={handleSubmit} 
                 size="lg" 
                 className="w-full"
-                disabled={submitMutation.isPending}
+                disabled={submitMutation.isPending || !selectedTeamId}
               >
                 {submitMutation.isPending ? 'Indsender...' : 'Indsend besvarelse'}
               </Button>

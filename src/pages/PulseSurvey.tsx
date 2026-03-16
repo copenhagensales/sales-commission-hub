@@ -415,7 +415,7 @@ export default function PulseSurvey() {
               </div>
               <div className="border-t border-border" />
               <div>
-                <Button onClick={handleSubmit} size="lg" className="w-full" disabled={!isTestMode && submitSurvey.isPending}>
+                <Button onClick={handleSubmit} size="lg" className="w-full" disabled={!isTestMode && (submitSurvey.isPending || !selectedTeamId)}>
                   {isTestMode ? 'Afslut test (gemmes ikke)' : submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center mt-3">
