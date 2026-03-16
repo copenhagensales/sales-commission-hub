@@ -57,6 +57,7 @@ interface SalesGoalTrackerProps {
     monthSales: number;
     todayTotal: number;
     todaySales: number;
+    weekTotal?: number;
   };
   absences: Array<{
     start_date: string;
