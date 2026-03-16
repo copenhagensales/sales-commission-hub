@@ -179,6 +179,7 @@ export function SeasonManagerCard() {
         ) : seasons.length === 0 ? (
           <p className="text-center py-8 text-muted-foreground">Ingen sæsoner oprettet endnu</p>
         ) : (
+          <p className="text-xs text-muted-foreground mb-2">Status opdateres automatisk baseret på datoerne</p>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>

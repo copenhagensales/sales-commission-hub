@@ -256,6 +256,72 @@ async function saveKpiValuesBatch(supabase: SupabaseClient, values: CachedValue[
   }
 }
 
+async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
+  try {
+    const { data: seasons, error } = await supabase
+      .from("league_seasons")
+      .select("id, status, qualification_start_at, qualification_end_at, start_date, end_date, season_number")
+      .not("status", "eq", "completed");
+
+    if (error || !seasons?.length) return;
+
+    const now = new Date();
+    let transitions = 0;
+
+    for (const season of seasons) {
+      let newStatus: string | null = null;
+
+      if (season.status === "draft" && season.qualification_start_at && season.qualification_end_at) {
+        if (new Date(season.qualification_start_at) <= now && new Date(season.qualification_end_at) > now) {
+          newStatus = "qualification";
+        }
+      }
+
+      if (season.status === "qualification" && season.start_date && season.end_date) {
+        if (new Date(season.start_date) <= now && new Date(season.end_date) > now) {
+          newStatus = "active";
+        }
+      }
+
+      if (season.status === "active" && season.end_date) {
+        if (new Date(season.end_date) < now) {
+          newStatus = "completed";
+        }
+      }
+
+      if (newStatus) {
+        const isActive = newStatus === "active";
+
+        // Deactivate other seasons when activating one
+        if (isActive) {
+          await supabase
+            .from("league_seasons")
+            .update({ is_active: false })
+            .neq("id", season.id);
+        }
+
+        await supabase
+          .from("league_seasons")
+          .update({
+            status: newStatus,
+            is_active: isActive,
+            ...(newStatus === "completed" ? { is_active: false } : {}),
+          })
+          .eq("id", season.id);
+
+        console.log(`[auto-transition] Season S${season.season_number}: ${season.status} → ${newStatus}`);
+        transitions++;
+      }
+    }
+
+    if (transitions > 0) {
+      console.log(`[auto-transition] ${transitions} season(s) transitioned`);
+    }
+  } catch (err) {
+    console.error("[auto-transition] Error:", err);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
