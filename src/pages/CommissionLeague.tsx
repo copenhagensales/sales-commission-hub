@@ -227,10 +227,54 @@ export default function CommissionLeague() {
   const isQualificationPhase = season.status === "qualification";
   const isActivePhase = season.status === "active";
 
+  // Compute sticky bar data
+  const stickyData = (() => {
+    if (isFan) return null;
+    if (isActivePhase && mySeasonStanding) {
+      const div = mySeasonStanding.current_division;
+      const rank = mySeasonStanding.division_rank;
+      const isTop = div === 1;
+      const totalDivs = seasonStandings ? new Set(seasonStandings.map(s => s.current_division)).size : 1;
+      const isBottom = div === totalDivs;
+      let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
+      if (isTop && rank <= 2) zone = "top";
+      else if (!isTop && rank <= 2) zone = "promo";
+      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      return { rank: mySeasonStanding.overall_rank, division: div, points: Number(mySeasonStanding.total_points), zone, isQualification: false };
+    }
+    if (isQualificationPhase && myStanding) {
+      const div = myStanding.projected_division;
+      const rank = myStanding.projected_rank;
+      const isTop = div === 1;
+      const totalDivs = standings ? new Set(standings.map(s => s.projected_division)).size : 1;
+      const isBottom = div === totalDivs;
+      let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
+      if (isTop && rank <= 2) zone = "top";
+      else if (!isTop && rank <= 2) zone = "promo";
+      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      return { rank: myStanding.overall_rank, division: div, provision: myStanding.current_provision, zone, isQualification: true };
+    }
+    return null;
+  })();
+
   return (
     <MainLayout>
+      {/* Sticky status bar */}
+      {stickyData && isEnrolled && (
+        <LeagueStickyBar
+          rank={stickyData.rank}
+          division={stickyData.division}
+          points={stickyData.points}
+          provision={stickyData.provision}
+          zone={stickyData.zone}
+          isQualification={stickyData.isQualification}
+          visible={stickyVisible}
+        />
+      )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6" ref={headerRef}>
           {/* Header - Collapsible */}
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="w-full text-left">
