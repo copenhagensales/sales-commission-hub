@@ -256,17 +256,103 @@ async function saveKpiValuesBatch(supabase: SupabaseClient, values: CachedValue[
   }
 }
 
+async function initializeActiveSeasonData(supabase: SupabaseClient, seasonId: string, startDate: string, config: any) {
+  try {
+    const playersPerDivision = config?.players_per_division || 10;
+
+    // 1. Copy qualification standings → season standings
+    const { data: qualStandings } = await supabase
+      .from("league_qualification_standings")
+      .select("employee_id, projected_division, projected_rank")
+      .eq("season_id", seasonId)
+      .order("overall_rank", { ascending: true });
+
+    if (!qualStandings || qualStandings.length === 0) {
+      console.log("[season-init] No qualification standings to copy");
+      return;
+    }
+
+    const seasonStandings = qualStandings.map((q, i) => ({
+      season_id: seasonId,
+      employee_id: q.employee_id,
+      current_division: q.projected_division,
+      total_points: 0,
+      total_provision: 0,
+      rounds_played: 0,
+      overall_rank: i + 1,
+      division_rank: q.projected_rank,
+      previous_division: null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error: ssError } = await supabase
+      .from("league_season_standings")
+      .upsert(seasonStandings, { onConflict: "season_id,employee_id" });
+
+    if (ssError) {
+      console.error("[season-init] Failed to create season standings:", ssError);
+      return;
+    }
+    console.log(`[season-init] Created ${seasonStandings.length} season standings`);
+
+    // 2. Create first round
+    const roundStart = new Date(startDate);
+    const roundEnd = new Date(roundStart);
+    roundEnd.setDate(roundEnd.getDate() + 7);
+
+    const { error: roundError } = await supabase
+      .from("league_rounds")
+      .insert({
+        season_id: seasonId,
+        round_number: 1,
+        start_date: roundStart.toISOString(),
+        end_date: roundEnd.toISOString(),
+        status: "active",
+      });
+
+    if (roundError) {
+      console.error("[season-init] Failed to create first round:", roundError);
+    } else {
+      console.log("[season-init] Created first round");
+    }
+  } catch (err) {
+    console.error("[season-init] Error:", err);
+  }
+}
+
+async function triggerLeagueRoundProcessing(supabase: SupabaseClient) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/league-process-round`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseAnonKey}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const result = await response.json();
+    console.log("[league-round-trigger] Result:", JSON.stringify(result));
+  } catch (err) {
+    console.error("[league-round-trigger] Error:", err);
+  }
+}
+
 async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
   try {
     const { data: seasons, error } = await supabase
       .from("league_seasons")
-      .select("id, status, qualification_start_at, qualification_end_at, start_date, end_date, season_number")
+      .select("id, status, qualification_start_at, qualification_end_at, start_date, end_date, season_number, config")
       .not("status", "eq", "completed");
 
     if (error || !seasons?.length) return;
 
     const now = new Date();
     let transitions = 0;
+    let needsRoundProcessing = false;
 
     for (const season of seasons) {
       let newStatus: string | null = null;
@@ -311,11 +397,26 @@ async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
 
         console.log(`[auto-transition] Season S${season.season_number}: ${season.status} → ${newStatus}`);
         transitions++;
+
+        // Initialize season data when transitioning to active
+        if (newStatus === "active") {
+          await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
+        }
+      }
+
+      // If active season exists, trigger round processing
+      if (season.status === "active" || newStatus === "active") {
+        needsRoundProcessing = true;
       }
     }
 
     if (transitions > 0) {
       console.log(`[auto-transition] ${transitions} season(s) transitioned`);
+    }
+
+    // Process rounds for active seasons
+    if (needsRoundProcessing) {
+      await triggerLeagueRoundProcessing(supabase);
     }
   } catch (err) {
     console.error("[auto-transition] Error:", err);
