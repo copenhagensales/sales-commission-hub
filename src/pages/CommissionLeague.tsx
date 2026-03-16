@@ -460,6 +460,119 @@ export default function CommissionLeague() {
             </>
           )}
 
+          {/* Active Season UI */}
+          {isActivePhase && isEnrolled && (
+            <>
+              {/* My status card for active season */}
+              {!isFan && mySeasonStanding && (
+                <Card className="bg-gradient-to-r from-primary/20 to-slate-800 border-primary/30">
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Din placering</p>
+                      <p className="text-2xl font-bold">
+                        #{mySeasonStanding.overall_rank}
+                        <span className="text-base font-normal text-muted-foreground ml-2">
+                          Division {mySeasonStanding.current_division === 1 ? "Salgsligaen" : `${mySeasonStanding.current_division - 1}. Div`}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold font-mono">{Number(mySeasonStanding.total_points).toLocaleString("da-DK")} pt</p>
+                      <p className="text-sm text-muted-foreground">{mySeasonStanding.rounds_played} runder spillet</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Active season tabs */}
+              <Card className="bg-slate-800/30 border-slate-700">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Sæson {season.season_number}</CardTitle>
+                      <CardDescription>
+                        {currentRound ? `Runde ${currentRound.round_number} ${currentRound.status === "active" ? "(i gang)" : "(afsluttet)"}` : "Venter på runder"}
+                        {" • "}{seasonStandings?.length || 0} spillere
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="standings">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="standings">Samlet stilling</TabsTrigger>
+                      <TabsTrigger value="thisWeek">Denne uge</TabsTrigger>
+                      <TabsTrigger value="history">Rundehistorik</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="standings">
+                      <ActiveSeasonBoard
+                        standings={seasonStandings || []}
+                        playersPerDivision={playersPerDivision}
+                        isLoading={seasonStandingsLoading}
+                        currentEmployeeId={currentEmployeeId}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="thisWeek">
+                      {currentRound && currentRound.status === "completed" && roundStandings && roundStandings.length > 0 ? (
+                        <RoundResultsCard
+                          round={currentRound}
+                          standings={roundStandings}
+                          playersPerDivision={playersPerDivision}
+                          currentEmployeeId={currentEmployeeId}
+                        />
+                      ) : (
+                        <Card className="bg-card border-border">
+                          <CardContent className="py-10 text-center">
+                            <p className="text-muted-foreground text-sm">
+                              {currentRound?.status === "active" 
+                                ? `Runde ${currentRound.round_number} er stadig i gang. Resultater vises når runden afsluttes.`
+                                : "Ingen rundedata endnu."}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="history">
+                      {roundHistory && roundHistory.length > 0 ? (
+                        <div className="space-y-3">
+                          <div className="flex gap-2 flex-wrap">
+                            {roundHistory.map((r) => (
+                              <Button
+                                key={r.id}
+                                size="sm"
+                                variant={selectedHistoryRoundId === r.id ? "default" : "outline"}
+                                onClick={() => setSelectedHistoryRoundId(r.id)}
+                              >
+                                Runde {r.round_number}
+                              </Button>
+                            ))}
+                          </div>
+                          {selectedHistoryRoundId && historyRoundStandings && (
+                            <RoundResultsCard
+                              round={roundHistory.find(r => r.id === selectedHistoryRoundId)!}
+                              standings={historyRoundStandings}
+                              playersPerDivision={playersPerDivision}
+                              currentEmployeeId={currentEmployeeId}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <Card className="bg-card border-border">
+                          <CardContent className="py-10 text-center">
+                            <p className="text-muted-foreground text-sm">Ingen afsluttede runder endnu.</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
           {/* Rules */}
           <Card className="bg-slate-800/30 border-slate-700">
             <CardHeader>
