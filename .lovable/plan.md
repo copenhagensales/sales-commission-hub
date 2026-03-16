@@ -1,19 +1,25 @@
 
 
+## Træk dig fra ligaen → bliv fan
 
-## Draft-booking workflow ✅
+### Ændringer
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+**1. Ny mutation: `useUnenrollAndBecomeFan`** i `src/hooks/useLeagueData.ts`
+- Sætter `is_spectator = true` (i stedet for `is_active = false`) på enrollment
+- Fjerner fra standings-tabellen
+- Spilleren forbliver tilmeldt som fan
 
-## Fortrolige kontrakter ✅
+**2. Opdater unenroll-sektionen** i `src/pages/CommissionLeague.tsx`
+- For **aktive deltagere** (ikke fans): erstat "Afmeld liga"-knappen med **"Træk mig fra ligaen – bliv fan"**
+- Klik åbner en `AlertDialog` med advarsel:
+  - "Er du sikker? Hvis du trækker dig, starter du i bunden ved ny tilmelding."
+  - Bekræft-knap: "Ja, træk mig og bliv fan"
+  - Annuller-knap: "Nej, fortryd"
+- For **fans**: behold eksisterende "Stop med at følge"-knap (uændret)
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**3. Handler** `handleUnenrollAndBecomeFan`:
+- Kalder den nye mutation
+- Toast: "Du er nu fan og kan følge med! 👀"
+
+Ingen database- eller skemaændringer nødvendige.
+
