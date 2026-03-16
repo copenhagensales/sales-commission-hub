@@ -1,25 +1,19 @@
 
 
-## Auto-fjern fra liga ved deaktivering
 
-### Hvad skal ændres
+## Draft-booking workflow ✅
 
-Udvid den eksisterende `remove_deactivated_employee_from_teams()` trigger-funktion med 2 ekstra operationer når `is_active` går fra `true` → `false`:
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-1. **Soft-delete league enrollment**: `UPDATE league_enrollments SET is_active = false WHERE employee_id = NEW.id`
-2. **Fjern standings**: `DELETE FROM league_qualification_standings WHERE employee_id = NEW.id`
+## Fortrolige kontrakter ✅
 
-### Teknisk plan
-
-**1 database-migration** — tilføj liga-oprydning til den eksisterende trigger-funktion:
-
-```sql
-CREATE OR REPLACE FUNCTION public.remove_deactivated_employee_from_teams()
--- Eksisterende logik bevares (historical_employment, team_members, contracts)
--- NYT: efter linje 71, tilføj:
-    UPDATE public.league_enrollments SET is_active = false WHERE employee_id = NEW.id;
-    DELETE FROM public.league_qualification_standings WHERE employee_id = NEW.id;
-```
-
-Ingen kodeændringer i frontend — triggeren kører automatisk i databasen.
-
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
