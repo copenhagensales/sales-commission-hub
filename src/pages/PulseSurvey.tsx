@@ -282,6 +282,12 @@ export default function PulseSurvey() {
             </Alert>
           )}
 
+          <Alert className="border-blue-500/50 bg-blue-50 dark:bg-blue-950/20">
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              Vi beklager – din tidligere besvarelse blev desværre ikke registreret korrekt. Vi har derfor brug for, at du besvarer pulsmålingen igen. Tak for din forståelse.
+            </AlertDescription>
+          </Alert>
+
           <div>
             <h1 className="text-3xl font-bold">{isTestMode ? 'Pulsmåling (Test)' : 'Pulsmåling'}</h1>
             <p className="text-muted-foreground">
