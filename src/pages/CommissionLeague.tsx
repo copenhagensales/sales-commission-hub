@@ -252,6 +252,7 @@ export default function CommissionLeague() {
               )}
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</p>
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
