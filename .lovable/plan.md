@@ -1,31 +1,15 @@
 
 
+## Fjern decimaler fra provision-visninger i liga
 
-## Draft-booking workflow ✅
+Alle steder hvor `toLocaleString("da-DK")` bruges til at vise provision/kr-beløb i liga-komponenterne, skal der tilføjes `{ maximumFractionDigits: 0 }` så decimaler aldrig vises.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Filer der ændres
 
-## Fortrolige kontrakter ✅
+1. **`ActiveSeasonBoard.tsx`** (linje 223, 226) — `total_points` og `total_provision`
+2. **`RoundResultsCard.tsx`** (linje 86) — `weekly_provision`
+3. **`CommissionLeague.tsx`** (linje 480) — `total_points`
+4. **`PremierLeagueBoard.tsx`** (linje 335) — `current_provision`
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+Ændringen er simpel: `toLocaleString("da-DK")` → `toLocaleString("da-DK", { maximumFractionDigits: 0 })` eller wrap med `Math.round()`.
 
-## Liga Gameplay med Division-først Ranking ✅
-
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
-4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
-5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
-8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
