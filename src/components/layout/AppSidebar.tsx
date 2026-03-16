@@ -600,6 +600,24 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   Min Feedback
                 </NavLink>
               )}
+
+              {/* Pulsmåling */}
+              {pulseSurvey.showMenuItem && (
+                <NavLink
+                  to="/pulse-survey"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/pulse-survey" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="flex-1">Pulsmåling</span>
+                  {pulseSurvey.showBadge && (
+                    <Badge variant="destructive" className="animate-pulse ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">1</Badge>
+                  )}
+                </NavLink>
+              )}
               
               {/* Løn & Mål - kun for provision-ansatte */}
               {p.canViewMyGoals && (
