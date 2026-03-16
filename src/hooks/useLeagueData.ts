@@ -527,7 +527,7 @@ export function useCreateSeason() {
       qualification_start_at: string;
       qualification_end_at: string;
       start_date: string;
-      end_date: string;
+      end_date: string | null;
     }) => {
       // Get max season_number
       const { data: existing } = await supabase

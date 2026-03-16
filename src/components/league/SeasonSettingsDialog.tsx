@@ -132,6 +132,7 @@ function DateRangeSection({
   endDate,
   onStartChange,
   onEndChange,
+  endPlaceholder,
 }: {
   label: string;
   description: string;
@@ -139,6 +140,7 @@ function DateRangeSection({
   endDate: Date | undefined;
   onStartChange: (d: Date | undefined) => void;
   onEndChange: (d: Date | undefined) => void;
+  endPlaceholder?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -146,7 +148,7 @@ function DateRangeSection({
       <p className="text-xs text-muted-foreground">{description}</p>
       <div className="grid grid-cols-2 gap-3">
         <DatePickerButton date={startDate} onSelect={onStartChange} placeholder="Start" />
-        <DatePickerButton date={endDate} onSelect={onEndChange} placeholder="Slut" />
+        <DatePickerButton date={endDate} onSelect={onEndChange} placeholder={endPlaceholder || "Slut"} />
       </div>
     </div>
   );
