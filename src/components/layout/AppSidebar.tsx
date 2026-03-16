@@ -20,6 +20,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
+import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
