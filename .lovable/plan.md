@@ -1,19 +1,39 @@
 
 
+## Nulstil kvalifikation til denne uge
 
-## Draft-booking workflow ✅
+### Hvad er problemet
+Sæsonens datoer er sat til januar 2026. De er udløbet, og kvalifikationen kører ikke.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Hvad skal ændres
 
-## Fortrolige kontrakter ✅
+**1 database-opdatering** — opdater sæson-datoerne:
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+| Felt | Nuværende | Ny værdi |
+|------|-----------|----------|
+| `qualification_source_start` | 12. jan | **16. marts (mandag)** |
+| `qualification_source_end` | 24. jan | **22. marts (søndag)** |
+| `qualification_start_at` | 11. jan | **16. marts (mandag)** |
+| `qualification_end_at` | 24. jan | **22. marts (søndag kl 23:59)** |
+
+```sql
+UPDATE league_seasons
+SET 
+  qualification_source_start = '2026-03-16T00:00:00+01:00',
+  qualification_source_end   = '2026-03-22T23:59:59+01:00',
+  qualification_start_at     = '2026-03-16T00:00:00+01:00',
+  qualification_end_at       = '2026-03-22T23:59:59+01:00'
+WHERE id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78';
+```
+
+**2. Nulstil standings** — slet alle eksisterende standings så de genberegnes med den nye periodes provision:
+
+```sql
+DELETE FROM league_qualification_standings
+WHERE season_id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78';
+```
+
+**3. Genberegn** — kald `league-calculate-standings` edge function for at beregne nye standings baseret på denne uges salg.
+
+Ingen kodeændringer — kun data-opdatering og genberegning.
+
