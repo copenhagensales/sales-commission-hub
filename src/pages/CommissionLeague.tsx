@@ -477,7 +477,7 @@ export default function CommissionLeague() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold font-mono">{Number(mySeasonStanding.total_points).toLocaleString("da-DK")} pt</p>
+                      <p className="text-2xl font-bold font-mono">{Number(mySeasonStanding.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt</p>
                       <p className="text-sm text-muted-foreground">{mySeasonStanding.rounds_played} runder spillet</p>
                     </div>
                   </CardContent>

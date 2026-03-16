@@ -83,7 +83,7 @@ export function RoundResultsCard({ round, standings, playersPerDivision, current
                         </Badge>
                       )}
                       <span className="font-mono text-xs text-muted-foreground w-16 text-right">
-                        {Number(s.weekly_provision).toLocaleString("da-DK")} kr
+                        {Number(s.weekly_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
                       </span>
                       <span className="font-mono text-xs font-semibold w-10 text-right">
                         +{points}
