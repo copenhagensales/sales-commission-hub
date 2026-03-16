@@ -41,8 +41,8 @@ export function SeasonSettingsDialog({ season }: SeasonSettingsDialogProps) {
   }, [season]);
 
   const handleSave = async () => {
-    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt) {
-      toast.error("Alle datoer skal udfyldes");
+    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt || !startDate) {
+      toast.error("Alle påkrævede datoer skal udfyldes");
       return;
     }
 
