@@ -66,6 +66,7 @@ export default function CommissionLeague() {
   const { data: enrollmentCount } = useEnrollmentCount(season?.id);
   const enrollMutation = useEnrollInSeason();
   const unenrollMutation = useUnenrollFromSeason();
+  const unenrollAndFanMutation = useUnenrollAndBecomeFan();
   const fanMutation = useEnrollAsFan();
 
   const isEnrolled = !!enrollment;
