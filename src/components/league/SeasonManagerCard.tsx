@@ -69,8 +69,8 @@ export function SeasonManagerCard() {
   };
 
   const handleCreate = async () => {
-    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt || !startDate || !endDate) {
-      toast.error("Alle 6 datoer skal udfyldes");
+    if (!qualSourceStart || !qualSourceEnd || !qualStartAt || !qualEndAt || !startDate) {
+      toast.error("Alle påkrævede datoer skal udfyldes");
       return;
     }
 
@@ -81,7 +81,7 @@ export function SeasonManagerCard() {
         qualification_start_at: qualStartAt.toISOString(),
         qualification_end_at: qualEndAt.toISOString(),
         start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
+        end_date: endDate ? endDate.toISOString().split("T")[0] : null,
       });
       toast.success("Ny sæson oprettet!");
       setCreateOpen(false);
