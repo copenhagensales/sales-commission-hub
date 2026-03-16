@@ -1,31 +1,40 @@
 
 
+## Fix: Brug medarbejderens vagtplan til beregning af arbejdsdage i SalesGoalTracker
 
-## Draft-booking workflow ✅
+### Problem
+`SalesGoalTracker.tsx` beregner arbejdsdage ved at tage alle hverdage (man-fre) og fjerne helligdage og fravær. Den tager **ikke** højde for den individuelle vagtplan. Sandra kan f.eks. have en speciel vagtplan med færre dage eller weekendvagter — men beregneren antager en standard man-fre uge.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Løsning
+Hent vagtdata og følg det etablerede vagthierarki (brugt i `useTeamGoalForecast.ts`):
 
-## Fortrolige kontrakter ✅
+1. **Individuelle vagter** (`shift` tabellen) — højeste prioritet
+2. **Medarbejder-standardvagter** (`employee_standard_shifts` → `team_standard_shift_days`)
+3. **Team-standardvagter** (`team_standard_shifts` → `team_standard_shift_days`)
+4. **Fallback**: hverdage (man-fre) — kun hvis ingen vagtdata findes
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+### Ændringer
 
-## Liga Gameplay med Division-først Ranking ✅
+**1. Ny hook: `src/hooks/useEmployeeWorkingDays.ts`**
+- Henter individuelle vagter, medarbejder-standardvagter, team-standardvagter og vagtdage for en given periode
+- Henter medarbejderens `team_id` fra `employee_master_data`
+- Bygger et sæt af "planlagte arbejdsdage" baseret på vagthierarkiet
+- Filtrerer helligdage og godkendt fravær fra
+- Returnerer `{ total, passed, remaining, days }` — samme format som nuværende `workingDaysData`
 
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
-4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
-5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
-8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+**2. `src/components/my-profile/SalesGoalTracker.tsx`**
+- Erstat den inline `workingDaysData` useMemo (linje 212-249) med den nye hook
+- Props og resten af komponenten forbliver uændret
+
+### Teknisk detalje
+Hookens logik for at afgøre om en dag er en "vagtdag":
+```text
+for each day in period:
+  if absence → skip
+  if holiday → skip
+  if individual shift exists for that date → count
+  else if employee has standard shift → check day_of_week match
+  else if team has active standard shift → check day_of_week match  
+  else → fallback to weekday (mon-fri)
+```
+
