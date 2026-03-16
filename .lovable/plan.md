@@ -1,39 +1,62 @@
 
 
-## Nulstil kvalifikation til denne uge
+## "Fan"-tilmelding og rollebegrænsning i Salgsligaen
 
-### Hvad er problemet
-Sæsonens datoer er sat til januar 2026. De er udløbet, og kvalifikationen kører ikke.
+### Hvad skal laves
 
-### Hvad skal ændres
+1. **Definér ikke-deltagende roller** — roller som ejer, ass. teamleder, some, rekruttering, FM leder osv. må ikke deltage som spillere. De kan kun tilmelde sig som "fan" (spectator).
 
-**1 database-opdatering** — opdater sæson-datoerne:
+2. **Ny "Bliv fan"-knap** på landing-sektionen — vises for alle, ved siden af "Tilmeld mig nu". Fans tilmeldes med `is_spectator = true` og ser leaderboardet, men optræder ikke i standings.
 
-| Felt | Nuværende | Ny værdi |
-|------|-----------|----------|
-| `qualification_source_start` | 12. jan | **16. marts (mandag)** |
-| `qualification_source_end` | 24. jan | **22. marts (søndag)** |
-| `qualification_start_at` | 11. jan | **16. marts (mandag)** |
-| `qualification_end_at` | 24. jan | **22. marts (søndag kl 23:59)** |
+3. **Bloker deltagelse for ikke-spillende roller** — "Tilmeld mig nu"-knappen skjules for ejer, ass. teamleder, some, rekruttering m.fl. De ser kun "Bliv fan"-knappen.
 
-```sql
-UPDATE league_seasons
-SET 
-  qualification_source_start = '2026-03-16T00:00:00+01:00',
-  qualification_source_end   = '2026-03-22T23:59:59+01:00',
-  qualification_start_at     = '2026-03-16T00:00:00+01:00',
-  qualification_end_at       = '2026-03-22T23:59:59+01:00'
-WHERE id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78';
+### Ændringer
+
+**`src/hooks/useLeagueData.ts`**
+- Tilføj ny `useEnrollAsFan()` mutation der altid sætter `is_spectator = true`
+- I `useEnrollInSeason()` — tilføj tjek af brugerens `system_role_key` via `position_id`. Hvis rollen er i en blocklist (`ejer`, `some`, `rekruttering`, `assisterende_teamleder_fm`, `fm_leder`), kast en fejl ("Din rolle tillader ikke deltagelse")
+
+**`src/pages/CommissionLeague.tsx`**
+- Hent brugerens rolle via `useUnifiedPermissions()` (allerede tilgængelig)
+- Definer `canParticipate` boolean: `true` kun for `medarbejder` og `teamleder` roller
+- Landing-sektion:
+  - Vis "Tilmeld mig nu" kun hvis `canParticipate`
+  - Vis altid "Bliv fan 👀"-knap for alle
+- Enrolled-sektion:
+  - Hvis fan (`enrollment.is_spectator`): vis leaderboard men **ikke** `MyQualificationStatus`, og vis "Du følger med som fan" badge
+  - Skjul "Afmeld liga" → vis "Stop med at følge" for fans
+
+**`src/hooks/useLeagueData.ts` — `LeagueEnrollment` interface**
+- Tilføj `is_spectator?: boolean` til interfacet
+- Opdater `useMyEnrollment` select til at inkludere `is_spectator`
+
+### Rolleblocklist (kan ikke deltage, kun fan)
+| Rolle | system_role_key |
+|-------|----------------|
+| Ejer | `ejer` |
+| Ass. teamleder FM | `assisterende_teamleder_fm` |
+| SoMe | `some` |
+| Rekruttering | `rekruttering` |
+| FM Leder | `fm_leder` |
+
+### UI-flow
+
+```text
+Ikke tilmeldt + kan deltage:
+  [🏆 Tilmeld mig nu]  [👀 Følg som fan]
+
+Ikke tilmeldt + kan IKKE deltage (ejer etc.):
+  [👀 Følg som fan]
+
+Tilmeldt som deltager:
+  → Ser standings + egen placering
+  → [Afmeld liga]
+
+Tilmeldt som fan:
+  → Ser standings (uden egen placering)
+  → Badge: "Du følger med som fan"
+  → [Stop med at følge]
 ```
 
-**2. Nulstil standings** — slet alle eksisterende standings så de genberegnes med den nye periodes provision:
-
-```sql
-DELETE FROM league_qualification_standings
-WHERE season_id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78';
-```
-
-**3. Genberegn** — kald `league-calculate-standings` edge function for at beregne nye standings baseret på denne uges salg.
-
-Ingen kodeændringer — kun data-opdatering og genberegning.
+Ingen databaseændringer — `is_spectator` kolonne eksisterer allerede i `league_enrollments`.
 
