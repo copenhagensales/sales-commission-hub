@@ -23,7 +23,17 @@ export function QualificationBoard({
   playersPerDivision,
   isLoading,
   currentEmployeeId,
+  defaultShowAll = false,
 }: QualificationBoardProps) {
+  const [showAll, setShowAll] = useState(defaultShowAll);
+
+  // Find current user's division
+  const myDivision = useMemo(() => {
+    if (!currentEmployeeId) return null;
+    const my = standings.find(s => s.employee_id === currentEmployeeId);
+    return my?.projected_division ?? null;
+  }, [standings, currentEmployeeId]);
+
   // Group standings by division
   const divisionGroups = useMemo(() => {
     const groups: { division: number; players: QualificationStanding[] }[] = [];
