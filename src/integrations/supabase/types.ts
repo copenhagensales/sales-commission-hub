@@ -6615,6 +6615,196 @@ export type Database = {
           },
         ]
       }
+      league_round_standings: {
+        Row: {
+          created_at: string
+          cumulative_points: number
+          division: number
+          employee_id: string
+          id: string
+          movement: string
+          points_earned: number
+          rank_in_division: number
+          round_id: string
+          season_id: string
+          weekly_deals: number
+          weekly_provision: number
+        }
+        Insert: {
+          created_at?: string
+          cumulative_points?: number
+          division: number
+          employee_id: string
+          id?: string
+          movement?: string
+          points_earned?: number
+          rank_in_division: number
+          round_id: string
+          season_id: string
+          weekly_deals?: number
+          weekly_provision?: number
+        }
+        Update: {
+          created_at?: string
+          cumulative_points?: number
+          division?: number
+          employee_id?: string
+          id?: string
+          movement?: string
+          points_earned?: number
+          rank_in_division?: number
+          round_id?: string
+          season_id?: string
+          weekly_deals?: number
+          weekly_provision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_round_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_round_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_round_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_round_standings_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "league_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_round_standings_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "league_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_rounds: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          round_number: number
+          season_id: string
+          start_date: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          round_number: number
+          season_id: string
+          start_date: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          round_number?: number
+          season_id?: string
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_rounds_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "league_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_season_standings: {
+        Row: {
+          current_division: number
+          division_rank: number
+          employee_id: string
+          id: string
+          overall_rank: number
+          previous_division: number | null
+          rounds_played: number
+          season_id: string
+          total_points: number
+          total_provision: number
+          updated_at: string
+        }
+        Insert: {
+          current_division?: number
+          division_rank?: number
+          employee_id: string
+          id?: string
+          overall_rank?: number
+          previous_division?: number | null
+          rounds_played?: number
+          season_id: string
+          total_points?: number
+          total_provision?: number
+          updated_at?: string
+        }
+        Update: {
+          current_division?: number
+          division_rank?: number
+          employee_id?: string
+          id?: string
+          overall_rank?: number
+          previous_division?: number | null
+          rounds_played?: number
+          season_id?: string
+          total_points?: number
+          total_provision?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_season_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_season_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_season_standings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_season_standings_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "league_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       league_seasons: {
         Row: {
           config: Json | null
