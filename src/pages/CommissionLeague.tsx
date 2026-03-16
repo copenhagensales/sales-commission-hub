@@ -322,6 +322,7 @@ export default function CommissionLeague() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+          </div>
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
