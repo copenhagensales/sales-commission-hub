@@ -1,8 +1,9 @@
-import { useMemo, memo } from "react";
+import { useMemo, useState, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Medal, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Medal, ArrowUpRight, ArrowDownRight, Eye, EyeOff } from "lucide-react";
 import { QualificationStanding } from "@/hooks/useLeagueData";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
@@ -14,6 +15,7 @@ interface QualificationBoardProps {
   playersPerDivision: number;
   isLoading: boolean;
   currentEmployeeId?: string;
+  defaultShowAll?: boolean;
 }
 
 export function QualificationBoard({
