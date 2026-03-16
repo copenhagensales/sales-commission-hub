@@ -366,6 +366,9 @@ export default function LeagueAdminDashboard() {
           </Card>
         </div>
 
+        {/* Season Manager */}
+        <SeasonManagerCard />
+
         {/* Filters */}
         <Card>
           <CardHeader>
