@@ -1,44 +1,34 @@
 
 
-## Dataopdateringer for Sæson 1 → Sæson 2
+## Overfør tilmeldinger fra Sæson 1 til Sæson 2
 
-Nuværende status i databasen:
-- **Sæson 1** (id: `dd9d9404...`): `active`, `is_active: true`
-- **Runde 5** (id: `bf0052a5...`): `active` under Sæson 1
+### Status nu
+- **Sæson 1**: 55 aktive spillere + 3 fans = 58 aktive tilmeldinger (+ 21 inaktive)
+- **Sæson 2** (id: `1413d941...`): 0 tilmeldinger
 
-### Trin 1: Afslut Sæson 1 + aktive runder
+### Plan
 
-```sql
--- Afslut Sæson 1
-UPDATE league_seasons 
-SET status = 'completed', is_active = false 
-WHERE id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78';
-
--- Afslut Runde 5
-UPDATE league_rounds 
-SET status = 'completed' 
-WHERE id = 'bf0052a5-a0cd-4cd6-ac4b-4b4407b56887';
-```
-
-### Trin 2: Opret Sæson 2 med kvalifikation denne uge
+Kør én SQL-migration der kopierer alle **aktive** tilmeldinger fra Sæson 1 til Sæson 2:
 
 ```sql
-INSERT INTO league_seasons (
-  season_number, status, is_active,
-  qualification_source_start, qualification_source_end,
-  qualification_start_at, qualification_end_at,
-  start_date, end_date
-) VALUES (
-  2, 'qualification', true,
-  '2026-03-15', '2026-03-22',
-  '2026-03-16T00:00:00+01:00', '2026-03-22T23:59:59+01:00',
-  '2026-03-23', NULL
-);
+INSERT INTO league_enrollments (season_id, employee_id, is_active, is_spectator, enrolled_at)
+SELECT 
+  '1413d941-ed9f-4c55-a7ff-d1bc948eb5da',  -- Sæson 2
+  employee_id,
+  true,
+  is_spectator,
+  now()
+FROM league_enrollments
+WHERE season_id = 'dd9d9404-0a8c-4ed7-9c7a-2a446d54ff78'
+  AND is_active = true;
 ```
 
-### Resultat
-- Sæson 1 lukkes helt ned (status `completed`)
-- Sæson 2 oprettes med `qualification` status — tilmelding er åben nu
-- `end_date = NULL` → sæsonen kører uendeligt
-- Ingen kodeændringer nødvendige
+Dette overfører:
+- **55 aktive spillere** (beholder `is_spectator = false`)
+- **3 fans** (beholder `is_spectator = true`)
+- Inaktive/afmeldte kopieres **ikke**
+
+Derefter køres `league-calculate-standings` for at generere kvalifikationsstandings for de overførte spillere.
+
+Ingen kodeændringer nødvendige — kun databaseopdatering.
 
