@@ -1,25 +1,6 @@
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import type { PrizeLeaders } from "@/hooks/useLeaguePrizeData";
 
-interface PrizeCardProps {
-  emoji: string;
-  title: string;
-  playerName: string;
-  subtitle: string;
-  borderClass: string;
-}
-
-function PrizeCard({ emoji, title, playerName, subtitle, borderClass }: PrizeCardProps) {
-  return (
-    <div className={`relative rounded-xl bg-slate-800/80 p-4 border-2 ${borderClass} text-center space-y-1`}>
-      <span className="text-2xl">{emoji}</span>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      <p className="text-sm font-bold truncate">{playerName}</p>
-      <p className="text-xs text-muted-foreground">{subtitle}</p>
-    </div>
-  );
-}
-
 interface Standing {
   overall_rank?: number;
   employee?: { id: string; first_name: string; last_name: string } | null;
@@ -37,10 +18,8 @@ interface PrizeShowcaseProps {
 }
 
 export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive }: PrizeShowcaseProps) {
-  // During qualification (not active), no points exist yet — all cards show pending
   const notStarted = !isActive;
 
-  // Top 3 sorted by total_points (not overall_rank)
   const sorted = [...standings].sort((a, b) => (b.total_points ?? 0) - (a.total_points ?? 0));
   const top1 = sorted[0];
   const top2 = sorted[1];
@@ -52,61 +31,72 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
   };
 
   const pendingText = notStarted ? "Afgøres når sæsonen starter" : "Afsløres efter runde 1";
-
   const revealed = isActive && prizeLeaders;
 
-  const cards: PrizeCardProps[] = [
-    {
-      emoji: "🥇",
-      title: "Nummer 1",
-      playerName: !notStarted && top1 ? formatPlayerName(top1.employee) : pendingText,
-      subtitle: !notStarted ? pointLabel(top1) : "",
-      borderClass: "border-yellow-500/60",
-    },
-    {
-      emoji: "🥈",
-      title: "Nummer 2",
-      playerName: !notStarted && top2 ? formatPlayerName(top2.employee) : pendingText,
-      subtitle: !notStarted ? pointLabel(top2) : "",
-      borderClass: "border-slate-400/60",
-    },
-    {
-      emoji: "🥉",
-      title: "Nummer 3",
-      playerName: !notStarted && top3 ? formatPlayerName(top3.employee) : pendingText,
-      subtitle: !notStarted ? pointLabel(top3) : "",
-      borderClass: "border-amber-700/60",
-    },
-    {
-      emoji: "🔥",
-      title: "Bedste Runde",
-      playerName: revealed && prizeLeaders.bestRound ? formatPlayerName(prizeLeaders.bestRound.employee) : pendingText,
-      subtitle: revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound.label : "",
-      borderClass: "border-red-500/50",
-    },
-    {
-      emoji: "⭐",
-      title: "Sæsonens Talent",
-      playerName: revealed && prizeLeaders.talent ? formatPlayerName(prizeLeaders.talent.employee) : pendingText,
-      subtitle: revealed && prizeLeaders.talent ? prizeLeaders.talent.label : "",
-      borderClass: "border-purple-500/50",
-    },
-    {
-      emoji: "🚀",
-      title: "Sæsonens Comeback",
-      playerName: revealed && prizeLeaders.comeback ? formatPlayerName(prizeLeaders.comeback.employee) : pendingText,
-      subtitle: revealed && prizeLeaders.comeback ? prizeLeaders.comeback.label : "",
-      borderClass: "border-emerald-500/50",
-    },
+  const podium = [
+    { emoji: "🥇", label: "1.", standing: top1, colorClass: "text-yellow-400" },
+    { emoji: "🥈", label: "2.", standing: top2, colorClass: "text-slate-300" },
+    { emoji: "🥉", label: "3.", standing: top3, colorClass: "text-amber-600" },
   ];
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {cards.map((card) => (
-          <PrizeCard key={card.title} {...card} />
+    <div className="space-y-3">
+      {/* Top 3 – combined podium card */}
+      <div className="rounded-xl bg-slate-800/80 border-2 border-yellow-500/50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground text-center mb-4">
+          🏆 Top 3
+        </p>
+        {notStarted ? (
+          <p className="text-sm text-muted-foreground text-center">{pendingText}</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {podium.map((p) => (
+              <div key={p.label} className="text-center space-y-1">
+                <span className="text-2xl">{p.emoji}</span>
+                <p className={`text-base font-bold truncate ${p.colorClass}`}>
+                  {p.standing ? formatPlayerName(p.standing.employee) : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">{pointLabel(p.standing)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Special prizes */}
+      <div className="grid grid-cols-3 gap-3">
+        {([
+          {
+            emoji: "🔥",
+            title: "Bedste Runde",
+            playerName: revealed && prizeLeaders.bestRound ? formatPlayerName(prizeLeaders.bestRound.employee) : pendingText,
+            subtitle: revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound.label : "",
+            borderClass: "border-red-500/50",
+          },
+          {
+            emoji: "⭐",
+            title: "Sæsonens Talent",
+            playerName: revealed && prizeLeaders.talent ? formatPlayerName(prizeLeaders.talent.employee) : pendingText,
+            subtitle: revealed && prizeLeaders.talent ? prizeLeaders.talent.label : "",
+            borderClass: "border-purple-500/50",
+          },
+          {
+            emoji: "🚀",
+            title: "Sæsonens Comeback",
+            playerName: revealed && prizeLeaders.comeback ? formatPlayerName(prizeLeaders.comeback.employee) : pendingText,
+            subtitle: revealed && prizeLeaders.comeback ? prizeLeaders.comeback.label : "",
+            borderClass: "border-emerald-500/50",
+          },
+        ]).map((card) => (
+          <div key={card.title} className={`relative rounded-xl bg-slate-800/80 p-4 border-2 ${card.borderClass} text-center space-y-1`}>
+            <span className="text-2xl">{card.emoji}</span>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{card.title}</p>
+            <p className="text-sm font-bold truncate">{card.playerName}</p>
+            <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+          </div>
         ))}
       </div>
+
       <p className="text-center text-xs text-muted-foreground">
         Afgøres ved sæsonens afslutning
       </p>
