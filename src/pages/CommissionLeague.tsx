@@ -30,6 +30,8 @@ import {
   useRoundHistory,
   useMySeasonStanding,
 } from "@/hooks/useLeagueActiveData";
+import { usePrizeLeaders } from "@/hooks/useLeaguePrizeData";
+import { PrizeShowcase } from "@/components/league/PrizeShowcase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,7 +104,10 @@ export default function CommissionLeague() {
   const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
   const [selectedHistoryRoundId, setSelectedHistoryRoundId] = useState<string | undefined>();
   const { data: historyRoundStandings } = useRoundStandings(selectedHistoryRoundId);
-
+  const { data: prizeLeaders } = usePrizeLeaders(
+    season?.status === "active" ? season?.id : undefined,
+    season?.start_date
+  );
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
@@ -325,6 +330,14 @@ export default function CommissionLeague() {
             </CollapsibleContent>
           </Collapsible>
           </div>
+
+          {/* Prize Showcase */}
+          <PrizeShowcase
+            standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+            prizeLeaders={prizeLeaders}
+            seasonStatus={season.status || ""}
+            isActive={isActivePhase}
+          />
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
