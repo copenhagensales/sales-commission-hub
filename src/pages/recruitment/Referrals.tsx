@@ -102,6 +102,21 @@ export default function Referrals() {
   const deleteReferral = useDeleteReferral();
   const convertToCandidate = useConvertReferralToCandidate();
 
+  // Fetch active employees for linking in hire dialog
+  const { data: activeEmployees = [] } = useQuery({
+    queryKey: ["active-employees-for-hire-link"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: hireDialogOpen,
+  });
+
   const filteredReferrals = referrals?.filter(r => {
     const matchesSearch = 
       `${r.candidate_first_name} ${r.candidate_last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
