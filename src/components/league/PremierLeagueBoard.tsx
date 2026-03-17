@@ -86,25 +86,25 @@ export function PremierLeagueBoard({
     let nextZoneProvision: number | null = null;
     let prevZoneProvision: number | null = null;
 
-    if (isTopDivision && rank <= 2) {
+    if (isTopDivision && rank <= 3) {
       zoneType = "top";
-    } else if (!isTopDivision && rank <= 2) {
+    } else if (!isTopDivision && rank <= 3) {
       zoneType = "promo";
-    } else if (!isTopDivision && rank === 3) {
+    } else if (!isTopDivision && (rank === 4 || rank === 5)) {
       zoneType = "playoff";
-      if (players[1]) nextZoneProvision = players[1].current_provision;
-    } else if (rank === playersPerDivision - 2) {
+      if (players[2]) nextZoneProvision = players[2].current_provision;
+    } else if (rank === playersPerDivision - 3 || rank === playersPerDivision - 4) {
       zoneType = "playoff";
-      if (players[playersPerDivision - 4]) nextZoneProvision = players[playersPerDivision - 4].current_provision;
-    } else if (!isBottomDivision && rank >= playersPerDivision - 1) {
+      if (players[playersPerDivision - 6]) nextZoneProvision = players[playersPerDivision - 6].current_provision;
+    } else if (!isBottomDivision && rank >= playersPerDivision - 2) {
       zoneType = "relegation";
-      if (players[playersPerDivision - 3]) nextZoneProvision = players[playersPerDivision - 3].current_provision;
+      if (players[playersPerDivision - 5]) nextZoneProvision = players[playersPerDivision - 5].current_provision;
     } else {
-      if (!isTopDivision && players[2]) {
-        nextZoneProvision = players[2].current_provision;
+      if (!isTopDivision && players[4]) {
+        nextZoneProvision = players[4].current_provision;
       }
-      if (players[playersPerDivision - 3]) {
-        prevZoneProvision = players[playersPerDivision - 3].current_provision;
+      if (players[playersPerDivision - 5]) {
+        prevZoneProvision = players[playersPerDivision - 5].current_provision;
       }
     }
 
