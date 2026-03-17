@@ -60,7 +60,7 @@ export function StaffEmployeesTab() {
     invitation_status: string | null;
   }
 
-  const { data: staffEmployees = [], isLoading } = useQuery<StaffEmployee[]>({
+  const { data: staffEmployees = [], isLoading, refetch: refetchStaff } = useQuery<StaffEmployee[]>({
     queryKey: ["staff-employees"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -71,6 +71,9 @@ export function StaffEmployeesTab() {
       if (error) throw error;
       return (data ?? []) as StaffEmployee[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 
   const { data: jobPositions = [] } = useQuery({
