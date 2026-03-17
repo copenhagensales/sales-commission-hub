@@ -236,7 +236,7 @@ const PlayerRow = memo(function PlayerRow({
           </div>
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}
-            {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 2</Badge>}
+            {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 3</Badge>}
             {isPlayoffZone && <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">Playoff</Badge>}
             {isRelegationZone && <Badge className="bg-red-500/20 text-red-600 border-red-500/30 text-[10px] px-1.5 py-0">Nedrykker</Badge>}
           </div>

@@ -359,7 +359,7 @@ export function PremierLeagueBoard({
                             )}
                             {isTopZone && (
                               <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">
-                                Top 2
+                                Top 3
                               </Badge>
                             )}
                             {isPlayoffZone && (

@@ -15,19 +15,19 @@ export function ZoneLegend({ className }: ZoneLegendProps) {
       {/* Zone indicators */}
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-sm bg-green-500" />
-        <span>Oprykker</span>
+        <span>Oprykker (1-3)</span>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-sm bg-orange-500" />
-        <span>Playoff</span>
+        <span>Playoff (4-5 / 10-11)</span>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-sm bg-red-500" />
-        <span>Nedrykker</span>
+        <span>Nedrykker (12-14)</span>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-sm bg-yellow-500" />
-        <span>Top 2</span>
+        <span>Top 3</span>
       </div>
       
       {/* Division movement - compact */}
