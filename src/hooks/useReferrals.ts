@@ -14,6 +14,7 @@ export interface Referral {
   message: string | null;
   status: 'pending' | 'contacted' | 'hired' | 'eligible_for_bonus' | 'bonus_paid' | 'rejected';
   hired_date: string | null;
+  hired_employee_id: string | null;
   bonus_eligible_date: string | null;
   bonus_paid_date: string | null;
   bonus_amount: number;
