@@ -7,10 +7,30 @@ export interface PrizeLeader {
   label: string;
 }
 
+export interface RankedPlayer {
+  employee: { id: string; first_name: string; last_name: string } | null;
+  total_points: number;
+}
+
+export interface RankedRound {
+  employee: { id: string; first_name: string; last_name: string } | null;
+  points_earned: number;
+  round_number: number | null;
+}
+
+export interface RankedComeback {
+  employee: { id: string; first_name: string; last_name: string } | null;
+  improvement: number;
+}
+
 export interface PrizeLeaders {
   bestRound: PrizeLeader | null;
   talent: PrizeLeader | null;
   comeback: PrizeLeader | null;
+  allByPoints: RankedPlayer[];
+  allBestRounds: RankedRound[];
+  allTalents: RankedPlayer[];
+  allComebacks: RankedComeback[];
 }
 
 export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: string | undefined) {
@@ -18,10 +38,33 @@ export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: s
     queryKey: ["league-prize-leaders", seasonId],
     staleTime: 60000,
     queryFn: async (): Promise<PrizeLeaders> => {
-      if (!seasonId) return { bestRound: null, talent: null, comeback: null };
+      const empty: PrizeLeaders = {
+        bestRound: null, talent: null, comeback: null,
+        allByPoints: [], allBestRounds: [], allTalents: [], allComebacks: [],
+      };
+      if (!seasonId) return empty;
 
-      // 1. Best round: highest points_earned in a single round
-      const { data: bestRoundData } = await supabase
+      // --- All by points (for Top 3 dialog) ---
+      const { data: allStandings } = await supabase
+        .from("league_season_standings")
+        .select(`
+          total_points,
+          employee:employee_master_data!league_season_standings_employee_id_fkey(
+            id, first_name, last_name, employment_start_date
+          )
+        `)
+        .eq("season_id", seasonId)
+        .order("total_points", { ascending: false });
+
+      const allByPoints: RankedPlayer[] = (allStandings ?? [])
+        .filter((s: any) => s.total_points > 0)
+        .map((s: any) => ({
+          employee: s.employee ? { id: s.employee.id, first_name: s.employee.first_name, last_name: s.employee.last_name } : null,
+          total_points: s.total_points,
+        }));
+
+      // --- Best rounds ---
+      const { data: roundStandings } = await supabase
         .from("league_round_standings")
         .select(`
           points_earned,
@@ -32,65 +75,66 @@ export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: s
         `)
         .eq("season_id", seasonId)
         .order("points_earned", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(50);
 
-      // Get round number for best round
-      let bestRoundNumber: number | null = null;
-      if (bestRoundData?.round_id) {
-        const { data: roundData } = await supabase
+      // Get round numbers for all round_ids
+      const roundIds = [...new Set((roundStandings ?? []).map((r: any) => r.round_id).filter(Boolean))];
+      const roundNumberMap: Record<string, number> = {};
+      if (roundIds.length > 0) {
+        const { data: rounds } = await supabase
           .from("league_rounds")
-          .select("round_number")
-          .eq("id", bestRoundData.round_id)
-          .maybeSingle();
-        bestRoundNumber = roundData?.round_number ?? null;
+          .select("id, round_number")
+          .in("id", roundIds);
+        (rounds ?? []).forEach((r: any) => { roundNumberMap[r.id] = r.round_number; });
       }
 
-      const bestRound: PrizeLeader | null = bestRoundData?.employee
+      const allBestRounds: RankedRound[] = (roundStandings ?? [])
+        .filter((r: any) => r.points_earned > 0)
+        .map((r: any) => ({
+          employee: r.employee as any,
+          points_earned: r.points_earned,
+          round_number: r.round_id ? (roundNumberMap[r.round_id] ?? null) : null,
+        }));
+
+      const bestRound: PrizeLeader | null = allBestRounds.length > 0
         ? {
-            employee: bestRoundData.employee as any,
-            value: bestRoundData.points_earned,
-            label: `${bestRoundData.points_earned} pt${bestRoundNumber ? ` (runde ${bestRoundNumber})` : ""}`,
+            employee: allBestRounds[0].employee,
+            value: allBestRounds[0].points_earned,
+            label: `${allBestRounds[0].points_earned} pt${allBestRounds[0].round_number ? ` (runde ${allBestRounds[0].round_number})` : ""}`,
           }
         : null;
 
-      // 2. Talent: most points among players with < 3 months employment at season start
+      // --- Talent: < 3 months employment at season start ---
+      let allTalents: RankedPlayer[] = [];
       let talent: PrizeLeader | null = null;
-      if (seasonStartDate) {
+      if (seasonStartDate && allStandings) {
         const cutoffDate = new Date(seasonStartDate);
         cutoffDate.setDate(cutoffDate.getDate() - 90);
         const cutoffStr = cutoffDate.toISOString().split("T")[0];
 
-        const { data: standingsWithDates } = await supabase
-          .from("league_season_standings")
-          .select(`
-            total_points,
-            employee:employee_master_data!league_season_standings_employee_id_fkey(
-              id, first_name, last_name, employment_start_date
-            )
-          `)
-          .eq("season_id", seasonId)
-          .order("total_points", { ascending: false });
+        allTalents = (allStandings as any[])
+          .filter((s: any) => {
+            const emp = s.employee;
+            return emp?.employment_start_date && emp.employment_start_date > cutoffStr && s.total_points > 0;
+          })
+          .map((s: any) => ({
+            employee: { id: s.employee.id, first_name: s.employee.first_name, last_name: s.employee.last_name },
+            total_points: s.total_points,
+          }));
 
-        if (standingsWithDates) {
-          for (const s of standingsWithDates) {
-            const emp = s.employee as any;
-            if (emp?.employment_start_date && emp.employment_start_date > cutoffStr) {
-              talent = {
-                employee: { id: emp.id, first_name: emp.first_name, last_name: emp.last_name },
-                value: s.total_points,
-                label: `${s.total_points} pt`,
-              };
-              break;
-            }
-          }
+        if (allTalents.length > 0) {
+          talent = {
+            employee: allTalents[0].employee,
+            value: allTalents[0].total_points,
+            label: `${allTalents[0].total_points} pt`,
+          };
         }
       }
 
-      // 3. Comeback: biggest rank improvement from round 1 to current overall_rank
+      // --- Comeback: rank improvement from round 1 ---
+      let allComebacks: RankedComeback[] = [];
       let comeback: PrizeLeader | null = null;
 
-      // Find round 1
       const { data: round1 } = await supabase
         .from("league_rounds")
         .select("id")
@@ -99,7 +143,6 @@ export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: s
         .maybeSingle();
 
       if (round1) {
-        // Get round 1 standings to compute initial overall rank
         const { data: round1Standings } = await supabase
           .from("league_round_standings")
           .select("employee_id, division, rank_in_division")
@@ -107,7 +150,6 @@ export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: s
           .order("division", { ascending: true })
           .order("rank_in_division", { ascending: true });
 
-        // Get current season standings
         const { data: currentStandings } = await supabase
           .from("league_season_standings")
           .select(`
@@ -120,36 +162,34 @@ export function usePrizeLeaders(seasonId: string | undefined, seasonStartDate: s
           .eq("season_id", seasonId);
 
         if (round1Standings && currentStandings) {
-          // Compute global rank from round 1 (division-first, then rank_in_division)
           const startRankMap: Record<string, number> = {};
-          round1Standings.forEach((s, idx) => {
-            startRankMap[s.employee_id] = idx + 1;
-          });
+          round1Standings.forEach((s, idx) => { startRankMap[s.employee_id] = idx + 1; });
 
-          let maxImprovement = 0;
-          let comebackPlayer: PrizeLeader | null = null;
-
+          const comebackEntries: RankedComeback[] = [];
           for (const cs of currentStandings) {
             const startRank = startRankMap[cs.employee_id];
             if (startRank == null) continue;
             const improvement = startRank - cs.overall_rank;
-            if (improvement > maxImprovement) {
-              maxImprovement = improvement;
-              comebackPlayer = {
+            if (improvement > 0) {
+              comebackEntries.push({
                 employee: cs.employee as any,
-                value: improvement,
-                label: `+${improvement} pladser`,
-              };
+                improvement,
+              });
             }
           }
+          allComebacks = comebackEntries.sort((a, b) => b.improvement - a.improvement);
 
-          if (comebackPlayer && maxImprovement > 0) {
-            comeback = comebackPlayer;
+          if (allComebacks.length > 0) {
+            comeback = {
+              employee: allComebacks[0].employee,
+              value: allComebacks[0].improvement,
+              label: `+${allComebacks[0].improvement} pladser`,
+            };
           }
         }
       }
 
-      return { bestRound, talent, comeback };
+      return { bestRound, talent, comeback, allByPoints, allBestRounds, allTalents, allComebacks };
     },
     enabled: !!seasonId,
   });
