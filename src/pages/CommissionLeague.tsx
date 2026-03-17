@@ -237,10 +237,10 @@ export default function CommissionLeague() {
       const totalDivs = seasonStandings ? new Set(seasonStandings.map(s => s.current_division)).size : 1;
       const isBottom = div === totalDivs;
       let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
-      if (isTop && rank <= 2) zone = "top";
-      else if (!isTop && rank <= 2) zone = "promo";
-      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
-      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      if (isTop && rank <= 3) zone = "top";
+      else if (!isTop && rank <= 3) zone = "promo";
+      else if ((!isTop && (rank === 4 || rank === 5)) || (rank === playersPerDivision - 3 || rank === playersPerDivision - 4)) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 2) zone = "relegation";
       return { rank: mySeasonStanding.overall_rank, division: div, points: Number(mySeasonStanding.total_points), zone, isQualification: false };
     }
     if (isQualificationPhase && myStanding) {
@@ -250,10 +250,10 @@ export default function CommissionLeague() {
       const totalDivs = standings ? new Set(standings.map(s => s.projected_division)).size : 1;
       const isBottom = div === totalDivs;
       let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
-      if (isTop && rank <= 2) zone = "top";
-      else if (!isTop && rank <= 2) zone = "promo";
-      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
-      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      if (isTop && rank <= 3) zone = "top";
+      else if (!isTop && rank <= 3) zone = "promo";
+      else if ((!isTop && (rank === 4 || rank === 5)) || (rank === playersPerDivision - 3 || rank === playersPerDivision - 4)) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 2) zone = "relegation";
       return { rank: myStanding.overall_rank, division: div, provision: myStanding.current_provision, zone, isQualification: true };
     }
     return null;
