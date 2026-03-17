@@ -1,6 +1,5 @@
 
 
-
 ## Draft-booking workflow ✅
 
 ### Implementeret
@@ -23,12 +22,15 @@
 ### Implementeret
 1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
 2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
-4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
-5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
-8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
+4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
+5. ✅ **14 spillere pr. division** (opdateret fra 10).
+6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
+7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
+10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
 
 ## Referral bonus-validering ved deaktivering ✅
 
