@@ -8,21 +8,24 @@ const corsHeaders = {
 interface SeasonConfig {
   players_per_division?: number;
   round_end_hour?: number;
+  round_multipliers?: number[];
 }
 
+const DEFAULT_ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
+
 /**
- * Division-First Ranking point formula:
- * points = (totalDivisions - division) * playersPerDivision + (playersPerDivision - rank + 1)
- * 
- * Guarantees #10 in Div N always scores higher than #1 in Div N+1
+ * New point formula:
+ * basePoints = max(0, (totalDivisions - division) * 20 - (rank - 1) * 5)
+ * finalPoints = Math.round(basePoints * roundMultiplier)
  */
 function calculatePoints(
   division: number,
   rankInDivision: number,
   totalDivisions: number,
-  playersPerDivision: number
+  roundMultiplier: number
 ): number {
-  return (totalDivisions - division) * playersPerDivision + (playersPerDivision - rankInDivision + 1);
+  const basePoints = Math.max(0, (totalDivisions - division) * 20 - (rankInDivision - 1) * 5);
+  return Math.round(basePoints * roundMultiplier);
 }
 
 Deno.serve(async (req) => {
@@ -83,7 +86,8 @@ Deno.serve(async (req) => {
     }
 
     const config: SeasonConfig = season.config || {};
-    const playersPerDivision = config.players_per_division || 10;
+    const playersPerDivision = config.players_per_division || 14;
+    const roundMultipliers = config.round_multipliers || DEFAULT_ROUND_MULTIPLIERS;
 
     // Find current round that needs processing (active/pending + end_date < now)
     const now = new Date().toISOString();
@@ -98,7 +102,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!expiredRound) {
-      // Check if there's an active round still running
       const { data: activeRound } = await supabase
         .from("league_rounds")
         .select("id, round_number, end_date")
@@ -117,7 +120,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[league-process-round] Processing round ${expiredRound.round_number}`);
+    const roundNumber = expiredRound.round_number;
+    const multiplier = roundMultipliers[Math.min(roundNumber - 1, roundMultipliers.length - 1)] || 1;
+    console.log(`[league-process-round] Processing round ${roundNumber} with multiplier ×${multiplier}`);
 
     // Get all season standings (current divisions)
     const { data: seasonStandings, error: standingsError } = await supabase
@@ -136,7 +141,6 @@ Deno.serve(async (req) => {
     // --- Fetch weekly provision for all players ---
     const employeeIds = seasonStandings.map(s => s.employee_id);
     
-    // Get employee -> agent email mappings
     const { data: agentMappings } = await supabase
       .from("employee_agent_mapping")
       .select("employee_id, agent_id")
@@ -154,7 +158,6 @@ Deno.serve(async (req) => {
       if (agent?.email) employeeToEmail[mapping.employee_id] = agent.email.toLowerCase();
     }
 
-    // Fallback emails
     const { data: empData } = await supabase
       .from("employee_master_data")
       .select("id, work_email, private_email")
@@ -273,7 +276,7 @@ Deno.serve(async (req) => {
       const players = divisionGroups[div];
       for (let i = 0; i < players.length; i++) {
         const rank = i + 1;
-        const points = calculatePoints(div, rank, totalDivisions, playersPerDivision);
+        const points = calculatePoints(div, rank, totalDivisions, multiplier);
         results.push({
           empId: players[i].empId,
           division: div,
@@ -287,43 +290,57 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- Promotion/Relegation ---
+    // --- Promotion/Relegation (new rules: top 3 promote, #12-14 relegate) ---
     const isTopDiv = (d: number) => d === divisions[0];
     const isBottomDiv = (d: number) => d === divisions[divisions.length - 1];
 
     for (const result of results) {
-      // Top 2 promote (except top division)
-      if (result.rank <= 2 && !isTopDiv(result.division)) {
+      // Top 3 promote (except top division)
+      if (result.rank <= 3 && !isTopDiv(result.division)) {
         result.movement = "promoted";
         result.newDivision = result.division - 1;
       }
-      // Bottom 2 relegate (except bottom division)
-      if (result.rank >= playersPerDivision - 1 && !isBottomDiv(result.division)) {
+      // Bottom 3 (#12-14) relegate (except bottom division)
+      if (result.rank >= playersPerDivision - 2 && !isBottomDiv(result.division)) {
         result.movement = "relegated";
         result.newDivision = result.division + 1;
       }
     }
 
-    // --- Playoffs: #3 in lower div vs #8 in upper div ---
+    // --- Playoffs: #4-5 in lower div vs #10-11 in upper div ---
     for (let i = 0; i < divisions.length - 1; i++) {
       const upperDiv = divisions[i];
       const lowerDiv = divisions[i + 1];
       
-      const playoff8 = results.find(r => r.division === upperDiv && r.rank === playersPerDivision - 2);
-      const playoff3 = results.find(r => r.division === lowerDiv && r.rank === 3);
+      // Playoff 1: #4 in lower vs #11 in upper
+      const playoff11 = results.find(r => r.division === upperDiv && r.rank === playersPerDivision - 3); // rank 11
+      const playoff4 = results.find(r => r.division === lowerDiv && r.rank === 4);
 
-      if (playoff8 && playoff3) {
-        // Higher provision wins the playoff
-        if (playoff3.provision > playoff8.provision) {
-          // #3 from lower wins → promotes
-          playoff3.movement = "playoff_won";
-          playoff3.newDivision = upperDiv;
-          playoff8.movement = "playoff_lost";
-          playoff8.newDivision = lowerDiv;
+      if (playoff11 && playoff4) {
+        if (playoff4.provision > playoff11.provision) {
+          playoff4.movement = "playoff_won";
+          playoff4.newDivision = upperDiv;
+          playoff11.movement = "playoff_lost";
+          playoff11.newDivision = lowerDiv;
         } else {
-          // #8 from upper stays
-          playoff8.movement = "playoff_won";
-          playoff3.movement = "playoff_lost";
+          playoff11.movement = "playoff_won";
+          playoff4.movement = "playoff_lost";
+        }
+      }
+
+      // Playoff 2: #5 in lower vs #10 in upper
+      const playoff10 = results.find(r => r.division === upperDiv && r.rank === playersPerDivision - 4); // rank 10
+      const playoff5 = results.find(r => r.division === lowerDiv && r.rank === 5);
+
+      if (playoff10 && playoff5) {
+        if (playoff5.provision > playoff10.provision) {
+          playoff5.movement = "playoff_won";
+          playoff5.newDivision = upperDiv;
+          playoff10.movement = "playoff_lost";
+          playoff10.newDivision = lowerDiv;
+        } else {
+          playoff10.movement = "playoff_won";
+          playoff5.movement = "playoff_lost";
         }
       }
     }
@@ -435,12 +452,13 @@ Deno.serve(async (req) => {
     const promoted = results.filter(r => r.movement === "promoted" || r.movement === "playoff_won").length;
     const relegated = results.filter(r => r.movement === "relegated" || r.movement === "playoff_lost").length;
 
-    console.log(`[league-process-round] Round ${expiredRound.round_number} completed: ${results.length} players, ${promoted} promoted, ${relegated} relegated`);
+    console.log(`[league-process-round] Round ${roundNumber} completed: ${results.length} players, ${promoted} promoted, ${relegated} relegated, multiplier ×${multiplier}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        round: expiredRound.round_number,
+        round: roundNumber,
+        multiplier,
         players: results.length,
         promoted,
         relegated,

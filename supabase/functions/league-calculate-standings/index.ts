@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
     const sourceStart = season.qualification_source_start;
     const sourceEnd = season.qualification_source_end;
-    const playersPerDivision = season.config?.players_per_division || 10;
+    const playersPerDivision = season.config?.players_per_division || 14;
 
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
 
