@@ -29,3 +29,11 @@
 6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
 7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
 8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+
+## Referral bonus-validering ved deaktivering ✅
+
+### Implementeret
+1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
+2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
+3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
+4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
