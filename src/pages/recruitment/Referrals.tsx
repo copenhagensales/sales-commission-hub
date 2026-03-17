@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +90,7 @@ export default function Referrals() {
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
   const [hireDialogOpen, setHireDialogOpen] = useState(false);
   const [hiredDate, setHiredDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -98,6 +101,21 @@ export default function Referrals() {
   const markBonusPaid = useMarkBonusPaid();
   const deleteReferral = useDeleteReferral();
   const convertToCandidate = useConvertReferralToCandidate();
+
+  // Fetch active employees for linking in hire dialog
+  const { data: activeEmployees = [] } = useQuery({
+    queryKey: ["active-employees-for-hire-link"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: hireDialogOpen,
+  });
 
   const filteredReferrals = referrals?.filter(r => {
     const matchesSearch = 
@@ -142,9 +160,11 @@ export default function Referrals() {
       id: selectedReferral.id, 
       status: 'hired',
       hired_date: hiredDate,
+      hired_employee_id: selectedEmployeeId || undefined,
     });
     setHireDialogOpen(false);
     setSelectedReferral(null);
+    setSelectedEmployeeId("");
   };
 
   const handleOpenNotes = (referral: Referral) => {
@@ -474,6 +494,24 @@ export default function Referrals() {
                 value={hiredDate}
                 onChange={(e) => setHiredDate(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Link til medarbejder (vigtigt for bonus-validering)</Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg medarbejder..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeEmployees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.first_name} {emp.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Kobler henvisningen til medarbejderen, så bonus automatisk afvises hvis de stopper inden 60 dage.
+              </p>
             </div>
             {selectedReferral && (
               <div className="p-3 bg-muted rounded-lg">

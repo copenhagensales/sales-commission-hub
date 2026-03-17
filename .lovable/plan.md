@@ -1,50 +1,39 @@
 
 
-## Problem
 
-Når en ansat medarbejder (som blev henvist via referral-programmet) deaktiveres inden 60 dages ansættelse, sker der **ingenting** med den tilhørende referral. Deaktiverings-triggeren (`remove_deactivated_employee_from_teams`) håndterer teams, kontrakter og league — men rører ikke `employee_referrals`.
+## Draft-booking workflow ✅
 
-Det betyder:
-- Referral-status forbliver "Ansat" eller "Bonus klar"
-- Henviseren kan fejlagtigt få udbetalt bonus
-- Der er ingen automatisk registrering af at den ansatte stoppede for tidligt
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-## Plan
+## Fortrolige kontrakter ✅
 
-### 1. Udvid deaktiverings-triggeren
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-Tilføj logik i `remove_deactivated_employee_from_teams()` der:
-- Finder referrals hvor `converted_to_candidate_id` matcher den deaktiverede medarbejder (via candidates-tabellen) ELLER via direkte email-match
-- Tjekker om `hired_date` er sat og om ansættelsen var under 60 dage (`CURRENT_DATE - hired_date < 60`)
-- Sætter status til `'rejected'` med en note om at medarbejderen stoppede før 60 dage
+## Liga Gameplay med Division-først Ranking ✅
 
-### 2. Tilføj link mellem referral og medarbejder
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
+4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
+5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
+8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
 
-Pt. er koblingen svag (via `converted_to_candidate_id` → candidates → email match). For at gøre det robust:
-- Tilføj kolonne `hired_employee_id UUID REFERENCES employee_master_data(id)` på `employee_referrals`
-- Udfyld denne når status sættes til "Ansat" i UI'et
-- Brug denne i triggeren til direkte lookup
+## Referral bonus-validering ved deaktivering ✅
 
-### 3. Opdater UI til at sætte `hired_employee_id`
-
-I `useUpdateReferralStatus` og hiring-dialogen: når status ændres til `'hired'`, skal brugeren kunne vælge/matche den faktiske medarbejder, så `hired_employee_id` gemmes.
-
-### 4. Trigger-logik (pseudokode)
-
-```sql
--- Inside remove_deactivated_employee_from_teams(), after existing logic:
-UPDATE public.employee_referrals
-SET status = 'rejected',
-    notes = COALESCE(notes, '') || E'\nAutomatisk afvist: Medarbejder stoppede før 60 dages ansættelse.'
-WHERE hired_employee_id = NEW.id
-  AND status IN ('hired', 'eligible_for_bonus')
-  AND hired_date IS NOT NULL
-  AND (CURRENT_DATE - hired_date::date) < 60;
-```
-
-### Tekniske detaljer
-
-- **Migration**: Tilføj `hired_employee_id` kolonne + udvid trigger-funktionen
-- **Frontend**: Opdater hiring-flow til at linke medarbejder-ID
-- **Eksisterende data**: Kan manuelt linkes eller efterlades som NULL (triggeren virker kun fremadrettet)
-
+### Implementeret
+1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
+2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
+3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
+4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.

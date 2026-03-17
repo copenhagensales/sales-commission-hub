@@ -4367,6 +4367,7 @@ export type Database = {
           converted_to_candidate_id: string | null
           created_at: string
           hired_date: string | null
+          hired_employee_id: string | null
           id: string
           message: string | null
           notes: string | null
@@ -4387,6 +4388,7 @@ export type Database = {
           converted_to_candidate_id?: string | null
           created_at?: string
           hired_date?: string | null
+          hired_employee_id?: string | null
           id?: string
           message?: string | null
           notes?: string | null
@@ -4407,6 +4409,7 @@ export type Database = {
           converted_to_candidate_id?: string | null
           created_at?: string
           hired_date?: string | null
+          hired_employee_id?: string | null
           id?: string
           message?: string | null
           notes?: string | null
@@ -4422,6 +4425,27 @@ export type Database = {
             columns: ["converted_to_candidate_id"]
             isOneToOne: false
             referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_referrals_hired_employee_id_fkey"
+            columns: ["hired_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_referrals_hired_employee_id_fkey"
+            columns: ["hired_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_referrals_hired_employee_id_fkey"
+            columns: ["hired_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
           {

@@ -14,6 +14,7 @@ export interface Referral {
   message: string | null;
   status: 'pending' | 'contacted' | 'hired' | 'eligible_for_bonus' | 'bonus_paid' | 'rejected';
   hired_date: string | null;
+  hired_employee_id: string | null;
   bonus_eligible_date: string | null;
   bonus_paid_date: string | null;
   bonus_amount: number;
@@ -136,11 +137,13 @@ export function useUpdateReferralStatus() {
       id, 
       status, 
       hired_date,
+      hired_employee_id,
       notes 
     }: { 
       id: string; 
       status: Referral['status'];
       hired_date?: string;
+      hired_employee_id?: string;
       notes?: string;
     }) => {
       const updates: Record<string, unknown> = { status };
@@ -151,6 +154,10 @@ export function useUpdateReferralStatus() {
         const eligibleDate = new Date(hired_date);
         eligibleDate.setMonth(eligibleDate.getMonth() + 2);
         updates.bonus_eligible_date = eligibleDate.toISOString();
+      }
+
+      if (hired_employee_id) {
+        updates.hired_employee_id = hired_employee_id;
       }
       
       if (notes !== undefined) {
