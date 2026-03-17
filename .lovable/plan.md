@@ -1,28 +1,50 @@
 
 
-## Fix: Manglende salg for Christoffer Forman (sale 95f5d774)
+## Problem
 
-### Problem
-Salg `95f5d774` har `client_campaign_id = NULL`. Tavlen (klient-scoped leaderboard) tæller kun salg med korrekt klient-attribution → viser 8 i stedet for 9. Dagsrapporter tæller via agent_email → viser 9.
+Når en ansat medarbejder (som blev henvist via referral-programmet) deaktiveres inden 60 dages ansættelse, sker der **ingenting** med den tilhørende referral. Deaktiverings-triggeren (`remove_deactivated_employee_from_teams`) håndterer teams, kontrakter og league — men rører ikke `employee_referrals`.
 
-### Plan
+Det betyder:
+- Referral-status forbliver "Ansat" eller "Bonus klar"
+- Henviseren kan fejlagtigt få udbetalt bonus
+- Der er ingen automatisk registrering af at den ansatte stoppede for tidligt
 
-**1. Data-fix: Sæt client_campaign_id på det manglende salg**
+## Plan
+
+### 1. Udvid deaktiverings-triggeren
+
+Tilføj logik i `remove_deactivated_employee_from_teams()` der:
+- Finder referrals hvor `converted_to_candidate_id` matcher den deaktiverede medarbejder (via candidates-tabellen) ELLER via direkte email-match
+- Tjekker om `hired_date` er sat og om ansættelsen var under 60 dage (`CURRENT_DATE - hired_date < 60`)
+- Sætter status til `'rejected'` med en note om at medarbejderen stoppede før 60 dage
+
+### 2. Tilføj link mellem referral og medarbejder
+
+Pt. er koblingen svag (via `converted_to_candidate_id` → candidates → email match). For at gøre det robust:
+- Tilføj kolonne `hired_employee_id UUID REFERENCES employee_master_data(id)` på `employee_referrals`
+- Udfyld denne når status sættes til "Ansat" i UI'et
+- Brug denne i triggeren til direkte lookup
+
+### 3. Opdater UI til at sætte `hired_employee_id`
+
+I `useUpdateReferralStatus` og hiring-dialogen: når status ændres til `'hired'`, skal brugeren kunne vælge/matche den faktiske medarbejder, så `hired_employee_id` gemmes.
+
+### 4. Trigger-logik (pseudokode)
 
 ```sql
-UPDATE sales 
-SET client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'
-WHERE id = '95f5d774-7257-4b4a-b87a-e12e759fb865'
-  AND client_campaign_id IS NULL;
+-- Inside remove_deactivated_employee_from_teams(), after existing logic:
+UPDATE public.employee_referrals
+SET status = 'rejected',
+    notes = COALESCE(notes, '') || E'\nAutomatisk afvist: Medarbejder stoppede før 60 dages ansættelse.'
+WHERE hired_employee_id = NEW.id
+  AND status IN ('hired', 'eligible_for_bonus')
+  AND hired_date IS NOT NULL
+  AND (CURRENT_DATE - hired_date::date) < 60;
 ```
 
-**2. Root cause fix: Undersøg hvorfor enrichment-triggeren fejlede**
+### Tekniske detaljer
 
-Salget har `dialer_campaign_id = NULL` og `source = 'Eesy'`. Enrichment-triggeren slår op via `dialer_campaign_id` → `adversus_campaign_mappings` → `client_campaign_id`. Når `dialer_campaign_id` er NULL, sker der ingen mapping.
-
-Mulig løsning: Tilføj fallback-logik i webhook/enrichment der mapper baseret på agent + source når dialer_campaign_id mangler. Dette kræver yderligere undersøgelse af ingestion-koden for at finde det rigtige sted at tilføje fallbacken.
-
-### Effekt
-- Salg 95f5d774 vil tælle på Eesy-tavlen efter data-fix
-- KPI-cachen opdateres automatisk ved næste beregningscyklus (~1 min)
+- **Migration**: Tilføj `hired_employee_id` kolonne + udvid trigger-funktionen
+- **Frontend**: Opdater hiring-flow til at linke medarbejder-ID
+- **Eksisterende data**: Kan manuelt linkes eller efterlades som NULL (triggeren virker kun fremadrettet)
 
