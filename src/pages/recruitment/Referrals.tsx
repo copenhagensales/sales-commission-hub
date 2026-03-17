@@ -90,6 +90,7 @@ export default function Referrals() {
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
   const [hireDialogOpen, setHireDialogOpen] = useState(false);
   const [hiredDate, setHiredDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
