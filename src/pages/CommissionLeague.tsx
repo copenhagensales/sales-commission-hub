@@ -294,6 +294,12 @@ export default function CommissionLeague() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
                   </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
+                    {isQualificationPhase && (
+                      <QualificationCountdown endDate={season.qualification_end_at} />
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
@@ -302,7 +308,6 @@ export default function CommissionLeague() {
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-3">
-              <p className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</p>
               <div className="flex items-center gap-3">
                 {isOwner && season && (
                   <SeasonSettingsDialog season={season} />
@@ -316,9 +321,6 @@ export default function CommissionLeague() {
                   <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? "animate-spin" : ""}`} />
                   Opdater
                 </Button>
-                {isQualificationPhase && (
-                  <QualificationCountdown endDate={season.qualification_end_at} />
-                )}
               </div>
             </CollapsibleContent>
           </Collapsible>
