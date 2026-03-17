@@ -214,6 +214,9 @@ export default function EmployeeMasterData() {
       if (error) throw error;
       return data as EmployeeMasterDataRecord[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 
   // Fetch KPI values from centralized cache

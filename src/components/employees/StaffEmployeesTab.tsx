@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, MoreHorizontal } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -60,7 +60,7 @@ export function StaffEmployeesTab() {
     invitation_status: string | null;
   }
 
-  const { data: staffEmployees = [], isLoading } = useQuery<StaffEmployee[]>({
+  const { data: staffEmployees = [], isLoading, refetch: refetchStaff } = useQuery<StaffEmployee[]>({
     queryKey: ["staff-employees"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -71,6 +71,9 @@ export function StaffEmployeesTab() {
       if (error) throw error;
       return (data ?? []) as StaffEmployee[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 
   const { data: jobPositions = [] } = useQuery({
@@ -475,7 +478,14 @@ export function StaffEmployeesTab() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-semibold">Backoffice oversigt</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Backoffice oversigt</h2>
+            <Tooltip><TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetchStaff()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger><TooltipContent>Opdater liste</TooltipContent></Tooltip>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-lg bg-muted/50 p-1">
               <Button

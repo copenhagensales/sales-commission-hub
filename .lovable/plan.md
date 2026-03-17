@@ -1,48 +1,39 @@
 
-Problem
-- Madhan findes allerede i databasen med `is_staff_employee = true` og `is_active = true`.
-- Staff-listen sorterer på `last_name`, så Madhan burde faktisk ligge øverst.
-- Derfor er dette ikke en rolle-/RLS-fejl. Det er meget sandsynligt en stale frontend-cache: previewet viser en gammel `staff-employees` query fra før dataændringen.
 
-Hvad jeg fandt
-- `StaffEmployeesTab.tsx` henter listen med `useQuery(["staff-employees"])` uden lokal refetch-strategi.
-- Appens globale React Query-konfiguration har `staleTime: 60s` og `refetchOnWindowFocus: false`.
-- Der er ingen realtime-subscription for medarbejderlisten.
-- Network-snapshot viser ingen ny staff-liste request efter dataændringen, hvilket passer med cache-problemet.
 
-Plan
-1. Gør medarbejderlisterne selv-opdaterende
-- Tilføj eksplicit refetch-konfiguration på:
-  - `src/components/employees/StaffEmployeesTab.tsx`
-  - `src/pages/EmployeeMasterData.tsx`
-- Brug en kombination som:
-  - `staleTime: 0`
-  - `refetchOnMount: "always"`
-  - `refetchOnWindowFocus: "always"`
-- Så bliver listen genindlæst, når man vender tilbage til previewet eller åbner fanen igen.
+## Draft-booking workflow ✅
 
-2. Tilføj manuel “Opdater” fallback i UI
-- Tilføj en lille refresh-knap i headeren på staff-listen (og evt. også alle medarbejdere).
-- Knapen skal kalde queryens `refetch()`.
-- Det giver en tydelig nødudvej ved backend-ændringer, imports eller manuelle datarettelser.
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-3. Hold begge faner i sync
-- Samme refetch-adfærd bør gælde både:
-  - “Stab”
-  - “Alle medarbejdere”
-- Ellers risikerer vi, at en medarbejder flyttes korrekt i databasen men stadig vises i den forkerte liste, indtil siden reloades.
+## Fortrolige kontrakter ✅
 
-4. QA
-- Reproducer flowet med en medarbejder, der flyttes ind/ud af stab via backend/dataændring.
-- Bekræft at:
-  - Madhan dukker op i “Stab” uden hård reload
-  - han forsvinder fra “Alle medarbejdere”
-  - listen opdateres ved faneskift/fokus eller via refresh-knappen
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-Tekniske noter
-- Ingen databaseændringer er nødvendige.
-- Ingen RLS-ændringer er nødvendige for denne fejl.
-- Den foreslåede Stack Overflow-retning om “roller loader for sent” matcher ikke den faktiske kode her; problemet er cache/synkronisering, ikke permission-resolution.
+## Liga Gameplay med Division-først Ranking ✅
 
-Praktisk lige nu
-- En manuel browser-refresh af `/employees?tab=staff-employees` burde sandsynligvis få Madhan frem med det samme, fordi data allerede ligger korrekt i backend.
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
+4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
+5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
+8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+
+## Referral bonus-validering ved deaktivering ✅
+
+### Implementeret
+1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
+2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
+3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
+4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
