@@ -189,21 +189,21 @@ export function PremierLeagueBoard({
                   const justPromoted = divisionChange > 0;
                   const justRelegated = divisionChange < 0;
 
-                  const isPromoZone = !isTopDivision && standing.projected_rank <= 2;
-                  const isTopZone = isTopDivision && standing.projected_rank <= 2;
-                  const isPlayoffZoneTop = !isTopDivision && standing.projected_rank === 3;
-                  const isPlayoffZoneBottom = standing.projected_rank === playersPerDivision - 2;
-                  const isPlayoffZone = isPlayoffZoneTop || isPlayoffZoneBottom;
-                  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 1;
+                  const isPromoZone = !isTopDivision && standing.projected_rank <= 3;
+                  const isTopZone = isTopDivision && standing.projected_rank <= 3;
+                  const isPlayoffZoneUp = !isTopDivision && (standing.projected_rank === 4 || standing.projected_rank === 5);
+                  const isPlayoffZoneDown = (standing.projected_rank === playersPerDivision - 3 || standing.projected_rank === playersPerDivision - 4);
+                  const isPlayoffZone = isPlayoffZoneUp || isPlayoffZoneDown;
+                  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 2;
 
                   const isPodium = standing.projected_rank <= 3;
                   const podiumRank = standing.projected_rank as 1 | 2 | 3;
                   const isPersonalBest = standing.current_provision > standing.personal_best_provision;
 
                   const showDashedBefore = 
-                    (idx > 0 && standing.projected_rank === 3 && !isTopDivision) ||
-                    (idx > 0 && standing.projected_rank === playersPerDivision - 2) ||
-                    (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isPlayoffZoneBottom);
+                    (idx > 0 && standing.projected_rank === 4 && !isTopDivision) ||
+                    (idx > 0 && standing.projected_rank === playersPerDivision - 4) ||
+                    (idx > 0 && standing.projected_rank === playersPerDivision - 2);
 
                   const rivalry = isCurrentUser ? getRivalryData(group.players, idx) : null;
                   const zoneData = isCurrentUser 
