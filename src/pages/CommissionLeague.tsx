@@ -237,10 +237,10 @@ export default function CommissionLeague() {
       const totalDivs = seasonStandings ? new Set(seasonStandings.map(s => s.current_division)).size : 1;
       const isBottom = div === totalDivs;
       let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
-      if (isTop && rank <= 2) zone = "top";
-      else if (!isTop && rank <= 2) zone = "promo";
-      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
-      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      if (isTop && rank <= 3) zone = "top";
+      else if (!isTop && rank <= 3) zone = "promo";
+      else if ((!isTop && (rank === 4 || rank === 5)) || (rank === playersPerDivision - 3 || rank === playersPerDivision - 4)) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 2) zone = "relegation";
       return { rank: mySeasonStanding.overall_rank, division: div, points: Number(mySeasonStanding.total_points), zone, isQualification: false };
     }
     if (isQualificationPhase && myStanding) {
@@ -250,10 +250,10 @@ export default function CommissionLeague() {
       const totalDivs = standings ? new Set(standings.map(s => s.projected_division)).size : 1;
       const isBottom = div === totalDivs;
       let zone: "top" | "promo" | "playoff" | "relegation" | "safe" = "safe";
-      if (isTop && rank <= 2) zone = "top";
-      else if (!isTop && rank <= 2) zone = "promo";
-      else if ((!isTop && rank === 3) || rank === playersPerDivision - 2) zone = "playoff";
-      else if (!isBottom && rank >= playersPerDivision - 1) zone = "relegation";
+      if (isTop && rank <= 3) zone = "top";
+      else if (!isTop && rank <= 3) zone = "promo";
+      else if ((!isTop && (rank === 4 || rank === 5)) || (rank === playersPerDivision - 3 || rank === playersPerDivision - 4)) zone = "playoff";
+      else if (!isBottom && rank >= playersPerDivision - 2) zone = "relegation";
       return { rank: myStanding.overall_rank, division: div, provision: myStanding.current_provision, zone, isQualification: true };
     }
     return null;
@@ -343,15 +343,15 @@ export default function CommissionLeague() {
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4 text-primary" />
-                        <span>10 spillere pr. division</span>
+                        <span>14 spillere pr. division</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4 text-primary" />
-                        <span>Top 2 rykker op hver uge</span>
+                        <span>Top 3 rykker op hver uge</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4 text-primary" />
-                        <span>#8 spiller duel mod #3 i divisionen under</span>
+                        <span>#4-5 spiller playoff mod #10-11 i divisionen over</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4 text-primary" />

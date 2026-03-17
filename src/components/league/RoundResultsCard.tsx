@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+const ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
+
 interface RoundResultsCardProps {
   round: LeagueRound;
   standings: LeagueRoundStanding[];
@@ -22,6 +24,8 @@ const movementConfig: Record<string, { icon: React.ElementType; label: string; c
 };
 
 export function RoundResultsCard({ round, standings, playersPerDivision, currentEmployeeId }: RoundResultsCardProps) {
+  const multiplier = ROUND_MULTIPLIERS[Math.min(round.round_number - 1, ROUND_MULTIPLIERS.length - 1)] || 1;
+
   // Group by division
   const divisions: Record<number, LeagueRoundStanding[]> = {};
   for (const s of standings) {
@@ -36,7 +40,12 @@ export function RoundResultsCard({ round, standings, playersPerDivision, current
     <Card className="bg-card border-border">
       <CardHeader className="py-3 px-4">
         <CardTitle className="flex items-center justify-between text-sm">
-          <span>Runde {round.round_number}</span>
+          <span className="flex items-center gap-2">
+            Runde {round.round_number}
+            <Badge variant="secondary" className="text-[10px] font-mono">
+              ×{multiplier.toFixed(1)}
+            </Badge>
+          </span>
           <Badge variant="outline" className="text-[10px]">
             {format(new Date(round.start_date), "d. MMM", { locale: da })} – {format(new Date(round.end_date), "d. MMM", { locale: da })}
           </Badge>
@@ -61,7 +70,7 @@ export function RoundResultsCard({ round, standings, playersPerDivision, current
                 {players.map((s) => {
                   const isMe = s.employee_id === currentEmployeeId;
                   const mov = movementConfig[s.movement];
-                  const points = calculatePointsDisplay(div, s.rank_in_division, totalDivisions, playersPerDivision);
+                  const points = calculatePointsDisplay(div, s.rank_in_division, totalDivisions, multiplier);
 
                   return (
                     <div
@@ -104,7 +113,8 @@ function calculatePointsDisplay(
   division: number,
   rank: number,
   totalDivisions: number,
-  playersPerDivision: number
+  multiplier: number
 ): number {
-  return (totalDivisions - division) * playersPerDivision + (playersPerDivision - rank + 1);
+  const basePoints = Math.max(0, (totalDivisions - division) * 20 - (rank - 1) * 5);
+  return Math.round(basePoints * multiplier);
 }

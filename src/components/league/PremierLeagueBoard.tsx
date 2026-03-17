@@ -86,25 +86,25 @@ export function PremierLeagueBoard({
     let nextZoneProvision: number | null = null;
     let prevZoneProvision: number | null = null;
 
-    if (isTopDivision && rank <= 2) {
+    if (isTopDivision && rank <= 3) {
       zoneType = "top";
-    } else if (!isTopDivision && rank <= 2) {
+    } else if (!isTopDivision && rank <= 3) {
       zoneType = "promo";
-    } else if (!isTopDivision && rank === 3) {
+    } else if (!isTopDivision && (rank === 4 || rank === 5)) {
       zoneType = "playoff";
-      if (players[1]) nextZoneProvision = players[1].current_provision;
-    } else if (rank === playersPerDivision - 2) {
+      if (players[2]) nextZoneProvision = players[2].current_provision;
+    } else if (rank === playersPerDivision - 3 || rank === playersPerDivision - 4) {
       zoneType = "playoff";
-      if (players[playersPerDivision - 4]) nextZoneProvision = players[playersPerDivision - 4].current_provision;
-    } else if (!isBottomDivision && rank >= playersPerDivision - 1) {
+      if (players[playersPerDivision - 6]) nextZoneProvision = players[playersPerDivision - 6].current_provision;
+    } else if (!isBottomDivision && rank >= playersPerDivision - 2) {
       zoneType = "relegation";
-      if (players[playersPerDivision - 3]) nextZoneProvision = players[playersPerDivision - 3].current_provision;
+      if (players[playersPerDivision - 5]) nextZoneProvision = players[playersPerDivision - 5].current_provision;
     } else {
-      if (!isTopDivision && players[2]) {
-        nextZoneProvision = players[2].current_provision;
+      if (!isTopDivision && players[4]) {
+        nextZoneProvision = players[4].current_provision;
       }
-      if (players[playersPerDivision - 3]) {
-        prevZoneProvision = players[playersPerDivision - 3].current_provision;
+      if (players[playersPerDivision - 5]) {
+        prevZoneProvision = players[playersPerDivision - 5].current_provision;
       }
     }
 
@@ -189,21 +189,21 @@ export function PremierLeagueBoard({
                   const justPromoted = divisionChange > 0;
                   const justRelegated = divisionChange < 0;
 
-                  const isPromoZone = !isTopDivision && standing.projected_rank <= 2;
-                  const isTopZone = isTopDivision && standing.projected_rank <= 2;
-                  const isPlayoffZoneTop = !isTopDivision && standing.projected_rank === 3;
-                  const isPlayoffZoneBottom = standing.projected_rank === playersPerDivision - 2;
-                  const isPlayoffZone = isPlayoffZoneTop || isPlayoffZoneBottom;
-                  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 1;
+                  const isPromoZone = !isTopDivision && standing.projected_rank <= 3;
+                  const isTopZone = isTopDivision && standing.projected_rank <= 3;
+                  const isPlayoffZoneUp = !isTopDivision && (standing.projected_rank === 4 || standing.projected_rank === 5);
+                  const isPlayoffZoneDown = (standing.projected_rank === playersPerDivision - 3 || standing.projected_rank === playersPerDivision - 4);
+                  const isPlayoffZone = isPlayoffZoneUp || isPlayoffZoneDown;
+                  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 2;
 
                   const isPodium = standing.projected_rank <= 3;
                   const podiumRank = standing.projected_rank as 1 | 2 | 3;
                   const isPersonalBest = standing.current_provision > standing.personal_best_provision;
 
                   const showDashedBefore = 
-                    (idx > 0 && standing.projected_rank === 3 && !isTopDivision) ||
-                    (idx > 0 && standing.projected_rank === playersPerDivision - 2) ||
-                    (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isPlayoffZoneBottom);
+                    (idx > 0 && standing.projected_rank === 4 && !isTopDivision) ||
+                    (idx > 0 && standing.projected_rank === playersPerDivision - 4) ||
+                    (idx > 0 && standing.projected_rank === playersPerDivision - 2);
 
                   const rivalry = isCurrentUser ? getRivalryData(group.players, idx) : null;
                   const zoneData = isCurrentUser 
@@ -359,7 +359,7 @@ export function PremierLeagueBoard({
                             )}
                             {isTopZone && (
                               <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">
-                                Top 2
+                                Top 3
                               </Badge>
                             )}
                             {isPlayoffZone && (

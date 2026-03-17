@@ -157,20 +157,20 @@ const PlayerRow = memo(function PlayerRow({
     ? standing.previous_overall_rank - standing.overall_rank
     : 0;
 
-  const isPromoZone = !isTopDivision && standing.projected_rank <= 2;
-  const isTopZone = isTopDivision && standing.projected_rank <= 2;
-  const isPlayoffZoneTop = !isTopDivision && standing.projected_rank === 3;
-  const isPlayoffZoneBottom = standing.projected_rank === playersPerDivision - 2;
-  const isPlayoffZone = isPlayoffZoneTop || isPlayoffZoneBottom;
-  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 1;
+  const isPromoZone = !isTopDivision && standing.projected_rank <= 3;
+  const isTopZone = isTopDivision && standing.projected_rank <= 3;
+  const isPlayoffZoneUp = !isTopDivision && (standing.projected_rank === 4 || standing.projected_rank === 5);
+  const isPlayoffZoneDown = (standing.projected_rank === playersPerDivision - 3 || standing.projected_rank === playersPerDivision - 4);
+  const isPlayoffZone = isPlayoffZoneUp || isPlayoffZoneDown;
+  const isRelegationZone = !isBottomDivision && standing.projected_rank >= playersPerDivision - 2;
 
   const isPodium = standing.projected_rank <= 3;
   const podiumRank = standing.projected_rank as 1 | 2 | 3;
 
   const showDashedBefore = 
-    (idx > 0 && standing.projected_rank === 3 && !isTopDivision) ||
-    (idx > 0 && standing.projected_rank === playersPerDivision - 2) ||
-    (idx > 0 && standing.projected_rank === playersPerDivision - 1 && !isPlayoffZoneBottom);
+    (idx > 0 && standing.projected_rank === 4 && !isTopDivision) ||
+    (idx > 0 && standing.projected_rank === playersPerDivision - 4) ||
+    (idx > 0 && standing.projected_rank === playersPerDivision - 2);
 
   return (
     <div>
@@ -236,7 +236,7 @@ const PlayerRow = memo(function PlayerRow({
           </div>
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}
-            {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 2</Badge>}
+            {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 3</Badge>}
             {isPlayoffZone && <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">Playoff</Badge>}
             {isRelegationZone && <Badge className="bg-red-500/20 text-red-600 border-red-500/30 text-[10px] px-1.5 py-0">Nedrykker</Badge>}
           </div>

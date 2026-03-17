@@ -1,60 +1,41 @@
 
 
-## Samlet plan: Ny ligastruktur + runde-multiplikator
+## Draft-booking workflow ✅
 
-### Overblik
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-Kombineret opdatering af hele ligaens gameplay: 14 spillere pr. division, nyt pointsystem, nye zone-regler, og stigende runde-multiplikator.
+## Fortrolige kontrakter ✅
 
-### Ny struktur
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-| Parameter | Nu | Nyt |
-|---|---|---|
-| Spillere pr. division | 10 | **14** |
-| Pointformel | lineær | **max(0, (totalDiv - div) × 20 - (rank - 1) × 5)** |
-| Oprykker | Top 2 | **Top 3** |
-| Playoff op | #3 | **#4-5** |
-| Safe | #4-7 | **#6-9** |
-| Playoff ned | #8 | **#10-11** |
-| Nedrykker | #9-10 | **#12-14** |
-| Runde-multiplikator | ingen | **1.0 → 1.2 → 1.4 → 1.6 → 1.8 → 2.0** |
+## Liga Gameplay med Division-først Ranking ✅
 
-### Pointtabel (base, før multiplikator)
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
+4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
+5. ✅ **14 spillere pr. division** (opdateret fra 10).
+6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
+7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
+10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
 
-```text
-Superliga: 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35
-1. div:     80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15
-2. div:     60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10,  5,  0,  0
-...osv. Runde 4 ganger med ×1.6, runde 6 med ×2.0
-```
+## Referral bonus-validering ved deaktivering ✅
 
-### Ændringer
-
-**1. Database – sæsonkonfiguration**
-- Opdater aktiv sæsons `config.players_per_division` til 14
-- Sæt `end_date` til 6 uger efter kvalifikationsslut
-
-**2. `league-process-round` edge function** (hoveddelen)
-- Ny pointformel: `max(0, (totalDivisions - division) * 20 - (rank - 1) * 5)`
-- Tilføj `ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0]` – gang basepoint med faktor for `round_number`
-- Nye bevægelsesregler:
-  - Top 3 rykker op (undtagen Superligaen)
-  - #12-14 rykker ned (undtagen bund-division)
-  - Playoffs: #4-5 i lavere div vs #10-11 i højere div (2 playoff-kampe pr. divisionsgrænse)
-
-**3. `league-calculate-standings` edge function**
-- Samme nye pointformel for kvalifikationsvisning
-
-**4. `RoundResultsCard.tsx`**
-- Opdater `calculatePointsDisplay()` med ny formel + multiplikator baseret på `round.round_number`
-- Vis multiplikator-badge i header (f.eks. "×1.4")
-
-**5. Zone-logik i UI-komponenter** (4 filer)
-- `QualificationBoard.tsx` – zone-grænser: promo ≤3, playoff 4-5 / 10-11, relegation ≥12
-- `ActiveSeasonBoard.tsx` – samme zone-opdatering
-- `PremierLeagueBoard.tsx` – samme zone-opdatering + dashed dividers
-- `ZoneLegend.tsx` – opdater "Top 2" → "Top 3", tilføj "Playoff ned" som separat indikator
-
-**6. Zone-beregning i `CommissionLeague.tsx`**
-- Opdater zone-beregninger fra rank ≤2/≥9 til de nye grænser
-
+### Implementeret
+1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
+2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
+3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
+4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.

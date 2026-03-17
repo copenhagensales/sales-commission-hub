@@ -171,17 +171,19 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   const promoted = divChanged && standing.previous_division !== null && standing.previous_division > standing.current_division;
   const relegated = divChanged && standing.previous_division !== null && standing.previous_division < standing.current_division;
 
-  const isPromoZone = !isTopDivision && rank <= 2;
-  const isTopZone = isTopDivision && rank <= 2;
-  const isPlayoffZone = (!isTopDivision && rank === 3) || (rank === playersPerDivision - 2);
-  const isRelegationZone = !isBottomDivision && rank >= playersPerDivision - 1;
+  const isPromoZone = !isTopDivision && rank <= 3;
+  const isTopZone = isTopDivision && rank <= 3;
+  const isPlayoffZoneUp = !isTopDivision && (rank === 4 || rank === 5);
+  const isPlayoffZoneDown = (rank === playersPerDivision - 3 || rank === playersPerDivision - 4);
+  const isPlayoffZone = isPlayoffZoneUp || isPlayoffZoneDown;
+  const isRelegationZone = !isBottomDivision && rank >= playersPerDivision - 2;
 
   const isPodium = rank <= 3;
 
   const showDashedBefore =
-    (idx > 0 && rank === 3 && !isTopDivision) ||
-    (idx > 0 && rank === playersPerDivision - 2) ||
-    (idx > 0 && rank === playersPerDivision - 1 && rank !== playersPerDivision - 2);
+    (idx > 0 && rank === 4 && !isTopDivision) ||
+    (idx > 0 && rank === playersPerDivision - 4) ||
+    (idx > 0 && rank === playersPerDivision - 2);
 
   return (
     <div>
@@ -266,7 +268,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>
             )}
             {isTopZone && (
-              <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 2</Badge>
+              <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 3</Badge>
             )}
             {isPlayoffZone && (
               <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">Playoff</Badge>
