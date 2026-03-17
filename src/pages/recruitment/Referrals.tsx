@@ -160,9 +160,11 @@ export default function Referrals() {
       id: selectedReferral.id, 
       status: 'hired',
       hired_date: hiredDate,
+      hired_employee_id: selectedEmployeeId || undefined,
     });
     setHireDialogOpen(false);
     setSelectedReferral(null);
+    setSelectedEmployeeId("");
   };
 
   const handleOpenNotes = (referral: Referral) => {
