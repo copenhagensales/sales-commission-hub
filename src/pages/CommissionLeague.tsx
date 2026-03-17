@@ -30,6 +30,8 @@ import {
   useRoundHistory,
   useMySeasonStanding,
 } from "@/hooks/useLeagueActiveData";
+import { usePrizeLeaders } from "@/hooks/useLeaguePrizeData";
+import { PrizeShowcase } from "@/components/league/PrizeShowcase";
 import {
   AlertDialog,
   AlertDialogAction,
