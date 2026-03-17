@@ -621,6 +621,7 @@ export default function EmployeeMasterData() {
           password: createData.password,
           firstName: createData.first_name,
           lastName: createData.last_name,
+          job_title: createData.job_title,
         },
       });
 

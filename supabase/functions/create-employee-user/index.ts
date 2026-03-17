@@ -73,6 +73,45 @@ serve(async (req) => {
         .is("auth_user_id", null);
       if (linkError) console.error("Error linking auth_user_id:", linkError);
 
+      // Check if employee_master_data record exists, if not create one
+      const { data: existingEmp } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or(`private_email.ilike.${email},work_email.ilike.${email}`)
+        .maybeSingle();
+
+      if (!existingEmp) {
+        console.log(`No employee record found for existing user ${email}, creating one`);
+        const employeeData: Record<string, unknown> = {
+          first_name: firstName,
+          last_name: lastName || '',
+          private_email: email,
+          is_active: true,
+          auth_user_id: existingUser.id,
+        };
+        if (jobTitle) employeeData.job_title = jobTitle;
+        if (isStaffEmployee !== undefined) employeeData.is_staff_employee = isStaffEmployee;
+
+        const { error: empError } = await supabase
+          .from("employee_master_data")
+          .insert(employeeData);
+        if (empError) console.error("Error creating employee record:", empError);
+        else console.log(`Created employee_master_data for existing user ${email}`);
+      }
+
+      // Assign medarbejder role if not already assigned
+      const { data: existingRole } = await supabase
+        .from("system_roles")
+        .select("id")
+        .eq("user_id", existingUser.id)
+        .maybeSingle();
+      if (!existingRole) {
+        const { error: roleError } = await supabase
+          .from("system_roles")
+          .insert({ user_id: existingUser.id, role: "medarbejder" });
+        if (roleError) console.error("Error assigning role:", roleError);
+      }
+
       console.log(`Updated password for existing user ${email}`);
       return new Response(
         JSON.stringify({ 
