@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Info, ChevronRight } from "lucide-react";
 import {
   Dialog,
