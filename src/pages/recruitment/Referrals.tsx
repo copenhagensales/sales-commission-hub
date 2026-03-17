@@ -495,6 +495,24 @@ export default function Referrals() {
                 onChange={(e) => setHiredDate(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Link til medarbejder (vigtigt for bonus-validering)</Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg medarbejder..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeEmployees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.first_name} {emp.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Kobler henvisningen til medarbejderen, så bonus automatisk afvises hvis de stopper inden 60 dage.
+              </p>
+            </div>
             {selectedReferral && (
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm">
