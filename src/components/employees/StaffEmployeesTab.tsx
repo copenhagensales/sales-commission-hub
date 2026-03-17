@@ -478,7 +478,14 @@ export function StaffEmployeesTab() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-semibold">Backoffice oversigt</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Backoffice oversigt</h2>
+            <Tooltip><TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetchStaff()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger><TooltipContent>Opdater liste</TooltipContent></Tooltip>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-lg bg-muted/50 p-1">
               <Button
