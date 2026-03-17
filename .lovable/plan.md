@@ -1,24 +1,32 @@
 
 
-## Hvorfor Madhan skal oprette MFA
+## Problem
 
-Madhans `job_title` er **"Rekruttering"**, og positionen `Rekruttering` i `job_positions`-tabellen har `requires_mfa = true`.
+Rekrutteringsmedarbejdere (med `system_role_key = 'rekruttering'`) har **ikke** adgang til rekrutteringsdashboardet, fordi `can_view = false` er sat i `role_page_permissions` for kombinationen `role_key = 'rekruttering'` + `permission_key = 'menu_recruitment_dashboard'`.
 
-Flowet i `useMfa.ts` er:
-1. Finder medarbejderens `job_title` → "Rekruttering"
-2. Slår op i `job_positions` → `requires_mfa = true`
-3. `isRequired = true` → MFA-lås vises i `LockOverlays`
+Ruten `/recruitment` kræver `positionPermission: "menu_recruitment_dashboard"`, og route-guarden (`RoleProtectedRoute`) tjekker dette – og afviser adgang.
 
-### Muligheder
+## Plan
 
-**A) Slå MFA-krav fra for Rekruttering-positionen:**
+**Én database-opdatering** – sæt `can_view = true` (og evt. `can_edit = true`) for `rekruttering`-rollen på alle relevante rekrutterings-permissions:
+
 ```sql
-UPDATE job_positions SET requires_mfa = false WHERE name = 'Rekruttering';
+UPDATE role_page_permissions
+SET can_view = true, can_edit = true
+WHERE role_key = 'rekruttering'
+  AND permission_key IN (
+    'menu_section_rekruttering',
+    'menu_recruitment_dashboard',
+    'menu_candidates',
+    'menu_upcoming_interviews',
+    'menu_winback',
+    'menu_upcoming_hires',
+    'menu_messages_recruitment',
+    'menu_sms_templates',
+    'menu_email_templates_recruitment',
+    'menu_referrals'
+  );
 ```
 
-**B) Slå MFA-krav fra kun for Madhan** ved at tilføje en IP-exemption eller en individuel override.
-
-**C) Behold MFA-kravet** – Madhan skal sætte MFA op som forventet.
-
-Anbefaling: Hvis Rekruttering ikke skal kræve MFA, kør option A (én database-opdatering, ingen kodeændring). Hvis kun Madhan skal undtages, skal vi tilføje en individuel override-kolonne.
+Ingen kodeændringer er nødvendige – kun en database-opdatering af rettigheder.
 
