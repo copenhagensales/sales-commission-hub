@@ -104,7 +104,10 @@ export default function CommissionLeague() {
   const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
   const [selectedHistoryRoundId, setSelectedHistoryRoundId] = useState<string | undefined>();
   const { data: historyRoundStandings } = useRoundStandings(selectedHistoryRoundId);
-
+  const { data: prizeLeaders } = usePrizeLeaders(
+    season?.status === "active" ? season?.id : undefined,
+    season?.start_date
+  );
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
