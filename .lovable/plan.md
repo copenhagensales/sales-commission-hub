@@ -1,41 +1,35 @@
 
 
-## Draft-booking workflow ✅
+## Plan: Klikbare præmiebokse med ranglister i dialog
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+### Oversigt
+Gør hver præmieboks klikbar, så den åbner en Dialog med den fulde rangliste for den pågældende kategori.
 
-## Fortrolige kontrakter ✅
+### Ændringer
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**1. `src/hooks/useLeaguePrizeData.ts` — Udvid til at returnere fulde lister**
 
-## Liga Gameplay med Division-først Ranking ✅
+Hooket returnerer i dag kun top-1 per kategori. Udvid `PrizeLeaders` med:
+- `allByPoints: Array<{employee, total_points}>` — alle spillere sorteret efter total_points (bruges til Top 3 dialog)
+- `allBestRounds: Array<{employee, points_earned, round_number}>` — alle runde-standings sorteret efter points_earned desc (bedste runde per spiller, eller alle entries)
+- `allTalents: Array<{employee, total_points}>` — kun spillere med < 3 mdr ansættelse og total_points > 0
+- `allComebacks: Array<{employee, improvement}>` — alle med positiv rank-forbedring, sorteret desc
 
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
-4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
-5. ✅ **14 spillere pr. division** (opdateret fra 10).
-6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
-7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
-10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
-11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
+Dataen er allerede hentet i hooket (standingsWithDates, round1Standings, currentStandings) — vi skal bare returnere de fulde arrays i stedet for kun top-1.
 
-## Referral bonus-validering ved deaktivering ✅
+**2. `src/components/league/PrizeShowcase.tsx` — Tilføj Dialog per boks**
 
-### Implementeret
-1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
-2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
-3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
-4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
+- Importér `Dialog, DialogContent, DialogHeader, DialogTitle` fra UI
+- Tilføj state: `openDialog: 'top3' | 'bestRound' | 'talent' | 'comeback' | null`
+- Gør hver boks til en `<button>` der sætter `openDialog` (kun hvis `isActive`)
+- Render 4 dialoger:
+  - **Top 3**: Fuld rangliste af alle spillere med point, sorteret desc. Viser rank, navn, point.
+  - **Bedste Runde**: Alle runde-præstationer sorteret efter points_earned. Viser rank, navn, point, runde-nummer.
+  - **Sæsonens Talent**: Alle kvalificerede talenter med point > 0, sorteret desc. Viser rank, navn, point.
+  - **Sæsonens Comeback**: Alle med positiv rank-stigning, sorteret desc. Viser rank, navn, "+X pladser".
+- Brug `formatPlayerName` for navne, da-DK locale for tal
+- Simpel tabel-lignende liste med alternerende rækker
+
+### Ingen database-ændringer
+Al data er tilgængelig fra eksisterende tabeller.
+
