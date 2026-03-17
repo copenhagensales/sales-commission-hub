@@ -37,42 +37,44 @@ interface PrizeShowcaseProps {
 }
 
 export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive }: PrizeShowcaseProps) {
-  // Top 3 from standings (sorted by overall_rank)
-  const sorted = [...standings].sort((a, b) => (a.overall_rank ?? 999) - (b.overall_rank ?? 999));
+  // During qualification (not active), no points exist yet — all cards show pending
+  const notStarted = !isActive;
+
+  // Top 3 sorted by total_points (not overall_rank)
+  const sorted = [...standings].sort((a, b) => (b.total_points ?? 0) - (a.total_points ?? 0));
   const top1 = sorted[0];
   const top2 = sorted[1];
   const top3 = sorted[2];
 
   const pointLabel = (s: Standing | undefined) => {
-    if (!s) return "";
-    if (isActive && s.total_points != null) return `${Number(s.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt`;
-    if (!isActive && s.current_provision != null) return `${Number(s.current_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`;
-    return "";
+    if (!s || !s.total_points) return "";
+    return `${Number(s.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt`;
   };
 
+  const pendingText = notStarted ? "Afgøres når sæsonen starter" : "Afsløres efter runde 1";
+
   const revealed = isActive && prizeLeaders;
-  const pendingText = "Afsløres efter runde 1";
 
   const cards: PrizeCardProps[] = [
     {
       emoji: "🥇",
       title: "Nummer 1",
-      playerName: top1 ? formatPlayerName(top1.employee) : "—",
-      subtitle: pointLabel(top1),
+      playerName: !notStarted && top1 ? formatPlayerName(top1.employee) : pendingText,
+      subtitle: !notStarted ? pointLabel(top1) : "",
       borderClass: "border-yellow-500/60",
     },
     {
       emoji: "🥈",
       title: "Nummer 2",
-      playerName: top2 ? formatPlayerName(top2.employee) : "—",
-      subtitle: pointLabel(top2),
+      playerName: !notStarted && top2 ? formatPlayerName(top2.employee) : pendingText,
+      subtitle: !notStarted ? pointLabel(top2) : "",
       borderClass: "border-slate-400/60",
     },
     {
       emoji: "🥉",
       title: "Nummer 3",
-      playerName: top3 ? formatPlayerName(top3.employee) : "—",
-      subtitle: pointLabel(top3),
+      playerName: !notStarted && top3 ? formatPlayerName(top3.employee) : pendingText,
+      subtitle: !notStarted ? pointLabel(top3) : "",
       borderClass: "border-amber-700/60",
     },
     {
