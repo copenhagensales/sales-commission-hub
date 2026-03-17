@@ -381,9 +381,10 @@ export function StaffEmployeesTab() {
     try {
       const { error } = await supabase.functions.invoke("send-employee-invitation", {
         body: {
-          employee_id: employee.id,
+          employeeId: employee.id,
           email: email,
-          name: `${employee.first_name} ${employee.last_name}`,
+          firstName: employee.first_name,
+          lastName: employee.last_name,
         },
       });
 
