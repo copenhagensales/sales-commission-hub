@@ -331,6 +331,14 @@ export default function CommissionLeague() {
           </Collapsible>
           </div>
 
+          {/* Prize Showcase */}
+          <PrizeShowcase
+            standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+            prizeLeaders={prizeLeaders}
+            seasonStatus={season.status || ""}
+            isActive={isActivePhase}
+          />
+
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
             <Card className="bg-gradient-to-br from-primary/20 via-slate-800 to-slate-900 border-primary/30 overflow-hidden">
