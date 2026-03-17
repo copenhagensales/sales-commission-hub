@@ -1,39 +1,24 @@
 
 
+## Hvorfor Madhan skal oprette MFA
 
-## Draft-booking workflow ✅
+Madhans `job_title` er **"Rekruttering"**, og positionen `Rekruttering` i `job_positions`-tabellen har `requires_mfa = true`.
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+Flowet i `useMfa.ts` er:
+1. Finder medarbejderens `job_title` → "Rekruttering"
+2. Slår op i `job_positions` → `requires_mfa = true`
+3. `isRequired = true` → MFA-lås vises i `LockOverlays`
 
-## Fortrolige kontrakter ✅
+### Muligheder
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+**A) Slå MFA-krav fra for Rekruttering-positionen:**
+```sql
+UPDATE job_positions SET requires_mfa = false WHERE name = 'Rekruttering';
+```
 
-## Liga Gameplay med Division-først Ranking ✅
+**B) Slå MFA-krav fra kun for Madhan** ved at tilføje en IP-exemption eller en individuel override.
 
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ Pointformel: `points = (totalDivisions - division) × playersPerDivision + (playersPerDivision - rank + 1)` — garanterer #10 i Div 1 > #1 i Div 2.
-4. ✅ Op/nedrykning: Top 2 rykker op, #9-#10 ned, #3 vs #8 playoff (højest provision vinder).
-5. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-6. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-7. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser).
-8. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+**C) Behold MFA-kravet** – Madhan skal sætte MFA op som forventet.
 
-## Referral bonus-validering ved deaktivering ✅
+Anbefaling: Hvis Rekruttering ikke skal kræve MFA, kør option A (én database-opdatering, ingen kodeændring). Hvis kun Madhan skal undtages, skal vi tilføje en individuel override-kolonne.
 
-### Implementeret
-1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
-2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
-3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
-4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
