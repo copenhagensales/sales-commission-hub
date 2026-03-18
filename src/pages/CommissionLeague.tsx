@@ -54,6 +54,8 @@ import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
+import { LeagueMotivationBar } from "@/components/league/LeagueMotivationBar";
+import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
