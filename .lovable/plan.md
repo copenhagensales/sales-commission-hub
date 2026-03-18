@@ -16,7 +16,14 @@
 11. ✅ Seed data: 3 medlemmer, 3 møder, 1 årlig drøftelse, 1 APV, 1 Kemi-APV, 2 uddannelseskrav, 7 compliance-regler, 1 datakvalitetsopgave.
 12. ✅ Data quality warning: "William Seiding" vs "William Hoe" vises i dashboard og som åben opgave.
 
+## AMO Compliance Hub — Fase 2 ✅
+
+### Implementeret
+1. ✅ **AMO Organisation** (`/amo/organisation`): CRUD for arbejdspladser og medlemmer, AMR-valg oversigt, compliance-beregning baseret på medarbejderantal (< 10, 10-34, 35+), tabs-baseret UI.
+2. ✅ **Møder og referater** (`/amo/meetings`): CRUD for AMO-møder, agenda-skabelon generator, mødestatus (planlagt/gennemført/overskredet/aflyst), detaljevisning, statistik-kort.
+3. ✅ **Årlig drøftelse** (`/amo/annual-discussion`): CRUD med alle påkrævede felter, auto-beregning af næste frist (12 mdr), påmindelsesbannere (60/30/7 dage), referat-status.
+4. ✅ **APV** (`/amo/apv`): CRUD med handlingsplan, 3-års cyklus tracking, risikoniveau, detaljevisning, overdue-advarsler, statistik-kort.
+
 ### Næste faser
-- **Fase 2**: AMO Organisation CRUD, Møder & referater, Årlig drøftelse, APV modul
 - **Fase 3**: Kemi-APV, Uddannelse & certifikater, Dokumentcenter
 - **Fase 4**: Opgavemotor, Notifikationer, Eksport (PDF/CSV), Audit log triggers
