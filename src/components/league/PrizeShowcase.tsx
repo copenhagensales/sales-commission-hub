@@ -161,9 +161,6 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
         ))}
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Afgøres ved sæsonens afslutning
-      </p>
 
       {/* Dialogs */}
       <Dialog open={openDialog === "top3"} onOpenChange={(open) => !open && setOpenDialog(null)}>
