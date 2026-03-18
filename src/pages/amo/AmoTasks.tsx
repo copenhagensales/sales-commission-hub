@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,6 +203,7 @@ export default function AmoTasks() {
   };
 
   return (
+    <MainLayout>
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -443,5 +445,6 @@ export default function AmoTasks() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

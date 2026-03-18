@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Plus, Pencil, Trash2, Users, Building2, Vote } from "lucide-react";
@@ -177,6 +178,7 @@ export default function AmoOrganisation() {
   const activeMembers = members?.filter(m => m.active) || [];
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-lg bg-emerald-500/20">
@@ -465,5 +467,6 @@ export default function AmoOrganisation() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

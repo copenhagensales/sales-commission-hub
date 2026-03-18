@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Calendar, FileText, AlertTriangle, CheckCircle2, Clock, Users, Beaker, GraduationCap, FolderOpen, ListChecks } from "lucide-react";
 import { format, differenceInDays, addMonths, addYears } from "date-fns";
@@ -218,6 +219,7 @@ export default function AmoDashboard() {
   }
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -368,5 +370,6 @@ export default function AmoDashboard() {
         )}
       </div>
     </div>
+    </MainLayout>
   );
 }

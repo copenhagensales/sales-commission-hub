@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Plus, Pencil, Trash2, AlertTriangle, GraduationCap, ExternalLink } from "lucide-react";
@@ -160,6 +161,7 @@ export default function AmoTraining() {
   const pending = courses?.filter(c => c.requirement_applies && !c.completed_date) || [];
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -347,5 +349,6 @@ export default function AmoTraining() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

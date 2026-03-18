@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +103,7 @@ export default function AmoSettings() {
   };
 
   return (
+    <MainLayout>
     <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -267,5 +269,6 @@ export default function AmoSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

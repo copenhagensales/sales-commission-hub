@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +103,7 @@ export default function AmoAuditLog() {
   const uniqueTables = useMemo(() => [...new Set(entries.map((e) => e.table_name))].sort(), [entries]);
 
   return (
+    <MainLayout>
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -252,5 +254,6 @@ export default function AmoAuditLog() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }
