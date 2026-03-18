@@ -18,10 +18,9 @@ type ComplianceRule = Database["public"]["Tables"]["amo_compliance_rules"]["Row"
 type RuleType = Database["public"]["Enums"]["amo_rule_type"];
 
 const ruleTypeLabels: Record<RuleType, string> = {
-  deadline: "Deadline",
-  interval: "Interval",
-  checklist: "Tjekliste",
-  data_quality: "Datakvalitet",
+  lovpligtigt: "Lovpligtigt",
+  anbefalet: "Anbefalet",
+  intern: "Intern",
 };
 
 export default function AmoSettings() {
