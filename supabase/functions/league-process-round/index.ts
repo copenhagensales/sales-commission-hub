@@ -152,10 +152,17 @@ Deno.serve(async (req) => {
       .select("id, email")
       .in("id", agentIds.length > 0 ? agentIds : ["__none__"]);
 
-    const employeeToEmail: Record<string, string> = {};
+    const employeeToEmails: Record<string, string[]> = {};
+    const addEmail = (empId: string, email: string | null | undefined) => {
+      if (!email) return;
+      const lower = email.toLowerCase();
+      if (!employeeToEmails[empId]) employeeToEmails[empId] = [];
+      if (!employeeToEmails[empId].includes(lower)) employeeToEmails[empId].push(lower);
+    };
+
     for (const mapping of agentMappings || []) {
       const agent = (agents || []).find(a => a.id === mapping.agent_id);
-      if (agent?.email) employeeToEmail[mapping.employee_id] = agent.email.toLowerCase();
+      if (agent?.email) addEmail(mapping.employee_id, agent.email);
     }
 
     const { data: empData } = await supabase
@@ -164,8 +171,8 @@ Deno.serve(async (req) => {
       .in("id", employeeIds);
 
     for (const emp of empData || []) {
-      if (!employeeToEmail[emp.id] && emp.work_email) employeeToEmail[emp.id] = emp.work_email.toLowerCase();
-      if (!employeeToEmail[emp.id] && emp.private_email) employeeToEmail[emp.id] = emp.private_email.toLowerCase();
+      addEmail(emp.id, emp.work_email);
+      addEmail(emp.id, emp.private_email);
     }
 
     // Fetch TM sales in round period (exclude FM)
