@@ -1,3 +1,4 @@
+// LeagueMotivationBar — Intelligent Coach
 import { useMemo } from "react";
 import { Flame, Target, TrendingUp, Swords, Clock, Trophy, Rocket } from "lucide-react";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
