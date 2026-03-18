@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Plus, Pencil, Trash2, AlertTriangle, GraduationCap, ExternalLink } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, AlertTriangle, GraduationCap, ExternalLink, Upload, Loader2 } from "lucide-react";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,25 @@ export default function AmoTraining() {
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState<TrainingForm>(emptyForm);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `certificates/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("amo-documents").upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("amo-documents").getPublicUrl(path);
+      setForm(f => ({ ...f, certificate_url: urlData.publicUrl }));
+      toast.success("Certifikat uploadet");
+    } catch (e: any) {
+      toast.error("Upload fejlede: " + e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data: courses } = useQuery({
     queryKey: ["amo-training"],
@@ -324,7 +343,44 @@ export default function AmoTraining() {
               <div><Label>Gennemført dato</Label><Input type="date" value={form.completed_date} onChange={e => setForm(f => ({ ...f, completed_date: e.target.value }))} /></div>
             </div>
             <div><Label>Udbyder</Label><Input value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} /></div>
-            <div><Label>Certifikat URL</Label><Input value={form.certificate_url} onChange={e => setForm(f => ({ ...f, certificate_url: e.target.value }))} /></div>
+            <div>
+              <Label>Certifikat</Label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    value={form.certificate_url}
+                    onChange={e => setForm(f => ({ ...f, certificate_url: e.target.value }))}
+                    placeholder="URL eller upload fil"
+                    className="flex-1"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {form.certificate_url && (
+                  <a href={form.certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                    <ExternalLink className="h-3 w-3" /> Se vedhæftet certifikat
+                  </a>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Status</Label>
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
