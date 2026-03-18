@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import type { PrizeLeaders, RankedPlayer, RankedRound, RankedComeback } from "@/hooks/useLeaguePrizeData";
 import {
@@ -15,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface Standing {
   overall_rank?: number;
@@ -65,10 +67,17 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
 
   return (
     <div className="space-y-3">
-      {/* Top 3 – combined podium card */}
+      {/* Top 3 – combined podium card with shimmer */}
       <button
         type="button"
-        className="w-full text-left rounded-xl bg-slate-800/80 border-2 border-yellow-500/50 p-5 transition-colors hover:bg-slate-700/80 cursor-pointer disabled:cursor-default disabled:hover:bg-slate-800/80"
+        className={cn(
+          "w-full text-left rounded-xl p-5 transition-all cursor-pointer disabled:cursor-default",
+          "border-2 border-yellow-500/40",
+          notStarted
+            ? "bg-slate-800/60 shimmer-card"
+            : "bg-gradient-to-br from-yellow-500/10 via-slate-800/80 to-amber-900/10 shimmer-card hover:border-yellow-500/60 hover:scale-[1.01]",
+          "disabled:hover:scale-100 disabled:hover:border-yellow-500/40"
+        )}
         disabled={!isActive}
         onClick={() => handleOpen("top3")}
       >
@@ -76,7 +85,10 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
           🏆 Top 3
         </p>
         {notStarted ? (
-          <p className="text-sm text-muted-foreground text-center">{pendingText}</p>
+          <div className="flex flex-col items-center gap-2">
+            <Lock className="h-5 w-5 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground text-center">{pendingText}</p>
+          </div>
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {podium.map((p) => (
@@ -101,7 +113,8 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
             title: "Bedste Runde",
             playerName: revealed && prizeLeaders.bestRound ? formatPlayerName(prizeLeaders.bestRound.employee) : pendingText,
             subtitle: revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound.label : "",
-            borderClass: "border-red-500/50",
+            borderClass: "border-red-500/40 hover:border-red-500/60",
+            gradientClass: "from-red-500/5 to-transparent",
           },
           {
             type: "talent" as const,
@@ -109,7 +122,8 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
             title: "Sæsonens Talent",
             playerName: revealed && prizeLeaders.talent ? formatPlayerName(prizeLeaders.talent.employee) : pendingText,
             subtitle: revealed && prizeLeaders.talent ? prizeLeaders.talent.label : "",
-            borderClass: "border-purple-500/50",
+            borderClass: "border-purple-500/40 hover:border-purple-500/60",
+            gradientClass: "from-purple-500/5 to-transparent",
           },
           {
             type: "comeback" as const,
@@ -117,16 +131,28 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
             title: "Sæsonens Comeback",
             playerName: revealed && prizeLeaders.comeback ? formatPlayerName(prizeLeaders.comeback.employee) : pendingText,
             subtitle: revealed && prizeLeaders.comeback ? prizeLeaders.comeback.label : "",
-            borderClass: "border-emerald-500/50",
+            borderClass: "border-emerald-500/40 hover:border-emerald-500/60",
+            gradientClass: "from-emerald-500/5 to-transparent",
           },
         ]).map((card) => (
           <button
             key={card.title}
             type="button"
-            className={`relative rounded-xl bg-slate-800/80 p-4 border-2 ${card.borderClass} text-center space-y-1 transition-colors hover:bg-slate-700/80 cursor-pointer disabled:cursor-default disabled:hover:bg-slate-800/80`}
+            className={cn(
+              "relative rounded-xl p-4 border-2 text-center space-y-1 transition-all cursor-pointer",
+              "hover:scale-[1.03] disabled:hover:scale-100",
+              `bg-gradient-to-b ${card.gradientClass} bg-slate-800/80`,
+              card.borderClass,
+              "disabled:cursor-default disabled:opacity-80"
+            )}
             disabled={!isActive}
             onClick={() => handleOpen(card.type)}
           >
+            {notStarted && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/30 backdrop-blur-[1px] z-10">
+                <Lock className="h-4 w-4 text-muted-foreground/40" />
+              </div>
+            )}
             <span className="text-2xl">{card.emoji}</span>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{card.title}</p>
             <p className="text-sm font-bold truncate">{card.playerName}</p>
