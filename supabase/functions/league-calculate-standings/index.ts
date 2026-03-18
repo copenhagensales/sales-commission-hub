@@ -67,7 +67,11 @@ Deno.serve(async (req) => {
     }
 
     const sourceStart = season.qualification_source_start;
-    const sourceEnd = season.qualification_source_end;
+    const sourceEndRaw = season.qualification_source_end;
+    // Ensure we include the full end day by using < next day
+    const sourceEndDate = new Date(sourceEndRaw);
+    sourceEndDate.setDate(sourceEndDate.getDate() + 1);
+    const sourceEndExclusive = sourceEndDate.toISOString().slice(0, 10);
     const playersPerDivision = season.config?.players_per_division || 14;
 
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
