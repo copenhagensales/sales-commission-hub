@@ -119,6 +119,7 @@ export default function AmoKemiApv() {
   const overdueReview = products?.filter(p => p.next_review_due && new Date(p.next_review_due) < today) || [];
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

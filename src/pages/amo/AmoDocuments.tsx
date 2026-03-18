@@ -157,6 +157,7 @@ export default function AmoDocuments() {
   }, {} as Record<string, number>);
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
