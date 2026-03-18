@@ -283,7 +283,7 @@ export default function CommissionLeague() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
-              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg">
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3">
                     <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
