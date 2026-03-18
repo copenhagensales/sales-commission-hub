@@ -75,7 +75,8 @@ serve(async (req) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: [event],
-          access_token: FB_ACCESS_TOKEN
+          access_token: FB_ACCESS_TOKEN,
+          test_event_code: "TEST52118"
         }),
       }
     );
