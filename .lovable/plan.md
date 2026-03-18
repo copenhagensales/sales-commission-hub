@@ -1,92 +1,50 @@
 
 
-## LeagueMotivationBar — Intelligent Coach-bjælke
+## Draft-booking workflow ✅
 
-### Koncept
+### Implementeret
+1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
+2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
+3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
+4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
 
-Én **dynamisk, coachende bjælke** der vælger de **3 mest motiverende beskeder** baseret på spillerens aktuelle situation. Ikke et statisk dashboard — en prioriteringsmotor der altid viser det mest handlingsanvisende.
+## Fortrolige kontrakter ✅
 
-Hver besked følger formlen: **Status + gevinst + næste handling**
+### Implementeret
+1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
+2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
+3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
+4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
+5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
 
-### Prioriteringslogik (vælg top 3 fra denne liste)
+## Liga Gameplay med Division-først Ranking ✅
 
-| Prioritet | Signal | Betingelse | Besked-eksempel |
-|---|---|---|---|
-| 1 | 🔥 Streak i fare | `currentStreak > 0 && !hitDailyGoal` | "🔥 5 dages streak — 1 salg mere holder den i live!" |
-| 2 | 🏁 Tæt på overhalning | gap til spiller over < 2.000 kr | "Kun 950 kr til at overhale #4 — det er inden for rækkevidde i dag" |
-| 3 | 🎯 Tæt på dagens mål | har dailyTarget og mangler < 50% | "600 kr til dagens mål — du er næsten der!" |
-| 4 | 🔥 Streak kører | `currentStreak >= 3` | "🔥 5 dages streak! Hold tempoet de næste timer" |
-| 5 | 📈 Stærk uge-momentum | currentWeek > lastWeek | "+34% vs. forrige uge — hold tempoet de næste 2 timer" |
-| 6 | ⚠️ Nogen tæt bag dig | gap fra spiller under < 1.500 kr | "#8 er kun 700 kr bag dig — hold afstanden!" |
-| 7 | 💰 Ekstra indsats | altid tilgængelig (baseret på top 3 dage) | "Hver time ekstra ≈ X kr · Lørdag = +X.XXX kr" |
-| 8 | 📈 Svag uge (konstruktivt) | currentWeek < lastWeek | "Du er ikke langt fra sidste uge — 2 gode timer kan vende den" |
-| 9 | 🏆 Tæt på personlig rekord | todayTotal > 80% af bestDayRecord | "Du er 12% fra din personlige rekord — push!" |
-| 10 | 🚀 Ny streak | `currentStreak === 0` | "Start en ny streak i dag — dit første salg tæller!" |
+### Implementeret
+1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
+2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
+3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
+4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
+5. ✅ **14 spillere pr. division** (opdateret fra 10).
+6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
+7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
+8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
+9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
+10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
+11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
 
-**Negativt momentum frames aldrig negativt** — altid "du er tæt på" eller "X kan vende den".
+## Referral bonus-validering ved deaktivering ✅
 
-### Ekstra indsats-beregning
+### Implementeret
+1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
+2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
+3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
+4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
 
-```text
-dailyBreakdown (14 dage)
-  → filtrer dage med commission > 0 (inkl. lørdage)
-  → sortér desc, tag top 3
-  → avgTopDay = sum(top3) / 3
-  → hourlyRate = avgTopDay / 8
-  → saturdayValue = hourlyRate * 8
-```
+## LeagueMotivationBar — Intelligent Coach-bjælke ✅
 
-Bruger top 3 dage — aspirationelt: "hvad du kan når du giver den gas".
-
-### Data-kilder (alle eksisterende)
-
-- `usePersonalWeeklyStats(employeeId)` → uge-momentum, dailyBreakdown for hourly rate
-- `useSalesGamification(...)` → streak, bestDayRecord, hitDailyGoal, dailyTarget, todayTotal
-- `myStanding` + `standings[]` (props) → liga-gap beregning
-
-### Visuelt design
-
-- Glasmorfisk bar: `bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg`
-- **3 beskeder** i `grid-cols-1 md:grid-cols-3` med subtile dividers
-- Hvert element: relevant ikon + 1-2 linjer tekst, nøgletal i `text-amber-400 font-semibold`
-- Kompakt: `py-3 px-4`, `animate-fade-in`
-- Farvekodning: grøn (fremdrift), amber (udfordring), rød kun ved streak-i-fare
-
-### Ny fil
-
-**`src/components/league/LeagueMotivationBar.tsx`**
-
-```typescript
-interface LeagueMotivationBarProps {
-  employeeId: string;
-  myStanding: QualificationStanding | null;
-  standings: QualificationStanding[];
-  dailyTarget: number;
-  todayTotal: number;
-  currentWeekTotal: number;
-}
-```
-
-Internt kalder den `usePersonalWeeklyStats` og `useSalesGamification`, beregner top-3-dage hourly rate, og kører prioriteringslogikken for at vælge de 3 mest relevante beskeder.
-
-### Integration i CommissionLeague.tsx
-
-Indsættes mellem hero-header (linje ~336) og PrizeShowcase (linje ~338), kun for enrolled non-fan spillere:
-
-```tsx
-{isEnrolled && !isFan && currentEmployeeId && (
-  <LeagueMotivationBar
-    employeeId={currentEmployeeId}
-    myStanding={isActivePhase ? mySeasonStanding : myStanding}
-    standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
-    dailyTarget={0}
-    todayTotal={0}
-    currentWeekTotal={weeklyStats?.currentWeek?.weekTotal ?? 0}
-  />
-)}
-```
-
-### Filer der ændres
-1. **Ny**: `src/components/league/LeagueMotivationBar.tsx`
-2. **Edit**: `src/pages/CommissionLeague.tsx` — import + indsæt
-
+### Implementeret
+1. ✅ `src/components/league/LeagueMotivationBar.tsx`: Dynamisk 3-besked coach-bar med 10-punkts prioriteringslogik.
+2. ✅ Prioriteringsmotor: Streak i fare → Tæt på overhalning → Dagens mål → Streak kører → Uge-momentum → Nogen bag dig → Ekstra indsats → Svag uge (konstruktivt) → Personlig rekord → Ny streak.
+3. ✅ Ekstra indsats-beregning baseret på top 3 dages gennemsnit fra 14-dages breakdown.
+4. ✅ Liga-gap beregning med spiller over/under.
+5. ✅ Integration i `CommissionLeague.tsx` mellem hero-header og PrizeShowcase, kun for enrolled non-fan spillere.

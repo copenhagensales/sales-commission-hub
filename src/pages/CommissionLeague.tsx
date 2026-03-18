@@ -54,6 +54,8 @@ import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
+import { LeagueMotivationBar } from "@/components/league/LeagueMotivationBar";
+import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
@@ -109,6 +111,7 @@ export default function CommissionLeague() {
     season?.status === "active" ? season?.id : undefined,
     season?.start_date
   );
+  const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
@@ -335,6 +338,18 @@ export default function CommissionLeague() {
               </div>
           </div>
 
+          {/* Motivation Coach Bar */}
+          {isEnrolled && !isFan && currentEmployeeId && (
+            <LeagueMotivationBar
+              employeeId={currentEmployeeId}
+              myStanding={isActivePhase ? (mySeasonStanding ?? null) : (myStanding ?? null)}
+              standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+              dailyTarget={0}
+              todayTotal={0}
+              currentWeekTotal={weeklyStats?.currentWeek?.weekTotal ?? 0}
+            />
+          )}
+
           {/* Prize Showcase */}
           <PrizeShowcase
             standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
@@ -342,7 +357,6 @@ export default function CommissionLeague() {
             seasonStatus={season.status || ""}
             isActive={isActivePhase}
           />
-
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
