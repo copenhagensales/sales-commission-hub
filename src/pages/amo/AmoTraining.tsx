@@ -67,6 +67,25 @@ export default function AmoTraining() {
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState<TrainingForm>(emptyForm);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `certificates/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("amo-documents").upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("amo-documents").getPublicUrl(path);
+      setForm(f => ({ ...f, certificate_url: urlData.publicUrl }));
+      toast.success("Certifikat uploadet");
+    } catch (e: any) {
+      toast.error("Upload fejlede: " + e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data: courses } = useQuery({
     queryKey: ["amo-training"],
