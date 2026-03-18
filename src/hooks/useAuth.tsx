@@ -1,13 +1,14 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+const loggedSessionKeys = new Set<string>();
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
-  const loggedSessionsRef = useRef<Set<string>>(new Set());
 
   const checkMustChangePassword = useCallback(async (userEmail: string | undefined) => {
     if (!userEmail) {
@@ -50,18 +51,18 @@ export function useAuth() {
     // Use LAST 20 chars of token (unique signature) instead of first 20 (always same JWT header)
     const sessionKey = `${currentSession.user.id}-${currentSession.access_token.slice(-20)}`;
     
-    // Only log once per unique session
-    if (loggedSessionsRef.current.has(sessionKey)) {
+    // Only log once per unique session across the entire app
+    if (loggedSessionKeys.has(sessionKey)) {
       return;
     }
-    loggedSessionsRef.current.add(sessionKey);
+    loggedSessionKeys.add(sessionKey);
 
     // Fire-and-forget: Don't block login flow with logging
     (async () => {
       try {
         const lowerEmail = currentSession.user.email?.toLowerCase() || "";
         
-        // Add 2s timeout to employee lookup - fall back to null
+        // Add 2s timeout to employee lookup - fall back to auth metadata/null
         const employeePromise = supabase
           .from("employee_master_data")
           .select("first_name, last_name")
@@ -75,9 +76,14 @@ export function useAuth() {
         
         const { data: employee } = await Promise.race([employeePromise, timeoutPromise]);
 
-        const userName = employee 
-          ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() 
-          : null;
+        const fallbackName =
+          typeof currentSession.user.user_metadata?.name === "string"
+            ? currentSession.user.user_metadata.name.trim() || null
+            : null;
+
+        const userName = employee
+          ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() || fallbackName
+          : fallbackName;
 
         supabase.functions.invoke("log-login-event", {
           body: {
