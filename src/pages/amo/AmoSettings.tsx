@@ -55,7 +55,7 @@ export default function AmoSettings() {
 
   const openCreate = () => {
     setEditingRule(null);
-    setForm({ rule_name: "", description: "", rule_type: "deadline", interval_months: "", check_logic_key: "", active: true });
+    setForm({ rule_name: "", description: "", rule_type: "lovpligtigt", interval_months: "", check_logic_key: "", active: true });
     setDialogOpen(true);
   };
 
