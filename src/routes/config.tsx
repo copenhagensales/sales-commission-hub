@@ -384,10 +384,10 @@ export const routes: RouteConfig[] = [
 
   // AMO Compliance Hub
   { path: "/amo", component: AmoDashboard, access: "role", positionPermission: "menu_amo_dashboard" },
-  { path: "/amo/organisation", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_organisation" },
-  { path: "/amo/annual-discussion", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_annual_discussion" },
-  { path: "/amo/meetings", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_meetings" },
-  { path: "/amo/apv", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_apv" },
+  { path: "/amo/organisation", component: AmoOrganisation, access: "role", positionPermission: "menu_amo_organisation" },
+  { path: "/amo/annual-discussion", component: AmoAnnualDiscussion, access: "role", positionPermission: "menu_amo_annual_discussion" },
+  { path: "/amo/meetings", component: AmoMeetings, access: "role", positionPermission: "menu_amo_meetings" },
+  { path: "/amo/apv", component: AmoApv, access: "role", positionPermission: "menu_amo_apv" },
   { path: "/amo/kemi-apv", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_kemi_apv" },
   { path: "/amo/training", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_training" },
   { path: "/amo/documents", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_documents" },
