@@ -20,6 +20,19 @@ export function MyQualificationStatus({
   playersPerDivision,
   standings,
 }: MyQualificationStatusProps) {
+  // Rival info - must be before any early return
+  const rivalInfo = useMemo(() => {
+    if (!standing || !standings || standings.length === 0) return null;
+    const myIndex = standings.findIndex(s => s.employee_id === standing.employee_id);
+    if (myIndex <= 0) return null;
+    const rival = standings[myIndex - 1];
+    const gap = rival.current_provision - standing.current_provision;
+    if (gap <= 0) return null;
+    return {
+      gap: gap.toLocaleString("da-DK", { maximumFractionDigits: 0 }),
+    };
+  }, [standings, standing]);
+
   if (!standing) {
     return (
       <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-border">
