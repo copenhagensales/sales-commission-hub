@@ -118,6 +118,7 @@ export function QualificationBoard({
                     isTopDivision={isTopDivision}
                     isBottomDivision={isBottomDivision}
                     idx={idx}
+                    maxProvision={computedMaxProvision}
                   />
                 ))}
               </div>
