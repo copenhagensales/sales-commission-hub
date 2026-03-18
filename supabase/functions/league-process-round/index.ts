@@ -168,11 +168,11 @@ Deno.serve(async (req) => {
       if (!employeeToEmail[emp.id] && emp.private_email) employeeToEmail[emp.id] = emp.private_email.toLowerCase();
     }
 
-    // Fetch sales in round period
+    // Fetch TM sales in round period (exclude FM)
     const roundStart = expiredRound.start_date;
     const roundEnd = expiredRound.end_date;
     
-    let allSales: any[] = [];
+    let allTmSales: any[] = [];
     const PAGE = 1000;
     let offset = 0;
     let hasMore = true;
@@ -181,13 +181,13 @@ Deno.serve(async (req) => {
       const { data: batch } = await supabase
         .from("sales")
         .select("id, agent_email")
-        .or("validation_status.neq.rejected,validation_status.is.null")
+        .neq("source", "fieldmarketing")
         .gte("sale_datetime", roundStart)
         .lte("sale_datetime", roundEnd)
         .range(offset, offset + PAGE - 1);
 
       if (batch && batch.length > 0) {
-        allSales = [...allSales, ...batch];
+        allTmSales = [...allTmSales, ...batch];
         offset += batch.length;
         hasMore = batch.length === PAGE;
       } else {
@@ -195,9 +195,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build email -> sale commission map
+    // Fetch FM sales separately — matched by raw_payload->>'fm_seller_id'
+    let allFmSales: any[] = [];
+    let fmOffset = 0;
+    let hasMoreFm = true;
+
+    while (hasMoreFm) {
+      const { data: fmBatch } = await supabase
+        .from("sales")
+        .select("id, raw_payload")
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", roundStart)
+        .lte("sale_datetime", roundEnd)
+        .range(fmOffset, fmOffset + PAGE - 1);
+
+      if (fmBatch && fmBatch.length > 0) {
+        allFmSales = [...allFmSales, ...fmBatch];
+        fmOffset += fmBatch.length;
+        hasMoreFm = fmBatch.length === PAGE;
+      } else {
+        hasMoreFm = false;
+      }
+    }
+
+    // Build email -> sale IDs map for TM
     const emailToSaleIds: Record<string, string[]> = {};
-    for (const sale of allSales) {
+    for (const sale of allTmSales) {
       const email = sale.agent_email?.toLowerCase();
       if (email) {
         if (!emailToSaleIds[email]) emailToSaleIds[email] = [];
@@ -205,7 +228,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    const allSaleIds = allSales.map(s => s.id);
+    // Build employee_id -> FM sale IDs map
+    const employeeToFmSaleIds: Record<string, string[]> = {};
+    for (const sale of allFmSales) {
+      const fmSellerId = sale.raw_payload?.fm_seller_id;
+      if (fmSellerId) {
+        if (!employeeToFmSaleIds[fmSellerId]) employeeToFmSaleIds[fmSellerId] = [];
+        employeeToFmSaleIds[fmSellerId].push(sale.id);
+      }
+    }
+
+    const allSaleIds = [...allTmSales.map(s => s.id), ...allFmSales.map(s => s.id)];
     const saleToCommission: Record<string, number> = {};
 
     if (allSaleIds.length > 0) {
@@ -223,17 +256,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculate provision per employee
+    // Calculate provision per employee (TM via email + FM via fm_seller_id)
     const employeeProvision: Record<string, { provision: number; deals: number }> = {};
     for (const empId of employeeIds) {
       const email = employeeToEmail[empId];
       let provision = 0;
       let deals = 0;
+      // TM sales
       if (email && emailToSaleIds[email]) {
         for (const saleId of emailToSaleIds[email]) {
           provision += saleToCommission[saleId] || 0;
           deals++;
         }
+      }
+      // FM sales
+      const fmSaleIds = employeeToFmSaleIds[empId] || [];
+      for (const saleId of fmSaleIds) {
+        provision += saleToCommission[saleId] || 0;
+        deals++;
       }
       employeeProvision[empId] = { provision, deals };
     }
