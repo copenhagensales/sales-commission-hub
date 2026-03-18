@@ -39,3 +39,12 @@
 2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
 3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
 4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
+
+## LeagueMotivationBar — Intelligent Coach-bjælke ✅
+
+### Implementeret
+1. ✅ `src/components/league/LeagueMotivationBar.tsx`: Dynamisk 3-besked coach-bar med 10-punkts prioriteringslogik.
+2. ✅ Prioriteringsmotor: Streak i fare → Tæt på overhalning → Dagens mål → Streak kører → Uge-momentum → Nogen bag dig → Ekstra indsats → Svag uge (konstruktivt) → Personlig rekord → Ny streak.
+3. ✅ Ekstra indsats-beregning baseret på top 3 dages gennemsnit fra 14-dages breakdown.
+4. ✅ Liga-gap beregning med spiller over/under.
+5. ✅ Integration i `CommissionLeague.tsx` mellem hero-header og PrizeShowcase, kun for enrolled non-fan spillere.
