@@ -162,9 +162,9 @@ Deno.serve(async (req) => {
 
     console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmails).length} employees (multi-email)`);
 
-    // 4. Fetch ALL sales in qualification period (TM + FM unified)
+    // 4. Fetch TM sales in qualification period (exclude FM — those are matched separately)
     // Paginate to avoid the 1000 row limit
-    let allSales: any[] = [];
+    let allTmSales: any[] = [];
     const SALES_PAGE_SIZE = 1000;
     let salesOffset = 0;
     let hasMoreSales = true;
@@ -173,13 +173,13 @@ Deno.serve(async (req) => {
       const { data: salesBatch, error: salesError } = await supabase
         .from("sales")
         .select("id, agent_email")
-        .or("validation_status.neq.rejected,validation_status.is.null")
+        .neq("source", "fieldmarketing")
         .gte("sale_datetime", sourceStart)
         .lt("sale_datetime", sourceEndExclusive)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
 
       if (salesError) {
-        console.error("[league-calculate-standings] Failed to fetch sales:", salesError);
+        console.error("[league-calculate-standings] Failed to fetch TM sales:", salesError);
         return new Response(
           JSON.stringify({ error: "Failed to fetch sales", details: salesError }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       }
 
       if (salesBatch && salesBatch.length > 0) {
-        allSales = [...allSales, ...salesBatch];
+        allTmSales = [...allTmSales, ...salesBatch];
         salesOffset += salesBatch.length;
         hasMoreSales = salesBatch.length === SALES_PAGE_SIZE;
       } else {
@@ -195,11 +195,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[league-calculate-standings] Found ${allSales.length} total sales in period (TM + FM unified)`);
+    console.log(`[league-calculate-standings] Found ${allTmSales.length} TM sales in period`);
 
-    // 5. Build email -> sale_ids map
+    // 4b. Fetch FM sales separately — matched by raw_payload->>'fm_seller_id'
+    let allFmSales: any[] = [];
+    let fmOffset = 0;
+    let hasMoreFm = true;
+
+    while (hasMoreFm) {
+      const { data: fmBatch, error: fmError } = await supabase
+        .from("sales")
+        .select("id, raw_payload")
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", sourceStart)
+        .lt("sale_datetime", sourceEndExclusive)
+        .range(fmOffset, fmOffset + SALES_PAGE_SIZE - 1);
+
+      if (fmError) {
+        console.error("[league-calculate-standings] Failed to fetch FM sales:", fmError);
+        break;
+      }
+
+      if (fmBatch && fmBatch.length > 0) {
+        allFmSales = [...allFmSales, ...fmBatch];
+        fmOffset += fmBatch.length;
+        hasMoreFm = fmBatch.length === SALES_PAGE_SIZE;
+      } else {
+        hasMoreFm = false;
+      }
+    }
+
+    console.log(`[league-calculate-standings] Found ${allFmSales.length} FM sales in period`);
+
+    // 5. Build email -> sale_ids map for TM sales
     const emailToSaleIds: Record<string, string[]> = {};
-    for (const sale of allSales) {
+    for (const sale of allTmSales) {
       const email = sale.agent_email?.toLowerCase();
       if (email) {
         if (!emailToSaleIds[email]) {
@@ -209,54 +239,59 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Get sale_items with mapped_commission - use it directly (authoritative source)
-    const allSaleIds = allSales.map((s) => s.id);
-    const saleItemsMap: Record<string, { total_commission: number; deals_count: number }> = {};
+    // 5b. Build employee_id -> FM sale_ids map
+    const employeeToFmSaleIds: Record<string, string[]> = {};
+    for (const sale of allFmSales) {
+      const fmSellerId = sale.raw_payload?.fm_seller_id;
+      if (fmSellerId) {
+        if (!employeeToFmSaleIds[fmSellerId]) {
+          employeeToFmSaleIds[fmSellerId] = [];
+        }
+        employeeToFmSaleIds[fmSellerId].push(sale.id);
+      }
+    }
+
+    // 6. Get sale_items with mapped_commission for ALL sales (TM + FM)
+    const allSaleIds = [...allTmSales.map((s) => s.id), ...allFmSales.map((s) => s.id)];
+    const saleToCommission: Record<string, number> = {};
 
     if (allSaleIds.length > 0) {
       const BATCH_SIZE = 100;
-      const saleItems: any[] = [];
       
       for (let i = 0; i < allSaleIds.length; i += BATCH_SIZE) {
         const batchIds = allSaleIds.slice(i, i + BATCH_SIZE);
         const { data: batchItems, error: batchError } = await supabase
           .from("sale_items")
-          .select("sale_id, mapped_commission, quantity")
+          .select("sale_id, mapped_commission")
           .in("sale_id", batchIds);
         
         if (batchError) {
           console.error(`[league-calculate-standings] Failed to fetch sale_items batch ${i}-${i + BATCH_SIZE}:`, batchError);
         } else if (batchItems) {
-          saleItems.push(...batchItems);
+          for (const item of batchItems) {
+            saleToCommission[item.sale_id] = (saleToCommission[item.sale_id] || 0) + (Number(item.mapped_commission) || 0);
+          }
         }
       }
       
-      console.log(`[league-calculate-standings] Fetched ${saleItems.length} sale_items for ${allSaleIds.length} sales`);
-
-      // Calculate commission per sale using mapped_commission directly (authoritative source)
-      const saleToCommission: Record<string, number> = {};
-      for (const item of saleItems) {
-        if (!saleToCommission[item.sale_id]) {
-          saleToCommission[item.sale_id] = 0;
-        }
-        saleToCommission[item.sale_id] += Number(item.mapped_commission) || 0;
-      }
-
-      // Map email -> commission/deals
-      for (const [email, saleIds] of Object.entries(emailToSaleIds)) {
-        let totalCommission = 0;
-        let dealsCount = 0;
-        for (const saleId of saleIds) {
-          totalCommission += saleToCommission[saleId] || 0;
-          dealsCount += 1;
-        }
-        saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
-      }
+      console.log(`[league-calculate-standings] Fetched commissions for ${Object.keys(saleToCommission).length} sales`);
     }
 
-    console.log(`[league-calculate-standings] Stats for ${Object.keys(saleItemsMap).length} unique sellers`);
+    // Build email -> commission/deals for TM
+    const saleItemsMap: Record<string, { total_commission: number; deals_count: number }> = {};
+    for (const [email, saleIds] of Object.entries(emailToSaleIds)) {
+      let totalCommission = 0;
+      let dealsCount = 0;
+      for (const saleId of saleIds) {
+        totalCommission += saleToCommission[saleId] || 0;
+        dealsCount += 1;
+      }
+      saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
+    }
 
-    // 7. Calculate standings for each employee
+    console.log(`[league-calculate-standings] Stats: ${Object.keys(saleItemsMap).length} TM sellers, ${Object.keys(employeeToFmSaleIds).length} FM sellers`);
+
+    // 7. Calculate standings for each employee (TM via email + FM via fm_seller_id)
     const standingsData: StandingResult[] = [];
 
     for (const employeeId of employeeIds) {
@@ -264,6 +299,7 @@ Deno.serve(async (req) => {
       let currentProvision = 0;
       let dealsCount = 0;
 
+      // TM sales via agent_email
       for (const email of agentEmails) {
         if (saleItemsMap[email]) {
           currentProvision += saleItemsMap[email].total_commission;
@@ -271,10 +307,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (agentEmails.length > 0 && (currentProvision > 0 || dealsCount > 0)) {
-        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmails.join(', ')}): ${currentProvision} kr, ${dealsCount} deals`);
-      } else {
-        console.log(`[league-calculate-standings] Employee ${employeeId}: No sales found (emails: ${agentEmails.join(', ') || 'none'})`);
+      // FM sales via fm_seller_id (directly matched to employee_id)
+      const fmSaleIds = employeeToFmSaleIds[employeeId] || [];
+      for (const saleId of fmSaleIds) {
+        currentProvision += saleToCommission[saleId] || 0;
+        dealsCount += 1;
+      }
+
+      if (currentProvision > 0 || dealsCount > 0) {
+        console.log(`[league-calculate-standings] Employee ${employeeId}: ${currentProvision} kr, ${dealsCount} deals (TM emails: ${agentEmails.join(', ') || 'none'}, FM sales: ${fmSaleIds.length})`);
       }
 
       standingsData.push({
