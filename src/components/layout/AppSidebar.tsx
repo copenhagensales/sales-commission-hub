@@ -90,6 +90,9 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [economicOpen, setEconomicOpen] = useState(
     location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload"
   );
+  const [amoOpen, setAmoOpen] = useState(
+    location.pathname.startsWith("/amo")
+  );
 
   // Fetch employee name and pending contracts count
   // OPTIMIZED: Removed refetchInterval to reduce DB load - only refetch on window focus
