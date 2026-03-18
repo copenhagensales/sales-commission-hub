@@ -283,40 +283,33 @@ export default function CommissionLeague() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
-          <Collapsible defaultOpen={true}>
-            <CollapsibleTrigger className="w-full text-left">
               <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
-                      <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
-                      {isFan && (
-                        <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Fan
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <Sparkles className="h-3.5 w-3.5 text-yellow-400/80" />
-                      <span className="text-sm italic text-yellow-200/70">
-                        {getRandomQuote(getPerformanceStatus(
-                          myStanding ? (myStanding.current_provision / 1) * 100 : 50,
-                          myStanding ? myStanding.projected_rank <= 3 : false,
-                          myStanding ? myStanding.projected_rank <= 7 : true
-                        )).quote}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
-                    </div>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
+                    <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
+                    {isFan && (
+                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Fan
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <Sparkles className="h-3.5 w-3.5 text-yellow-400/80" />
+                    <span className="text-sm italic text-yellow-200/70">
+                      {getRandomQuote(getPerformanceStatus(
+                        myStanding ? (myStanding.current_provision / 1) * 100 : 50,
+                        myStanding ? myStanding.projected_rank <= 3 : false,
+                        myStanding ? myStanding.projected_rank <= 7 : true
+                      )).quote}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
                   </div>
                 </div>
                 {isQualificationPhase && (
@@ -325,8 +318,6 @@ export default function CommissionLeague() {
                   </div>
                 )}
               </div>
-            </CollapsibleTrigger>
-          </Collapsible>
           </div>
 
           {/* Prize Showcase */}
