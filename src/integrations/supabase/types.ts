@@ -321,6 +321,663 @@ export type Database = {
         }
         Relationships: []
       }
+      amo_amr_elections: {
+        Row: {
+          created_at: string
+          elected_date: string
+          election_document_url: string | null
+          election_period_months: number
+          id: string
+          member_id: string
+          next_election_due: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          elected_date: string
+          election_document_url?: string | null
+          election_period_months?: number
+          id?: string
+          member_id: string
+          next_election_due: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          elected_date?: string
+          election_document_url?: string | null
+          election_period_months?: number
+          id?: string
+          member_id?: string
+          next_election_due?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_amr_elections_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "amo_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_annual_discussions: {
+        Row: {
+          approved_by: string | null
+          collab_model: string | null
+          created_at: string
+          discussion_date: string
+          follow_up_tasks: Json | null
+          goals: string | null
+          id: string
+          meeting_cadence: string | null
+          minutes_url: string | null
+          next_due_date: string | null
+          participants: string[] | null
+          previous_year_eval: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          collab_model?: string | null
+          created_at?: string
+          discussion_date: string
+          follow_up_tasks?: Json | null
+          goals?: string | null
+          id?: string
+          meeting_cadence?: string | null
+          minutes_url?: string | null
+          next_due_date?: string | null
+          participants?: string[] | null
+          previous_year_eval?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          collab_model?: string | null
+          created_at?: string
+          discussion_date?: string
+          follow_up_tasks?: Json | null
+          goals?: string | null
+          id?: string
+          meeting_cadence?: string | null
+          minutes_url?: string | null
+          next_due_date?: string | null
+          participants?: string[] | null
+          previous_year_eval?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      amo_apv: {
+        Row: {
+          action_plan: string | null
+          completed_date: string | null
+          created_at: string
+          deadline: string | null
+          evidence_documents: string[] | null
+          findings: string | null
+          follow_up_status: string | null
+          id: string
+          next_due_date: string | null
+          physical_env: string | null
+          psychological_env: string | null
+          reason: Database["public"]["Enums"]["amo_apv_reason"]
+          responsible_owner: string | null
+          risk_level: string | null
+          sickness_review: string | null
+          start_date: string | null
+          title: string
+          updated_at: string
+          workplace_id: string | null
+        }
+        Insert: {
+          action_plan?: string | null
+          completed_date?: string | null
+          created_at?: string
+          deadline?: string | null
+          evidence_documents?: string[] | null
+          findings?: string | null
+          follow_up_status?: string | null
+          id?: string
+          next_due_date?: string | null
+          physical_env?: string | null
+          psychological_env?: string | null
+          reason?: Database["public"]["Enums"]["amo_apv_reason"]
+          responsible_owner?: string | null
+          risk_level?: string | null
+          sickness_review?: string | null
+          start_date?: string | null
+          title: string
+          updated_at?: string
+          workplace_id?: string | null
+        }
+        Update: {
+          action_plan?: string | null
+          completed_date?: string | null
+          created_at?: string
+          deadline?: string | null
+          evidence_documents?: string[] | null
+          findings?: string | null
+          follow_up_status?: string | null
+          id?: string
+          next_due_date?: string | null
+          physical_env?: string | null
+          psychological_env?: string | null
+          reason?: Database["public"]["Enums"]["amo_apv_reason"]
+          responsible_owner?: string | null
+          risk_level?: string | null
+          sickness_review?: string | null
+          start_date?: string | null
+          title?: string
+          updated_at?: string
+          workplace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_apv_workplace_id_fkey"
+            columns: ["workplace_id"]
+            isOneToOne: false
+            referencedRelation: "amo_workplaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      amo_compliance_rules: {
+        Row: {
+          active: boolean
+          check_logic_key: string | null
+          created_at: string
+          description: string | null
+          id: string
+          interval_months: number | null
+          rule_name: string
+          rule_type: Database["public"]["Enums"]["amo_rule_type"]
+        }
+        Insert: {
+          active?: boolean
+          check_logic_key?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          interval_months?: number | null
+          rule_name: string
+          rule_type?: Database["public"]["Enums"]["amo_rule_type"]
+        }
+        Update: {
+          active?: boolean
+          check_logic_key?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          interval_months?: number | null
+          rule_name?: string
+          rule_type?: Database["public"]["Enums"]["amo_rule_type"]
+        }
+        Relationships: []
+      }
+      amo_documents: {
+        Row: {
+          category: string | null
+          comments: string | null
+          created_at: string
+          document_date: string | null
+          doko_reference: string | null
+          expiry_date: string | null
+          external_reference: string | null
+          file_url: string | null
+          id: string
+          owner: string | null
+          related_member_id: string | null
+          related_module: string | null
+          related_workplace_id: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          upload_date: string
+          version: number
+        }
+        Insert: {
+          category?: string | null
+          comments?: string | null
+          created_at?: string
+          document_date?: string | null
+          doko_reference?: string | null
+          expiry_date?: string | null
+          external_reference?: string | null
+          file_url?: string | null
+          id?: string
+          owner?: string | null
+          related_member_id?: string | null
+          related_module?: string | null
+          related_workplace_id?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          upload_date?: string
+          version?: number
+        }
+        Update: {
+          category?: string | null
+          comments?: string | null
+          created_at?: string
+          document_date?: string | null
+          doko_reference?: string | null
+          expiry_date?: string | null
+          external_reference?: string | null
+          file_url?: string | null
+          id?: string
+          owner?: string | null
+          related_member_id?: string | null
+          related_module?: string | null
+          related_workplace_id?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          upload_date?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_documents_related_member_id_fkey"
+            columns: ["related_member_id"]
+            isOneToOne: false
+            referencedRelation: "amo_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amo_documents_related_workplace_id_fkey"
+            columns: ["related_workplace_id"]
+            isOneToOne: false
+            referencedRelation: "amo_workplaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_kemi_apv: {
+        Row: {
+          created_at: string
+          exposure_risk: string | null
+          hazard_flag: boolean
+          id: string
+          instructions: string | null
+          next_review_due: string | null
+          product_name: string
+          product_type: string | null
+          protective_measures: string | null
+          related_apv_id: string | null
+          responsible_owner: string | null
+          review_date: string | null
+          sds_url: string | null
+          storage_notes: string | null
+          supplier: string | null
+          updated_at: string
+          work_process: string | null
+        }
+        Insert: {
+          created_at?: string
+          exposure_risk?: string | null
+          hazard_flag?: boolean
+          id?: string
+          instructions?: string | null
+          next_review_due?: string | null
+          product_name: string
+          product_type?: string | null
+          protective_measures?: string | null
+          related_apv_id?: string | null
+          responsible_owner?: string | null
+          review_date?: string | null
+          sds_url?: string | null
+          storage_notes?: string | null
+          supplier?: string | null
+          updated_at?: string
+          work_process?: string | null
+        }
+        Update: {
+          created_at?: string
+          exposure_risk?: string | null
+          hazard_flag?: boolean
+          id?: string
+          instructions?: string | null
+          next_review_due?: string | null
+          product_name?: string
+          product_type?: string | null
+          protective_measures?: string | null
+          related_apv_id?: string | null
+          responsible_owner?: string | null
+          review_date?: string | null
+          sds_url?: string | null
+          storage_notes?: string | null
+          supplier?: string | null
+          updated_at?: string
+          work_process?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_kemi_apv_related_apv_id_fkey"
+            columns: ["related_apv_id"]
+            isOneToOne: false
+            referencedRelation: "amo_apv"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_meetings: {
+        Row: {
+          action_items: Json | null
+          actual_date: string | null
+          agenda: string | null
+          attendees: string[] | null
+          created_at: string
+          decisions: string | null
+          id: string
+          meeting_type: Database["public"]["Enums"]["amo_meeting_type"]
+          minutes_url: string | null
+          next_meeting_date: string | null
+          planned_date: string
+          related_documents: string[] | null
+          status: Database["public"]["Enums"]["amo_meeting_status"]
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          actual_date?: string | null
+          agenda?: string | null
+          attendees?: string[] | null
+          created_at?: string
+          decisions?: string | null
+          id?: string
+          meeting_type?: Database["public"]["Enums"]["amo_meeting_type"]
+          minutes_url?: string | null
+          next_meeting_date?: string | null
+          planned_date: string
+          related_documents?: string[] | null
+          status?: Database["public"]["Enums"]["amo_meeting_status"]
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          actual_date?: string | null
+          agenda?: string | null
+          attendees?: string[] | null
+          created_at?: string
+          decisions?: string | null
+          id?: string
+          meeting_type?: Database["public"]["Enums"]["amo_meeting_type"]
+          minutes_url?: string | null
+          next_meeting_date?: string | null
+          planned_date?: string
+          related_documents?: string[] | null
+          status?: Database["public"]["Enums"]["amo_meeting_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      amo_members: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string | null
+          employee_id: string | null
+          end_date: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          prior_valid_training: boolean
+          role_type: Database["public"]["Enums"]["amo_role_type"]
+          start_date: string | null
+          training_required: boolean
+          updated_at: string
+          workplace_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          employee_id?: string | null
+          end_date?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          prior_valid_training?: boolean
+          role_type: Database["public"]["Enums"]["amo_role_type"]
+          start_date?: string | null
+          training_required?: boolean
+          updated_at?: string
+          workplace_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          employee_id?: string | null
+          end_date?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          prior_valid_training?: boolean
+          role_type?: Database["public"]["Enums"]["amo_role_type"]
+          start_date?: string | null
+          training_required?: boolean
+          updated_at?: string
+          workplace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amo_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amo_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amo_members_workplace_id_fkey"
+            columns: ["workplace_id"]
+            isOneToOne: false
+            referencedRelation: "amo_workplaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_tasks: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_date: string | null
+          evidence_required: boolean
+          id: string
+          owner_id: string | null
+          priority: Database["public"]["Enums"]["amo_task_priority"]
+          related_module: string | null
+          related_record_id: string | null
+          reminder_schedule: Json | null
+          status: Database["public"]["Enums"]["amo_task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          evidence_required?: boolean
+          id?: string
+          owner_id?: string | null
+          priority?: Database["public"]["Enums"]["amo_task_priority"]
+          related_module?: string | null
+          related_record_id?: string | null
+          reminder_schedule?: Json | null
+          status?: Database["public"]["Enums"]["amo_task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          evidence_required?: boolean
+          id?: string
+          owner_id?: string | null
+          priority?: Database["public"]["Enums"]["amo_task_priority"]
+          related_module?: string | null
+          related_record_id?: string | null
+          reminder_schedule?: Json | null
+          status?: Database["public"]["Enums"]["amo_task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_tasks_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "amo_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_training_courses: {
+        Row: {
+          certificate_url: string | null
+          completed_date: string | null
+          created_at: string
+          deadline_date: string | null
+          id: string
+          member_id: string | null
+          membership_start: string | null
+          notes: string | null
+          offered_date: string | null
+          provider: string | null
+          requirement_applies: boolean
+          status: string
+          training_type: Database["public"]["Enums"]["amo_training_type"]
+          updated_at: string
+        }
+        Insert: {
+          certificate_url?: string | null
+          completed_date?: string | null
+          created_at?: string
+          deadline_date?: string | null
+          id?: string
+          member_id?: string | null
+          membership_start?: string | null
+          notes?: string | null
+          offered_date?: string | null
+          provider?: string | null
+          requirement_applies?: boolean
+          status?: string
+          training_type: Database["public"]["Enums"]["amo_training_type"]
+          updated_at?: string
+        }
+        Update: {
+          certificate_url?: string | null
+          completed_date?: string | null
+          created_at?: string
+          deadline_date?: string | null
+          id?: string
+          member_id?: string | null
+          membership_start?: string | null
+          notes?: string | null
+          offered_date?: string | null
+          provider?: string | null
+          requirement_applies?: boolean
+          status?: string
+          training_type?: Database["public"]["Enums"]["amo_training_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amo_training_courses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "amo_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amo_workplaces: {
+        Row: {
+          address: string | null
+          created_at: string
+          employee_count: number
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          employee_count?: number
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          employee_count?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       api_integrations: {
         Row: {
           created_at: string | null
@@ -11441,6 +12098,28 @@ export type Database = {
       absence_request_status: "pending" | "approved" | "rejected"
       absence_type: "sick" | "vacation" | "other"
       absence_type_v2: "vacation" | "sick" | "no_show" | "day_off"
+      amo_apv_reason:
+        | "regular_cycle"
+        | "organisational_change"
+        | "relocation"
+        | "incident"
+        | "other"
+      amo_meeting_status: "planned" | "completed" | "overdue" | "cancelled"
+      amo_meeting_type: "amo_meeting" | "annual_discussion" | "extraordinary"
+      amo_role_type:
+        | "admin"
+        | "ledelsesrepresentant"
+        | "arbejdsleder"
+        | "amr"
+        | "readonly"
+      amo_rule_type: "lovpligtigt" | "anbefalet" | "intern"
+      amo_task_priority: "low" | "medium" | "high" | "critical"
+      amo_task_status: "open" | "in_progress" | "done" | "overdue"
+      amo_training_type:
+        | "mandatory_3day"
+        | "supplementary"
+        | "internal_workshop"
+        | "legal_update"
       app_role: "admin" | "payroll" | "manager" | "agent"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
@@ -11624,6 +12303,31 @@ export const Constants = {
       absence_request_status: ["pending", "approved", "rejected"],
       absence_type: ["sick", "vacation", "other"],
       absence_type_v2: ["vacation", "sick", "no_show", "day_off"],
+      amo_apv_reason: [
+        "regular_cycle",
+        "organisational_change",
+        "relocation",
+        "incident",
+        "other",
+      ],
+      amo_meeting_status: ["planned", "completed", "overdue", "cancelled"],
+      amo_meeting_type: ["amo_meeting", "annual_discussion", "extraordinary"],
+      amo_role_type: [
+        "admin",
+        "ledelsesrepresentant",
+        "arbejdsleder",
+        "amr",
+        "readonly",
+      ],
+      amo_rule_type: ["lovpligtigt", "anbefalet", "intern"],
+      amo_task_priority: ["low", "medium", "high", "critical"],
+      amo_task_status: ["open", "in_progress", "done", "overdue"],
+      amo_training_type: [
+        "mandatory_3day",
+        "supplementary",
+        "internal_workshop",
+        "legal_update",
+      ],
       app_role: ["admin", "payroll", "manager", "agent"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
