@@ -100,11 +100,11 @@ export default function CommissionLeague() {
   // Active season hooks
   const { data: currentRound } = useCurrentRound(season?.status === "active" ? season?.id : undefined);
   const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
-  const { data: roundStandings } = useRoundStandings(currentRound?.status === "completed" ? currentRound?.id : undefined);
   const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
   const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
-  const [selectedHistoryRoundId, setSelectedHistoryRoundId] = useState<string | undefined>();
-  const { data: historyRoundStandings } = useRoundStandings(selectedHistoryRoundId);
+  const [selectedRoundIndex, setSelectedRoundIndex] = useState(-1); // -1 = "Samlet stilling"
+  const selectedRound = selectedRoundIndex >= 0 && roundHistory ? roundHistory[selectedRoundIndex] : undefined;
+  const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.id);
   const { data: prizeLeaders } = usePrizeLeaders(
     season?.status === "active" ? season?.id : undefined,
     season?.start_date
