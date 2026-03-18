@@ -283,34 +283,55 @@ export default function CommissionLeague() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
-              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
-                    <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 border border-indigo-500/20 border-t-2 border-t-indigo-500/30 p-6 md:p-8 shadow-lg shadow-indigo-500/5">
+                {/* Mobile: stacked center-first | Desktop: 3-column grid */}
+                <div className="flex flex-col items-center text-center gap-5 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:text-left md:gap-6">
+
+                  {/* === LEFT COLUMN === */}
+                  <div className="order-2 md:order-1 flex flex-col gap-1.5">
+                    <div className="inline-flex items-center gap-2 self-center md:self-start">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                        {isQualificationPhase ? "Kvalifikationsrunde" : `Runde ${currentRound?.round_number ?? "?"}`}
+                      </span>
+                      {currentRound?.status === "active" && !isQualificationPhase && (
+                        <span className="text-[10px] text-muted-foreground">(i gang)</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {enrollmentCount ?? 0} spillere tilmeldt
+                    </span>
                     {isFan && (
-                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400 w-fit self-center md:self-start">
                         <Eye className="h-3 w-3 mr-1" />
                         Fan
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {isQualificationPhase
-                      ? `Kvalifikationsrunde • ${enrollmentCount ?? 0} spillere`
-                      : `Runde ${currentRound?.round_number ?? "?"} ${currentRound?.status === "active" ? "(i gang)" : currentRound?.status === "completed" ? "(afsluttet)" : ""} • ${enrollmentCount ?? 0} spillere`
-                    }
-                  </p>
-                  <span className="text-xs text-muted-foreground/60 mt-1">Formand: Oscar Belcher</span>
-                  <div className="mt-1">
+
+                  {/* === CENTER COLUMN === */}
+                  <div className="order-1 md:order-2 flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-9 w-9 md:h-10 md:w-10 text-yellow-500 trophy-glow drop-shadow-[0_0_12px_rgba(234,179,8,0.4)]" />
+                      <h1 className="text-3xl md:text-4xl font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                        Sæson {season.season_number}
+                      </h1>
+                    </div>
+                    <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
                     <LeagueRulesSheet compact />
                   </div>
-                </div>
-                {isQualificationPhase && (
-                  <div className="flex-shrink-0">
-                    <QualificationCountdown endDate={season.qualification_end_at} startDate={season.qualification_source_start} />
+
+                  {/* === RIGHT COLUMN === */}
+                  <div className="order-3 flex justify-center md:justify-end">
+                    {isQualificationPhase && (
+                      <QualificationCountdown endDate={season.qualification_end_at} startDate={season.qualification_source_start} />
+                    )}
                   </div>
-                )}
+
+                </div>
               </div>
           </div>
 
