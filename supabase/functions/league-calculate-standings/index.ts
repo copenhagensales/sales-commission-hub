@@ -119,12 +119,18 @@ Deno.serve(async (req) => {
       console.error("[league-calculate-standings] Failed to fetch agents:", agentsError);
     }
 
-    // Build employee -> agent email map
-    const employeeToAgentEmail: Record<string, string> = {};
+    // Build employee -> agent emails map (multi-email support)
+    const employeeToAgentEmails: Record<string, string[]> = {};
     for (const mapping of agentMappings || []) {
       const agent = (agents || []).find((a) => a.id === mapping.agent_id);
       if (agent?.email) {
-        employeeToAgentEmail[mapping.employee_id] = agent.email.toLowerCase();
+        const email = agent.email.toLowerCase();
+        if (!employeeToAgentEmails[mapping.employee_id]) {
+          employeeToAgentEmails[mapping.employee_id] = [];
+        }
+        if (!employeeToAgentEmails[mapping.employee_id].includes(email)) {
+          employeeToAgentEmails[mapping.employee_id].push(email);
+        }
       }
     }
 
@@ -139,15 +145,18 @@ Deno.serve(async (req) => {
     }
 
     for (const emp of empData || []) {
-      if (!employeeToAgentEmail[emp.id] && emp.work_email) {
-        employeeToAgentEmail[emp.id] = emp.work_email.toLowerCase();
+      if (!employeeToAgentEmails[emp.id]) {
+        employeeToAgentEmails[emp.id] = [];
       }
-      if (!employeeToAgentEmail[emp.id] && emp.private_email) {
-        employeeToAgentEmail[emp.id] = emp.private_email.toLowerCase();
+      if (emp.work_email && !employeeToAgentEmails[emp.id].includes(emp.work_email.toLowerCase())) {
+        employeeToAgentEmails[emp.id].push(emp.work_email.toLowerCase());
+      }
+      if (emp.private_email && !employeeToAgentEmails[emp.id].includes(emp.private_email.toLowerCase())) {
+        employeeToAgentEmails[emp.id].push(emp.private_email.toLowerCase());
       }
     }
 
-    console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmail).length} employees`);
+    console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmails).length} employees (multi-email)`);
 
     // 4. Fetch ALL sales in qualification period (TM + FM unified)
     // Paginate to avoid the 1000 row limit
