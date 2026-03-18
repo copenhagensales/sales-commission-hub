@@ -355,11 +355,6 @@ export const routes: RouteConfig[] = [
   // System Stability (integration health dashboard)
   { path: "/system-stability", component: SystemStability, access: "role", positionPermission: "menu_security_dashboard" },
 
-  // League Admin
-  { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
-
-  // H2H Admin
-  { path: "/admin/h2h", component: H2HAdminBoard, access: "role", positionPermission: "menu_league_admin" },
 
   // KPI Definitions (Owner only)
   { path: "/admin/kpi-definitions", component: KpiDefinitions, access: "role", positionPermission: "menu_kpi_definitions" },
