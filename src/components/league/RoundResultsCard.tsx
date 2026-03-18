@@ -115,6 +115,6 @@ function calculatePointsDisplay(
   totalDivisions: number,
   multiplier: number
 ): number {
-  const basePoints = Math.max(0, (totalDivisions - division) * 20 - (rank - 1) * 5);
+  const basePoints = Math.max(0, (totalDivisions - division + 1) * 20 - (rank - 1) * 5);
   return Math.round(basePoints * multiplier);
 }

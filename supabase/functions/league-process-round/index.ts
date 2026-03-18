@@ -24,7 +24,7 @@ function calculatePoints(
   totalDivisions: number,
   roundMultiplier: number
 ): number {
-  const basePoints = Math.max(0, (totalDivisions - division) * 20 - (rankInDivision - 1) * 5);
+  const basePoints = Math.max(0, (totalDivisions - division + 1) * 20 - (rankInDivision - 1) * 5);
   return Math.round(basePoints * roundMultiplier);
 }
 
