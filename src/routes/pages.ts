@@ -146,7 +146,7 @@ export const CommissionLeague = lazyPage(() => import("@/pages/CommissionLeague"
 
 
 // League Admin
-export const LeagueAdminDashboard = lazyPage(() => import("@/pages/admin/LeagueAdminDashboard"));
+
 
 // H2H Admin
 export const H2HAdminBoard = lazyPage(() => import("@/pages/H2HAdminBoard"));
