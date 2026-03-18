@@ -229,7 +229,7 @@ const PlayerRow = memo(function PlayerRow({
             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
-            <div className="text-[10px] text-muted-foreground sm:hidden">{standing.deals_count} salg</div>
+            <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">{standing.deals_count} salg</span>
