@@ -21,7 +21,8 @@ serve(async (req) => {
     console.log('Received application webhook:', JSON.stringify(body));
 
     // Validate required fields
-    const { first_name, last_name, email, phone, role, notes } = body;
+    const { first_name, last_name, email, phone, role, notes, fbclid } = body;
+    console.log("Received fbclid:", fbclid);
 
     if (!first_name || !last_name || !email || !phone || !role) {
       console.error('Missing required fields:', { first_name, last_name, email, phone, role });
