@@ -147,7 +147,7 @@ export const routes: RouteConfig[] = [
   { path: "/refer-a-friend", component: ReferAFriend, access: "role", positionPermission: "menu_refer_a_friend" },
   { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "protected" },
   { path: "/commission-league", component: CommissionLeague, access: "role", positionPermission: "menu_commission_league" },
-  { path: "/commission-league/test", component: CommissionLeagueTest, access: "role", positionPermission: "menu_commission_league" },
+  
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/tdc-public", component: TdcOpsummeringPublic, access: "public" },
