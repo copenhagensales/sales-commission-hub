@@ -702,7 +702,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             <Collapsible open={spilOpen} onOpenChange={setSpilOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
+                ["/head-to-head", "/commission-league"].some(path => location.pathname === path || location.pathname.startsWith(path))
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
