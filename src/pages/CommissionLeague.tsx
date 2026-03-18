@@ -323,8 +323,6 @@ export default function CommissionLeague() {
             isActive={isActivePhase}
           />
 
-          {/* Rules box */}
-          <LeagueRulesSheet />
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
