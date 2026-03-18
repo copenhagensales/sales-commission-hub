@@ -127,6 +127,8 @@ import {
   AmoKemiApv,
   AmoTraining,
   AmoDocuments,
+  AmoTasks,
+  AmoAuditLog,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
