@@ -102,11 +102,7 @@ import {
   UpcomingStarts,
   SalarySchemes,
   CommissionLeague,
-  CommissionLeagueTest,
-  LeagueAdminDashboard,
-  H2HAdminBoard,
   KpiDefinitions,
-  TeamH2H,
   SalaryTypes,
   TdcOpsummering,
   TdcOpsummeringPublic,
@@ -133,7 +129,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
-  { path: "/team/h2h", component: TeamH2H, access: "role", positionPermission: "menu_team_h2h" },
+  
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
   { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
@@ -151,7 +147,7 @@ export const routes: RouteConfig[] = [
   { path: "/refer-a-friend", component: ReferAFriend, access: "role", positionPermission: "menu_refer_a_friend" },
   { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "protected" },
   { path: "/commission-league", component: CommissionLeague, access: "role", positionPermission: "menu_commission_league" },
-  { path: "/commission-league/test", component: CommissionLeagueTest, access: "role", positionPermission: "menu_commission_league" },
+  
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/tdc-public", component: TdcOpsummeringPublic, access: "public" },
@@ -359,11 +355,6 @@ export const routes: RouteConfig[] = [
   // System Stability (integration health dashboard)
   { path: "/system-stability", component: SystemStability, access: "role", positionPermission: "menu_security_dashboard" },
 
-  // League Admin
-  { path: "/admin/league", component: LeagueAdminDashboard, access: "role", positionPermission: "menu_league_admin" },
-
-  // H2H Admin
-  { path: "/admin/h2h", component: H2HAdminBoard, access: "role", positionPermission: "menu_league_admin" },
 
   // KPI Definitions (Owner only)
   { path: "/admin/kpi-definitions", component: KpiDefinitions, access: "role", positionPermission: "menu_kpi_definitions" },

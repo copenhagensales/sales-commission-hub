@@ -702,7 +702,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             <Collapsible open={spilOpen} onOpenChange={setSpilOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
+                ["/head-to-head", "/commission-league"].some(path => location.pathname === path || location.pathname.startsWith(path))
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -767,65 +767,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   </NavLink>
                 )}
                 
-                {/* Liga Test Board - kun for ejere */}
-                {p.position?.name?.toLowerCase() === "ejer" && (
-                  <NavLink
-                    to="/commission-league/test"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                      location.pathname === "/commission-league/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <FlaskConical className="h-4 w-4" />
-                    Liga Test Board
-                  </NavLink>
-                )}
-
-                {/* Liga Admin */}
-                {p.canViewLeagueAdmin && (
-                  <NavLink
-                    to="/admin/league"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                      location.pathname === "/admin/league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <Shield className="h-4 w-4" />
-                    Liga Admin
-                  </NavLink>
-                )}
-
-                {/* H2H Admin */}
-                {p.canViewLeagueAdmin && (
-                  <NavLink
-                    to="/admin/h2h"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                      location.pathname === "/admin/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <Swords className="h-4 w-4" />
-                    H2H Admin
-                  </NavLink>
-                )}
-
-                {/* Team H2H */}
-                {p.canView('menu_team_h2h') && (
-                  <NavLink
-                    to="/team/h2h"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ml-4",
-                      location.pathname === "/team/h2h" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <Users className="h-4 w-4" />
-                    Team H2H
-                  </NavLink>
-                )}
               </CollapsibleContent>
             </Collapsible>
           )}

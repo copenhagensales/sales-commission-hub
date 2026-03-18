@@ -287,7 +287,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
             items={[{ icon: Users, label: "Medarbejdere" }, { icon: Briefcase, label: "Teams" }, { icon: Shield, label: "Rettigheder" }, { icon: LogIn, label: "Login Log" }]} />
 
           <ZoneCard title="Spil & Liga" icon={Trophy} status="ok" dimmed={!isVisible("app") && !isVisible("app-games")}
-            items={[{ icon: Trophy, label: "Salgsligaen" }, { icon: Swords, label: "Head-to-Head" }, { icon: Gamepad2, label: "Team H2H" }]} />
+            items={[{ icon: Trophy, label: "Salgsligaen" }, { icon: Swords, label: "Head-to-Head" }]} />
 
           <ZoneCard title="Rekruttering" icon={UserPlus} status="ok" dimmed={!isVisible("app") && !isVisible("app-recruitment")}
             items={[{ icon: ClipboardList, label: "Pipeline" }, { icon: UserPlus, label: "Kandidater" }, { icon: Heart, label: "Winback" }, { icon: MessageSquare, label: "Beskeder" }]} />
