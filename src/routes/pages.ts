@@ -186,3 +186,7 @@ export const OnboardingAnalyse = lazyPage(() => import("@/pages/OnboardingAnalys
 // AMO Compliance Hub
 export const AmoDashboard = lazyPage(() => import("@/pages/amo/AmoDashboard"));
 export const AmoPlaceholder = lazyPage(() => import("@/pages/amo/AmoPlaceholder"));
+export const AmoOrganisation = lazyPage(() => import("@/pages/amo/AmoOrganisation"));
+export const AmoMeetings = lazyPage(() => import("@/pages/amo/AmoMeetings"));
+export const AmoAnnualDiscussion = lazyPage(() => import("@/pages/amo/AmoAnnualDiscussion"));
+export const AmoApv = lazyPage(() => import("@/pages/amo/AmoApv"));
