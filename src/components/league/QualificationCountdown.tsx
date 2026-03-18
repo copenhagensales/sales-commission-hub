@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { Clock } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 interface QualificationCountdownProps {
@@ -67,24 +66,37 @@ export function QualificationCountdown({ endDate, startDate }: QualificationCoun
 
   return (
     <div className={cn(
-      "flex flex-col items-center gap-3 rounded-lg p-3",
+      "flex flex-col items-center gap-3 rounded-xl p-4",
       isUrgent && "countdown-urgent"
     )}>
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Clock className="h-4 w-4" />
-        <span className="text-sm">Kvalifikation slutter om</span>
+        <Clock className="h-3.5 w-3.5" />
+        <span className="text-xs font-medium uppercase tracking-wider">Kvalifikation slutter om</span>
       </div>
-      <div className="flex gap-2">
+      <div className="flex items-center gap-1">
         <TimeBlock value={timeLeft.days} label="dage" urgent={isUrgent} />
+        <Separator urgent={isUrgent} />
         <TimeBlock value={timeLeft.hours} label="timer" urgent={isUrgent} />
+        <Separator urgent={isUrgent} />
         <TimeBlock value={timeLeft.minutes} label="min" urgent={isUrgent} />
+        <Separator urgent={isUrgent} />
         <TimeBlock value={timeLeft.seconds} label="sek" urgent={isUrgent} />
       </div>
       {progressPercent !== null && (
-        <div className="w-full space-y-1">
-          <Progress value={progressPercent} className="h-1.5" />
-          <p className="text-[10px] text-muted-foreground text-center">
-            {Math.round(progressPercent)}% af kvalifikationen gennemført
+        <div className="w-full space-y-1.5">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/5">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                isUrgent
+                  ? "bg-gradient-to-r from-red-500 to-orange-400"
+                  : "bg-gradient-to-r from-emerald-500 to-cyan-400"
+              )}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 text-center">
+            {Math.round(progressPercent)}% gennemført
           </p>
         </div>
       )}
@@ -92,21 +104,30 @@ export function QualificationCountdown({ endDate, startDate }: QualificationCoun
   );
 }
 
+function Separator({ urgent }: { urgent?: boolean }) {
+  return (
+    <span className={cn(
+      "text-lg font-bold pb-4",
+      urgent ? "text-red-400/60" : "text-muted-foreground/40"
+    )}>:</span>
+  );
+}
+
 function TimeBlock({ value, label, urgent }: { value: number; label: string; urgent?: boolean }) {
   return (
     <div className={cn(
-      "flex flex-col items-center rounded-lg px-3 py-2 min-w-[60px] transition-colors",
+      "flex flex-col items-center rounded-lg px-2.5 py-1.5 min-w-[52px] transition-colors backdrop-blur-sm",
       urgent
-        ? "bg-red-500/15 border border-red-500/30"
-        : "bg-slate-800/50"
+        ? "bg-red-500/10 border border-red-500/20"
+        : "bg-white/5 border border-white/10"
     )}>
       <span className={cn(
-        "text-2xl font-bold",
+        "text-xl font-bold font-mono tabular-nums",
         urgent ? "text-red-400" : "text-foreground"
       )}>
         {value.toString().padStart(2, "0")}
       </span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">{label}</span>
     </div>
   );
 }
