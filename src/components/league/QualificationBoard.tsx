@@ -229,10 +229,10 @@ const PlayerRow = memo(function PlayerRow({
             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
-            <div className="text-[10px] text-muted-foreground sm:hidden">{standing.deals_count} salg</div>
+            <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
-            <span className="text-sm text-muted-foreground">{standing.deals_count} salg</span>
+            <span className="text-sm text-muted-foreground">0 pt</span>
           </div>
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}
