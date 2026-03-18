@@ -124,6 +124,9 @@ import {
   AmoMeetings,
   AmoAnnualDiscussion,
   AmoApv,
+  AmoKemiApv,
+  AmoTraining,
+  AmoDocuments,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
