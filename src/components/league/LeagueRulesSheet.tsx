@@ -68,7 +68,7 @@ export function LeagueRulesSheet() {
               <p>4. Division: #1 = 20 pt, #2 = 15 pt, … #4 = 5 pt</p>
             </div>
             <p className="text-sm text-muted-foreground mt-1.5">
-              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 7 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
+              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 6 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
             </p>
           </div>
 
@@ -76,7 +76,7 @@ export function LeagueRulesSheet() {
           <div>
             <h4 className="font-semibold mb-1.5 text-primary">📅 Runder</h4>
             <p className="text-sm text-muted-foreground">
-              Sæsonen består af 1 kvalifikationsuge + 7 aktive runder. Hver uge er én runde. Din provision i ugen bestemmer din placering inden for divisionen. 14 spillere pr. division.
+              Sæsonen består af 1 kvalifikationsuge + 6 aktive runder. Hver uge er én runde. Din provision i ugen bestemmer din placering inden for divisionen. 14 spillere pr. division.
             </p>
             <p className="text-sm text-muted-foreground mt-1.5">
               Kvalifikationsugen sætter startdivisionerne — derefter begynder point at tælle.
