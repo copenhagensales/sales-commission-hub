@@ -129,7 +129,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
-  { path: "/team/h2h", component: TeamH2H, access: "role", positionPermission: "menu_team_h2h" },
+  
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
   { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
