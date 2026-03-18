@@ -182,3 +182,7 @@ export const SystemStability = lazyPage(() => import("@/pages/SystemStability"))
 
 // Onboarding Analyse
 export const OnboardingAnalyse = lazyPage(() => import("@/pages/OnboardingAnalyse"));
+
+// AMO Compliance Hub
+export const AmoDashboard = lazyPage(() => import("@/pages/amo/AmoDashboard"));
+export const AmoPlaceholder = lazyPage(() => import("@/pages/amo/AmoPlaceholder"));

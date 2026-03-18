@@ -672,5 +672,17 @@ export function usePermissions() {
     canViewEconomicBudget: canView("menu_economic_budget"),
     canViewEconomicMapping: canView("menu_economic_mapping"),
     canViewEconomicUpload: canView("menu_economic_upload"),
+    // AMO permissions
+    canViewAmoDashboard: canView("menu_amo_dashboard"),
+    canViewAmoOrganisation: canView("menu_amo_organisation"),
+    canViewAmoAnnualDiscussion: canView("menu_amo_annual_discussion"),
+    canViewAmoMeetings: canView("menu_amo_meetings"),
+    canViewAmoApv: canView("menu_amo_apv"),
+    canViewAmoKemiApv: canView("menu_amo_kemi_apv"),
+    canViewAmoTraining: canView("menu_amo_training"),
+    canViewAmoDocuments: canView("menu_amo_documents"),
+    canViewAmoTasks: canView("menu_amo_tasks"),
+    canViewAmoSettings: canView("menu_amo_settings"),
+    canViewAmoAuditLog: canView("menu_amo_audit_log"),
   };
 }

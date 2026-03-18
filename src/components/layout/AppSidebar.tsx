@@ -90,6 +90,9 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [economicOpen, setEconomicOpen] = useState(
     location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload"
   );
+  const [amoOpen, setAmoOpen] = useState(
+    location.pathname.startsWith("/amo")
+  );
 
   // Fetch employee name and pending contracts count
   // OPTIMIZED: Removed refetchInterval to reduce DB load - only refetch on window focus
@@ -473,6 +476,11 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
+  
+  // Check if AMO menu should be visible
+  const showAmoMenu = p.canView("menu_section_amo") && (
+    p.canViewAmoDashboard || p.canViewAmoOrganisation || p.canViewAmoMeetings || p.canViewAmoApv
+  );
   
   // Check if Spil (Games) menu should be visible
   const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
@@ -1696,6 +1704,125 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <BookOpen className="h-4 w-4" />
                     KPI Definitioner
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* AMO Compliance Hub */}
+          {showAmoMenu && (
+            <Collapsible open={amoOpen} onOpenChange={setAmoOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/amo")
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5" />
+                  Arbejdsmiljø
+                </div>
+                {amoOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewAmoDashboard && (
+                  <NavLink to="/amo" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </NavLink>
+                )}
+                {p.canViewAmoOrganisation && (
+                  <NavLink to="/amo/organisation" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/organisation" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Users className="h-4 w-4" />
+                    Organisation
+                  </NavLink>
+                )}
+                {p.canViewAmoAnnualDiscussion && (
+                  <NavLink to="/amo/annual-discussion" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/annual-discussion" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Calendar className="h-4 w-4" />
+                    Årlig drøftelse
+                  </NavLink>
+                )}
+                {p.canViewAmoMeetings && (
+                  <NavLink to="/amo/meetings" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/meetings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <ClipboardList className="h-4 w-4" />
+                    Møder
+                  </NavLink>
+                )}
+                {p.canViewAmoApv && (
+                  <NavLink to="/amo/apv" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/apv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <FileText className="h-4 w-4" />
+                    APV
+                  </NavLink>
+                )}
+                {p.canViewAmoKemiApv && (
+                  <NavLink to="/amo/kemi-apv" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/kemi-apv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <FlaskConical className="h-4 w-4" />
+                    Kemi-APV
+                  </NavLink>
+                )}
+                {p.canViewAmoTraining && (
+                  <NavLink to="/amo/training" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/training" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <GraduationCap className="h-4 w-4" />
+                    Uddannelse
+                  </NavLink>
+                )}
+                {p.canViewAmoDocuments && (
+                  <NavLink to="/amo/documents" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/documents" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Database className="h-4 w-4" />
+                    Dokumenter
+                  </NavLink>
+                )}
+                {p.canViewAmoTasks && (
+                  <NavLink to="/amo/tasks" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/tasks" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <ListChecks className="h-4 w-4" />
+                    Opgaver
+                  </NavLink>
+                )}
+                {p.canViewAmoSettings && (
+                  <NavLink to="/amo/settings" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Settings className="h-4 w-4" />
+                    Indstillinger
+                  </NavLink>
+                )}
+                {p.canViewAmoAuditLog && (
+                  <NavLink to="/amo/audit-log" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/amo/audit-log" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Clock className="h-4 w-4" />
+                    Audit log
                   </NavLink>
                 )}
               </CollapsibleContent>

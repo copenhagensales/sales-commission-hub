@@ -118,6 +118,8 @@ import {
   SystemStability,
   TeamGoals,
   OnboardingAnalyse,
+  AmoDashboard,
+  AmoPlaceholder,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -375,6 +377,19 @@ export const routes: RouteConfig[] = [
   { path: "/economic/expenses", component: EconomicExpenses, access: "role", positionPermission: "menu_economic_expenses" },
   { path: "/economic/budget", component: EconomicBudget, access: "role", positionPermission: "menu_economic_budget" },
   { path: "/economic/mapping", component: EconomicMapping, access: "role", positionPermission: "menu_economic_mapping" },
+
+  // AMO Compliance Hub
+  { path: "/amo", component: AmoDashboard, access: "role", positionPermission: "menu_amo_dashboard" },
+  { path: "/amo/organisation", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_organisation" },
+  { path: "/amo/annual-discussion", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_annual_discussion" },
+  { path: "/amo/meetings", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_meetings" },
+  { path: "/amo/apv", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_apv" },
+  { path: "/amo/kemi-apv", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_kemi_apv" },
+  { path: "/amo/training", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_training" },
+  { path: "/amo/documents", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_documents" },
+  { path: "/amo/tasks", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_tasks" },
+  { path: "/amo/settings", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_settings" },
+  { path: "/amo/audit-log", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_audit_log" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
