@@ -57,7 +57,7 @@ import { da } from "date-fns/locale";
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { role, isOwner } = useUnifiedPermissions();
+  const { role } = useUnifiedPermissions();
   const canParticipate = !NON_PARTICIPATING_ROLES.includes(role);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
