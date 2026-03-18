@@ -477,6 +477,11 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Check if Admin menu should be visible
   const showAdminMenu = p.canViewKpiDefinitions;
   
+  // Check if AMO menu should be visible
+  const showAmoMenu = p.canView("menu_section_amo") && (
+    p.canViewAmoDashboard || p.canViewAmoOrganisation || p.canViewAmoMeetings || p.canViewAmoApv
+  );
+  
   // Check if Spil (Games) menu should be visible
   const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
   
