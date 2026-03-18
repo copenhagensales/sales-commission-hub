@@ -60,14 +60,15 @@ export function LeagueRulesSheet() {
               Point gives baseret på din placering i divisionen. #1 i divisionen får flest point, og hvert trin ned koster 5 point. Højere divisioner giver 20 ekstra basispoint per niveau — så selv sidstepladsen i en højere division slår førstepladsen i divisionen under.
             </p>
             <div className="text-sm text-muted-foreground mt-1.5 space-y-0.5">
-              <p className="font-medium text-foreground/80">Eksempel (4 divisioner, ×1.0):</p>
-              <p>Salgsligaen: #1 = 60 pt, #2 = 55, … #12 = 5 pt</p>
-              <p>1. Division: #1 = 40 pt, #2 = 35, … #8 = 5 pt</p>
-              <p>2. Division: #1 = 20 pt, #2 = 15, … #4 = 5 pt</p>
-              <p>3. Division: 0 pt (men du kan rykke op!)</p>
+              <p className="font-medium text-foreground/80">Eksempel (5 divisioner, ×1.0):</p>
+              <p>Superliga: #1 = 100 pt, #2 = 95, … #14 = 35 pt</p>
+              <p>1. Division: #1 = 80 pt, #2 = 75, … #14 = 15 pt</p>
+              <p>2. Division: #1 = 60 pt, #2 = 55 pt, …</p>
+              <p>3. Division: #1 = 40 pt, #2 = 35 pt, …</p>
+              <p>4. Division: #1 = 20 pt, #2 = 15 pt, … #4 = 5 pt</p>
             </div>
             <p className="text-sm text-muted-foreground mt-1.5">
-              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 6 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
+              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 7 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
             </p>
           </div>
 
