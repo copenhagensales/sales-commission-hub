@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     const sourceEndExclusive = sourceEndDate.toISOString().slice(0, 10);
     const playersPerDivision = season.config?.players_per_division || 14;
 
-    console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
+    console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEndExclusive} (exclusive)`);
 
     // 2. Get all active enrollments (exclude spectators)
     const { data: enrollments, error: enrollError } = await supabase
