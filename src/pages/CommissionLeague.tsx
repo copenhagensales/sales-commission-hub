@@ -329,9 +329,6 @@ export default function CommissionLeague() {
           </Collapsible>
           </div>
 
-          {/* Rules box */}
-          <LeagueRulesSheet />
-
           {/* Prize Showcase */}
           <PrizeShowcase
             standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
@@ -339,6 +336,9 @@ export default function CommissionLeague() {
             seasonStatus={season.status || ""}
             isActive={isActivePhase}
           />
+
+          {/* Rules box */}
+          <LeagueRulesSheet />
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
