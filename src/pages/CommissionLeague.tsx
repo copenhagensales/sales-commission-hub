@@ -430,20 +430,9 @@ export default function CommissionLeague() {
                 />
               )}
 
-              {/* Unenroll / stop following button */}
+              {/* Unenroll button (only for active players, not fans) */}
               <div className="flex justify-end">
-                {isFan ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleUnenroll}
-                    disabled={unenrollMutation.isPending}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    {unenrollMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Stop med at følge
-                  </Button>
-                ) : (
+                {isFan ? null : (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
