@@ -31,5 +31,12 @@
 2. ✅ **Uddannelse og certifikater** (`/amo/training`): Kursuskrav CRUD, 4 kursustyper, auto deadline-beregning (3 mdr), certifikat-sporing, overdue-advarsler.
 3. ✅ **Dokumentcenter** (`/amo/documents`): Upload til storage bucket, metadata og kategorisering, søgning og filtrering, version-tracking, DOKO-reference, udløbsadvarsler.
 
+## AMO Compliance Hub — Fase 4 ✅
+
+### Implementeret
+1. ✅ **Opgavemotor** (`/amo/tasks`): Fuld CRUD, prioritet/status-styring, modul-filtrering, overdue-auto-detection, CSV-eksport.
+2. ✅ **Audit Log** (`/amo/audit-log`): Log-viewer med søgning, tabel/handling-filtre, detaljevisning med gamle/nye værdier, CSV-eksport.
+3. ✅ **Eksport**: CSV-eksport integreret i både Opgavemotor og Audit Log.
+
 ### Næste faser
-- **Fase 4**: Opgavemotor, Notifikationer, Eksport (PDF/CSV), Audit log triggers
+- **Fase 5**: Indstillinger, Notifikationer, Dashboard-udvidelser

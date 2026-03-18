@@ -193,3 +193,5 @@ export const AmoApv = lazyPage(() => import("@/pages/amo/AmoApv"));
 export const AmoKemiApv = lazyPage(() => import("@/pages/amo/AmoKemiApv"));
 export const AmoTraining = lazyPage(() => import("@/pages/amo/AmoTraining"));
 export const AmoDocuments = lazyPage(() => import("@/pages/amo/AmoDocuments"));
+export const AmoTasks = lazyPage(() => import("@/pages/amo/AmoTasks"));
+export const AmoAuditLog = lazyPage(() => import("@/pages/amo/AmoAuditLog"));
