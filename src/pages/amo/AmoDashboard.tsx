@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Calendar, FileText, AlertTriangle, CheckCircle2, Clock, Users, Beaker, GraduationCap, FolderOpen, ListChecks } from "lucide-react";
 import { format, differenceInDays, addMonths, addYears } from "date-fns";
