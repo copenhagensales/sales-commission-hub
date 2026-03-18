@@ -111,6 +111,7 @@ export default function CommissionLeague() {
     season?.status === "active" ? season?.id : undefined,
     season?.start_date
   );
+  const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
