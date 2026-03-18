@@ -169,12 +169,18 @@ export default function AmoDashboard() {
 
   const hazardProducts = kemiApv?.filter(k => k.hazard_flag) || [];
   const kemiMissingSds = hazardProducts.filter(k => !k.sds_url);
-  const kemiStatus: ComplianceStatus = hazardProducts.length === 0
-    ? (kemiApv?.length ?? 0) === 0 ? "unknown" : "green"
-    : kemiMissingSds.length > 0 ? "red" : "green";
-  const kemiDetail = kemiMissingSds.length > 0
-    ? `${kemiMissingSds.length} farlige produkter mangler sikkerhedsblad`
-    : `${kemiApv?.length || 0} produkter registreret`;
+  const kemiOverdueReviews = (kemiApv || []).filter(k => k.next_review_due && new Date(k.next_review_due) < today);
+  const kemiSoonDueReviews = (kemiApv || []).filter(k => k.next_review_due && new Date(k.next_review_due) >= today && differenceInDays(new Date(k.next_review_due), today) <= 30);
+  const kemiStatus: ComplianceStatus = (kemiApv?.length ?? 0) === 0
+    ? "unknown"
+    : kemiMissingSds.length > 0 || kemiOverdueReviews.length > 0 ? "red"
+    : kemiSoonDueReviews.length > 0 ? "yellow"
+    : "green";
+  const kemiDetailParts: string[] = [];
+  if (kemiOverdueReviews.length > 0) kemiDetailParts.push(`${kemiOverdueReviews.length} forfaldne reviews`);
+  if (kemiMissingSds.length > 0) kemiDetailParts.push(`${kemiMissingSds.length} mangler sikkerhedsblad`);
+  if (kemiSoonDueReviews.length > 0) kemiDetailParts.push(`${kemiSoonDueReviews.length} review snart`);
+  const kemiDetail = kemiDetailParts.length > 0 ? kemiDetailParts.join(", ") : `${kemiApv?.length || 0} produkter registreret`;
 
   const nearestElection = elections?.[0];
   const electionDue = nearestElection?.next_election_due ? new Date(nearestElection.next_election_due) : null;
