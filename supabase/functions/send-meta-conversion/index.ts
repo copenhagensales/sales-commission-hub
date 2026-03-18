@@ -5,11 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function hashEmail(email: string) {
-  const msgUint8 = new TextEncoder().encode(email.trim().toLowerCase());
+async function hashValue(value: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(value.trim().toLowerCase());
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 serve(async (req) => {
@@ -45,24 +44,20 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Config missing' }), { status: 500 });
     }
 
-    // Hash email
-    const hashedEmail = await hashEmail(record.email);
+    // Build user_data with hashed PII
+    const userData: Record<string, unknown> = {
+      em: [await hashValue(record.email)],
+      fbc: fbc,
+    };
 
-    // Timestamp (seconds)
-    const timestampSeconds = Math.floor(Date.now() / 1000);
-
-    // Format fbc
-    const fbc = `fb.1.${timestampSeconds}.${record.fbclid}`;
-
-    console.log(`[Meta Conversion] fbc: ${fbc}`);
+    if (record.phone) userData.ph = [await hashValue(record.phone)];
+    if (record.first_name) userData.fn = [await hashValue(record.first_name)];
+    if (record.last_name) userData.ln = [await hashValue(record.last_name)];
 
     const event = {
       event_name: 'Hire',
       event_time: timestampSeconds,
-      user_data: {
-        em: [hashedEmail],
-        fbc: fbc
-      },
+      user_data: userData,
       action_source: 'system_generated'
     };
 
