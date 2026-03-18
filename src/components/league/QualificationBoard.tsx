@@ -16,6 +16,7 @@ interface QualificationBoardProps {
   isLoading: boolean;
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
+  maxProvision?: number;
 }
 
 export function QualificationBoard({
