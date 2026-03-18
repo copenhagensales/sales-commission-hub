@@ -177,8 +177,8 @@ export function useRoundHistory(seasonId: string | undefined) {
         .from("league_rounds")
         .select("*")
         .eq("season_id", seasonId)
-        .eq("status", "completed")
-        .order("round_number", { ascending: false });
+        .in("status", ["completed", "active"])
+        .order("round_number", { ascending: true });
 
       if (error) throw error;
       return data as LeagueRound[];
