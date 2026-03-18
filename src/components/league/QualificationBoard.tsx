@@ -234,17 +234,11 @@ const PlayerRow = memo(function PlayerRow({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="text-right relative">
-            <div className="absolute inset-0 flex items-center justify-end pr-1">
-              <div
-                className="h-6 rounded-sm bg-primary/10"
-                style={{ width: `${Math.max(provisionPercent, 2)}%` }}
-              />
-            </div>
-            <div className="relative font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
+          <div className="text-right">
+            <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
-            <div className="relative text-[10px] text-muted-foreground sm:hidden">0 pt</div>
+            <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">0 pt</span>
