@@ -283,7 +283,7 @@ export default function CommissionLeague() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
-              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg">
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3">
                     <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
@@ -301,22 +301,12 @@ export default function CommissionLeague() {
                       : `Runde ${currentRound?.round_number ?? "?"} ${currentRound?.status === "active" ? "(i gang)" : currentRound?.status === "completed" ? "(afsluttet)" : ""} • ${enrollmentCount ?? 0} spillere`
                     }
                   </p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <Sparkles className="h-3.5 w-3.5 text-yellow-400/80" />
-                    <span className="text-sm italic text-yellow-200/70">
-                      {getRandomQuote(getPerformanceStatus(
-                        myStanding ? (myStanding.current_provision / 1) * 100 : 50,
-                        myStanding ? myStanding.projected_rank <= 3 : false,
-                        myStanding ? myStanding.projected_rank <= 7 : true
-                      )).quote}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-muted-foreground/60">Landstræner: Oscar Belcher</span>
                   </div>
                 </div>
                 {isQualificationPhase && (
-                  <div className="mt-4 pt-4 border-t border-indigo-500/20">
+                  <div className="flex-shrink-0">
                     <QualificationCountdown endDate={season.qualification_end_at} startDate={season.qualification_source_start} />
                   </div>
                 )}
