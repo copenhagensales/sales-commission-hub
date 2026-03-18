@@ -556,7 +556,7 @@ export default function CommissionLeague() {
                 </Card>
               )}
 
-              {/* Active season tabs */}
+              {/* Active season with round navigation */}
               <Card className="bg-slate-800/30 border-slate-700">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -570,76 +570,56 @@ export default function CommissionLeague() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="standings">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="standings">Samlet stilling</TabsTrigger>
-                      <TabsTrigger value="thisWeek">Denne uge</TabsTrigger>
-                      <TabsTrigger value="history">Rundehistorik</TabsTrigger>
-                    </TabsList>
+                  {/* Round navigation */}
+                  <div className="flex items-center justify-between mb-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={selectedRoundIndex <= -1}
+                      onClick={() => setSelectedRoundIndex(i => i - 1)}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <span className="text-sm font-semibold">
+                      {selectedRoundIndex === -1
+                        ? "Samlet stilling"
+                        : `Runde ${selectedRound?.round_number ?? ""}${selectedRound?.status === "active" ? " (i gang)" : ""}`}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={!roundHistory || selectedRoundIndex >= roundHistory.length - 1}
+                      onClick={() => setSelectedRoundIndex(i => i + 1)}
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </div>
 
-                    <TabsContent value="standings">
-                      <ActiveSeasonBoard
-                        standings={seasonStandings || []}
-                        playersPerDivision={playersPerDivision}
-                        isLoading={seasonStandingsLoading}
-                        currentEmployeeId={currentEmployeeId}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="thisWeek">
-                      {currentRound && currentRound.status === "completed" && roundStandings && roundStandings.length > 0 ? (
-                        <RoundResultsCard
-                          round={currentRound}
-                          standings={roundStandings}
-                          playersPerDivision={playersPerDivision}
-                          currentEmployeeId={currentEmployeeId}
-                        />
-                      ) : (
-                        <Card className="bg-card border-border">
-                          <CardContent className="py-10 text-center">
-                            <p className="text-muted-foreground text-sm">
-                              {currentRound?.status === "active" 
-                                ? `Runde ${currentRound.round_number} er stadig i gang. Resultater vises når runden afsluttes.`
-                                : "Ingen rundedata endnu."}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="history">
-                      {roundHistory && roundHistory.length > 0 ? (
-                        <div className="space-y-3">
-                          <div className="flex gap-2 flex-wrap">
-                            {roundHistory.map((r) => (
-                              <Button
-                                key={r.id}
-                                size="sm"
-                                variant={selectedHistoryRoundId === r.id ? "default" : "outline"}
-                                onClick={() => setSelectedHistoryRoundId(r.id)}
-                              >
-                                Runde {r.round_number}
-                              </Button>
-                            ))}
-                          </div>
-                          {selectedHistoryRoundId && historyRoundStandings && (
-                            <RoundResultsCard
-                              round={roundHistory.find(r => r.id === selectedHistoryRoundId)!}
-                              standings={historyRoundStandings}
-                              playersPerDivision={playersPerDivision}
-                              currentEmployeeId={currentEmployeeId}
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <Card className="bg-card border-border">
-                          <CardContent className="py-10 text-center">
-                            <p className="text-muted-foreground text-sm">Ingen afsluttede runder endnu.</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                  {selectedRoundIndex === -1 ? (
+                    <ActiveSeasonBoard
+                      standings={seasonStandings || []}
+                      playersPerDivision={playersPerDivision}
+                      isLoading={seasonStandingsLoading}
+                      currentEmployeeId={currentEmployeeId}
+                    />
+                  ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
+                    <RoundResultsCard
+                      round={selectedRound}
+                      standings={selectedRoundStandings}
+                      playersPerDivision={playersPerDivision}
+                      currentEmployeeId={currentEmployeeId}
+                    />
+                  ) : (
+                    <Card className="bg-card border-border">
+                      <CardContent className="py-10 text-center">
+                        <p className="text-muted-foreground text-sm">
+                          {selectedRound?.status === "active"
+                            ? `Runde ${selectedRound.round_number} er stadig i gang. Resultater vises når runden afsluttes.`
+                            : "Ingen rundedata endnu."}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </CardContent>
               </Card>
             </>
