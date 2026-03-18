@@ -303,6 +303,8 @@ export default function CommissionLeague() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <LeagueRulesSheet compact />
                   </div>
                 </div>
                 {isQualificationPhase && (
@@ -321,8 +323,6 @@ export default function CommissionLeague() {
             isActive={isActivePhase}
           />
 
-          {/* Rules box */}
-          <LeagueRulesSheet />
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (

@@ -7,22 +7,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function LeagueRulesSheet() {
+export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button className="w-full rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 transition-colors p-3 flex items-center justify-between gap-3 text-left cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/15 shrink-0">
-              <Info className="h-4 w-4 text-primary" />
+        {compact ? (
+          <button className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-primary transition-colors cursor-pointer">
+            <Info className="h-3 w-3" />
+            <span>Turneringsregler</span>
+          </button>
+        ) : (
+          <button className="w-full rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 transition-colors p-3 flex items-center justify-between gap-3 text-left cursor-pointer">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/15 shrink-0">
+                <Info className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Turneringsregler</p>
+                <p className="text-xs text-muted-foreground">Point, op-/nedrykning & præmier</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium">Turneringsregler</p>
-              <p className="text-xs text-muted-foreground">Point, op-/nedrykning & præmier</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        </button>
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
