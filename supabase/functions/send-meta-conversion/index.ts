@@ -44,6 +44,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Config missing' }), { status: 500 });
     }
 
+    const timestampSeconds = Math.floor(Date.now() / 1000);
+    const fbc = `fb.1.${timestampSeconds}.${record.fbclid}`;
+
     // Build user_data with hashed PII
     const userData: Record<string, unknown> = {
       em: [await hashValue(record.email)],
