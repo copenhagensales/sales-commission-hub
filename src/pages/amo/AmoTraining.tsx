@@ -343,7 +343,44 @@ export default function AmoTraining() {
               <div><Label>Gennemført dato</Label><Input type="date" value={form.completed_date} onChange={e => setForm(f => ({ ...f, completed_date: e.target.value }))} /></div>
             </div>
             <div><Label>Udbyder</Label><Input value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} /></div>
-            <div><Label>Certifikat URL</Label><Input value={form.certificate_url} onChange={e => setForm(f => ({ ...f, certificate_url: e.target.value }))} /></div>
+            <div>
+              <Label>Certifikat</Label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    value={form.certificate_url}
+                    onChange={e => setForm(f => ({ ...f, certificate_url: e.target.value }))}
+                    placeholder="URL eller upload fil"
+                    className="flex-1"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {form.certificate_url && (
+                  <a href={form.certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                    <ExternalLink className="h-3 w-3" /> Se vedhæftet certifikat
+                  </a>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Status</Label>
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
