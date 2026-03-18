@@ -297,7 +297,7 @@ export default function CommissionLeague() {
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     {isQualificationPhase
-                      ? `Kvalifikationsrunde (i gang) • ${enrollmentCount ?? 0} spillere`
+                      ? `Kvalifikationsrunde • ${enrollmentCount ?? 0} spillere`
                       : `Runde ${currentRound?.round_number ?? "?"} ${currentRound?.status === "active" ? "(i gang)" : currentRound?.status === "completed" ? "(afsluttet)" : ""} • ${enrollmentCount ?? 0} spillere`
                     }
                   </p>
