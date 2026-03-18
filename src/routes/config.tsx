@@ -118,6 +118,8 @@ import {
   SystemStability,
   TeamGoals,
   OnboardingAnalyse,
+  AmoDashboard,
+  AmoPlaceholder,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
