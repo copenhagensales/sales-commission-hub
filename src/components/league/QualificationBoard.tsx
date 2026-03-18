@@ -26,6 +26,10 @@ export function QualificationBoard({
   currentEmployeeId,
   defaultShowAll = false,
 }: QualificationBoardProps) {
+  const computedMaxProvision = useMemo(() => {
+    if (standings.length === 0) return 1;
+    return Math.max(...standings.map(s => s.current_provision), 1);
+  }, [standings]);
   const [showAll, setShowAll] = useState(defaultShowAll);
 
   const myDivision = useMemo(() => {
