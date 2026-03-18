@@ -949,6 +949,7 @@ export type Database = {
           cohort_assignment_status: string | null
           created_at: string
           email: string | null
+          fbclid: string | null
           first_name: string
           heard_about_us: string | null
           id: string
@@ -971,6 +972,7 @@ export type Database = {
           cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
+          fbclid?: string | null
           first_name: string
           heard_about_us?: string | null
           id?: string
@@ -993,6 +995,7 @@ export type Database = {
           cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
+          fbclid?: string | null
           first_name?: string
           heard_about_us?: string | null
           id?: string
