@@ -55,6 +55,7 @@ serve(async (req) => {
         phone: phone.trim(),
         applied_position: appliedPosition,
         notes: notes?.trim() || null,
+        fbclid: fbclid || null,
         source: 'webhook',
         status: 'new',
       })
