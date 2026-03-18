@@ -120,6 +120,10 @@ import {
   OnboardingAnalyse,
   AmoDashboard,
   AmoPlaceholder,
+  AmoOrganisation,
+  AmoMeetings,
+  AmoAnnualDiscussion,
+  AmoApv,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
