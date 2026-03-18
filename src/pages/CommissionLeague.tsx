@@ -301,9 +301,8 @@ export default function CommissionLeague() {
                       : `Runde ${currentRound?.round_number ?? "?"} ${currentRound?.status === "active" ? "(i gang)" : currentRound?.status === "completed" ? "(afsluttet)" : ""} • ${enrollmentCount ?? 0} spillere`
                     }
                   </p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
-                    <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/60 mt-1">Formand: Oscar Belcher</span>
+                  <div className="mt-1">
                     <LeagueRulesSheet compact />
                   </div>
                 </div>
