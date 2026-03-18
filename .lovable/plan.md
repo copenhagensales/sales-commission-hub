@@ -1,41 +1,116 @@
 
 
-## Draft-booking workflow ✅
+## UI-forbedringer for Salgsligaen -- Komplet plan
 
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
+Baseret på en grundig gennemgang af koden identificerer jeg 5 konkrete forbedringer der vil gøre siden markant pænere og mere motiverende.
 
-## Fortrolige kontrakter ✅
+---
 
-### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+### 1. Hero Header med gradient, glow og motiverende tagline
 
-## Liga Gameplay med Division-først Ranking ✅
+**Fil:** `CommissionLeague.tsx` (linje 284-315)
 
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
-4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
-5. ✅ **14 spillere pr. division** (opdateret fra 10).
-6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
-7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
-10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
-11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
+**Nu:** Flad header med plain `Trophy`-ikon og tekst uden visuel "wow-faktor".
 
-## Referral bonus-validering ved deaktivering ✅
+**Forbedring:**
+- Wrap headeren i en gradient-baggrund (`bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950`)
+- Tilføj en glowing pulse-animation på trophy-ikonet via CSS keyframe
+- Tilføj motiverende tagline under sæson-info (f.eks. "Kaemp dig til toppen!") fra `gamification-quotes.ts`
+- Afrundede hjørner og subtle border-glow
 
-### Implementeret
-1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
-2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
-3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
-4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
+```text
+┌─────────────────────────────────────────────┐
+│  ✨ [Glowing Trophy]  Saeson 1   [Fan]      │
+│  Runde ? (i gang) · 61 spillere             │
+│  "Kaempf dig til toppen!"                   │
+│  Landstraener: Oscar Belcher  [Countdown]   │
+└─────────────────────────────────────────────┘
+```
+
+**Teknisk:** Gradient-klasser, ny `@keyframes trophy-glow` i `index.css`, random tagline fra `gamification-quotes.ts`.
+
+---
+
+### 2. Forbedret Countdown med progress-bar og urgency-effekt
+
+**Fil:** `QualificationCountdown.tsx`
+
+**Nu:** 4 flade blokke (dage/timer/min/sek) uden kontekst for "hvor langt er vi".
+
+**Forbedring:**
+- Tilfoej en progress-bar under countdown der viser `(elapsed / total) * 100%`
+- Pulserende glow-effekt naar der er < 2 dage tilbage
+- Props udvides med `startDate` saa progress kan beregnes
+
+**Teknisk:** Ny prop `startDate`, beregn progress, conditional `animate-pulse` klasse paa wrapper.
+
+---
+
+### 3. Prize Cards med shimmer, gradient-borders og lock-overlay
+
+**Fil:** `PrizeShowcase.tsx`
+
+**Nu:** Flade kort med solid borders. Ingen visuel forskel mellem "laast" og "aaben" tilstand.
+
+**Forbedring:**
+- Top 3-kortet: Subtle guld-gradient baggrund, CSS shimmer-sweep animation
+- De 3 special-kort: Gradient-borders (conic-gradient trick), hover-scale effekt
+- Naar saesonen ikke er startet: Lock-ikon overlay med blur/opacity
+- Naar data er tilgaengeligt: Kort "popper" ind med scale-animation
+
+**Teknisk:** Ny `@keyframes shimmer` i `index.css`, `hover-scale` klasse (allerede i CSS), conditional lock-overlay.
+
+---
+
+### 4. "Din Position" highlight-kort med motiverende besked
+
+**Fil:** `MyQualificationStatus.tsx`
+
+**Nu:** Funktionelt kort med rank, division og stats -- men visuelt diskret og uden motivation.
+
+**Forbedring:**
+- Stoerre, mere prominent rank-visning med gradient-baggrund baseret paa zone
+- Motiverende besked fra `gamification-quotes.ts` baseret paa zone (groen = "Du er paa vej op!", roed = "Kaempf dig fri!")
+- Animated number for rank (CSS `number-animate` klasse eksisterer allerede)
+- Tilfoej en "rival-info" sektion: "Du er X kr fra naeste plads"
+
+```text
+┌──────────────────────────────────────┐
+│  #12 i Salgsligaen    Division 1     │
+│  ████████████░░░  85.000 kr          │
+│  "Du er taet paa toppen – push!"     │
+│  Naeste plads: 2.300 kr foran dig    │
+└──────────────────────────────────────┘
+```
+
+**Teknisk:** Zone-baserede gradient-klasser, import `getContextualMotivation` fra `gamification-quotes.ts`, rival-beregning fra standings-data.
+
+---
+
+### 5. Standings med mini progress-bars og bedre visuel hierarki
+
+**Fil:** `QualificationBoard.tsx` (PlayerRow, linje 148-261)
+
+**Nu:** Ren tekst med provision-belob. Svaert at se "gabet" mellem spillere visuelt.
+
+**Forbedring:**
+- Tilfoej en tynd baggrunds-bar bag provision der viser `provision / maxProvision * 100%`
+- Bedre visuelt hierarki: Stoerre skrift for top-3, subtle fade for lavere placeringer
+- Tilfoej en subtle separator-animation mellem zoner
+
+**Teknisk:** Beregn `maxProvision` i parent og send som prop. Render en `div` med `width: X%` bag provision-vaerdien.
+
+---
+
+### Opsummering
+
+| # | Forbedring | Filer | Svaerhedsgrad |
+|---|-----------|-------|---------------|
+| 1 | Hero gradient + glow + tagline | `CommissionLeague.tsx`, `index.css` | Let |
+| 2 | Countdown med progress-bar | `QualificationCountdown.tsx` | Let |
+| 3 | Prize cards shimmer + lock | `PrizeShowcase.tsx`, `index.css` | Medium |
+| 4 | "Din Position" med motivation | `MyQualificationStatus.tsx` | Medium |
+| 5 | Standings mini progress-bars | `QualificationBoard.tsx` | Let |
+
+Alle aendringer er rent frontend/UI. Ingen database- eller backend-aendringer. Eksisterende `gamification-quotes.ts` genbruges for motiverende beskeder.
+
