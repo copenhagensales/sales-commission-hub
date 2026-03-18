@@ -103,7 +103,6 @@ import {
   SalarySchemes,
   CommissionLeague,
   KpiDefinitions,
-  TeamH2H,
   SalaryTypes,
   TdcOpsummering,
   TdcOpsummeringPublic,
