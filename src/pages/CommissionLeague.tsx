@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, Calendar, ChevronRight, Loader2, Eye, AlertTriangle, ChevronDown } from "lucide-react";
+import { Trophy, Users, Calendar, ChevronRight, Loader2, Eye, AlertTriangle, ChevronDown, Sparkles } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,7 @@ import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
 import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
 
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
@@ -280,35 +281,49 @@ export default function CommissionLeague() {
       )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Header - Collapsible */}
+          {/* Header - Hero with gradient */}
           <div ref={headerRef}>
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="w-full text-left">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-8 w-8 text-yellow-500" />
-                    <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
-                    {isFan && (
-                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Fan
-                      </Badge>
-                    )}
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60 border border-indigo-500/20 p-5 md:p-6 shadow-lg">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-8 w-8 text-yellow-500 trophy-glow" />
+                      <h1 className="text-2xl md:text-3xl font-bold">Sæson {season.season_number}</h1>
+                      {isFan && (
+                        <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Fan
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <Sparkles className="h-3.5 w-3.5 text-yellow-400/80" />
+                      <span className="text-sm italic text-yellow-200/70">
+                        {getRandomQuote(getPerformanceStatus(
+                          myStanding ? (myStanding.current_provision / 1) * 100 : 50,
+                          myStanding ? myStanding.projected_rank <= 3 : false,
+                          myStanding ? myStanding.projected_rank <= 7 : true
+                        )).quote}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
-                  </p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-sm text-muted-foreground">Landstræner: Oscar Belcher</span>
-                    {isQualificationPhase && (
-                      <QualificationCountdown endDate={season.qualification_end_at} />
-                    )}
+                  <div className="flex items-center gap-2">
+                    <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
-                </div>
+                {isQualificationPhase && (
+                  <div className="mt-4 pt-4 border-t border-indigo-500/20">
+                    <QualificationCountdown endDate={season.qualification_end_at} startDate={season.qualification_source_start} />
+                  </div>
+                )}
               </div>
             </CollapsibleTrigger>
           </Collapsible>
@@ -427,6 +442,7 @@ export default function CommissionLeague() {
                   standing={myStanding || null}
                   totalPlayers={standings?.length || 0}
                   playersPerDivision={playersPerDivision}
+                  standings={standings || []}
                 />
               )}
 

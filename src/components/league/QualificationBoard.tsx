@@ -16,6 +16,7 @@ interface QualificationBoardProps {
   isLoading: boolean;
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
+  maxProvision?: number;
 }
 
 export function QualificationBoard({
@@ -25,6 +26,10 @@ export function QualificationBoard({
   currentEmployeeId,
   defaultShowAll = false,
 }: QualificationBoardProps) {
+  const computedMaxProvision = useMemo(() => {
+    if (standings.length === 0) return 1;
+    return Math.max(...standings.map(s => s.current_provision), 1);
+  }, [standings]);
   const [showAll, setShowAll] = useState(defaultShowAll);
 
   const myDivision = useMemo(() => {
@@ -113,6 +118,7 @@ export function QualificationBoard({
                     isTopDivision={isTopDivision}
                     isBottomDivision={isBottomDivision}
                     idx={idx}
+                    maxProvision={computedMaxProvision}
                   />
                 ))}
               </div>
@@ -143,6 +149,7 @@ interface PlayerRowProps {
   isTopDivision: boolean;
   isBottomDivision: boolean;
   idx: number;
+  maxProvision: number;
 }
 
 const PlayerRow = memo(function PlayerRow({
@@ -152,7 +159,9 @@ const PlayerRow = memo(function PlayerRow({
   isTopDivision,
   isBottomDivision,
   idx,
+  maxProvision,
 }: PlayerRowProps) {
+  const provisionPercent = maxProvision > 0 ? (standing.current_provision / maxProvision) * 100 : 0;
   const rankChange = standing.previous_overall_rank !== null
     ? standing.previous_overall_rank - standing.overall_rank
     : 0;
@@ -225,11 +234,17 @@ const PlayerRow = memo(function PlayerRow({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="text-right">
-            <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
+          <div className="text-right relative">
+            <div className="absolute inset-0 flex items-center justify-end pr-1">
+              <div
+                className="h-6 rounded-sm bg-primary/10"
+                style={{ width: `${Math.max(provisionPercent, 2)}%` }}
+              />
+            </div>
+            <div className="relative font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
-            <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>
+            <div className="relative text-[10px] text-muted-foreground sm:hidden">0 pt</div>
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">0 pt</span>
