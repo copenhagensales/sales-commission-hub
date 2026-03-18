@@ -77,18 +77,6 @@ export function MyQualificationStatus({
   const status = getPerformanceStatus(progressPercent, isAhead, isOnTrack);
   const motivation = getRandomQuote(status);
 
-  // Rival info
-  const rivalInfo = useMemo(() => {
-    if (!standings || standings.length === 0) return null;
-    const myIndex = standings.findIndex(s => s.employee_id === standing.employee_id);
-    if (myIndex <= 0) return null;
-    const rival = standings[myIndex - 1];
-    const gap = rival.current_provision - standing.current_provision;
-    if (gap <= 0) return null;
-    return {
-      gap: gap.toLocaleString("da-DK", { maximumFractionDigits: 0 }),
-    };
-  }, [standings, standing]);
 
   return (
     <Card className={cn("border-primary/30 overflow-hidden", `bg-gradient-to-br ${zoneInfo.gradient}`)}>
