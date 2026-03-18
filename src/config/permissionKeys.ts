@@ -42,6 +42,20 @@ export const PERMISSION_KEYS = {
   menu_section_sales_system: { label: 'Salg & System', section: 'sections', parent: null },
   menu_section_spil: { label: 'Spil', section: 'sections', parent: null },
   menu_section_economic: { label: 'Økonomi', section: 'sections', parent: null },
+  menu_section_amo: { label: 'Arbejdsmiljø (AMO)', section: 'sections', parent: null },
+
+  // ==================== AMO (under menu_section_amo) ====================
+  menu_amo_dashboard: { label: 'AMO Dashboard', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_organisation: { label: 'AMO Organisation', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_annual_discussion: { label: 'Årlig drøftelse', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_meetings: { label: 'Møder og referater', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_apv: { label: 'APV', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_kemi_apv: { label: 'Kemi-APV', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_training: { label: 'Uddannelse', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_documents: { label: 'Dokumentcenter', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_tasks: { label: 'Opgaver', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_settings: { label: 'AMO Indstillinger', section: 'amo', parent: 'menu_section_amo' },
+  menu_amo_audit_log: { label: 'AMO Audit Log', section: 'amo', parent: 'menu_section_amo' },
 
   // ==================== ØKONOMI (under menu_section_economic) ====================
   menu_economic_dashboard: { label: 'Økonomi Dashboard', section: 'economic', parent: 'menu_section_economic' },
