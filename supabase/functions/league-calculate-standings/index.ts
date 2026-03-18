@@ -289,9 +289,9 @@ Deno.serve(async (req) => {
       saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
     }
 
-    console.log(`[league-calculate-standings] Stats for ${Object.keys(saleItemsMap).length} unique sellers`);
+    console.log(`[league-calculate-standings] Stats: ${Object.keys(saleItemsMap).length} TM sellers, ${Object.keys(employeeToFmSaleIds).length} FM sellers`);
 
-    // 7. Calculate standings for each employee
+    // 7. Calculate standings for each employee (TM via email + FM via fm_seller_id)
     const standingsData: StandingResult[] = [];
 
     for (const employeeId of employeeIds) {
@@ -299,6 +299,7 @@ Deno.serve(async (req) => {
       let currentProvision = 0;
       let dealsCount = 0;
 
+      // TM sales via agent_email
       for (const email of agentEmails) {
         if (saleItemsMap[email]) {
           currentProvision += saleItemsMap[email].total_commission;
@@ -306,10 +307,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (agentEmails.length > 0 && (currentProvision > 0 || dealsCount > 0)) {
-        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmails.join(', ')}): ${currentProvision} kr, ${dealsCount} deals`);
-      } else {
-        console.log(`[league-calculate-standings] Employee ${employeeId}: No sales found (emails: ${agentEmails.join(', ') || 'none'})`);
+      // FM sales via fm_seller_id (directly matched to employee_id)
+      const fmSaleIds = employeeToFmSaleIds[employeeId] || [];
+      for (const saleId of fmSaleIds) {
+        currentProvision += saleToCommission[saleId] || 0;
+        dealsCount += 1;
+      }
+
+      if (currentProvision > 0 || dealsCount > 0) {
+        console.log(`[league-calculate-standings] Employee ${employeeId}: ${currentProvision} kr, ${dealsCount} deals (TM emails: ${agentEmails.join(', ') || 'none'}, FM sales: ${fmSaleIds.length})`);
       }
 
       standingsData.push({
