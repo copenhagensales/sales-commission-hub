@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Plus, Pencil, Trash2, AlertTriangle, GraduationCap, ExternalLink } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, AlertTriangle, GraduationCap, ExternalLink, Upload, Loader2 } from "lucide-react";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
