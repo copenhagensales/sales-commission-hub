@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
         .select("id, agent_email")
         .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", sourceStart)
-        .lte("sale_datetime", sourceEnd)
+        .lt("sale_datetime", sourceEnd.replace(/T00:00:00/, 'T00:00:00').slice(0, 10) < sourceEnd.slice(0, 10) ? sourceEnd : new Date(new Date(sourceEnd).getTime() + 86400000).toISOString().slice(0, 10))
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
 
       if (salesError) {
