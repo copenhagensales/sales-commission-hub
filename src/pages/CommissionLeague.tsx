@@ -46,7 +46,7 @@ import {
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
-import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
+
 import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
 import { RoundResultsCard } from "@/components/league/RoundResultsCard";
 import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
