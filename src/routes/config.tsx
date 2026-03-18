@@ -129,6 +129,7 @@ import {
   AmoDocuments,
   AmoTasks,
   AmoAuditLog,
+  AmoSettings,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -397,7 +398,7 @@ export const routes: RouteConfig[] = [
   { path: "/amo/training", component: AmoTraining, access: "role", positionPermission: "menu_amo_training" },
   { path: "/amo/documents", component: AmoDocuments, access: "role", positionPermission: "menu_amo_documents" },
   { path: "/amo/tasks", component: AmoTasks, access: "role", positionPermission: "menu_amo_tasks" },
-  { path: "/amo/settings", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_settings" },
+  { path: "/amo/settings", component: AmoSettings, access: "role", positionPermission: "menu_amo_settings" },
   { path: "/amo/audit-log", component: AmoAuditLog, access: "role", positionPermission: "menu_amo_audit_log" },
 
   { path: "*", component: NotFound, access: "public" },

@@ -36,7 +36,9 @@
 ### Implementeret
 1. ✅ **Opgavemotor** (`/amo/tasks`): Fuld CRUD, prioritet/status-styring, modul-filtrering, overdue-auto-detection, CSV-eksport.
 2. ✅ **Audit Log** (`/amo/audit-log`): Log-viewer med søgning, tabel/handling-filtre, detaljevisning med gamle/nye værdier, CSV-eksport.
-3. ✅ **Eksport**: CSV-eksport integreret i både Opgavemotor og Audit Log.
+3. ✅ **Audit Log Triggers**: Automatisk logging af INSERT/UPDATE/DELETE på alle 11 AMO-tabeller via `amo_audit_trigger_fn()`.
+4. ✅ **Eksport**: CSV-eksport integreret i Opgavemotor og Audit Log.
+5. ✅ **Indstillinger** (`/amo/settings`): Compliance-regler CRUD, notifikationsindstillinger, regel-aktivering/deaktivering.
 
-### Næste faser
-- **Fase 5**: Indstillinger, Notifikationer, Dashboard-udvidelser
+### Status
+Alle AMO-moduler er nu fuldt implementeret. Ingen placeholders tilbage.
