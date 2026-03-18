@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, Calendar, ChevronRight, Loader2, RefreshCw, Eye, AlertTriangle, ChevronDown } from "lucide-react";
+import { Trophy, Users, Calendar, ChevronRight, Loader2, Eye, AlertTriangle, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,7 +46,7 @@ import {
 import { QualificationCountdown } from "@/components/league/QualificationCountdown";
 import { QualificationBoard } from "@/components/league/QualificationBoard";
 import { MyQualificationStatus } from "@/components/league/MyQualificationStatus";
-import { SeasonSettingsDialog } from "@/components/league/SeasonSettingsDialog";
+
 import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
 import { RoundResultsCard } from "@/components/league/RoundResultsCard";
 import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
@@ -57,7 +57,7 @@ import { da } from "date-fns/locale";
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { role, isOwner } = useUnifiedPermissions();
+  const { role } = useUnifiedPermissions();
   const canParticipate = !NON_PARTICIPATING_ROLES.includes(role);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
@@ -311,22 +311,6 @@ export default function CommissionLeague() {
                 </div>
               </div>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4 space-y-3">
-              <div className="flex items-center gap-3">
-                {isOwner && season && (
-                  <SeasonSettingsDialog season={season} />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCalculateStandings}
-                  disabled={isCalculating}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? "animate-spin" : ""}`} />
-                  Opdater
-                </Button>
-              </div>
-            </CollapsibleContent>
           </Collapsible>
           </div>
 
