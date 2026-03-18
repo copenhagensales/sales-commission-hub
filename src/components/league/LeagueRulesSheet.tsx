@@ -68,7 +68,7 @@ export function LeagueRulesSheet() {
               <p>4. Division: #1 = 20 pt, #2 = 15 pt, … #4 = 5 pt</p>
             </div>
             <p className="text-sm text-muted-foreground mt-1.5">
-              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 7 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
+              En runde-multiplikator stiger fra ×1.0 til ×2.0 henover sæsonens 6 runder, så de sidste runder tæller mest og der altid er mulighed for et comeback.
             </p>
           </div>
 
