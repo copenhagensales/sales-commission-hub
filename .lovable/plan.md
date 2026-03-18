@@ -1,50 +1,22 @@
+# Lovable Plan
 
-
-## Draft-booking workflow ✅
-
-### Implementeret
-1. ✅ Database: `status text DEFAULT 'draft'` tilføjet til `booking`-tabellen. Eksisterende bookings sat til `confirmed`.
-2. ✅ `BookWeekContent.tsx`: Nye bookings oprettes med `status: 'draft'`. "Bekræft uge"-knap batch-opdaterer drafts.
-3. ✅ `SupplierReportTab.tsx`: Filtrerer kun `confirmed` bookings i leverandørrapporter.
-4. ✅ `Billing.tsx`: Filtrerer kun `confirmed` bookings i fakturering.
-
-## Fortrolige kontrakter ✅
+## AMO Compliance Hub — Fase 1 ✅
 
 ### Implementeret
-1. ✅ Database: `is_confidential BOOLEAN DEFAULT false` tilføjet til `contracts`-tabellen.
-2. ✅ `can_access_confidential_contract()` security definer funktion — kun `km@` og `mg@` returnerer `true`.
-3. ✅ RLS-policies opdateret: Owners, Teamledere og Rekruttering kan IKKE se fortrolige kontrakter (medmindre autoriseret). Medarbejderen selv kan altid se sine egne.
-4. ✅ `SendContractDialog.tsx`: "Fortrolig"-toggle med lås-ikon, kun synlig for km@/mg@.
-5. ✅ `Contracts.tsx`: Lås-ikon vises ved fortrolige kontrakter i listen.
+1. ✅ Database: 12 tabeller oprettet (`amo_workplaces`, `amo_members`, `amo_amr_elections`, `amo_annual_discussions`, `amo_meetings`, `amo_apv`, `amo_kemi_apv`, `amo_training_courses`, `amo_documents`, `amo_tasks`, `amo_compliance_rules`, `amo_audit_log`).
+2. ✅ 8 enums: `amo_role_type`, `amo_meeting_type`, `amo_meeting_status`, `amo_apv_reason`, `amo_training_type`, `amo_task_priority`, `amo_task_status`, `amo_rule_type`.
+3. ✅ RLS: Alle authenticated kan læse; teamleder/ejer kan skrive.
+4. ✅ Storage bucket: `amo-documents` (privat) med RLS.
+5. ✅ Permissions: 12 nye permission keys i `permissionKeys.ts` under `menu_section_amo`.
+6. ✅ Hooks: `usePositionPermissions` udvidet med 11 AMO-permissions.
+7. ✅ Sidebar: AMO-sektion med Shield-ikon og 11 undermenu-items i `AppSidebar.tsx`.
+8. ✅ Routes: 11 routes under `/amo/*` i `config.tsx`.
+9. ✅ Dashboard: `AmoDashboard.tsx` med dynamisk compliance score, 8 statuskort (rød/gul/grøn), åbne opgaver, seneste uploads, AMO-medlemmer.
+10. ✅ Placeholder: `AmoPlaceholder.tsx` for endnu ikke implementerede moduler.
+11. ✅ Seed data: 3 medlemmer, 3 møder, 1 årlig drøftelse, 1 APV, 1 Kemi-APV, 2 uddannelseskrav, 7 compliance-regler, 1 datakvalitetsopgave.
+12. ✅ Data quality warning: "William Seiding" vs "William Hoe" vises i dashboard og som åben opgave.
 
-## Liga Gameplay med Division-først Ranking ✅
-
-### Implementeret
-1. ✅ Database: 3 nye tabeller (`league_rounds`, `league_round_standings`, `league_season_standings`) + RLS + realtime.
-2. ✅ Edge function: `league-process-round` — ugentlig rundebehandling med division-først pointmodel.
-3. ✅ **Ny pointformel**: `max(0, (totalDivisions - division) × 20 - (rank - 1) × 5)` — garanterer divisionsbaseret point.
-4. ✅ **Runde-multiplikator**: `[1.0, 1.2, 1.4, 1.6, 1.8, 2.0]` — point stiger i løbet af turneringen.
-5. ✅ **14 spillere pr. division** (opdateret fra 10).
-6. ✅ Op/nedrykning: **Top 3 rykker op**, **#12-14 ned**, **#4-5 vs #10-11 playoff** (højest provision vinder).
-7. ✅ `calculate-kpi-values`: Sæsoninitialisering ved `qualification → active` + automatisk round-processing.
-8. ✅ Frontend hooks: `useCurrentRound`, `useSeasonStandings`, `useRoundStandings`, `useRoundHistory`, `useMySeasonStanding`.
-9. ✅ Nye komponenter: `ActiveSeasonBoard.tsx` (divisioner med samlet point) + `RoundResultsCard.tsx` (runderesultater med bevægelser + multiplikator-badge).
-10. ✅ `CommissionLeague.tsx`: Håndterer `active` status med tabs "Samlet stilling" | "Denne uge" | "Rundehistorik".
-11. ✅ Zone-logik opdateret i alle UI-komponenter: `QualificationBoard`, `ActiveSeasonBoard`, `PremierLeagueBoard`, `ZoneLegend`.
-
-## Referral bonus-validering ved deaktivering ✅
-
-### Implementeret
-1. ✅ Database: `hired_employee_id UUID` kolonne tilføjet til `employee_referrals` — direkte link til den ansatte medarbejder.
-2. ✅ Trigger: `remove_deactivated_employee_from_teams()` udvidet til automatisk at afvise referrals (`status = 'rejected'`) hvis medarbejderen stopper inden 60 dages ansættelse.
-3. ✅ `useUpdateReferralStatus`: Understøtter nu `hired_employee_id` parameter.
-4. ✅ Hiring-dialog i `Referrals.tsx`: Dropdown til at vælge medarbejder ved "Marker som ansat" — kobler henvisningen til medarbejderen for automatisk bonus-validering.
-
-## LeagueMotivationBar — Intelligent Coach-bjælke ✅
-
-### Implementeret
-1. ✅ `src/components/league/LeagueMotivationBar.tsx`: Dynamisk 3-besked coach-bar med 10-punkts prioriteringslogik.
-2. ✅ Prioriteringsmotor: Streak i fare → Tæt på overhalning → Dagens mål → Streak kører → Uge-momentum → Nogen bag dig → Ekstra indsats → Svag uge (konstruktivt) → Personlig rekord → Ny streak.
-3. ✅ Ekstra indsats-beregning baseret på top 3 dages gennemsnit fra 14-dages breakdown.
-4. ✅ Liga-gap beregning med spiller over/under.
-5. ✅ Integration i `CommissionLeague.tsx` mellem hero-header og PrizeShowcase, kun for enrolled non-fan spillere.
+### Næste faser
+- **Fase 2**: AMO Organisation CRUD, Møder & referater, Årlig drøftelse, APV modul
+- **Fase 3**: Kemi-APV, Uddannelse & certifikater, Dokumentcenter
+- **Fase 4**: Opgavemotor, Notifikationer, Eksport (PDF/CSV), Audit log triggers
