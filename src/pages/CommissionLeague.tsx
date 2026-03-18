@@ -296,7 +296,10 @@ export default function CommissionLeague() {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Runde {currentRound?.round_number ?? "?"} (i gang) • {enrollmentCount ?? 0} spillere
+                    {isQualificationPhase
+                      ? `Kvalifikationsrunde (i gang) • ${enrollmentCount ?? 0} spillere`
+                      : `Runde ${currentRound?.round_number ?? "?"} ${currentRound?.status === "active" ? "(i gang)" : currentRound?.status === "completed" ? "(afsluttet)" : ""} • ${enrollmentCount ?? 0} spillere`
+                    }
                   </p>
                   <div className="flex items-center gap-1.5 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-yellow-400/80" />
