@@ -344,7 +344,7 @@ export default function CommissionLeague() {
             seasonStatus={season.status || ""}
             isActive={isActivePhase}
           />
-
+  const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
