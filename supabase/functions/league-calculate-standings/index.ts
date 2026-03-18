@@ -67,10 +67,14 @@ Deno.serve(async (req) => {
     }
 
     const sourceStart = season.qualification_source_start;
-    const sourceEnd = season.qualification_source_end;
+    const sourceEndRaw = season.qualification_source_end;
+    // Ensure we include the full end day by using < next day
+    const sourceEndDate = new Date(sourceEndRaw);
+    sourceEndDate.setDate(sourceEndDate.getDate() + 1);
+    const sourceEndExclusive = sourceEndDate.toISOString().slice(0, 10);
     const playersPerDivision = season.config?.players_per_division || 14;
 
-    console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
+    console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEndExclusive} (exclusive)`);
 
     // 2. Get all active enrollments (exclude spectators)
     const { data: enrollments, error: enrollError } = await supabase
@@ -119,12 +123,18 @@ Deno.serve(async (req) => {
       console.error("[league-calculate-standings] Failed to fetch agents:", agentsError);
     }
 
-    // Build employee -> agent email map
-    const employeeToAgentEmail: Record<string, string> = {};
+    // Build employee -> agent emails map (multi-email support)
+    const employeeToAgentEmails: Record<string, string[]> = {};
     for (const mapping of agentMappings || []) {
       const agent = (agents || []).find((a) => a.id === mapping.agent_id);
       if (agent?.email) {
-        employeeToAgentEmail[mapping.employee_id] = agent.email.toLowerCase();
+        const email = agent.email.toLowerCase();
+        if (!employeeToAgentEmails[mapping.employee_id]) {
+          employeeToAgentEmails[mapping.employee_id] = [];
+        }
+        if (!employeeToAgentEmails[mapping.employee_id].includes(email)) {
+          employeeToAgentEmails[mapping.employee_id].push(email);
+        }
       }
     }
 
@@ -139,15 +149,18 @@ Deno.serve(async (req) => {
     }
 
     for (const emp of empData || []) {
-      if (!employeeToAgentEmail[emp.id] && emp.work_email) {
-        employeeToAgentEmail[emp.id] = emp.work_email.toLowerCase();
+      if (!employeeToAgentEmails[emp.id]) {
+        employeeToAgentEmails[emp.id] = [];
       }
-      if (!employeeToAgentEmail[emp.id] && emp.private_email) {
-        employeeToAgentEmail[emp.id] = emp.private_email.toLowerCase();
+      if (emp.work_email && !employeeToAgentEmails[emp.id].includes(emp.work_email.toLowerCase())) {
+        employeeToAgentEmails[emp.id].push(emp.work_email.toLowerCase());
+      }
+      if (emp.private_email && !employeeToAgentEmails[emp.id].includes(emp.private_email.toLowerCase())) {
+        employeeToAgentEmails[emp.id].push(emp.private_email.toLowerCase());
       }
     }
 
-    console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmail).length} employees`);
+    console.log(`[league-calculate-standings] Found email mappings for ${Object.keys(employeeToAgentEmails).length} employees (multi-email)`);
 
     // 4. Fetch ALL sales in qualification period (TM + FM unified)
     // Paginate to avoid the 1000 row limit
@@ -162,7 +175,7 @@ Deno.serve(async (req) => {
         .select("id, agent_email")
         .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", sourceStart)
-        .lte("sale_datetime", sourceEnd)
+        .lt("sale_datetime", sourceEndExclusive)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
 
       if (salesError) {
@@ -247,16 +260,21 @@ Deno.serve(async (req) => {
     const standingsData: StandingResult[] = [];
 
     for (const employeeId of employeeIds) {
-      const agentEmail = employeeToAgentEmail[employeeId];
+      const agentEmails = employeeToAgentEmails[employeeId] || [];
       let currentProvision = 0;
       let dealsCount = 0;
 
-      if (agentEmail && saleItemsMap[agentEmail]) {
-        currentProvision = saleItemsMap[agentEmail].total_commission;
-        dealsCount = saleItemsMap[agentEmail].deals_count;
-        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmail}): ${currentProvision} kr, ${dealsCount} deals`);
+      for (const email of agentEmails) {
+        if (saleItemsMap[email]) {
+          currentProvision += saleItemsMap[email].total_commission;
+          dealsCount += saleItemsMap[email].deals_count;
+        }
+      }
+
+      if (agentEmails.length > 0 && (currentProvision > 0 || dealsCount > 0)) {
+        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmails.join(', ')}): ${currentProvision} kr, ${dealsCount} deals`);
       } else {
-        console.log(`[league-calculate-standings] Employee ${employeeId}: No agent email or no sales found (email: ${agentEmail || 'none'})`);
+        console.log(`[league-calculate-standings] Employee ${employeeId}: No sales found (emails: ${agentEmails.join(', ') || 'none'})`);
       }
 
       standingsData.push({
