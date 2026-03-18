@@ -266,14 +266,16 @@ Deno.serve(async (req) => {
     // Calculate provision per employee (TM via email + FM via fm_seller_id)
     const employeeProvision: Record<string, { provision: number; deals: number }> = {};
     for (const empId of employeeIds) {
-      const email = employeeToEmail[empId];
+      const emails = employeeToEmails[empId] || [];
       let provision = 0;
       let deals = 0;
-      // TM sales
-      if (email && emailToSaleIds[email]) {
-        for (const saleId of emailToSaleIds[email]) {
-          provision += saleToCommission[saleId] || 0;
-          deals++;
+      // TM sales (all emails)
+      for (const email of emails) {
+        if (emailToSaleIds[email]) {
+          for (const saleId of emailToSaleIds[email]) {
+            provision += saleToCommission[saleId] || 0;
+            deals++;
+          }
         }
       }
       // FM sales
