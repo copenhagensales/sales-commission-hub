@@ -24,6 +24,12 @@
 3. ✅ **Årlig drøftelse** (`/amo/annual-discussion`): CRUD med alle påkrævede felter, auto-beregning af næste frist (12 mdr), påmindelsesbannere (60/30/7 dage), referat-status.
 4. ✅ **APV** (`/amo/apv`): CRUD med handlingsplan, 3-års cyklus tracking, risikoniveau, detaljevisning, overdue-advarsler, statistik-kort.
 
+## AMO Compliance Hub — Fase 3 ✅
+
+### Implementeret
+1. ✅ **Kemi-APV** (`/amo/kemi-apv`): Produktliste med CRUD, hazard flag, SDS-link, review-deadlines, statistik-kort, manglende-SDS-advarsler.
+2. ✅ **Uddannelse og certifikater** (`/amo/training`): Kursuskrav CRUD, 4 kursustyper, auto deadline-beregning (3 mdr), certifikat-sporing, overdue-advarsler.
+3. ✅ **Dokumentcenter** (`/amo/documents`): Upload til storage bucket, metadata og kategorisering, søgning og filtrering, version-tracking, DOKO-reference, udløbsadvarsler.
+
 ### Næste faser
-- **Fase 3**: Kemi-APV, Uddannelse & certifikater, Dokumentcenter
 - **Fase 4**: Opgavemotor, Notifikationer, Eksport (PDF/CSV), Audit log triggers

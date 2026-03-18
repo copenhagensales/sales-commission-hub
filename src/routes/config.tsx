@@ -124,6 +124,9 @@ import {
   AmoMeetings,
   AmoAnnualDiscussion,
   AmoApv,
+  AmoKemiApv,
+  AmoTraining,
+  AmoDocuments,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -388,9 +391,9 @@ export const routes: RouteConfig[] = [
   { path: "/amo/annual-discussion", component: AmoAnnualDiscussion, access: "role", positionPermission: "menu_amo_annual_discussion" },
   { path: "/amo/meetings", component: AmoMeetings, access: "role", positionPermission: "menu_amo_meetings" },
   { path: "/amo/apv", component: AmoApv, access: "role", positionPermission: "menu_amo_apv" },
-  { path: "/amo/kemi-apv", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_kemi_apv" },
-  { path: "/amo/training", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_training" },
-  { path: "/amo/documents", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_documents" },
+  { path: "/amo/kemi-apv", component: AmoKemiApv, access: "role", positionPermission: "menu_amo_kemi_apv" },
+  { path: "/amo/training", component: AmoTraining, access: "role", positionPermission: "menu_amo_training" },
+  { path: "/amo/documents", component: AmoDocuments, access: "role", positionPermission: "menu_amo_documents" },
   { path: "/amo/tasks", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_tasks" },
   { path: "/amo/settings", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_settings" },
   { path: "/amo/audit-log", component: AmoPlaceholder, access: "role", positionPermission: "menu_amo_audit_log" },
