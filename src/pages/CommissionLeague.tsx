@@ -337,6 +337,18 @@ export default function CommissionLeague() {
               </div>
           </div>
 
+          {/* Motivation Coach Bar */}
+          {isEnrolled && !isFan && currentEmployeeId && (
+            <LeagueMotivationBar
+              employeeId={currentEmployeeId}
+              myStanding={isActivePhase ? (mySeasonStanding ?? null) : (myStanding ?? null)}
+              standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+              dailyTarget={0}
+              todayTotal={0}
+              currentWeekTotal={weeklyStats?.currentWeek?.weekTotal ?? 0}
+            />
+          )}
+
           {/* Prize Showcase */}
           <PrizeShowcase
             standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
@@ -344,7 +356,6 @@ export default function CommissionLeague() {
             seasonStatus={season.status || ""}
             isActive={isActivePhase}
           />
-  const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
           {/* Not enrolled - show landing */}
           {!isEnrolled && (
