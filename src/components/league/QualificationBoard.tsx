@@ -149,6 +149,7 @@ interface PlayerRowProps {
   isTopDivision: boolean;
   isBottomDivision: boolean;
   idx: number;
+  maxProvision: number;
 }
 
 const PlayerRow = memo(function PlayerRow({
