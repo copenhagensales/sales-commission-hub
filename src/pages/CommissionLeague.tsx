@@ -311,22 +311,6 @@ export default function CommissionLeague() {
                 </div>
               </div>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4 space-y-3">
-              <div className="flex items-center gap-3">
-                {isOwner && season && (
-                  <SeasonSettingsDialog season={season} />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCalculateStandings}
-                  disabled={isCalculating}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? "animate-spin" : ""}`} />
-                  Opdater
-                </Button>
-              </div>
-            </CollapsibleContent>
           </Collapsible>
           </div>
 
