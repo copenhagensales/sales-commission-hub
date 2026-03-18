@@ -444,5 +444,6 @@ export default function AmoTasks() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

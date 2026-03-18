@@ -466,5 +466,6 @@ export default function AmoOrganisation() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

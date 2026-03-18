@@ -348,5 +348,6 @@ export default function AmoTraining() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

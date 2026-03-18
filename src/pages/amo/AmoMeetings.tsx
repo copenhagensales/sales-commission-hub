@@ -359,5 +359,6 @@ export default function AmoMeetings() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

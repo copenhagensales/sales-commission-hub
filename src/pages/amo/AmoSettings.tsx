@@ -268,5 +268,6 @@ export default function AmoSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

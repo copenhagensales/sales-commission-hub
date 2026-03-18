@@ -316,5 +316,6 @@ export default function AmoDocuments() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

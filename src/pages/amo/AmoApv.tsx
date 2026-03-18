@@ -405,5 +405,6 @@ export default function AmoApv() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

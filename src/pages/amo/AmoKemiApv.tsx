@@ -261,5 +261,6 @@ export default function AmoKemiApv() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

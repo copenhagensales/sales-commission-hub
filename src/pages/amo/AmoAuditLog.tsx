@@ -253,5 +253,6 @@ export default function AmoAuditLog() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }

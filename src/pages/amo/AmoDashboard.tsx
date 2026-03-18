@@ -370,5 +370,6 @@ export default function AmoDashboard() {
         )}
       </div>
     </div>
+    </MainLayout>
   );
 }

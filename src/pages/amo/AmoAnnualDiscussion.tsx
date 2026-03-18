@@ -299,5 +299,6 @@ export default function AmoAnnualDiscussion() {
         </DialogContent>
       </Dialog>
     </div>
+    </MainLayout>
   );
 }
