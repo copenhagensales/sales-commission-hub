@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Plus, Pencil, Trash2, Calendar, FileText } from "lucide-react";
