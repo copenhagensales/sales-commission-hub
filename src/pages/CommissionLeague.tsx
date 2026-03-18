@@ -442,6 +442,7 @@ export default function CommissionLeague() {
                   standing={myStanding || null}
                   totalPlayers={standings?.length || 0}
                   playersPerDivision={playersPerDivision}
+                  standings={standings || []}
                 />
               )}
 
