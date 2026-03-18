@@ -260,16 +260,21 @@ Deno.serve(async (req) => {
     const standingsData: StandingResult[] = [];
 
     for (const employeeId of employeeIds) {
-      const agentEmail = employeeToAgentEmail[employeeId];
+      const agentEmails = employeeToAgentEmails[employeeId] || [];
       let currentProvision = 0;
       let dealsCount = 0;
 
-      if (agentEmail && saleItemsMap[agentEmail]) {
-        currentProvision = saleItemsMap[agentEmail].total_commission;
-        dealsCount = saleItemsMap[agentEmail].deals_count;
-        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmail}): ${currentProvision} kr, ${dealsCount} deals`);
+      for (const email of agentEmails) {
+        if (saleItemsMap[email]) {
+          currentProvision += saleItemsMap[email].total_commission;
+          dealsCount += saleItemsMap[email].deals_count;
+        }
+      }
+
+      if (agentEmails.length > 0 && (currentProvision > 0 || dealsCount > 0)) {
+        console.log(`[league-calculate-standings] Employee ${employeeId} (${agentEmails.join(', ')}): ${currentProvision} kr, ${dealsCount} deals`);
       } else {
-        console.log(`[league-calculate-standings] Employee ${employeeId}: No agent email or no sales found (email: ${agentEmail || 'none'})`);
+        console.log(`[league-calculate-standings] Employee ${employeeId}: No sales found (emails: ${agentEmails.join(', ') || 'none'})`);
       }
 
       standingsData.push({
