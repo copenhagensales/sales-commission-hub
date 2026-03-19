@@ -144,16 +144,21 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   };
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (newStatus: string) => {
+    mutationFn: async ({ newStatus, postponed_until }: { newStatus: string; postponed_until?: string | null }) => {
+      const updates: Record<string, any> = { status: newStatus };
+      if (postponed_until !== undefined) updates.postponed_until = postponed_until;
+      // Clear postponed_until when changing to non-postponed status
+      if (newStatus !== "udskudt_samtale") updates.postponed_until = null;
       const { error } = await supabase
         .from("candidates")
-        .update({ status: newStatus })
+        .update(updates)
         .eq("id", candidate.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["winback-candidates"] });
       toast.success("Status opdateret");
       if (onUpdate) onUpdate();
     },
