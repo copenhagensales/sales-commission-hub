@@ -1,26 +1,37 @@
 
 
-# Gør rival-afstandsbaren mere tydelig
+# Forbedret UI for leaderboard-headeren
 
-## Problem
-Baren er for lille og diskret — `text-[10px]`, `h-2` bar, og placeret som et appendiks under progress-baren. Den drukner i layoutet.
+## Nuværende problemer
+- Headeren er flad og kedelig — bare tekst og en lille badge
+- "Kvalifikationsrunde" titlen blander sig med ZoneLegend-ikonet
+- "Opdateret"-badgen ser ud som metadata, ikke som et vigtigt signal
+- Tabs ("Alle Divisioner" / "Min Division") er visuelt adskilt fra headeren
 
-## Forslag
+## Forslag til forbedringer
 
-### 1. Flyt baren op — direkte under zone-indikatoren
-Placer den lige efter "⚠️ Nedrykningszone" / "✅ Oprykningszone" boksen og **før** motivational quote. Det giver kontekst: zonen fortæller *hvor* du er, baren fortæller *hvor tæt* rivalerne er.
+### 1. Tilføj et ikon og bedre hierarki til titlen
+- Tilføj et `Trophy`-ikon (allerede importeret) foran "Kvalifikationsrunde" i en accent-farve
+- Gør titlen lidt større og med gradient-tekst eller accent-farve for at signalere vigtighed
+- Flyt ZoneLegend til højre side af headeren (som en utility-knap)
 
-### 2. Gør den visuelt større og tydeligere
-- **Højere bar**: Fra `h-2` → `h-3` med en `ring-1 ring-border` kant
-- **Større tekst**: Fra `text-[10px]` → `text-xs` (12px)
-- **Større markør**: Fra `h-3.5 w-3.5` → `h-4 w-4` med en pulsende `ring-2 ring-primary/30` glow
-- **Overskrift**: Tilføj en lille "Afstand til rivaler" label over baren
-- **Stærkere farver**: `bg-green-500/40` → `bg-green-500/50`, `bg-amber-500/30` → `bg-amber-500/40`
-- **Ikoner større**: `h-3 w-3` → `h-3.5 w-3.5`
+### 2. Live-status som pulserende indikator
+- Erstat den statiske "Live opdatering" tekst med en pulserende grøn prik + "Live" label (samme stil som spillerens live-prik)
+- Gør "Opdateret HH:mm" til en subtil muted tekst i stedet for en Badge
 
-### 3. Tilføj subtil baggrund
-Wrap hele rival-sektionen i en `rounded-lg bg-slate-800/40 p-3` boks så den visuelt skiller sig ud som sin egen sektion.
+### 3. Bedre header-layout
+- Brug hele bredden med flex justify-between
+- Venstre: Ikon + titel + live-prik + tilmeldte count
+- Højre: "Opdateret HH:mm" tekst + ZoneLegend ikon
 
-## Fil der ændres
-**`src/components/league/MyQualificationStatus.tsx`** — flyt rival-blokken op (efter zone-indicator, før motivation quote) og forstør alle visuelle elementer.
+### 4. Tabs tættere på headeren
+- Reducer spacing mellem header og tabs for bedre sammenhæng
+
+## Teknisk ændring
+**Fil:** `src/pages/CommissionLeague.tsx` (linje 538-563)
+
+Omskriv `CardHeader`-blokken:
+- Venstre side: `Trophy`-ikon (text-yellow-400) + "Kvalifikationsrunde" (større font) + pulserende grøn prik + "Live" + "• 67 tilmeldte"
+- Højre side: "Opdateret 15:45" (muted, ingen badge) + `ZoneLegend`
+- Reducer `mb-4` på TabsList til `mb-3`
 
