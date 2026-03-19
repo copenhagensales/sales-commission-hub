@@ -1,31 +1,26 @@
 
 
-# Rival-afstandsbar: Vis afstand til spilleren over og under dig
+# Gør rival-afstandsbaren mere tydelig
 
-## Idé
-Erstat den nuværende tekstlinje ("📊 Næste plads: 2.250 kr foran dig") med en visuel bar der viser begge rivaler:
+## Problem
+Baren er for lille og diskret — `text-[10px]`, `h-2` bar, og placeret som et appendiks under progress-baren. Den drukner i layoutet.
 
-```text
-← 1.200 kr bag dig   ████████████████████   3.400 kr foran dig →
-   (spilleren under)        (din position)      (spilleren over)
-```
+## Forslag
 
-- **Venstre side**: Hvor meget spilleren bagved (under dig) mangler for at indhente dig — din buffer
-- **Højre side**: Hvor meget du mangler for at overhale spilleren foran dig
-- Baren viser din relative position mellem de to rivaler
-- Tal formateres i dansk format med "kr"
+### 1. Flyt baren op — direkte under zone-indikatoren
+Placer den lige efter "⚠️ Nedrykningszone" / "✅ Oprykningszone" boksen og **før** motivational quote. Det giver kontekst: zonen fortæller *hvor* du er, baren fortæller *hvor tæt* rivalerne er.
 
-## Teknisk
+### 2. Gør den visuelt større og tydeligere
+- **Højere bar**: Fra `h-2` → `h-3` med en `ring-1 ring-border` kant
+- **Større tekst**: Fra `text-[10px]` → `text-xs` (12px)
+- **Større markør**: Fra `h-3.5 w-3.5` → `h-4 w-4` med en pulsende `ring-2 ring-primary/30` glow
+- **Overskrift**: Tilføj en lille "Afstand til rivaler" label over baren
+- **Stærkere farver**: `bg-green-500/40` → `bg-green-500/50`, `bg-amber-500/30` → `bg-amber-500/40`
+- **Ikoner større**: `h-3 w-3` → `h-3.5 w-3.5`
 
-### Udvid `rivalInfo` useMemo
-Beregn også afstanden til spilleren *under* dig (index + 1 i standings). Returnér begge gaps som tal.
+### 3. Tilføj subtil baggrund
+Wrap hele rival-sektionen i en `rounded-lg bg-slate-800/40 p-3` boks så den visuelt skiller sig ud som sin egen sektion.
 
-### Erstat tekstblokken med en visuel komponent
-En lille custom bar med:
-- Venstre label: buffer til spilleren under (grøn tekst, Shield-ikon)
-- Højre label: afstand til spilleren over (amber/rød tekst, pil-op ikon)
-- Midter-markør der viser din position proportionelt mellem de to
-
-### Fil der ændres
-**`src/components/league/MyQualificationStatus.tsx`** — udvid rivalInfo-beregning + erstat rival-sektionen (linje 153-160) med den nye bar.
+## Fil der ændres
+**`src/components/league/MyQualificationStatus.tsx`** — flyt rival-blokken op (efter zone-indicator, før motivation quote) og forstør alle visuelle elementer.
 
