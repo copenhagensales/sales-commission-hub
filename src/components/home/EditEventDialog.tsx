@@ -205,6 +205,17 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
           )}
 
           <div className="flex items-center justify-between py-2">
+            <Label htmlFor="edit-requires-registration" className="cursor-pointer">
+              Kræver tilmelding
+            </Label>
+            <Switch
+              id="edit-requires-registration"
+              checked={form.requires_registration}
+              onCheckedChange={(checked) => setForm(prev => ({ ...prev, requires_registration: checked }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2">
             <Label htmlFor="edit-show-popup" className="cursor-pointer">
               Vis popup-invitation ved login
             </Label>
