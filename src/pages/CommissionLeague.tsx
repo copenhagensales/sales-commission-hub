@@ -544,11 +544,14 @@ export default function CommissionLeague() {
                         Live opdatering • {standings?.length || 0} tilmeldte
                       </CardDescription>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      Opdateret {standings?.[0]?.last_calculated_at
-                        ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
-                        : "-"}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="text-xs">
+                        Opdateret {standings?.[0]?.last_calculated_at
+                          ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
+                          : "-"}
+                      </Badge>
+                      <ZoneLegend />
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
