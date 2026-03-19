@@ -1,50 +1,44 @@
+# Lovable Plan
 
+## AMO Compliance Hub — Fase 1 ✅
 
-# Nyt Relatel Produkt-Dashboard
+### Implementeret
+1. ✅ Database: 12 tabeller oprettet (`amo_workplaces`, `amo_members`, `amo_amr_elections`, `amo_annual_discussions`, `amo_meetings`, `amo_apv`, `amo_kemi_apv`, `amo_training_courses`, `amo_documents`, `amo_tasks`, `amo_compliance_rules`, `amo_audit_log`).
+2. ✅ 8 enums: `amo_role_type`, `amo_meeting_type`, `amo_meeting_status`, `amo_apv_reason`, `amo_training_type`, `amo_task_priority`, `amo_task_status`, `amo_rule_type`.
+3. ✅ RLS: Alle authenticated kan læse; teamleder/ejer kan skrive.
+4. ✅ Storage bucket: `amo-documents` (privat) med RLS.
+5. ✅ Permissions: 12 nye permission keys i `permissionKeys.ts` under `menu_section_amo`.
+6. ✅ Hooks: `usePositionPermissions` udvidet med 11 AMO-permissions.
+7. ✅ Sidebar: AMO-sektion med Shield-ikon og 11 undermenu-items i `AppSidebar.tsx`.
+8. ✅ Routes: 11 routes under `/amo/*` i `config.tsx`.
+9. ✅ Dashboard: `AmoDashboard.tsx` med dynamisk compliance score, 8 statuskort (rød/gul/grøn), åbne opgaver, seneste uploads, AMO-medlemmer.
+10. ✅ Placeholder: `AmoPlaceholder.tsx` for endnu ikke implementerede moduler.
+11. ✅ Seed data: 3 medlemmer, 3 møder, 1 årlig drøftelse, 1 APV, 1 Kemi-APV, 2 uddannelseskrav, 7 compliance-regler, 1 datakvalitetsopgave.
+12. ✅ Data quality warning: "William Seiding" vs "William Hoe" vises i dashboard og som åben opgave.
 
-## Hvad
-Et nyt dashboard "Relatel Produkter" der viser 3 KPI-kort med antal oprettede produkter i en valgt periode:
-- **Mobile Voice oprettet** — produkter med "Fri Tale" i navnet
-- **Mobilt Bredbånd oprettet** — produkter med "MBB" eller "Mobilt Bredbånd" i navnet
-- **Switch oprettet** — produkter med "Switch" i navnet
+## AMO Compliance Hub — Fase 2 ✅
 
-Samme periodevalg som det eksisterende Relatel-board (dag/uge/måned/lønperiode/custom). Ingen leaderboard, ingen per-medarbejder data.
+### Implementeret
+1. ✅ **AMO Organisation** (`/amo/organisation`): CRUD for arbejdspladser og medlemmer, AMR-valg oversigt, compliance-beregning baseret på medarbejderantal (< 10, 10-34, 35+), tabs-baseret UI.
+2. ✅ **Møder og referater** (`/amo/meetings`): CRUD for AMO-møder, agenda-skabelon generator, mødestatus (planlagt/gennemført/overskredet/aflyst), detaljevisning, statistik-kort.
+3. ✅ **Årlig drøftelse** (`/amo/annual-discussion`): CRUD med alle påkrævede felter, auto-beregning af næste frist (12 mdr), påmindelsesbannere (60/30/7 dage), referat-status.
+4. ✅ **APV** (`/amo/apv`): CRUD med handlingsplan, 3-års cyklus tracking, risikoniveau, detaljevisning, overdue-advarsler, statistik-kort.
 
-## Produkt-kategorisering (baseret på faktiske data)
-Relatel-produkter i databasen matcher disse mønstre:
-- "Fri Tale" → Mobile Voice (ca. 20+ varianter)
-- "MBB" / "Mobilt Bredbånd" → Mobilt Bredbånd (ca. 10+ varianter)
-- "Switch" / "Omstillingsbruger" / "Professional" / "Contact Center" → Switch (ca. 10+ varianter)
+## AMO Compliance Hub — Fase 3 ✅
 
-## Nye filer
-1. **`src/pages/RelatelProductsDashboard.tsx`** — simpel page-komponent der renderer det nye dashboard
-2. **`src/components/dashboard/RelatelProductsBoard.tsx`** — selve dashboardet:
-   - Bruger `DashboardShell`, `DashboardHeader`, `DashboardPeriodSelector`
-   - Henter `sale_items` via Supabase join med `sales` + `products`, filtreret på Relatel client_id og periode
-   - Kategoriserer produkter via produkt-navn matching (ILIKE patterns)
-   - Viser 3 `TvKpiCard` med antal for hver kategori
-   - Understøtter TV-mode
+### Implementeret
+1. ✅ **Kemi-APV** (`/amo/kemi-apv`): Produktliste med CRUD, hazard flag, SDS-link, review-deadlines, statistik-kort, manglende-SDS-advarsler.
+2. ✅ **Uddannelse og certifikater** (`/amo/training`): Kursuskrav CRUD, 4 kursustyper, auto deadline-beregning (3 mdr), certifikat-sporing, overdue-advarsler.
+3. ✅ **Dokumentcenter** (`/amo/documents`): Upload til storage bucket, metadata og kategorisering, søgning og filtrering, version-tracking, DOKO-reference, udløbsadvarsler.
 
-## Ændringer i eksisterende filer
-3. **`src/routes/pages.ts`** — tilføj lazy import af `RelatelProductsDashboard`
-4. **`src/routes/config.tsx`** — tilføj route `/dashboards/relatel-products`
-5. **`src/config/dashboards.ts`** — tilføj entry med `permissionKey: "menu_dashboard_relatel"`
+## AMO Compliance Hub — Fase 4 ✅
 
-## Teknisk tilgang
-- En `useQuery` der henter produkt-counts direkte:
-```sql
-SELECT p.name, SUM(si.quantity) as total_quantity
-FROM sale_items si
-JOIN sales s ON si.sale_id = s.id
-JOIN products p ON si.product_id = p.id
-WHERE s.client_campaign_id IN (
-  SELECT id FROM client_campaigns 
-  WHERE client_id = 'relatel-id'
-)
-AND s.sale_datetime BETWEEN :start AND :end
-AND s.validation_status != 'Rejected'
-GROUP BY p.name
-```
-- Client-side kategorisering af produkt-navne til de 3 grupper
-- Samme periodevalg-komponent som eksisterende dashboards
+### Implementeret
+1. ✅ **Opgavemotor** (`/amo/tasks`): Fuld CRUD, prioritet/status-styring, modul-filtrering, overdue-auto-detection, CSV-eksport.
+2. ✅ **Audit Log** (`/amo/audit-log`): Log-viewer med søgning, tabel/handling-filtre, detaljevisning med gamle/nye værdier, CSV-eksport.
+3. ✅ **Audit Log Triggers**: Automatisk logging af INSERT/UPDATE/DELETE på alle 11 AMO-tabeller via `amo_audit_trigger_fn()`.
+4. ✅ **Eksport**: CSV-eksport integreret i Opgavemotor og Audit Log.
+5. ✅ **Indstillinger** (`/amo/settings`): Compliance-regler CRUD, notifikationsindstillinger, regel-aktivering/deaktivering.
 
+### Status
+Alle AMO-moduler er nu fuldt implementeret. Ingen placeholders tilbage.

@@ -15,6 +15,7 @@ export const MgTest = lazyPage(() => import("@/pages/MgTest"));
 
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
+export const RelatelProductsDashboard = lazyPage(() => import("@/pages/RelatelProductsDashboard"));
 export const UnitedDashboard = lazyPage(() => import("@/pages/UnitedDashboard"));
 export const CsTop20Dashboard = lazyPage(() => import("@/pages/CsTop20Dashboard"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
