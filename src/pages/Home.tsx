@@ -21,6 +21,8 @@ import {
   ChevronDown,
   ThumbsUp,
   ThumbsDown,
+  UserPlus,
+  UserMinus,
   Info,
   CalendarX,
   Pencil,
