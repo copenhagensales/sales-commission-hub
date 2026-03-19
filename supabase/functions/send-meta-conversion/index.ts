@@ -93,7 +93,6 @@ serve(async (req) => {
         body: JSON.stringify({
           data: [event],
           access_token: FB_ACCESS_TOKEN,
-          test_event_code: "TEST63976",
         }),
       }
     );
