@@ -54,6 +54,7 @@ import { ActiveSeasonBoard } from "@/components/league/ActiveSeasonBoard";
 import { RoundResultsCard } from "@/components/league/RoundResultsCard";
 import { LeagueStickyBar } from "@/components/league/LeagueStickyBar";
 import { LeagueRulesSheet } from "@/components/league/LeagueRulesSheet";
+import { ZoneLegend } from "@/components/league/ZoneLegend";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
