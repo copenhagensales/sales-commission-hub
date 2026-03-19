@@ -34,6 +34,7 @@ export function QualificationBoard({
     return Math.max(...standings.map(s => s.current_provision), 1);
   }, [standings]);
   const [showAll, setShowAll] = useState(defaultShowAll);
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
 
   const myDivision = useMemo(() => {
     if (!currentEmployeeId) return null;
