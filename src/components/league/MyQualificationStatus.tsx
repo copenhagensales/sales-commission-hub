@@ -160,12 +160,40 @@ export function MyQualificationStatus({
           <Progress value={progressInDivision} className="h-2" />
         </div>
 
-        {/* Rival info */}
+        {/* Rival distance bar */}
         {rivalInfo && (
-          <div className="mt-3 text-center">
-            <p className="text-xs text-muted-foreground">
-              📊 Næste plads: <span className="font-semibold text-foreground">{rivalInfo.gap} kr</span> foran dig
-            </p>
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              {rivalInfo.behindGap > 0 ? (
+                <span className="flex items-center gap-0.5 text-green-500">
+                  <Shield className="h-3 w-3" />
+                  {rivalInfo.behindGap.toLocaleString("da-DK")} kr bag dig
+                </span>
+              ) : <span />}
+              {rivalInfo.aheadGap > 0 ? (
+                <span className="flex items-center gap-0.5 text-amber-500">
+                  <ArrowUp className="h-3 w-3" />
+                  {rivalInfo.aheadGap.toLocaleString("da-DK")} kr foran dig
+                </span>
+              ) : <span />}
+            </div>
+            <div className="relative h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
+              {/* green zone (buffer) */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-l-full bg-green-500/40"
+                style={{ width: `${rivalInfo.position}%` }}
+              />
+              {/* amber zone (gap ahead) */}
+              <div
+                className="absolute inset-y-0 right-0 rounded-r-full bg-amber-500/30"
+                style={{ width: `${100 - rivalInfo.position}%` }}
+              />
+              {/* position marker */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-primary border-2 border-primary-foreground shadow-md"
+                style={{ left: `calc(${rivalInfo.position}% - 7px)` }}
+              />
+            </div>
           </div>
         )}
 
