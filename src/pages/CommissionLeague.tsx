@@ -540,18 +540,18 @@ export default function CommissionLeague() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Kvalifikationsrunde</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="flex items-center gap-2">
+                        Kvalifikationsrunde
+                        <ZoneLegend />
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-2">
                         Live opdatering • {standings?.length || 0} tilmeldte
+                        <Badge variant="outline" className="text-xs">
+                          Opdateret {standings?.[0]?.last_calculated_at
+                            ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
+                            : "-"}
+                        </Badge>
                       </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline" className="text-xs">
-                        Opdateret {standings?.[0]?.last_calculated_at
-                          ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
-                          : "-"}
-                      </Badge>
-                      <ZoneLegend />
                     </div>
                   </div>
                 </CardHeader>

@@ -11,8 +11,8 @@ export function ZoneLegend({ className }: ZoneLegendProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className={cn("h-7 w-7 rounded-full", className)}>
-          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+        <Button variant="ghost" size="icon" className={cn("h-8 w-8 rounded-full", className)}>
+          <HelpCircle className="h-5 w-5 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto" side="bottom" align="end">
