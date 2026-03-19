@@ -1,6 +1,6 @@
-// LeagueMotivationBar — Intelligent Coach
+// LeagueMotivationBar — Intelligent Coach (Dynamic)
 import { useMemo } from "react";
-import { Flame, Target, TrendingUp, Swords, Clock, Trophy, Rocket } from "lucide-react";
+import { Flame, Target, TrendingUp, Swords, Clock, Trophy, Rocket, Star, Sun, Zap } from "lucide-react";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
 import type { QualificationStanding } from "@/hooks/useLeagueData";
@@ -48,10 +48,14 @@ export function LeagueMotivationBar({
   myStanding,
   standings,
   dailyTarget,
-  todayTotal,
+  todayTotal: todayTotalProp,
   currentWeekTotal,
 }: LeagueMotivationBarProps) {
   const { data: weeklyStats } = usePersonalWeeklyStats(employeeId);
+
+  // Derive todayTotal from dailyBreakdown if prop is 0
+  const todayFromBreakdown = weeklyStats?.dailyBreakdown?.find(d => d.isToday)?.commission ?? 0;
+  const todayTotal = todayTotalProp > 0 ? todayTotalProp : todayFromBreakdown;
 
   const gamification = useSalesGamification({
     employeeId,
@@ -69,6 +73,10 @@ export function LeagueMotivationBar({
 
   const signals = useMemo(() => {
     const result: MotivationSignal[] = [];
+    const now = new Date();
+    const hour = now.getHours();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 5=Fri, 6=Sat
+    const dateSeed = now.getDate(); // 1-31, used for daily rotation
 
     const { currentStreak, hitDailyGoal, bestDayRecord } = gamification;
     const currentWeek = weeklyStats?.currentWeek?.weekTotal ?? 0;
@@ -113,8 +121,8 @@ export function LeagueMotivationBar({
       });
     }
 
-    // 2. Tæt på overhalning
-    if (gapUp && gapUp.gap < 2000 && gapUp.gap > 0) {
+    // 2. Tæt på overhalning (loosened: < 5.000 kr)
+    if (gapUp && gapUp.gap < 5000 && gapUp.gap > 0) {
       result.push({
         priority: 2,
         icon: <Swords className="h-4 w-4 text-amber-400" />,
@@ -162,6 +170,21 @@ export function LeagueMotivationBar({
       });
     }
 
+    // 4b. Small streak building (1-2 days)
+    if (currentStreak >= 1 && currentStreak < 3 && hitDailyGoal) {
+      result.push({
+        priority: 4.5,
+        icon: <Flame className="h-4 w-4 text-amber-400" />,
+        message: (
+          <span>
+            <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag i træk!</span>
+            {" Keep going — en streak bygges dag for dag"}
+          </span>
+        ),
+        color: "amber",
+      });
+    }
+
     // 5. Stærk uge-momentum
     if (lastWeek > 0 && currentWeek > lastWeek) {
       const pct = Math.round(((currentWeek - lastWeek) / lastWeek) * 100);
@@ -178,8 +201,8 @@ export function LeagueMotivationBar({
       });
     }
 
-    // 6. Nogen tæt bag dig
-    if (gapDown && gapDown.gap < 1500 && gapDown.gap > 0) {
+    // 6. Nogen tæt bag dig (loosened: < 3.000 kr)
+    if (gapDown && gapDown.gap < 3000 && gapDown.gap > 0) {
       result.push({
         priority: 6,
         icon: <Swords className="h-4 w-4 text-amber-400" />,
@@ -194,20 +217,97 @@ export function LeagueMotivationBar({
       });
     }
 
-    // 7. Ekstra indsats
+    // 7. Ekstra indsats (with daily rotation)
     if (hourlyRate > 0) {
+      const variant = dateSeed % 3;
+      const extraMessages: React.ReactNode[] = [
+        <span key="v0">
+          {"Hver time ekstra ≈ "}
+          <span className="text-amber-400 font-semibold">{formatKr(hourlyRate)} kr</span>
+          {" · Din top-timeløn! 💪"}
+        </span>,
+        <span key="v1">
+          {"2 gode timer i dag = +"}
+          <span className="text-amber-400 font-semibold">{formatKr(hourlyRate * 2)} kr</span>
+          {" i lønposen"}
+        </span>,
+        <span key="v2">
+          {"1 ekstra time = "}
+          <span className="text-amber-400 font-semibold">{formatKr(hourlyRate)} kr</span>
+          {" mere — push for en stærkere uge"}
+        </span>,
+      ];
+      // Show Saturday-specific on Fri/Sat
+      if (dayOfWeek === 5 || dayOfWeek === 6) {
+        extraMessages[variant % 3] = (
+          <span key="sat">
+            {"Lørdag = +"}
+            <span className="text-amber-400 font-semibold">{formatKr(hourlyRate * 8)} kr</span>
+            {" ekstra — det er det værd!"}
+          </span>
+        );
+      }
       result.push({
         priority: 7,
         icon: <Clock className="h-4 w-4 text-blue-400" />,
+        message: extraMessages[variant % extraMessages.length],
+        color: "blue",
+      });
+    }
+
+    // 7.5 Time-of-day signals (fallbacks)
+    if (hour < 11 && todayTotal === 0) {
+      result.push({
+        priority: 7.5,
+        icon: <Sun className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            {"Hver time ekstra ≈ "}
-            <span className="text-amber-400 font-semibold">{formatKr(hourlyRate)} kr</span>
-            {" · Lørdag = +"}
-            <span className="text-amber-400 font-semibold">{formatKr(hourlyRate * 8)} kr</span>
+            {"God morgen! "}
+            <span className="text-amber-400 font-semibold">Første salg</span>
+            {" sætter tempoet for hele dagen 💪"}
+          </span>
+        ),
+        color: "amber",
+      });
+    } else if (hour >= 14) {
+      result.push({
+        priority: 7.6,
+        icon: <Zap className="h-4 w-4 text-emerald-400" />,
+        message: (
+          <span>
+            {"Stærk finish — "}
+            <span className="text-emerald-400 font-semibold">de sidste timer</span>
+            {" tæller mest 🏁"}
+          </span>
+        ),
+        color: "green",
+      });
+    }
+
+    // 7.7 Day-of-week signals
+    if (dayOfWeek === 1) {
+      result.push({
+        priority: 7.7,
+        icon: <Rocket className="h-4 w-4 text-blue-400" />,
+        message: (
+          <span>
+            <span className="text-blue-400 font-semibold">Ny uge, nyt mål</span>
+            {" — sæt standarden i dag!"}
           </span>
         ),
         color: "blue",
+      });
+    } else if (dayOfWeek === 5) {
+      result.push({
+        priority: 7.8,
+        icon: <Star className="h-4 w-4 text-amber-400" />,
+        message: (
+          <span>
+            <span className="text-amber-400 font-semibold">Stærk fredag = stærk uge</span>
+            {" — afslut ugen med en topdag! 🔥"}
+          </span>
+        ),
+        color: "amber",
       });
     }
 
@@ -228,10 +328,10 @@ export function LeagueMotivationBar({
       });
     }
 
-    // 9. Tæt på personlig rekord
+    // 9. Tæt på personlig rekord (loosened: > 60%)
     if (bestDayRecord && todayTotal > 0) {
       const recordValue = bestDayRecord.record_value;
-      if (todayTotal > recordValue * 0.8 && todayTotal < recordValue) {
+      if (todayTotal > recordValue * 0.6 && todayTotal < recordValue) {
         const pctLeft = Math.round(((recordValue - todayTotal) / recordValue) * 100);
         result.push({
           priority: 9,
@@ -248,19 +348,80 @@ export function LeagueMotivationBar({
       }
     }
 
-    // 10. Ny streak
+    // 10. Ny streak (with daily rotation)
     if (currentStreak === 0) {
+      const streakVariant = dateSeed % 3;
+      const streakMessages: { msg: React.ReactNode }[] = [
+        {
+          msg: (
+            <span>
+              {"Start en ny streak i dag — dit "}
+              <span className="text-amber-400 font-semibold">første salg</span>
+              {" tæller! 🚀"}
+            </span>
+          ),
+        },
+        {
+          msg: (
+            <span>
+              {"En god dag starter med "}
+              <span className="text-amber-400 font-semibold">ét salg</span>
+              {" — tag det første skridt! 💪"}
+            </span>
+          ),
+        },
+        {
+          msg: (
+            <span>
+              <span className="text-amber-400 font-semibold">Første salg</span>
+              {" er det sværeste — resten følger! 🚀"}
+            </span>
+          ),
+        },
+      ];
       result.push({
         priority: 10,
         icon: <Rocket className="h-4 w-4 text-blue-400" />,
+        message: streakMessages[streakVariant].msg,
+        color: "blue",
+      });
+    }
+
+    // 11. Rank fallback — always available
+    if (myStanding) {
+      const rank = getOverallRank(myStanding);
+      const totalPlayers = standings.length;
+      const topPct = totalPlayers > 0 ? Math.round((rank / totalPlayers) * 100) : 0;
+      const rankMsg = rank <= 3
+        ? `Du er #${rank} — hold positionen! 🏆`
+        : topPct <= 25
+          ? `Du er #${rank} af ${totalPlayers} — du er i top 25%!`
+          : `Du er #${rank} af ${totalPlayers} — kæmp dig opad!`;
+      result.push({
+        priority: 11,
+        icon: <Star className="h-4 w-4 text-blue-400" />,
         message: (
           <span>
-            {"Start en ny streak i dag — dit "}
-            <span className="text-amber-400 font-semibold">første salg</span>
-            {" tæller! 🚀"}
+            <span className="text-blue-400 font-semibold">{rankMsg}</span>
           </span>
         ),
         color: "blue",
+      });
+    }
+
+    // 12. Week progress fallback
+    if (currentWeek > 0) {
+      result.push({
+        priority: 12,
+        icon: <TrendingUp className="h-4 w-4 text-emerald-400" />,
+        message: (
+          <span>
+            {"Denne uge: "}
+            <span className="text-emerald-400 font-semibold">{formatKr(currentWeek)} kr</span>
+            {" — bliv ved med at bygge!"}
+          </span>
+        ),
+        color: "green",
       });
     }
 
