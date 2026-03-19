@@ -35,6 +35,7 @@ interface CompanyEvent {
   event_time: string | null;
   location: string | null;
   description: string | null;
+  requires_registration?: boolean;
 }
 
 interface EventDetailDialogProps {
