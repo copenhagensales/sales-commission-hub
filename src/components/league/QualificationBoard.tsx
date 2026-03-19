@@ -26,6 +26,7 @@ export function QualificationBoard({
   isLoading,
   currentEmployeeId,
   defaultShowAll = false,
+  todayProvisionMap = {},
 }: QualificationBoardProps) {
   const computedMaxProvision = useMemo(() => {
     if (standings.length === 0) return 1;
