@@ -10,6 +10,7 @@ import {
   MgTest,
   TdcErhvervDashboard,
   RelatelDashboard,
+  RelatelProductsDashboard,
   NotFound,
   Logikker,
   EmployeeMasterData,
