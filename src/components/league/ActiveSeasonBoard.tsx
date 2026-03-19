@@ -164,6 +164,7 @@ interface SeasonPlayerRowProps {
   totalDivisions: number;
   idx: number;
   todayProvision: number;
+  todayDailyRank: 1 | 2 | 3 | null;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
