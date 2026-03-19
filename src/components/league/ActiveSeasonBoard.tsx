@@ -160,6 +160,7 @@ interface SeasonPlayerRowProps {
   isBottomDivision: boolean;
   totalDivisions: number;
   idx: number;
+  todayProvision: number;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
