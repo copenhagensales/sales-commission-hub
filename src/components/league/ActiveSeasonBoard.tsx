@@ -131,6 +131,7 @@ export function ActiveSeasonBoard({
                     totalDivisions={totalDivisions}
                     idx={idx}
                     todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                    todayDailyRank={todayTop3[standing.employee_id] || null}
                   />
                 ))}
               </div>
