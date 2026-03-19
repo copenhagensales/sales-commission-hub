@@ -24,6 +24,7 @@ interface EditEventDialogProps {
     location: string | null;
     description: string | null;
     show_popup: boolean;
+    requires_registration: boolean;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
