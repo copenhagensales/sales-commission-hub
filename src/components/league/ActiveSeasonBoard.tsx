@@ -8,6 +8,7 @@ import { Trophy, Medal, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { PodiumBadge } from "./PodiumBadge";
+import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { ZoneLegend } from "./ZoneLegend";
 import { LeagueSeasonStanding } from "@/hooks/useLeagueActiveData";
 
@@ -29,6 +30,7 @@ export function ActiveSeasonBoard({
   todayProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
 
   const myDivision = useMemo(() => {
     if (!currentEmployeeId) return null;
@@ -129,6 +131,7 @@ export function ActiveSeasonBoard({
                     totalDivisions={totalDivisions}
                     idx={idx}
                     todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                    todayDailyRank={todayTop3[standing.employee_id] || null}
                   />
                 ))}
               </div>
@@ -161,6 +164,7 @@ interface SeasonPlayerRowProps {
   totalDivisions: number;
   idx: number;
   todayProvision: number;
+  todayDailyRank: 1 | 2 | 3 | null;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -171,6 +175,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   isBottomDivision,
   idx,
   todayProvision,
+  todayDailyRank,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -268,7 +273,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
             {todayProvision > 0 && (
-              <div className="text-[10px] text-emerald-400 font-medium">
+              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                {todayDailyRank && <DailyTopBadge rank={todayDailyRank} />}
                 I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             )}

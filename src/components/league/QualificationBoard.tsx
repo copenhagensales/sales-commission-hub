@@ -8,6 +8,7 @@ import { QualificationStanding } from "@/hooks/useLeagueData";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { PodiumBadge } from "./PodiumBadge";
+import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { ZoneLegend } from "./ZoneLegend";
 
 interface QualificationBoardProps {
@@ -33,6 +34,7 @@ export function QualificationBoard({
     return Math.max(...standings.map(s => s.current_provision), 1);
   }, [standings]);
   const [showAll, setShowAll] = useState(defaultShowAll);
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
 
   const myDivision = useMemo(() => {
     if (!currentEmployeeId) return null;
@@ -122,6 +124,7 @@ export function QualificationBoard({
                     idx={idx}
                     maxProvision={computedMaxProvision}
                     todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                    todayDailyRank={todayTop3[standing.employee_id] || null}
                   />
                 ))}
               </div>
@@ -154,6 +157,7 @@ interface PlayerRowProps {
   idx: number;
   maxProvision: number;
   todayProvision: number;
+  todayDailyRank: 1 | 2 | 3 | null;
 }
 
 const PlayerRow = memo(function PlayerRow({
@@ -165,6 +169,7 @@ const PlayerRow = memo(function PlayerRow({
   idx,
   maxProvision,
   todayProvision,
+  todayDailyRank,
 }: PlayerRowProps) {
   const provisionPercent = maxProvision > 0 ? (standing.current_provision / maxProvision) * 100 : 0;
   const rankChange = standing.previous_overall_rank !== null
@@ -244,7 +249,8 @@ const PlayerRow = memo(function PlayerRow({
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
             {todayProvision > 0 && (
-              <div className="text-[10px] text-emerald-400 font-medium">
+              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                {todayDailyRank && <DailyTopBadge rank={todayDailyRank} />}
                 I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             )}
