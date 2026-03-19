@@ -617,6 +617,18 @@ const Home = () => {
                       </div>
                     )}
                     
+                    {/* Requires registration toggle */}
+                    <div className="flex items-center justify-between py-2">
+                      <Label htmlFor="requires-registration" className="cursor-pointer">
+                        Kræver tilmelding
+                      </Label>
+                      <Switch
+                        id="requires-registration"
+                        checked={newEvent.requires_registration}
+                        onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, requires_registration: checked }))}
+                      />
+                    </div>
+
                     {/* Show popup toggle */}
                     <div className="flex items-center justify-between py-2">
                       <Label htmlFor="show-popup" className="cursor-pointer">
