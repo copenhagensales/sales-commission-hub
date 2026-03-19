@@ -431,6 +431,7 @@ const Home = () => {
           event_time: selectedEvent.event_time,
           location: selectedEvent.location,
           description: selectedEvent.description,
+          requires_registration: (selectedEvent as any).requires_registration,
         } : null}
         open={!!selectedEventForDetail}
         onOpenChange={(open) => !open && setSelectedEventForDetail(null)}
