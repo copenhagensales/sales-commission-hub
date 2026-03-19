@@ -1,47 +1,44 @@
+# Lovable Plan
 
+## AMO Compliance Hub — Fase 1 ✅
 
-# Plan: Gør LeagueMotivationBar dynamisk
+### Implementeret
+1. ✅ Database: 12 tabeller oprettet (`amo_workplaces`, `amo_members`, `amo_amr_elections`, `amo_annual_discussions`, `amo_meetings`, `amo_apv`, `amo_kemi_apv`, `amo_training_courses`, `amo_documents`, `amo_tasks`, `amo_compliance_rules`, `amo_audit_log`).
+2. ✅ 8 enums: `amo_role_type`, `amo_meeting_type`, `amo_meeting_status`, `amo_apv_reason`, `amo_training_type`, `amo_task_priority`, `amo_task_status`, `amo_rule_type`.
+3. ✅ RLS: Alle authenticated kan læse; teamleder/ejer kan skrive.
+4. ✅ Storage bucket: `amo-documents` (privat) med RLS.
+5. ✅ Permissions: 12 nye permission keys i `permissionKeys.ts` under `menu_section_amo`.
+6. ✅ Hooks: `usePositionPermissions` udvidet med 11 AMO-permissions.
+7. ✅ Sidebar: AMO-sektion med Shield-ikon og 11 undermenu-items i `AppSidebar.tsx`.
+8. ✅ Routes: 11 routes under `/amo/*` i `config.tsx`.
+9. ✅ Dashboard: `AmoDashboard.tsx` med dynamisk compliance score, 8 statuskort (rød/gul/grøn), åbne opgaver, seneste uploads, AMO-medlemmer.
+10. ✅ Placeholder: `AmoPlaceholder.tsx` for endnu ikke implementerede moduler.
+11. ✅ Seed data: 3 medlemmer, 3 møder, 1 årlig drøftelse, 1 APV, 1 Kemi-APV, 2 uddannelseskrav, 7 compliance-regler, 1 datakvalitetsopgave.
+12. ✅ Data quality warning: "William Seiding" vs "William Hoe" vises i dashboard og som åben opgave.
 
-## Problem
-Mathias ser kun 2 statiske beskeder fordi:
-1. `dailyTarget` og `todayTotal` er hardcoded til `0` i CommissionLeague.tsx — så signaler der afhænger af dem (streak, dagsmål, personlig rekord) aldrig trigger
-2. De signaler der kan trigge (hourly rate + ny streak/uge-momentum) har ingen variation — samme besked hver dag
-3. Overhalings-gaps er for snævre (< 2.000 kr / < 1.500 kr)
+## AMO Compliance Hub — Fase 2 ✅
 
-## Løsning
+### Implementeret
+1. ✅ **AMO Organisation** (`/amo/organisation`): CRUD for arbejdspladser og medlemmer, AMR-valg oversigt, compliance-beregning baseret på medarbejderantal (< 10, 10-34, 35+), tabs-baseret UI.
+2. ✅ **Møder og referater** (`/amo/meetings`): CRUD for AMO-møder, agenda-skabelon generator, mødestatus (planlagt/gennemført/overskredet/aflyst), detaljevisning, statistik-kort.
+3. ✅ **Årlig drøftelse** (`/amo/annual-discussion`): CRUD med alle påkrævede felter, auto-beregning af næste frist (12 mdr), påmindelsesbannere (60/30/7 dage), referat-status.
+4. ✅ **APV** (`/amo/apv`): CRUD med handlingsplan, 3-års cyklus tracking, risikoniveau, detaljevisning, overdue-advarsler, statistik-kort.
 
-### 1. Pass rigtige data fra CommissionLeague.tsx
-- Importér `usePersonalSalesStats` og hent `todayTotal` og `dailyTarget` (fra goal tracker eller employee data)
-- Alternativt: Lad `LeagueMotivationBar` selv hente sin `todayTotal` fra `weeklyStats.dailyBreakdown` (dagens entry) — dette kræver ingen ændring i parent
+## AMO Compliance Hub — Fase 3 ✅
 
-### 2. LeagueMotivationBar intern fix: Beregn todayTotal fra dailyBreakdown
-- Find dagens entry i `dailyBreakdown` og brug `commission` som `todayTotal` (i stedet for at stole på prop'en)
-- Fjern afhængighed af hardcoded `0`-props
+### Implementeret
+1. ✅ **Kemi-APV** (`/amo/kemi-apv`): Produktliste med CRUD, hazard flag, SDS-link, review-deadlines, statistik-kort, manglende-SDS-advarsler.
+2. ✅ **Uddannelse og certifikater** (`/amo/training`): Kursuskrav CRUD, 4 kursustyper, auto deadline-beregning (3 mdr), certifikat-sporing, overdue-advarsler.
+3. ✅ **Dokumentcenter** (`/amo/documents`): Upload til storage bucket, metadata og kategorisering, søgning og filtrering, version-tracking, DOKO-reference, udløbsadvarsler.
 
-### 3. Lempede betingelser
-- Signal #2 (overhalning): `gap < 5.000 kr` i stedet for `< 2.000 kr`
-- Signal #6 (nogen bag dig): `gap < 3.000 kr` i stedet for `< 1.500 kr`
-- Signal #9 (personlig rekord): `> 60%` i stedet for `> 80%`
+## AMO Compliance Hub — Fase 4 ✅
 
-### 4. Besked-variation via dato-seed
-- Brug `new Date().getDate()` som seed til at rotere varianter af signal #7 (ekstra indsats) og #10 (ny streak)
-- Signal #7 varianter: "Hver time ≈ X kr", "2 gode timer = +Y kr", "Lørdag = +Z kr" (rotér dagligt)
-- Signal #10 varianter: "Start en ny streak", "Dit første salg tæller", "En god dag starter med ét salg"
+### Implementeret
+1. ✅ **Opgavemotor** (`/amo/tasks`): Fuld CRUD, prioritet/status-styring, modul-filtrering, overdue-auto-detection, CSV-eksport.
+2. ✅ **Audit Log** (`/amo/audit-log`): Log-viewer med søgning, tabel/handling-filtre, detaljevisning med gamle/nye værdier, CSV-eksport.
+3. ✅ **Audit Log Triggers**: Automatisk logging af INSERT/UPDATE/DELETE på alle 11 AMO-tabeller via `amo_audit_trigger_fn()`.
+4. ✅ **Eksport**: CSV-eksport integreret i Opgavemotor og Audit Log.
+5. ✅ **Indstillinger** (`/amo/settings`): Compliance-regler CRUD, notifikationsindstillinger, regel-aktivering/deaktivering.
 
-### 5. Tidspunkt- og ugedag-signaler (nye)
-- Morgen (< 11): "God morgen! Første salg sætter tempoet"
-- Eftermiddag (> 14): "Stærk finish — de sidste timer tæller mest"
-- Fredag: "Stærk fredag = stærk uge"
-- Disse får prioritet 7-8 og fungerer som fallbacks der sikrer variation
-
-### 6. Bredt rang-signal (nyt)
-- "Du er #X i ligaen" — altid tilgængeligt som lavprioritets-fallback
-- Sikrer at der altid er mindst 3 beskeder
-
-## Filer der ændres
-- **`src/components/league/LeagueMotivationBar.tsx`** — al logik: beregn todayTotal internt, lempede thresholds, rotation, nye signaler
-- **`src/pages/CommissionLeague.tsx`** — minor: kan beholde props som de er (todayTotal beregnes nu internt)
-
-## Forventet resultat
-Brugere ser 3 varierede, dagligt skiftende beskeder der afspejler deres faktiske situation.
-
+### Status
+Alle AMO-moduler er nu fuldt implementeret. Ingen placeholders tilbage.
