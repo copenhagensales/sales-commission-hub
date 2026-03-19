@@ -1043,5 +1043,14 @@ export default function CandidateDetail() {
           statusColors={statusColors}
         />
       )}
+
+      <PostponeDateDialog
+        open={showPostponeDialog}
+        onOpenChange={setShowPostponeDialog}
+        onConfirm={(date) => {
+          const dateStr = format(date, "yyyy-MM-dd");
+          updateCandidateMutation.mutate({ status: "udskudt_samtale", postponed_until: dateStr });
+        }}
+      />
     </MainLayout>;
 }
