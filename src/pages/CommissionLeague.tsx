@@ -537,27 +537,37 @@ export default function CommissionLeague() {
 
               {/* Leaderboard */}
               <Card className="bg-slate-800/30 border-slate-700">
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        Kvalifikationsrunde
-                        <ZoneLegend />
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-2">
-                        Live opdatering • {standings?.length || 0} tilmeldte
-                        <Badge variant="outline" className="text-xs">
-                          Opdateret {standings?.[0]?.last_calculated_at
-                            ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
-                            : "-"}
-                        </Badge>
-                      </CardDescription>
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-5 w-5 text-yellow-400" />
+                      <div>
+                        <CardTitle className="text-lg font-bold">
+                          Kvalifikationsrunde
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2 mt-0.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
+                          <span className="text-emerald-400 text-xs font-medium">Live</span>
+                          <span className="text-muted-foreground text-xs">• {standings?.length || 0} tilmeldte</span>
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        Opdateret {standings?.[0]?.last_calculated_at
+                          ? format(new Date(standings[0].last_calculated_at), "HH:mm", { locale: da })
+                          : "-"}
+                      </span>
+                      <ZoneLegend />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="all">
-                    <TabsList className="mb-4">
+                    <TabsList className="mb-3">
                       <TabsTrigger value="all">Alle Divisioner</TabsTrigger>
                       {!isFan && <TabsTrigger value="my">Min Division</TabsTrigger>}
                     </TabsList>
