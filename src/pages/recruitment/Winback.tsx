@@ -78,6 +78,12 @@ export default function Winback() {
   });
 
   const sortedCandidates = [...filteredCandidates].sort((a, b) => {
+    // For udskudt_samtale tab, sort by postponed_until ASC (earliest first, nulls last)
+    if (activeTab === "udskudt_samtale") {
+      const aDate = (a as any).postponed_until ? new Date((a as any).postponed_until).getTime() : Infinity;
+      const bDate = (b as any).postponed_until ? new Date((b as any).postponed_until).getTime() : Infinity;
+      return aDate - bDate;
+    }
     switch (sortBy) {
       case "newest":
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();

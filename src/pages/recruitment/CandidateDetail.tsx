@@ -56,7 +56,8 @@ const statusColors: Record<string, string> = {
   rejected: "bg-red-500/10 text-red-600 border-red-500/30",
   ghostet: "bg-amber-500/10 text-amber-600 border-amber-500/30",
   takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30",
-  ikke_kvalificeret: "bg-orange-500/10 text-orange-600 border-orange-500/30"
+  ikke_kvalificeret: "bg-orange-500/10 text-orange-600 border-orange-500/30",
+  udskudt_samtale: "bg-teal-500/10 text-teal-600 border-teal-500/30"
 };
 const roleLabels: Record<string, string> = {
   fieldmarketing: "Fieldmarketing",
