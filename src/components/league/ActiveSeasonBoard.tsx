@@ -4,12 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Trophy, Medal, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { Trophy, Medal, ArrowUp, ArrowDown, Eye, EyeOff, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { PodiumBadge } from "./PodiumBadge";
 import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { ZoneLegend } from "./ZoneLegend";
+import { ProvisionSparkline } from "./ProvisionSparkline";
+import { PlayerHoverCard } from "./PlayerHoverCard";
+import { ZoneProgressBar } from "./ZoneProgressBar";
 import { LeagueSeasonStanding } from "@/hooks/useLeagueActiveData";
 
 interface ActiveSeasonBoardProps {
@@ -19,6 +22,7 @@ interface ActiveSeasonBoardProps {
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
   todayProvisionMap?: Record<string, number>;
+  weeklyProvisionMap?: Record<string, number[]>;
 }
 
 export function ActiveSeasonBoard({
@@ -28,6 +32,7 @@ export function ActiveSeasonBoard({
   currentEmployeeId,
   defaultShowAll = false,
   todayProvisionMap = {},
+  weeklyProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
   const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
@@ -97,18 +102,26 @@ export function ActiveSeasonBoard({
         const isTopDivision = group.division === 1;
         const isBottomDivision = group.division === divisionGroups[divisionGroups.length - 1].division;
 
+        const headerGradient = isTopDivision
+          ? "bg-gradient-to-r from-yellow-500/15 to-amber-500/5"
+          : group.division === 2
+          ? "bg-gradient-to-r from-slate-400/15 to-slate-300/5"
+          : "bg-gradient-to-r from-orange-500/10 to-orange-400/5";
+
         return (
           <Card key={group.division} className="bg-card border-border overflow-hidden shadow-sm">
-            <CardHeader className="py-2.5 px-3 sm:px-4 bg-muted/40 border-b">
+            <CardHeader className={cn("py-2.5 px-3 sm:px-4 border-b", headerGradient)}>
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold">
                 {isTopDivision ? (
                   <>
                     <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
+                    <Shield className="h-3.5 w-3.5 text-yellow-500/60 shrink-0 -ml-1" />
                     <span className="truncate">Salgsligaen</span>
                   </>
                 ) : (
                   <>
                     <Medal className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Shield className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 -ml-1" />
                     <span>{group.division - 1}. Division</span>
                   </>
                 )}
@@ -132,6 +145,7 @@ export function ActiveSeasonBoard({
                     idx={idx}
                     todayProvision={todayProvisionMap[standing.employee_id] || 0}
                     todayDailyRank={todayTop3[standing.employee_id] || null}
+                    weeklyData={weeklyProvisionMap[standing.employee_id]}
                   />
                 ))}
               </div>
@@ -165,6 +179,7 @@ interface SeasonPlayerRowProps {
   idx: number;
   todayProvision: number;
   todayDailyRank: 1 | 2 | 3 | null;
+  weeklyData?: number[];
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -176,6 +191,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   idx,
   todayProvision,
   todayDailyRank,
+  weeklyData,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -196,13 +212,15 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
     (idx > 0 && rank === playersPerDivision - 4) ||
     (idx > 0 && rank === playersPerDivision - 2);
 
+  const playerName = formatPlayerName(standing.employee);
+
   return (
     <div>
       {showDashedBefore && <div className="border-t-2 border-dashed border-muted-foreground/20" />}
       
       <div
         className={cn(
-          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-colors",
+          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-500",
           isCurrentUser && "bg-primary/10 border-l-[3px] border-l-primary",
           !isCurrentUser && isPromoZone && "bg-green-500/8",
           !isCurrentUser && isTopZone && "bg-yellow-500/8",
@@ -232,12 +250,27 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         {/* Name + movement */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={cn(
-              "font-medium text-sm sm:text-[15px] truncate max-w-[140px] sm:max-w-none",
-              isCurrentUser && "text-primary font-semibold"
-            )}>
-              {formatPlayerName(standing.employee)}
-            </span>
+            {/* Live pulse dot */}
+            {todayProvision > 0 && (
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </span>
+            )}
+            <PlayerHoverCard
+              playerName={playerName}
+              teamName={standing.employee?.team_name || "Ingen team"}
+              todayProvision={todayProvision}
+              totalProvision={Number(standing.total_provision)}
+              division={standing.current_division}
+            >
+              <span className={cn(
+                "font-medium text-sm sm:text-[15px] truncate max-w-[140px] sm:max-w-none cursor-default",
+                isCurrentUser && "text-primary font-semibold"
+              )}>
+                {playerName}
+              </span>
+            </PlayerHoverCard>
             {isCurrentUser && <span className="text-[10px] text-muted-foreground">(dig)</span>}
             
             {promoted && (
@@ -250,11 +283,6 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
                 <ArrowDown className="h-3 w-3 mr-0.5" />Nedrykket
               </Badge>
             )}
-            {!promoted && !relegated && standing.overall_rank > 0 && (() => {
-              // Show rank movement arrow based on previous standings (via overall_rank change proxy)
-              // For season standings, we show division movement indicators
-              return null;
-            })()}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
@@ -264,10 +292,15 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         </div>
 
         {/* Points + provision */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
-            <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-              {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
+            <div className="flex items-center gap-1.5 justify-end">
+              <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
+                {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
+              </div>
+              {weeklyData && weeklyData.length > 0 && (
+                <ProvisionSparkline data={weeklyData} className="hidden sm:flex" />
+              )}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr

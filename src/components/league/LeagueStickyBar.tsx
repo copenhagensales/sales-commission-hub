@@ -10,14 +10,16 @@ interface LeagueStickyBarProps {
   zone: "top" | "promo" | "playoff" | "relegation" | "safe";
   isQualification?: boolean;
   visible: boolean;
+  todayProvision?: number;
+  distanceToNextZone?: number | null;
 }
 
 const zoneConfig = {
-  top: { label: "Top 2", color: "bg-yellow-500", textColor: "text-yellow-400" },
-  promo: { label: "Oprykker", color: "bg-green-500", textColor: "text-green-400" },
-  playoff: { label: "Playoff", color: "bg-orange-500", textColor: "text-orange-400" },
-  relegation: { label: "Nedrykker", color: "bg-red-500", textColor: "text-red-400" },
-  safe: { label: "Sikker", color: "bg-muted-foreground", textColor: "text-muted-foreground" },
+  top: { label: "Top 2", color: "bg-yellow-500", textColor: "text-yellow-400", borderColor: "border-yellow-500/30" },
+  promo: { label: "Oprykker", color: "bg-green-500", textColor: "text-green-400", borderColor: "border-green-500/30" },
+  playoff: { label: "Playoff", color: "bg-orange-500", textColor: "text-orange-400", borderColor: "border-orange-500/30" },
+  relegation: { label: "Nedrykker", color: "bg-red-500", textColor: "text-red-400", borderColor: "border-red-500/30" },
+  safe: { label: "Sikker", color: "bg-muted-foreground", textColor: "text-muted-foreground", borderColor: "border-border" },
 };
 
 export const LeagueStickyBar = memo(function LeagueStickyBar({
@@ -28,6 +30,8 @@ export const LeagueStickyBar = memo(function LeagueStickyBar({
   zone,
   isQualification,
   visible,
+  todayProvision,
+  distanceToNextZone,
 }: LeagueStickyBarProps) {
   const z = zoneConfig[zone];
   const divLabel = division === 1 ? "Salgsligaen" : `${division - 1}. Division`;
@@ -41,7 +45,7 @@ export const LeagueStickyBar = memo(function LeagueStickyBar({
           : "opacity-0 -translate-y-full pointer-events-none"
       )}
     >
-      <div className="bg-card/95 backdrop-blur-md border-b border-border shadow-sm px-3 py-2">
+      <div className={cn("bg-card/95 backdrop-blur-md border-b shadow-sm px-3 py-2", z.borderColor)}>
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           {/* Left: rank + division */}
           <div className="flex items-center gap-2.5 min-w-0">
@@ -53,17 +57,31 @@ export const LeagueStickyBar = memo(function LeagueStickyBar({
             <span className="text-sm text-muted-foreground truncate">{divLabel}</span>
           </div>
 
-          {/* Center: points/provision */}
-          <div className="font-mono text-sm font-semibold whitespace-nowrap">
-            {isQualification
-              ? `${(provision ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
-              : `${(points ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt`}
+          {/* Center: points/provision + today */}
+          <div className="flex flex-col items-center">
+            <div className="font-mono text-sm font-semibold whitespace-nowrap">
+              {isQualification
+                ? `${(provision ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+                : `${(points ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt`}
+            </div>
+            {todayProvision != null && todayProvision > 0 && (
+              <span className="text-[10px] text-emerald-400 font-medium whitespace-nowrap">
+                I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              </span>
+            )}
           </div>
 
-          {/* Right: zone badge */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className={cn("w-2 h-2 rounded-full", z.color)} />
-            <span className={cn("text-xs font-medium", z.textColor)}>{z.label}</span>
+          {/* Right: zone badge + distance */}
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <div className={cn("w-2 h-2 rounded-full", z.color)} />
+              <span className={cn("text-xs font-medium", z.textColor)}>{z.label}</span>
+            </div>
+            {distanceToNextZone != null && distanceToNextZone > 0 && (
+              <span className="text-[10px] text-muted-foreground font-mono whitespace-nowrap">
+                ↑ {distanceToNextZone.toLocaleString("da-DK")} kr
+              </span>
+            )}
           </div>
         </div>
       </div>

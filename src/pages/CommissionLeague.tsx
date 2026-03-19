@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Users, Calendar, ChevronRight, ChevronLeft, Loader2, Eye, AlertTriangle, Sparkles } from "lucide-react";
+import confetti from "canvas-confetti";
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,7 @@ import {
 } from "@/hooks/useLeagueActiveData";
 import { usePrizeLeaders } from "@/hooks/useLeaguePrizeData";
 import { useLeagueTodayProvision } from "@/hooks/useLeagueTodayProvision";
+import { useLeagueWeeklyProvision } from "@/hooks/useLeagueWeeklyProvision";
 import { PrizeShowcase } from "@/components/league/PrizeShowcase";
 import {
   AlertDialog,
@@ -122,6 +124,7 @@ export default function CommissionLeague() {
     return Array.from(ids);
   }, [standings, seasonStandings]);
   const { data: todayProvisionMap } = useLeagueTodayProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
+  const { data: weeklyProvisionMap } = useLeagueWeeklyProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
@@ -278,6 +281,22 @@ export default function CommissionLeague() {
     return null;
   })();
 
+  // Today provision for sticky bar
+  const myTodayProvision = currentEmployeeId ? (todayProvisionMap?.[currentEmployeeId] ?? 0) : 0;
+
+  // Confetti when entering top 3
+  useEffect(() => {
+    if (!currentEmployeeId || !stickyData) return;
+    const currentRankVal = stickyData.rank;
+    if (currentRankVal <= 3) {
+      const key = `confetti-top3-${currentEmployeeId}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+  }, [stickyData?.rank, currentEmployeeId]);
+
   return (
     <MainLayout>
       {/* Sticky status bar */}
@@ -290,6 +309,7 @@ export default function CommissionLeague() {
           zone={stickyData.zone}
           isQualification={stickyData.isQualification}
           visible={stickyVisible}
+          todayProvision={myTodayProvision}
         />
       )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
@@ -545,6 +565,7 @@ export default function CommissionLeague() {
                         isLoading={standingsLoading}
                         currentEmployeeId={currentEmployeeId}
                         todayProvisionMap={todayProvisionMap || {}}
+                        weeklyProvisionMap={weeklyProvisionMap || {}}
                       />
                     </TabsContent>
 
@@ -558,6 +579,7 @@ export default function CommissionLeague() {
                           isLoading={standingsLoading}
                           currentEmployeeId={currentEmployeeId}
                           todayProvisionMap={todayProvisionMap || {}}
+                          weeklyProvisionMap={weeklyProvisionMap || {}}
                         />
                       </TabsContent>
                     )}
@@ -637,6 +659,7 @@ export default function CommissionLeague() {
                       isLoading={seasonStandingsLoading}
                       currentEmployeeId={currentEmployeeId}
                       todayProvisionMap={todayProvisionMap || {}}
+                      weeklyProvisionMap={weeklyProvisionMap || {}}
                     />
                   ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
                     <RoundResultsCard
