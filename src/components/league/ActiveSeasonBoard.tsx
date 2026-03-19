@@ -30,6 +30,7 @@ export function ActiveSeasonBoard({
   todayProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
 
   const myDivision = useMemo(() => {
     if (!currentEmployeeId) return null;
