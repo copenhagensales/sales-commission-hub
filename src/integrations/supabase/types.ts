@@ -1614,6 +1614,7 @@ export type Database = {
           last_name: string
           notes: string | null
           phone: string | null
+          postponed_until: string | null
           rating: number | null
           resume_url: string | null
           source: string | null
@@ -1637,6 +1638,7 @@ export type Database = {
           last_name: string
           notes?: string | null
           phone?: string | null
+          postponed_until?: string | null
           rating?: number | null
           resume_url?: string | null
           source?: string | null
@@ -1660,6 +1662,7 @@ export type Database = {
           last_name?: string
           notes?: string | null
           phone?: string | null
+          postponed_until?: string | null
           rating?: number | null
           resume_url?: string | null
           source?: string | null

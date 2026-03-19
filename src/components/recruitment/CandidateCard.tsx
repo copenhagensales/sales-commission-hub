@@ -32,6 +32,7 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { SendSmsDialog } from "./SendSmsDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
+import { PostponeDateDialog } from "./PostponeDateDialog";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 
@@ -121,6 +122,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPostponeDialog, setShowPostponeDialog] = useState(false);
   const queryClient = useQueryClient();
   const { makeCall, callState, isDeviceReady, initializeDevice } = useTwilioDeviceContext();
 
@@ -142,16 +144,21 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   };
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (newStatus: string) => {
+    mutationFn: async ({ newStatus, postponed_until }: { newStatus: string; postponed_until?: string | null }) => {
+      const updates: Record<string, any> = { status: newStatus };
+      if (postponed_until !== undefined) updates.postponed_until = postponed_until;
+      // Clear postponed_until when changing to non-postponed status
+      if (newStatus !== "udskudt_samtale") updates.postponed_until = null;
       const { error } = await supabase
         .from("candidates")
-        .update({ status: newStatus })
+        .update(updates)
         .eq("id", candidate.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["winback-candidates"] });
       toast.success("Status opdateret");
       if (onUpdate) onUpdate();
     },
@@ -254,7 +261,13 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                       )}
                       <Select
                         value={candidate.status}
-                        onValueChange={(value) => updateStatusMutation.mutate(value)}
+                        onValueChange={(value) => {
+                          if (value === "udskudt_samtale") {
+                            setShowPostponeDialog(true);
+                          } else {
+                            updateStatusMutation.mutate({ newStatus: value });
+                          }
+                        }}
                       >
                         <SelectTrigger
                           className={`h-6 w-auto min-w-[120px] text-xs px-2 ${statusColors[candidate.status] || ""}`}
@@ -272,8 +285,14 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                           <SelectItem value="ghostet">Ghostet</SelectItem>
                           <SelectItem value="takket_nej">Takket nej</SelectItem>
                           <SelectItem value="ikke_kvalificeret">Ikke kvalificeret</SelectItem>
+                          <SelectItem value="udskudt_samtale">Udskudt samtale</SelectItem>
                         </SelectContent>
                       </Select>
+                      {candidate.status === "udskudt_samtale" && (candidate as any).postponed_until && (
+                        <Badge variant="outline" className="text-xs bg-teal-500/10 text-teal-600 border-teal-500/20">
+                          Opfølgning: {format(new Date((candidate as any).postponed_until), "d. MMM yyyy", { locale: da })}
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className="text-xs">
                         <Clock className="h-3 w-3 mr-1" />
                         {getTimeSinceApplication(candidate.created_at)}
@@ -444,6 +463,15 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PostponeDateDialog
+        open={showPostponeDialog}
+        onOpenChange={setShowPostponeDialog}
+        onConfirm={(date) => {
+          const dateStr = format(date, "yyyy-MM-dd");
+          updateStatusMutation.mutate({ newStatus: "udskudt_samtale", postponed_until: dateStr });
+        }}
+      />
     </>
   );
 }

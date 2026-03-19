@@ -31,6 +31,7 @@ import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog"
 import { AddToWinbackDialog } from "@/components/recruitment/AddToWinbackDialog";
 import { CandidateDetailDialog } from "@/components/recruitment/CandidateDetailDialog";
 import { CandidateSourceSelect } from "@/components/recruitment/CandidateSourceSelect";
+import { PostponeDateDialog } from "@/components/recruitment/PostponeDateDialog";
 import { combineDateAndDanishTime } from "@/lib/danish-time-utils";
 
 const statusLabels: Record<string, string> = {
@@ -43,7 +44,8 @@ const statusLabels: Record<string, string> = {
   rejected: "Afvist",
   ghostet: "Ghostet",
   takket_nej: "Takket nej",
-  ikke_kvalificeret: "Ikke kvalificeret"
+  ikke_kvalificeret: "Ikke kvalificeret",
+  udskudt_samtale: "Udskudt samtale"
 };
 const statusColors: Record<string, string> = {
   ny_ansoegning: "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -55,7 +57,8 @@ const statusColors: Record<string, string> = {
   rejected: "bg-red-500/10 text-red-600 border-red-500/30",
   ghostet: "bg-amber-500/10 text-amber-600 border-amber-500/30",
   takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30",
-  ikke_kvalificeret: "bg-orange-500/10 text-orange-600 border-orange-500/30"
+  ikke_kvalificeret: "bg-orange-500/10 text-orange-600 border-orange-500/30",
+  udskudt_samtale: "bg-teal-500/10 text-teal-600 border-teal-500/30"
 };
 const roleLabels: Record<string, string> = {
   fieldmarketing: "Fieldmarketing",
@@ -100,6 +103,7 @@ export default function CandidateDetail() {
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [showWinbackDialog, setShowWinbackDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPostponeDialog, setShowPostponeDialog] = useState(false);
   const {
     data: candidate,
     isLoading
@@ -587,6 +591,8 @@ export default function CandidateDetail() {
                     <Select value={candidate.status} onValueChange={value => {
                       if (value === "hired") {
                         setShowAssignCohortDialog(true);
+                      } else if (value === "udskudt_samtale") {
+                        setShowPostponeDialog(true);
                       } else {
                         updateCandidateMutation.mutate({ status: value });
                       }
@@ -1037,5 +1043,14 @@ export default function CandidateDetail() {
           statusColors={statusColors}
         />
       )}
+
+      <PostponeDateDialog
+        open={showPostponeDialog}
+        onOpenChange={setShowPostponeDialog}
+        onConfirm={(date) => {
+          const dateStr = format(date, "yyyy-MM-dd");
+          updateCandidateMutation.mutate({ status: "udskudt_samtale", postponed_until: dateStr });
+        }}
+      />
     </MainLayout>;
 }

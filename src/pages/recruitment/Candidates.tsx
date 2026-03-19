@@ -123,7 +123,7 @@ export default function Candidates() {
   });
 
   // Define finished statuses that should be hidden in "active" view
-  const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret'];
+  const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret', 'udskudt_samtale'];
 
   const activeCandidates = candidatesWithApps.filter(c => !finishedStatuses.includes(c.status));
 
@@ -306,6 +306,7 @@ export default function Candidates() {
                     <SelectItem value="ghostet">Ghostet</SelectItem>
                     <SelectItem value="takket_nej">Takket nej</SelectItem>
                     <SelectItem value="ikke_kvalificeret">Ikke kvalificeret</SelectItem>
+                    <SelectItem value="udskudt_samtale">Udskudt samtale</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
