@@ -309,6 +309,7 @@ export default function CommissionLeague() {
           zone={stickyData.zone}
           isQualification={stickyData.isQualification}
           visible={stickyVisible}
+          todayProvision={myTodayProvision}
         />
       )}
       <div className="min-h-screen bg-slate-900 p-4 md:p-6">
