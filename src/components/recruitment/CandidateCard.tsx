@@ -261,7 +261,13 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                       )}
                       <Select
                         value={candidate.status}
-                        onValueChange={(value) => updateStatusMutation.mutate(value)}
+                        onValueChange={(value) => {
+                          if (value === "udskudt_samtale") {
+                            setShowPostponeDialog(true);
+                          } else {
+                            updateStatusMutation.mutate({ newStatus: value });
+                          }
+                        }}
                       >
                         <SelectTrigger
                           className={`h-6 w-auto min-w-[120px] text-xs px-2 ${statusColors[candidate.status] || ""}`}
@@ -279,8 +285,14 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                           <SelectItem value="ghostet">Ghostet</SelectItem>
                           <SelectItem value="takket_nej">Takket nej</SelectItem>
                           <SelectItem value="ikke_kvalificeret">Ikke kvalificeret</SelectItem>
+                          <SelectItem value="udskudt_samtale">Udskudt samtale</SelectItem>
                         </SelectContent>
                       </Select>
+                      {candidate.status === "udskudt_samtale" && (candidate as any).postponed_until && (
+                        <Badge variant="outline" className="text-xs bg-teal-500/10 text-teal-600 border-teal-500/20">
+                          Opfølgning: {format(new Date((candidate as any).postponed_until), "d. MMM yyyy", { locale: da })}
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className="text-xs">
                         <Clock className="h-3 w-3 mr-1" />
                         {getTimeSinceApplication(candidate.created_at)}
