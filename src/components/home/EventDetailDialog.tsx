@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown, UserPlus, UserMinus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
