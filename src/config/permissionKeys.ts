@@ -68,7 +68,7 @@ export const PERMISSION_KEYS = {
   menu_home: { label: 'Hjem', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_home_goals: { label: 'Hjem mål', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_h2h: { label: 'Head-to-Head', section: 'mit_hjem', parent: 'menu_section_personal' },
-  menu_commission_league: { label: 'Salgsligaen', section: 'mit_hjem', parent: 'menu_section_personal' },
+  menu_commission_league: { label: 'Superligaen', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_league_admin: { label: 'Liga Administration', section: 'mit_hjem', parent: 'menu_commission_league' },
   menu_h2h_admin: { label: 'H2H Admin', section: 'mit_hjem', parent: 'menu_commission_league' },
   menu_team_h2h: { label: 'Team H2H', section: 'mit_hjem', parent: 'menu_commission_league' },

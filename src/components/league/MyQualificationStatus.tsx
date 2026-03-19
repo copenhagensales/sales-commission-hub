@@ -64,7 +64,7 @@ export function MyQualificationStatus({
 
   const getZoneInfo = () => {
     if (standing.projected_division === 1 && standing.projected_rank <= 3) {
-      return { text: "🔥 Top 3 i Salgsligaen!", color: "text-yellow-400", gradient: "from-yellow-500/15 via-slate-900 to-slate-900" };
+      return { text: "🔥 Top 3 i Superligaen!", color: "text-yellow-400", gradient: "from-yellow-500/15 via-slate-900 to-slate-900" };
     }
     if (standing.projected_rank <= 3) {
       return { text: "✅ Oprykningszone", color: "text-green-400", gradient: "from-green-500/15 via-slate-900 to-slate-900" };

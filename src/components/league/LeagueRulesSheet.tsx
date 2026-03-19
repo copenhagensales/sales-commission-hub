@@ -33,7 +33,7 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>📋 Sådan fungerer Salgsligaen</DialogTitle>
+          <DialogTitle>📋 Sådan fungerer Superligaen</DialogTitle>
         </DialogHeader>
         <div className="mt-2 space-y-5">
           {/* Oprykning */}
