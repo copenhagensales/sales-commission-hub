@@ -579,6 +579,7 @@ export default function CommissionLeague() {
                           isLoading={standingsLoading}
                           currentEmployeeId={currentEmployeeId}
                           todayProvisionMap={todayProvisionMap || {}}
+                          weeklyProvisionMap={weeklyProvisionMap || {}}
                         />
                       </TabsContent>
                     )}
