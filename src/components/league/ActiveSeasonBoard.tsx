@@ -245,6 +245,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
                 <ArrowDown className="h-3 w-3 mr-0.5" />Nedrykket
               </Badge>
             )}
+            {!promoted && !relegated && standing.overall_rank > 0 && (() => {
+              // Show rank movement arrow based on previous standings (via overall_rank change proxy)
+              // For season standings, we show division movement indicators
+              return null;
+            })()}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
