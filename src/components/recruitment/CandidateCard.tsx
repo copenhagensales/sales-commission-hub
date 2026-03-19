@@ -463,6 +463,15 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PostponeDateDialog
+        open={showPostponeDialog}
+        onOpenChange={setShowPostponeDialog}
+        onConfirm={(date) => {
+          const dateStr = format(date, "yyyy-MM-dd");
+          updateStatusMutation.mutate({ newStatus: "udskudt_samtale", postponed_until: dateStr });
+        }}
+      />
     </>
   );
 }
