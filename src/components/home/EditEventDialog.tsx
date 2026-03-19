@@ -76,6 +76,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
         location: event.location || "",
         description: event.description || "",
         show_popup: event.show_popup,
+        requires_registration: event.requires_registration ?? false,
         invited_teams: currentInvitations,
       });
     }
