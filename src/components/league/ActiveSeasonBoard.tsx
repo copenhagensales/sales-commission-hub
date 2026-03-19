@@ -26,6 +26,7 @@ export function ActiveSeasonBoard({
   isLoading,
   currentEmployeeId,
   defaultShowAll = false,
+  todayProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
 
