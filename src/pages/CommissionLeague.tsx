@@ -114,6 +114,15 @@ export default function CommissionLeague() {
   );
   const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
+  // Today's provision for all enrolled players
+  const allEmployeeIds = useMemo(() => {
+    const ids = new Set<string>();
+    (standings || []).forEach(s => ids.add(s.employee_id));
+    (seasonStandings || []).forEach(s => ids.add(s.employee_id));
+    return Array.from(ids);
+  }, [standings, seasonStandings]);
+  const { data: todayProvisionMap } = useLeagueTodayProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
+
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
 
