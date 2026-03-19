@@ -1,38 +1,41 @@
 
+# 10 UI-forbedringer til liga-boardet — IMPLEMENTERET ✅
 
-# Tilføj "Dagens Top 3"-symboler til liga-boardet
+## Implementerede forbedringer
 
-## Oversigt
-Vis et medal-/flamme-ikon ved de 3 spillere med højest provision i dag, uanset hvilken division de er i. Symbolerne vises ved siden af "I dag"-teksten.
+### 1. ✅ Animerede Top 3 badges
+- `PodiumBadge.tsx`: Pulserende glow via `podium-glow-gold/silver/bronze` CSS classes
+- `DailyTopBadge.tsx`: `animate-pulse` på flamme/lyn-ikoner
+- `index.css`: 3 nye `@keyframes` for medal-glow
 
-## Ændringer
+### 2. ✅ Sparkline provision-graf (7 dage)
+- `useLeagueWeeklyProvision.ts`: Batch-henter 7 dages provision via `get_sales_aggregates_v2` (group_by: "both")
+- `ProvisionSparkline.tsx`: SVG polyline (48×16px) med farvet trend
 
-### 1. `src/components/league/QualificationBoard.tsx`
-- Beregn `todayTop3` fra `todayProvisionMap`: sortér alle employee IDs efter dagens provision, tag top 3 (kun dem med > 0)
-- Send `todayDailyRank` (1, 2, eller 3) ned til `PlayerRow`
-- I `PlayerRow`: vis et ikon ved siden af "I dag"-linjen:
-  - 🥇 (guld cirkel) for #1
-  - 🥈 (sølv cirkel) for #2  
-  - 🥉 (bronze cirkel) for #3
-- Brug små farvede cirkler med tal eller Flame/Zap-ikon med farve
+### 3. ✅ Flottere divisions-headers med gradient
+- Salgsligaen: `from-yellow-500/15 to-amber-500/5` + Shield-ikon
+- 1. Division: `from-slate-400/15 to-slate-300/5`
+- 2. Division+: `from-orange-500/10 to-orange-400/5`
 
-### 2. `src/components/league/ActiveSeasonBoard.tsx`
-- Samme logik: beregn `todayTop3` fra `todayProvisionMap`
-- Send `todayDailyRank` til `SeasonPlayerRow`
-- Vis samme ikon/badge
+### 4. ✅ Forbedret sticky bar
+- Ny props: `todayProvision`, `distanceToNextZone`
+- Zone-farvet border, "I dag: X kr" visning
 
-### 3. Ny komponent: `src/components/league/DailyTopBadge.tsx`
-- Simpel komponent der tager `rank: 1 | 2 | 3`
-- Viser et lille ikon:
-  - Rank 1: 🔥 flamme-ikon i guld/orange
-  - Rank 2: sølvfarvet lyn-ikon
-  - Rank 3: bronzefarvet lyn-ikon
-- Alternativt: brug små runde badges med "🥇", "🥈", "🥉" eller tal i farvede cirkler
+### 5. ✅ Hover-effekt med tooltip detaljer
+- `PlayerHoverCard.tsx`: Team, division, total provision, dagens provision
 
-### Visuel placering
-Badgen vises til venstre for "I dag: X kr"-teksten, f.eks.:
-```
-  25.050 kr
-  🔥 I dag: 4.750 kr
-```
+### 6. ✅ Live puls-indikator
+- Grøn `animate-ping` dot ved spillernavn hvis `todayProvision > 0`
 
+### 7. ✅ Animated rank transitions
+- `transition-all duration-500` på PlayerRow containers
+
+### 8. ✅ Progress bar mod næste zone
+- `ZoneProgressBar.tsx`: 2px farvet bar med zone-farve
+
+### 9. ✅ Konfetti ved Top 3
+- `canvas-confetti` trigger i CommissionLeague ved rank ≤ 3, én gang pr. session
+
+### 10. ✅ Momentum-indikator
+- Integreret i `ProvisionSparkline.tsx`: TrendingUp/TrendingDown/Minus ikon
+- Baseret på 3-dages gennemsnit vs. foregående 3 dage
