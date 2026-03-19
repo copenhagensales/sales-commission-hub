@@ -175,6 +175,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   isBottomDivision,
   idx,
   todayProvision,
+  todayDailyRank,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
