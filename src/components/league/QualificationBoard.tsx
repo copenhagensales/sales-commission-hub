@@ -169,6 +169,7 @@ const PlayerRow = memo(function PlayerRow({
   idx,
   maxProvision,
   todayProvision,
+  todayDailyRank,
 }: PlayerRowProps) {
   const provisionPercent = maxProvision > 0 ? (standing.current_provision / maxProvision) * 100 : 0;
   const rankChange = standing.previous_overall_rank !== null
