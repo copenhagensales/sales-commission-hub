@@ -15,7 +15,7 @@ const config = {
 export function DailyTopBadge({ rank, className }: DailyTopBadgeProps) {
   const { icon: Icon, color } = config[rank];
   return (
-    <Icon className={cn("h-3 w-3 shrink-0", color, className)} />
+    <Icon className={cn("h-3 w-3 shrink-0 animate-pulse", color, className)} />
   );
 }
 

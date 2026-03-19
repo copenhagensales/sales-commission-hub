@@ -10,16 +10,19 @@ const podiumConfig = {
     emoji: "🥇",
     gradient: "bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500",
     shadow: "shadow-yellow-500/25",
+    glow: "podium-glow-gold",
   },
   2: {
     emoji: "🥈",
     gradient: "bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400",
     shadow: "shadow-slate-400/25",
+    glow: "podium-glow-silver",
   },
   3: {
     emoji: "🥉",
     gradient: "bg-gradient-to-br from-orange-300 via-amber-500 to-orange-600",
     shadow: "shadow-orange-500/25",
+    glow: "podium-glow-bronze",
   },
 };
 
@@ -33,6 +36,7 @@ export function PodiumBadge({ rank, className }: PodiumBadgeProps) {
         config.gradient,
         "shadow-md",
         config.shadow,
+        config.glow,
         className
       )}
     >
