@@ -17,6 +17,7 @@ interface QualificationBoardProps {
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
   maxProvision?: number;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function QualificationBoard({
