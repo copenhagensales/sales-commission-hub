@@ -259,7 +259,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         </div>
 
         {/* Points + provision */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
@@ -267,6 +267,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
+            {todayProvision > 0 && (
+              <div className="text-[10px] text-emerald-400 font-medium">
+                I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              </div>
+            )}
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">
