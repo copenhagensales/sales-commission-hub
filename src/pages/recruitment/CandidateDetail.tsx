@@ -31,6 +31,7 @@ import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog"
 import { AddToWinbackDialog } from "@/components/recruitment/AddToWinbackDialog";
 import { CandidateDetailDialog } from "@/components/recruitment/CandidateDetailDialog";
 import { CandidateSourceSelect } from "@/components/recruitment/CandidateSourceSelect";
+import { PostponeDateDialog } from "@/components/recruitment/PostponeDateDialog";
 import { combineDateAndDanishTime } from "@/lib/danish-time-utils";
 
 const statusLabels: Record<string, string> = {
