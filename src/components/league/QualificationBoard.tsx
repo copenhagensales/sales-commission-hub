@@ -8,6 +8,7 @@ import { QualificationStanding } from "@/hooks/useLeagueData";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { PodiumBadge } from "./PodiumBadge";
+import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { ZoneLegend } from "./ZoneLegend";
 
 interface QualificationBoardProps {
