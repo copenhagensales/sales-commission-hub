@@ -591,6 +591,8 @@ export default function CandidateDetail() {
                     <Select value={candidate.status} onValueChange={value => {
                       if (value === "hired") {
                         setShowAssignCohortDialog(true);
+                      } else if (value === "udskudt_samtale") {
+                        setShowPostponeDialog(true);
                       } else {
                         updateCandidateMutation.mutate({ status: value });
                       }
