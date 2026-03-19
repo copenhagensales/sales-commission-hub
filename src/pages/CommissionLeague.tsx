@@ -628,6 +628,7 @@ export default function CommissionLeague() {
                         {" • "}{seasonStandings?.length || 0} spillere
                       </CardDescription>
                     </div>
+                    <ZoneLegend />
                   </div>
                 </CardHeader>
                 <CardContent>
