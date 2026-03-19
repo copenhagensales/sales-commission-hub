@@ -24,13 +24,23 @@ export function MyQualificationStatus({
   const rivalInfo = useMemo(() => {
     if (!standing || !standings || standings.length === 0) return null;
     const myIndex = standings.findIndex(s => s.employee_id === standing.employee_id);
-    if (myIndex <= 0) return null;
-    const rival = standings[myIndex - 1];
-    const gap = rival.current_provision - standing.current_provision;
-    if (gap <= 0) return null;
-    return {
-      gap: gap.toLocaleString("da-DK", { maximumFractionDigits: 0 }),
-    };
+    if (myIndex < 0) return null;
+
+    const aheadGap = myIndex > 0
+      ? standings[myIndex - 1].current_provision - standing.current_provision
+      : null;
+    const behindGap = myIndex < standings.length - 1
+      ? standing.current_provision - standings[myIndex + 1].current_provision
+      : null;
+
+    if ((aheadGap === null || aheadGap <= 0) && (behindGap === null || behindGap <= 0)) return null;
+
+    const safeAhead = aheadGap !== null && aheadGap > 0 ? aheadGap : 0;
+    const safeBehind = behindGap !== null && behindGap > 0 ? behindGap : 0;
+    const total = safeAhead + safeBehind;
+    const position = total > 0 ? (safeBehind / total) * 100 : 50;
+
+    return { aheadGap: safeAhead, behindGap: safeBehind, position };
   }, [standings, standing]);
 
   if (!standing) {
