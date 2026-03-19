@@ -1,0 +1,1 @@
+ALTER TABLE public.company_events ADD COLUMN requires_registration boolean NOT NULL DEFAULT false;

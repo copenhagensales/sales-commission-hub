@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown, UserPlus, UserMinus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ interface CompanyEvent {
   event_time: string | null;
   location: string | null;
   description: string | null;
+  requires_registration?: boolean;
 }
 
 interface EventDetailDialogProps {
@@ -138,24 +139,49 @@ export function EventDetailDialog({
 
           {/* Actions */}
           <div className="flex gap-2 pt-4">
-            <Button
-              variant={myStatus === 'attending' ? "default" : "outline"}
-              className="flex-1 gap-2"
-              onClick={() => onToggleAttendance('attending')}
-              disabled={isLoading}
-            >
-              <ThumbsUp className="w-4 h-4" />
-              Jeg deltager
-            </Button>
-            <Button
-              variant={myStatus === 'not_attending' ? "secondary" : "outline"}
-              className="flex-1 gap-2"
-              onClick={() => onToggleAttendance('not_attending')}
-              disabled={isLoading}
-            >
-              <ThumbsDown className="w-4 h-4" />
-              Deltager ikke
-            </Button>
+            {event.requires_registration ? (
+              <>
+                <Button
+                  variant={myStatus === 'attending' ? "default" : "outline"}
+                  className={`flex-1 gap-2 ${myStatus === 'attending' ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600' : 'border-emerald-600/50 text-emerald-600 hover:bg-emerald-50'}`}
+                  onClick={() => onToggleAttendance('attending')}
+                  disabled={isLoading}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  {myStatus === 'attending' ? 'Tilmeldt' : 'Tilmeld mig'}
+                </Button>
+                <Button
+                  variant={myStatus === 'not_attending' ? "secondary" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => onToggleAttendance('not_attending')}
+                  disabled={isLoading}
+                >
+                  <UserMinus className="w-4 h-4" />
+                  Afmeld
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant={myStatus === 'attending' ? "default" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => onToggleAttendance('attending')}
+                  disabled={isLoading}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                  Jeg deltager
+                </Button>
+                <Button
+                  variant={myStatus === 'not_attending' ? "secondary" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => onToggleAttendance('not_attending')}
+                  disabled={isLoading}
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                  Deltager ikke
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>

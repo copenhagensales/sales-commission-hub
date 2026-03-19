@@ -24,6 +24,7 @@ interface EditEventDialogProps {
     location: string | null;
     description: string | null;
     show_popup: boolean;
+    requires_registration: boolean;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,6 +39,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
     location: "",
     description: "",
     show_popup: false,
+    requires_registration: false,
     invited_teams: [] as string[],
   });
 
@@ -74,6 +76,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
         location: event.location || "",
         description: event.description || "",
         show_popup: event.show_popup,
+        requires_registration: event.requires_registration ?? false,
         invited_teams: currentInvitations,
       });
     }
@@ -91,6 +94,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
           location: form.location || null,
           description: form.description || null,
           show_popup: form.show_popup,
+          requires_registration: form.requires_registration,
         })
         .eq("id", event.id);
       if (error) throw error;
@@ -199,6 +203,17 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
               </div>
             </div>
           )}
+
+          <div className="flex items-center justify-between py-2">
+            <Label htmlFor="edit-requires-registration" className="cursor-pointer">
+              Kræver tilmelding
+            </Label>
+            <Switch
+              id="edit-requires-registration"
+              checked={form.requires_registration}
+              onCheckedChange={(checked) => setForm(prev => ({ ...prev, requires_registration: checked }))}
+            />
+          </div>
 
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="edit-show-popup" className="cursor-pointer">

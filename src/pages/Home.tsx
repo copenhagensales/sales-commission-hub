@@ -21,6 +21,8 @@ import {
   ChevronDown,
   ThumbsUp,
   ThumbsDown,
+  UserPlus,
+  UserMinus,
   Info,
   CalendarX,
   Pencil,
@@ -66,6 +68,7 @@ const Home = () => {
     location: "", 
     description: "",
     show_popup: false,
+    requires_registration: false,
     invited_teams: [] as string[]
   });
   const [celebrationsOpen, setCelebrationsOpen] = useState(true);
@@ -347,6 +350,7 @@ const Home = () => {
           location: event.location || null,
           description: event.description || null,
           show_popup: event.show_popup,
+          requires_registration: event.requires_registration,
           created_by: user?.id
         })
         .select()
@@ -367,7 +371,7 @@ const Home = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-company-events"] });
       setAddEventOpen(false);
-      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, invited_teams: [] });
+      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, requires_registration: false, invited_teams: [] });
       toast.success("Begivenhed tilføjet");
     },
     onError: () => {
@@ -427,6 +431,7 @@ const Home = () => {
           event_time: selectedEvent.event_time,
           location: selectedEvent.location,
           description: selectedEvent.description,
+          requires_registration: (selectedEvent as any).requires_registration,
         } : null}
         open={!!selectedEventForDetail}
         onOpenChange={(open) => !open && setSelectedEventForDetail(null)}
@@ -613,6 +618,18 @@ const Home = () => {
                       </div>
                     )}
                     
+                    {/* Requires registration toggle */}
+                    <div className="flex items-center justify-between py-2">
+                      <Label htmlFor="requires-registration" className="cursor-pointer">
+                        Kræver tilmelding
+                      </Label>
+                      <Switch
+                        id="requires-registration"
+                        checked={newEvent.requires_registration}
+                        onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, requires_registration: checked }))}
+                      />
+                    </div>
+
                     {/* Show popup toggle */}
                     <div className="flex items-center justify-between py-2">
                       <Label htmlFor="show-popup" className="cursor-pointer">
@@ -713,24 +730,53 @@ const Home = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
-                        <Button
-                          variant={myStatus === 'attending' ? "default" : "ghost"}
-                          size="sm"
-                          className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
-                          onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
-                          disabled={toggleAttendanceMutation.isPending}
-                        >
-                          <ThumbsUp className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant={myStatus === 'not_attending' ? "default" : "ghost"}
-                          size="sm"
-                          className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
-                          onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
-                          disabled={toggleAttendanceMutation.isPending}
-                        >
-                          <ThumbsDown className="w-3.5 h-3.5" />
-                        </Button>
+                        {(event as any).requires_registration ? (
+                          <>
+                            <Button
+                              variant={myStatus === 'attending' ? "default" : "outline"}
+                              size="sm"
+                              className={`h-8 px-2 md:px-3 gap-1 text-xs ${myStatus === 'attending' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'border-emerald-600/50 text-emerald-600 hover:bg-emerald-50'}`}
+                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
+                              disabled={toggleAttendanceMutation.isPending}
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{myStatus === 'attending' ? 'Tilmeldt' : 'Tilmeld'}</span>
+                            </Button>
+                            {myStatus === 'attending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 gap-1 text-xs text-muted-foreground hover:text-destructive"
+                                onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
+                                disabled={toggleAttendanceMutation.isPending}
+                              >
+                                <UserMinus className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Afmeld</span>
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant={myStatus === 'attending' ? "default" : "ghost"}
+                              size="sm"
+                              className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
+                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
+                              disabled={toggleAttendanceMutation.isPending}
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant={myStatus === 'not_attending' ? "default" : "ghost"}
+                              size="sm"
+                              className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
+                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
+                              disabled={toggleAttendanceMutation.isPending}
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
