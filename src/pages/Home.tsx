@@ -350,6 +350,7 @@ const Home = () => {
           location: event.location || null,
           description: event.description || null,
           show_popup: event.show_popup,
+          requires_registration: event.requires_registration,
           created_by: user?.id
         })
         .select()
