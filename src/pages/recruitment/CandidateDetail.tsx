@@ -43,7 +43,8 @@ const statusLabels: Record<string, string> = {
   rejected: "Afvist",
   ghostet: "Ghostet",
   takket_nej: "Takket nej",
-  ikke_kvalificeret: "Ikke kvalificeret"
+  ikke_kvalificeret: "Ikke kvalificeret",
+  udskudt_samtale: "Udskudt samtale"
 };
 const statusColors: Record<string, string> = {
   ny_ansoegning: "bg-blue-500/10 text-blue-600 border-blue-500/30",
