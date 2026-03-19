@@ -17,6 +17,7 @@ interface ActiveSeasonBoardProps {
   isLoading: boolean;
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function ActiveSeasonBoard({
