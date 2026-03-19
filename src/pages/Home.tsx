@@ -68,6 +68,7 @@ const Home = () => {
     location: "", 
     description: "",
     show_popup: false,
+    requires_registration: false,
     invited_teams: [] as string[]
   });
   const [celebrationsOpen, setCelebrationsOpen] = useState(true);
