@@ -39,6 +39,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
     location: "",
     description: "",
     show_popup: false,
+    requires_registration: false,
     invited_teams: [] as string[],
   });
 
