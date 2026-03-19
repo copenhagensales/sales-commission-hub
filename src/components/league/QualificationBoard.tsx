@@ -121,6 +121,7 @@ export function QualificationBoard({
                     isBottomDivision={isBottomDivision}
                     idx={idx}
                     maxProvision={computedMaxProvision}
+                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
                   />
                 ))}
               </div>
