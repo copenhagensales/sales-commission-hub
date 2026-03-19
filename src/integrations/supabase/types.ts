@@ -3021,6 +3021,7 @@ export type Database = {
           event_time: string | null
           id: string
           location: string | null
+          requires_registration: boolean
           show_popup: boolean
           title: string
           updated_at: string
@@ -3033,6 +3034,7 @@ export type Database = {
           event_time?: string | null
           id?: string
           location?: string | null
+          requires_registration?: boolean
           show_popup?: boolean
           title: string
           updated_at?: string
@@ -3045,6 +3047,7 @@ export type Database = {
           event_time?: string | null
           id?: string
           location?: string | null
+          requires_registration?: boolean
           show_popup?: boolean
           title?: string
           updated_at?: string
