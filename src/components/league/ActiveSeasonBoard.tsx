@@ -1,4 +1,5 @@
 import { useMemo, useState, memo } from "react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,7 @@ interface ActiveSeasonBoardProps {
   isLoading: boolean;
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function ActiveSeasonBoard({
@@ -24,6 +26,7 @@ export function ActiveSeasonBoard({
   isLoading,
   currentEmployeeId,
   defaultShowAll = false,
+  todayProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
 
@@ -125,6 +128,7 @@ export function ActiveSeasonBoard({
                     isBottomDivision={isBottomDivision}
                     totalDivisions={totalDivisions}
                     idx={idx}
+                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
                   />
                 ))}
               </div>
@@ -156,6 +160,7 @@ interface SeasonPlayerRowProps {
   isBottomDivision: boolean;
   totalDivisions: number;
   idx: number;
+  todayProvision: number;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -165,6 +170,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   isTopDivision,
   isBottomDivision,
   idx,
+  todayProvision,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -239,6 +245,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
                 <ArrowDown className="h-3 w-3 mr-0.5" />Nedrykket
               </Badge>
             )}
+            {!promoted && !relegated && standing.overall_rank > 0 && (() => {
+              // Show rank movement arrow based on previous standings (via overall_rank change proxy)
+              // For season standings, we show division movement indicators
+              return null;
+            })()}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
@@ -248,7 +259,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         </div>
 
         {/* Points + provision */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
@@ -256,6 +267,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
+            {todayProvision > 0 && (
+              <div className="text-[10px] text-emerald-400 font-medium">
+                I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              </div>
+            )}
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">

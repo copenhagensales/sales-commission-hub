@@ -17,6 +17,7 @@ interface QualificationBoardProps {
   currentEmployeeId?: string;
   defaultShowAll?: boolean;
   maxProvision?: number;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function QualificationBoard({
@@ -25,6 +26,7 @@ export function QualificationBoard({
   isLoading,
   currentEmployeeId,
   defaultShowAll = false,
+  todayProvisionMap = {},
 }: QualificationBoardProps) {
   const computedMaxProvision = useMemo(() => {
     if (standings.length === 0) return 1;
@@ -119,6 +121,7 @@ export function QualificationBoard({
                     isBottomDivision={isBottomDivision}
                     idx={idx}
                     maxProvision={computedMaxProvision}
+                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
                   />
                 ))}
               </div>
@@ -150,6 +153,7 @@ interface PlayerRowProps {
   isBottomDivision: boolean;
   idx: number;
   maxProvision: number;
+  todayProvision: number;
 }
 
 const PlayerRow = memo(function PlayerRow({
@@ -160,6 +164,7 @@ const PlayerRow = memo(function PlayerRow({
   isBottomDivision,
   idx,
   maxProvision,
+  todayProvision,
 }: PlayerRowProps) {
   const provisionPercent = maxProvision > 0 ? (standing.current_provision / maxProvision) * 100 : 0;
   const rankChange = standing.previous_overall_rank !== null
@@ -238,7 +243,12 @@ const PlayerRow = memo(function PlayerRow({
             <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
               {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
-            <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>
+            {todayProvision > 0 && (
+              <div className="text-[10px] text-emerald-400 font-medium">
+                I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              </div>
+            )}
+            {todayProvision <= 0 && <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>}
           </div>
           <div className="hidden sm:block text-right min-w-[50px]">
             <span className="text-sm text-muted-foreground">0 pt</span>

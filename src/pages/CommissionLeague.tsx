@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   useMySeasonStanding,
 } from "@/hooks/useLeagueActiveData";
 import { usePrizeLeaders } from "@/hooks/useLeaguePrizeData";
+import { useLeagueTodayProvision } from "@/hooks/useLeagueTodayProvision";
 import { PrizeShowcase } from "@/components/league/PrizeShowcase";
 import {
   AlertDialog,
@@ -112,6 +113,15 @@ export default function CommissionLeague() {
     season?.start_date
   );
   const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
+
+  // Today's provision for all enrolled players
+  const allEmployeeIds = useMemo(() => {
+    const ids = new Set<string>();
+    (standings || []).forEach(s => ids.add(s.employee_id));
+    (seasonStandings || []).forEach(s => ids.add(s.employee_id));
+    return Array.from(ids);
+  }, [standings, seasonStandings]);
+  const { data: todayProvisionMap } = useLeagueTodayProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
@@ -534,6 +544,7 @@ export default function CommissionLeague() {
                         playersPerDivision={playersPerDivision}
                         isLoading={standingsLoading}
                         currentEmployeeId={currentEmployeeId}
+                        todayProvisionMap={todayProvisionMap || {}}
                       />
                     </TabsContent>
 
@@ -546,6 +557,7 @@ export default function CommissionLeague() {
                           playersPerDivision={playersPerDivision}
                           isLoading={standingsLoading}
                           currentEmployeeId={currentEmployeeId}
+                          todayProvisionMap={todayProvisionMap || {}}
                         />
                       </TabsContent>
                     )}
@@ -624,6 +636,7 @@ export default function CommissionLeague() {
                       playersPerDivision={playersPerDivision}
                       isLoading={seasonStandingsLoading}
                       currentEmployeeId={currentEmployeeId}
+                      todayProvisionMap={todayProvisionMap || {}}
                     />
                   ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
                     <RoundResultsCard

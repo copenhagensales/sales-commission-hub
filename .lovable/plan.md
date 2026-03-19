@@ -1,38 +1,44 @@
+# Lovable Plan
 
+## AMO Compliance Hub — Fase 1 ✅
 
-# Tilføj "optjent i dag" og placeringsryk til liga-boardet
+### Implementeret
+1. ✅ Database: 12 tabeller oprettet (`amo_workplaces`, `amo_members`, `amo_amr_elections`, `amo_annual_discussions`, `amo_meetings`, `amo_apv`, `amo_kemi_apv`, `amo_training_courses`, `amo_documents`, `amo_tasks`, `amo_compliance_rules`, `amo_audit_log`).
+2. ✅ 8 enums: `amo_role_type`, `amo_meeting_type`, `amo_meeting_status`, `amo_apv_reason`, `amo_training_type`, `amo_task_priority`, `amo_task_status`, `amo_rule_type`.
+3. ✅ RLS: Alle authenticated kan læse; teamleder/ejer kan skrive.
+4. ✅ Storage bucket: `amo-documents` (privat) med RLS.
+5. ✅ Permissions: 12 nye permission keys i `permissionKeys.ts` under `menu_section_amo`.
+6. ✅ Hooks: `usePositionPermissions` udvidet med 11 AMO-permissions.
+7. ✅ Sidebar: AMO-sektion med Shield-ikon og 11 undermenu-items i `AppSidebar.tsx`.
+8. ✅ Routes: 11 routes under `/amo/*` i `config.tsx`.
+9. ✅ Dashboard: `AmoDashboard.tsx` med dynamisk compliance score, 8 statuskort (rød/gul/grøn), åbne opgaver, seneste uploads, AMO-medlemmer.
+10. ✅ Placeholder: `AmoPlaceholder.tsx` for endnu ikke implementerede moduler.
+11. ✅ Seed data: 3 medlemmer, 3 møder, 1 årlig drøftelse, 1 APV, 1 Kemi-APV, 2 uddannelseskrav, 7 compliance-regler, 1 datakvalitetsopgave.
+12. ✅ Data quality warning: "William Seiding" vs "William Hoe" vises i dashboard og som åben opgave.
 
-## Hvad ændres
+## AMO Compliance Hub — Fase 2 ✅
 
-### 1. Ny hook: `src/hooks/useLeagueTodayProvision.ts`
-- Henter dagens provision for alle tilmeldte spillere via en enkelt query
-- Joiner `sale_items` → `sales` → `employee_agent_mapping` → `employee_master_data` filtreret på `sale_datetime >= today` og `counts_as_sale = true`
-- Returnerer `Record<employeeId, number>` (today's commission)
-- Alternativt: bruger `get_sales_aggregates_v2` RPC med `groupBy: ['employee']` for dagens dato
+### Implementeret
+1. ✅ **AMO Organisation** (`/amo/organisation`): CRUD for arbejdspladser og medlemmer, AMR-valg oversigt, compliance-beregning baseret på medarbejderantal (< 10, 10-34, 35+), tabs-baseret UI.
+2. ✅ **Møder og referater** (`/amo/meetings`): CRUD for AMO-møder, agenda-skabelon generator, mødestatus (planlagt/gennemført/overskredet/aflyst), detaljevisning, statistik-kort.
+3. ✅ **Årlig drøftelse** (`/amo/annual-discussion`): CRUD med alle påkrævede felter, auto-beregning af næste frist (12 mdr), påmindelsesbannere (60/30/7 dage), referat-status.
+4. ✅ **APV** (`/amo/apv`): CRUD med handlingsplan, 3-års cyklus tracking, risikoniveau, detaljevisning, overdue-advarsler, statistik-kort.
 
-### 2. `src/components/league/QualificationBoard.tsx`
-- Modtag ny prop `todayProvisionMap: Record<string, number>`
-- Send den videre til `PlayerRow`
-- I `PlayerRow`: vis "I dag: X kr" under total provision (lille grøn tekst)
-- Placeringsryk-indikatoren er allerede implementeret (linje 222-227), men vises kun når `previous_overall_rank !== null` — den virker allerede korrekt
+## AMO Compliance Hub — Fase 3 ✅
 
-### 3. `src/components/league/ActiveSeasonBoard.tsx`
-- Modtag ny prop `todayProvisionMap: Record<string, number>`
-- Send den videre til `SeasonPlayerRow`
-- Vis "I dag: X kr" i provision-kolonnen
-- Tilføj placeringsryk-indikator (op/ned-pile) baseret på `previous_division` eller tilføj `previous_overall_rank` til season standings (kræver evt. DB-ændring)
+### Implementeret
+1. ✅ **Kemi-APV** (`/amo/kemi-apv`): Produktliste med CRUD, hazard flag, SDS-link, review-deadlines, statistik-kort, manglende-SDS-advarsler.
+2. ✅ **Uddannelse og certifikater** (`/amo/training`): Kursuskrav CRUD, 4 kursustyper, auto deadline-beregning (3 mdr), certifikat-sporing, overdue-advarsler.
+3. ✅ **Dokumentcenter** (`/amo/documents`): Upload til storage bucket, metadata og kategorisering, søgning og filtrering, version-tracking, DOKO-reference, udløbsadvarsler.
 
-### 4. `src/pages/CommissionLeague.tsx`
-- Kald `useLeagueTodayProvision(employeeIds)` med alle enrolled employee IDs
-- Send `todayProvisionMap` ned til QualificationBoard og ActiveSeasonBoard
+## AMO Compliance Hub — Fase 4 ✅
 
-## Visuel design (inspireret af screenshot)
-- Provision-kolonnen viser allerede total i fed skrift
-- Tilføj en lille linje nedenunder: `"I dag: 2.450 kr"` i `text-emerald-400 text-[10px]`
-- Placeringsryk: grøn pil op + antal pladser, rød pil ned + antal pladser (allerede i QualificationBoard)
+### Implementeret
+1. ✅ **Opgavemotor** (`/amo/tasks`): Fuld CRUD, prioritet/status-styring, modul-filtrering, overdue-auto-detection, CSV-eksport.
+2. ✅ **Audit Log** (`/amo/audit-log`): Log-viewer med søgning, tabel/handling-filtre, detaljevisning med gamle/nye værdier, CSV-eksport.
+3. ✅ **Audit Log Triggers**: Automatisk logging af INSERT/UPDATE/DELETE på alle 11 AMO-tabeller via `amo_audit_trigger_fn()`.
+4. ✅ **Eksport**: CSV-eksport integreret i Opgavemotor og Audit Log.
+5. ✅ **Indstillinger** (`/amo/settings`): Compliance-regler CRUD, notifikationsindstillinger, regel-aktivering/deaktivering.
 
-## Teknisk tilgang
-- Én query for alle spilleres daglige provision (grupperet pr. employee) — undgår N+1
-- Stale time 60s, refetch 120s — matcher standings-refresh
-- Ingen DB-migration nødvendig — bruger eksisterende salgsdata
-
+### Status
+Alle AMO-moduler er nu fuldt implementeret. Ingen placeholders tilbage.
