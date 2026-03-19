@@ -1,37 +1,29 @@
 
 
-# Forbedret UI for leaderboard-headeren
+# Tilføj "Tilmeld mig"-knap til begivenheder
 
-## Nuværende problemer
-- Headeren er flad og kedelig — bare tekst og en lille badge
-- "Kvalifikationsrunde" titlen blander sig med ZoneLegend-ikonet
-- "Opdateret"-badgen ser ud som metadata, ikke som et vigtigt signal
-- Tabs ("Alle Divisioner" / "Min Division") er visuelt adskilt fra headeren
+## Hvad bygges
+En ny mulighed ved oprettelse/redigering af events: "Kræver tilmelding". Når aktiveret, vises en tydelig "Tilmeld"-knap på eventet i stedet for (eller ved siden af) thumbs up/down. Brugere kan tilmelde/afmelde sig, og antallet af tilmeldte vises.
 
-## Forslag til forbedringer
+## Database-ændring
+Tilføj kolonne `requires_registration` (boolean, default false) til `company_events`-tabellen.
 
-### 1. Tilføj et ikon og bedre hierarki til titlen
-- Tilføj et `Trophy`-ikon (allerede importeret) foran "Kvalifikationsrunde" i en accent-farve
-- Gør titlen lidt større og med gradient-tekst eller accent-farve for at signalere vigtighed
-- Flyt ZoneLegend til højre side af headeren (som en utility-knap)
+## UI-ændringer
 
-### 2. Live-status som pulserende indikator
-- Erstat den statiske "Live opdatering" tekst med en pulserende grøn prik + "Live" label (samme stil som spillerens live-prik)
-- Gør "Opdateret HH:mm" til en subtil muted tekst i stedet for en Badge
+### Ved oprettelse/redigering af event
+- Ny Switch "Kræver tilmelding" i både oprettelses-dialogen (`Home.tsx`) og `EditEventDialog.tsx`
 
-### 3. Bedre header-layout
-- Brug hele bredden med flex justify-between
-- Venstre: Ikon + titel + live-prik + tilmeldte count
-- Højre: "Opdateret HH:mm" tekst + ZoneLegend ikon
+### I event-listen (Kommende begivenheder)
+- Hvis `requires_registration = true`: Vis en "Tilmeld"-knap (grøn, med `UserPlus`-ikon) i stedet for ThumbsUp. ThumbsDown erstattes af en "Afmeld"-knap
+- Hvis `requires_registration = false`: Behold nuværende ThumbsUp/ThumbsDown som i dag
+- Genbruger den eksisterende `event_attendees`-tabel og `toggleAttendanceMutation` — ingen ny tabel nødvendig
 
-### 4. Tabs tættere på headeren
-- Reducer spacing mellem header og tabs for bedre sammenhæng
+### I EventDetailDialog
+- Vis tilmeldingsknap i detaljevisningen også, når `requires_registration = true`
 
-## Teknisk ændring
-**Fil:** `src/pages/CommissionLeague.tsx` (linje 538-563)
-
-Omskriv `CardHeader`-blokken:
-- Venstre side: `Trophy`-ikon (text-yellow-400) + "Kvalifikationsrunde" (større font) + pulserende grøn prik + "Live" + "• 67 tilmeldte"
-- Højre side: "Opdateret 15:45" (muted, ingen badge) + `ZoneLegend`
-- Reducer `mb-4` på TabsList til `mb-3`
+## Filer der ændres
+1. **Database migration** — tilføj `requires_registration` kolonne
+2. **`src/pages/Home.tsx`** — ny switch i oprettelses-dialog + betinget knap-visning i event-listen
+3. **`src/components/home/EditEventDialog.tsx`** — ny switch i redigerings-dialog
+4. **`src/components/home/EventDetailDialog.tsx`** — betinget tilmeldingsknap
 
