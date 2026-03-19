@@ -1,36 +1,31 @@
 
 
-# Tilføj symbolforklaring (legend) til Salgsligaen
+# Rival-afstandsbar: Vis afstand til spilleren over og under dig
 
-## Hvad skal bygges
-En udvidet symbolforklaring der placeres ved "Opdateret HH:mm"-badget i leaderboard-headeren. Den eksisterende `ZoneLegend` komponent dækker kun zone-farver og op/nedrykningspile, men mangler forklaring af:
+## Idé
+Erstat den nuværende tekstlinje ("📊 Næste plads: 2.250 kr foran dig") med en visuel bar der viser begge rivaler:
 
-- 🥇🥈🥉 **Podium badges** (top 3 i divisionen)
-- 🔥 **Flamme** / ⚡ **Lyn** (Dagens Top 3 på tværs af divisioner)
-- 🟢 **Grøn pulserende prik** (har solgt i dag)
-- 📈📉 **Sparkline med trend-pil** (ugentlig formkurve — grøn stiger, rød falder, blå stabil)
-- ↗↘ **Grøn/rød pil med tal** (placeringsændring siden i går)
-- Farve-striber langs rækker (zone-indikator)
+```text
+← 1.200 kr bag dig   ████████████████████   3.400 kr foran dig →
+   (spilleren under)        (din position)      (spilleren over)
+```
 
-## Plan
+- **Venstre side**: Hvor meget spilleren bagved (under dig) mangler for at indhente dig — din buffer
+- **Højre side**: Hvor meget du mangler for at overhale spilleren foran dig
+- Baren viser din relative position mellem de to rivaler
+- Tal formateres i dansk format med "kr"
 
-### 1. Udvid `ZoneLegend` komponenten
-Omdøb/udvid `src/components/league/ZoneLegend.tsx` til en fuld `LeagueLegend` der inkluderer alle symboler — ikke kun zoner. Brug en collapsible/expandable sektion så den ikke fylder for meget:
-- Klik på et "?" ikon eller "Symbolforklaring" knap ved siden af "Opdateret"-badget
-- Åbner en popover/sheet med alle symboler forklaret visuelt (med selve ikonerne)
+## Teknisk
 
-### 2. Placering i `CommissionLeague.tsx`
-Tilføj legend-triggeren ved siden af "Opdateret HH:mm"-badget (linje ~547), som vist i screenshottet. En `HelpCircle`-ikon eller lille "?"-knap der åbner en `Popover` med den fulde forklaring.
+### Udvid `rivalInfo` useMemo
+Beregn også afstanden til spilleren *under* dig (index + 1 i standings). Returnér begge gaps som tal.
 
-### 3. Indhold i legenden
-Grupperet i sektioner:
-- **Placering**: 🥇🥈🥉 = Top 3 i division, tal = øvrige pladser
-- **Zoner**: Grøn/Orange/Rød/Gul farvestreg = oprykker/playoff/nedrykker/top 3
-- **Aktivitet**: Grøn prik = solgt i dag, 🔥 = #1 i dag, ⚡ = #2-3 i dag
-- **Trend**: Sparkline viser ugens provision, pil viser momentum
-- **Bevægelse**: ↗+2 = rykket 2 pladser op, ↘-1 = rykket 1 ned
+### Erstat tekstblokken med en visuel komponent
+En lille custom bar med:
+- Venstre label: buffer til spilleren under (grøn tekst, Shield-ikon)
+- Højre label: afstand til spilleren over (amber/rød tekst, pil-op ikon)
+- Midter-markør der viser din position proportionelt mellem de to
 
-### Filer der ændres
-1. **`src/components/league/ZoneLegend.tsx`** → Udvides til `LeagueLegend` med alle symboler i en `Popover`
-2. **`src/pages/CommissionLeague.tsx`** → Tilføj legend-trigger ved "Opdateret"-badget (2 steder: kvalifikation ~547 og aktiv sæson)
+### Fil der ændres
+**`src/components/league/MyQualificationStatus.tsx`** — udvid rivalInfo-beregning + erstat rival-sektionen (linje 153-160) med den nye bar.
 
