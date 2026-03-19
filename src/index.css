@@ -430,6 +430,52 @@
   animation: trophy-glow 2.5s ease-in-out infinite;
 }
 
+/* Podium badge glow animations */
+@keyframes podium-glow-gold-kf {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(45 93% 58% / 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 12px hsl(45 93% 58% / 0.6);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes podium-glow-silver-kf {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(215 14% 70% / 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 10px hsl(215 14% 70% / 0.5);
+    transform: scale(1.04);
+  }
+}
+
+@keyframes podium-glow-bronze-kf {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(25 75% 50% / 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 10px hsl(25 75% 50% / 0.5);
+    transform: scale(1.04);
+  }
+}
+
+.podium-glow-gold {
+  animation: podium-glow-gold-kf 2s ease-in-out infinite;
+}
+
+.podium-glow-silver {
+  animation: podium-glow-silver-kf 2.5s ease-in-out infinite;
+}
+
+.podium-glow-bronze {
+  animation: podium-glow-bronze-kf 2.5s ease-in-out infinite;
+}
+
 /* League: Shimmer sweep for prize cards */
 @keyframes shimmer-sweep {
   0% {
