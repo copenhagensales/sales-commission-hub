@@ -103,6 +103,7 @@ export default function CandidateDetail() {
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [showWinbackDialog, setShowWinbackDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPostponeDialog, setShowPostponeDialog] = useState(false);
   const {
     data: candidate,
     isLoading
