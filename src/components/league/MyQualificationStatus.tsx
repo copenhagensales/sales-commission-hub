@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, TrendingUp, TrendingDown, Users, Sparkles } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Users, Sparkles, Shield, ArrowUp } from "lucide-react";
 import { QualificationStanding } from "@/hooks/useLeagueData";
 import { cn } from "@/lib/utils";
 import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
