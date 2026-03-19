@@ -94,6 +94,7 @@ export function EditEventDialog({ event, open, onOpenChange }: EditEventDialogPr
           location: form.location || null,
           description: form.description || null,
           show_popup: form.show_popup,
+          requires_registration: form.requires_registration,
         })
         .eq("id", event.id);
       if (error) throw error;
