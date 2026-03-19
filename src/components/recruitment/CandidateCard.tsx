@@ -122,6 +122,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPostponeDialog, setShowPostponeDialog] = useState(false);
   const queryClient = useQueryClient();
   const { makeCall, callState, isDeviceReady, initializeDevice } = useTwilioDeviceContext();
 
