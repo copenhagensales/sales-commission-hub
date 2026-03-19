@@ -34,7 +34,7 @@ export const LeagueStickyBar = memo(function LeagueStickyBar({
   distanceToNextZone,
 }: LeagueStickyBarProps) {
   const z = zoneConfig[zone];
-  const divLabel = division === 1 ? "Salgsligaen" : `${division - 1}. Division`;
+  const divLabel = division === 1 ? "Superligaen" : `${division - 1}. Division`;
 
   return (
     <div

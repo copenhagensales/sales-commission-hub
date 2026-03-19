@@ -765,7 +765,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   >
                     <div className="flex items-center gap-3">
                       <Trophy className="h-4 w-4" />
-                      Salgsligaen
+                      Superligaen
                     </div>
                     {!localStorage.getItem("league-sidebar-seen") && (
                       <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">

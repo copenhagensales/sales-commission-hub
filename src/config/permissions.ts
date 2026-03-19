@@ -71,7 +71,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: true,
       },
       { key: "menu_h2h", label: "Head to Head", description: "Adgang til Head to Head", hasEditOption: false },
-      { key: "menu_commission_league", label: "Salgsligaen", description: "Adgang til provisionsligaen", hasEditOption: false },
+      { key: "menu_commission_league", label: "Superligaen", description: "Adgang til provisionsligaen", hasEditOption: false },
       { key: "menu_messages_personal", label: "Beskeder", description: "Adgang til beskeder", hasEditOption: false },
       { key: "menu_my_schedule", label: "Min kalender", description: "Adgang til egen kalender", hasEditOption: false },
       { key: "menu_my_profile", label: "Min profil", description: "Adgang til egen profil", hasEditOption: true },
@@ -848,7 +848,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       {
         key: "menu_league_admin",
         label: "Liga Administration",
-        description: "Adgang til at administrere Salgsligaen",
+        description: "Adgang til at administrere Superligaen",
         hasEditOption: false,
       },
     ],

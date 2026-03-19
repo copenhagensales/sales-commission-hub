@@ -126,7 +126,7 @@ export function QualificationBoard({
                   <>
                     <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
                     <Shield className="h-3.5 w-3.5 text-yellow-500/60 shrink-0 -ml-1" />
-                    <span className="truncate">Salgsligaen</span>
+                    <span className="truncate">Superligaen</span>
                   </>
                 ) : (
                   <>

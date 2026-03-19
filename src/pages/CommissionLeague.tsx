@@ -160,7 +160,7 @@ export default function CommissionLeague() {
     if (!season?.id) return;
     try {
       await enrollMutation.mutateAsync(season.id);
-      toast.success("Du er nu tilmeldt Salgsligaen! 🎉");
+      toast.success("Du er nu tilmeldt Superligaen! 🎉");
       handleCalculateStandings();
     } catch (error: any) {
       toast.error(error.message || "Kunne ikke tilmelde");
@@ -235,7 +235,7 @@ export default function CommissionLeague() {
             <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
               <CardContent className="py-16 text-center">
                 <Trophy className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
-                <h1 className="text-2xl font-bold mb-2">Salgsligaen</h1>
+                <h1 className="text-2xl font-bold mb-2">Superligaen</h1>
                 <p className="text-muted-foreground mb-6">
                   Der er ingen aktiv sæson lige nu. Kom tilbage senere!
                 </p>
@@ -396,7 +396,7 @@ export default function CommissionLeague() {
                 <div className="grid md:grid-cols-2 gap-8 items-center">
                   <div>
                     <h2 className="text-2xl font-bold mb-4">
-                      🏆 Deltag i Salgsligaen!
+                      🏆 Deltag i Superligaen!
                     </h2>
                     <p className="text-muted-foreground mb-6">
                       Kæmp mod dine kolleger i et spændende liga-system baseret på din provision.
@@ -605,7 +605,7 @@ export default function CommissionLeague() {
                       <p className="text-2xl font-bold">
                         #{mySeasonStanding.overall_rank}
                         <span className="text-base font-normal text-muted-foreground ml-2">
-                          Division {mySeasonStanding.current_division === 1 ? "Salgsligaen" : `${mySeasonStanding.current_division - 1}. Div`}
+                          Division {mySeasonStanding.current_division === 1 ? "Superligaen" : `${mySeasonStanding.current_division - 1}. Div`}
                         </span>
                       </p>
                     </div>

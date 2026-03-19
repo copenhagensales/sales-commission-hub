@@ -63,7 +63,7 @@ export function RoundResultsCard({ round, standings, playersPerDivision, current
                   <Trophy className="h-3.5 w-3.5 text-yellow-500" />
                 ) : null}
                 <span className="text-xs font-semibold text-muted-foreground">
-                  {isTopDiv ? "Salgsligaen" : `${div - 1}. Division`}
+                  {isTopDiv ? "Superligaen" : `${div - 1}. Division`}
                 </span>
               </div>
               <div className="divide-y divide-border/30">
