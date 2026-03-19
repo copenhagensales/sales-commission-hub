@@ -273,7 +273,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
             </div>
             {todayProvision > 0 && (
-              <div className="text-[10px] text-emerald-400 font-medium">
+              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                {todayDailyRank && <DailyTopBadge rank={todayDailyRank} />}
                 I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             )}
