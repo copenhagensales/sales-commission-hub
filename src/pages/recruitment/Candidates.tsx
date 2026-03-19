@@ -123,7 +123,7 @@ export default function Candidates() {
   });
 
   // Define finished statuses that should be hidden in "active" view
-  const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret'];
+  const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret', 'udskudt_samtale'];
 
   const activeCandidates = candidatesWithApps.filter(c => !finishedStatuses.includes(c.status));
 
