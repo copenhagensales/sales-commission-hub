@@ -36,6 +36,7 @@ const allTabs = [
   { value: "ghostet", label: "Ghostet", permissionKey: "tab_winback_ghostet" },
   { value: "takket_nej", label: "Takket nej", permissionKey: "tab_winback_takket_nej" },
   { value: "interesseret_i_kundeservice", label: "Kundeservice", permissionKey: "tab_winback_kundeservice" },
+  { value: "udskudt_samtale", label: "Udskudte samtaler", permissionKey: "tab_winback_udskudt" },
 ];
 
 export default function Winback() {
