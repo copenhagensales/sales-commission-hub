@@ -557,6 +557,7 @@ export default function CommissionLeague() {
                           playersPerDivision={playersPerDivision}
                           isLoading={standingsLoading}
                           currentEmployeeId={currentEmployeeId}
+                          todayProvisionMap={todayProvisionMap || {}}
                         />
                       </TabsContent>
                     )}
