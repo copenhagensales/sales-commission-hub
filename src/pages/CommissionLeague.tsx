@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Users, Calendar, ChevronRight, ChevronLeft, Loader2, Eye, AlertTriangle, Sparkles } from "lucide-react";
+import confetti from "canvas-confetti";
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
