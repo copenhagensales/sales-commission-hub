@@ -128,6 +128,7 @@ export function ActiveSeasonBoard({
                     isBottomDivision={isBottomDivision}
                     totalDivisions={totalDivisions}
                     idx={idx}
+                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
                   />
                 ))}
               </div>
