@@ -157,6 +157,7 @@ interface PlayerRowProps {
   idx: number;
   maxProvision: number;
   todayProvision: number;
+  todayDailyRank: 1 | 2 | 3 | null;
 }
 
 const PlayerRow = memo(function PlayerRow({
