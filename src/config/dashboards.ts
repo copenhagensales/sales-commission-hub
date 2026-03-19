@@ -45,6 +45,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     permissionKey: "menu_dashboard_relatel" 
   },
   { 
+    slug: "relatel-products", 
+    name: "Relatel Produkter", 
+    path: "/dashboards/relatel-products", 
+    description: "Relatel produktoversigt – Mobile Voice, Mobilt Bredbånd, Switch",
+    permissionKey: "menu_dashboard_relatel" 
+  },
+  { 
     slug: "mg-test", 
     name: "MG Test", 
     path: "/dashboards/mg-test", 
