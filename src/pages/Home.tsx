@@ -371,7 +371,7 @@ const Home = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-company-events"] });
       setAddEventOpen(false);
-      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, invited_teams: [] });
+      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, requires_registration: false, invited_teams: [] });
       toast.success("Begivenhed tilføjet");
     },
     onError: () => {
