@@ -340,29 +340,51 @@ Deno.serve(async (req) => {
       s.projected_rank = (i % playersPerDivision) + 1;
     }
 
-    // 9. Get previous ranks for tracking movement
+    // 9. Get previous ranks for tracking movement (only rotate on day change)
     const { data: existingStandings } = await supabase
       .from("league_qualification_standings")
-      .select("employee_id, overall_rank")
+      .select("employee_id, overall_rank, previous_overall_rank, last_calculated_at")
       .eq("season_id", seasonId);
 
-    const previousRankMap: Record<string, number> = {};
+    const existingMap: Record<string, { overall_rank: number; previous_overall_rank: number | null; last_calculated_at: string | null }> = {};
     for (const existing of existingStandings || []) {
-      previousRankMap[existing.employee_id] = existing.overall_rank;
+      existingMap[existing.employee_id] = {
+        overall_rank: existing.overall_rank,
+        previous_overall_rank: existing.previous_overall_rank,
+        last_calculated_at: existing.last_calculated_at,
+      };
     }
 
-    // 10. Upsert standings
-    const upsertData = standingsData.map((s) => ({
-      season_id: seasonId,
-      employee_id: s.employee_id,
-      current_provision: s.current_provision,
-      deals_count: s.deals_count,
-      overall_rank: s.overall_rank,
-      projected_division: s.projected_division,
-      projected_rank: s.projected_rank,
-      previous_overall_rank: previousRankMap[s.employee_id] ?? null,
-      last_calculated_at: new Date().toISOString(),
-    }));
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // 10. Upsert standings — only rotate previous_overall_rank on day change
+    const upsertData = standingsData.map((s) => {
+      const prev = existingMap[s.employee_id];
+      let previousRank: number | null = null;
+
+      if (prev) {
+        const lastCalcDay = prev.last_calculated_at ? prev.last_calculated_at.slice(0, 10) : null;
+        if (lastCalcDay && lastCalcDay < todayStr) {
+          // New day: snapshot the old overall_rank as "start of day" rank
+          previousRank = prev.overall_rank;
+        } else {
+          // Same day: keep existing previous_overall_rank so intraday movement is visible
+          previousRank = prev.previous_overall_rank;
+        }
+      }
+
+      return {
+        season_id: seasonId,
+        employee_id: s.employee_id,
+        current_provision: s.current_provision,
+        deals_count: s.deals_count,
+        overall_rank: s.overall_rank,
+        projected_division: s.projected_division,
+        projected_rank: s.projected_rank,
+        previous_overall_rank: previousRank,
+        last_calculated_at: new Date().toISOString(),
+      };
+    });
 
     const { error: upsertError } = await supabase
       .from("league_qualification_standings")
