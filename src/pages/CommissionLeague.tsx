@@ -659,6 +659,7 @@ export default function CommissionLeague() {
                       isLoading={seasonStandingsLoading}
                       currentEmployeeId={currentEmployeeId}
                       todayProvisionMap={todayProvisionMap || {}}
+                      weeklyProvisionMap={weeklyProvisionMap || {}}
                     />
                   ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
                     <RoundResultsCard
