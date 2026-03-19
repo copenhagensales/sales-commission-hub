@@ -153,6 +153,7 @@ interface PlayerRowProps {
   isBottomDivision: boolean;
   idx: number;
   maxProvision: number;
+  todayProvision: number;
 }
 
 const PlayerRow = memo(function PlayerRow({
