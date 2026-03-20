@@ -133,21 +133,33 @@ export function ActiveSeasonBoard({
 
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                {group.players.map((standing, idx) => (
-                  <SeasonPlayerRow
-                    key={standing.id}
-                    standing={standing}
-                    isCurrentUser={standing.employee_id === currentEmployeeId}
-                    playersPerDivision={playersPerDivision}
-                    isTopDivision={isTopDivision}
-                    isBottomDivision={isBottomDivision}
-                    totalDivisions={totalDivisions}
-                    idx={idx}
-                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
-                    todayDailyRank={todayTop3[standing.employee_id] || null}
-                    weeklyData={weeklyProvisionMap[standing.employee_id]}
-                  />
-                ))}
+                {(() => {
+                  const divWeeklyArrays = group.players
+                    .map(s => weeklyProvisionMap[s.employee_id])
+                    .filter((a): a is number[] => !!a && a.length === 7);
+                  const divisionAvg = divWeeklyArrays.length > 0
+                    ? Array.from({ length: 7 }, (_, dayIdx) =>
+                        divWeeklyArrays.reduce((sum, arr) => sum + arr[dayIdx], 0) / divWeeklyArrays.length
+                      )
+                    : undefined;
+
+                  return group.players.map((standing, idx) => (
+                    <SeasonPlayerRow
+                      key={standing.id}
+                      standing={standing}
+                      isCurrentUser={standing.employee_id === currentEmployeeId}
+                      playersPerDivision={playersPerDivision}
+                      isTopDivision={isTopDivision}
+                      isBottomDivision={isBottomDivision}
+                      totalDivisions={totalDivisions}
+                      idx={idx}
+                      todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                      todayDailyRank={todayTop3[standing.employee_id] || null}
+                      weeklyData={weeklyProvisionMap[standing.employee_id]}
+                      divisionAvg={divisionAvg}
+                    />
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>
