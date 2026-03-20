@@ -55,22 +55,53 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
   });
 
   const points = data.map((v, i) => toPoint(v, i, data.length));
-  const pointsStr = points.map((p) => `${p.x},${p.y}`).join(" ");
 
-  // Polygon for gradient fill (line + bottom edge)
-  const polygonPoints = [
-    ...points.map((p) => `${p.x},${p.y}`),
-    `${points[points.length - 1].x},${h}`,
-    `${points[0].x},${h}`,
-  ].join(" ");
+  // Smooth bezier path (catmull-rom to cubic bezier)
+  const smoothPath = useMemo(() => {
+    if (points.length < 2) return "";
+    const pts = points;
+    let d = `M ${pts[0].x},${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+      const tension = 0.3;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  }, [points]);
 
-  // Division average line
-  const avgPointsStr = divisionAvg
-    ? divisionAvg.map((v, i) => {
-        const p = toPoint(v, i, divisionAvg.length);
-        return `${p.x},${p.y}`;
-      }).join(" ")
-    : null;
+  // Area path for gradient fill
+  const areaPath = useMemo(() => {
+    if (!smoothPath) return "";
+    return `${smoothPath} L ${points[points.length - 1].x},${h} L ${points[0].x},${h} Z`;
+  }, [smoothPath, points, h]);
+
+  // Division average smooth path
+  const avgPath = useMemo(() => {
+    if (!divisionAvg) return null;
+    const avgPts = divisionAvg.map((v, i) => toPoint(v, i, divisionAvg.length));
+    if (avgPts.length < 2) return null;
+    let d = `M ${avgPts[0].x},${avgPts[0].y}`;
+    for (let i = 0; i < avgPts.length - 1; i++) {
+      const p0 = avgPts[Math.max(i - 1, 0)];
+      const p1 = avgPts[i];
+      const p2 = avgPts[i + 1];
+      const p3 = avgPts[Math.min(i + 2, avgPts.length - 1)];
+      const tension = 0.3;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  }, [divisionAvg, w, h, max]);
 
   // Momentum
   const recent = data.slice(-3);
