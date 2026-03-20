@@ -41,6 +41,29 @@ export function useSalesGamification({
   const [newRecordType, setNewRecordType] = useState<RecordType>(null);
   const clearNewRecord = () => setNewRecordType(null);
 
+  // Fetch yesterday's provision (last working day)
+  const { data: yesterdayTotal = 0 } = useQuery({
+    queryKey: ["yesterday-provision", employeeId],
+    queryFn: async () => {
+      // Find the last working day (skip weekends)
+      let checkDate = subDays(new Date(), 1);
+      while (isWeekend(checkDate)) {
+        checkDate = subDays(checkDate, 1);
+      }
+      const startDate = format(checkDate, "yyyy-MM-dd");
+      
+      const { data, error } = await supabase.rpc("get_personal_daily_commission", {
+        p_employee_id: employeeId,
+        p_start_date: startDate,
+        p_end_date: startDate,
+      });
+      
+      if (error) throw error;
+      return data?.[0]?.commission ?? 0;
+    },
+    enabled: !!employeeId,
+  });
+
   // Fetch streak data
   const { data: streakData } = useQuery({
     queryKey: ["sales-streak", employeeId],
