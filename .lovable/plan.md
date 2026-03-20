@@ -1,56 +1,69 @@
 
 
-# Ændr straksbetaling fra lønperiode til 7-dages + månedsskift-regel
+# 4 UI-forbedringer til Superligaen
 
-## Nuværende adfærd
-Siden filtrerer salg baseret på den aktuelle lønperiode (15. – 14.). Alle salg i perioden vises og kan aktiveres/annulleres.
+## 1. Animated rank transitions (framer-motion)
+Wrap hver `PlayerRow` / `SeasonPlayerRow` i en `motion.div` med `layoutId` baseret på `employee_id`, så spillere glider op/ned ved rangopdatering i stedet for at re-rendere instant.
 
-## Ny adfærd
-- Vis alle ASE-salg fra de seneste 30 dage (for at have data at vise)
-- **Aktivering tilladt** hvis: salget er maks 7 dage gammelt OG salget er fra samme kalendermåned som i dag
-- **Annullering** altid tilladt på allerede aktiverede salg
-- Salg der er for gamle eller fra forrige måned vises stadig, men knappen er disabled med forklaring
-- Tilføj en synlig forklaringsboks øverst på siden
+**Filer:**
+- `src/components/league/QualificationBoard.tsx` — import `motion` fra framer-motion, wrap `PlayerRow` output
+- `src/components/league/ActiveSeasonBoard.tsx` — samme tilgang for `SeasonPlayerRow`
+- `package.json` — tilføj `framer-motion` (allerede i projektet via shadcn)
 
-## Ændringer
+**Detaljer:**
+- Tilføj `<motion.div layout layoutId={standing.employee_id} transition={{ type: "spring", damping: 25, stiffness: 200 }}>` rundt om hver spillerrække
+- Wrap hele listen i `<AnimatePresence>` for enter/exit
+- Bevar eksisterende `memo` logik — framer-motion håndterer layout-animationen uafhængigt
 
-### `src/pages/ImmediatePaymentASE.tsx`
+---
 
-**1. Fjern lønperiode-logik**
-- Fjern `getPayrollPeriod` import og `payrollPeriod` useMemo
-- Ændr query til at hente salg fra de seneste 30 dage i stedet (giver bred nok visning)
-- Opdater queryKey så den ikke afhænger af payrollPeriod
+## 2. Provision gap-indikator
+Vis afstand til spilleren over og under i subtil tekst, f.eks. "↑ 1.250 kr" og "↓ 820 kr".
 
-**2. Tilføj eligibility-funktion**
-```ts
-function canActivateImmediate(saleDatetime: string): { allowed: boolean; reason?: string } {
-  const saleDate = new Date(saleDatetime);
-  const now = new Date();
-  const daysDiff = (now.getTime() - saleDate.getTime()) / (1000 * 60 * 60 * 24);
-  
-  if (saleDate.getMonth() !== now.getMonth() || saleDate.getFullYear() !== now.getFullYear()) {
-    return { allowed: false, reason: "Salget er fra forrige måned" };
-  }
-  if (daysDiff > 7) {
-    return { allowed: false, reason: "Mere end 7 dage siden salget" };
-  }
-  return { allowed: true };
-}
-```
+**Filer:**
+- `src/components/league/QualificationBoard.tsx` — beregn gap i `PlayerRow`, vis under provision
+- `src/components/league/ActiveSeasonBoard.tsx` — samme for `SeasonPlayerRow`
 
-**3. Opdater header**
-- Fjern lønperiode-visning, erstat med kort tekst om regler
-- Tilføj info-boks (Alert component) med forklaring:
-  > "Du kan tilføje straksbetaling op til 7 dage efter salget er registreret. Ved månedsskift kan straksbetaling kun tilføjes på salg fra den aktuelle måned."
+**Detaljer:**
+- Send `prevProvision` og `nextProvision` som nye props til row-komponenten
+- Vis i `text-[9px]` under provision-tallet:
+  - `↑ X kr til #N` (afstand til spilleren foran)
+  - Kun vis gap-indikatoren for den aktuelle bruger (`isCurrentUser`) for at undgå clutter
 
-**4. Opdater tabel-handling**
-- For ikke-aktiverede salg: tjek `canActivateImmediate()` — hvis ikke tilladt, vis disabled knap med tooltip/tekst der forklarer hvorfor
-- Allerede aktiverede salg: annullering forbliver uændret
+---
 
-**5. Opdater tom-tilstand tekst**
-- Fjern reference til "lønperiode", skriv "seneste 30 dage" i stedet
+## 3. Hover-highlight hele rækken
+Tilføj en synlig hover-effekt på hele rækken.
 
-| Fil | Handling |
+**Filer:**
+- `src/components/league/QualificationBoard.tsx` — tilføj hover-klasser til row div
+- `src/components/league/ActiveSeasonBoard.tsx` — samme
+
+**Detaljer:**
+- Tilføj `hover:bg-muted/30 cursor-default` til den ydre `div` i PlayerRow
+- Tilføj `group` klasse og brug `group-hover:` til subtil border-glow:
+  ```
+  "hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] transition-all duration-200"
+  ```
+
+---
+
+## 4. Ret sparkline-alignment (forskudt grafer)
+Sparklines er placeret i en `flex-1` container, men navnelængden skubber dem ud af alignment. Løsning: giv navn-kolonnen fast bredde.
+
+**Filer:**
+- `src/components/league/QualificationBoard.tsx` — ændr navn-kolonne fra `max-w-[180px]` til fast `w-[180px]`
+- `src/components/league/ActiveSeasonBoard.tsx` — samme
+
+**Detaljer:**
+- Ændr `min-w-0 max-w-[180px] sm:max-w-[220px]` til `w-[180px] sm:w-[220px] shrink-0` på navn-div'en
+- Dette sikrer at sparkline-containeren (`flex-1`) altid starter på samme x-position uanset navnelængde
+- Sparklines vil herefter stå perfekt på linje
+
+---
+
+| Fil | Ændring |
 |-----|---------|
-| `src/pages/ImmediatePaymentASE.tsx` | Erstat lønperiode med 7-dages/månedsskift logik + forklaring |
+| `QualificationBoard.tsx` | Alle 4 forbedringer |
+| `ActiveSeasonBoard.tsx` | Alle 4 forbedringer |
 
