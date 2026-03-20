@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3, Lock } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3, Lock, Users, Target } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
@@ -42,6 +42,26 @@ interface PrizeLeader {
   improvement?: number;
 }
 
+interface TopEarner {
+  rank: number;
+  name: string;
+  provision: number;
+}
+
+interface TeamRanking {
+  teamId: string;
+  name: string;
+  totalProvision: number;
+  playerCount: number;
+}
+
+interface RaceEntry {
+  name: string;
+  rank: number;
+  provision: number;
+  gapToFirst: number;
+}
+
 interface LeaguePayload {
   seasonId: string;
   seasonStatus: string;
@@ -62,6 +82,12 @@ interface LeaguePayload {
     talent: PrizeLeader | null;
     comeback: PrizeLeader | null;
   } | null;
+  todayTopEarners: TopEarner[];
+  teamRankings: TeamRanking[];
+  todayLeagueTotal: number;
+  longestStreak: { name: string; employeeId: string; streak: number } | null;
+  raceToTop: RaceEntry[];
+  activeLast15Min: number;
   updatedAt: string;
 }
 
@@ -80,7 +106,7 @@ function formatPt(value: number): string {
 }
 
 const DIVISION_DISPLAY_DURATION = 15_000;
-const LEFT_SCENE_DURATIONS = [15_000, 20_000, 20_000]; // overview, movements, records
+const LEFT_SCENE_DURATIONS = [15_000, 20_000, 20_000, 20_000]; // overview, movements, records, league overview
 const REFRESH_INTERVAL = 30_000;
 
 // ─── Fetch Hook ───────────────────────────────────────────────
@@ -103,8 +129,8 @@ function useLeagueTvData() {
 }
 
 // ─── Left Scene Rotation ──────────────────────────────────────
-type LeftScene = "overview" | "movements" | "records";
-const LEFT_SCENES: LeftScene[] = ["overview", "movements", "records"];
+type LeftScene = "overview" | "movements" | "records" | "league-overview";
+const LEFT_SCENES: LeftScene[] = ["overview", "movements", "records", "league-overview"];
 
 // ─── Sub-components ───────────────────────────────────────────
 
@@ -308,7 +334,6 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
                 <div className="text-right shrink-0 flex items-center gap-1 2xl:gap-2">
                   <div>
                     <p className="text-xs 2xl:text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
-                    <p className="text-[9px] 2xl:text-[10px] text-slate-500">{p.deals} deals</p>
                   </div>
                   {p.zone && p.zone !== "safe" && (
                     <span className={`text-[8px] 2xl:text-[9px] font-bold uppercase px-1 2xl:px-1.5 py-0.5 rounded whitespace-nowrap ${
@@ -337,7 +362,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           <span className="w-2 h-2 rounded-full bg-emerald-500" /> Oprykningszone (1-3)
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-orange-500" /> Playoff (4-5 / 10-11)
+          <span className="w-2 h-2 rounded-full bg-orange-500" /> Playoff (4-5 / 11-12)
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-red-500" /> Nedrykningszone (13-14)
@@ -347,70 +372,84 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
   );
 }
 
-// Scene B: Movements + Top last hour
+// Scene B: Movements + Top last hour + Today's Top 5
 function SceneMovements({
   movements,
   topLastHour,
+  todayTopEarners,
+  activeLast15Min,
 }: {
   movements: { risers: Movement[]; fallers: Movement[] };
   topLastHour: { name: string; provision: number; sales: number }[];
+  todayTopEarners: TopEarner[];
+  activeLast15Min: number;
 }) {
   return (
-    <div className="h-full flex flex-col gap-3 2xl:gap-6 overflow-y-auto">
-      <div>
-        <h2 className="text-xl 2xl:text-3xl font-black text-white mb-2 2xl:mb-4">Dagens bevægelser</h2>
-        <div className="grid grid-cols-2 gap-2 2xl:gap-4">
-          <div>
-            <h3 className="text-xs 2xl:text-sm font-medium text-emerald-400 mb-2 2xl:mb-3 flex items-center gap-2">
-              <TrendingUp className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største spring op
-            </h3>
-            <div className="space-y-1.5 2xl:space-y-2">
-              {movements.risers.slice(0, 3).map((m, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
-                >
-                  <span className="text-emerald-400 font-black text-sm 2xl:text-lg">🚀</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
-                    <p className="text-emerald-400 text-[10px] 2xl:text-xs">+{m.change} pladser</p>
-                  </div>
-                  <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
-                </motion.div>
-              ))}
-              {movements.risers.length === 0 && (
-                <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
-              )}
-            </div>
+    <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl 2xl:text-3xl font-black text-white">Dagens bevægelser</h2>
+        {activeLast15Min > 0 && (
+          <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+            <span className="text-emerald-400 text-[10px] 2xl:text-xs font-bold">{activeLast15Min} aktive</span>
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 2xl:gap-4">
+        <div>
+          <h3 className="text-xs 2xl:text-sm font-medium text-emerald-400 mb-2 2xl:mb-3 flex items-center gap-2">
+            <TrendingUp className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største spring op
+          </h3>
+          <div className="space-y-1.5 2xl:space-y-2">
+            {movements.risers.slice(0, 3).map((m, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
+              >
+                <span className="text-emerald-400 font-black text-sm 2xl:text-lg">🚀</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
+                  <p className="text-emerald-400 text-[10px] 2xl:text-xs">+{m.change} pladser</p>
+                </div>
+                <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
+              </motion.div>
+            ))}
+            {movements.risers.length === 0 && (
+              <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
+            )}
           </div>
-          <div>
-            <h3 className="text-xs 2xl:text-sm font-medium text-red-400 mb-2 2xl:mb-3 flex items-center gap-2">
-              <TrendingDown className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største fald
-            </h3>
-            <div className="space-y-1.5 2xl:space-y-2">
-              {movements.fallers.slice(0, 3).map((m, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-red-500/10 border border-red-500/20"
-                >
-                  <span className="text-red-400 font-black text-sm 2xl:text-lg">📉</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
-                    <p className="text-red-400 text-[10px] 2xl:text-xs">{m.change} pladser</p>
-                  </div>
-                  <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
-                </motion.div>
-              ))}
-              {movements.fallers.length === 0 && (
-                <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
-              )}
-            </div>
+        </div>
+        <div>
+          <h3 className="text-xs 2xl:text-sm font-medium text-red-400 mb-2 2xl:mb-3 flex items-center gap-2">
+            <TrendingDown className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største fald
+          </h3>
+          <div className="space-y-1.5 2xl:space-y-2">
+            {movements.fallers.slice(0, 3).map((m, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-red-500/10 border border-red-500/20"
+              >
+                <span className="text-red-400 font-black text-sm 2xl:text-lg">📉</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
+                  <p className="text-red-400 text-[10px] 2xl:text-xs">{m.change} pladser</p>
+                </div>
+                <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
+              </motion.div>
+            ))}
+            {movements.fallers.length === 0 && (
+              <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
+            )}
           </div>
         </div>
       </div>
@@ -441,38 +480,151 @@ function SceneMovements({
           )}
         </div>
       </div>
+
+      {/* Today's Top 5 */}
+      <div>
+        <h3 className="text-xs 2xl:text-sm font-medium text-sky-400 mb-2 2xl:mb-3 flex items-center gap-2">
+          <Trophy className="h-3 w-3 2xl:h-4 2xl:w-4" /> Dagens Top 5
+        </h3>
+        <div className="space-y-1.5 2xl:space-y-2">
+          {todayTopEarners.map((e, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-sky-500/10 border border-sky-500/20"
+            >
+              <span className={`text-sm 2xl:text-base font-black tabular-nums w-5 text-center ${
+                i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-orange-400" : "text-slate-500"
+              }`}>
+                {e.rank}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
+              </div>
+              <span className="text-sky-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
+            </motion.div>
+          ))}
+          {todayTopEarners.length === 0 && (
+            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg i dag endnu</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-// Scene C: Records
-function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
+// Scene C: Records (expanded)
+function SceneRecords({
+  records,
+  longestStreak,
+  teamRankings,
+  todayLeagueTotal,
+}: {
+  records: LeaguePayload["records"];
+  longestStreak: LeaguePayload["longestStreak"];
+  teamRankings: TeamRanking[];
+  todayLeagueTotal: number;
+}) {
   const maxAvg = Math.max(...records.divisionAverages.map((d) => d.average), 1);
+  const maxTeam = Math.max(...teamRankings.map((t) => t.totalProvision), 1);
 
   return (
-    <div className="h-full flex flex-col gap-3 2xl:gap-6 overflow-y-auto">
+    <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
       <h2 className="text-xl 2xl:text-3xl font-black text-white">Statistik & Records</h2>
 
-      <div className="p-3 2xl:p-5 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
-        <div className="flex items-center gap-2 2xl:gap-3 mb-1 2xl:mb-2">
-          <Trophy className="h-4 w-4 2xl:h-6 2xl:w-6 text-yellow-400" />
-          <span className="text-xs 2xl:text-sm text-yellow-400/80 font-medium">Højeste provision i sæsonen</span>
+      {/* Today league total + streak side by side */}
+      <div className="grid grid-cols-2 gap-2 2xl:gap-3">
+        <div className="p-3 2xl:p-4 rounded-2xl bg-gradient-to-br from-sky-500/10 to-blue-500/5 border border-sky-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="h-4 w-4 2xl:h-5 2xl:w-5 text-sky-400" />
+            <span className="text-[10px] 2xl:text-xs text-sky-400/80 font-medium">Ligaens total i dag</span>
+          </div>
+          <p className="text-xl 2xl:text-3xl font-black text-white tabular-nums">{formatKr(todayLeagueTotal)}</p>
         </div>
-        <p className="text-2xl 2xl:text-4xl font-black text-white tabular-nums">{formatKr(records.highestProvision)}</p>
-        <p className="text-slate-400 text-xs 2xl:text-sm mt-1">{records.highestProvisionName}</p>
+        <div className="p-3 2xl:p-4 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <Flame className="h-4 w-4 2xl:h-5 2xl:w-5 text-orange-400" />
+            <span className="text-[10px] 2xl:text-xs text-orange-400/80 font-medium">Længste streak 🔥</span>
+          </div>
+          {longestStreak ? (
+            <>
+              <p className="text-xl 2xl:text-3xl font-black text-white tabular-nums">{longestStreak.streak} dage</p>
+              <p className="text-slate-400 text-[10px] 2xl:text-xs mt-0.5">{longestStreak.name}</p>
+            </>
+          ) : (
+            <p className="text-slate-500 text-xs 2xl:text-sm italic mt-1">Ingen aktiv streak</p>
+          )}
+        </div>
       </div>
 
+      {/* Highest provision */}
+      <div className="p-3 2xl:p-4 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
+        <div className="flex items-center gap-2 mb-1">
+          <Trophy className="h-4 w-4 2xl:h-5 2xl:w-5 text-yellow-400" />
+          <span className="text-[10px] 2xl:text-xs text-yellow-400/80 font-medium">Højeste provision i sæsonen</span>
+        </div>
+        <p className="text-xl 2xl:text-3xl font-black text-white tabular-nums">{formatKr(records.highestProvision)}</p>
+        <p className="text-slate-400 text-[10px] 2xl:text-xs mt-0.5">{records.highestProvisionName}</p>
+      </div>
+
+      {/* Team Rankings */}
       <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-4 flex items-center gap-2">
+        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-3 flex items-center gap-2">
+          <Users className="h-3 w-3 2xl:h-4 2xl:w-4" /> Team Ranking
+        </h3>
+        <div className="space-y-2 2xl:space-y-2.5">
+          {teamRankings.map((t, i) => {
+            const pct = (t.totalProvision / maxTeam) * 100;
+            return (
+              <motion.div
+                key={t.teamId}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center gap-2 2xl:gap-3"
+              >
+                <span className="text-sm 2xl:text-base font-black text-slate-500 w-5 text-center">{i + 1}</span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs 2xl:text-sm text-white font-medium truncate">{t.name}</span>
+                    <span className="text-[10px] 2xl:text-xs text-slate-400 tabular-nums">{formatKr(t.totalProvision)}</span>
+                  </div>
+                  <div className="bg-slate-800 rounded-full h-2 2xl:h-2.5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.8, delay: i * 0.1 }}
+                      className={`h-full rounded-full ${
+                        i === 0 ? "bg-gradient-to-r from-yellow-500 to-amber-500" :
+                        i === 1 ? "bg-gradient-to-r from-slate-400 to-slate-300" :
+                        "bg-gradient-to-r from-orange-500 to-orange-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+          {teamRankings.length === 0 && (
+            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen team-data</p>
+          )}
+        </div>
+      </div>
+
+      {/* Division averages */}
+      <div>
+        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-3 flex items-center gap-2">
           <BarChart3 className="h-3 w-3 2xl:h-4 2xl:w-4" /> Gennemsnit per division
         </h3>
-        <div className="space-y-2 2xl:space-y-3">
-          {records.divisionAverages.slice(0, 3).map((d) => {
+        <div className="space-y-2 2xl:space-y-2.5">
+          {records.divisionAverages.slice(0, 4).map((d) => {
             const pct = (d.average / maxAvg) * 100;
             return (
               <div key={d.division} className="flex items-center gap-2 2xl:gap-3">
                 <span className="text-xs 2xl:text-sm text-slate-500 w-20 2xl:w-24 shrink-0 truncate">{getDivisionName(d.division)}</span>
-                <div className="flex-1 bg-slate-800 rounded-full h-5 2xl:h-6 overflow-hidden">
+                <div className="flex-1 bg-slate-800 rounded-full h-4 2xl:h-5 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
@@ -486,6 +638,146 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
                 </div>
                 <span className="text-[10px] 2xl:text-xs text-slate-600 w-10 2xl:w-12 text-right">{d.playerCount} sp.</span>
               </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Scene D: League Overview (Race to #1, Division battle, Liga i tal)
+function SceneLeagueOverview({
+  raceToTop,
+  divisions,
+  totalPlayers,
+  totalDivisions,
+  todayLeagueTotal,
+  activeLast15Min,
+}: {
+  raceToTop: RaceEntry[];
+  divisions: DivisionData[];
+  totalPlayers: number;
+  totalDivisions: number;
+  todayLeagueTotal: number;
+  activeLast15Min: number;
+}) {
+  const maxProv = Math.max(...raceToTop.map((r) => r.provision), 1);
+
+  // Division battle: total provision per division
+  const divisionTotals = divisions.map((d) => ({
+    division: d.division,
+    total: d.players.reduce((sum, p) => sum + p.provision, 0),
+    count: d.totalPlayers,
+  })).sort((a, b) => b.total - a.total);
+  const maxDivTotal = Math.max(...divisionTotals.map((d) => d.total), 1);
+
+  return (
+    <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
+      <h2 className="text-xl 2xl:text-3xl font-black text-white">Ligaoverblik</h2>
+
+      {/* Liga i tal */}
+      <div className="grid grid-cols-4 gap-2 2xl:gap-3">
+        {[
+          { label: "Spillere", value: totalPlayers, icon: "👥" },
+          { label: "Divisioner", value: totalDivisions, icon: "🏟️" },
+          { label: "Samlet i dag", value: formatKr(todayLeagueTotal), icon: "💰" },
+          { label: "Aktive nu", value: activeLast15Min, icon: "🟢" },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="p-2 2xl:p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 text-center"
+          >
+            <span className="text-lg 2xl:text-xl">{stat.icon}</span>
+            <p className="text-base 2xl:text-xl font-black text-white mt-0.5 tabular-nums">{stat.value}</p>
+            <p className="text-[9px] 2xl:text-[10px] text-slate-500 uppercase tracking-wide">{stat.label}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Race to #1 */}
+      <div>
+        <h3 className="text-xs 2xl:text-sm font-medium text-amber-400 mb-2 2xl:mb-3 flex items-center gap-2">
+          <Target className="h-3 w-3 2xl:h-4 2xl:w-4" /> Race to #1
+        </h3>
+        <div className="space-y-2 2xl:space-y-2.5">
+          {raceToTop.map((r, i) => {
+            const pct = (r.provision / maxProv) * 100;
+            return (
+              <motion.div
+                key={r.name}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="flex items-center gap-2 2xl:gap-3"
+              >
+                <span className={`text-sm 2xl:text-base font-black w-5 text-center tabular-nums ${
+                  i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-orange-400" : "text-slate-500"
+                }`}>
+                  {r.rank}
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs 2xl:text-sm text-white font-medium truncate">{r.name}</span>
+                    <span className="text-[10px] 2xl:text-xs tabular-nums">
+                      <span className="text-white">{formatKr(r.provision)}</span>
+                      {r.gapToFirst > 0 && (
+                        <span className="text-red-400 ml-1">-{formatKr(r.gapToFirst)}</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="bg-slate-800 rounded-full h-2.5 2xl:h-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.8, delay: i * 0.08 }}
+                      className={`h-full rounded-full ${
+                        i === 0 ? "bg-gradient-to-r from-yellow-500 to-amber-400" :
+                        "bg-gradient-to-r from-slate-500 to-slate-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Division battle */}
+      <div>
+        <h3 className="text-xs 2xl:text-sm font-medium text-purple-400 mb-2 2xl:mb-3 flex items-center gap-2">
+          ⚔️ Divisionskamp
+        </h3>
+        <div className="space-y-2 2xl:space-y-2.5">
+          {divisionTotals.slice(0, 4).map((d, i) => {
+            const pct = (d.total / maxDivTotal) * 100;
+            return (
+              <motion.div
+                key={d.division}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center gap-2 2xl:gap-3"
+              >
+                <span className="text-xs 2xl:text-sm text-slate-400 w-20 2xl:w-24 shrink-0 truncate">{getDivisionName(d.division)}</span>
+                <div className="flex-1 bg-slate-800 rounded-full h-4 2xl:h-5 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.8, delay: i * 0.1 }}
+                    className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full flex items-center justify-end px-2"
+                  >
+                    <span className="text-[9px] 2xl:text-[10px] font-bold text-white tabular-nums">
+                      {formatKr(Math.round(d.total))}
+                    </span>
+                  </motion.div>
+                </div>
+                <span className="text-[10px] 2xl:text-xs text-slate-600 w-10 2xl:w-12 text-right">{d.count} sp.</span>
+              </motion.div>
             );
           })}
         </div>
@@ -543,7 +835,7 @@ export default function TvLeagueDashboard() {
         />
       )}
       <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "min-h-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
-        {/* ─── LEFT ZONE (40%) — rotates overview / movements / records ─── */}
+        {/* ─── LEFT ZONE (40%) — rotates overview / movements / records / league overview ─── */}
         <div className="w-[40%] border-r border-slate-800 p-3 2xl:p-6 flex flex-col">
           {tvMode && (
             <div className="mb-2 2xl:mb-4">
@@ -632,10 +924,30 @@ export default function TvLeagueDashboard() {
                   </>
                 )}
                 {currentLeftScene === "movements" && (
-                  <SceneMovements movements={data.movements} topLastHour={data.topLastHour} />
+                  <SceneMovements
+                    movements={data.movements}
+                    topLastHour={data.topLastHour}
+                    todayTopEarners={data.todayTopEarners || []}
+                    activeLast15Min={data.activeLast15Min || 0}
+                  />
                 )}
                 {currentLeftScene === "records" && (
-                  <SceneRecords records={data.records} />
+                  <SceneRecords
+                    records={data.records}
+                    longestStreak={data.longestStreak}
+                    teamRankings={data.teamRankings || []}
+                    todayLeagueTotal={data.todayLeagueTotal || 0}
+                  />
+                )}
+                {currentLeftScene === "league-overview" && (
+                  <SceneLeagueOverview
+                    raceToTop={data.raceToTop || []}
+                    divisions={data.divisions}
+                    totalPlayers={data.totalPlayers}
+                    totalDivisions={data.totalDivisions}
+                    todayLeagueTotal={data.todayLeagueTotal || 0}
+                    activeLast15Min={data.activeLast15Min || 0}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>
