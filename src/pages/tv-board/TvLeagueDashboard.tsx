@@ -156,24 +156,24 @@ function PrizeCard({
 }) {
   return (
     <div
-      className={`relative rounded-xl p-3 border-2 text-center space-y-1 bg-gradient-to-b ${gradientClass} bg-slate-800/80 ${borderClass}`}
+      className={`relative rounded-xl p-2 2xl:p-3 border-2 text-center space-y-0.5 2xl:space-y-1 bg-gradient-to-b ${gradientClass} bg-slate-800/80 ${borderClass}`}
     >
       {locked && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/40 backdrop-blur-[1px] z-10">
-          <Lock className="h-4 w-4 text-slate-500" />
+          <Lock className="h-3 w-3 2xl:h-4 2xl:w-4 text-slate-500" />
         </div>
       )}
-      <span className="text-2xl">{emoji}</span>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      <span className="text-lg 2xl:text-2xl">{emoji}</span>
+      <p className="text-[8px] 2xl:text-[10px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
       {locked ? (
-        <p className="text-xs text-slate-500">{lockedText}</p>
+        <p className="text-[10px] 2xl:text-xs text-slate-500">{lockedText}</p>
       ) : leader ? (
         <>
-          <p className="text-sm font-bold text-white truncate">{leader.name}</p>
-          <p className="text-xs text-slate-400">{leader.label}</p>
+          <p className="text-xs 2xl:text-sm font-bold text-white truncate">{leader.name}</p>
+          <p className="text-[10px] 2xl:text-xs text-slate-400">{leader.label}</p>
         </>
       ) : (
-        <p className="text-xs text-slate-500">Ingen data endnu</p>
+        <p className="text-[10px] 2xl:text-xs text-slate-500">Ingen data endnu</p>
       )}
     </div>
   );
