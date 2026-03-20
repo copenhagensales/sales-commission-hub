@@ -79,7 +79,7 @@ export function SalesRecords({
                 {currentStreak}
               </span>
               <span className="text-sm text-muted-foreground">
-                {currentStreak === 1 ? "dags streak" : "dages streak"}
+                {currentStreak === 1 ? "dag i træk" : "dage i træk"}
               </span>
             </div>
           </div>
