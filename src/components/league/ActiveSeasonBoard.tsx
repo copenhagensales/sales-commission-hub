@@ -305,6 +305,17 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           </div>
         </div>
 
+        {/* Sparkline — centrally placed */}
+        {weeklyData && weeklyData.length > 0 && (
+          <div className="hidden sm:flex flex-1 justify-center items-center min-w-[90px]">
+            <ProvisionSparkline
+              data={weeklyData}
+              divisionAvg={divisionAvg}
+              playerName={formatPlayerName(standing.employee)}
+            />
+          </div>
+        )}
+
         {/* Points + provision */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
@@ -312,9 +323,6 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
               </div>
-              {weeklyData && weeklyData.length > 0 && (
-                <ProvisionSparkline data={weeklyData} className="hidden sm:flex" />
-              )}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr

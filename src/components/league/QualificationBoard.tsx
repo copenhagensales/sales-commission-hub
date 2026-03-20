@@ -315,15 +315,23 @@ const PlayerRow = memo(function PlayerRow({
           </div>
         </div>
 
+        {/* Sparkline — centrally placed */}
+        {weeklyData && weeklyData.length > 0 && (
+          <div className="hidden sm:flex flex-1 justify-center items-center min-w-[90px]">
+            <ProvisionSparkline
+              data={weeklyData}
+              divisionAvg={divisionAvg}
+              playerName={formatPlayerName(standing.employee)}
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end">
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
-              {weeklyData && weeklyData.length > 0 && (
-                <ProvisionSparkline data={weeklyData} className="hidden sm:flex" />
-              )}
             </div>
             {todayProvision > 0 && (
               <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
