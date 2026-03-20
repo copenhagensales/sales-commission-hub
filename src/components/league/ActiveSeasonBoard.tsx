@@ -14,6 +14,7 @@ import { ProvisionSparkline } from "./ProvisionSparkline";
 import { PlayerHoverCard } from "./PlayerHoverCard";
 import { ZoneProgressBar } from "./ZoneProgressBar";
 import { LeagueSeasonStanding } from "@/hooks/useLeagueActiveData";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ActiveSeasonBoardProps {
   standings: LeagueSeasonStanding[];
@@ -143,22 +144,38 @@ export function ActiveSeasonBoard({
                       )
                     : undefined;
 
-                  return group.players.map((standing, idx) => (
-                    <SeasonPlayerRow
-                      key={standing.id}
-                      standing={standing}
-                      isCurrentUser={standing.employee_id === currentEmployeeId}
-                      playersPerDivision={playersPerDivision}
-                      isTopDivision={isTopDivision}
-                      isBottomDivision={isBottomDivision}
-                      totalDivisions={totalDivisions}
-                      idx={idx}
-                      todayProvision={todayProvisionMap[standing.employee_id] || 0}
-                      todayDailyRank={todayTop3[standing.employee_id] || null}
-                      weeklyData={weeklyProvisionMap[standing.employee_id]}
-                      divisionAvg={divisionAvg}
-                    />
-                  ));
+                  return (
+                    <AnimatePresence mode="popLayout">
+                      {group.players.map((standing, idx) => {
+                        const prevProvision = idx > 0 ? Number(group.players[idx - 1].total_provision) : null;
+                        const nextProvision = idx < group.players.length - 1 ? Number(group.players[idx + 1].total_provision) : null;
+                        return (
+                          <motion.div
+                            key={standing.employee_id}
+                            layout
+                            layoutId={`season-${standing.employee_id}`}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                          >
+                            <SeasonPlayerRow
+                              standing={standing}
+                              isCurrentUser={standing.employee_id === currentEmployeeId}
+                              playersPerDivision={playersPerDivision}
+                              isTopDivision={isTopDivision}
+                              isBottomDivision={isBottomDivision}
+                              totalDivisions={totalDivisions}
+                              idx={idx}
+                              todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                              todayDailyRank={todayTop3[standing.employee_id] || null}
+                              weeklyData={weeklyProvisionMap[standing.employee_id]}
+                              divisionAvg={divisionAvg}
+                              prevProvision={prevProvision}
+                              nextProvision={nextProvision}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  );
                 })()}
               </div>
             </CardContent>
@@ -193,6 +210,8 @@ interface SeasonPlayerRowProps {
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
   divisionAvg?: number[];
+  prevProvision: number | null;
+  nextProvision: number | null;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -206,6 +225,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   todayDailyRank,
   weeklyData,
   divisionAvg,
+  prevProvision,
+  nextProvision,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -228,13 +249,18 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
 
   const playerName = formatPlayerName(standing.employee);
 
+  const myProvision = Number(standing.total_provision);
+  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - myProvision : null;
+  const gapDown = isCurrentUser && nextProvision !== null ? myProvision - nextProvision : null;
+
   return (
     <div>
       {showDashedBefore && <div className="border-t-2 border-dashed border-muted-foreground/20" />}
       
       <div
         className={cn(
-          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-500",
+          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-200",
+          "hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] cursor-default",
           isCurrentUser && "bg-primary/10 border-l-[3px] border-l-primary",
           !isCurrentUser && isPromoZone && "bg-green-500/8",
           !isCurrentUser && isTopZone && "bg-yellow-500/8",
@@ -261,8 +287,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           )}
         </div>
 
-        {/* Name + movement */}
-        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
+        {/* Name + movement — fixed width for sparkline alignment */}
+        <div className="w-[180px] sm:w-[220px] shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
@@ -331,6 +357,17 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
                 {todayDailyRank && <DailyTopBadge rank={todayDailyRank} />}
                 I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              </div>
+            )}
+            {/* Gap indicators — only for current user */}
+            {isCurrentUser && gapUp !== null && gapUp > 0 && (
+              <div className="text-[9px] text-muted-foreground/70 font-mono">
+                ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr til #{rank - 1}
+              </div>
+            )}
+            {isCurrentUser && gapDown !== null && gapDown > 0 && (
+              <div className="text-[9px] text-muted-foreground/50 font-mono">
+                ↓ {gapDown.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr forspring
               </div>
             )}
           </div>

@@ -13,6 +13,7 @@ import { ZoneLegend } from "./ZoneLegend";
 import { ProvisionSparkline } from "./ProvisionSparkline";
 import { PlayerHoverCard } from "./PlayerHoverCard";
 import { ZoneProgressBar } from "./ZoneProgressBar";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface QualificationBoardProps {
   standings: QualificationStanding[];
@@ -97,10 +98,8 @@ export function QualificationBoard({
     );
   }
 
-  // Compute zone thresholds per division for progress bars
   const getZoneTarget = (group: { division: number; players: QualificationStanding[] }) => {
     if (group.players.length < 3) return null;
-    // Target = provision of the 3rd player (promo/top cutoff)
     return group.players[2]?.current_provision ?? null;
   };
 
@@ -111,7 +110,6 @@ export function QualificationBoard({
         const isBottomDivision = group.division === totalDivisions;
         const zoneTarget = getZoneTarget(group);
 
-        // Division header gradient
         const headerGradient = isTopDivision
           ? "bg-gradient-to-r from-yellow-500/15 to-amber-500/5"
           : group.division === 2
@@ -143,7 +141,6 @@ export function QualificationBoard({
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
                 {(() => {
-                  // Compute division average weekly provision
                   const divWeeklyArrays = group.players
                     .map(s => weeklyProvisionMap[s.employee_id])
                     .filter((a): a is number[] => !!a && a.length === 7);
@@ -153,24 +150,40 @@ export function QualificationBoard({
                       )
                     : undefined;
 
-                  return group.players.map((standing, idx) => (
-                    <PlayerRow
-                      key={standing.id}
-                      standing={standing}
-                      isCurrentUser={standing.employee_id === currentEmployeeId}
-                      playersPerDivision={playersPerDivision}
-                      isTopDivision={isTopDivision}
-                      isBottomDivision={isBottomDivision}
-                      idx={idx}
-                      maxProvision={computedMaxProvision}
-                      todayProvision={todayProvisionMap[standing.employee_id] || 0}
-                      todayDailyRank={todayTop3[standing.employee_id] || null}
-                      weeklyData={weeklyProvisionMap[standing.employee_id]}
-                      divisionAvg={divisionAvg}
-                      division={standing.projected_division}
-                      zoneTarget={zoneTarget}
-                    />
-                  ));
+                  return (
+                    <AnimatePresence mode="popLayout">
+                      {group.players.map((standing, idx) => {
+                        const prevProvision = idx > 0 ? group.players[idx - 1].current_provision : null;
+                        const nextProvision = idx < group.players.length - 1 ? group.players[idx + 1].current_provision : null;
+                        return (
+                          <motion.div
+                            key={standing.employee_id}
+                            layout
+                            layoutId={`qual-${standing.employee_id}`}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                          >
+                            <PlayerRow
+                              standing={standing}
+                              isCurrentUser={standing.employee_id === currentEmployeeId}
+                              playersPerDivision={playersPerDivision}
+                              isTopDivision={isTopDivision}
+                              isBottomDivision={isBottomDivision}
+                              idx={idx}
+                              maxProvision={computedMaxProvision}
+                              todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                              todayDailyRank={todayTop3[standing.employee_id] || null}
+                              weeklyData={weeklyProvisionMap[standing.employee_id]}
+                              divisionAvg={divisionAvg}
+                              division={standing.projected_division}
+                              zoneTarget={zoneTarget}
+                              prevProvision={prevProvision}
+                              nextProvision={nextProvision}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  );
                 })()}
               </div>
             </CardContent>
@@ -207,6 +220,8 @@ interface PlayerRowProps {
   divisionAvg?: number[];
   division: number;
   zoneTarget: number | null;
+  prevProvision: number | null;
+  nextProvision: number | null;
 }
 
 const PlayerRow = memo(function PlayerRow({
@@ -223,6 +238,8 @@ const PlayerRow = memo(function PlayerRow({
   divisionAvg,
   division,
   zoneTarget,
+  prevProvision,
+  nextProvision,
 }: PlayerRowProps) {
   const rankChange = standing.previous_overall_rank !== null
     ? standing.previous_overall_rank - standing.overall_rank
@@ -238,7 +255,6 @@ const PlayerRow = memo(function PlayerRow({
   const isPodium = standing.projected_rank <= 3;
   const podiumRank = standing.projected_rank as 1 | 2 | 3;
 
-  // Zone for progress bar
   const zone = isTopZone ? "top" : isPromoZone ? "promo" : isPlayoffZone ? "playoff" : isRelegationZone ? "relegation" : "safe";
 
   const showDashedBefore = 
@@ -248,12 +264,17 @@ const PlayerRow = memo(function PlayerRow({
 
   const playerName = formatPlayerName(standing.employee);
 
+  // Gap indicators for current user
+  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - standing.current_provision : null;
+  const gapDown = isCurrentUser && nextProvision !== null ? standing.current_provision - nextProvision : null;
+
   return (
     <div>
       {showDashedBefore && <div className="border-t-2 border-dashed border-muted-foreground/20" />}
       <div
         className={cn(
-          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-500",
+          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-200",
+          "hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] cursor-default",
           isCurrentUser && "bg-primary/10 border-l-[3px] border-l-primary",
           !isCurrentUser && isPromoZone && "bg-green-500/8",
           !isCurrentUser && isTopZone && "bg-yellow-500/8",
@@ -277,9 +298,9 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
+        {/* Name — fixed width for sparkline alignment */}
+        <div className="w-[180px] sm:w-[220px] shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Live pulse dot */}
             {todayProvision > 0 && (
               <span className="relative flex h-1.5 w-1.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -315,7 +336,7 @@ const PlayerRow = memo(function PlayerRow({
           </div>
         </div>
 
-        {/* Sparkline — centrally placed (always rendered for alignment) */}
+        {/* Sparkline — centrally placed */}
         <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
@@ -340,7 +361,17 @@ const PlayerRow = memo(function PlayerRow({
               </div>
             )}
             {todayProvision <= 0 && <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>}
-            {/* Zone progress bar */}
+            {/* Gap indicators — only for current user */}
+            {isCurrentUser && gapUp !== null && gapUp > 0 && (
+              <div className="text-[9px] text-muted-foreground/70 font-mono">
+                ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr til #{standing.projected_rank - 1}
+              </div>
+            )}
+            {isCurrentUser && gapDown !== null && gapDown > 0 && (
+              <div className="text-[9px] text-muted-foreground/50 font-mono">
+                ↓ {gapDown.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr forspring
+              </div>
+            )}
             {zoneTarget != null && zoneTarget > 0 && (
               <ZoneProgressBar
                 current={standing.current_provision}
@@ -377,6 +408,8 @@ const PlayerRow = memo(function PlayerRow({
     prevProps.isBottomDivision === nextProps.isBottomDivision &&
     prevProps.idx === nextProps.idx &&
     prevProps.todayProvision === nextProps.todayProvision &&
-    prevProps.weeklyData === nextProps.weeklyData
+    prevProps.weeklyData === nextProps.weeklyData &&
+    prevProps.prevProvision === nextProps.prevProvision &&
+    prevProps.nextProvision === nextProps.nextProvision
   );
 });
