@@ -121,8 +121,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "streak_legend",
       name: "Streak Legend",
-      description: `Opnå ${targets.streakLegend} dages streak`,
-      requirement: `Sælg noget ${targets.streakLegend} dage i træk`,
+      description: `Overgå dagen før ${targets.streakLegend} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.streakLegend} dage i træk`,
       icon: Medal,
       color: "text-pink-400 bg-pink-400/20",
       category: "streaks",
