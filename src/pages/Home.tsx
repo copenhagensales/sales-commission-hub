@@ -53,6 +53,7 @@ import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
+import { CustomerInquiryInbox } from "@/components/home/CustomerInquiryInbox";
 
 const Home = () => {
   const { user } = useAuth();
@@ -421,6 +422,13 @@ const Home = () => {
         employeeId={employee?.id} 
         teamId={employee?.team_id} 
       />
+
+      {/* Customer Inquiry Inbox - Only for mg@ and km@ */}
+      {(user?.email === "mg@copenhagensales.dk" || user?.email === "km@copenhagensales.dk") && (
+        <div className="mb-6">
+          <CustomerInquiryInbox />
+        </div>
+      )}
       
       {/* Event Detail Dialog */}
       <EventDetailDialog
