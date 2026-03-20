@@ -99,8 +99,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "week_warrior",
       name: "Uge Kriger",
-      description: `Opnå ${targets.weekWarrior} dages streak`,
-      requirement: `Sælg noget ${targets.weekWarrior} dage i træk`,
+      description: `Overgå dagen før ${targets.weekWarrior} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.weekWarrior} dage i træk`,
       icon: Flame,
       color: "text-orange-400 bg-orange-400/20",
       category: "streaks",
