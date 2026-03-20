@@ -594,7 +594,7 @@ export default function TvLeagueDashboard() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="grid grid-cols-3 gap-1.5 2xl:gap-2 mb-2 2xl:mb-4">
                       <PrizeCard
                         emoji="🔥"
                         title="Bedste Runde"
@@ -624,7 +624,7 @@ export default function TvLeagueDashboard() {
                       />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+                      <h3 className="text-[10px] 2xl:text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 2xl:mb-3">
                         🔥 Seneste indtjening (300+ kr samlet)
                       </h3>
                       <TickerFeed earners={data.recentEarners} />
