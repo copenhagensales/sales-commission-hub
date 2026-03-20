@@ -450,41 +450,41 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
   const maxAvg = Math.max(...records.divisionAverages.map((d) => d.average), 1);
 
   return (
-    <div className="h-full flex flex-col gap-6">
-      <h2 className="text-3xl font-black text-white">Statistik & Records</h2>
+    <div className="h-full flex flex-col gap-3 2xl:gap-6 overflow-y-auto">
+      <h2 className="text-xl 2xl:text-3xl font-black text-white">Statistik & Records</h2>
 
-      <div className="p-5 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
-        <div className="flex items-center gap-3 mb-2">
-          <Trophy className="h-6 w-6 text-yellow-400" />
-          <span className="text-sm text-yellow-400/80 font-medium">Højeste provision i sæsonen</span>
+      <div className="p-3 2xl:p-5 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
+        <div className="flex items-center gap-2 2xl:gap-3 mb-1 2xl:mb-2">
+          <Trophy className="h-4 w-4 2xl:h-6 2xl:w-6 text-yellow-400" />
+          <span className="text-xs 2xl:text-sm text-yellow-400/80 font-medium">Højeste provision i sæsonen</span>
         </div>
-        <p className="text-4xl font-black text-white tabular-nums">{formatKr(records.highestProvision)}</p>
-        <p className="text-slate-400 text-sm mt-1">{records.highestProvisionName}</p>
+        <p className="text-2xl 2xl:text-4xl font-black text-white tabular-nums">{formatKr(records.highestProvision)}</p>
+        <p className="text-slate-400 text-xs 2xl:text-sm mt-1">{records.highestProvisionName}</p>
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-slate-400 mb-4 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" /> Gennemsnit per division
+        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-4 flex items-center gap-2">
+          <BarChart3 className="h-3 w-3 2xl:h-4 2xl:w-4" /> Gennemsnit per division
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-2 2xl:space-y-3">
           {records.divisionAverages.map((d) => {
             const pct = (d.average / maxAvg) * 100;
             return (
-              <div key={d.division} className="flex items-center gap-3">
-                <span className="text-sm text-slate-500 w-24 shrink-0">{getDivisionName(d.division)}</span>
-                <div className="flex-1 bg-slate-800 rounded-full h-6 overflow-hidden">
+              <div key={d.division} className="flex items-center gap-2 2xl:gap-3">
+                <span className="text-xs 2xl:text-sm text-slate-500 w-20 2xl:w-24 shrink-0 truncate">{getDivisionName(d.division)}</span>
+                <div className="flex-1 bg-slate-800 rounded-full h-5 2xl:h-6 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ duration: 0.8, delay: d.division * 0.1 }}
                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-end px-2"
                   >
-                    <span className="text-[10px] font-bold text-white tabular-nums">
+                    <span className="text-[9px] 2xl:text-[10px] font-bold text-white tabular-nums">
                       {formatKr(Math.round(d.average))}
                     </span>
                   </motion.div>
                 </div>
-                <span className="text-xs text-slate-600 w-12 text-right">{d.playerCount} sp.</span>
+                <span className="text-[10px] 2xl:text-xs text-slate-600 w-10 2xl:w-12 text-right">{d.playerCount} sp.</span>
               </div>
             );
           })}
