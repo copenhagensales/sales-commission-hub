@@ -1,21 +1,20 @@
 
 
-# Send email-notifikation ved ny kundehenvendelse
+# Fix: Tilføj DELETE RLS-policy til customer_inquiries
+
+## Problem
+Tabellen `customer_inquiries` har kun SELECT og UPDATE policies. Der mangler en DELETE policy, så sletning blokeres af Row Level Security.
 
 ## Ændring
+Kør én SQL migration:
 
-### `supabase/functions/customer-inquiry-webhook/index.ts`
-Efter succesfuld insert i `customer_inquiries`, send en notifikations-email til `mg@copenhagensales.dk` og `km@copenhagensales.dk` via Microsoft Graph API (M365-credentials er allerede konfigureret).
+```sql
+CREATE POLICY "Authenticated users can delete inquiries"
+ON public.customer_inquiries
+FOR DELETE
+TO authenticated
+USING (true);
+```
 
-**Tilføjelser:**
-1. Efter insert: hent M365 OAuth token (samme mønster som andre edge functions i projektet)
-2. Send én email med begge modtagere (`toRecipients` array) med detaljer om henvendelsen (navn, firma, email, telefon, besked)
-3. Email sendes asynkront — hvis den fejler, logges fejlen men webhook returnerer stadig success (henvendelsen er gemt)
-4. Simpel HTML-formatering med henvendelsens detaljer
-
-**Ingen andre filer ændres.** Ingen database-ændringer.
-
-| Fil | Handling |
-|-----|---------|
-| `supabase/functions/customer-inquiry-webhook/index.ts` | Tilføj email-notifikation efter insert |
+Ingen kodeændringer nødvendige — UI og mutation er allerede korrekt implementeret.
 
