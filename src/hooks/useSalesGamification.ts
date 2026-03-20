@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
-import { format, startOfWeek } from "date-fns";
+import { format, startOfWeek, subDays, isWeekend } from "date-fns";
 
 export type RecordType = "best_day" | "best_week" | null;
 
