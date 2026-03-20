@@ -259,8 +259,11 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
             </div>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs whitespace-pre font-mono">
-          {tooltipText}
+        <TooltipContent side="top" className="text-xs font-mono">
+          {hoveredIdx !== null
+            ? `${dayLabels[hoveredIdx]}: ${data[hoveredIdx].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+            : `${dayLabels[data.length - 1]}: ${data[data.length - 1].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+          }
         </TooltipContent>
       </Tooltip>
 
