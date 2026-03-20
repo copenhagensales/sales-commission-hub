@@ -151,11 +151,12 @@ Deno.serve(async (req) => {
         return {
           division: divNum,
           totalPlayers: sorted.length,
-          players: sorted.slice(0, 5).map((p) => ({
+          players: sorted.map((p) => ({
             rank: p.projected_rank,
             name: p.name,
             provision: p.current_provision || 0,
             deals: p.deals_count || 0,
+            rankChange: p.previous_overall_rank != null ? p.previous_overall_rank - p.overall_rank : 0,
             zone:
               p.projected_rank <= 2
                 ? "promotion"

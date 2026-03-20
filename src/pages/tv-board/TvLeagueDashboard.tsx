@@ -15,6 +15,7 @@ interface PlayerEntry {
   teamName?: string;
   employeeId?: string;
   deals?: number;
+  rankChange?: number;
   zone?: "promotion" | "relegation" | "safe";
 }
 
