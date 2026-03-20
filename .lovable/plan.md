@@ -1,54 +1,57 @@
 
 
-# Sparkline: Flyt, forstør og 6 forbedringer
+# Fix Sparkline alignment, størrelse og UI-forbedringer
 
-## Overblik
-Sparkline-grafen flyttes centralt mellem sælgernavn og provision, forstørres, og opgraderes med 6 visuelle forbedringer (3 godkendte + 3 nye).
+## Problemer fra screenshot
+1. **Forskudte grafer** — Sparklines er ikke justeret fordi de er wrappet i en conditional (`weeklyData && ...`) med `flex-1`, så rækker uden data mangler elementet og hele layoutet rykker.
+2. **For små** — SVG er kun 80×28px, fylder lidt i det store mellemrum.
+3. **Gennemsnit er generelt** — `divisionAvg` beregnes allerede korrekt per division (linje 137-144 i ActiveSeasonBoard), men det ser ud til at det er det der bruges. Dobbelttjek at QualificationBoard gør det samme.
 
 ## Ændringer
 
-### 1. `src/components/league/ProvisionSparkline.tsx` — Komplet omskrivning
-- **Størrelse**: SVG fra 48×16 til 80×28, strokeWidth 1.5→2
-- **Gradient fill**: `<linearGradient>` + `<polygon>` under linjen, farvet efter momentum (grøn/rød/blå, 20% opacity)
-- **Pulserende endpoint**: `<circle>` med CSS `animate-pulse` på sidste datapunkt
-- **Draw-animation**: `stroke-dasharray`/`stroke-dashoffset` CSS-animation så linjen tegnes ind over 0.8s
-- **Min/max-markører**: Små cirkler (3px) på højeste og laveste punkt med dimmet farve
-- **Divisionsgennemsnit-linje**: Ny optional prop `divisionAvg?: number[]` — renderes som tynd stiplet linje i grå
-- **Hover tooltip**: Wrap i shadcn `Tooltip` der viser daglige værdier formateret som "Man: 3.200 kr, Tir: 4.100 kr..."
-- Ny prop `size?: "sm" | "md"` (md=80×28 default, sm=48×16)
+### 1. `ProvisionSparkline.tsx` — Gør større
+- Øg `md` størrelse fra 80×28 til **140×36** (næsten dobbelt bredde)
+- Øg `sm` fra 48×16 til **100×28**
+- Behold proportionel strokeWidth
 
-### 2. `src/components/league/QualificationBoard.tsx`
-- Fjern sparkline fra provisions-div (linje ~309-311)
-- Tilføj nyt `flex-1` element mellem navn-div og provisions-div med sparkline centreret
-- Beregn divisionsgennemsnit fra standings-data og send som `divisionAvg` prop
-- Fjern `hidden sm:flex` — altid synlig
+### 2. `ActiveSeasonBoard.tsx` + `QualificationBoard.tsx` — Fix alignment
+- **Fjern conditional rendering** af sparkline-wrapperen. Vis ALTID flex-1 div'en, men vis kun grafen indeni hvis data findes. Dette sikrer at alle rækker har samme layout-struktur og intet forskyder sig.
+- Ændr fra:
+  ```tsx
+  {weeklyData && weeklyData.length > 0 && (
+    <div className="hidden sm:flex flex-1 ...">
+      <ProvisionSparkline ... />
+    </div>
+  )}
+  ```
+  Til:
+  ```tsx
+  <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
+    {weeklyData && weeklyData.length > 0 && (
+      <ProvisionSparkline ... />
+    )}
+  </div>
+  ```
+- Øg `min-w` fra 90px til 120px
 
-### 3. `src/components/league/ActiveSeasonBoard.tsx`
-- Samme flytning som QualificationBoard (linje ~301-303)
-- Tilføj centralt sparkline-element, beregn og send divisionsgennemsnit
+### 3. Divisionsgennemsnit — allerede korrekt
+Koden beregner allerede gennemsnit per division (kun spillerne i gruppen). Ingen ændring nødvendig her.
 
-### 4. `src/index.css` — Nye keyframes
-- `sparkline-draw`: stroke-dashoffset animation (0.8s ease-out)
-- `sparkline-pulse-dot`: pulserende cirkel på endpoint
+### 4. Yderligere UI-forbedringer
 
-### 5. Klikbar graf med detaljeret view (ny komponent)
-- **`src/components/league/SparklineDetailModal.tsx`**: Dialog/popover med recharts `AreaChart` der viser 7 dage med labels, akser, tooltips og divisionens gennemsnit som referencelinje
-- Sparkline wraps i klikbar container der åbner modal
+**a) Smooth path i stedet for kantet polyline**
+- Erstat `<polyline>` med en `<path>` der bruger cubic bezier curves (catmull-rom interpolation) for en blødere, mere professionel kurve.
 
-## Layout efter ændring
-```text
-FØR:  [Rank] [Navn+Team]                         [32.850 kr 📈] [0 pt] [Zone]
-EFTER: [Rank] [Navn+Team]  [──●──min──max──📈──]  [32.850 kr]   [0 pt] [Zone]
-                            ^ gradient fill         ^ klikbar
-                            ^ stiplet avg-linje
-```
+**b) Hover-highlight af individuelle datapunkter**
+- Tilføj usynlige hit-areas (større cirkler) på hvert datapunkt der viser en tooltip med den specifikke dags værdi ved hover, i stedet for at vise alle 7 dage på én gang.
 
-## Filer
-| Fil | Handling |
-|-----|----------|
-| `src/components/league/ProvisionSparkline.tsx` | Omskriv: størrelse, gradient, endpoint, draw-anim, min/max, avg-linje, tooltip |
-| `src/components/league/SparklineDetailModal.tsx` | Ny: recharts AreaChart modal med 7-dages detaljer |
-| `src/components/league/QualificationBoard.tsx` | Flyt sparkline centralt, beregn divisionsgennemsnit |
-| `src/components/league/ActiveSeasonBoard.tsx` | Flyt sparkline centralt, beregn divisionsgennemsnit |
-| `src/index.css` | Tilføj sparkline-draw og sparkline-pulse-dot keyframes |
+**c) Relativ performance-indikator**
+- Vis en lille tekst-label under grafen ("↑12% over gns." eller "↓8% under gns.") der sammenligner spillerens ugetotal med divisionens gennemsnit. Giver hurtigt overblik uden at klikke.
+
+## Filer der ændres
+| Fil | Ændring |
+|-----|---------|
+| `ProvisionSparkline.tsx` | Større SVG, smooth bezier path, hover-highlights per punkt, performance-label |
+| `ActiveSeasonBoard.tsx` | Fix alignment (altid render flex-1 wrapper) |
+| `QualificationBoard.tsx` | Fix alignment (altid render flex-1 wrapper) |
 
