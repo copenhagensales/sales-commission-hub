@@ -1,44 +1,16 @@
 
 
-# Flyt Kundehenvendelser til Ledelse-menuen
+# Seed permission for Kundehenvendelser
 
-## Ændringer
+## Ændring
+Indsæt `menu_customer_inquiries` permission for `ejer`-rollen i `role_page_permissions`-tabellen, så menupunktet bliver synligt under Ledelse.
 
-### 1. Ny side: `src/pages/CustomerInquiries.tsx`
-- Wrapper-side med `MainLayout` der renderer `CustomerInquiryInbox` komponenten
-- Simpel side med titel
+## SQL
+```sql
+INSERT INTO role_page_permissions (role_key, permission_key, parent_key, permission_type, can_view, can_edit, description)
+VALUES ('ejer', 'menu_customer_inquiries', 'menu_section_ledelse', 'page', true, true, 'Kundehenvendelser');
+```
 
-### 2. `src/components/layout/PreviewSidebar.tsx`
-- Tilføj `menu_customer_inquiries` til `MANAGEMENT_ITEMS`:
-  ```
-  menu_customer_inquiries: { name: "Kundehenvendelser", href: "/customer-inquiries", icon: Inbox }
-  ```
-
-### 3. `src/config/permissionKeys.ts`
-- Tilføj ny permission key under Ledelse-sektionen:
-  ```
-  menu_customer_inquiries: { label: 'Kundehenvendelser', section: 'ledelse', parent: 'menu_section_ledelse' }
-  ```
-
-### 4. `src/routes/pages.ts`
-- Tilføj lazy import for `CustomerInquiries`
-
-### 5. `src/routes/config.tsx`
-- Tilføj route: `{ path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" }`
-
-### 6. `src/pages/Home.tsx`
-- Fjern `CustomerInquiryInbox` og den hardcodede email-check fra home-siden
-
-### 7. Database migration
-- Seed `menu_customer_inquiries` permission for ejer-rollen med `can_view: true`
-
-| Fil | Handling |
-|-----|---------|
-| `src/pages/CustomerInquiries.tsx` | Ny side |
-| `src/components/layout/PreviewSidebar.tsx` | Tilføj menupunkt |
-| `src/config/permissionKeys.ts` | Tilføj permission key |
-| `src/routes/pages.ts` | Lazy import |
-| `src/routes/config.tsx` | Tilføj route |
-| `src/pages/Home.tsx` | Fjern inbox derfra |
-| DB migration | Seed permission |
+## Resultat
+Efter insert vil ejer-rollen kunne se "Kundehenvendelser" under Ledelse i sidebaren.
 
