@@ -102,9 +102,9 @@ function useLeagueTvData() {
   });
 }
 
-// ─── Scene Rotation ───────────────────────────────────────────
-type SceneType = "divisions" | "movements" | "records";
-const SCENES: SceneType[] = ["divisions", "movements", "records"];
+// ─── Left Scene Rotation ──────────────────────────────────────
+type LeftScene = "overview" | "movements" | "records";
+const LEFT_SCENES: LeftScene[] = ["overview", "movements", "records"];
 
 // ─── Sub-components ───────────────────────────────────────────
 
