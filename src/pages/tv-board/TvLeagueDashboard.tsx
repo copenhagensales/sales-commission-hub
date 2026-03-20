@@ -467,7 +467,7 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
           <BarChart3 className="h-3 w-3 2xl:h-4 2xl:w-4" /> Gennemsnit per division
         </h3>
         <div className="space-y-2 2xl:space-y-3">
-          {records.divisionAverages.map((d) => {
+          {records.divisionAverages.slice(0, 3).map((d) => {
             const pct = (d.average / maxAvg) * 100;
             return (
               <div key={d.division} className="flex items-center gap-2 2xl:gap-3">
