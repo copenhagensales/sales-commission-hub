@@ -576,7 +576,7 @@ export default function TvLeagueDashboard() {
               gradientClass="from-purple-500/5 to-transparent"
             />
             <PrizeCard
-              icon="🚀"
+              emoji="🚀"
               title="Sæsonens Comeback"
               leader={prizeLeaders?.comeback ?? null}
               locked={!prizeLeaders?.comeback}
