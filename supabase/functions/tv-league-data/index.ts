@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
       divisionAverages,
     };
 
-    // === PRIZE LEADERS (only for active season) ===
+    // === PRIZE LEADERS (qualification + active) ===
     let prizeLeaders: any = null;
 
     if (isActive) {
@@ -282,7 +282,6 @@ Deno.serve(async (req) => {
       let bestRound: any = null;
       if (bestRoundData) {
         const emp = empMap.get(bestRoundData.employee_id);
-        // Get round number
         const { data: roundInfo } = await supabase
           .from("league_rounds")
           .select("round_number")
@@ -303,7 +302,6 @@ Deno.serve(async (req) => {
         const seasonStart = new Date(seasonStartDate);
         const talentCutoff = new Date(seasonStart.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-        // Get all season standings with points > 0
         const { data: seasonStandingsAll } = await supabase
           .from("league_season_standings")
           .select("employee_id, total_points, overall_rank")
@@ -351,7 +349,6 @@ Deno.serve(async (req) => {
           .eq("season_id", season.id);
 
         if (round1Standings && currentSeasonStandings) {
-          // Calculate overall rank for round 1 (division * playersPerDiv + rank_in_division)
           const r1Map = new Map(
             round1Standings.map((r) => [r.employee_id, (r.division - 1) * playersPerDivision + r.rank_in_division])
           );
@@ -386,6 +383,41 @@ Deno.serve(async (req) => {
       }
 
       prizeLeaders = { bestRound, talent, comeback };
+    } else {
+      // Qualification: use provision-based data
+      // Best Round (kval) = highest current_provision
+      let bestRound: any = null;
+      if (enriched.length > 0) {
+        const topProvider = enriched.reduce((best, s) =>
+          (s.current_provision || 0) > (best.current_provision || 0) ? s : best,
+          enriched[0]
+        );
+        if ((topProvider.current_provision || 0) > 0) {
+          bestRound = {
+            name: topProvider.name,
+            employeeId: topProvider.employee_id,
+            points: topProvider.current_provision,
+            label: `${Math.round(topProvider.current_provision).toLocaleString("da-DK")} kr`,
+          };
+        }
+      }
+
+      // Comeback (kval) = biggest rank improvement
+      let comeback: any = null;
+      const bestMover = enriched
+        .filter((s) => s.previous_overall_rank != null && s.previous_overall_rank > s.overall_rank)
+        .sort((a, b) => (b.previous_overall_rank! - b.overall_rank) - (a.previous_overall_rank! - a.overall_rank))[0];
+      if (bestMover) {
+        const improvement = bestMover.previous_overall_rank! - bestMover.overall_rank;
+        comeback = {
+          name: bestMover.name,
+          employeeId: bestMover.employee_id,
+          improvement,
+          label: `+${improvement} pladser`,
+        };
+      }
+
+      prizeLeaders = { bestRound, talent: null, comeback };
     }
 
     const payload = {
