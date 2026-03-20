@@ -788,20 +788,32 @@ function SceneLeagueOverview({
 }
 
 // ─── Main Component ───────────────────────────────────────────
+// Mobile tab type
+type MobileTab = "divisions" | "overview" | "movements" | "records" | "league-overview";
+const MOBILE_TABS: { key: MobileTab; label: string; icon: string }[] = [
+  { key: "divisions", label: "Divisioner", icon: "🏟️" },
+  { key: "overview", label: "Top 3", icon: "🏆" },
+  { key: "movements", label: "Bevægelser", icon: "📈" },
+  { key: "records", label: "Records", icon: "🏅" },
+  { key: "league-overview", label: "Overblik", icon: "📊" },
+];
+
 export default function TvLeagueDashboard() {
   const { data, isLoading, error } = useLeagueTvData();
   const [leftSceneIndex, setLeftSceneIndex] = useState(0);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("divisions");
   const tvMode = isTvMode();
+  const isMobile = useIsMobile();
 
-  // Left scene rotation
+  // Left scene rotation (only on desktop/TV)
   useEffect(() => {
-    if (!data) return;
+    if (!data || isMobile) return;
     const duration = LEFT_SCENE_DURATIONS[leftSceneIndex] || 15_000;
     const timer = setTimeout(() => {
       setLeftSceneIndex((prev) => (prev + 1) % LEFT_SCENES.length);
     }, duration);
     return () => clearTimeout(timer);
-  }, [leftSceneIndex, data]);
+  }, [leftSceneIndex, data, isMobile]);
 
   if (isLoading) {
     return (
@@ -827,6 +839,139 @@ export default function TvLeagueDashboard() {
   const isActive = data.seasonStatus === "active";
   const prizeLeaders = data.prizeLeaders;
 
+  // ─── MOBILE LAYOUT ───
+  if (isMobile) {
+    return (
+      <DashboardShell>
+        <div className="bg-slate-900 text-white min-h-screen flex flex-col">
+          {/* Mobile header */}
+          <div className="px-4 pt-4 pb-2">
+            <h1 className="text-lg font-black tracking-tight">
+              <span className="text-yellow-400">⚽</span> Superliga Live
+            </h1>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {data.totalPlayers} spillere · {data.totalDivisions} divisioner
+            </p>
+          </div>
+
+          {/* Mobile tab bar */}
+          <div className="px-2 pb-2">
+            <div className="flex gap-1 overflow-x-auto no-scrollbar">
+              {MOBILE_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setMobileTab(tab.key)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                    mobileTab === tab.key
+                      ? "bg-white/10 text-white border border-white/20"
+                      : "text-slate-500 border border-transparent"
+                  }`}
+                >
+                  <span className="text-sm">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Mobile content */}
+          <div className="flex-1 px-3 pb-4 overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={mobileTab}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.3 }}
+              >
+                {mobileTab === "divisions" && (
+                  <SceneDivisions divisions={data.divisions} />
+                )}
+                {mobileTab === "overview" && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">
+                        🏆 Top 3 {isActive ? "(point)" : "(provision)"}
+                      </h3>
+                      <div className="space-y-1.5">
+                        {data.top3.map((p, i) => (
+                          <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} isPoints={isActive} />
+                        ))}
+                        {data.top3.length === 0 && (
+                          <p className="text-slate-600 text-xs italic">Ingen data endnu</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <PrizeCard
+                        emoji="🔥" title="Bedste Runde"
+                        leader={prizeLeaders?.bestRound ?? null}
+                        locked={!prizeLeaders?.bestRound} lockedText="Ingen data endnu"
+                        borderClass="border-red-500/40" gradientClass="from-red-500/5 to-transparent"
+                      />
+                      <PrizeCard
+                        emoji="⭐" title="Sæsonens Talent"
+                        leader={prizeLeaders?.talent ?? null}
+                        locked={!prizeLeaders?.talent} lockedText="Afgøres efter runde 1"
+                        borderClass="border-purple-500/40" gradientClass="from-purple-500/5 to-transparent"
+                      />
+                      <PrizeCard
+                        emoji="🚀" title="Sæsonens Comeback"
+                        leader={prizeLeaders?.comeback ?? null}
+                        locked={!prizeLeaders?.comeback} lockedText="Ingen data endnu"
+                        borderClass="border-emerald-500/40" gradientClass="from-emerald-500/5 to-transparent"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">
+                        🔥 Seneste indtjening (300+ kr samlet)
+                      </h3>
+                      <TickerFeed earners={data.recentEarners} />
+                    </div>
+                  </div>
+                )}
+                {mobileTab === "movements" && (
+                  <SceneMovements
+                    movements={data.movements}
+                    topLastHour={data.topLastHour}
+                    todayTopEarners={data.todayTopEarners || []}
+                    activeLast15Min={data.activeLast15Min || 0}
+                  />
+                )}
+                {mobileTab === "records" && (
+                  <SceneRecords
+                    records={data.records}
+                    longestStreak={data.longestStreak}
+                    teamRankings={data.teamRankings || []}
+                    todayLeagueTotal={data.todayLeagueTotal || 0}
+                  />
+                )}
+                {mobileTab === "league-overview" && (
+                  <SceneLeagueOverview
+                    raceToTop={data.raceToTop || []}
+                    divisions={data.divisions}
+                    totalPlayers={data.totalPlayers}
+                    totalDivisions={data.totalDivisions}
+                    todayLeagueTotal={data.todayLeagueTotal || 0}
+                    activeLast15Min={data.activeLast15Min || 0}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Mobile footer */}
+          <div className="px-4 py-2 border-t border-slate-800">
+            <p className="text-[9px] text-slate-600">
+              Opdateret: {data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString("da-DK") : "–"}
+            </p>
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  // ─── DESKTOP / TV LAYOUT ───
   return (
     <DashboardShell>
       {!tvMode && (
