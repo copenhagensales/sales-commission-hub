@@ -557,7 +557,7 @@ export default function TvLeagueDashboard() {
           )}
 
           {/* Scene indicator dots */}
-          <div className="flex gap-1.5 mb-4">
+          <div className="flex gap-1.5 mb-2 2xl:mb-4">
             {LEFT_SCENES.map((s, i) => (
               <div
                 key={s}
