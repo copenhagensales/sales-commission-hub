@@ -267,7 +267,9 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
                   p.rank === 2 ? "border-l-2 border-l-slate-300" :
                   p.rank === 3 ? "border-l-2 border-l-orange-400" :
                   p.zone === "promotion" ? "border-l-2 border-l-emerald-500" :
-                  p.zone === "relegation" ? "border-l-2 border-l-red-500" : ""
+                  p.zone === "playoff" ? "border-l-2 border-l-orange-500" :
+                  p.zone === "relegation" ? "border-l-2 border-l-red-500" :
+                  p.zone === "top" ? "border-l-2 border-l-yellow-500" : ""
                 }`}
               >
                 <span className={`text-lg font-black w-7 text-center tabular-nums shrink-0 ${
