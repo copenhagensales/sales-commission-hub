@@ -220,6 +220,7 @@ const PlayerRow = memo(function PlayerRow({
   todayProvision,
   todayDailyRank,
   weeklyData,
+  divisionAvg,
   division,
   zoneTarget,
 }: PlayerRowProps) {
