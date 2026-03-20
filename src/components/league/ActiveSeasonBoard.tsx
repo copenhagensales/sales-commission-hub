@@ -332,7 +332,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         </div>
 
         {/* Sparkline — centrally placed (always rendered for alignment) */}
-        <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
+        <div className="hidden sm:flex flex-1 items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
               data={weeklyData}

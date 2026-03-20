@@ -262,15 +262,6 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
               </svg>
               <MomentumIcon className={cn("h-3 w-3 shrink-0", momentumColor)} />
             </div>
-            {/* Performance vs division avg */}
-            {isMd && perfLabel && (
-              <span className={cn(
-                "text-[9px] font-medium leading-none",
-                perfLabel.above ? "text-emerald-400" : "text-rose-400"
-              )}>
-                {perfLabel.above ? "↑" : "↓"}{Math.abs(perfLabel.pct)}% {perfLabel.above ? "over" : "under"} gns.
-              </span>
-            )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs whitespace-pre font-mono">
