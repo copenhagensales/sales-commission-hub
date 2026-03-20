@@ -162,7 +162,7 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            <span className="text-amber-400 font-semibold">🔥 {currentStreak} dages streak!</span>
+            <span className="text-amber-400 font-semibold">🔥 {currentStreak} dage i træk!</span>
             {" Hold tempoet de næste timer"}
           </span>
         ),
