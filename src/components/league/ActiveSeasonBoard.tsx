@@ -192,6 +192,7 @@ interface SeasonPlayerRowProps {
   todayProvision: number;
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
+  divisionAvg?: number[];
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({

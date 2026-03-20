@@ -204,6 +204,7 @@ interface PlayerRowProps {
   todayProvision: number;
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
+  divisionAvg?: number[];
   division: number;
   zoneTarget: number | null;
 }
