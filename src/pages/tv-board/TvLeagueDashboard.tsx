@@ -544,13 +544,13 @@ export default function TvLeagueDashboard() {
       )}
       <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "min-h-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
         {/* ─── LEFT ZONE (40%) — rotates overview / movements / records ─── */}
-        <div className="w-[40%] border-r border-slate-800 p-6 flex flex-col">
+        <div className="w-[40%] border-r border-slate-800 p-3 2xl:p-6 flex flex-col">
           {tvMode && (
-            <div className="mb-4">
-              <h1 className="text-2xl font-black tracking-tight">
+            <div className="mb-2 2xl:mb-4">
+              <h1 className="text-lg 2xl:text-2xl font-black tracking-tight">
                 <span className="text-yellow-400">⚽</span> Superliga Live
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-[10px] 2xl:text-xs text-slate-500 mt-1">
                 {data.totalPlayers} spillere · {data.totalDivisions} divisioner
               </p>
             </div>
