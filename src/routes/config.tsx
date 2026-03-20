@@ -132,6 +132,7 @@ import {
   AmoAuditLog,
   AmoSettings,
   CustomerInquiries,
+  TvLeagueDashboard,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -324,6 +325,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/united", component: UnitedDashboard, access: "protected" },
   { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
   { path: "/dashboards/sales-overview-all", component: SalesOverviewAll, access: "protected" },
+  { path: "/dashboards/commission-league", component: TvLeagueDashboard, access: "protected" },
 
   // Dashboard Admin pages - restricted to those with dashboard admin permission
   { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },

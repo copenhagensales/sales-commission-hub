@@ -86,4 +86,11 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "Samlet salgsoversigt for alle klienter - dagens salg",
     permissionKey: "menu_dashboard_sales_overview_all" 
   },
+  { 
+    slug: "commission-league", 
+    name: "Superliga Live", 
+    path: "/dashboards/commission-league", 
+    description: "Live liga-overblik med top performers og division highlights",
+    permissionKey: "menu_dashboard_commission_league" 
+  },
 ];
