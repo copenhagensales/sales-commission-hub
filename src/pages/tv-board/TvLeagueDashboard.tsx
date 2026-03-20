@@ -445,7 +445,7 @@ export default function TvLeagueDashboard() {
         {/* Sales Ticker */}
         <div className="flex-1 min-h-0">
           <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-            🔥 Seneste salg (300+ kr)
+            🔥 Seneste indtjening (300+ kr samlet)
           </h3>
           <TickerFeed earners={data.recentEarners} />
         </div>
