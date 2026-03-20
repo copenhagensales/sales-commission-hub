@@ -355,26 +355,26 @@ export function LeagueMotivationBar({
         {
           msg: (
             <span>
-              {"Start en ny streak i dag — dit "}
-              <span className="text-amber-400 font-semibold">første salg</span>
-              {" tæller! 🚀"}
+              {"Start en ny streak — "}
+              <span className="text-amber-400 font-semibold">overgå gårsdagen</span>
+              {" og sæt gang i væksten! 🚀"}
             </span>
           ),
         },
         {
           msg: (
             <span>
-              {"En god dag starter med "}
-              <span className="text-amber-400 font-semibold">ét salg</span>
-              {" — tag det første skridt! 💪"}
+              {"Tjen mere end i går og "}
+              <span className="text-amber-400 font-semibold">start en streak</span>
+              {" — dag for dag! 💪"}
             </span>
           ),
         },
         {
           msg: (
             <span>
-              <span className="text-amber-400 font-semibold">Første salg</span>
-              {" er det sværeste — resten følger! 🚀"}
+              <span className="text-amber-400 font-semibold">Beat yesterday</span>
+              {" — overgå gårsdagen og byg momentum! 🚀"}
             </span>
           ),
         },

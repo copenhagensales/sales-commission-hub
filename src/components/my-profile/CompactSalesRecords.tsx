@@ -122,7 +122,7 @@ export function CompactSalesRecords({
       {/* Streak motivation */}
       {streakAtRisk && (
         <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1.5 text-center">
-          Hold momentum! Luk dagens mål og forlæng din streak 💪
+          Hold momentum! Overgå gårsdagen og forlæng din streak 💪
         </p>
       )}
     </div>

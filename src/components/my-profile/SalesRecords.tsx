@@ -120,7 +120,7 @@ export function SalesRecords({
         {streakAtRisk && (
           <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-md px-3 py-2 mt-2 border border-warning/20">
             <Zap className="h-3.5 w-3.5 shrink-0 animate-pulse" />
-            <span>Hold momentum! Luk dagens mål og forlæng din streak 💪</span>
+            <span>Hold momentum! Overgå gårsdagen og forlæng din streak 💪</span>
           </div>
         )}
       </div>

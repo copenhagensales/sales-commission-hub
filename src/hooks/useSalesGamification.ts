@@ -437,6 +437,8 @@ export function useSalesGamification({
     longestStreak,
     totalStreakDays: streakData?.total_streak_days || 0,
     hitDailyGoal,
+    beatYesterday,
+    yesterdayTotal,
     streakAtRisk,
     updateStreak: updateStreakMutation.mutate,
 

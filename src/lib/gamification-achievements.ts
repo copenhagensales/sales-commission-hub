@@ -132,8 +132,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "unstoppable",
       name: "Ustoppelig",
-      description: `${targets.unstoppable} dages streak`,
-      requirement: `Sælg noget ${targets.unstoppable} dage i træk`,
+      description: `Overgå dagen før ${targets.unstoppable} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.unstoppable} dage i træk`,
       icon: Crown,
       color: "text-yellow-500 bg-yellow-500/20",
       category: "streaks",

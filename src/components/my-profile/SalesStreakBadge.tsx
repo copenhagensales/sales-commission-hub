@@ -38,7 +38,7 @@ export function SalesStreakBadge({
       {streakAtRisk ? (
         <>
           <Zap className="h-4 w-4 animate-pulse" />
-          <span>Hold momentum! 💪</span>
+          <span>Overgå gårsdagen! 💪</span>
         </>
       ) : (
         <>
