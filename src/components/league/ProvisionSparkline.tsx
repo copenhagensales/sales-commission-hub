@@ -1,45 +1,92 @@
-import { memo } from "react";
+import { memo, useState, useMemo } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { SparklineDetailModal } from "./SparklineDetailModal";
 
 interface ProvisionSparklineProps {
   data: number[]; // 7 values [day-6 ... today]
+  divisionAvg?: number[]; // 7 values, division average per day
+  playerName?: string;
+  size?: "sm" | "md";
   className?: string;
+}
+
+const DAY_LABELS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+function getDayLabels(): string[] {
+  const now = new Date();
+  const todayIdx = (now.getDay() + 6) % 7; // Mon=0
+  const labels: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    labels.push(DAY_LABELS[(todayIdx - i + 7) % 7]);
+  }
+  return labels;
 }
 
 export const ProvisionSparkline = memo(function ProvisionSparkline({
   data,
+  divisionAvg,
+  playerName,
+  size = "md",
   className,
 }: ProvisionSparklineProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   if (!data || data.length === 0) return null;
 
-  const max = Math.max(...data, 1);
-  const w = 48;
-  const h = 16;
-  const padding = 1;
+  const isMd = size === "md";
+  const w = isMd ? 80 : 48;
+  const h = isMd ? 28 : 16;
+  const padding = 2;
+  const strokeW = isMd ? 2 : 1.5;
 
-  const points = data
-    .map((v, i) => {
-      const x = padding + (i / (data.length - 1)) * (w - padding * 2);
-      const y = h - padding - (v / max) * (h - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const allValues = [...data, ...(divisionAvg || [])];
+  const max = Math.max(...allValues, 1);
 
-  // Momentum: compare last 3 days avg vs previous 3 days avg
+  const toPoint = (v: number, i: number, total: number) => ({
+    x: padding + (i / (total - 1)) * (w - padding * 2),
+    y: h - padding - (v / max) * (h - padding * 2),
+  });
+
+  const points = data.map((v, i) => toPoint(v, i, data.length));
+  const pointsStr = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+  // Polygon for gradient fill (line + bottom edge)
+  const polygonPoints = [
+    ...points.map((p) => `${p.x},${p.y}`),
+    `${points[points.length - 1].x},${h}`,
+    `${points[0].x},${h}`,
+  ].join(" ");
+
+  // Division average line
+  const avgPointsStr = divisionAvg
+    ? divisionAvg.map((v, i) => {
+        const p = toPoint(v, i, divisionAvg.length);
+        return `${p.x},${p.y}`;
+      }).join(" ")
+    : null;
+
+  // Momentum
   const recent = data.slice(-3);
   const older = data.slice(0, 3);
   const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
   const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
-
   const isRising = recentAvg > olderAvg * 1.05;
   const isFalling = recentAvg < olderAvg * 0.95;
 
-  const strokeColor = isRising
-    ? "hsl(142 71% 45%)"  // success green
+  const colorHsl = isRising
+    ? "142 71% 45%"
     : isFalling
-    ? "hsl(0 84% 60%)"    // danger red
-    : "hsl(217 91% 60%)"; // neutral blue
+    ? "0 84% 60%"
+    : "217 91% 60%";
+
+  const strokeColor = `hsl(${colorHsl})`;
 
   const MomentumIcon = isRising ? TrendingUp : isFalling ? TrendingDown : Minus;
   const momentumColor = isRising
@@ -48,19 +95,136 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
     ? "text-rose-400"
     : "text-slate-400";
 
+  // Min/max indices
+  const minIdx = data.indexOf(Math.min(...data));
+  const maxIdx = data.indexOf(Math.max(...data));
+
+  // Endpoint (last point)
+  const lastPoint = points[points.length - 1];
+
+  // Total path length estimate for draw animation
+  let pathLength = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    pathLength += Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Tooltip content
+  const dayLabels = getDayLabels();
+  const tooltipText = data
+    .map((v, i) => `${dayLabels[i]}: ${v.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`)
+    .join("\n");
+
+  const gradientId = `spark-grad-${isRising ? "up" : isFalling ? "down" : "flat"}`;
+
   return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <svg width={w} height={h} className="shrink-0" viewBox={`0 0 ${w} ${h}`}>
-        <polyline
-          points={points}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <MomentumIcon className={cn("h-3 w-3 shrink-0", momentumColor)} />
-    </div>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn("flex items-center gap-1 cursor-pointer", className)}
+            onClick={() => setModalOpen(true)}
+          >
+            <svg
+              width={w}
+              height={h}
+              className="shrink-0"
+              viewBox={`0 0 ${w} ${h}`}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={strokeColor} stopOpacity={0.25} />
+                  <stop offset="100%" stopColor={strokeColor} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+
+              {/* Gradient fill area */}
+              <polygon
+                points={polygonPoints}
+                fill={`url(#${gradientId})`}
+              />
+
+              {/* Division average dashed line */}
+              {avgPointsStr && (
+                <polyline
+                  points={avgPointsStr}
+                  fill="none"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={1}
+                  strokeDasharray="3 2"
+                  strokeLinecap="round"
+                  opacity={0.4}
+                />
+              )}
+
+              {/* Main line with draw animation */}
+              <polyline
+                points={pointsStr}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={strokeW}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="sparkline-draw"
+                style={{
+                  strokeDasharray: pathLength,
+                  strokeDashoffset: pathLength,
+                  animationDuration: "0.8s",
+                  // @ts-ignore CSS custom property
+                  "--sparkline-path-length": pathLength,
+                } as React.CSSProperties}
+              />
+
+              {/* Min marker */}
+              {isMd && minIdx !== maxIdx && (
+                <circle
+                  cx={points[minIdx].x}
+                  cy={points[minIdx].y}
+                  r={2}
+                  fill="hsl(var(--muted-foreground))"
+                  opacity={0.5}
+                />
+              )}
+
+              {/* Max marker */}
+              {isMd && minIdx !== maxIdx && (
+                <circle
+                  cx={points[maxIdx].x}
+                  cy={points[maxIdx].y}
+                  r={2}
+                  fill={strokeColor}
+                  opacity={0.7}
+                />
+              )}
+
+              {/* Pulsating endpoint */}
+              <circle
+                cx={lastPoint.x}
+                cy={lastPoint.y}
+                r={isMd ? 3 : 2}
+                fill={strokeColor}
+                className="sparkline-pulse-dot"
+              />
+            </svg>
+            <MomentumIcon className={cn("h-3 w-3 shrink-0", momentumColor)} />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs whitespace-pre font-mono">
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
+
+      <SparklineDetailModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        data={data}
+        divisionAvg={divisionAvg}
+        playerName={playerName}
+        dayLabels={dayLabels}
+        isRising={isRising}
+        isFalling={isFalling}
+      />
+    </TooltipProvider>
   );
 });
