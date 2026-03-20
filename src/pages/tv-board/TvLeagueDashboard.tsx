@@ -559,28 +559,28 @@ export default function TvLeagueDashboard() {
           <div className="grid grid-cols-3 gap-2 mb-4">
             <PrizeCard
               emoji="🔥"
-              title="Bedste Runde"
+               title="Bedste Runde"
               leader={prizeLeaders?.bestRound ?? null}
-              locked={isQualification}
-              lockedText="Afgøres når sæsonen starter"
+              locked={!prizeLeaders?.bestRound}
+              lockedText="Ingen data endnu"
               borderClass="border-red-500/40"
               gradientClass="from-red-500/5 to-transparent"
             />
             <PrizeCard
-              emoji="⭐"
+              icon="⭐"
               title="Sæsonens Talent"
               leader={prizeLeaders?.talent ?? null}
-              locked={isQualification || (isActive && !prizeLeaders?.talent)}
-              lockedText={isQualification ? "Afgøres når sæsonen starter" : "Afgøres efter runde 1"}
+              locked={!prizeLeaders?.talent}
+              lockedText="Afgøres efter runde 1"
               borderClass="border-purple-500/40"
               gradientClass="from-purple-500/5 to-transparent"
             />
             <PrizeCard
-              emoji="🚀"
+              icon="🚀"
               title="Sæsonens Comeback"
               leader={prizeLeaders?.comeback ?? null}
-              locked={isQualification}
-              lockedText="Afgøres når sæsonen starter"
+              locked={!prizeLeaders?.comeback}
+              lockedText="Ingen data endnu"
               borderClass="border-emerald-500/40"
               gradientClass="from-emerald-500/5 to-transparent"
             />
