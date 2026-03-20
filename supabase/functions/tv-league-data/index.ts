@@ -417,7 +417,33 @@ Deno.serve(async (req) => {
         };
       }
 
-      prizeLeaders = { bestRound, talent: null, comeback };
+      // Talent (kval): provision-based for new employees (< 90 days)
+      let talent: any = null;
+      const seasonStartDate = season.start_date;
+      if (seasonStartDate && enriched.length > 0) {
+        const seasonStart = new Date(seasonStartDate);
+        const talentCutoff = new Date(seasonStart.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+        const talentCandidates = enriched
+          .filter((s) => {
+            const emp = empMap.get(s.employee_id);
+            if (!emp?.employment_start_date) return false;
+            return new Date(emp.employment_start_date) > talentCutoff && (s.current_provision || 0) > 0;
+          })
+          .sort((a, b) => (b.current_provision || 0) - (a.current_provision || 0));
+
+        if (talentCandidates.length > 0) {
+          const top = talentCandidates[0];
+          talent = {
+            name: top.name,
+            employeeId: top.employee_id,
+            points: top.current_provision,
+            label: `${Math.round(top.current_provision).toLocaleString("da-DK")} kr`,
+          };
+        }
+      }
+
+      prizeLeaders = { bestRound, talent, comeback };
     }
 
     const payload = {
