@@ -141,11 +141,7 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
     pathLength += Math.sqrt(dx * dx + dy * dy);
   }
 
-  // Tooltip content
   const dayLabels = getDayLabels();
-  const tooltipText = data
-    .map((v, i) => `${dayLabels[i]}: ${v.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`)
-    .join("\n");
 
   // Performance vs division average
   const perfLabel = useMemo(() => {
