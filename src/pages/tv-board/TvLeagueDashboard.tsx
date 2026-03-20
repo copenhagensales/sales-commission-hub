@@ -581,16 +581,16 @@ export default function TvLeagueDashboard() {
               >
                 {currentLeftScene === "overview" && (
                   <>
-                    <div className="mb-4">
-                      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+                    <div className="mb-2 2xl:mb-4">
+                      <h3 className="text-[10px] 2xl:text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 2xl:mb-3">
                         🏆 Top 3 {isActive ? "(point)" : "(provision)"}
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5 2xl:space-y-2">
                         {data.top3.map((p, i) => (
                           <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} isPoints={isActive} />
                         ))}
                         {data.top3.length === 0 && (
-                          <p className="text-slate-600 text-sm italic">Ingen data endnu</p>
+                          <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen data endnu</p>
                         )}
                       </div>
                     </div>
