@@ -277,7 +277,7 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
