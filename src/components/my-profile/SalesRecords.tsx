@@ -112,7 +112,7 @@ export function SalesRecords({
         
         {currentStreak === 0 && (
           <p className="text-xs text-muted-foreground">
-            Start en streak ved at nå dit dagsmål
+            Start en streak ved at overgå gårsdagens indtjening
           </p>
         )}
         
