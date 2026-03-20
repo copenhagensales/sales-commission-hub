@@ -53,7 +53,7 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
   };
 
   const pendingText = notStarted ? "Afgøres når sæsonen starter" : "Afsløres efter runde 1";
-  const revealed = isActive && prizeLeaders;
+  const revealed = prizeLeaders != null;
 
   const podium = [
     { emoji: "🥇", label: "1.", standing: top1, colorClass: "text-yellow-400" },
@@ -62,7 +62,7 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
   ];
 
   const handleOpen = (type: DialogType) => {
-    if (isActive) setOpenDialog(type);
+    setOpenDialog(type);
   };
 
   return (

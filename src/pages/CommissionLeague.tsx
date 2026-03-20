@@ -112,8 +112,9 @@ export default function CommissionLeague() {
   const selectedRound = selectedRoundIndex >= 0 && roundHistory ? roundHistory[selectedRoundIndex] : undefined;
   const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.id);
   const { data: prizeLeaders } = usePrizeLeaders(
-    season?.status === "active" ? season?.id : undefined,
-    season?.start_date
+    season?.id,
+    season?.start_date,
+    season?.status === "active" ? (currentRound?.round_number ?? undefined) : undefined
   );
   const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
 
