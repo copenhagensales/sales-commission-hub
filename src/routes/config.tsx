@@ -131,6 +131,7 @@ import {
   AmoTasks,
   AmoAuditLog,
   AmoSettings,
+  CustomerInquiries,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
