@@ -1,46 +1,32 @@
 
-## Diagnose
-Jeg har verificeret 3 ting i det nuværende setup:
 
-1. `commission-league` er allerede korrekt registreret i kodebasen:
-- `TvBoardDirect.tsx`
-- `TvBoardView.tsx`
-- `src/config/dashboards.ts`
-- `src/routes/config.tsx`
+# Flyt Movements & Records til venstre side — Divisioner altid i højre
 
-2. Adgangskoden `XKVP` findes stadig i backend, men den er **deaktiveret** (`is_active = false`).
+## Nuværende layout
+- **Venstre (40%)**: Top 3 podium, Prize Cards, Ticker (statisk)
+- **Højre (60%)**: Roterer mellem Divisions → Movements → Records
 
-3. Preview, published URL og custom domain returnerer nu ikke “Dashboard ikke fundet”, men **“Adgang nægtet / Ugyldig eller inaktiv adgangskode”**. Det peger på, at problemet nu er **link-status**, ikke manglende dashboard-mapning.
+## Nyt layout
+- **Venstre (40%)**: Roterer mellem 3 scener:
+  1. Top 3 podium + Prize Cards + Ticker (nuværende indhold)
+  2. Movements (Dagens bevægelser + Top sidste time)
+  3. Records (Statistik & Records)
+- **Højre (60%)**: Kun divisioner (altid synligt, roterer internt mellem divisioner)
 
-## Plan for opdatering
+Begge sider bliver dynamiske — venstre roterer scener, højre roterer divisioner.
 
-### 1. Få linket til at virke igen
-- Hvis I vil beholde samme URL, reaktiverer vi `XKVP`.
-- Hvis linket bevidst skulle lukkes, opretter vi et nyt aktivt TV-link til `commission-league`.
-- Efter det tester vi samme `/t/XKVP`-flow i både preview og public/custom domain.
+## Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
 
-### 2. Fjerne den misvisende fejl fremadrettet
-- Flyt TV-link validering over i en backend-funktion, så vi kan skelne tydeligt mellem:
-  - ugyldig kode
-  - deaktiveret link
-  - udløbet link
-  - gyldigt link
-- Opdater `useTvBoardConfig` og TV-login-flowet til at vise præcis fejltekst i stedet for en generisk fallback.
+1. **Fjern scene-rotation fra højre side** — højre viser kun `SceneDivisions` permanent
+2. **Tilføj scene-rotation til venstre side** med 3 left-scenes:
+   - `"overview"` → Top 3 + Prize Cards + Ticker (15 sek)
+   - `"movements"` → SceneMovements (20 sek)
+   - `"records"` → SceneRecords (20 sek)
+3. **Flyt scene-indikator dots** (de 3 streger i toppen) til venstre side
+4. **Bevar header + timestamp** i venstre side (udenfor rotation)
+5. **Fjern den ydre `SCENES` rotation** — erstat med en `leftSceneIndex` state
 
-### 3. Forbedre TV-link administration
-- Udvid TV-link settings/admin så man kan se både **aktive og deaktiverede** links.
-- Tilføj en **“Reaktiver”** handling på deaktiverede links.
-- Vis tydelig status-badge på hvert link, så det er nemt at se hvorfor et link ikke virker.
+| Fil | Handling |
+|-----|---------|
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Omstrukturér layout: venstre roterer 3 scener, højre kun divisioner |
 
-### 4. Beskytte mod gamle cached TV-visninger
-- Tilføj tydeligere recovery-flow, så gamle TV-faner ikke hænger fast i en gammel tilstand.
-- Ved fejl kan siden vise en mere handlingsorienteret besked, fx at linket er deaktiveret og at man skal bruge et nyt/aktivt link.
-
-## Tekniske noter
-- Den nuværende backend-politik for `tv_board_access` skjuler deaktiverede links for offentlige opslag. Derfor kan klienten ikke sikkert kende forskel på “ugyldig” og “deaktiveret” uden en backend-funktion.
-- Selve dashboard-komponenten for `commission-league` er allerede wired korrekt ind. Derfor er næste rigtige opdatering ikke route-mapning, men **link-validering og reaktivering/admin-flow**.
-
-## Resultat efter implementering
-- `/t/XKVP` virker igen, hvis linket reaktiveres.
-- Brugerne får korrekt fejlbesked, hvis et TV-link er deaktiveret eller udløbet.
-- I kan selv genaktivere links i dashboard-miljøet uden at skulle oprette alt på ny.
