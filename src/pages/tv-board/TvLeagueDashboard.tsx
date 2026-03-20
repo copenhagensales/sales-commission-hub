@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3, Lock, Users, Target } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
 
