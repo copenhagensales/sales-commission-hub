@@ -315,16 +315,16 @@ const PlayerRow = memo(function PlayerRow({
           </div>
         </div>
 
-        {/* Sparkline — centrally placed */}
-        {weeklyData && weeklyData.length > 0 && (
-          <div className="hidden sm:flex flex-1 justify-center items-center min-w-[90px]">
+        {/* Sparkline — centrally placed (always rendered for alignment) */}
+        <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
+          {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
               data={weeklyData}
               divisionAvg={divisionAvg}
               playerName={formatPlayerName(standing.employee)}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
