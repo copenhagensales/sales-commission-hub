@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2, Eye, AlertTriangle } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, Eye, AlertTriangle, RotateCcw, Power } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { getTvBoardUrl } from "@/lib/getPublicUrl";
@@ -43,18 +43,20 @@ function getStaleInfo(code: { last_accessed_at?: string | null; created_at?: str
 export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorProps) {
   const [open, setOpen] = useState(false);
   const [newCodeName, setNewCodeName] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const queryClient = useQueryClient();
 
   const dashboardName = DASHBOARD_LIST.find(d => d.slug === dashboardSlug)?.name || dashboardSlug;
 
-  const { data: accessCodes = [], isLoading } = useQuery({
-    queryKey: ["tv-board-access", dashboardSlug],
+  // Fetch ALL codes (active + inactive) for authenticated users
+  const { data: allAccessCodes = [], isLoading } = useQuery({
+    queryKey: ["tv-board-access", dashboardSlug, "all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tv_board_access")
         .select("*")
         .eq("dashboard_slug", dashboardSlug)
-        .eq("is_active", true)
+        .order("is_active", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -62,6 +64,9 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     },
     enabled: open,
   });
+
+  const activeCodes = allAccessCodes.filter(c => c.is_active);
+  const inactiveCodes = allAccessCodes.filter(c => !c.is_active);
 
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -85,7 +90,7 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     },
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("tv_board_access")
@@ -102,12 +107,113 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     },
   });
 
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("tv_board_access")
+        .update({ is_active: true })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tv-board-access", dashboardSlug] });
+      toast.success("Adgangskode reaktiveret");
+    },
+    onError: () => {
+      toast.error("Kunne ikke reaktivere adgangskode");
+    },
+  });
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} kopieret`);
   };
 
   const getTvUrl = (code: string) => getTvBoardUrl(code);
+
+  const renderCodeRow = (code: typeof allAccessCodes[0], isActive: boolean) => {
+    const stale = getStaleInfo(code);
+    return (
+      <div
+        key={code.id}
+        className={`flex items-center justify-between gap-2 p-2 rounded-md border ${
+          isActive ? "bg-muted/50" : "bg-muted/20 opacity-70 border-dashed"
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate block">
+              {code.name || "Unavngivet"}
+            </span>
+            {!isActive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">
+                Deaktiveret
+              </span>
+            )}
+            {isActive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">
+                Aktiv
+              </span>
+            )}
+          </div>
+          <span className="text-xs font-mono text-muted-foreground">
+            {code.access_code}
+          </span>
+          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {code.access_count || 0} visninger
+            </span>
+            {code.last_accessed_at && (
+              <span>• Sidst: {format(new Date(code.last_accessed_at), "d. MMM HH:mm", { locale: da })}</span>
+            )}
+            {isActive && stale.isStale && (
+              <span className="flex items-center gap-1 text-orange-500">
+                <AlertTriangle className="h-3 w-3" />
+                {stale.label}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-1">
+          {isActive ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => copyToClipboard(getTvUrl(code.access_code), "Link")}
+                title="Kopier link"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={() => deactivateMutation.mutate(code.id)}
+                disabled={deactivateMutation.isPending}
+                title="Deaktiver"
+              >
+                <Power className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
+              onClick={() => reactivateMutation.mutate(code.id)}
+              disabled={reactivateMutation.isPending}
+              title="Reaktiver"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -126,75 +232,39 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Existing codes */}
+          {/* Active codes */}
           <div>
-            <p className="text-sm font-medium mb-2">Eksisterende adgangskoder:</p>
+            <p className="text-sm font-medium mb-2">Aktive adgangskoder:</p>
             {isLoading ? (
               <div className="flex justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : accessCodes.length === 0 ? (
+            ) : activeCodes.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">Ingen aktive koder</p>
             ) : (
               <div className="space-y-2">
-                {accessCodes.map((code) => (
-                  <div
-                    key={code.id}
-                    className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/50"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium truncate block">
-                        {code.name || "Unavngivet"}
-                      </span>
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {code.access_code}
-                      </span>
-                      {(() => {
-                        const stale = getStaleInfo(code);
-                        return (
-                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Eye className="h-3 w-3" />
-                              {code.access_count || 0} visninger
-                            </span>
-                            {code.last_accessed_at && (
-                              <span>• Sidst: {format(new Date(code.last_accessed_at), "d. MMM HH:mm", { locale: da })}</span>
-                            )}
-                            {stale.isStale && (
-                              <span className="flex items-center gap-1 text-orange-500">
-                                <AlertTriangle className="h-3 w-3" />
-                                {stale.label}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => copyToClipboard(getTvUrl(code.access_code), "Link")}
-                        title="Kopier link"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteMutation.mutate(code.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                {activeCodes.map((code) => renderCodeRow(code, true))}
               </div>
             )}
           </div>
+
+          {/* Inactive codes toggle */}
+          {inactiveCodes.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowInactive(!showInactive)}
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <Power className="h-3 w-3" />
+                {showInactive ? "Skjul" : "Vis"} deaktiverede ({inactiveCodes.length})
+              </button>
+              {showInactive && (
+                <div className="space-y-2 mt-2">
+                  {inactiveCodes.map((code) => renderCodeRow(code, false))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Create new code */}
           <div className="border-t pt-4">
@@ -223,7 +293,7 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
           {/* Info */}
           <div className="border-t pt-4">
             <p className="text-sm text-muted-foreground">
-              Klik på kopier-ikonet ved en kode for at kopiere det fulde TV-link.
+              Klik på kopier-ikonet ved en kode for at kopiere det fulde TV-link. Deaktiverede koder kan reaktiveres.
             </p>
           </div>
         </div>
