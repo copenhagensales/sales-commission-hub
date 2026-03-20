@@ -54,8 +54,9 @@ function formatKr(value: number): string {
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value);
 }
 
-const SCENE_DURATION = 15_000; // 15 seconds per scene
-const DIVISION_DISPLAY_DURATION = 10_000; // 10 seconds per division in Scene A
+const DIVISION_DISPLAY_DURATION = 15_000; // 15 seconds per division in Scene A
+const MOVEMENTS_DURATION = 20_000;
+const RECORDS_DURATION = 20_000;
 const REFRESH_INTERVAL = 30_000; // 30 seconds
 
 // ─── Fetch Hook ───────────────────────────────────────────────
@@ -114,7 +115,7 @@ function TickerFeed({ earners }: { earners: { name: string; provision: number }[
   if (earners.length === 0) {
     return (
       <div className="text-slate-500 text-center py-4 text-sm italic">
-        Ingen salg over 300 kr de sidste 15 min
+        Ingen sælgere med 300+ kr siden sidste opdatering
       </div>
     );
   }
@@ -389,11 +390,17 @@ export default function TvLeagueDashboard() {
 
   // Scene rotation
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!data) return;
+    const scene = SCENES[sceneIndex];
+    const duration =
+      scene === "divisions" ? DIVISION_DISPLAY_DURATION * (data.divisions.length || 1) :
+      scene === "movements" ? MOVEMENTS_DURATION :
+      RECORDS_DURATION;
+    const timer = setTimeout(() => {
       setSceneIndex((prev) => (prev + 1) % SCENES.length);
-    }, SCENE_DURATION);
-    return () => clearInterval(timer);
-  }, []);
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [sceneIndex, data]);
 
   if (isLoading) {
     return (
@@ -445,7 +452,7 @@ export default function TvLeagueDashboard() {
         {/* Sales Ticker */}
         <div className="flex-1 min-h-0">
           <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-            🔥 Seneste salg (300+ kr)
+            🔥 Seneste indtjening (300+ kr samlet)
           </h3>
           <TickerFeed earners={data.recentEarners} />
         </div>
