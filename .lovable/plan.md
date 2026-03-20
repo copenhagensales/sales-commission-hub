@@ -1,29 +1,41 @@
 
-# Tilføj Kundehenvendelser til AppSidebar
 
-## Problem
-"Kundehenvendelser" blev kun tilføjet til `PreviewSidebar` (preview-mode), men den rigtige sidebar i normal brug er `AppSidebar`. Derfor er menupunktet usynligt.
+# Rate limiting til customer-inquiry-webhook
+
+## Tilgang
+Implementer IP-baseret rate limiting direkte i edge function med en in-memory sliding window. Da edge functions kan have flere instanser, suppleres med en database-baseret check (max antal inquiries per tidsenhed).
 
 ## Ændringer
 
-### 1. `src/components/layout/AppSidebar.tsx`
-- Tilføj `Inbox` icon til imports (linje 1)
-- Udvid `showLedelseMenu` betingelsen (linje 438-439) til at inkludere `p.canView("menu_customer_inquiries")`
-- Tilføj `/customer-inquiries` til `ledelseOpen` state-initialisering (linje 67)
-- Tilføj `/customer-inquiries` til Collapsible trigger active-check (linje 913)
-- Tilføj NavLink for Kundehenvendelser i Ledelse-menuen (efter Pulsmåling, før `</CollapsibleContent>` ca. linje 1033):
-  ```tsx
-  {p.canView("menu_customer_inquiries") && (
-    <NavLink to="/customer-inquiries" onClick={handleNavClick} className={...}>
-      <Inbox className="h-4 w-4" />
-      Kundehenvendelser
-    </NavLink>
-  )}
-  ```
+### `supabase/functions/customer-inquiry-webhook/index.ts`
 
-### 2. Ingen andre filer
-Database-rettigheden er allerede korrekt indsat. Route og side eksisterer allerede.
+**1. In-memory IP rate limiter (per instans)**
+- Map af `IP → timestamps[]` med sliding window
+- Grænse: max **5 requests per minut** per IP
+- Returnerer `429 Too Many Requests` med `Retry-After` header
 
-| Fil | Handling |
-|-----|---------|
-| `src/components/layout/AppSidebar.tsx` | Tilføj Kundehenvendelser menupunkt under Ledelse |
+**2. Database-baseret global rate limit**
+- Før insert: tæl antal inquiries fra samme email ELLER IP inden for seneste 10 minutter
+- Hvis > 3 fra samme email på 10 min → afvis med 429
+- Beskytter mod distribuerede angreb der omgår in-memory limiter
+
+**3. Basis honeypot-felt**
+- Acceptér et optional `_hp` felt i body — hvis det er udfyldt, ignorer stille (returnér 200 uden insert)
+- Simpel bot-beskyttelse uden CAPTCHA
+
+**4. Request size limit**
+- Tjek `Content-Length` header, afvis > 10KB
+
+### Resultat
+- Spam fra samme IP: blokeret efter 5/min
+- Spam fra samme email: blokeret efter 3/10min
+- Bots: fanget af honeypot
+- Store payloads: afvist tidligt
+
+| Beskyttelse | Grænse | Respons |
+|------------|--------|---------|
+| IP per minut | 5 req/min | 429 |
+| Email per 10 min | 3 req/10min | 429 |
+| Honeypot | Felt udfyldt | 200 (silent drop) |
+| Payload størrelse | 10 KB | 413 |
+
