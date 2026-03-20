@@ -167,6 +167,38 @@ export const CustomerInquiryInbox = () => {
                             {inquiry.message}
                           </div>
                         )}
+                        <div className="flex justify-end pt-2">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Slet
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Slet henvendelse?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Henvendelsen fra {inquiry.name} slettes permanent. Denne handling kan ikke fortrydes.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => deleteInquiry.mutate(inquiry.id)}
+                                >
+                                  Slet
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     )}
                   </div>
