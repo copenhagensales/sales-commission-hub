@@ -641,15 +641,15 @@ export default function TvLeagueDashboard() {
             </AnimatePresence>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800">
-            <p className="text-[10px] text-slate-600">
+          <div className="mt-2 2xl:mt-4 pt-2 2xl:pt-3 border-t border-slate-800">
+            <p className="text-[9px] 2xl:text-[10px] text-slate-600">
               Opdateret: {data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString("da-DK") : "–"}
             </p>
           </div>
         </div>
 
         {/* ─── RIGHT ZONE (60%) — always divisions ─── */}
-        <div className="w-[60%] p-6">
+        <div className="w-[60%] p-3 2xl:p-6">
           <SceneDivisions divisions={data.divisions} />
         </div>
       </div>
