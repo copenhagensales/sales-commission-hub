@@ -174,6 +174,8 @@ export function LocationReportTab() {
         Lokation: b.location?.name ?? "",
         Type: b.location?.type ?? "",
         Region: b.location?.region ?? "",
+        Adresse: b.location?.address_street ?? "",
+        Postnr: b.location?.address_postal_code ?? "",
         By: b.location?.address_city ?? "",
         Kunde: clientLabel(b.client_id ?? ""),
         "Start dato": b.start_date,
@@ -185,7 +187,7 @@ export function LocationReportTab() {
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [
-        { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 16 },
+        { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 16 },
         { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
       ];
       const wb = XLSX.utils.book_new();
