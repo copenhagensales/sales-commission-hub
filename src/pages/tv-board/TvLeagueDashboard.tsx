@@ -66,6 +66,11 @@ interface LeaguePayload {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
+function getDivisionName(divNum: number): string {
+  if (divNum === 1) return "Superligaen";
+  return `${divNum - 1}. Division`;
+}
+
 function formatKr(value: number): string {
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value);
 }
@@ -122,7 +127,7 @@ function PodiumCard({ player, rank, isPoints }: { player: PlayerEntry; rank: num
       <span className={c.size}>{c.emoji}</span>
       <div className="flex-1 min-w-0">
         <p className="text-white font-bold text-xl truncate">{player.name}</p>
-        <p className="text-slate-400 text-sm">Division {player.division} · {player.teamName}</p>
+        <p className="text-slate-400 text-sm">{getDivisionName(player.division || 1)} · {player.teamName}</p>
       </div>
       <div className="text-right">
         <p className="text-2xl font-black text-white tabular-nums">
@@ -237,7 +242,10 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-3xl font-black text-white">Division {div.division}</h2>
+          <h2 className="text-3xl font-black text-white flex items-center gap-2">
+            {div.division === 1 && <Trophy className="h-7 w-7 text-yellow-400" />}
+            {getDivisionName(div.division)}
+          </h2>
           <p className="text-slate-400 text-sm">{div.totalPlayers} spillere</p>
         </div>
         <div className="flex gap-1">
@@ -298,9 +306,24 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
                     <span className="text-xs text-slate-600">–</span>
                   )}
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
-                  <p className="text-[10px] text-slate-500">{p.deals} deals</p>
+                <div className="text-right shrink-0 flex items-center gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
+                    <p className="text-[10px] text-slate-500">{p.deals} deals</p>
+                  </div>
+                  {p.zone && p.zone !== "safe" && (
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      p.zone === "top" ? "bg-yellow-500/20 text-yellow-300" :
+                      p.zone === "promotion" ? "bg-emerald-500/20 text-emerald-400" :
+                      p.zone === "playoff" ? "bg-orange-500/20 text-orange-400" :
+                      p.zone === "relegation" ? "bg-red-500/20 text-red-400" : ""
+                    }`}>
+                      {p.zone === "top" ? "Top 3" :
+                       p.zone === "promotion" ? "Oprykker" :
+                       p.zone === "playoff" ? "Playoff" :
+                       p.zone === "relegation" ? "Nedrykker" : ""}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -449,7 +472,7 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
             const pct = (d.average / maxAvg) * 100;
             return (
               <div key={d.division} className="flex items-center gap-3">
-                <span className="text-sm text-slate-500 w-16 shrink-0">Div {d.division}</span>
+                <span className="text-sm text-slate-500 w-24 shrink-0">{getDivisionName(d.division)}</span>
                 <div className="flex-1 bg-slate-800 rounded-full h-6 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
