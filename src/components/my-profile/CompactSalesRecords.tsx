@@ -59,7 +59,7 @@ export function CompactSalesRecords({
             {currentStreak}
           </span>
           <span className="text-xs text-muted-foreground">
-            {currentStreak === 1 ? "dags streak" : "dages streak"}
+            {currentStreak === 1 ? "dag i træk" : "dage i træk"}
           </span>
           {streakBadge.badge && (
             <span className={cn(
